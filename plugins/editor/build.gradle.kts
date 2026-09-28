@@ -8,3 +8,21 @@ dependencies {
     testImplementation(project(":jasper-sdk"))
     testImplementation(project(":jasper-sdk-testkit"))
 }
+
+tasks.test {
+    // VimDocsTest reads, and with -PupdateDocs=true rewrites, files in the repository's docs folder.
+    systemProperty("jasper.repoRoot", rootDir.absolutePath)
+    systemProperty("jasper.updateDocs", providers.gradleProperty("updateDocs").getOrElse("false"))
+    inputs.files(rootDir.resolve("docs/vim-divergences.md"), rootDir.resolve("docs/editor-vim-reference.md")).optional()
+}
+
+// Records the Vim corpus's expected results by running real Vim (Vim spec 11.1). Needs vim on PATH, or
+// -PvimBinary=/path/to/vim; -Pcase=<text> records only the cases whose names contain the text. Not part of check.
+tasks.register<JavaExec>("recordVimCorpus") {
+    group = "verification"
+    description = "Records the expected results of the Vim corpus by running real Vim."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.editor.vim.RecordCorpus"
+    args(layout.projectDirectory.dir("src/test/resources/vim/corpus").asFile.absolutePath,
+        providers.gradleProperty("vimBinary").getOrElse("vim"), providers.gradleProperty("case").getOrElse(""))
+}

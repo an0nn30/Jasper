@@ -1,0 +1,516 @@
+# d with motions and lines, and the registers it writes.
+
+=== dd deletes the line
+text:
+  one
+    two
+  three
+cursor: 1,2
+keys: dd
+registers: " 1 -
+--- vim 9.1
+expect-text:
+    two
+  three
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": l "one\n"
+expect-register 1: l "one\n"
+expect-register -: none
+
+=== 2dd deletes two lines
+text:
+  one
+  two
+  three
+cursor: 1,1
+keys: 2dd
+registers: " 1
+--- vim 9.1
+expect-text:
+  three
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one\ntwo\n"
+expect-register 1: l "one\ntwo\n"
+
+=== dd on the last line moves up
+text:
+  one
+    two
+cursor: 2,1
+keys: dd
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,1
+expect-mode: normal
+
+=== 5dd near the end deletes to the end
+text:
+  one
+  two
+  three
+cursor: 2,1
+keys: 5dd
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,1
+expect-mode: normal
+
+=== 2dd on the last line fails
+text:
+  one
+  two
+cursor: 2,1
+keys: 2dd
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dd on the only line empties the text
+text:
+  only
+cursor: 1,1
+keys: dd
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dj deletes two lines
+text:
+  one
+  two
+  three
+cursor: 1,1
+keys: dj
+--- vim 9.1
+expect-text:
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dk deletes the line above too
+text:
+  one
+  two
+  three
+cursor: 2,1
+keys: dk
+--- vim 9.1
+expect-text:
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dj on the last line fails
+text:
+  one
+  two
+cursor: 2,1
+keys: dj
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== d2j equals 3dd
+text:
+  1
+  2
+  3
+  4
+cursor: 1,1
+keys: d2j
+--- vim 9.1
+expect-text:
+  4
+expect-cursor: 1,1
+expect-mode: normal
+
+=== 2d3l deletes six characters
+text:
+  abcdefghij
+cursor: 1,1
+keys: 2d3l
+--- vim 9.1
+expect-text:
+  ghij
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dl deletes the last character
+text:
+  abc
+cursor: 1,3
+keys: dl
+--- vim 9.1
+expect-text:
+  ab
+expect-cursor: 1,2
+expect-mode: normal
+
+=== x deletes the character
+text:
+  abc
+cursor: 1,2
+keys: x
+registers: " -
+--- vim 9.1
+expect-text:
+  ac
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": c "b"
+expect-register -: c "b"
+
+=== 3x deletes three characters
+text:
+  abcdef
+cursor: 1,2
+keys: 3x
+--- vim 9.1
+expect-text:
+  aef
+expect-cursor: 1,2
+expect-mode: normal
+
+=== x past the end deletes to the end
+text:
+  abc
+cursor: 1,2
+keys: 9x
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+
+=== x on an empty line does nothing
+text:
+  one
+  $
+cursor: 2,1
+keys: x
+--- vim 9.1
+expect-text:
+  one
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Del deletes like x
+text:
+  abc
+cursor: 1,1
+keys: <Del>
+--- vim 9.1
+expect-text:
+  bc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== X deletes before the cursor
+text:
+  abcdef
+cursor: 1,4
+keys: 2X
+--- vim 9.1
+expect-text:
+  adef
+expect-cursor: 1,2
+expect-mode: normal
+
+=== X at column 1 fails
+text:
+  abc
+cursor: 1,1
+keys: X
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== D deletes to the end of the line
+text:
+  one two three
+cursor: 1,5
+keys: D
+registers: " -
+--- vim 9.1
+expect-text:
+  one $
+expect-cursor: 1,4
+expect-mode: normal
+expect-register ": c "two three"
+expect-register -: c "two three"
+
+=== 2D deletes into the next line
+text:
+  one two
+  three
+  four
+cursor: 1,5
+keys: 2D
+--- vim 9.1
+expect-text:
+  one $
+  four
+expect-cursor: 1,4
+expect-mode: normal
+
+=== d dollar on an empty line
+text:
+  $
+  x
+cursor: 1,1
+keys: d$
+--- vim 9.1
+expect-text:
+  $
+  x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dh at column 1 does nothing
+text:
+  abc
+cursor: 1,1
+keys: dh
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d zero deletes to column 1
+text:
+  one two
+cursor: 1,5
+keys: d0
+--- vim 9.1
+expect-text:
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d caret deletes to the first non-blank
+text:
+     one two
+cursor: 1,9
+keys: d^
+--- vim 9.1
+expect-text:
+     wo
+expect-cursor: 1,4
+expect-mode: normal
+
+=== dG deletes to the end
+text:
+  one
+  two
+  three
+cursor: 2,1
+keys: dG
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dgg deletes to the top
+text:
+  one
+  two
+  three
+cursor: 2,1
+keys: dgg
+--- vim 9.1
+expect-text:
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dv j deletes charwise
+text:
+  one two
+  three four
+cursor: 1,5
+keys: dvj
+--- vim 9.1
+expect-text:
+  one e four
+expect-cursor: 1,5
+expect-mode: normal
+
+=== dV w deletes the line
+text:
+  one two
+  three
+cursor: 1,5
+keys: dVw
+--- vim 9.1
+expect-text:
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dv e excludes the last character
+text:
+  one two
+cursor: 1,1
+keys: dve
+--- vim 9.1
+expect-text:
+  e two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== BS with d joins lines
+text:
+  one
+  two
+cursor: 2,1
+keys: d<BS>
+--- vim 9.1
+expect-text:
+  onetwo
+expect-cursor: 1,4
+expect-mode: normal
+
+=== d Space at the end of a line deletes the break
+set: whichwrap=b,s
+text:
+  ab
+  cd
+cursor: 1,2
+keys: 2d<Space>
+--- vim 9.1
+expect-text:
+  a
+  cd
+expect-cursor: 1,1
+expect-mode: normal
+
+=== named register delete
+text:
+  one two
+cursor: 1,1
+keys: "adw
+registers: " a - 1
+--- vim 9.1
+expect-text:
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "one "
+expect-register a: c "one "
+expect-register -: none
+expect-register 1: c "one "
+
+=== append to a named register
+text:
+  one two three
+cursor: 1,1
+keys: "adw"Adw
+registers: " a
+--- vim 9.1
+expect-text:
+  three
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "two "
+expect-register a: c "one two "
+
+=== linewise delete into a named register writes register 1 too
+text:
+  one
+  two
+cursor: 1,1
+keys: "add
+registers: " a 1
+--- vim 9.1
+expect-text:
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one\n"
+expect-register a: l "one\n"
+expect-register 1: l "one\n"
+
+=== black hole delete leaves the registers
+register a: c "keep"
+text:
+  one two
+cursor: 1,1
+keys: "ayiw"_dw
+registers: " a 0 -
+--- vim 9.1
+expect-text:
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "one"
+expect-register a: c "one"
+expect-register 0: none
+expect-register -: none
+
+=== numbered registers shift
+text:
+  1
+  2
+  3
+cursor: 1,1
+keys: dddddd
+registers: " 1 2 3
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "3\n"
+expect-register 1: l "3\n"
+expect-register 2: l "2\n"
+expect-register 3: l "1\n"
+
+=== small deletes do not shift the numbered registers
+text:
+  line
+  a b c
+cursor: 1,1
+keys: ddxx
+registers: " 1 2 -
+--- vim 9.1
+expect-text:
+  b c
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c " "
+expect-register 1: l "line\n"
+expect-register 2: none
+expect-register -: c " "
+
+=== multi-line charwise delete ending at a line end becomes linewise
+text:
+  one two
+  three
+  four
+cursor: 1,1
+keys: d3e
+registers: " 1
+--- vim 9.1
+expect-text:
+  four
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one two\nthree\n"
+expect-register 1: l "one two\nthree\n"

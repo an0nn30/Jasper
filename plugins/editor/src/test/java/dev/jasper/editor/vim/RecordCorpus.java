@@ -1,0 +1,163 @@
+package dev.jasper.editor.vim;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+
+/**
+ * Records the corpus's expectations from real Vim (spec 11.1): {@code ./gradlew :jasper-plugin-editor:recordVimCorpus}.
+ * Each case runs in its own {@code vim -u NONE -i NONE -N}, which types the keys with feedkeys() and writes the text,
+ * cursor, mode and registers as JSON. Divergent cases are skipped. Not part of {@code check}.
+ *
+ * <p>Arguments: the corpus folder, the Vim binary, and an optional case-name filter (a substring).
+ */
+public final class RecordCorpus {
+    private RecordCorpus() { }
+
+    public static void main(String[] arguments) throws Exception {
+        Path folder = Path.of(arguments[0]);
+        String vim = arguments.length > 1 && !arguments[1].isBlank() ? arguments[1] : "vim";
+        String filter = arguments.length > 2 ? arguments[2] : "";
+        String version = version(vim);
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(folder)) { files = listing.filter(p -> p.toString().endsWith(".case")).sorted().toList(); }
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors()));
+        int recorded = 0;
+        try {
+            for (Path file : files) {
+                List<CorpusCase> cases = CorpusFile.read(file);
+                Map<String, Future<CorpusCase.Expected>> pending = new LinkedHashMap<>();
+                for (CorpusCase c : cases) {
+                    if (c.divergent() != null || !c.name().contains(filter)) continue;
+                    pending.put(c.name(), pool.submit(() -> record(vim, version, c)));
+                }
+                Map<String, List<String>> lines = new LinkedHashMap<>();
+                for (CorpusCase c : cases) {
+                    Future<CorpusCase.Expected> result = pending.get(c.name());
+                    if (result == null) continue;
+                    lines.put(c.name(), CorpusFile.format(c, result.get()));
+                    recorded++;
+                }
+                if (!lines.isEmpty()) CorpusFile.writeExpectations(file, lines);
+            }
+        } finally { pool.shutdownNow(); }
+        System.out.println("Recorded " + recorded + " cases with " + version + ".");
+    }
+
+    static String version(String vim) throws IOException, InterruptedException {
+        Process process = new ProcessBuilder(vim, "--version").redirectErrorStream(true).start();
+        String first = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).lines().findFirst().orElse("");
+        process.waitFor();
+        // "VIM - Vi IMproved 9.1 (2024 Jan 02, compiled ...)" -> "vim 9.1"
+        String[] words = first.split("\\s+");
+        return words.length > 4 ? "vim " + words[4] : "vim";
+    }
+
+    static CorpusCase.Expected record(String vim, String version, CorpusCase c) throws IOException, InterruptedException {
+        Path folder = Files.createTempDirectory("jasper-vim-case");
+        try {
+            Path out = folder.resolve("out.json"), script = folder.resolve("case.vim");
+            Files.writeString(script, script(c, out, folder.resolve("text.txt")), StandardCharsets.UTF_8);
+            Process process = new ProcessBuilder(vim, "-u", "NONE", "-i", "NONE", "-N", "-n", "--not-a-term", "-S", script.toString())
+                .redirectInput(ProcessBuilder.Redirect.from(Path.of(System.getProperty("os.name").startsWith("Windows") ? "NUL" : "/dev/null").toFile()))
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            if (!process.waitFor(20, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IllegalStateException(c + ": Vim did not finish within 20 s (keys left it waiting for input?)");
+            }
+            if (!Files.exists(out)) throw new IllegalStateException(c + ": Vim wrote no result; check the keys");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) Json.parse(Files.readString(out, StandardCharsets.UTF_8).trim());
+            @SuppressWarnings("unchecked")
+            List<String> text = (List<String>) result.get("text");
+            Map<Character, CorpusCase.Register> registers = new LinkedHashMap<>();
+            @SuppressWarnings("unchecked")
+            Map<String, List<Object>> regs = (Map<String, List<Object>>) result.get("regs");
+            for (var entry : regs.entrySet()) {
+                String type = (String) entry.getValue().get(0);
+                @SuppressWarnings("unchecked")
+                List<String> lines = (List<String>) entry.getValue().get(1);
+                if (type.isEmpty() || lines.isEmpty()) continue;
+                char kind = type.equals("V") ? 'l' : type.equals("v") ? 'c' : 'b';
+                String joined = String.join("\n", lines) + (kind == 'l' ? "\n" : "");
+                registers.put(entry.getKey().charAt(0), new CorpusCase.Register(kind, joined));
+            }
+            return new CorpusCase.Expected(version, text, ((Long) result.get("line")).intValue(), ((Long) result.get("col")).intValue(),
+                mode((String) result.get("mode")), registers);
+        } finally {
+            try (Stream<Path> files = Files.list(folder)) { for (Path p : files.toList()) Files.deleteIfExists(p); }
+            Files.deleteIfExists(folder);
+        }
+    }
+
+    static String mode(String vim) {
+        if (vim.equals("n")) return "normal";
+        if (vim.equals("i")) return "insert";
+        if (vim.equals("R")) return "replace";
+        if (vim.equals("niI") || vim.equals("niR")) return "insert-normal";
+        if (vim.startsWith("no")) return "operator-pending";
+        return vim;
+    }
+
+    /** @return a Vim script that sets the case up, types its keys and writes the result to {@code out} */
+    static String script(CorpusCase c, Path out, Path file) {
+        List<String> lines = new ArrayList<>();
+        lines.add("set encoding=utf-8");
+        lines.add("scriptencoding utf-8");
+        lines.add("set nocompatible");
+        lines.add("function! JasperRecord()");
+        lines.add("  let g:jasper = {'text': getline(1, '$'), 'line': line('.'), 'col': charcol('.'), 'mode': mode(1), 'regs': {}}");
+        lines.add("  for r in " + vimList(c.registers().stream().map(String::valueOf).toList()));
+        lines.add("    let g:jasper.regs[r] = [getregtype(r), getreg(r, 1, 1)]");
+        lines.add("  endfor");
+        lines.add("endfunction");
+        lines.add("for r in split('\"0123456789abcdefghijklmnopqrstuvwxyz-', '\\zs')");
+        lines.add("  call setreg(r, [], 'c')");
+        lines.add("endfor");
+        if (!c.set().isBlank()) lines.add("set " + c.set());
+        for (var entry : c.given().entrySet()) {
+            CorpusCase.Register register = entry.getValue();
+            String text = register.type() == 'l' && register.text().endsWith("\n") ? register.text().substring(0, register.text().length() - 1) : register.text();
+            lines.add("call setreg(" + Json.quote(String.valueOf(entry.getKey())) + ", " + vimList(List.of(text.split("\n", -1))) + ", " + (register.type() == 'l' ? "'l'" : "'c'") + ")");
+        }
+        // Editing a file, rather than setline(), leaves no undo history for u to reach.
+        lines.add("call writefile(" + vimList(c.text()) + ", " + Json.quote(file.toString()) + ")");
+        lines.add("silent execute 'edit!' fnameescape(" + Json.quote(file.toString()) + ")");
+        lines.add("call setcursorcharpos(" + c.line() + ", " + c.col() + ")");
+        lines.add("let g:jasper = {}");
+        lines.add("call feedkeys(\"" + vimKeys(c.keys()) + "\\<Cmd>call JasperRecord()\\<CR>\", 'xt')");
+        lines.add("call writefile([json_encode(g:jasper)], " + Json.quote(out.toString()) + ")");
+        lines.add("qa!");
+        return String.join("\n", lines) + "\n";
+    }
+
+    private static String vimList(List<String> items) {
+        List<String> quoted = items.stream().map(Json::quote).toList();
+        return "[" + String.join(", ", quoted) + "]";
+    }
+
+    /** @return the keys as the inside of a Vim double-quoted string: {@code <Esc>} becomes {@code \<Esc>} */
+    static String vimKeys(String notation) {
+        StringBuilder out = new StringBuilder();
+        for (KeyInput key : KeyInput.parse(notation)) {
+            if (key.isChar() && key.modifiers() == 0) {
+                char c = key.key().charAt(0);
+                if (c == '\\') out.append("\\\\");
+                else if (c == '"') out.append("\\\"");
+                else if (key.key().length() == 1 && c < 0x20) out.append(String.format("\\x%02x", (int) c));
+                else out.append(key.key());
+            } else out.append('\\').append(key.notation());
+        }
+        return out.toString();
+    }
+}

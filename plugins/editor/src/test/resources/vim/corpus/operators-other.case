@@ -1,0 +1,435 @@
+# Shifting, case, joining and the other operators.
+
+=== double greater-than shifts right
+set: shiftwidth=4 expandtab
+text:
+  one
+  two
+cursor: 1,1
+keys: >>
+--- vim 9.1
+expect-text:
+      one
+  two
+expect-cursor: 1,5
+expect-mode: normal
+
+=== 3 greater-than shifts three lines
+set: shiftwidth=2 expandtab
+text:
+  a
+  b
+  c
+  d
+cursor: 1,1
+keys: 3>>
+--- vim 9.1
+expect-text:
+    a
+    b
+    c
+  d
+expect-cursor: 1,3
+expect-mode: normal
+
+=== greater-than skips empty lines
+set: shiftwidth=4 expandtab
+text:
+  a
+  $
+  b
+cursor: 1,1
+keys: >2j
+--- vim 9.1
+expect-text:
+      a
+  $
+      b
+expect-cursor: 1,5
+expect-mode: normal
+
+=== shift with tabs
+set: shiftwidth=4 tabstop=8
+text:
+      a
+cursor: 1,1
+keys: >>
+--- vim 9.1
+expect-text:
+  	a
+expect-cursor: 1,2
+expect-mode: normal
+
+=== less-than shifts left
+set: shiftwidth=4
+text:
+          x
+cursor: 1,1
+keys: <lt><lt>
+--- vim 9.1
+expect-text:
+      x
+expect-cursor: 1,5
+expect-mode: normal
+
+=== less-than past zero stops at zero
+set: shiftwidth=4
+text:
+    x
+cursor: 1,1
+keys: 3<lt><lt>
+--- vim 9.1
+expect-text:
+    x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== shiftround rounds to a multiple
+set: shiftwidth=4 expandtab shiftround
+text:
+     x
+cursor: 1,1
+keys: >>
+--- vim 9.1
+expect-text:
+      x
+expect-cursor: 1,5
+expect-mode: normal
+
+=== greater-than with a paragraph
+set: shiftwidth=2 expandtab
+text:
+  a
+  b
+  $
+  c
+cursor: 1,1
+keys: >}
+--- vim 9.1
+expect-text:
+    a
+    b
+  $
+  c
+expect-cursor: 1,3
+expect-mode: normal
+
+=== tilde toggles one character
+text:
+  abc
+cursor: 1,1
+keys: ~
+--- vim 9.1
+expect-text:
+  Abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== 5 tilde stops at the end
+text:
+  aBc
+cursor: 1,1
+keys: 5~
+--- vim 9.1
+expect-text:
+  AbC
+expect-cursor: 1,3
+expect-mode: normal
+
+=== tilde on an empty line fails
+text:
+  $
+cursor: 1,1
+keys: ~
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g tilde tilde toggles the line
+text:
+  Hello World
+cursor: 1,4
+keys: g~~
+--- vim 9.1
+expect-text:
+  hELLO wORLD
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g tilde with a word
+text:
+  hello world
+cursor: 1,1
+keys: g~w
+--- vim 9.1
+expect-text:
+  HELLO world
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gu lowers a word
+text:
+  HELLO WORLD
+cursor: 1,3
+keys: guiw
+--- vim 9.1
+expect-text:
+  hello WORLD
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gU uppercases to the end
+text:
+  hello world
+cursor: 1,7
+keys: gU$
+--- vim 9.1
+expect-text:
+  hello WORLD
+expect-cursor: 1,7
+expect-mode: normal
+
+=== gUU uppercases the line
+text:
+  hello world
+cursor: 1,7
+keys: gUU
+--- vim 9.1
+expect-text:
+  HELLO WORLD
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gUgU uppercases the line
+text:
+  hello world
+cursor: 1,7
+keys: gUgU
+--- vim 9.1
+expect-text:
+  HELLO WORLD
+expect-cursor: 1,1
+expect-mode: normal
+
+=== guu lowers two lines
+text:
+  ONE
+  TWO
+  THREE
+cursor: 1,2
+keys: 2guu
+--- vim 9.1
+expect-text:
+  one
+  two
+  THREE
+expect-cursor: 1,2
+expect-mode: normal
+
+=== gU k moves the cursor up
+text:
+  one
+  two
+cursor: 2,2
+keys: gUk
+--- vim 9.1
+expect-text:
+  ONE
+  TWO
+expect-cursor: 1,2
+expect-mode: normal
+
+=== rot13 with g question mark
+text:
+  Hello, World
+cursor: 1,1
+keys: g??
+--- vim 9.1
+expect-text:
+  Uryyb, Jbeyq
+expect-cursor: 1,1
+expect-mode: normal
+
+=== tildeop makes tilde an operator
+set: tildeop
+text:
+  hello world
+cursor: 1,1
+keys: ~w
+--- vim 9.1
+expect-text:
+  HELLO world
+expect-cursor: 1,1
+expect-mode: normal
+
+=== tildeop tilde tilde
+set: tildeop
+text:
+  hello
+cursor: 1,3
+keys: ~~
+--- vim 9.1
+expect-text:
+  HELLO
+expect-cursor: 1,1
+expect-mode: normal
+
+=== J joins with a space
+text:
+  one
+    two
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,4
+expect-mode: normal
+
+=== J with a count joins three lines
+text:
+  a
+  b
+  c
+  d
+cursor: 1,1
+keys: 3J
+--- vim 9.1
+expect-text:
+  a b c
+  d
+expect-cursor: 1,4
+expect-mode: normal
+
+=== J after a period adds two spaces with joinspaces
+text:
+  End.
+  Next
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  End.  Next
+expect-cursor: 1,5
+expect-mode: normal
+
+=== J after a period with nojoinspaces
+set: nojoinspaces
+text:
+  End.
+  Next
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  End. Next
+expect-cursor: 1,5
+expect-mode: normal
+
+=== J with a trailing space adds none
+text:
+  one $
+  two
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,5
+expect-mode: normal
+
+=== J before a closing paren adds no space
+text:
+  f(a
+  )
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  f(a)
+expect-cursor: 1,4
+expect-mode: normal
+
+=== J with an empty line
+text:
+  one
+  $
+  two
+cursor: 1,1
+keys: 3J
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,4
+expect-mode: normal
+
+=== J on the last line fails
+text:
+  one
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,1
+expect-mode: normal
+
+=== 10J past the end joins to the end
+text:
+  a
+  b
+  c
+cursor: 1,1
+keys: 10J
+--- vim 9.1
+expect-text:
+  a b c
+expect-cursor: 1,4
+expect-mode: normal
+
+=== gJ joins without spaces
+text:
+  one
+    two
+cursor: 1,1
+keys: gJ
+--- vim 9.1
+expect-text:
+  one  two
+expect-cursor: 1,4
+expect-mode: normal
+
+=== equals reindents a block
+divergent: = uses previous-line indent and bracket depth, not Vim's C-indenting
+set: shiftwidth=4 expandtab
+text:
+  if (x) {
+  y;
+  z;
+  }
+cursor: 1,1
+keys: =3j
+--- expected
+expect-text:
+  if (x) {
+      y;
+      z;
+  }
+expect-cursor: 1,1
+expect-mode: normal
+
+=== equals equals on a blank line
+divergent: = uses previous-line indent and bracket depth, not Vim's C-indenting
+text:
+  a
+     $
+cursor: 2,1
+keys: ==
+--- expected
+expect-text:
+  a
+  $
+expect-cursor: 2,1
+expect-mode: normal

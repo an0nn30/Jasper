@@ -1,0 +1,340 @@
+# Edge cases: text ends, counts past the end, and characters beyond ASCII.
+
+=== x on an accented letter
+text:
+  café au lait
+cursor: 1,4
+keys: x
+--- vim 9.1
+expect-text:
+  caf au lait
+expect-cursor: 1,4
+expect-mode: normal
+
+=== x on a combining sequence
+text:
+  café ok
+cursor: 1,4
+keys: x
+--- vim 9.1
+expect-text:
+  caf ok
+expect-cursor: 1,4
+expect-mode: normal
+
+=== l over a wide character
+text:
+  a日b
+cursor: 1,1
+keys: ll
+--- vim 9.1
+expect-text:
+  a日b
+expect-cursor: 1,3
+expect-mode: normal
+
+=== dw over an emoji
+text:
+  a 😀 b
+cursor: 1,3
+keys: dw
+--- vim 9.1
+expect-text:
+  a b
+expect-cursor: 1,3
+expect-mode: normal
+
+=== e at the end of the text fails
+text:
+  one
+cursor: 1,3
+keys: ex
+--- vim 9.1
+expect-text:
+  on
+expect-cursor: 1,2
+expect-mode: normal
+
+=== 9w runs to the end of the text
+text:
+  one two
+  three
+cursor: 1,1
+keys: 9w
+--- vim 9.1
+expect-text:
+  one two
+  three
+expect-cursor: 2,5
+expect-mode: normal
+
+=== 9dw deletes to the end of the text
+text:
+  one two
+  three
+cursor: 1,5
+keys: 9dw
+--- vim 9.1
+expect-text:
+  one $
+expect-cursor: 1,4
+expect-mode: normal
+
+=== cc on the last line
+text:
+  one
+  two
+cursor: 2,1
+keys: ccX<Esc>
+--- vim 9.1
+expect-text:
+  one
+  X
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dd then p at the end
+text:
+  one
+  two
+cursor: 1,1
+keys: ddp
+--- vim 9.1
+expect-text:
+  two
+  one
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dG from the first line empties the text
+text:
+  one
+  two
+cursor: 1,1
+keys: dGix<Esc>
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== o on an empty text
+text:
+  $
+cursor: 1,1
+keys: ox<Esc>
+--- vim 9.1
+expect-text:
+  $
+  x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== J with a tab before
+text:
+  one	
+  two
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  one	two
+expect-cursor: 1,5
+expect-mode: normal
+
+=== J with leading tabs
+text:
+  one
+  		two
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,4
+expect-mode: normal
+
+=== yy then P on the first line
+text:
+  one
+  two
+cursor: 2,1
+keys: yyggP
+--- vim 9.1
+expect-text:
+  two
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== 3p linewise
+text:
+  a
+cursor: 1,1
+keys: yy3p
+--- vim 9.1
+expect-text:
+  a
+  a
+  a
+  a
+expect-cursor: 2,1
+expect-mode: normal
+
+=== r on the last character
+text:
+  abc
+cursor: 1,3
+keys: rX
+--- vim 9.1
+expect-text:
+  abX
+expect-cursor: 1,3
+expect-mode: normal
+
+=== tilde over a combining sequence
+text:
+  éx
+cursor: 1,1
+keys: ~
+--- vim 9.1
+expect-text:
+  Éx
+expect-cursor: 1,2
+expect-mode: normal
+
+=== A on a line with a wide character
+text:
+  日本
+cursor: 1,1
+keys: Ax<Esc>
+--- vim 9.1
+expect-text:
+  日本x
+expect-cursor: 1,3
+expect-mode: normal
+
+=== cw on the last word of the text
+text:
+  one two
+cursor: 1,5
+keys: cwX<Esc>
+--- vim 9.1
+expect-text:
+  one X
+expect-cursor: 1,5
+expect-mode: normal
+
+=== c percent
+text:
+  (a)(b)
+cursor: 1,1
+keys: c%X<Esc>
+--- vim 9.1
+expect-text:
+  X(b)
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d2j from the second-to-last line fails
+text:
+  a
+  b
+  c
+cursor: 2,1
+keys: d2j
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+
+=== counts multiply across the operator
+text:
+  a b c d e f g h
+cursor: 1,1
+keys: 2d2w
+--- vim 9.1
+expect-text:
+  e f g h
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dot with a count on an insert
+text:
+  x
+cursor: 1,1
+keys: ia<Esc>3.
+--- vim 9.1
+expect-text:
+  aaaax
+expect-cursor: 1,3
+expect-mode: normal
+
+=== undo then dot
+text:
+  one two three
+cursor: 1,1
+keys: dwu.
+--- vim 9.1
+expect-text:
+  two three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== yank of a paragraph keeps the cursor
+text:
+  a
+  b
+  
+  c
+cursor: 2,1
+keys: yip
+registers: "
+--- vim 9.1
+expect-text:
+  a
+  b
+  $
+  c
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "a\nb\n"
+
+=== C-w across the line start joins
+text:
+  one
+  two
+cursor: 2,1
+keys: i<C-w><Esc>
+--- vim 9.1
+expect-text:
+  onetwo
+expect-cursor: 1,3
+expect-mode: normal
+
+=== BS with softtabstop removes a tab
+set: softtabstop=4 tabstop=8
+text:
+  x
+cursor: 1,1
+keys: i<Tab><Tab><BS><BS>y<Esc>
+--- vim 9.1
+expect-text:
+  yx
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Esc after o with autoindent on a tab-indented line
+set: autoindent
+text:
+  	a
+cursor: 1,1
+keys: o<Esc>
+--- vim 9.1
+expect-text:
+  	a
+  $
+expect-cursor: 2,1
+expect-mode: normal

@@ -1,0 +1,500 @@
+# Sentences, paragraphs, sections and brackets.
+
+=== close paren goes to the next sentence
+text:
+  One two.  Three four.  Five.
+cursor: 1,1
+keys: )
+--- vim 9.1
+expect-text:
+  One two.  Three four.  Five.
+expect-cursor: 1,11
+expect-mode: normal
+
+=== 2 close paren
+text:
+  One two.  Three four.  Five.
+cursor: 1,1
+keys: 2)
+--- vim 9.1
+expect-text:
+  One two.  Three four.  Five.
+expect-cursor: 1,24
+expect-mode: normal
+
+=== open paren goes to the sentence start
+text:
+  One two.  Three four.  Five.
+cursor: 1,17
+keys: (
+--- vim 9.1
+expect-text:
+  One two.  Three four.  Five.
+expect-cursor: 1,11
+expect-mode: normal
+
+=== open paren from a sentence start goes to the previous one
+text:
+  One two.  Three four.  Five.
+cursor: 1,11
+keys: (
+--- vim 9.1
+expect-text:
+  One two.  Three four.  Five.
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sentences across lines
+text:
+  First line ends here.
+  Second sentence starts.
+cursor: 1,1
+keys: )
+--- vim 9.1
+expect-text:
+  First line ends here.
+  Second sentence starts.
+expect-cursor: 2,1
+expect-mode: normal
+
+=== sentence end with a closing quote
+text:
+  He said "stop."  Then left.
+cursor: 1,1
+keys: )
+--- vim 9.1
+expect-text:
+  He said "stop."  Then left.
+expect-cursor: 1,18
+expect-mode: normal
+
+=== close paren stops at an empty line
+text:
+  One sentence
+  $
+  Next paragraph.
+cursor: 1,1
+keys: )
+--- vim 9.1
+expect-text:
+  One sentence
+  $
+  Next paragraph.
+expect-cursor: 2,1
+expect-mode: normal
+
+=== d close paren deletes a sentence
+text:
+  One two.  Three four.
+cursor: 1,1
+keys: d)
+registers: " 1 -
+--- vim 9.1
+expect-text:
+  Three four.
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "One two.  "
+expect-register 1: c "One two.  "
+expect-register -: c "One two.  "
+
+=== close brace goes to the next empty line
+text:
+  one
+  two
+  $
+  three
+cursor: 1,1
+keys: }
+--- vim 9.1
+expect-text:
+  one
+  two
+  $
+  three
+expect-cursor: 3,1
+expect-mode: normal
+
+=== close brace skips a white-space line
+text:
+  one
+     $
+  two
+  $
+  three
+cursor: 1,1
+keys: }
+--- vim 9.1
+expect-text:
+  one
+     $
+  two
+  $
+  three
+expect-cursor: 4,1
+expect-mode: normal
+
+=== 2 close brace
+text:
+  a
+  $
+  b
+  $
+  c
+cursor: 1,1
+keys: 2}
+--- vim 9.1
+expect-text:
+  a
+  $
+  b
+  $
+  c
+expect-cursor: 4,1
+expect-mode: normal
+
+=== close brace on the last paragraph goes to the last character
+text:
+  a
+  $
+  b c
+cursor: 3,1
+keys: }
+--- vim 9.1
+expect-text:
+  a
+  $
+  b c
+expect-cursor: 3,3
+expect-mode: normal
+
+=== open brace goes to the previous empty line
+text:
+  one
+  $
+  two
+  three
+cursor: 4,3
+keys: {
+--- vim 9.1
+expect-text:
+  one
+  $
+  two
+  three
+expect-cursor: 2,1
+expect-mode: normal
+
+=== open brace at the top goes to line 1
+text:
+  one
+  two
+cursor: 2,2
+keys: {
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d close brace deletes to the paragraph end
+text:
+  one
+  two
+  $
+  three
+cursor: 1,2
+keys: d}
+registers: " 1
+--- vim 9.1
+expect-text:
+  o
+  $
+  three
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "ne\ntwo"
+expect-register 1: c "ne\ntwo"
+
+=== d close brace from column 1 is linewise
+text:
+  one
+  two
+  $
+  three
+cursor: 1,1
+keys: d}
+registers: " 1
+--- vim 9.1
+expect-text:
+  $
+  three
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one\ntwo\n"
+expect-register 1: l "one\ntwo\n"
+
+=== y close brace uses register 1 only for deletes
+text:
+  one
+  $
+  two
+cursor: 1,1
+keys: y}
+registers: " 0 1
+--- vim 9.1
+expect-text:
+  one
+  $
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one\n"
+expect-register 0: l "one\n"
+expect-register 1: none
+
+=== close brackets go to a brace in column 1
+text:
+  int a;
+  {
+    body;
+  }
+  int b;
+  {
+cursor: 1,1
+keys: ]]
+--- vim 9.1
+expect-text:
+  int a;
+  {
+    body;
+  }
+  int b;
+  {
+expect-cursor: 2,1
+expect-mode: normal
+
+=== open brackets go back to a brace in column 1
+text:
+  {
+    body;
+  }
+  int b;
+cursor: 4,3
+keys: [[
+--- vim 9.1
+expect-text:
+  {
+    body;
+  }
+  int b;
+expect-cursor: 1,1
+expect-mode: normal
+
+=== bracket pair go to a closing brace in column 1
+text:
+  {
+    body;
+  }
+  int b;
+cursor: 1,1
+keys: ][
+--- vim 9.1
+expect-text:
+  {
+    body;
+  }
+  int b;
+expect-cursor: 3,1
+expect-mode: normal
+
+=== reverse bracket pair go back to a closing brace
+text:
+  {
+  }
+  int b;
+cursor: 3,3
+keys: []
+--- vim 9.1
+expect-text:
+  {
+  }
+  int b;
+expect-cursor: 2,1
+expect-mode: normal
+
+=== percent jumps to the matching paren
+text:
+  if (a && (b || c)) x;
+cursor: 1,4
+keys: %
+--- vim 9.1
+expect-text:
+  if (a && (b || c)) x;
+expect-cursor: 1,18
+expect-mode: normal
+
+=== percent from a closing bracket
+text:
+  if (a && (b || c)) x;
+cursor: 1,18
+keys: %
+--- vim 9.1
+expect-text:
+  if (a && (b || c)) x;
+expect-cursor: 1,4
+expect-mode: normal
+
+=== percent finds the first bracket after the cursor
+text:
+  call(arg);
+cursor: 1,1
+keys: %
+--- vim 9.1
+expect-text:
+  call(arg);
+expect-cursor: 1,9
+expect-mode: normal
+
+=== percent across lines
+text:
+  fn main() {
+      body();
+  }
+cursor: 1,11
+keys: %
+--- vim 9.1
+expect-text:
+  fn main() {
+      body();
+  }
+expect-cursor: 3,1
+expect-mode: normal
+
+=== percent skips brackets in quotes
+text:
+  f("a)b", c)
+cursor: 1,2
+keys: %
+--- vim 9.1
+expect-text:
+  f("a)b", c)
+expect-cursor: 1,11
+expect-mode: normal
+
+=== percent with no bracket fails
+text:
+  plain text
+cursor: 1,1
+keys: %x
+--- vim 9.1
+expect-text:
+  lain text
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d percent deletes the bracketed text
+text:
+  x(a, b)y
+cursor: 1,2
+keys: d%
+--- vim 9.1
+expect-text:
+  xy
+expect-cursor: 1,2
+expect-mode: normal
+
+=== percent with a count goes to a line
+text:
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+  10
+cursor: 1,1
+keys: 30%
+--- vim 9.1
+expect-text:
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+  10
+expect-cursor: 3,1
+expect-mode: normal
+
+=== open bracket paren goes back to the unmatched paren
+text:
+  f(a, (b), c)
+cursor: 1,11
+keys: [(
+--- vim 9.1
+expect-text:
+  f(a, (b), c)
+expect-cursor: 1,2
+expect-mode: normal
+
+=== close bracket paren goes to the unmatched paren
+text:
+  f(a, (b), c)
+cursor: 1,4
+keys: ])
+--- vim 9.1
+expect-text:
+  f(a, (b), c)
+expect-cursor: 1,12
+expect-mode: normal
+
+=== open bracket brace goes back to the unmatched brace
+text:
+  {
+    if (x) { y; }
+    z;
+  }
+cursor: 3,3
+keys: [{
+--- vim 9.1
+expect-text:
+  {
+    if (x) { y; }
+    z;
+  }
+expect-cursor: 1,1
+expect-mode: normal
+
+=== close bracket brace goes to the unmatched brace
+text:
+  {
+    a;
+  }
+cursor: 2,3
+keys: ]}
+--- vim 9.1
+expect-text:
+  {
+    a;
+  }
+expect-cursor: 3,1
+expect-mode: normal
+
+=== d close bracket paren
+text:
+  f(a, b)
+cursor: 1,3
+keys: d])
+--- vim 9.1
+expect-text:
+  f()
+expect-cursor: 1,3
+expect-mode: normal

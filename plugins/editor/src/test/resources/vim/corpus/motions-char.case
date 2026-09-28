@@ -1,0 +1,642 @@
+# Character and line motions without an operator.
+
+=== h moves left
+text:
+  hello world
+cursor: 1,5
+keys: h
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,4
+expect-mode: normal
+
+=== 3h stops at column 1
+text:
+  hello
+cursor: 1,2
+keys: 3h
+--- vim 9.1
+expect-text:
+  hello
+expect-cursor: 1,1
+expect-mode: normal
+
+=== h at column 1 fails and stays
+text:
+  hello
+cursor: 1,1
+keys: hx
+--- vim 9.1
+expect-text:
+  ello
+expect-cursor: 1,1
+expect-mode: normal
+
+=== l moves right
+text:
+  hello
+cursor: 1,1
+keys: 2l
+--- vim 9.1
+expect-text:
+  hello
+expect-cursor: 1,3
+expect-mode: normal
+
+=== l stops on the last character
+text:
+  hello
+cursor: 1,4
+keys: 5l
+--- vim 9.1
+expect-text:
+  hello
+expect-cursor: 1,5
+expect-mode: normal
+
+=== Left and Right arrows
+text:
+  hello
+cursor: 1,3
+keys: <Left><Left><Right>
+--- vim 9.1
+expect-text:
+  hello
+expect-cursor: 1,2
+expect-mode: normal
+
+=== BS wraps to the end of the previous line
+text:
+  one
+  two
+cursor: 2,1
+keys: <BS>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,3
+expect-mode: normal
+
+=== Space wraps to the next line
+text:
+  one
+  two
+cursor: 1,3
+keys: <Space>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== 5 Space crosses lines
+text:
+  ab
+  cd
+cursor: 1,1
+keys: 5<Space>
+--- vim 9.1
+expect-text:
+  ab
+  cd
+expect-cursor: 2,2
+expect-mode: normal
+
+=== C-h moves left like BS
+text:
+  one
+  two
+cursor: 2,2
+keys: <C-h><C-h>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,3
+expect-mode: normal
+
+=== j keeps the column
+text:
+  hello world
+  hi there friend
+cursor: 1,7
+keys: j
+--- vim 9.1
+expect-text:
+  hello world
+  hi there friend
+expect-cursor: 2,7
+expect-mode: normal
+
+=== j onto a shorter line lands on its last character
+text:
+  hello world
+  hi
+  goodbye world
+cursor: 1,9
+keys: j
+--- vim 9.1
+expect-text:
+  hello world
+  hi
+  goodbye world
+expect-cursor: 2,2
+expect-mode: normal
+
+=== j then j again restores the column
+text:
+  hello world
+  hi
+  goodbye world
+cursor: 1,9
+keys: jj
+--- vim 9.1
+expect-text:
+  hello world
+  hi
+  goodbye world
+expect-cursor: 3,9
+expect-mode: normal
+
+=== k keeps the column
+text:
+  hello world
+  hi there friend
+cursor: 2,9
+keys: k
+--- vim 9.1
+expect-text:
+  hello world
+  hi there friend
+expect-cursor: 1,9
+expect-mode: normal
+
+=== 5j stops on the last line
+text:
+  a
+  b
+  c
+cursor: 1,1
+keys: 5j
+--- vim 9.1
+expect-text:
+  a
+  b
+  c
+expect-cursor: 3,1
+expect-mode: normal
+
+=== j on the last line fails
+text:
+  a
+  b
+cursor: 2,1
+keys: jx
+--- vim 9.1
+expect-text:
+  a
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== k on the first line fails
+text:
+  a
+  b
+cursor: 1,1
+keys: kx
+--- vim 9.1
+expect-text:
+  $
+  b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Down, Up, C-n, C-p and C-j
+text:
+  one
+  two
+  three
+cursor: 1,2
+keys: <Down><C-n><Up><C-p><C-j>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+expect-cursor: 2,2
+expect-mode: normal
+
+=== j across a tab keeps the display column
+text:
+  a	b
+  12345678901
+cursor: 2,9
+keys: k
+--- vim 9.1
+expect-text:
+  a	b
+  12345678901
+expect-cursor: 1,3
+expect-mode: normal
+
+=== j from a tab lands at the same display column
+text:
+  	x
+  abcdefghij
+cursor: 1,1
+keys: j
+--- vim 9.1
+expect-text:
+  	x
+  abcdefghij
+expect-cursor: 2,8
+expect-mode: normal
+
+=== j across wide characters
+text:
+  日本語です
+  abcdefghij
+cursor: 1,3
+keys: j
+--- vim 9.1
+expect-text:
+  日本語です
+  abcdefghij
+expect-cursor: 2,5
+expect-mode: normal
+
+=== zero goes to column 1
+text:
+    indented
+cursor: 1,8
+keys: 0
+--- vim 9.1
+expect-text:
+    indented
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Home goes to column 1
+text:
+    indented
+cursor: 1,8
+keys: <Home>
+--- vim 9.1
+expect-text:
+    indented
+expect-cursor: 1,1
+expect-mode: normal
+
+=== caret goes to the first non-blank
+text:
+    indented line
+cursor: 1,12
+keys: ^
+--- vim 9.1
+expect-text:
+    indented line
+expect-cursor: 1,3
+expect-mode: normal
+
+=== caret on a blank line
+text:
+  one
+      $
+cursor: 2,1
+keys: ^
+--- vim 9.1
+expect-text:
+  one
+      $
+expect-cursor: 2,4
+expect-mode: normal
+
+=== dollar goes to the last character
+text:
+  hello world
+cursor: 1,1
+keys: $
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,11
+expect-mode: normal
+
+=== 2 dollar goes to the end of the next line
+text:
+  one
+  three
+cursor: 1,1
+keys: 2$
+--- vim 9.1
+expect-text:
+  one
+  three
+expect-cursor: 2,5
+expect-mode: normal
+
+=== dollar then j keeps the end
+text:
+  hi
+  hello world
+  a
+cursor: 1,1
+keys: $jj
+--- vim 9.1
+expect-text:
+  hi
+  hello world
+  a
+expect-cursor: 3,1
+expect-mode: normal
+
+=== End goes to the last character
+text:
+  hello
+cursor: 1,1
+keys: <End>
+--- vim 9.1
+expect-text:
+  hello
+expect-cursor: 1,5
+expect-mode: normal
+
+=== g underscore goes to the last non-blank
+text:
+  hello   $
+cursor: 1,1
+keys: g_
+--- vim 9.1
+expect-text:
+  hello   $
+expect-cursor: 1,5
+expect-mode: normal
+
+=== 2g underscore on the next line
+text:
+  one
+  two   $
+cursor: 1,1
+keys: 2g_
+--- vim 9.1
+expect-text:
+  one
+  two   $
+expect-cursor: 2,3
+expect-mode: normal
+
+=== bar goes to a display column
+text:
+  hello world
+cursor: 1,1
+keys: 7|
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,7
+expect-mode: normal
+
+=== bar past the end stops on the last character
+text:
+  hello
+cursor: 1,1
+keys: 20|
+--- vim 9.1
+expect-text:
+  hello
+expect-cursor: 1,5
+expect-mode: normal
+
+=== bar without a count goes to column 1
+text:
+  hello
+cursor: 1,4
+keys: |
+--- vim 9.1
+expect-text:
+  hello
+expect-cursor: 1,1
+expect-mode: normal
+
+=== plus goes to the next line's first non-blank
+text:
+  one
+     two
+cursor: 1,2
+keys: +
+--- vim 9.1
+expect-text:
+  one
+     two
+expect-cursor: 2,4
+expect-mode: normal
+
+=== Enter goes down to the first non-blank
+text:
+  one
+    two
+    three
+cursor: 1,1
+keys: 2<CR>
+--- vim 9.1
+expect-text:
+  one
+    two
+    three
+expect-cursor: 3,3
+expect-mode: normal
+
+=== minus goes up to the first non-blank
+text:
+    one
+  two
+cursor: 2,3
+keys: -
+--- vim 9.1
+expect-text:
+    one
+  two
+expect-cursor: 1,3
+expect-mode: normal
+
+=== underscore stays on the line at its first non-blank
+text:
+     one
+cursor: 1,7
+keys: _
+--- vim 9.1
+expect-text:
+     one
+expect-cursor: 1,4
+expect-mode: normal
+
+=== 2 underscore goes down one line
+text:
+  one
+    two
+cursor: 1,1
+keys: 2_
+--- vim 9.1
+expect-text:
+  one
+    two
+expect-cursor: 2,3
+expect-mode: normal
+
+=== G goes to the last line's first non-blank
+text:
+  one
+  two
+    three
+cursor: 1,1
+keys: G
+--- vim 9.1
+expect-text:
+  one
+  two
+    three
+expect-cursor: 3,3
+expect-mode: normal
+
+=== 2G goes to line 2
+text:
+  one
+    two
+  three
+cursor: 3,3
+keys: 2G
+--- vim 9.1
+expect-text:
+  one
+    two
+  three
+expect-cursor: 2,3
+expect-mode: normal
+
+=== 9G past the end goes to the last line
+text:
+  one
+  two
+cursor: 1,1
+keys: 9G
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gg goes to the first line
+text:
+    one
+  two
+cursor: 2,2
+keys: gg
+--- vim 9.1
+expect-text:
+    one
+  two
+expect-cursor: 1,3
+expect-mode: normal
+
+=== 3gg goes to line 3
+text:
+  one
+  two
+  three
+  four
+cursor: 1,1
+keys: 3gg
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+expect-cursor: 3,1
+expect-mode: normal
+
+=== G with nostartofline keeps the column
+set: nostartofline
+text:
+  one two
+  three four
+cursor: 1,5
+keys: G
+--- vim 9.1
+expect-text:
+  one two
+  three four
+expect-cursor: 2,5
+expect-mode: normal
+
+=== 50 percent goes to the middle line
+text:
+  1
+  2
+  3
+  4
+cursor: 1,1
+keys: 50%
+--- vim 9.1
+expect-text:
+  1
+  2
+  3
+  4
+expect-cursor: 2,1
+expect-mode: normal
+
+=== 100 percent goes to the last line
+text:
+  1
+  2
+  3
+cursor: 1,1
+keys: 100%
+--- vim 9.1
+expect-text:
+  1
+  2
+  3
+expect-cursor: 3,1
+expect-mode: normal
+
+=== go goes to a character of the text
+text:
+  abc
+  def
+cursor: 1,1
+keys: 6go
+--- vim 9.1
+expect-text:
+  abc
+  def
+expect-cursor: 2,2
+expect-mode: normal
+
+=== x after moving shows where the cursor was
+text:
+  abcdef
+cursor: 1,1
+keys: 3lx
+--- vim 9.1
+expect-text:
+  abcef
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-l does nothing
+text:
+  abc
+cursor: 1,2
+keys: <C-l>x
+--- vim 9.1
+expect-text:
+  ac
+expect-cursor: 1,2
+expect-mode: normal

@@ -1,0 +1,879 @@
+# Entering Insert mode and the keys that work in it.
+
+=== i inserts before the cursor
+text:
+  world
+cursor: 1,1
+keys: ihello <Esc>
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,6
+expect-mode: normal
+
+=== a appends after the cursor
+text:
+  ac
+cursor: 1,1
+keys: ab<Esc>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== a on an empty line
+text:
+  $
+cursor: 1,1
+keys: ax<Esc>
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== I inserts before the first non-blank
+text:
+     text
+cursor: 1,7
+keys: I- <Esc>
+--- vim 9.1
+expect-text:
+     - text
+expect-cursor: 1,5
+expect-mode: normal
+
+=== gI inserts in column 1
+text:
+     text
+cursor: 1,7
+keys: gIx<Esc>
+--- vim 9.1
+expect-text:
+  x   text
+expect-cursor: 1,1
+expect-mode: normal
+
+=== A appends at the end
+text:
+  line
+cursor: 1,1
+keys: A end<Esc>
+--- vim 9.1
+expect-text:
+  line end
+expect-cursor: 1,8
+expect-mode: normal
+
+=== o opens a line below
+text:
+  one
+  three
+cursor: 1,1
+keys: otwo<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+expect-cursor: 2,3
+expect-mode: normal
+
+=== O opens a line above
+text:
+  two
+cursor: 1,1
+keys: Oone<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,3
+expect-mode: normal
+
+=== o with autoindent copies the indent
+set: autoindent
+text:
+      one
+cursor: 1,1
+keys: otwo<Esc>
+--- vim 9.1
+expect-text:
+      one
+      two
+expect-cursor: 2,7
+expect-mode: normal
+
+=== o with autoindent and nothing typed leaves no indent
+set: autoindent
+text:
+      one
+cursor: 1,1
+keys: o<Esc>
+--- vim 9.1
+expect-text:
+      one
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== o with autoindent and tabs
+set: autoindent tabstop=4
+text:
+  	x
+cursor: 1,1
+keys: oy<Esc>
+--- vim 9.1
+expect-text:
+  	x
+  	y
+expect-cursor: 2,2
+expect-mode: normal
+
+=== o with autoindent and expandtab
+set: autoindent expandtab tabstop=4
+text:
+  	x
+cursor: 1,1
+keys: oy<Esc>
+--- vim 9.1
+expect-text:
+  	x
+      y
+expect-cursor: 2,5
+expect-mode: normal
+
+=== 3i repeats the text
+text:
+  x
+cursor: 1,1
+keys: 3iab<Esc>
+--- vim 9.1
+expect-text:
+  abababx
+expect-cursor: 1,6
+expect-mode: normal
+
+=== 2A repeats at the end
+text:
+  x
+cursor: 1,1
+keys: 2A-<Esc>
+--- vim 9.1
+expect-text:
+  x--
+expect-cursor: 1,3
+expect-mode: normal
+
+=== 3o opens three lines
+text:
+  a
+cursor: 1,1
+keys: 3ob<Esc>
+--- vim 9.1
+expect-text:
+  a
+  b
+  b
+  b
+expect-cursor: 4,1
+expect-mode: normal
+
+=== 2O opens two lines above
+text:
+  z
+cursor: 1,1
+keys: 2Oy<Esc>
+--- vim 9.1
+expect-text:
+  y
+  y
+  z
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Esc at column 1 stays
+text:
+  abc
+cursor: 1,1
+keys: i<Esc>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-c leaves Insert mode
+text:
+  abc
+cursor: 1,3
+keys: ix<C-c>
+--- vim 9.1
+expect-text:
+  abxc
+expect-cursor: 1,3
+expect-mode: normal
+
+=== Insert mode is reported
+text:
+  abc
+cursor: 1,2
+keys: ix
+--- vim 9.1
+expect-text:
+  axbc
+expect-cursor: 1,3
+expect-mode: insert
+
+=== Enter splits the line
+text:
+  onetwo
+cursor: 1,4
+keys: i<CR><Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Enter with autoindent keeps the indent and drops leading blanks
+set: autoindent
+text:
+      one   two
+cursor: 1,10
+keys: i<CR><Esc>
+--- vim 9.1
+expect-text:
+      one  $
+      two
+expect-cursor: 2,4
+expect-mode: normal
+
+=== Enter twice with autoindent empties the middle line
+set: autoindent
+text:
+    one
+cursor: 1,6
+keys: A<CR><CR>x<Esc>
+--- vim 9.1
+expect-text:
+    one
+  $
+    x
+expect-cursor: 3,3
+expect-mode: normal
+
+=== C-j makes a new line
+text:
+  ab
+cursor: 1,2
+keys: i<C-j><Esc>
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 2,1
+expect-mode: normal
+
+=== BS deletes the character before
+text:
+  abc
+cursor: 1,3
+keys: i<BS><Esc>
+--- vim 9.1
+expect-text:
+  ac
+expect-cursor: 1,1
+expect-mode: normal
+
+=== BS joins lines
+text:
+  one
+  two
+cursor: 2,1
+keys: i<BS><Esc>
+--- vim 9.1
+expect-text:
+  onetwo
+expect-cursor: 1,3
+expect-mode: normal
+
+=== BS at the start of the text fails
+text:
+  abc
+cursor: 1,1
+keys: i<BS>x<Esc>
+--- vim 9.1
+expect-text:
+  xabc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== BS before the insert start with backspace=start
+text:
+  abc
+cursor: 1,3
+keys: ix<BS><BS><BS><Esc>
+--- vim 9.1
+expect-text:
+  c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== BS without start stops at the insert
+set: backspace=indent,eol
+text:
+  abc
+cursor: 1,3
+keys: ix<BS><BS><Esc>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-h deletes like BS
+text:
+  abc
+cursor: 1,3
+keys: a<C-h><Esc>
+--- vim 9.1
+expect-text:
+  ab
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-w deletes the word before
+text:
+  one two
+cursor: 1,7
+keys: a<C-w><Esc>
+--- vim 9.1
+expect-text:
+  one $
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-w deletes white space then the word
+text:
+  one two   $
+cursor: 1,10
+keys: a<C-w><Esc>
+--- vim 9.1
+expect-text:
+  one $
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-w stops at the insert start once
+text:
+  one two
+cursor: 1,7
+keys: a three<C-w><C-w><Esc>
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,7
+expect-mode: normal
+
+=== C-w deletes punctuation as its own word
+text:
+  a.b
+cursor: 1,3
+keys: a<C-w><Esc>
+--- vim 9.1
+expect-text:
+  a.
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-u deletes the typed text
+text:
+  one
+cursor: 1,3
+keys: a two<C-u><Esc>
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-u deletes the line before the cursor
+text:
+  one two
+cursor: 1,7
+keys: a<C-u><Esc>
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-u keeps the indent with autoindent
+set: autoindent
+text:
+      one two
+cursor: 1,11
+keys: a<C-u><Esc>
+--- vim 9.1
+expect-text:
+      $
+expect-cursor: 1,4
+expect-mode: normal
+
+=== Del deletes under the cursor
+text:
+  abc
+cursor: 1,1
+keys: i<Del><Esc>
+--- vim 9.1
+expect-text:
+  bc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Del at the end joins the next line
+text:
+  ab
+  cd
+cursor: 1,2
+keys: a<Del><Esc>
+--- vim 9.1
+expect-text:
+  abcd
+expect-cursor: 1,2
+expect-mode: normal
+
+=== Tab inserts a tab
+text:
+  x
+cursor: 1,1
+keys: i<Tab><Esc>
+--- vim 9.1
+expect-text:
+  	x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Tab with expandtab inserts spaces
+set: expandtab tabstop=4
+text:
+  ab
+cursor: 1,2
+keys: i<Tab><Esc>
+--- vim 9.1
+expect-text:
+  a   b
+expect-cursor: 1,4
+expect-mode: normal
+
+=== Tab with softtabstop inserts spaces then tabs
+set: softtabstop=4 tabstop=8
+text:
+  x
+cursor: 1,1
+keys: i<Tab><Tab>y<Esc>
+--- vim 9.1
+expect-text:
+  	yx
+expect-cursor: 1,2
+expect-mode: normal
+
+=== BS with softtabstop deletes a soft tab
+set: softtabstop=4 expandtab
+text:
+  x
+cursor: 1,1
+keys: i<Tab><Tab><BS>y<Esc>
+--- vim 9.1
+expect-text:
+      yx
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-t indents the line
+set: shiftwidth=4 expandtab
+text:
+  one
+cursor: 1,2
+keys: i<C-t><Esc>
+--- vim 9.1
+expect-text:
+      one
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-d unindents the line
+set: shiftwidth=4 expandtab
+text:
+        one
+cursor: 1,10
+keys: i<C-d><Esc>
+--- vim 9.1
+expect-text:
+      one
+expect-cursor: 1,6
+expect-mode: normal
+
+=== C-t rounds to shiftwidth
+set: shiftwidth=4 expandtab
+text:
+     one
+cursor: 1,6
+keys: i<C-t><Esc>
+--- vim 9.1
+expect-text:
+      one
+expect-cursor: 1,6
+expect-mode: normal
+
+=== C-r inserts a register
+register a: c "hello"
+text:
+  x
+cursor: 1,1
+keys: a<C-r>a<Esc>
+--- vim 9.1
+expect-text:
+  xhello
+expect-cursor: 1,6
+expect-mode: normal
+
+=== C-r inserts a linewise register with its line break
+register a: l "one\n"
+text:
+  x
+cursor: 1,1
+keys: i<C-r>a<Esc>
+--- vim 9.1
+expect-text:
+  one
+  x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== C-r C-r inserts literally
+register a: c "a b"
+text:
+  x
+cursor: 1,1
+keys: a<C-r><C-r>a<Esc>
+--- vim 9.1
+expect-text:
+  xa b
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-r of the unnamed register
+text:
+  word
+cursor: 1,1
+keys: yiwA <C-r>"<Esc>
+--- vim 9.1
+expect-text:
+  word word
+expect-cursor: 1,9
+expect-mode: normal
+
+=== C-v inserts a tab with expandtab
+set: expandtab
+text:
+  x
+cursor: 1,1
+keys: i<C-v><Tab><Esc>
+--- vim 9.1
+expect-text:
+  	x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-v with a decimal code
+text:
+  x
+cursor: 1,1
+keys: i<C-v>065<Esc>
+--- vim 9.1
+expect-text:
+  Ax
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-v u with a hex code
+text:
+  x
+cursor: 1,1
+keys: i<C-v>u00e9<Esc>
+--- vim 9.1
+expect-text:
+  éx
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-v x with a short hex code
+text:
+  x
+cursor: 1,1
+keys: i<C-v>x41z<Esc>
+--- vim 9.1
+expect-text:
+  Azx
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-a inserts the last inserted text
+text:
+  x
+cursor: 1,1
+keys: ahi<Esc>A <C-a><Esc>
+--- vim 9.1
+expect-text:
+  xhi hi
+expect-cursor: 1,6
+expect-mode: normal
+
+=== C-e copies the character below
+text:
+  ab
+  xyz
+cursor: 1,2
+keys: a<C-e><Esc>
+--- vim 9.1
+expect-text:
+  abz
+  xyz
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-y copies the character above
+text:
+  abc
+  x
+cursor: 2,1
+keys: a<C-y><Esc>
+--- vim 9.1
+expect-text:
+  abc
+  xb
+expect-cursor: 2,2
+expect-mode: normal
+
+=== C-y with nothing above fails
+text:
+  abc
+  x
+cursor: 1,3
+keys: a<C-y><Esc>
+--- vim 9.1
+expect-text:
+  abc
+  x
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-o runs one command
+text:
+  one two
+cursor: 1,1
+keys: i<C-o>wX<Esc>
+--- vim 9.1
+expect-text:
+  one Xtwo
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-o at the end of the line stays there
+text:
+  one
+cursor: 1,3
+keys: A<C-o>~X<Esc>
+--- vim 9.1
+expect-text:
+  onEX
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-o reports insert-normal
+text:
+  one
+cursor: 1,1
+keys: i<C-o>
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,1
+expect-mode: insert-normal
+
+=== C-o then Esc returns to Insert mode
+text:
+  one
+cursor: 1,1
+keys: i<C-o><Esc>x<Esc>
+--- vim 9.1
+expect-text:
+  xone
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-o dd
+text:
+  one
+  two
+cursor: 1,1
+keys: ix<C-o>ddy<Esc>
+--- vim 9.1
+expect-text:
+  ytwo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Insert key switches to Replace mode
+text:
+  abc
+cursor: 1,1
+keys: i<Insert>XY<Esc>
+--- vim 9.1
+expect-text:
+  XYc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== Insert key in Normal mode inserts
+text:
+  abc
+cursor: 1,2
+keys: <Insert>x<Esc>
+--- vim 9.1
+expect-text:
+  axbc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== Left arrow moves in Insert mode
+text:
+  abc
+cursor: 1,3
+keys: a<Left>X<Esc>
+--- vim 9.1
+expect-text:
+  abXc
+expect-cursor: 1,3
+expect-mode: normal
+
+=== Right arrow can reach the end
+text:
+  abc
+cursor: 1,2
+keys: i<Right><Right>X<Esc>
+--- vim 9.1
+expect-text:
+  abcX
+expect-cursor: 1,4
+expect-mode: normal
+
+=== Up and Down keep the column
+text:
+  abcdef
+  xy
+  123456
+cursor: 1,5
+keys: i<Down><Down>X<Esc>
+--- vim 9.1
+expect-text:
+  abcdef
+  xy
+  1234X56
+expect-cursor: 3,5
+expect-mode: normal
+
+=== Home and End
+text:
+  abc
+cursor: 1,2
+keys: i<End>X<Home>Y<Esc>
+--- vim 9.1
+expect-text:
+  YabcX
+expect-cursor: 1,1
+expect-mode: normal
+
+=== count is dropped after an arrow
+text:
+  ab
+cursor: 1,1
+keys: 3ix<Right>y<Esc>
+--- vim 9.1
+expect-text:
+  xayb
+expect-cursor: 1,3
+expect-mode: normal
+
+=== typing a closing brace is literal
+text:
+  x
+cursor: 1,1
+keys: a{}()[]<Esc>
+--- vim 9.1
+expect-text:
+  x{}()[]
+expect-cursor: 1,7
+expect-mode: normal
+
+=== C-q inserts literally like C-v
+set: expandtab
+text:
+  x
+cursor: 1,1
+keys: i<C-q><Tab><Esc>
+--- vim 9.1
+expect-text:
+  	x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Up in Insert mode keeps the column
+text:
+  abcdef
+  xy
+cursor: 2,2
+keys: a<Up>Z<Esc>
+--- vim 9.1
+expect-text:
+  abZcdef
+  xy
+expect-cursor: 1,3
+expect-mode: normal
+
+=== a failed Del is not repeated by the count
+text:
+  abc
+cursor: 1,1
+keys: 2A<Del>z<Esc>
+--- vim 9.1
+expect-text:
+  abczz
+expect-cursor: 1,5
+expect-mode: normal
+
+=== a failed BS is not repeated by the count
+text:
+  abc
+cursor: 1,1
+keys: 2ix<BS><BS>y<Esc>
+--- vim 9.1
+expect-text:
+  yyabc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-c repeats the count like Esc
+text:
+  abc
+cursor: 1,1
+keys: 3ix<C-c>
+--- vim 9.1
+expect-text:
+  xxxabc
+expect-cursor: 1,3
+expect-mode: normal

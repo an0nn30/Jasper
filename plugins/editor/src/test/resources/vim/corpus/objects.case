@@ -1,0 +1,615 @@
+# Text objects after an operator.
+
+=== diw deletes the word
+text:
+  one two three
+cursor: 1,6
+keys: diw
+--- vim 9.1
+expect-text:
+  one  three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== diw on white space deletes the white space
+text:
+  one   two
+cursor: 1,5
+keys: diw
+--- vim 9.1
+expect-text:
+  onetwo
+expect-cursor: 1,4
+expect-mode: normal
+
+=== daw deletes the word and a space
+text:
+  one two three
+cursor: 1,6
+keys: daw
+--- vim 9.1
+expect-text:
+  one three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== daw on the last word takes the space before
+text:
+  one two
+cursor: 1,6
+keys: daw
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,3
+expect-mode: normal
+
+=== d2aw deletes two words
+text:
+  one two three four
+cursor: 1,1
+keys: d2aw
+--- vim 9.1
+expect-text:
+  three four
+expect-cursor: 1,1
+expect-mode: normal
+
+=== diW deletes a WORD
+text:
+  a foo.bar b
+cursor: 1,5
+keys: diW
+--- vim 9.1
+expect-text:
+  a  b
+expect-cursor: 1,3
+expect-mode: normal
+
+=== daW deletes a WORD with space
+text:
+  a foo.bar b
+cursor: 1,5
+keys: daW
+--- vim 9.1
+expect-text:
+  a b
+expect-cursor: 1,3
+expect-mode: normal
+
+=== ciw changes the word
+text:
+  one two three
+cursor: 1,5
+keys: ciwX<Esc>
+--- vim 9.1
+expect-text:
+  one X three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== yiw on punctuation
+text:
+  a...b
+cursor: 1,3
+keys: yiw
+registers: "
+--- vim 9.1
+expect-text:
+  a...b
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": c "..."
+
+=== dis deletes a sentence
+text:
+  One two.  Three four.  Five.
+cursor: 1,13
+keys: dis
+--- vim 9.1
+expect-text:
+  One two.    Five.
+expect-cursor: 1,11
+expect-mode: normal
+
+=== das deletes a sentence and its space
+text:
+  One two.  Three four.  Five.
+cursor: 1,13
+keys: das
+--- vim 9.1
+expect-text:
+  One two.  Five.
+expect-cursor: 1,11
+expect-mode: normal
+
+=== dip deletes a paragraph
+text:
+  a
+  b
+  $
+  c
+cursor: 1,1
+keys: dip
+--- vim 9.1
+expect-text:
+  $
+  c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dap deletes a paragraph and the blank line
+text:
+  a
+  b
+  $
+  c
+cursor: 2,1
+keys: dap
+--- vim 9.1
+expect-text:
+  c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dap on the last paragraph takes the blank line before
+text:
+  a
+  $
+  b
+cursor: 3,1
+keys: dap
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dip on blank lines deletes them
+text:
+  a
+  $
+     $
+  b
+cursor: 2,1
+keys: dip
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 2,1
+expect-mode: normal
+
+=== di paren deletes inside parentheses
+text:
+  f(a, b)
+cursor: 1,4
+keys: di(
+--- vim 9.1
+expect-text:
+  f()
+expect-cursor: 1,3
+expect-mode: normal
+
+=== da paren deletes the parentheses too
+text:
+  f(a, b) x
+cursor: 1,4
+keys: da(
+--- vim 9.1
+expect-text:
+  f x
+expect-cursor: 1,2
+expect-mode: normal
+
+=== dib from the opening paren
+text:
+  f(a, b)
+cursor: 1,2
+keys: dib
+--- vim 9.1
+expect-text:
+  f()
+expect-cursor: 1,3
+expect-mode: normal
+
+=== di paren with nesting
+text:
+  f(a, (b), c)
+cursor: 1,7
+keys: di)
+--- vim 9.1
+expect-text:
+  f(a, (), c)
+expect-cursor: 1,7
+expect-mode: normal
+
+=== d2i paren takes the outer block
+text:
+  f(a, (b), c)
+cursor: 1,7
+keys: d2i(
+--- vim 9.1
+expect-text:
+  f()
+expect-cursor: 1,3
+expect-mode: normal
+
+=== di paren on empty parentheses
+text:
+  f()
+cursor: 1,2
+keys: di(
+--- vim 9.1
+expect-text:
+  f()
+expect-cursor: 1,3
+expect-mode: normal
+
+=== di brace across lines keeps the braces' lines
+text:
+  fn x() {
+      body();
+  }
+cursor: 2,5
+keys: di{
+--- vim 9.1
+expect-text:
+  fn x() {
+  }
+expect-cursor: 2,1
+expect-mode: normal
+
+=== da brace across lines
+text:
+  fn x() {
+      body();
+  }
+cursor: 2,5
+keys: da{
+--- vim 9.1
+expect-text:
+  fn x() $
+expect-cursor: 1,7
+expect-mode: normal
+
+=== diB inside braces on one line
+text:
+  {a b}
+cursor: 1,3
+keys: diB
+--- vim 9.1
+expect-text:
+  {}
+expect-cursor: 1,2
+expect-mode: normal
+
+=== di bracket
+text:
+  x[1, 2]
+cursor: 1,4
+keys: di[
+--- vim 9.1
+expect-text:
+  x[]
+expect-cursor: 1,3
+expect-mode: normal
+
+=== di angle
+text:
+  <a href>
+cursor: 1,3
+keys: di<lt>
+--- vim 9.1
+expect-text:
+  <>
+expect-cursor: 1,2
+expect-mode: normal
+
+=== di paren outside any parentheses finds the next
+text:
+  x = f(a)
+cursor: 1,1
+keys: di(
+--- vim 9.1
+expect-text:
+  x = f()
+expect-cursor: 1,7
+expect-mode: normal
+
+=== di quote deletes inside quotes
+text:
+  say "hello there" now
+cursor: 1,8
+keys: di"
+--- vim 9.1
+expect-text:
+  say "" now
+expect-cursor: 1,6
+expect-mode: normal
+
+=== da quote takes the trailing space
+text:
+  say "hello" now
+cursor: 1,7
+keys: da"
+--- vim 9.1
+expect-text:
+  say now
+expect-cursor: 1,5
+expect-mode: normal
+
+=== da quote at the end takes the leading space
+text:
+  say "hello"
+cursor: 1,7
+keys: da"
+--- vim 9.1
+expect-text:
+  say
+expect-cursor: 1,3
+expect-mode: normal
+
+=== di quote with the cursor before the string
+text:
+  x = "abc"
+cursor: 1,1
+keys: di"
+--- vim 9.1
+expect-text:
+  x = ""
+expect-cursor: 1,6
+expect-mode: normal
+
+=== di quote with the cursor on the closing quote
+text:
+  a "b" "c"
+cursor: 1,5
+keys: di"
+--- vim 9.1
+expect-text:
+  a "" "c"
+expect-cursor: 1,4
+expect-mode: normal
+
+=== di quote with an escaped quote
+text:
+  "a\"b"
+cursor: 1,2
+keys: di"
+--- vim 9.1
+expect-text:
+  ""
+expect-cursor: 1,2
+expect-mode: normal
+
+=== di single quote
+text:
+  x = 'abc'
+cursor: 1,7
+keys: di'
+--- vim 9.1
+expect-text:
+  x = ''
+expect-cursor: 1,6
+expect-mode: normal
+
+=== di backtick
+text:
+  run `cmd` now
+cursor: 1,7
+keys: di`
+--- vim 9.1
+expect-text:
+  run `` now
+expect-cursor: 1,6
+expect-mode: normal
+
+=== ci quote on an empty string
+text:
+  x = ""
+cursor: 1,5
+keys: ci"y<Esc>
+--- vim 9.1
+expect-text:
+  x = "y"
+expect-cursor: 1,6
+expect-mode: normal
+
+=== dit deletes inside a tag
+text:
+  <b>bold</b>
+cursor: 1,5
+keys: dit
+--- vim 9.1
+expect-text:
+  <b></b>
+expect-cursor: 1,4
+expect-mode: normal
+
+=== dat deletes the tag block
+text:
+  x <b>bold</b> y
+cursor: 1,7
+keys: dat
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== dit with nested tags
+text:
+  <div><b>x</b></div>
+cursor: 1,10
+keys: 2dit
+--- vim 9.1
+expect-text:
+  <div></div>
+expect-cursor: 1,6
+expect-mode: normal
+
+=== diw with a count across white space
+text:
+  one two three
+cursor: 1,1
+keys: d3iw
+--- vim 9.1
+expect-text:
+   three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== da close paren
+text:
+  f(a) x
+cursor: 1,3
+keys: da)
+--- vim 9.1
+expect-text:
+  f x
+expect-cursor: 1,2
+expect-mode: normal
+
+=== dab
+text:
+  f(a) x
+cursor: 1,3
+keys: dab
+--- vim 9.1
+expect-text:
+  f x
+expect-cursor: 1,2
+expect-mode: normal
+
+=== di close brace
+text:
+  {a}
+cursor: 1,2
+keys: di}
+--- vim 9.1
+expect-text:
+  {}
+expect-cursor: 1,2
+expect-mode: normal
+
+=== da brace on one line
+text:
+  x {a} y
+cursor: 1,4
+keys: da{
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== da close brace
+text:
+  x {a} y
+cursor: 1,4
+keys: da}
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== daB
+text:
+  x {a} y
+cursor: 1,4
+keys: daB
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== di close bracket
+text:
+  [1, 2]
+cursor: 1,2
+keys: di]
+--- vim 9.1
+expect-text:
+  []
+expect-cursor: 1,2
+expect-mode: normal
+
+=== da bracket
+text:
+  x [1] y
+cursor: 1,4
+keys: da[
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== da close bracket
+text:
+  x [1] y
+cursor: 1,4
+keys: da]
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== di greater-than
+text:
+  <tag>
+cursor: 1,2
+keys: di>
+--- vim 9.1
+expect-text:
+  <>
+expect-cursor: 1,2
+expect-mode: normal
+
+=== da less-than
+text:
+  x <tag> y
+cursor: 1,4
+keys: da<lt>
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== da greater-than
+text:
+  x <tag> y
+cursor: 1,4
+keys: da>
+--- vim 9.1
+expect-text:
+  x  y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== da single quote
+text:
+  x 'abc' y
+cursor: 1,4
+keys: da'
+--- vim 9.1
+expect-text:
+  x y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== da backtick
+text:
+  x `abc` y
+cursor: 1,4
+keys: da`
+--- vim 9.1
+expect-text:
+  x y
+expect-cursor: 1,3
+expect-mode: normal

@@ -1,0 +1,180 @@
+# r and Replace mode.
+
+=== r replaces one character
+text:
+  abc
+cursor: 1,2
+keys: rx
+--- vim 9.1
+expect-text:
+  axc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== 3r replaces three characters
+text:
+  abcdef
+cursor: 1,2
+keys: 3rx
+--- vim 9.1
+expect-text:
+  axxxef
+expect-cursor: 1,4
+expect-mode: normal
+
+=== r with too few characters fails
+text:
+  abc
+cursor: 1,2
+keys: 5rx
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== r Esc cancels
+text:
+  abc
+cursor: 1,2
+keys: r<Esc>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== r Enter splits the line
+text:
+  one two
+cursor: 1,4
+keys: r<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== 2r Enter replaces two characters with one break
+text:
+  one  two
+cursor: 1,4
+keys: 2r<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== r Tab inserts a tab
+text:
+  a b
+cursor: 1,2
+keys: r<Tab>
+--- vim 9.1
+expect-text:
+  a	b
+expect-cursor: 1,2
+expect-mode: normal
+
+=== r on an empty line fails
+text:
+  $
+cursor: 1,1
+keys: rx
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== R overwrites
+text:
+  abcdef
+cursor: 1,2
+keys: RXY<Esc>
+--- vim 9.1
+expect-text:
+  aXYdef
+expect-cursor: 1,3
+expect-mode: normal
+
+=== R past the end appends
+text:
+  ab
+cursor: 1,2
+keys: RXYZ<Esc>
+--- vim 9.1
+expect-text:
+  aXYZ
+expect-cursor: 1,4
+expect-mode: normal
+
+=== R reports Replace mode
+text:
+  abc
+cursor: 1,1
+keys: RX
+--- vim 9.1
+expect-text:
+  Xbc
+expect-cursor: 1,2
+expect-mode: replace
+
+=== BS in Replace mode restores
+text:
+  abcdef
+cursor: 1,2
+keys: RXYZ<BS><BS><Esc>
+--- vim 9.1
+expect-text:
+  aXcdef
+expect-cursor: 1,2
+expect-mode: normal
+
+=== BS in Replace mode past the start only moves
+text:
+  abcdef
+cursor: 1,3
+keys: RX<BS><BS><Esc>
+--- vim 9.1
+expect-text:
+  abcdef
+expect-cursor: 1,1
+expect-mode: normal
+
+=== BS in Replace mode removes appended characters
+text:
+  ab
+cursor: 1,2
+keys: RXYZ<BS><Esc>
+--- vim 9.1
+expect-text:
+  aXY
+expect-cursor: 1,3
+expect-mode: normal
+
+=== 2R repeats the text as an insert
+text:
+  abcdef
+cursor: 1,1
+keys: 2RXY<Esc>
+--- vim 9.1
+expect-text:
+  XYXYef
+expect-cursor: 1,4
+expect-mode: normal
+
+=== Enter in Replace mode breaks the line without replacing
+text:
+  abcd
+cursor: 1,2
+keys: R<CR>X<Esc>
+--- vim 9.1
+expect-text:
+  a
+  Xcd
+expect-cursor: 2,1
+expect-mode: normal

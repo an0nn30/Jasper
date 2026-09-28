@@ -1,0 +1,389 @@
+# y and the put commands.
+
+=== yy then p puts the line below
+text:
+  one
+  two
+cursor: 1,2
+keys: yyp
+registers: " 0
+--- vim 9.1
+expect-text:
+  one
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "one\n"
+expect-register 0: l "one\n"
+
+=== yy keeps the cursor
+text:
+  one two
+cursor: 1,5
+keys: yy
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,5
+expect-mode: normal
+
+=== Y yanks the line
+text:
+  one two
+  three
+cursor: 1,5
+keys: Yjp
+--- vim 9.1
+expect-text:
+  one two
+  three
+  one two
+expect-cursor: 3,1
+expect-mode: normal
+
+=== 2yy then P puts above
+text:
+  one
+  two
+  three
+cursor: 1,1
+keys: 2yyjjP
+--- vim 9.1
+expect-text:
+  one
+  two
+  one
+  two
+  three
+expect-cursor: 3,1
+expect-mode: normal
+
+=== yk moves the cursor up
+text:
+  one
+  two
+cursor: 2,2
+keys: yk
+registers: "
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": l "one\ntwo\n"
+
+=== yiw moves to the word start
+text:
+  one two
+cursor: 1,6
+keys: yiw
+registers: " 0
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two"
+expect-register 0: c "two"
+
+=== yw then P puts before the cursor
+text:
+  one two
+cursor: 1,5
+keys: ywP
+--- vim 9.1
+expect-text:
+  one twotwo
+expect-cursor: 1,7
+expect-mode: normal
+
+=== p puts a word after the cursor
+text:
+  ab
+cursor: 1,1
+keys: ylp
+--- vim 9.1
+expect-text:
+  aab
+expect-cursor: 1,2
+expect-mode: normal
+
+=== 3p puts three times
+text:
+  ab
+cursor: 1,1
+keys: yl3p
+--- vim 9.1
+expect-text:
+  aaaab
+expect-cursor: 1,4
+expect-mode: normal
+
+=== p on an empty line
+register a: c "xyz"
+text:
+  $
+cursor: 1,1
+keys: "ap
+--- vim 9.1
+expect-text:
+  xyz
+expect-cursor: 1,3
+expect-mode: normal
+
+=== gp puts and moves after the text
+text:
+  abc def
+cursor: 1,1
+keys: yiwwgp
+--- vim 9.1
+expect-text:
+  abc dabcef
+expect-cursor: 1,9
+expect-mode: normal
+
+=== gP puts before and moves after the text
+text:
+  abc def
+cursor: 1,1
+keys: yiwwgP
+--- vim 9.1
+expect-text:
+  abc abcdef
+expect-cursor: 1,8
+expect-mode: normal
+
+=== gp linewise moves to the line after
+text:
+  one
+  two
+  three
+cursor: 1,1
+keys: yyjgp
+--- vim 9.1
+expect-text:
+  one
+  two
+  one
+  three
+expect-cursor: 4,1
+expect-mode: normal
+
+=== gp linewise at the end of the text
+text:
+  one
+  two
+cursor: 1,1
+keys: yyjgp
+--- vim 9.1
+expect-text:
+  one
+  two
+  one
+expect-cursor: 3,1
+expect-mode: normal
+
+=== multi-line charwise put
+register a: c "X\nY"
+text:
+  abc
+cursor: 1,1
+keys: "ap
+--- vim 9.1
+expect-text:
+  aX
+  Ybc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== multi-line charwise gp
+register a: c "X\nY"
+text:
+  abc
+cursor: 1,1
+keys: "agp
+--- vim 9.1
+expect-text:
+  aX
+  Ybc
+expect-cursor: 2,2
+expect-mode: normal
+
+=== linewise put of several lines
+register a: l "one\ntwo\n"
+text:
+  x
+cursor: 1,1
+keys: "ap
+--- vim 9.1
+expect-text:
+  x
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== bracket p adjusts the indent
+register a: l "a\n  b\n"
+text:
+      here
+cursor: 1,1
+keys: "a]p
+--- vim 9.1
+expect-text:
+      here
+      a
+        b
+expect-cursor: 2,5
+expect-mode: normal
+
+=== bracket P puts above with the indent
+register a: l "a\n"
+text:
+    here
+cursor: 1,1
+keys: "a[P
+--- vim 9.1
+expect-text:
+    a
+    here
+expect-cursor: 1,3
+expect-mode: normal
+
+=== put from an empty register fails
+text:
+  abc
+cursor: 1,1
+keys: "zp
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== xp swaps two characters
+text:
+  ab
+cursor: 1,1
+keys: xp
+--- vim 9.1
+expect-text:
+  ba
+expect-cursor: 1,2
+expect-mode: normal
+
+=== ddp swaps two lines
+text:
+  one
+  two
+cursor: 1,1
+keys: ddp
+--- vim 9.1
+expect-text:
+  two
+  one
+expect-cursor: 2,1
+expect-mode: normal
+
+=== yank into a named register and put it
+text:
+  one two
+cursor: 1,1
+keys: "qywwP
+registers: " q 0
+--- vim 9.1
+expect-text:
+  one one two
+expect-cursor: 1,8
+expect-mode: normal
+expect-register ": c "one "
+expect-register q: c "one "
+expect-register 0: none
+
+=== uppercase register appends linewise
+text:
+  one
+  two
+cursor: 1,1
+keys: "ayyj"Ayy
+registers: a
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+expect-register a: l "one\ntwo\n"
+
+=== appending a line to a charwise register makes it linewise
+text:
+  one two
+  three
+cursor: 1,1
+keys: "ayiwj"Ayy
+registers: a
+--- vim 9.1
+expect-text:
+  one two
+  three
+expect-cursor: 2,1
+expect-mode: normal
+expect-register a: l "one\nthree\n"
+
+=== y then p of the zero register after a delete
+text:
+  one two
+cursor: 1,1
+keys: yiwwdiw"0P
+registers: " 0 -
+--- vim 9.1
+expect-text:
+  oneone $
+expect-cursor: 1,6
+expect-mode: normal
+expect-register ": c "two"
+expect-register 0: c "one"
+expect-register -: c "two"
+
+=== unnamed after a small delete is the minus register
+text:
+  one two
+cursor: 1,1
+keys: yiwxP
+registers: " 0 -
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "o"
+expect-register 0: c "one"
+expect-register -: c "o"
+
+=== open bracket p puts before with the indent
+register a: l "x\n"
+text:
+    here
+cursor: 1,1
+keys: "a[p
+--- vim 9.1
+expect-text:
+    x
+    here
+expect-cursor: 1,3
+expect-mode: normal
+
+=== close bracket P puts before with the indent
+register a: l "x\n"
+text:
+    here
+cursor: 1,1
+keys: "a]P
+--- vim 9.1
+expect-text:
+    x
+    here
+expect-cursor: 1,3
+expect-mode: normal

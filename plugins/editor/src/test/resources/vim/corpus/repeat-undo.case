@@ -1,0 +1,430 @@
+# . and undo.
+
+=== dot repeats dw
+text:
+  one two three four
+cursor: 1,1
+keys: dw.
+--- vim 9.1
+expect-text:
+  three four
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dot with a count replaces the count
+text:
+  a b c d e f
+cursor: 1,1
+keys: 2dw3.
+--- vim 9.1
+expect-text:
+  f
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dot keeps the new count
+text:
+  a b c d e f g
+cursor: 1,1
+keys: dw2..
+--- vim 9.1
+expect-text:
+  f g
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dot repeats an insert
+text:
+  x
+  y
+cursor: 1,1
+keys: Aa<Esc>j.
+--- vim 9.1
+expect-text:
+  xa
+  ya
+expect-cursor: 2,2
+expect-mode: normal
+
+=== dot repeats cw
+text:
+  one two
+cursor: 1,1
+keys: cwX<Esc>w.
+--- vim 9.1
+expect-text:
+  X X
+expect-cursor: 1,3
+expect-mode: normal
+
+=== dot repeats o
+text:
+  a
+cursor: 1,1
+keys: ob<Esc>.
+--- vim 9.1
+expect-text:
+  a
+  b
+  b
+expect-cursor: 3,1
+expect-mode: normal
+
+=== dot repeats 3i
+text:
+  x
+cursor: 1,1
+keys: 3ia<Esc>.
+--- vim 9.1
+expect-text:
+  aaaaaax
+expect-cursor: 1,5
+expect-mode: normal
+
+=== dot repeats x
+text:
+  abcdef
+cursor: 1,1
+keys: 2x.
+--- vim 9.1
+expect-text:
+  ef
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dot repeats r
+text:
+  abcdef
+cursor: 1,1
+keys: rxll.
+--- vim 9.1
+expect-text:
+  xbxdef
+expect-cursor: 1,3
+expect-mode: normal
+
+=== dot repeats J
+text:
+  a
+  b
+  c
+cursor: 1,1
+keys: J.
+--- vim 9.1
+expect-text:
+  a b c
+expect-cursor: 1,4
+expect-mode: normal
+
+=== dot repeats p
+text:
+  ab
+cursor: 1,1
+keys: ylp.
+--- vim 9.1
+expect-text:
+  aaab
+expect-cursor: 1,3
+expect-mode: normal
+
+=== dot repeats a put from register 1 as register 2
+text:
+  1
+  2
+  3
+cursor: 1,1
+keys: dddd"1p.
+--- vim 9.1
+expect-text:
+  3
+  2
+  1
+expect-cursor: 3,1
+expect-mode: normal
+
+=== dot repeats text after an arrow as an insert
+text:
+  ab
+  cd
+cursor: 1,1
+keys: ix<Right>y<Esc>j0.
+--- vim 9.1
+expect-text:
+  xayb
+  ycd
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dot repeats a C-r insert with the text
+register a: c "Q"
+text:
+  ab
+  cd
+cursor: 1,1
+keys: i<C-r>a<Esc>j0.
+--- vim 9.1
+expect-text:
+  Qab
+  Qcd
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dot repeats greater-than
+set: shiftwidth=2 expandtab
+text:
+  a
+  b
+cursor: 1,1
+keys: >>j.
+--- vim 9.1
+expect-text:
+    a
+    b
+expect-cursor: 2,3
+expect-mode: normal
+
+=== dot repeats gUiw
+text:
+  one two
+cursor: 1,1
+keys: gUiww.
+--- vim 9.1
+expect-text:
+  ONE TWO
+expect-cursor: 1,5
+expect-mode: normal
+
+=== dot repeats a change with a named register
+text:
+  one two
+cursor: 1,1
+keys: "adw.
+registers: a
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: c "two"
+
+=== dot without a change fails
+text:
+  abc
+cursor: 1,1
+keys: .x
+--- vim 9.1
+expect-text:
+  bc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dot does not repeat a yank
+text:
+  one two
+cursor: 1,1
+keys: xyw.
+--- vim 9.1
+expect-text:
+  e two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== u undoes a delete
+text:
+  one two three
+cursor: 1,5
+keys: dwu
+--- vim 9.1
+expect-text:
+  one two three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== u undoes dd and restores the cursor
+text:
+  one
+    two
+  three
+cursor: 2,4
+keys: ddu
+--- vim 9.1
+expect-text:
+  one
+    two
+  three
+expect-cursor: 2,3
+expect-mode: normal
+
+=== u undoes dd on the last line
+text:
+  one
+  two
+cursor: 2,2
+keys: ddu
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== u undoes an insert as one step
+text:
+  x
+cursor: 1,1
+keys: ahello world<Esc>u
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== u undoes 3o as one step
+text:
+  a
+cursor: 1,1
+keys: 3ob<Esc>u
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+
+=== u undoes o and puts the cursor back
+text:
+  one
+  two
+cursor: 1,2
+keys: onew<Esc>u
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,2
+expect-mode: normal
+
+=== u undoes a put
+text:
+  one
+cursor: 1,1
+keys: yypu
+--- vim 9.1
+expect-text:
+  one
+expect-cursor: 1,1
+expect-mode: normal
+
+=== 2u undoes two changes
+text:
+  abcdef
+cursor: 1,1
+keys: xxxx2u
+--- vim 9.1
+expect-text:
+  cdef
+expect-cursor: 1,1
+expect-mode: normal
+
+=== u with nothing to undo fails
+text:
+  abc
+cursor: 1,2
+keys: ux
+--- vim 9.1
+expect-text:
+  ac
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-r redoes
+text:
+  one two
+cursor: 1,1
+keys: dwu<C-r>
+--- vim 9.1
+expect-text:
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-r redoes dd
+text:
+  one
+  two
+  three
+cursor: 2,1
+keys: ddu<C-r>
+--- vim 9.1
+expect-text:
+  one
+  three
+expect-cursor: 2,1
+expect-mode: normal
+
+=== u undoes a dot as one step
+text:
+  a b c d
+cursor: 1,1
+keys: 2dw.u
+--- vim 9.1
+expect-text:
+  c d
+expect-cursor: 1,1
+expect-mode: normal
+
+=== u after an arrow in Insert mode undoes only the second part
+text:
+  x
+cursor: 1,1
+keys: aab<Left>cd<Esc>u
+--- vim 9.1
+expect-text:
+  xab
+expect-cursor: 1,3
+expect-mode: normal
+
+=== u undoes J
+text:
+  one
+  two
+cursor: 1,1
+keys: Ju
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== u undoes cw
+text:
+  one two
+cursor: 1,5
+keys: cwX<Esc>u
+--- vim 9.1
+expect-text:
+  one two
+expect-cursor: 1,5
+expect-mode: normal
+
+=== u undoes r
+text:
+  abc
+cursor: 1,2
+keys: rxu
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== u after moving puts the cursor at the change
+text:
+  one two three
+cursor: 1,5
+keys: xwwu
+--- vim 9.1
+expect-text:
+  one two three
+expect-cursor: 1,5
+expect-mode: normal

@@ -1,0 +1,210 @@
+# f, F, t, T, ; and , within a line.
+
+=== f finds a character to the right
+text:
+  hello world
+cursor: 1,1
+keys: fo
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,5
+expect-mode: normal
+
+=== 2f finds the second occurrence
+text:
+  hello world
+cursor: 1,1
+keys: 2fo
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,8
+expect-mode: normal
+
+=== f with no match fails
+text:
+  hello
+cursor: 1,1
+keys: fzx
+--- vim 9.1
+expect-text:
+  ello
+expect-cursor: 1,1
+expect-mode: normal
+
+=== F finds a character to the left
+text:
+  hello world
+cursor: 1,11
+keys: Fo
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,8
+expect-mode: normal
+
+=== t stops before the character
+text:
+  hello world
+cursor: 1,1
+keys: tw
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,6
+expect-mode: normal
+
+=== T stops after the character
+text:
+  hello world
+cursor: 1,11
+keys: To
+--- vim 9.1
+expect-text:
+  hello world
+expect-cursor: 1,9
+expect-mode: normal
+
+=== semicolon repeats f
+text:
+  a-b-c-d
+cursor: 1,1
+keys: f-;;
+--- vim 9.1
+expect-text:
+  a-b-c-d
+expect-cursor: 1,6
+expect-mode: normal
+
+=== comma repeats f backwards
+text:
+  a-b-c-d
+cursor: 1,1
+keys: f-;;,
+--- vim 9.1
+expect-text:
+  a-b-c-d
+expect-cursor: 1,4
+expect-mode: normal
+
+=== semicolon after t skips the adjacent match
+text:
+  a-b-c-d
+cursor: 1,1
+keys: t-;
+--- vim 9.1
+expect-text:
+  a-b-c-d
+expect-cursor: 1,3
+expect-mode: normal
+
+=== comma after F goes right
+text:
+  a-b-c-d
+cursor: 1,7
+keys: F-,
+--- vim 9.1
+expect-text:
+  a-b-c-d
+expect-cursor: 1,6
+expect-mode: normal
+
+=== 2 semicolon
+text:
+  a-b-c-d-e
+cursor: 1,1
+keys: f-2;
+--- vim 9.1
+expect-text:
+  a-b-c-d-e
+expect-cursor: 1,6
+expect-mode: normal
+
+=== f finds a tab
+text:
+  a	b
+cursor: 1,1
+keys: f<Tab>x
+--- vim 9.1
+expect-text:
+  ab
+expect-cursor: 1,2
+expect-mode: normal
+
+=== df deletes through the character
+text:
+  one, two
+cursor: 1,1
+keys: df,
+--- vim 9.1
+expect-text:
+   two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dt deletes up to the character
+text:
+  one, two
+cursor: 1,1
+keys: dt,
+--- vim 9.1
+expect-text:
+  , two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dF deletes back to the character, not the cursor's
+text:
+  one, two
+cursor: 1,8
+keys: dF,
+--- vim 9.1
+expect-text:
+  oneo
+expect-cursor: 1,4
+expect-mode: normal
+
+=== dT deletes back to after the character
+text:
+  one, two
+cursor: 1,8
+keys: dT,
+--- vim 9.1
+expect-text:
+  one,o
+expect-cursor: 1,5
+expect-mode: normal
+
+=== c semicolon uses the last search
+text:
+  a(b)c(d)
+cursor: 1,1
+keys: f(;cfX)<Esc>
+--- vim 9.1
+expect-text:
+  a(b)c(d)
+expect-cursor: 1,8
+expect-mode: normal
+
+=== semicolon without a previous search fails
+text:
+  abc
+cursor: 1,1
+keys: ;x
+--- vim 9.1
+expect-text:
+  bc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== f with a count past the matches fails
+text:
+  a-b
+cursor: 1,1
+keys: 3f-x
+--- vim 9.1
+expect-text:
+  -b
+expect-cursor: 1,1
+expect-mode: normal

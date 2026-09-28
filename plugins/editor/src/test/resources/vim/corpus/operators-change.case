@@ -1,0 +1,203 @@
+# c, its abbreviations, and Insert mode entered by them.
+
+=== cc replaces the line
+text:
+  one
+  two
+cursor: 1,2
+keys: ccnew<Esc>
+registers: " 1
+--- vim 9.1
+expect-text:
+  new
+  two
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": l "one\n"
+expect-register 1: l "one\n"
+
+=== cc keeps the indent with autoindent
+set: autoindent
+text:
+      indented
+cursor: 1,7
+keys: ccx<Esc>
+--- vim 9.1
+expect-text:
+      x
+expect-cursor: 1,5
+expect-mode: normal
+
+=== cc without autoindent drops the indent
+text:
+      indented
+cursor: 1,7
+keys: ccx<Esc>
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cc with autoindent and nothing typed removes the indent
+set: autoindent
+text:
+      indented
+  next
+cursor: 1,7
+keys: cc<Esc>
+--- vim 9.1
+expect-text:
+  $
+  next
+expect-cursor: 1,1
+expect-mode: normal
+
+=== 2cc replaces two lines
+text:
+  one
+  two
+  three
+cursor: 1,1
+keys: 2ccX<Esc>
+--- vim 9.1
+expect-text:
+  X
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== S replaces the line
+text:
+  one
+  two
+cursor: 2,1
+keys: SX<Esc>
+--- vim 9.1
+expect-text:
+  one
+  X
+expect-cursor: 2,1
+expect-mode: normal
+
+=== C changes to the end of the line
+text:
+  one two three
+cursor: 1,5
+keys: CX<Esc>
+registers: " -
+--- vim 9.1
+expect-text:
+  one X
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two three"
+expect-register -: c "two three"
+
+=== s substitutes a character
+text:
+  abc
+cursor: 1,2
+keys: sX<Esc>
+--- vim 9.1
+expect-text:
+  aXc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== 3s substitutes three characters
+text:
+  abcdef
+cursor: 1,2
+keys: 3sX<Esc>
+--- vim 9.1
+expect-text:
+  aXef
+expect-cursor: 1,2
+expect-mode: normal
+
+=== s at the end of the line
+text:
+  abc
+cursor: 1,3
+keys: sX<Esc>
+--- vim 9.1
+expect-text:
+  abX
+expect-cursor: 1,3
+expect-mode: normal
+
+=== c dollar leaves Insert mode at the end
+text:
+  one two
+cursor: 1,5
+keys: c$
+--- vim 9.1
+expect-text:
+  one $
+expect-cursor: 1,5
+expect-mode: insert
+
+=== cj changes two lines
+text:
+  one
+  two
+  three
+cursor: 1,2
+keys: cjX<Esc>
+--- vim 9.1
+expect-text:
+  X
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== c zero changes to the line start
+text:
+  one two
+cursor: 1,5
+keys: c0X<Esc>
+--- vim 9.1
+expect-text:
+  Xtwo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== c with a named register
+text:
+  one two
+cursor: 1,1
+keys: "bcwX<Esc>
+registers: " b -
+--- vim 9.1
+expect-text:
+  X two
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "one"
+expect-register b: c "one"
+expect-register -: none
+
+=== cw at the end of a line
+text:
+  one two
+  three
+cursor: 1,5
+keys: cwX<Esc>
+--- vim 9.1
+expect-text:
+  one X
+  three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== c then Esc without typing moves left
+text:
+  one two
+cursor: 1,5
+keys: cw<Esc>
+--- vim 9.1
+expect-text:
+  one $
+expect-cursor: 1,4
+expect-mode: normal
