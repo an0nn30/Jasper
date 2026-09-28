@@ -2,8 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/settings-dialog`, worktree `.worktrees/settings-dialog`.
+**Status:** In progress (inline execution). Branch `claude/settings-dialog`, worktree `.worktrees/settings-dialog`.
 Record every deviation from this text here and in `docs/STATUS.md`.
+
+Deviations so far:
+- Task 4: the test and the implementation were written before the first run, so its failing run was not observed.
 
 **Goal:** An IntelliJ-style Settings dialog, opened by Cmd+, and the macOS Settings… menu item, that edits
 every core setting through schema-generated pages, with search, highlighting, Apply/OK/Cancel and banners.
