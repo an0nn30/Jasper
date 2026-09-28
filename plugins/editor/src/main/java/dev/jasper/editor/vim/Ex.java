@@ -185,7 +185,7 @@ final class Ex {
     }
 
     /** @return whether the keys running now were typed (Vim's KeyTyped) */
-    boolean typed() { return normalDepth == 0; }
+    boolean typed() { return normalDepth == 0 && editor.typeahead().keyTyped(); }
 
     /**
      * {@code :} in Normal or Visual mode: the command line opens. A count puts {@code .,.+N} on it, and Visual mode
@@ -276,6 +276,8 @@ final class Ex {
     void fail(VimFailure failure) {
         if (!failure.getMessage().isEmpty()) failed = true;
         if (failure.quiet) return;
+        // emsg and beep_flush drop the keys of a running mapping or macro.
+        editor.typeahead().flush();
         if (failure.getMessage().isEmpty()) editor.bell();
         else editor.message(failure.getMessage(), true);
     }

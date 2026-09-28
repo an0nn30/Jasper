@@ -112,6 +112,9 @@ final class InsertMode {
         editor.setCursor(new Pos(line, indent.length()), true);
     }
 
+    /** @return whether the next key is an argument ({@code <C-r>}'s register, {@code <C-v>}'s character), which is not mapped */
+    boolean readingArgument() { return argument != null; }
+
     /** @return whether the key means something in Insert mode, for the handler rule */
     boolean wants(KeyInput key) {
         if (argument != null || key.plainChar() >= 0) return true;

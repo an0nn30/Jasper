@@ -164,7 +164,7 @@ final class ExLines {
         VimEditor editor = cmd.editor;
         Ex ex = editor.ex();
         if (ex.normalDepth >= 1000) throw new VimFailure("E192: Recursive use of :normal too deep");
-        List<KeyInput> keys = keys(cmd.arg);
+        List<KeyInput> keys = KeyCodes.keys(cmd.arg);
         ex.normalDepth++;
         try {
             int line = cmd.line1;
@@ -174,34 +174,19 @@ final class ExLines {
                     editor.forgetColumn();
                     line++;
                 }
-                run(editor, keys);
+                run(editor, keys, !cmd.forceit);
             } while (cmd.addrCount > 0 && line <= cmd.line2);
         } finally {
             ex.normalDepth--;
         }
     }
 
-    /** The characters of {@code :normal}'s argument as keys: a control character is its CTRL key. */
-    static List<KeyInput> keys(String text) {
-        List<KeyInput> keys = new ArrayList<>();
-        text.codePoints().forEach(cp -> {
-            if (cp < 0x20) keys.add(KeyInput.ctrl((char) Character.toLowerCase(cp + '@')));
-            else if (cp == 0x7f) keys.add(KeyInput.named("Del"));
-            else keys.add(KeyInput.of(cp));
-        });
-        return keys;
-    }
-
-    private static void run(VimEditor editor, List<KeyInput> keys) {
-        VimFailure failed = null;
-        for (KeyInput key : keys) {
-            try {
-                editor.dispatch(key);
-            } catch (VimFailure failure) {
-                failed = failure;
-                break;
-            }
-        }
+    /**
+     * The keys run with the typeahead saved (mapped unless {@code :normal!}); a failure drops the rest of them.
+     * Out of keys, whatever still waits for one gets {@code <Esc>}.
+     */
+    private static void run(VimEditor editor, List<KeyInput> keys, boolean remap) {
+        VimFailure failed = editor.typeahead().execute(keys, remap);
         if (failed != null) {
             if (!failed.quiet) editor.bell();
             if (!failed.getMessage().isEmpty()) editor.message(failed.getMessage(), true);

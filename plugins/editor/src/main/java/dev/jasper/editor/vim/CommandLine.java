@@ -62,6 +62,9 @@ final class CommandLine {
         argument = null;
     }
 
+    /** @return whether the next key is an argument ({@code <C-r>}'s register, {@code <C-v>}'s character), which is not mapped */
+    boolean readingArgument() { return argument != null; }
+
     boolean active() { return done != null; }
 
     /** @param completer what {@code <Tab>} completes on the next {@code :} line: the matches for the text before the cursor */

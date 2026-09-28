@@ -41,6 +41,7 @@ public final class Options {
         new Def("iskeyword", "isk", Type.STRING, "@,48-57,_,192-255", true),
         new Def("joinspaces", "js", Type.BOOLEAN, true, false),
         new Def("matchpairs", "mps", Type.STRING, "(:),{:},[:]", true),
+        new Def("maxmapdepth", "mmd", Type.NUMBER, 1000, false),
         new Def("nrformats", "nf", Type.STRING, "bin,octal,hex", true),
         new Def("number", "nu", Type.BOOLEAN, true, true),
         new Def("relativenumber", "rnu", Type.BOOLEAN, false, true),
@@ -59,6 +60,8 @@ public final class Options {
         new Def("tabstop", "ts", Type.NUMBER, 8, true),
         new Def("textwidth", "tw", Type.NUMBER, 0, true),
         new Def("tildeop", "top", Type.BOOLEAN, false, false),
+        new Def("timeout", "to", Type.BOOLEAN, true, false),
+        new Def("timeoutlen", "tm", Type.NUMBER, 1000, false),
         new Def("whichwrap", "ww", Type.STRING, "b,s", false),
         new Def("wrap", "wrap", Type.BOOLEAN, true, true),
         new Def("wrapscan", "ws", Type.BOOLEAN, true, false));

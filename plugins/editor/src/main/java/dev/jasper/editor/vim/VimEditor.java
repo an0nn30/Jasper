@@ -25,6 +25,9 @@ public final class VimEditor {
     private final InsertMode insert;
     private final CommandLine commandLine = new CommandLine(this);
     private final Ex ex = new Ex(this);
+    private final Typeahead typeahead = new Typeahead(this);
+    /** How many keys have run, so {@link #feed} knows whether one did. */
+    private long steps;
     /** A question waiting for its answer key (Vim's ask_yesno and the {@code :s} confirmation): its text and what takes the key. */
     private String promptText;
     private java.util.function.Consumer<KeyInput> promptHandler;
@@ -124,6 +127,7 @@ public final class VimEditor {
 
     /** Turns Vim off: the caret and input methods return to the Editor's; the text is untouched. */
     public void close() {
+        typeahead.clear();
         ex.abort();
         promptHandler = null;
         output = List.of();
@@ -162,6 +166,7 @@ public final class VimEditor {
 
     /** The text was replaced (a reload): any command or insert in progress is dropped. */
     public void textReplaced() {
+        typeahead.clear();
         ex.abort();
         promptHandler = null;
         output = List.of();
@@ -193,10 +198,18 @@ public final class VimEditor {
         boolean mine = switch (vim.handlers().handler(key, handlerMode())) {
             case VIM -> true;
             case IDE -> false;
-            case DEFAULT -> (key.modifiers() & KeyInput.META) == 0 && (mode.inserting() ? insert.wants(key) : machine.wants(key));
+            // Keys that wait for the rest of a mapping, and a key that starts one (even a ⌘ key), are Vim's.
+            case DEFAULT -> typeahead.waiting() || startsMapping(key)
+                || (key.modifiers() & KeyInput.META) == 0 && (mode.inserting() ? insert.wants(key) : machine.wants(key));
         };
         if (mine) feed(key);
         return mine;
+    }
+
+    /** @return whether a mapping for the mode Vim is in starts with the key */
+    private boolean startsMapping(KeyInput key) {
+        int state = mapState(key);
+        return state != 0 && !vim.mappings().starting(state, key).isEmpty();
     }
 
     private char handlerMode() {
@@ -283,12 +296,57 @@ public final class VimEditor {
     }
 
     /**
-     * Runs one key, as typed. A failing command rings the bell; an unexpected exception cancels the command, closes
-     * its undo step and returns to Normal mode (spec 10).
+     * A key typed: it goes through the typeahead, where mappings apply (spec 7.2), and then runs, unless it starts a
+     * mapping and waits for the keys after it.
      *
      * @param key the key
      */
     public void feed(KeyInput key) {
+        long before = steps;
+        typeahead.typed(key);
+        // Nothing ran (keys wait for the rest of a mapping, or a mapping did nothing): the Vim bar shows what waits.
+        if (steps == before || typeahead.waiting()) fire();
+    }
+
+    /** The keys waiting for the rest of a mapping resolve now, as when 'timeoutlen' runs out. */
+    void timeoutNow() {
+        typeahead.timeout();
+        fire();
+    }
+
+    /** @return the typeahead, where keys wait and mappings and macros insert theirs */
+    Typeahead typeahead() { return typeahead; }
+
+    /**
+     * The mapping mode for the next key, as Vim's get_real_state, or 0 when the key is not mapped (no_mapping): a
+     * question's answer, the key after one that reads an argument ({@code f}, {@code "}, {@code i_CTRL-V}), the second
+     * key of a two-key command ({@code gx}), and {@code 0} after count digits. At the output panel's hit-enter
+     * prompt Normal-mode mappings apply to any key but {@code <CR>} and {@code <Space>}.
+     */
+    int mapState(KeyInput next) {
+        if (promptHandler != null) return 0;
+        if (!output.isEmpty()) return next.is("<CR>") || next.is(" ") ? 0 : Mappings.NORMAL;
+        if (commandLine.active()) return commandLine.readingArgument() ? 0 : Mappings.CMDLINE;
+        if (mode.inserting()) return insert.readingArgument() ? 0 : Mappings.INSERT;
+        if (!machine.mappable() || next.plainChar() == '0' && machine.counting()) return 0;
+        if (mode.visual()) return Mappings.VISUAL;
+        return machine.operatorPending() ? Mappings.OP_PENDING : Mappings.NORMAL;
+    }
+
+    /** Mapped keys failed (E223) or were interrupted: the bell, and the message if there is one, as for a failing command. */
+    void mappingFailed(VimFailure failure) {
+        bells++;
+        if (!failure.getMessage().isEmpty()) message(failure.getMessage(), true);
+        fire();
+    }
+
+    /**
+     * Runs one key from the typeahead. A failing command rings the bell and drops the keys of the mapping or macro
+     * running (spec 2.3); an unexpected exception cancels the command, closes its undo step and returns to Normal
+     * mode (spec 10).
+     */
+    void step(KeyInput key) {
+        steps++;
         busy = true;
         message = "";
         messageError = false;
@@ -299,12 +357,15 @@ public final class VimEditor {
         } catch (VimFailure failure) {
             if (!failure.quiet) bells++;
             if (!failure.getMessage().isEmpty()) message(failure.getMessage(), true);
+            // beep_flush and emsg drop the keys of a running mapping or macro; a beep in Insert mode does not.
+            if (!mode.inserting() || !failure.getMessage().isEmpty()) typeahead.flush();
             if (!mode.inserting()) {
                 machine.reset();
                 machine.resumeIfInsertNormal();
             }
         } catch (RuntimeException bug) {
             LOG.log(System.Logger.Level.ERROR, "Vim command failed", bug);
+            typeahead.clear();
             ex.abort();
             promptHandler = null;
             insert.abort();
@@ -358,6 +419,8 @@ public final class VimEditor {
     public String showcmd() {
         if (!options.flag("showcmd")) return "";
         String pending = machine.showcmd();
+        // Keys waiting for the rest of a mapping show after the partly typed command.
+        if (typeahead.waiting()) return pending + KeyInput.format(typeahead.waitingKeys());
         return pending.isEmpty() && mode.visual() && visualAnchor != null ? visualSize() : pending;
     }
 
@@ -616,6 +679,12 @@ public final class VimEditor {
     }
 
     void endUndoStep() { area.vimUndo().endStep(); }
+
+    /** Opens an undo step that the commands run from a mapping or macro share ({@link #endUndoStep} closes it). */
+    void beginUndoGroup() {
+        Pos p = cursor();
+        area.vimUndo().beginStep(p.line, p.col);
+    }
 
     /** {@code u}: undoes {@code count} steps, placing the cursor as Vim's u_undoredo does. */
     void undo(int count) { undoRedo(count, true); }

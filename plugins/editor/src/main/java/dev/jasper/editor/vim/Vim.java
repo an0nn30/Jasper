@@ -27,6 +27,7 @@ public final class Vim {
     private final VimHost host;
     private final Registers registers;
     private final KeyHandlers handlers = new KeyHandlers();
+    private final Mappings mappings = new Mappings();
     private final VimCommands commands = VimCommands.standard();
     private Consumer<String> coverage = id -> { };
     private Find lastFind;
@@ -59,6 +60,9 @@ public final class Vim {
 
     /** @return the handler table */
     public KeyHandlers handlers() { return handlers; }
+
+    /** @return the key mappings */
+    Mappings mappings() { return mappings; }
 
     /** @return the command table */
     public VimCommands commands() { return commands; }

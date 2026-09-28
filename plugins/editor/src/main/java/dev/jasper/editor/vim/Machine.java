@@ -41,6 +41,12 @@ final class Machine {
 
     boolean operatorPending() { return operator != null; }
 
+    /** @return whether the next key may start a mapping: it is not a command's argument or its second key (no_mapping) */
+    boolean mappable() { return argument == null && keys.isEmpty(); }
+
+    /** @return whether count digits are being typed, so that {@code 0} is one more and not mapped (no_zero_mapping) */
+    boolean counting() { return operator == null ? count1 > 0 : count2 > 0; }
+
     /** @return whether a command is partly typed */
     boolean pending() { return operator != null || argument != null || !keys.isEmpty() || count1 > 0 || count2 > 0 || register != 0; }
 
