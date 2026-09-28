@@ -74,6 +74,23 @@ class ExTest {
         });
     }
 
+    @Test void aConfirmationWaitsForItsAnswerThenTheRestOfTheLineRuns() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "a a\nb\n");
+            type(editor, ":s/a/X/gc|2d<CR>");
+            assertThat(editor.prompt()).contains("replace with X (y/n/a/q/l/^E/^Y)?");
+            assertThat(editor.mode()).isEqualTo(Mode.COMMAND_LINE);
+            assertThat(editor.highlights()).as("the match asked about is shown").anyMatch(h -> h[0] == 0 && h[1] == 0 && h[2] == 1);
+            assertThat(editor.offer(KeyInput.of('y'))).as("the question takes the key").isTrue();
+            type(editor, "n");
+            assertThat(editor.prompt()).isEmpty();
+            assertThat(area.getText()).as("the second match stayed, then :2d ran").isEqualTo("X a\n");
+            type(editor, "u");
+            assertThat(area.getText()).isEqualTo("a a\nb\n");
+        });
+    }
+
     @Test void aBackwardsRangeAsksBeforeItIsSwapped() throws Exception {
         onEdt(() -> {
             var area = new VimTextArea();
@@ -110,14 +127,12 @@ class ExTest {
             type(editor, ":norm Ax<CR>");
             assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
             assertThat(area.getText()).isEqualTo("abcx\n");
-            var lines = new VimTextArea();
-            var other = editor(lines, "1\n2\n3\n4\n");
-            type(other, ":norm :2,1d<C-v><CR>y<CR>");
-            assertThat(other.prompt()).as("the answer came from the keys").isEmpty();
-            assertThat(lines.getText()).isEqualTo("3\n4\n");
-            type(other, ":norm :2,1d<C-v><CR><CR>");
-            assertThat(other.prompt()).as("out of keys, the question got <Esc>").isEmpty();
-            assertThat(lines.getText()).isEqualTo("3\n4\n");
+            type(editor, ":norm :s/b/B/c<C-v><CR>y<CR>");
+            assertThat(editor.prompt()).as("the answer came from the keys").isEmpty();
+            assertThat(area.getText()).isEqualTo("aBcx\n");
+            type(editor, ":norm :s/c/C/c<C-v><CR><CR>");
+            assertThat(editor.prompt()).as("out of keys, the question got <Esc>").isEmpty();
+            assertThat(area.getText()).isEqualTo("aBcx\n");
         });
     }
 

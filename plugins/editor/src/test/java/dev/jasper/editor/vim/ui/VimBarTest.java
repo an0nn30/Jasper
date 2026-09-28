@@ -100,9 +100,9 @@ class VimBarTest {
             assertThat(bar.statusText()).isEqualTo("Press ENTER or type command to continue");
             type(editor, "<CR>");
             assertThat(bar.outputLines()).isEmpty();
-            type(editor, ":2,1p<CR>");
-            assertThat(bar.statusText()).isEqualTo("Backwards range given, OK to swap (y/n)?");
-            type(editor, "n");
+            type(editor, ":1s/one/1/c<CR>");
+            assertThat(bar.statusText()).isEqualTo("replace with 1 (y/n/a/q/l/^E/^Y)?");
+            type(editor, "y");
             assertThat(bar.statusText()).isEmpty();
             type(editor, ":foo<CR>");
             assertThat(bar.statusText()).isEqualTo("E492: Not an editor command: foo");

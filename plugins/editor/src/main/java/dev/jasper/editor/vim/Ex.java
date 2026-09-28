@@ -81,6 +81,10 @@ final class Ex {
         def("left", TRLBAR | RANGE | WHOLEFOLD | EXTRA, Addr.LINES, "align the lines left, with [indent]", ExLines::align);
         def("right", TRLBAR | RANGE | WHOLEFOLD | EXTRA, Addr.LINES, "align the lines right at [width] ('textwidth', or 80)", ExLines::align);
         def("center", TRLBAR | RANGE | WHOLEFOLD | EXTRA, Addr.LINES, "center the lines in [width] ('textwidth', or 80)", ExLines::align);
+        def("substitute", RANGE | WHOLEFOLD | EXTRA, Addr.LINES,
+            "`:s/pattern/string/flags [count]`: replace matches; flags `& c e g i I n p # l r`", ExSubstitute::substitute);
+        def("&", RANGE | WHOLEFOLD | EXTRA, Addr.LINES, "repeat the last `:s` with the same pattern and string; `:&&` keeps its flags", ExSubstitute::substitute);
+        def("~", RANGE | WHOLEFOLD | EXTRA, Addr.LINES, "repeat the last `:s` with the last used pattern", ExSubstitute::substitute);
         // Vim's EX_WORD1 includes EX_EXTRA: one word of argument.
         def("k", RANGE | EXTRA | TRLBAR, Addr.LINES, "set a mark at the line (`:ka`, `:k a`)", ExInfo::mark);
         def("mark", RANGE | EXTRA | TRLBAR, Addr.LINES, "set a mark at the line", ExInfo::mark);
@@ -108,6 +112,13 @@ final class Ex {
     static void register(VimCommands commands) {
         commands.action(":", "a command line; with a count, for that many lines (`:.,.+N`)", false, c -> c.editor.ex().open(c));
         commands.visual(":", "a command line for the Visual lines (`:'<,'>`)", false, false, c -> c.editor.ex().open(c));
+        commands.action("&", "repeat the last `:s` on the line, without its flags", false, c -> {
+            String line = (c.hasCount ? c.count > 1 ? ".,.+" + (c.count - 1) : "." : "") + "s";
+            c.editor.ex().execute(line);
+            c.editor.vim().registers().lastCommand(line);
+        });
+        commands.action("g&", "repeat the last `:s` on every line, with its flags (`:%s//~/&`)", false,
+            c -> c.editor.ex().execute("%s//~/&"));
     }
 
     /** A continuation: work left for after a question, or the end of a command line's run (closing its undo step). */

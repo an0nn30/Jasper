@@ -234,6 +234,8 @@ After an operator, and in Visual mode, where they extend the area.
 | `zR` | open every fold |
 | `zM` | close every fold |
 | `:` | a command line; with a count, for that many lines (`:.,.+N`) |
+| `&` | repeat the last `:s` on the line, without its flags |
+| `g&` | repeat the last `:s` on every line, with its flags (`:%s//~/&`) |
 
 ## Visual-mode commands
 
@@ -345,6 +347,9 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:le[ft]` | align the lines left, with [indent] |
 | `:ri[ght]` | align the lines right at [width] ('textwidth', or 80) |
 | `:ce[nter]` | center the lines in [width] ('textwidth', or 80) |
+| `:s[ubstitute]` | `:s/pattern/string/flags [count]`: replace matches; flags `& c e g i I n p # l r` |
+| `:&` | repeat the last `:s` with the same pattern and string; `:&&` keeps its flags |
+| `:~` | repeat the last `:s` with the last used pattern |
 | `:k` | set a mark at the line (`:ka`, `:k a`) |
 | `:ma[rk]` | set a mark at the line |
 | `:delm[arks]` | delete marks (`a b-d`); `!` all lowercase ones |
