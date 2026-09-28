@@ -719,9 +719,23 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * What plugins asked to open or raise, in order.
      *
-     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} or {@code front|<window id>}
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} (each followed by {@code |<profile id>} when the request named a shell profile) or {@code front|<window id>}
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
+
+    /**
+     * Replaces the shell profiles the application detected, as {@code Terminals.profiles()} returns them, and runs every
+     * plugin's {@code onProfilesChanged} listener at once. A throwing listener is recorded in {@link #failures()}.
+     *
+     * @param profiles the profiles, in display order
+     */
+    public void setShellProfiles(List<dev.jasper.sdk.terminal.ShellProfileInfo> profiles) {
+        workspace.profiles = List.copyOf(profiles);
+        for (Runnable listener : workspace.profileListeners) {
+            try { listener.run(); }
+            catch (RuntimeException failure) { failures.add("profiles listener: " + failure); }
+        }
+    }
 
     private static dev.jasper.sdk.terminal.PaneInfo with(dev.jasper.sdk.terminal.PaneInfo info, String title, Optional<Path> directory,
             dev.jasper.sdk.terminal.SessionState state, OptionalInt exitStatus) {

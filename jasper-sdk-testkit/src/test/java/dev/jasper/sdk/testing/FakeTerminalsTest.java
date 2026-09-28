@@ -7,7 +7,10 @@ import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
+import dev.jasper.sdk.terminal.OpenRequest;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -80,6 +83,27 @@ class FakeTerminalsTest {
                     Optional.of(Path.of("/src")), Optional.empty()),
                 new dev.jasper.sdk.terminal.TerminalEvents.SessionStateChanged(pane, SessionState.EXITED, OptionalInt.of(0)),
                 new dev.jasper.sdk.terminal.TerminalEvents.CwdChanged(pane, Optional.empty(), Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory("build-host", "/srv/app"))));
+        }
+    }
+
+    @Test void profilesAreScriptedAndOnlyListedOnesOpen() {
+        try (var host = new FakePluginHost()) {
+            var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
+            UUID window = host.addTerminalWindow();
+            var heard = new java.util.ArrayList<String>();
+            var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(),
+                plugin -> plugin.terminals().onProfilesChanged(() -> heard.add("changed")));
+            assertThat(context.terminals().profiles()).isEmpty();
+            host.setShellProfiles(List.of(ubuntu));
+            assertThat(heard).containsExactly("changed");
+            assertThat(context.terminals().profiles()).containsExactly(ubuntu);
+            var handle = context.terminals().window(window).orElseThrow();
+            assertThat(context.terminals().openTab(handle, OpenRequest.localProfile("wsl:Ubuntu"))).isPresent();
+            assertThat(context.terminals().openTab(handle, OpenRequest.localProfile("wsl:Debian"))).isEmpty();
+            assertThat(host.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu");
+            host.stopAll();
+            host.setShellProfiles(List.of());
+            assertThat(heard).as("closed with the plugin").hasSize(1);
         }
     }
 }

@@ -81,6 +81,17 @@ class AppContractTest extends PluginContractTest {
             () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
     }
 
+    /** The application's value for an SDK profile; the command is never run by the contract fixture. */
+    static dev.jasper.app.launch.ShellProfile appProfile(dev.jasper.sdk.terminal.ShellProfileInfo info) {
+        var kind = switch (info.kind()) {
+            case LOGIN_SHELL -> dev.jasper.app.launch.ShellProfile.Kind.LOGIN_SHELL;
+            case LOCAL_SHELL -> dev.jasper.app.launch.ShellProfile.Kind.LOCAL_SHELL;
+            case WSL -> dev.jasper.app.launch.ShellProfile.Kind.WSL;
+            case CUSTOM -> dev.jasper.app.launch.ShellProfile.Kind.CUSTOM;
+        };
+        return new dev.jasper.app.launch.ShellProfile(info.id(), info.name(), kind, info.detail(), List.of("sh"));
+    }
+
     @Override protected ContractHarness newHarness() {
         Path data;
         try { data = Files.createTempDirectory("jasper-contract"); }
@@ -99,7 +110,8 @@ class AppContractTest extends PluginContractTest {
         }));
         List<String> notices = new CopyOnWriteArrayList<>();
         List<Path> edited = new CopyOnWriteArrayList<>();
-        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited);
+        TestShellProfiles shells = new TestShellProfiles();
+        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited, shells.source());
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
         List<String> opens = new CopyOnWriteArrayList<>();
@@ -215,6 +227,9 @@ class AppContractTest extends PluginContractTest {
             @Override public String sessionOutput(UUID paneId) { return onEdtValue(() -> terminalFixture.sessionOutput(paneId)); }
             @Override public List<String> openRequests() {
                 return onEdtValue(() -> terminalFixture.opened().stream().filter(line -> !line.startsWith("front|")).toList());
+            }
+            @Override public void setShellProfiles(List<dev.jasper.sdk.terminal.ShellProfileInfo> profiles) {
+                onEdt(() -> shells.set(profiles.stream().map(AppContractTest::appProfile).toList()));
             }
             @Override public void finishCommand(UUID paneId, String command, int exitStatus) { onEdt(() -> terminalFixture.finishCommand(paneId, command, exitStatus)); }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) {

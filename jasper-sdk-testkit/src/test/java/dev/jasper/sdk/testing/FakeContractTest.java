@@ -63,6 +63,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public void typeIntoSession(java.util.UUID paneId, String text) { host.typeIntoSession(paneId, text); }
             @Override public String sessionOutput(java.util.UUID paneId) { return host.sessionOutput(paneId); }
             @Override public List<String> openRequests() { return host.openRequests().stream().filter(line -> !line.startsWith("front|")).toList(); }
+            @Override public void setShellProfiles(List<dev.jasper.sdk.terminal.ShellProfileInfo> profiles) { host.setShellProfiles(profiles); }
             @Override public void finishCommand(java.util.UUID paneId, String command, int exitStatus) {
                 host.commandFinished(paneId, command, java.util.OptionalInt.of(exitStatus), java.time.Duration.ofMillis(1500));
             }

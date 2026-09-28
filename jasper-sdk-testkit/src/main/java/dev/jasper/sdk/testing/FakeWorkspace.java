@@ -1,6 +1,7 @@
 package dev.jasper.sdk.testing;
 
 import dev.jasper.sdk.terminal.PaneInfo;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,10 @@ final class FakeWorkspace {
     private final List<Pane> everyPane = new ArrayList<>();
     private final List<Tab> everyTab = new ArrayList<>();
     final List<String> openRequests = new ArrayList<>();
+    /** The shell profiles the test says the application detected. */
+    List<ShellProfileInfo> profiles = List.of();
+    /** Every live {@code onProfilesChanged} listener, of every plugin. */
+    final List<Runnable> profileListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     Window lastActive;
     private UUID reportedActive;
 

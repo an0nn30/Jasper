@@ -2,10 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 1-2 done (plan A is implemented on this branch, which satisfies "plan A merged").
+**Status:** In progress: Tasks 1-3 done (plan A is implemented on this branch, which satisfies "plan A merged").
 Record every deviation from this text here and in `docs/STATUS.md`.
 
-Deviations so far: none.
+Deviations so far: none. Tasks 1-3 applied as written: plan A landed `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)`, `OpenSpec.Local(Optional<Path>, Optional<String>)` and the `JasperApplication.shellProfiles` field (created in the constructor, before `startPlugins`) under the names this plan assumed, and every edit anchor still matched. `knownProfile` compares ids exactly (as the fake does), although plan A resolves `wsl:` ids case-insensitively when launching.
 
 **Goal:** Plugins can list the shells Jasper detected (SDK 0.8.6 `Terminals.profiles()`) and open one by id; the
 Remote plugin uses that to show a read-only "WSL" group of distributions first in its panel (renamed "Sessions"),
@@ -771,7 +771,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   contract test `shellProfilesAreListedWatchedAndOpenedByIdOnly`.
 - Consumes: Task 1 SDK, Task 2 `TestShellProfiles` and the 10-argument `AppContractTest.host`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `FakeTerminalsTest.java` the imports `import dev.jasper.sdk.terminal.OpenRequest;` and
 `import dev.jasper.sdk.terminal.ShellProfileInfo;` (after `import dev.jasper.sdk.terminal.SessionState;`) and
@@ -864,12 +864,12 @@ In `PluginContractTest.java`, add `import dev.jasper.sdk.terminal.ShellProfileIn
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-sdk-testkit:test --tests "dev.jasper.sdk.testing.FakeTerminalsTest"`
 Expected: FAIL: compilation errors (`setShellProfiles` does not exist on `FakePluginHost` or `ContractHarness`).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `FakeWorkspace.java`, add `import dev.jasper.sdk.terminal.ShellProfileInfo;` after
 `import dev.jasper.sdk.terminal.PaneInfo;`, and after `final List<String> openRequests = new ArrayList<>();` add:
@@ -1028,12 +1028,12 @@ In `AppContractTest.java`:
     }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `./gradlew :jasper-sdk-testkit:test :jasper-app:test --tests "dev.jasper.app.plugins.*"`
 Expected: BUILD SUCCESSFUL; `FakeContractTest` and `AppContractTest` both run `shellProfilesAreListedWatchedAndOpenedByIdOnly`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
