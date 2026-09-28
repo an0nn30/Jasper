@@ -45,7 +45,7 @@ class HostedPaletteTest {
         host = onEdtValue(() -> new PluginHost(new PluginHost.Environment(javax.swing.SwingUtilities::invokeLater,
             javax.swing.SwingUtilities::isEventDispatchThread, data::resolve, id -> Map.of(), id -> data.resolve(id + ".toml"), (id, path) -> java.util.Optional.empty(), diagnostic -> { },
             Duration.ofMillis(200), contributions, () -> true, AppContractTest.headlessWindows(), fixture.registry,
-            notices::add, edited::add)));
+            notices::add, edited::add, PluginRuntime.ShellProfiles.NONE)));
         return host;
     }
 

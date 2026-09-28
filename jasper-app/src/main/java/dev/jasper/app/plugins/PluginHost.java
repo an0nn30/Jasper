@@ -27,7 +27,8 @@ final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Function<String, Map<String, Object>> settings, Function<String, Path> settingsFile, java.util.function.BiFunction<String, List<String>, java.util.Optional<PluginSettingsFiles.Position>> positions, Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor) { }
+                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       PluginRuntime.ShellProfiles profiles) { }
 
     record Outcome(PluginStatus.State state, String reason) { }
 

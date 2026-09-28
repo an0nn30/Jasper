@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Task 1 done (plan A is implemented on this branch, which satisfies "plan A merged").
+**Status:** In progress: Tasks 1-2 done (plan A is implemented on this branch, which satisfies "plan A merged").
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -348,7 +348,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: plan A's `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)` and
   `OpenSpec.Local(Optional<Path>, Optional<String>)` with its `profile()` accessor; Task 1's SDK types.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `TestShellProfiles.java`:
 
@@ -463,12 +463,12 @@ In `HostedTerminalsTest.java`, add the imports `import dev.jasper.app.launch.She
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests "dev.jasper.app.plugins.HostedTerminalsTest"`
 Expected: FAIL: compilation errors (`PluginRuntime.ShellProfiles` and the 9-argument `HostedTerminals` constructor do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `PluginRuntime.java`, add the imports `import dev.jasper.app.launch.ShellProfile;` (after
 `import dev.jasper.app.contributions.Contributions;`), `import java.util.function.Function;` and
@@ -732,7 +732,7 @@ In `AppContractTest.java`, replace the 9-argument `host(...)` helper with:
 In `HostedPaletteTest.java`, change `notices::add, edited::add)));` (the end of the `Environment` construction) to
 `notices::add, edited::add, PluginRuntime.ShellProfiles.NONE)));`.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `./gradlew :jasper-app:test --tests "dev.jasper.app.plugins.*"`
 Expected: BUILD SUCCESSFUL; the two new `HostedTerminalsTest` tests pass and nothing else changed.
@@ -740,7 +740,7 @@ Expected: BUILD SUCCESSFUL; the two new `HostedTerminalsTest` tests pass and not
 Run: `./gradlew verifyApplicationArchitecture`
 Expected: BUILD SUCCESSFUL (the new edge `plugins -> launch` is acyclic; SDK types stay in `dev.jasper.app.plugins`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
