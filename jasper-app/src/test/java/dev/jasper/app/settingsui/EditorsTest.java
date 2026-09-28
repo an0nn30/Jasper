@@ -5,10 +5,13 @@ import static org.assertj.core.api.Assertions.*;
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ToolbarMode;
+import dev.jasper.app.lifecycle.Subscription;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JSpinner;
@@ -101,5 +104,43 @@ class EditorsTest {
     @Test void fontsListInstalledFamiliesAndAMonospacedSubset() {
         assertThat(Fonts.families(false)).contains("Monospaced", "Dialog");
         assertThat(Fonts.families(true)).contains("Monospaced").doesNotContain("Dialog");
+    }
+
+    @Test void theProfileEditorListsDetectedShellsAndShowsTheEffectiveOne() {
+        var listeners = new ArrayList<Runnable>();
+        var refreshes = new int[1];
+        var choices = new AtomicReference<>(List.of(new ShellChoices.Choice("powershell", "PowerShell"),
+            new ShellChoices.Choice("wsl:Ubuntu", "Ubuntu (WSL 1)"), new ShellChoices.Choice("custom", "Custom")));
+        var shells = new ShellChoices(choices::get, () -> refreshes[0]++,
+            listener -> { listeners.add(listener); return new Subscription(() -> listeners.remove(listener)); });
+        var editor = (Editors.Profile) build(Editors.profile(shells), CoreSettings.TERMINAL_SHELL_PROFILE, context);
+        var edits = new int[1];
+        editor.onEdit(() -> edits[0]++);
+        assertThat(java.util.stream.IntStream.range(0, editor.box.getItemCount()).mapToObj(editor.box::getItemAt))
+            .containsExactly("PowerShell", "Ubuntu (WSL 1)", "Custom");
+        editor.show("");
+        assertThat(editor.value()).as("empty shows the platform default").isEqualTo("powershell");
+        editor.box.setSelectedIndex(1);
+        assertThat(editor.value()).isEqualTo("wsl:Ubuntu");
+        assertThat(edits[0]).isEqualTo(1);
+        editor.show("wsl:Gone");
+        assertThat(editor.box.getSelectedItem()).isEqualTo("wsl:Gone (not detected)");
+        assertThat(editor.value()).isEqualTo("wsl:Gone");
+        editor.detect.doClick();
+        assertThat(refreshes[0]).isEqualTo(1);
+        choices.set(List.of(new ShellChoices.Choice("powershell", "PowerShell"), new ShellChoices.Choice("custom", "Custom")));
+        List.copyOf(listeners).forEach(Runnable::run);
+        assertThat(editor.value()).as("a refill keeps the selection").isEqualTo("wsl:Gone");
+        assertThat(edits[0]).as("showing and refilling are not edits").isEqualTo(1);
+        editor.dispose();
+        assertThat(listeners).isEmpty();
+    }
+
+    @Test void anOldProgramSettingShowsAsCustom() {
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "[terminal.shell]\nprogram = '/bin/fish'\n", true).values());
+        var legacy = new PageContext(draft, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
+        var editor = build(Editors.profile(ShellChoices.NONE), CoreSettings.TERMINAL_SHELL_PROFILE, legacy);
+        editor.show("");
+        assertThat(editor.value()).isEqualTo("custom");
     }
 }

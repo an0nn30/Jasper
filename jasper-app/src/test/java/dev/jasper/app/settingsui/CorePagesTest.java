@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.CoreSettings;
+import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -53,5 +54,29 @@ class CorePagesTest {
 
     private static SettingsPage plugins(PageContext context) {
         return new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, context);
+    }
+
+    @Test void theShellPageOffersProfilesAndEnablesProgramAndArgsOnlyForCustom() {
+        var shells = new ShellChoices(() -> List.of(new ShellChoices.Choice("powershell", "PowerShell"), new ShellChoices.Choice("custom", "Custom")),
+            () -> { }, listener -> new Subscription(() -> { }));
+        var spec = CorePages.specs(() -> List.of("Jasper Dark"), system, shells).stream()
+            .filter(candidate -> candidate.id().equals("terminal.shell")).findFirst().orElseThrow();
+        assertThat(spec.settings()).startsWith(CoreSettings.TERMINAL_SHELL_PROFILE, CoreSettings.TERMINAL_SHELL_PROGRAM, CoreSettings.TERMINAL_SHELL_ARGS);
+        var page = spec.build(context);
+        page.component();
+        assertThat(page.rows().getFirst().editor()).isInstanceOf(Editors.Profile.class);
+        var program = page.rows().get(1).editor().component();
+        var args = page.rows().get(2).editor().component();
+        assertThat(program.isEnabled()).isFalse();
+        assertThat(args.isEnabled()).isFalse();
+        context.draft().stage(CoreSettings.TERMINAL_SHELL_PROFILE, Optional.of("custom"));
+        assertThat(program.isEnabled()).isTrue();
+        assertThat(args.isEnabled()).isTrue();
+        context.draft().stage(CoreSettings.TERMINAL_SHELL_PROFILE, Optional.of("powershell"));
+        assertThat(program.isEnabled()).isFalse();
+        context.draft().stage(CoreSettings.TERMINAL_SHELL_PROFILE, Optional.empty());
+        context.draft().stage(CoreSettings.TERMINAL_SHELL_PROGRAM, Optional.of("/bin/fish"));
+        assertThat(program.isEnabled()).as("an old program setting is the Custom profile").isTrue();
+        page.dispose();
     }
 }

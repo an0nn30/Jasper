@@ -405,8 +405,11 @@ public final class JasperApplication {
             var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
                 this::openConfigFile, this::revealConfigFile, () -> configuration.reload(), this::migrateConfiguration,
                 configuration::migrationAvailable);
+            var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
+                    .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
+                shellProfiles::refresh, shellProfiles::onChanged);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system,
+                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system, shells,
                     context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context)),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));

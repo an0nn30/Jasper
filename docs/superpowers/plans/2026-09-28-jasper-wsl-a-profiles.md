@@ -2,10 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-9 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-10 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
-Deviations so far: none.
+Deviations so far:
+
+- Task 10: `SchemaPage.showValue` changes a row's enablement only when its `enabledWhen` condition changes (a
+  `shownEnabled` flag on `Row`, initially true), instead of recursively enabling every row's control on every draft
+  change. The plan text would have re-enabled the optional line-height spinner while its "use the platform" box is
+  checked. Tests and names are unchanged.
 
 **Goal:** On Windows, sessions run on ConPTY, Jasper detects PowerShell, PowerShell 7, Command Prompt and every
 installed WSL 1 and WSL 2 distribution as shell profiles, `terminal.shell.profile` (and a Settings dropdown) makes
@@ -2988,7 +2993,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: `ShellChoices(Supplier<List<Choice>> choices, Runnable refresh, Function<Runnable, Subscription> onChanged)`, `ShellChoices.Choice(String id, String label)`, `ShellChoices.CUSTOM`, `ShellChoices.NONE`; `Editors.profile(ShellChoices)` and package-private `Editors.Profile` (fields `box`, `detect`); `ValueEditor.dispose()`; `SchemaPage.Spec.enabledWhen(Predicate<SettingsDraft>)`; `CorePages.specs(Supplier<List<String>>, SystemActions, ShellChoices)` and `CorePages.pages(Supplier<List<String>>, SystemActions, ShellChoices, Function<PageContext, SettingsPage>, Function<PageContext, SettingsPage>)`, the old signatures kept with `ShellChoices.NONE`.
 - Consumes: `ShellProfileCatalog.current()/refresh()/onChanged()` and `ShellProfile.label()` (JasperApplication adapts them), `TerminalConfig.Shell.custom(...)` (Task 5).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `EditorsTest.java` (add imports `dev.jasper.app.lifecycle.Subscription`, `java.util.ArrayList`,
 `java.util.concurrent.atomic.AtomicReference`):
@@ -3080,12 +3085,12 @@ Add to `CorePagesTest.java` (add imports `dev.jasper.app.lifecycle.Subscription`
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.*'`
 Expected: FAIL: compilation errors (`ShellChoices`, `Editors.profile`, `Editors.Profile`, `enabledWhen`, `dispose` on editors, the three-argument `specs` do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `ShellChoices.java`:
 
@@ -3364,7 +3369,7 @@ with
                 dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system, shells,
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.*' --tests 'dev.jasper.app.application.*'`
 Expected: PASS.
@@ -3372,7 +3377,7 @@ Expected: PASS.
 Run: `./gradlew verifyApplicationArchitecture :jasper-app:javadoc`
 Expected: PASS (`settingsui` still does not depend on `launch`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
