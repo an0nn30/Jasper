@@ -107,11 +107,13 @@ final class MarkCommands {
     }
 
     private static void moveTo(Context c, Pos pos) {
+        Pos before = c.cursor();
         String line = c.buffer.line(pos.line);
         int col = Math.min(pos.col, line.length());
         if (col >= line.length() && !line.isEmpty()) col = Text.last(line);
         c.editor.setCursor(new Pos(pos.line, col));
         c.editor.forgetColumn();
+        c.editor.machine().foldOpenAfter("mark", before);
     }
 
     /** gi: Insert mode at the {@code '^} mark, or at the cursor when it is not set. */

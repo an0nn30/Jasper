@@ -252,7 +252,7 @@ public final class EditorTab extends JPanel {
     }
 
     /** Vim's tab options start from the Editor's tab size and the tab's Tabs or Spaces (Vim spec 3.8). */
-    private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true); }
+    private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true, session.wrap()); }
 
     private void refresh() {
         switch (session.state()) {

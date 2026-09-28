@@ -39,6 +39,13 @@ public final class VimEditor {
     /** In Visual mode, the other end of the area (Vim's VIsual). */
     private Pos visualAnchor;
     private final Highlights highlights;
+    private final View view = new View(this);
+    private final ViewportSync viewport;
+    private final Folds folds;
+    /** The text area's word-wrapping, put back when Vim turns off (Vim wraps at any character). */
+    private final boolean originalWrapStyleWord;
+    /** The text area's fold-aware navigation, put back when Vim turns off (Vim's cursor may be inside a closed fold). */
+    private final javax.swing.text.NavigationFilter originalNavigation;
     /** While a search pattern is typed with 'incsearch', the match it would find ({start, end} offsets), or null. */
     private int[] incsearch;
     /** Bumped by every text change, so the 'hlsearch' matches are found again only when needed. */
@@ -75,6 +82,12 @@ public final class VimEditor {
         this.machine = new Machine(this);
         this.insert = new InsertMode(this);
         this.highlights = new Highlights(area);
+        this.folds = new Folds(area);
+        this.viewport = new ViewportSync(this, area);
+        this.originalWrapStyleWord = area.getWrapStyleWord();
+        area.setWrapStyleWord(false);
+        this.originalNavigation = area.getNavigationFilter();
+        area.setNavigationFilter(null);
         area.getDocument().addDocumentListener(highlightListener);
         area.addFocusListener(leaveListener);
         originalCaret = area.getCaret() instanceof ConfigurableCaret caret ? caret.getStyle() : CaretStyle.VERTICAL_LINE_STYLE;
@@ -102,6 +115,9 @@ public final class VimEditor {
         marks.close();
         area.getDocument().removeDocumentListener(highlightListener);
         area.removeFocusListener(leaveListener);
+        area.setWrapStyleWord(originalWrapStyleWord);
+        area.setNavigationFilter(originalNavigation);
+        viewport.close();
         highlights.clear();
         vim.forget(this);
         buffer.close();
@@ -119,6 +135,7 @@ public final class VimEditor {
         options.setLocal("shiftwidth", changed.tabstop());
         options.setLocal("expandtab", changed.expandtab());
         options.setLocal("autoindent", changed.autoindent());
+        options.setLocal("wrap", changed.wrap());
     }
 
     /** The text was replaced (a reload): any command or insert in progress is dropped. */
@@ -186,6 +203,37 @@ public final class VimEditor {
         fire();
     }
 
+    /** @return the window onto the text (topline, size, 'wrap') */
+    View view() { return view; }
+
+    /**
+     * The user scrolled the text area to show {@code topline} first: the view follows, and the cursor moves inside
+     * the window when it was scrolled out, keeping its column, as with Vim's scroll wheel.
+     */
+    void viewScrolled(int topline) {
+        if (mode.inserting() || commandLine.active()) {
+            view.topline(topline);
+            view.compBotline();
+            return;
+        }
+        view.topline(topline);
+        view.compBotline();
+        int lnum = cursor().line + 1;
+        int target = lnum < view.topline ? view.topline : lnum >= view.botline && view.botline <= buffer.count() ? view.botline - 1 : lnum;
+        if (target != lnum) {
+            busy = true;
+            try { setCursor(new Pos(target - 1, wantedColumn(target - 1)), mode.visual()); }
+            finally { busy = false; }
+        }
+        fire();
+    }
+
+    /** @return the tab's code folds */
+    Folds folds() { return folds; }
+
+    /** @return the remembered display column, computed from the cursor when it was forgotten (Vim's w_curswant) */
+    int columnWanted() { return want(false); }
+
     /** Rings the bell without failing the command (a key the command line has no use for). */
     void bell() { bells++; }
 
@@ -230,6 +278,9 @@ public final class VimEditor {
             busy = false;
             if (!commandLine.active()) marks.checkpcmark(cursor());
             if (mode == Mode.NORMAL || mode == Mode.OPERATOR_PENDING) setCursor(cursor());
+            view.updateTopline();
+            view.cursColumns();
+            viewport.show();
             look();
             fire();
         }
