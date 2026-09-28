@@ -347,7 +347,7 @@ text:
   line four
   line five
 cursor: 2,5
-keys: G````
+keys: G``0``
 --- vim 9.1
 expect-text:
   line one

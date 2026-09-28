@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md` (plan V1b of section 13, sections 3.5–3.8, 4.1, 5.2, 5.3, 11). Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) is merged; read its header for the engine's shape.
 
-**Status:** Written 2026-09-28 on branch `claude/vim-v1b` (worktree `.worktrees/vim-v1b`, from `main` at 16ec0f86). Every source file, test and corpus case below was compiled and run before the plan was written: against Vim 9.1, all 946 corpus cases (477 new: visual 113, visual-block 55, search 80, regex 58, marks 73, numbers 50, format 48) passed, three of them divergent, and every command in the table has a case. Applied to a fresh checkout of `16ec0f86` exactly as written, `./gradlew check` passed (3,372 tests, 0 failed, 5 skipped).
+**Status:** Written 2026-09-28 on branch `claude/vim-v1b` (worktree `.worktrees/vim-v1b`, from `main` at 16ec0f86). Every source file, test and corpus case below was compiled and run before the plan was written: against Vim 9.1, all 946 corpus cases (477 new: visual 113, visual-block 55, search 80, regex 58, marks 73, numbers 50, format 48) passed, three of them divergent, and every command in the table has a case. Applied to a fresh checkout of `16ec0f86` exactly as written, `./gradlew check` passed (3,372 tests, 0 failed, 5 skipped). **Executed 2026-09-28:** the marks case "backtick backtick twice toggles" first had the keys `G` followed by four backticks; a run of three backticks inside this plan broke `AppDocumentationTest`'s link check (it strips fenced blocks with a lazy pattern), so its keys became `G`, two backticks, `0`, two backticks, and it was re-recorded (Vim's expectation is unchanged).
 
 ## Deviations from the spec (approved scope, adjusted in this plan)
 
@@ -14250,7 +14250,7 @@ text:
   line four
   line five
 cursor: 2,5
-keys: G````
+keys: G``0``
 --- vim 9.1
 expect-text:
   line one
