@@ -68,6 +68,8 @@ public final class JasperApplication {
     private boolean quitting;
     private boolean resident;
     private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
+    private java.util.function.BinaryOperator<Runnable> residentIndicator = (open, quit) -> () -> { };
+    private Runnable removeIndicator;
     private boolean shutdownQueued;
     private boolean stopped;
     private final java.util.List<Runnable> shutdownActions = new java.util.ArrayList<>();
@@ -265,9 +267,32 @@ public final class JasperApplication {
      * Whether this process outlives its windows. Decided once at startup: which process owns the
      * handoff endpoint is not something to renegotiate while running.
      */
-    public void residency(boolean resident) { this.resident = resident; }
+    public void residency(boolean resident) {
+        this.resident = resident;
+        showIndicator(resident);
+    }
 
     public boolean resident() { return resident; }
+
+    /**
+     * Who shows that this process is resident, given its Open and Quit actions; it returns the way to
+     * remove what it showed. Injected, like {@link #loginItems}, so tests never touch the real
+     * notification area. Install before {@link #residency}.
+     */
+    public void residentIndicator(java.util.function.BinaryOperator<Runnable> install) {
+        residentIndicator = Objects.requireNonNull(install, "install");
+    }
+
+    private void showIndicator(boolean show) {
+        if (show && removeIndicator == null && !quitting && !stopped) {
+            removeIndicator = residentIndicator.apply(
+                () -> openOrRaise(Path.of(System.getProperty("user.home"))), this::quit);
+        } else if (!show && removeIndicator != null) {
+            Runnable remove = removeIndicator;
+            removeIndicator = null;
+            remove.run();
+        }
+    }
 
     /**
      * The handoff endpoint is gone, so nothing can reach this process any more. It stops being
@@ -281,7 +306,7 @@ public final class JasperApplication {
      * window and is not covered by a headless test — a known gap, not an oversight.
      */
     public void endpointReleased() {
-        resident = false;
+        residency(false);
         if (windows.isEmpty()) requestShutdown();
     }
 
@@ -648,6 +673,7 @@ public final class JasperApplication {
         if (stopped) return;
         stopped = true;
         quitting = true;
+        showIndicator(false);
         // Armed before anything else: a plugin's stop() that blocks the EDT cannot be abandoned, and
         // await() below is never reached in that case.
         shutdown.arm(() -> plugins == null ? null : plugins.executing());
