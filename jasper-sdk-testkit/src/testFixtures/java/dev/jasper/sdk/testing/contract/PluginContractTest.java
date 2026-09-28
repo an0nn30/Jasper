@@ -53,6 +53,7 @@ import dev.jasper.sdk.terminal.ExitPolicy;
 import dev.jasper.sdk.terminal.PendingSession;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionSpec;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TerminalConnection;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -741,6 +742,45 @@ public abstract class PluginContractTest {
             assertThat(split.tab().id()).isEqualTo(tab);
         });
         assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
+    }
+
+    @Test void shellProfilesAreListedWatchedAndOpenedByIdOnly() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        var pwsh = new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty());
+        var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
+        h.setShellProfiles(List.of(pwsh));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
+        var bare = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), bare::set);
+        var changes = new AtomicInteger();
+        var subscription = new AtomicReference<Subscription>();
+        h.ui(() -> {
+            assertThat(alpha.get().terminals().profiles()).containsExactly(pwsh);
+            subscription.set(alpha.get().terminals().onProfilesChanged(changes::incrementAndGet));
+            assertThatThrownBy(() -> bare.get().terminals().profiles()).isInstanceOf(MissingCapabilityException.class);
+        });
+        h.setShellProfiles(List.of(pwsh, ubuntu));
+        h.flush();
+        assertThat(changes.get()).isEqualTo(1);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            assertThat(terminals.profiles()).containsExactly(pwsh, ubuntu);
+            assertThat(terminals.openTab(terminals.window(window).orElseThrow(), OpenRequest.localProfile("wsl:Ubuntu"))).as("known").isPresent();
+            assertThat(terminals.openTab(terminals.window(window).orElseThrow(), OpenRequest.localProfile("wsl:Debian"))).as("unknown").isEmpty();
+            assertThat(terminals.split(terminals.pane(only).orElseThrow(), Direction.RIGHT, OpenRequest.localProfile("cmd"))).as("unknown").isEmpty();
+            assertThat(terminals.split(terminals.pane(only).orElseThrow(), Direction.DOWN, OpenRequest.local())).as("the default").isPresent();
+        });
+        assertThat(h.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu", "split|" + only + "|DOWN|-");
+        subscription.get().close();
+        h.setShellProfiles(List.of(pwsh));
+        h.flush();
+        assertThat(changes.get()).as("a closed registration hears nothing").isEqualTo(1);
+        h.ui(() -> alpha.get().terminals().onProfilesChanged(changes::incrementAndGet));
+        h.stopAll();
+        h.setShellProfiles(List.of());
+        h.flush();
+        assertThat(changes.get()).as("a stopped plugin hears nothing").isEqualTo(1);
     }
 
     @Test void actionContextsCarryHandlesOfTheInvokingPlugin() {

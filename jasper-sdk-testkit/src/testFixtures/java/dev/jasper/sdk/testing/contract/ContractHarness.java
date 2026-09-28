@@ -102,8 +102,14 @@ public interface ContractHarness extends AutoCloseable {
     /** What plugins sent to a pane, in order: {@code write:<the bytes as UTF-8 text>} or {@code paste:<text>}. */
     List<String> sentToPane(java.util.UUID paneId);
 
-    /** What plugins asked to open: {@code tab|<window id>|<directory or ->} or {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->}. */
+    /**
+     * What plugins asked to open: {@code tab|<window id>|<directory or ->} or {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->},
+     * each followed by {@code |<profile id>} when the request named a shell profile.
+     */
     List<String> openRequests();
+
+    /** UI thread: replaces the shell profiles the application detected and runs every plugin's change listener. */
+    void setShellProfiles(List<dev.jasper.sdk.terminal.ShellProfileInfo> profiles);
 
     /** UI thread: publishes that a command finished in a pane after 1.5 seconds, in the pane's directory. */
     void finishCommand(java.util.UUID paneId, String command, int exitStatus);

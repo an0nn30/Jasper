@@ -2,6 +2,7 @@ package dev.jasper.remote.ui;
 
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.ui.BundledIcon;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -34,7 +36,10 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-/** The "SSH hosts" rail panel: search, grouped hosts, the selected host's card with Connect. One per window. */
+/**
+ * The "Sessions" rail panel: search, the WSL distributions the application detected, grouped hosts, and the selected
+ * row's card with Connect (a host) or Open (a distribution). One per window.
+ */
 public final class HostsPanel extends JPanel {
     public record Actions(Consumer<RemoteHost> connect, Consumer<RemoteHost> connectSplit, Consumer<Optional<RemoteHost>> edit, Consumer<RemoteHost> duplicate,
                           Consumer<RemoteHost> delete, BiConsumer<RemoteHost, Boolean> favorite, Runnable importConfig) { }
@@ -42,24 +47,31 @@ public final class HostsPanel extends JPanel {
     final JTextField search = new JTextField();
     final JList<HostRows.Row> list;
     final JPanel card = new JPanel();
+    final JLabel title = heading("Sessions");
     final JLabel cardName = heading(""), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel(), cardInfo = new JLabel();
     final JButton connect = new JButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
-    final JLabel empty = new JLabel("No hosts yet — Add or Import from ~/.ssh/config");
+    final JLabel empty = new JLabel("No hosts yet \u2014 Add or Import from ~/.ssh/config");
     private final Actions actions;
     private final Function<BundledIcon, javax.swing.Icon> icons;
     private final DefaultListModel<HostRows.Row> model = new DefaultListModel<>();
     private final Set<String> collapsed = new HashSet<>();
+    private boolean wslCollapsed;
     private final List<Runnable> collapseListeners = new ArrayList<>();
     private List<RemoteHost> hosts = List.of();
     private Optional<String> error = Optional.empty();
     private Function<RemoteHost, String> credentialLabels = host -> "";
     private UUID selected;
+    private String selectedDistro;
     private String defaultGroup = HostRows.OTHER;
     private Runnable renameDefaultGroup = () -> {};
     private Consumer<RemoteHost> activate;
     private Consumer<RemoteHost> browseFiles;
     private Function<RemoteHost, String> metadata = host -> "";
-    private java.util.function.ToIntFunction<RemoteHost> sessionCount = host -> 0;
+    private ToIntFunction<RemoteHost> sessionCount = host -> 0;
+    private List<ShellProfileInfo> distros = List.of();
+    private ToIntFunction<ShellProfileInfo> distroSessions = profile -> 0;
+    private Consumer<ShellProfileInfo> openDistro = profile -> { };
+    private Consumer<ShellProfileInfo> splitDistro = profile -> { };
 
     private static JLabel heading(String text) {
         return new JLabel(text) {
@@ -81,11 +93,10 @@ public final class HostsPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        var title = heading("SSH hosts");
         header.add(title); header.add(Box.createHorizontalGlue()); header.add(importButton); header.add(Box.createHorizontalStrut(4)); header.add(add);
         var north = new JPanel(new BorderLayout(0, 6));
         north.add(header, BorderLayout.NORTH);
-        search.putClientProperty("JTextField.placeholderText", "Search hosts…");
+        search.putClientProperty("JTextField.placeholderText", "Search sessions\u2026");
         north.add(search, BorderLayout.SOUTH);
         add(north, BorderLayout.NORTH);
         list = new JList<>(model) {
@@ -139,7 +150,11 @@ public final class HostsPanel extends JPanel {
         });
         add.addActionListener(event -> actions.edit().accept(Optional.empty()));
         importButton.addActionListener(event -> actions.importConfig().run());
-        connect.addActionListener(event -> selectedHost().ifPresent(actions.connect()));
+        connect.addActionListener(event -> {
+            Optional<ShellProfileInfo> distro = selectedDistro();
+            if (distro.isPresent()) openDistro.accept(distro.get());
+            else selectedHost().ifPresent(actions.connect());
+        });
         edit.addActionListener(event -> selectedHost().ifPresent(host -> actions.edit().accept(Optional.of(host))));
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
@@ -159,24 +174,42 @@ public final class HostsPanel extends JPanel {
     public void onRenameDefaultGroup(Runnable rename) { renameDefaultGroup = rename; }
     public void onBrowseFiles(Consumer<RemoteHost> action) { browseFiles=action; }
     public void onActivate(Consumer<RemoteHost> action) { activate = action; }
-    public void setHostDetails(Function<RemoteHost, String> details, java.util.function.ToIntFunction<RemoteHost> sessions) {
+    public void setHostDetails(Function<RemoteHost, String> details, ToIntFunction<RemoteHost> sessions) {
         metadata = details; sessionCount = sessions; rebuild();
+    }
+
+    /** What Open (double-click, Enter, the card, the first menu item) and Open in split do for a WSL distribution. */
+    public void onDistros(Consumer<ShellProfileInfo> open, Consumer<ShellProfileInfo> openSplit) { openDistro = open; splitDistro = openSplit; }
+
+    /** The WSL group's rows and their running-pane counts; other kinds of profile are ignored, and none hides the group. */
+    public void setDistros(List<ShellProfileInfo> profiles, ToIntFunction<ShellProfileInfo> sessions) {
+        distros = profiles.stream().filter(profile -> profile.kind() == ShellProfileInfo.Kind.WSL).toList();
+        distroSessions = sessions;
+        rebuild();
     }
 
     public void setHosts(List<RemoteHost> hosts, Optional<String> error) { this.hosts = List.copyOf(hosts); this.error = error; rebuild(); }
     public void setCredentialLabels(Function<RemoteHost, String> labels) { credentialLabels = labels; refreshCard(); }
+    /** The collapsed host groups, by name; the WSL group is never among them (see {@link #wslCollapsed()}). */
     public Set<String> collapsed() { return Set.copyOf(collapsed); }
     public void setCollapsed(Set<String> groups) { collapsed.clear(); collapsed.addAll(groups); rebuild(); }
+    /** Whether the WSL group is collapsed, kept apart from the host groups so no host group name can share it. */
+    public boolean wslCollapsed() { return wslCollapsed; }
+    public void setWslCollapsed(boolean value) { wslCollapsed = value; rebuild(); }
     public Subscription onCollapsedChanged(Runnable listener) { collapseListeners.add(listener); return () -> collapseListeners.remove(listener); }
 
     public void select(UUID hostId) {
         for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof HostRows.Host row && row.host().id().equals(hostId)) { list.setSelectedIndex(i); return; }
     }
 
+    void selectDistro(String profileId) {
+        for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof HostRows.Distro row && row.profile().id().equals(profileId)) { list.setSelectedIndex(i); return; }
+    }
+
     private void selectFirstHost() {
         int firstGroup = -1;
         for (int i = 0; i < model.size(); i++) {
-            if (model.get(i) instanceof HostRows.Host) {
+            if (model.get(i) instanceof HostRows.Host || model.get(i) instanceof HostRows.Distro) {
                 list.setSelectedIndex(i);
                 list.ensureIndexIsVisible(i);
                 return;
@@ -190,27 +223,37 @@ public final class HostsPanel extends JPanel {
 
     Optional<RemoteHost> selectedHost() { return hosts.stream().filter(host -> host.id().equals(selected)).findFirst(); }
 
-    /** Double-click or Enter on a row: connect to a host, toggle a group. */
+    Optional<ShellProfileInfo> selectedDistro() { return distros.stream().filter(profile -> profile.id().equals(selectedDistro)).findFirst(); }
+
+    /** Double-click or Enter on a row: connect to a host, open a distribution, toggle a group. */
     void activate(int index) {
         if (index < 0 || index >= model.size()) return;
         switch (model.get(index)) {
             case HostRows.Host row -> activate.accept(row.host());
             case HostRows.Group group -> toggle(index);
+            case HostRows.Distro row -> openDistro.accept(row.profile());
             case HostRows.Error ignored -> { }
         }
     }
 
     void toggle(int index) {
         if (!(model.get(index) instanceof HostRows.Group group)) return;
-        if (!collapsed.remove(group.name())) collapsed.add(group.name());
+        if (group.wsl()) wslCollapsed = !wslCollapsed;
+        else if (!collapsed.remove(group.name())) collapsed.add(group.name());
         collapseListeners.forEach(Runnable::run);
         rebuild();
     }
 
     JPopupMenu menuFor(int index) {
         if (index < 0 || index >= model.size()) return null;
-        if (model.get(index) instanceof HostRows.Group group && group.name().equals(defaultGroup)) {
-            var menu = new JPopupMenu(); menu.add(item("Rename group…", renameDefaultGroup)); return menu;
+        if (model.get(index) instanceof HostRows.Distro row) {
+            var menu = new JPopupMenu();
+            menu.add(item("Open in new tab", () -> openDistro.accept(row.profile())));
+            menu.add(item("Open in split", () -> splitDistro.accept(row.profile())));
+            return menu;
+        }
+        if (model.get(index) instanceof HostRows.Group group && !group.wsl() && group.name().equals(defaultGroup)) {
+            var menu = new JPopupMenu(); menu.add(item("Rename group\u2026", renameDefaultGroup)); return menu;
         }
         if (!(model.get(index) instanceof HostRows.Host row)) return null;
         RemoteHost host = row.host();
@@ -218,9 +261,9 @@ public final class HostsPanel extends JPanel {
         menu.add(item("Connect in new tab", () -> actions.connect().accept(host)));
         menu.add(item("Connect in split", () -> actions.connectSplit().accept(host)));
         if(browseFiles!=null) menu.add(item("Browse files",()->browseFiles.accept(host)));
-        menu.add(item("Edit…", () -> actions.edit().accept(Optional.of(host))));
+        menu.add(item("Edit\u2026", () -> actions.edit().accept(Optional.of(host))));
         menu.add(item("Duplicate", () -> actions.duplicate().accept(host)));
-        menu.add(item("Delete…", () -> actions.delete().accept(host)));
+        menu.add(item("Delete\u2026", () -> actions.delete().accept(host)));
         menu.add(item(host.favorite() ? "Remove from favorites" : "Add to favorites", () -> actions.favorite().accept(host, !host.favorite())));
         return menu;
     }
@@ -229,6 +272,7 @@ public final class HostsPanel extends JPanel {
 
     private void rebuild() {
         UUID keep = selected;
+        String keepDistro = selectedDistro;
         HostRows.Row previous = list.getSelectedValue();
         model.clear();
         error.ifPresent(message -> model.addElement(new HostRows.Error(message)));
@@ -236,14 +280,20 @@ public final class HostsPanel extends JPanel {
         List<RemoteHost> matching = hosts.stream().filter(host -> HostRows.matches(host, query)
             || (host.group().isEmpty() && defaultGroup.toLowerCase(java.util.Locale.ROOT).contains(query))
             || metadata.apply(host).toLowerCase(java.util.Locale.ROOT).contains(query)).toList();
-        HostRows.rows(matching, "", query.isEmpty() ? collapsed : Set.of(), defaultGroup).forEach(model::addElement);
+        List<HostRows.Distro> distroRows = distros.stream().filter(profile -> HostRows.matches(profile, query))
+            .map(profile -> new HostRows.Distro(profile, distroSessions.applyAsInt(profile))).toList();
+        HostRows.rows(matching, "", query.isEmpty() ? collapsed : Set.of(), defaultGroup, distroRows, query.isEmpty() && wslCollapsed)
+            .forEach(model::addElement);
         boolean searching = !search.getText().strip().isEmpty();
-        empty.setText(hosts.isEmpty() ? "No hosts yet — Add or Import from ~/.ssh/config" : "No hosts match");
+        // With a WSL group shown, the hint sits under it and speaks of SSH hosts only; without WSL the panel holds hosts alone.
+        empty.setText(hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " \u2014 Add or Import from ~/.ssh/config"
+            : distros.isEmpty() ? "No hosts match" : "No sessions match");
         empty.setVisible(hosts.isEmpty() || (searching && model.size() == (error.isPresent() ? 1 : 0)));
         if (keep != null) select(keep);
+        else if (keepDistro != null) selectDistro(keepDistro);
         else if (previous instanceof HostRows.Group group) {
             for (int i = 0; i < model.size(); i++)
-                if (model.get(i) instanceof HostRows.Group next && next.name().equals(group.name())) {
+                if (model.get(i) instanceof HostRows.Group next && next.wsl() == group.wsl() && next.name().equals(group.name())) {
                     list.setSelectedIndex(i); break;
                 }
         }
@@ -254,12 +304,16 @@ public final class HostsPanel extends JPanel {
     private void selectionChanged() {
         HostRows.Row row = list.getSelectedValue();
         selected = row instanceof HostRows.Host host ? host.host().id() : null;
+        selectedDistro = row instanceof HostRows.Distro distro ? distro.profile().id() : null;
         refreshCard();
     }
 
     private void refreshCard() {
+        Optional<ShellProfileInfo> distro = selectedDistro();
+        if (distro.isPresent()) { distroCard(distro.get()); return; }
         Optional<RemoteHost> host = selectedHost();
         card.setVisible(host.isPresent());
+        connect.setText("Connect"); edit.setVisible(true); cardCredential.setVisible(true);
         host.ifPresent(h -> {
             cardName.setText(h.name());
             cardAddress.setText(h.label());
@@ -272,9 +326,22 @@ public final class HostsPanel extends JPanel {
         });
     }
 
+    /** A distribution's card: its name, WSL version and the command Jasper runs; nothing to edit. */
+    private void distroCard(ShellProfileInfo profile) {
+        card.setVisible(true);
+        cardName.setText(profile.name());
+        cardAddress.setText(profile.detail().orElse(HostRows.WSL));
+        cardInfo.setText("wsl.exe -d " + profile.name()); cardInfo.setVisible(true);
+        cardCredential.setText(""); cardCredential.setVisible(false);
+        cardJump.setText(""); cardJump.setVisible(false);
+        edit.setVisible(false);
+        connect.setText("Open");
+    }
+
     private final class Renderer implements javax.swing.ListCellRenderer<HostRows.Row> {
         @Override public Component getListCellRendererComponent(JList<? extends HostRows.Row> owner, HostRows.Row value, int index, boolean selected, boolean focused) {
             if (value instanceof HostRows.Host row) return hostRow(owner, row.host(), selected);
+            if (value instanceof HostRows.Distro row) return distroRow(owner, row, selected);
             JLabel label = new JLabel(); label.putClientProperty("html.disable", true);
             label.setOpaque(selected);
             label.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
@@ -286,7 +353,7 @@ public final class HostsPanel extends JPanel {
                 label.setIconTextGap(6);
                 label.setText(group.name() + "   " + group.count());
                 label.getAccessibleContext().setAccessibleDescription(group.collapsed() ? "Collapsed group" : "Expanded group");
-                if (group.name().equals(defaultGroup)) label.setToolTipText("Right-click to rename this group");
+                if (!group.wsl() && group.name().equals(defaultGroup)) label.setToolTipText("Right-click to rename this group");
             } else if (value instanceof HostRows.Error error) label.setText(error.message());
             return label;
         }
@@ -294,7 +361,7 @@ public final class HostsPanel extends JPanel {
 
     private static int favoriteWidth(JList<?> owner) {
         var metrics = owner.getFontMetrics(owner.getFont().deriveFont(owner.getFont().getSize2D() + 1));
-        return Math.max(16, Math.max(metrics.stringWidth("★"), metrics.stringWidth("☆")) + 2);
+        return Math.max(16, Math.max(metrics.stringWidth("\u2605"), metrics.stringWidth("\u2606")) + 2);
     }
 
     private Component hostRow(JList<?> owner, RemoteHost host, boolean selected) {
@@ -304,7 +371,7 @@ public final class HostsPanel extends JPanel {
         row.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 8));
         java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
         Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 1);
-        var favorite = text(host.favorite() ? "★" : "☆", foreground, font);
+        var favorite = text(host.favorite() ? "\u2605" : "\u2606", foreground, font);
         favorite.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), favorite.getPreferredSize().height));
         row.add(favorite, BorderLayout.WEST);
         row.add(text(host.name(), foreground, font), BorderLayout.CENTER);
@@ -312,7 +379,7 @@ public final class HostsPanel extends JPanel {
         if (sessions > 0) {
             var status = new JPanel(new BorderLayout(4, 0)); status.setOpaque(false);
             java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
-            var dot = text("●", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f)));
+            var dot = text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f)));
             status.add(dot, BorderLayout.WEST);
             if (sessions > 1) status.add(text(String.valueOf(sessions), foreground, owner.getFont()), BorderLayout.CENTER);
             row.add(status, BorderLayout.EAST);
@@ -320,6 +387,41 @@ public final class HostsPanel extends JPanel {
         String facts = metadata.apply(host);
         String description = host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts)
             + ", " + sessions + (sessions == 1 ? " session" : " sessions");
+        row.setToolTipText(description);
+        row.getAccessibleContext().setAccessibleName(description);
+        return row;
+    }
+
+    /** A distribution: terminal icon, name, its WSL version as a badge, and the session dot and count as for hosts. */
+    private Component distroRow(JList<?> owner, HostRows.Distro distro, boolean selected) {
+        var row = new JPanel(new BorderLayout(6, 0));
+        row.setOpaque(true);
+        row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
+        row.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 8));
+        java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
+        Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 1);
+        var icon = new JLabel(icons.apply(BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL));
+        icon.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), icon.getPreferredSize().height));
+        row.add(icon, BorderLayout.WEST);
+        row.add(text(distro.profile().name(), foreground, font), BorderLayout.CENTER);
+        var east = new JPanel();
+        east.setLayout(new BoxLayout(east, BoxLayout.X_AXIS));
+        east.setOpaque(false);
+        String badge = distro.profile().detail().orElse("");
+        if (!badge.isEmpty()) {
+            java.awt.Color muted = javax.swing.UIManager.getColor("Label.disabledForeground");
+            east.add(text(badge, selected || muted == null ? foreground : muted, owner.getFont().deriveFont(Math.max(9f, owner.getFont().getSize2D() - 1f))));
+        }
+        int sessions = distro.sessions();
+        if (sessions > 0) {
+            java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
+            east.add(Box.createHorizontalStrut(6));
+            east.add(text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f))));
+            if (sessions > 1) { east.add(Box.createHorizontalStrut(4)); east.add(text(String.valueOf(sessions), foreground, owner.getFont())); }
+        }
+        row.add(east, BorderLayout.EAST);
+        String description = distro.profile().name() + ", " + (badge.isEmpty() ? HostRows.WSL : badge) + ", " + sessions
+            + (sessions == 1 ? " session" : " sessions");
         row.setToolTipText(description);
         row.getAccessibleContext().setAccessibleName(description);
         return row;

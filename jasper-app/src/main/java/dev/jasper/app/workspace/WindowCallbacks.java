@@ -4,7 +4,10 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-/** Application-supplied requests and native window events; confined to the EDT. */
+/**
+ * Application-supplied requests and native window events; confined to the EDT. {@code newWindow} opens a window whose
+ * tab starts in the given directory, or where a new shell starts when it is null.
+ */
 public record WindowCallbacks(Consumer<Path> newWindow, Runnable quit,
                        Consumer<TerminalWindow> activated, Consumer<TerminalWindow> closed,
                        Consumer<State> stateChanged) {

@@ -2,9 +2,11 @@ package dev.jasper.app.launch;
 
 import dev.jasper.app.testsupport.ConfigTestSupport;
 import static dev.jasper.app.testsupport.ConfigTestSupport.snapshot;
+import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.ShellIntegrationMode;
 import dev.jasper.app.config.TerminalConfig;
+import dev.jasper.terminal.session.SessionLaunchOptions;
 import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,92 @@ class LaunchSettingsTest {
             t.cursorShape(), t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), mode);
         return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), Map.of(), d.columns(),
             d.lines(), terminal, d.buddyEnabled(), d.maxResults());
+    }
+
+    private static ShellProfile wsl() {
+        return new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.of("WSL 2"), List.of("wsl.exe", "-d", "Ubuntu"));
+    }
+
+    private static ShellProfile powershell() {
+        return new ShellProfile("powershell", "PowerShell", ShellProfile.Kind.LOCAL_SHELL, Optional.empty(), List.of("powershell.exe", "-NoLogo"));
+    }
+
+    @Test void aWslProfileSharesJasperVariablesThroughWslenvAndNamesTheTab() {
+        Path dir = Path.of("C:\\Users\\me\\AppData\\Local\\Jasper\\shell-integration");
+        var settings = LaunchSettings.resolve(ConfigSnapshot.defaults(), wsl(), "Windows 11", Map.of("WslEnv", "USERPROFILE/p"), 80, 24, dir);
+        assertThat(settings.command()).as("no injection into wsl.exe").containsExactly("wsl.exe", "-d", "Ubuntu");
+        assertThat(settings.environment())
+            .containsEntry("WslEnv", "USERPROFILE/p:TERM:COLORTERM:TERM_PROGRAM:JASPER_TERMINAL:JASPER_SHELL_INTEGRATION/p")
+            .doesNotContainKey("WSLENV").containsEntry("JASPER_SHELL_INTEGRATION", dir.toString());
+        assertThat(settings.label()).isEqualTo("Ubuntu");
+        assertThat(settings.profile()).isEqualTo(wsl());
+        assertThat(settings.localPaths().apply("/mnt/c/Users")).map(Path::toString).contains("C:\\Users");
+        assertThat(settings.localPaths().apply("/home/me")).map(Path::toString).contains("\\\\wsl.localhost\\Ubuntu\\home\\me");
+        var off = LaunchSettings.resolve(withShell("", List.of(), ShellIntegrationMode.OFF), wsl(), "Windows 11", Map.of(), 80, 24, dir);
+        assertThat(off.environment()).containsEntry("WSLENV", "TERM:COLORTERM:TERM_PROGRAM:JASPER_TERMINAL");
+        var local = LaunchSettings.resolve(ConfigSnapshot.defaults(), powershell(), "Windows 11", Map.of(), 80, 24, dir);
+        assertThat(local.environment()).doesNotContainKey("WSLENV");
+        assertThat(local.label()).isEqualTo("PowerShell");
+        assertThat(local.localPaths()).isSameAs(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
+    }
+
+    @Test void wslenvSpelledTwoWaysBecomesOneMergedEntry() {
+        var snapshot = snapshot("", List.of(), Map.of("WSLENV", "GOPATH/l"), 100, 80, 24);
+        var settings = LaunchSettings.resolve(snapshot, wsl(), "Windows 11", Map.of("WslEnv", "USERPROFILE/p"), 80, 24, null);
+        var names = settings.environment().keySet().stream().filter(name -> name.equalsIgnoreCase("WSLENV")).toList();
+        assertThat(names).as("Windows would keep only one of them").containsExactly("WslEnv");
+        assertThat(settings.environment()).containsEntry("WslEnv", "USERPROFILE/p:GOPATH/l:TERM:COLORTERM:TERM_PROGRAM:JASPER_TERMINAL");
+    }
+
+    @Test void wslenvKeepsTheUsersEntriesAndAddsEachNameOnce() {
+        assertThat(LaunchSettings.wslEnv(null, List.of("TERM", "JASPER_SHELL_INTEGRATION/p"))).isEqualTo("TERM:JASPER_SHELL_INTEGRATION/p");
+        assertThat(LaunchSettings.wslEnv("", List.of("TERM"))).isEqualTo("TERM");
+        assertThat(LaunchSettings.wslEnv("JASPER_SHELL_INTEGRATION/u::GOPATH/l", List.of("TERM", "JASPER_SHELL_INTEGRATION/p")))
+            .isEqualTo("JASPER_SHELL_INTEGRATION/u:GOPATH/l:TERM");
+    }
+
+    @Test void theOldResolveRunsTheConfiguredProfile() {
+        var argsOnly = LaunchSettings.resolve(withShell("", List.of("-i"), ShellIntegrationMode.AUTO), "Linux", Map.of("SHELL", "/bin/bash"), 80, 24);
+        assertThat(argsOnly.command()).containsExactly("/bin/bash", "-l", "-i");
+        assertThat(argsOnly.profile().id()).isEqualTo("custom");
+        var cmd = LaunchSettings.resolve(ConfigLoader.parse(Path.of("config.toml"), "[terminal.shell]\nprofile = 'cmd'\n", false).snapshot(),
+            "Windows 11", Map.of("ComSpec", "C:\\Windows\\system32\\cmd.exe"), 80, 24);
+        assertThat(cmd.command()).containsExactly("C:\\Windows\\system32\\cmd.exe");
+        assertThat(cmd.label()).isEqualTo("Command Prompt");
+        var login = LaunchSettings.resolve(ConfigSnapshot.defaults(), "Mac OS X", Map.of("SHELL", "/bin/zsh"), 80, 24);
+        assertThat(login.label()).as("login and custom shells keep their program name").isEqualTo("zsh");
+    }
+
+    @Test void wslStartsInHomeWithTheDirectoryPassedToCdAndOtherShellsAvoidTheShare() {
+        Path home = Path.of("home-directory");
+        var wsl = new LaunchSettings(List.of("wsl.exe", "-d", "Ubuntu"), Map.of(), 80, 24, 0, wsl());
+        java.util.function.Predicate<Path> untouchable = path -> { throw new AssertionError("the share is never touched: " + path); };
+        var linux = wsl.at(Optional.of(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me")), home, untouchable);
+        assertThat(linux.directory()).isEqualTo(home);
+        assertThat(linux.settings().command()).containsExactly("wsl.exe", "-d", "Ubuntu", "--cd", "/home/me");
+        var windows = wsl.at(Optional.of(Path.of("C:\\Users\\me")), home, path -> true);
+        assertThat(windows.settings().command()).containsExactly("wsl.exe", "-d", "Ubuntu", "--cd", Path.of("C:\\Users\\me").toString());
+        assertThat(wsl.at(Optional.of(Path.of("C:\\gone")), home, path -> false).settings().command()).endsWith("--cd", "~");
+        var unspecified = wsl.at(Optional.empty(), home, untouchable);
+        assertThat(unspecified.directory()).isEqualTo(home);
+        assertThat(unspecified.settings().command()).as("no directory asked for: the Linux home, not /mnt/c/Users/...")
+            .endsWith("--cd", "~");
+        assertThat(wsl.at(Optional.of(home), home, path -> true).settings().command())
+            .as("a pane that reported the Windows home (a split of one in /mnt/c/Users/NAME) stays there")
+            .endsWith("--cd", home.toString());
+        assertThat(wsl.at(Optional.of(Path.of("\\\\wsl$\\Debian\\srv")), home, untouchable).settings().command()).as("another distribution's share")
+            .endsWith("--cd", "~");
+        assertThat(wsl.command()).as("the captured settings are unchanged").containsExactly("wsl.exe", "-d", "Ubuntu");
+        var local = new LaunchSettings(List.of("powershell.exe", "-NoLogo"), Map.of(), 80, 24, 0, powershell());
+        var fromShare = local.at(Optional.of(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me")), home, untouchable);
+        assertThat(fromShare.directory()).isEqualTo(home);
+        assertThat(fromShare.settings()).isSameAs(local);
+        assertThat(local.at(Optional.of(Path.of("C:\\Users\\me")), home, path -> true).directory()).isEqualTo(Path.of("C:\\Users\\me"));
+        assertThatIllegalArgumentException().isThrownBy(() -> local.at(Optional.of(Path.of("missing")), home, path -> false))
+            .withMessageContaining("Directory is unavailable");
+        var localHome = local.at(Optional.empty(), home, path -> path.equals(home));
+        assertThat(localHome.directory()).isEqualTo(home);
+        assertThat(localHome.settings()).isSameAs(local);
     }
 
     @Test void termProgramIsAlwaysJasperAndOnlyAutoInjects() {

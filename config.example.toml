@@ -77,7 +77,12 @@ shell_integration = "auto"
 colors = "match"
 
 [terminal.shell]
-# New panes only. An empty program selects the platform default login shell.
+# New panes only. The shell new tabs start: "powershell", "pwsh" (PowerShell 7) or "cmd" on Windows,
+# "wsl:<name>" for a WSL distribution, "login" on macOS and Linux, or "custom" (program and args below).
+# Empty means "custom" when program or args are set, otherwise the platform default. A split starts the
+# shell of the pane it splits; a profile that is not installed starts the default with a warning.
+profile = ""
+# For the "custom" profile. An empty program selects the platform default login shell.
 # Configured args append to that default command. An explicit program receives only these args,
 # with no implicit login flag. Each array item is passed as one exact argument: Jasper performs
 # no shell parsing, splitting, expansion, or interpolation. Program and args must contain no NUL.

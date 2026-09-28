@@ -71,11 +71,13 @@ final class ConfigurationController implements AutoCloseable {
         for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
     }
 
-    /** An application problem with a key of config.toml; shown with the file's diagnostics until the next reload. */
+    /** An application problem with a key of config.toml; shown once with the file's diagnostics until the next reload. */
     void report(String key, String message) {
         requireEdt();
         if (closed) return;
-        reported.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, key, message));
+        var diagnostic = new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, key, message);
+        if (reported.contains(diagnostic)) return;
+        reported.add(diagnostic);
         for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
     }
 

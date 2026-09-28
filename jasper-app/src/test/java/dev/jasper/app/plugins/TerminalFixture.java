@@ -49,7 +49,8 @@ final class TerminalFixture {
             (axis, spec) -> {
                 UUID created = switch (spec) {
                     case OpenSpec.Local local -> {
-                        opened.add("split|" + pane.id + "|" + axis + "|" + local.directory().map(Path::toString).orElse("-"));
+                        opened.add("split|" + pane.id + "|" + axis + "|" + local.directory().map(Path::toString).orElse("-")
+                            + local.profile().map(profile -> "|" + profile).orElse(""));
                         yield addPane(pane.tab.id, "split", local.directory().orElse(pane.directory));
                     }
                     case OpenSpec.Session session -> {
@@ -74,7 +75,8 @@ final class TerminalFixture {
             () -> Optional.ofNullable(window.selected).map(this::entry), () -> registry.activeWindow().map(WindowEntry::id).equals(Optional.of(window.id)),
             () -> opened.add("front|" + window.id), spec -> switch (spec) {
                 case OpenSpec.Local local -> {
-                    opened.add("tab|" + window.id + "|" + local.directory().map(Path::toString).orElse("-"));
+                    opened.add("tab|" + window.id + "|" + local.directory().map(Path::toString).orElse("-")
+                        + local.profile().map(profile -> "|" + profile).orElse(""));
                     yield Optional.of(entry(panes.get(addPane(addTab(window.id, "opened"), "opened", local.directory().orElse(null)))));
                 }
                 case OpenSpec.Session session -> {

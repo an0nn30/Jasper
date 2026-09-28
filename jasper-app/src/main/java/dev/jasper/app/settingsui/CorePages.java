@@ -2,6 +2,7 @@ package dev.jasper.app.settingsui;
 
 import static dev.jasper.app.config.CoreSettings.*;
 
+import dev.jasper.app.config.TerminalConfig;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,8 +32,13 @@ public final class CorePages {
     public record SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
                                 BooleanSupplier migratable) { }
 
-    /** Every schema page's spec, in tree order. */
+    /** Every schema page's spec, in tree order, with no detected shells. */
     public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system) {
+        return specs(themeNames, system, ShellChoices.NONE);
+    }
+
+    /** Every schema page's spec, in tree order. */
+    public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
@@ -90,29 +96,51 @@ public final class CorePages {
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),
             SchemaPage.page("terminal.shell", "Shell").parent("terminal").anchor("shell-environment-and-history")
-                .row(TERMINAL_SHELL_PROGRAM, Editors.executable()).note("Leave empty for your login shell.")
-                .row(TERMINAL_SHELL_ARGS, Editors.textList())
+                .row(TERMINAL_SHELL_PROFILE, Editors.profile(shells)).note("New tabs start this shell; a split starts the shell of its pane.")
+                .row(TERMINAL_SHELL_PROGRAM, Editors.executable()).note("For Custom. Leave empty for your login shell.")
+                .enabledWhen(CorePages::customShell)
+                .row(TERMINAL_SHELL_ARGS, Editors.textList()).enabledWhen(CorePages::customShell)
                 .row(TERMINAL_ENV, Editors.table())
                 .row(TERMINAL_SHELL_INTEGRATION, Editors.choice(Map.of("auto", "Automatic", "manual", "Manual", "off", "Off"))));
+    }
+
+    /** Program and Args apply only to the Custom profile, which an old program or args setting also selects. */
+    static boolean customShell(SettingsDraft draft) {
+        return TerminalConfig.Shell.custom(draft.value(TERMINAL_SHELL_PROGRAM), draft.value(TERMINAL_SHELL_ARGS), draft.value(TERMINAL_SHELL_PROFILE));
+    }
+
+    /** The whole tree with no detected shells. */
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system,
+                                                                   Function<PageContext, SettingsPage> keymap,
+                                                                   Function<PageContext, SettingsPage> plugins) {
+        return pages(themeNames, system, ShellChoices.NONE, keymap, plugins);
     }
 
     /**
      * The whole tree for one dialog, in display order: group and schema pages, with the Keymap and Plugins pages the
      * application supplies.
      */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system,
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins) {
-        return pages(themeNames, system, keymap, plugins, context -> List.of());
+        return pages(themeNames, system, shells, keymap, plugins, context -> List.of());
     }
 
-    /** As above, followed by {@code tools}: pages under Tools, such as plugins' settings pages. */
+    /** The whole tree with no detected shells, followed by {@code tools}. */
     public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system,
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools) {
+        return pages(themeNames, system, ShellChoices.NONE, keymap, plugins, tools);
+    }
+
+    /** As above with {@code shells}, followed by {@code tools}: pages under Tools, such as plugins' settings pages. */
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
+                                                                   Function<PageContext, SettingsPage> keymap,
+                                                                   Function<PageContext, SettingsPage> plugins,
+                                                                   Function<PageContext, List<SettingsPage>> tools) {
         return context -> {
-            var specs = specs(themeNames, system);
+            var specs = specs(themeNames, system, shells);
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();

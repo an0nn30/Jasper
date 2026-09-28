@@ -10,7 +10,11 @@ import org.tomlj.Toml;
 import org.tomlj.TomlArray;
 import org.tomlj.TomlParseResult;
 
-/** Which groups the hosts panel shows collapsed, in {@code data/panel-state.toml}; a broken file means "all expanded". */
+/**
+ * Which groups the hosts panel shows collapsed, in {@code data/panel-state.toml}; a broken file means "all expanded".
+ * {@code collapsed} lists host groups by name; the WSL group has its own {@code wsl_collapsed} flag, so no host group
+ * (not even one named "wsl", nor the default group renamed so) can share its state.
+ */
 final class PanelState {
     private final Path file;
 
@@ -26,6 +30,13 @@ final class PanelState {
         } catch (IOException | RuntimeException unreadable) { return Set.of(); }
     }
 
+    boolean wslCollapsed() {
+        try {
+            if (!Files.isRegularFile(file)) return false;
+            return Toml.parse(Files.readString(file, StandardCharsets.UTF_8)).get("wsl_collapsed") instanceof Boolean value && value;
+        } catch (IOException | RuntimeException unreadable) { return false; }
+    }
+
     String defaultGroup() {
         try {
             if (!Files.isRegularFile(file)) return "Other";
@@ -39,13 +50,17 @@ final class PanelState {
         if (name.isBlank() || name.length() > 80) throw new IllegalArgumentException("Use a group name from 1 to 80 characters");
         var groups = new LinkedHashSet<>(collapsed());
         if (groups.remove(defaultGroup())) groups.add(name);
-        save(groups, name);
+        save(groups, wslCollapsed(), name);
     }
 
-    void save(Set<String> groups) throws IOException { save(groups, defaultGroup()); }
+    /** Saves the collapsed host groups and keeps the WSL group's flag. */
+    void save(Set<String> groups) throws IOException { save(groups, wslCollapsed(), defaultGroup()); }
 
-    private void save(Set<String> groups, String defaultGroup) throws IOException {
-        var out = new StringBuilder("# Jasper Remote panel state.\ndefault_group = ").append(dev.jasper.remote.hosts.HostFile.tomlString(defaultGroup)).append("\ncollapsed = [");
+    void save(Set<String> groups, boolean wslCollapsed) throws IOException { save(groups, wslCollapsed, defaultGroup()); }
+
+    private void save(Set<String> groups, boolean wslCollapsed, String defaultGroup) throws IOException {
+        var out = new StringBuilder("# Jasper Remote panel state.\ndefault_group = ").append(dev.jasper.remote.hosts.HostFile.tomlString(defaultGroup))
+            .append("\nwsl_collapsed = ").append(wslCollapsed).append("\ncollapsed = [");
         boolean first = true;
         for (String group : groups) { if (!first) out.append(", "); first = false; out.append(dev.jasper.remote.hosts.HostFile.tomlString(group)); }
         Files.createDirectories(file.toAbsolutePath().getParent());

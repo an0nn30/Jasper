@@ -2,6 +2,74 @@
 
 ## Current state — 2026-09-28
 
+- **Merged main (plugin settings C1-C3, Vim V1c-V3a) into `worktree-wsl-hosts`** (2026-09-28). Main's SDK 0.9.0
+  plus this branch's additive profile API ship as SDK 0.9.1 (`JasperSdk.VERSION`, `@since 0.9.1`, version tests);
+  Remote is 0.6.0 with `sdk = ">=0.9.1, <0.10"` (main's declared settings and the WSL group); the other bundled
+  plugins keep main's `>=0.9.0, <0.10`. `PluginHost.Environment` takes main's settings files and report clearing plus
+  `PluginRuntime.ShellProfiles`; `CorePages.pages` gains an overload with both the detected shells and the plugin
+  pages under Tools, which `JasperApplication` uses. `./gradlew check --continue` on Windows: 4367 tests, 234 skipped,
+  13 failed (app 1221/141/3, terminal 391/19/1, Editor 2005/13/3, Remote 284/54/6, Vault 139/7/0, Buddy 163/0/0,
+  History 41/0/0, SDK 31/0/0, SDK testkit 69/0/0, Sample 12/0/0, Snippets 11/0/0): the known list plus four that
+  also fail on `main` on Windows (listed in `docs/windows-startup-verification.md`). Not pushed.
+- **WSL B: SDK shell profiles and the Remote WSL group** (`worktree-wsl-hosts`, 2026-09-28; spec
+  `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`): SDK 0.9.1 (written as 0.8.6; renumbered when main's SDK 0.9.0 was merged) adds `ShellProfileInfo`,
+  `Terminals.profiles()`/`onProfilesChanged` (default methods, `terminal.open`), `LocalSpec.profile` and
+  `OpenRequest.localProfile`; the app feeds plan A's `ShellProfileCatalog` to plugins through
+  `PluginRuntime.ShellProfiles` and refuses unknown ids (empty result, warning); the testkit scripts profiles
+  (`setShellProfiles`) and the contract suite covers known, unknown and default. Remote 0.6.0 (`sdk >=0.9.1, <0.10`; 0.5.0 before the merge)
+  titles its panel Sessions and shows a read-only WSL group first (badges, session dots, Open in new tab/split,
+  its own `wsl_collapsed` flag), lists distributions first in the Sessions dropdown (no separator: the SDK dropdown has
+  none) and as `WSL` rows in `>ssh`. `./gradlew check --continue` on Windows: 3479 tests, 234
+  skipped, 8 failed, all on the known list in `docs/windows-startup-verification.md` (app 1187/141 skipped/2 failed,
+  terminal 391/19/0, Editor 1172/13/0, Remote 278/54/6, Vault 139/7/0, Buddy 163/0/0, History 40/0/0, SDK 27/0/0,
+  SDK testkit 60/0/0, Sample 11/0/0, Snippets 11/0/0); hygiene scan clean. Native WSL acceptance (docs/remote.md items 11 to 15, also in
+  `docs/windows-startup-verification.md`) and the macOS/Linux check pending with the user. Deviations from the
+  plan: none in code. Plan A's names matched the plan's assumptions (`ShellProfile.Kind`, `ShellProfileCatalog`,
+  `OpenSpec.Local(Optional<Path>, Optional<String>)`, `JasperApplication.shellProfiles`); `knownProfile` compares
+  ids exactly although plan A launches `wsl:` ids case-insensitively (plugins receive canonical ids from
+  `profiles()`); Tasks 5 and 6 left raw non-ASCII literals in `HostsPanel`, `RemoteScope` and `HostsPanelTest`,
+  rewritten as Java escapes in Task 7; Task 8 adds native item 15 (Sessions dropdown and `>ssh`) to
+  `docs/remote.md`, names the ↻ "Detect shells again" button in item 13, and copies the WSL-group checks into
+  `docs/windows-startup-verification.md`. Review fixes after Task 8: the WSL group's collapsed state is its own
+  `wsl_collapsed` flag in `panel-state.toml` (no longer the `wsl` entry a host group of that name shared); `>ssh`
+  matches distributions on names only and keeps up to half the result limit for hosts; `onProfilesChanged`'s
+  Javadoc and docs say when it fires (first detection, then changed results; Custom edits may not be reported); the
+  panel reads "Search sessions…" and, beside a WSL group with no hosts, "No SSH hosts yet — …". Remote tests
+  283/54/6 (known six). Merged with main afterwards (entry above: SDK 0.9.1, Remote 0.6.0). Not pushed; not merged into main.
+- **WSL shell profiles, plan A** (branch `worktree-wsl-hosts`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`, spec
+  `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`): Windows sessions run on ConPTY, so OSC
+  titles and working-directory reports pass through. `terminal.shell.profile` chooses the shell new tabs start:
+  PowerShell, PowerShell 7, Command Prompt, each detected WSL 1/WSL 2 distribution (registry, `wsl.exe -l -v`
+  fallback, Docker's hidden), the login shell on macOS/Linux, or Custom (`program`/`args`, which an empty profile
+  still selects when they are set). Settings › Terminal › Shell has a Profile dropdown; Program and Arguments apply
+  to Custom only. WSL tabs run `wsl.exe -d <name> --cd <dir>` from the home folder, forward Jasper's variables
+  through `WSLENV`, and report Windows paths (`SessionLaunchOptions.localPathMapper`). Splits start their pane's
+  profile. An unavailable profile starts the platform default with a status-bar warning. Automatic shell
+  integration does not reach WSL (manual line documented). `./gradlew check --continue` on Windows: 3458 tests,
+  237 skipped, 8 failed, no failures outside the known list (re-verified and shortened in
+  `docs/windows-startup-verification.md`: `ShellIntegrationSessionTest`/`ShellCommandTrackerTest` now pass, and
+  `SessionLaunchCoordinatorTest` is enabled on Windows because ConPTY passes its OSC 2 readiness title);
+  `ShellProfilesTest.anExecutionAliasCountsAsExistingThoughItCannotBeFollowed` is skipped on Windows (symlink
+  privilege) and runs on macOS/Linux. macOS/Linux check pending with the user. Native acceptance checklist in
+  `docs/windows-startup-verification.md`. Deviations from the plan: Task 10's `SchemaPage.showValue` changes a
+  row's enablement only when its `enabledWhen` condition changes (a `shownEnabled` flag), so the line-height
+  spinner stays disabled while "use the platform" is checked; review fixes after Task 10: a WSL launch in the
+  Windows home passes `--cd ~`, `wsl:NAME` ids match detected distributions case-insensitively
+  (`ShellProfiles.sameId`, also in the Settings dropdown), every spelling of `WSLENV` merges into one entry,
+  `WslDistributions.detect` asks `wsl.exe -l -v` only when `reg.exe` gives no answer (exit 1, a missing Lxss key,
+  means "no WSL"), PowerShell 7 detection uses `NOFOLLOW_LINKS` and also finds the Store alias under
+  `%LOCALAPPDATA%\Microsoft\WindowsApps`, the `SessionLaunchOptions` javadoc says the path mapper compares by
+  identity, and non-ASCII literals are Java escapes. Second review round after Task 11: a WSL/`pwsh` profile
+  trusted before startup detection completes waits for it off the EDT (at most 12 s) and falls back to the platform
+  default with a warning if missing, and detection completing reports a missing configured profile; only a pane
+  nobody asked a directory for gets `--cd ~` (`Optional<Path>` through `ShellLauncher.launch`/`LaunchSettings.at`,
+  `JasperApplication.newWindow()`), so a split of a WSL pane in `/mnt/c/Users/NAME` stays there;
+  `sessionDefaults` reports no profile warning for SSH panes; the Settings dropdown keeps one "(not detected)"
+  entry and ignores re-picking the shown entry; a supplied launcher skips detection; `WslDistributionsTest` runs
+  `java.home`'s java. Plan B (Remote panel WSL group, SDK 0.9.1) is implemented on the same branch (entry above).
+  Not merged.
 - **Editor Vim mode, plan V3a** (branch `claude/vim-v3a`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3a.md`, written 2026-09-28): macros (`q`, `@`, `@@`, `{n}@`, `@:`, `@.`,
   `recording @q` in the Vim bar) and the mapping commands typed on the command line (`:map :nmap :vmap :xmap :omap

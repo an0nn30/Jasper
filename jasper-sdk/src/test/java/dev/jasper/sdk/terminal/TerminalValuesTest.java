@@ -38,6 +38,36 @@ class TerminalValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new LocalSpec(Optional.of(Path.of("relative"))));
     }
 
+    @Test void shellProfilesAreNamedValuesAndALocalSpecMayNameOne() throws Exception {
+        var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
+        assertThat(ubuntu.detail()).contains("WSL 2");
+        assertThat(ShellProfileInfo.Kind.values()).containsExactly(ShellProfileInfo.Kind.LOGIN_SHELL, ShellProfileInfo.Kind.LOCAL_SHELL,
+            ShellProfileInfo.Kind.WSL, ShellProfileInfo.Kind.CUSTOM);
+        assertThatIllegalArgumentException().isThrownBy(() -> new ShellProfileInfo(" ", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.empty()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new ShellProfileInfo("wsl:Ubuntu", "", ShellProfileInfo.Kind.WSL, Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new ShellProfileInfo("pwsh", "PowerShell 7", null, Optional.empty()));
+        assertThatNullPointerException().isThrownBy(() -> new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, null));
+
+        assertThat(new LocalSpec(Optional.empty()).profile()).as("the old constructor means the default shell").isEmpty();
+        assertThat(OpenRequest.localProfile("wsl:Ubuntu"))
+            .isEqualTo(new OpenRequest.Local(new LocalSpec(Optional.empty(), Optional.of("wsl:Ubuntu"))))
+            .isEqualTo(OpenRequest.local(LocalSpec.ofProfile("wsl:Ubuntu")));
+        assertThatIllegalArgumentException().isThrownBy(() -> new LocalSpec(Optional.empty(), Optional.of(" ")));
+        assertThatNullPointerException().isThrownBy(() -> new LocalSpec(Optional.empty(), null));
+        assertThatIllegalArgumentException().as("the directory rule still applies")
+            .isThrownBy(() -> new LocalSpec(Optional.of(Path.of("relative")), Optional.of("pwsh")));
+
+        assertThat(Terminals.class.getMethod("profiles").isDefault()).isTrue();
+        assertThat(Terminals.class.getMethod("onProfilesChanged", Runnable.class).isDefault()).isTrue();
+        Terminals older = (Terminals) java.lang.reflect.Proxy.newProxyInstance(Terminals.class.getClassLoader(), new Class<?>[]{Terminals.class},
+            (proxy, method, args) -> method.isDefault() ? java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args) : null);
+        assertThat(older.profiles()).as("a host that detects nothing").isEmpty();
+        var heard = new java.util.concurrent.atomic.AtomicInteger();
+        older.onProfilesChanged(heard::incrementAndGet).close();
+        assertThat(heard).hasValue(0);
+        assertThatNullPointerException().isThrownBy(() -> older.onProfilesChanged(null));
+    }
+
     @Test void everyTerminalTopicIsNamespacedAndDistinct() throws Exception {
         List<String> ids = new ArrayList<>();
         for (var field : TerminalEvents.class.getFields()) {

@@ -12,7 +12,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
 | `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `Notices`, `Platform` |
-| `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
+| `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
 
 The SDK is **0.x: no compatibility promise** until the Vault and SSH plugins ship. Plugins
@@ -33,8 +33,7 @@ var unlock = context.appearance().icon(IconName.UNLOCK);
 Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
 Icons use IntelliJ New UI artwork, selected centrally and fitted into a 16px square.
 SDK 0.8.2 also exposes all 885 catalog choices through `Appearance.icon(BundledIcon)`.
-Vault requires `sdk = ">=0.8.2, <0.9"`; Remote and Editor require `sdk = ">=0.8.5, <0.9"` for app-hosted document tabs and theme palettes.
-Other bundled plugins retain their 0.8.0 floor.
+Bundled plugins require `sdk = ">=0.9.0, <0.10"` (SDK 0.9.0 removed `PluginConfig`); Remote requires `sdk = ">=0.9.1, <0.10"` for shell profiles. Before 0.9, Vault required `>=0.8.2` and Editor `>=0.8.5` for app-hosted document tabs and theme palettes.
 Older custom hosts inherit UnsupportedOperationException until they implement each catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
 
@@ -57,3 +56,10 @@ providers that discover a remote shell's directory through their transport. The 
 updates display and `PaneInfo.remoteDirectory()` only; shell OSC 7 reports take precedence.
 Reports before attachment, after exit/close, or from an old reconnect attempt are ignored.
 The hint never becomes a local `Path`, changes command history, or emits `CWD_CHANGED`.
+
+SDK 0.9.1 adds shell profiles: `Terminals.profiles()` lists the shells Jasper detected as
+`ShellProfileInfo` (PowerShell, Command Prompt and WSL distributions on Windows, the login shell
+elsewhere), `onProfilesChanged` fires after a shell detection completes with a changed list (Custom
+shell edits may not be reported), and `OpenRequest.localProfile(id)` opens one. An
+id Jasper does not list opens nothing. Both methods need `terminal.open`; the testkit scripts the list
+with `FakePluginHost.setShellProfiles`.

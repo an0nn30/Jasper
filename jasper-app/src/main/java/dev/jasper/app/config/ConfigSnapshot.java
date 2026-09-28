@@ -151,7 +151,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                 values.get(CoreSettings.TERMINAL_FONT_FALLBACK), values.get(CoreSettings.TERMINAL_FONT_LIGATURES),
                 values.get(CoreSettings.TERMINAL_FONT_LINE_HEIGHT)),
             values.get(CoreSettings.UI_THEME_NAME), keybindings, values.get(CoreSettings.WINDOW_COLUMNS), values.get(CoreSettings.WINDOW_LINES),
-            new TerminalConfig(new TerminalConfig.Shell(values.get(CoreSettings.TERMINAL_SHELL_PROGRAM), values.get(CoreSettings.TERMINAL_SHELL_ARGS)),
+            new TerminalConfig(new TerminalConfig.Shell(values.get(CoreSettings.TERMINAL_SHELL_PROGRAM), values.get(CoreSettings.TERMINAL_SHELL_ARGS), values.get(CoreSettings.TERMINAL_SHELL_PROFILE)),
                 values.get(CoreSettings.TERMINAL_ENV), values.get(CoreSettings.TERMINAL_SCROLLBACK), values.get(CoreSettings.TERMINAL_OPTION_AS_META),
                 values.get(CoreSettings.TERMINAL_CURSOR_SHAPE), values.get(CoreSettings.TERMINAL_CURSOR_BLINK),
                 values.get(CoreSettings.TERMINAL_DIM_INACTIVE_PANES), values.get(CoreSettings.TERMINAL_COPY_ON_SELECT),

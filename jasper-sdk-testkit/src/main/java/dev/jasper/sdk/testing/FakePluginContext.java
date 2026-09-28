@@ -73,6 +73,11 @@ public final class FakePluginContext implements PluginContext {
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
     }
 
+    /** Closes the registration when the plugin stops, like everything else the context handed out. */
+    void own(Subscription subscription) {
+        synchronized (owned) { owned.add(subscription); }
+    }
+
     @Override public PluginInfo plugin() { return info; }
     @Override public System.Logger log() { return System.getLogger("dev.jasper.plugins." + info.id()); }
 

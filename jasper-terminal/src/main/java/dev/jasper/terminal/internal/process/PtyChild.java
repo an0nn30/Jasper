@@ -102,13 +102,7 @@ public final class PtyChild implements AutoCloseable {
     public Optional<String> foregroundJob() { return foreground.foregroundJob(); }
 
     public static PtyChild start(List<String> command, java.util.Map<String,String> environment, java.nio.file.Path directory, int columns, int rows) throws IOException {
-        PtyProcess process = new com.pty4j.PtyProcessBuilder(command.toArray(String[]::new))
-            .setEnvironment(environment(environment))
-            .setDirectory(directory.toString())
-            .setInitialColumns(columns)
-            .setInitialRows(rows)
-            .setUnixOpenTtyToPreserveOutputAfterTermination(true)
-            .start();
+        PtyProcess process = builder(command, environment, directory, columns, rows, System.getProperty("os.name")).start();
         try {
             return new PtyChild(process, command);
         } catch (RuntimeException | Error failure) {
@@ -116,6 +110,21 @@ public final class PtyChild implements AutoCloseable {
             catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
             throw failure;
         }
+    }
+
+    /**
+     * The process description. Windows uses ConPTY: winpty, pty4j's default there, does not pass OSC through, so
+     * titles, working-directory reports and shell integration would never arrive. pty4j ignores the flag elsewhere.
+     */
+    static com.pty4j.PtyProcessBuilder builder(List<String> command, java.util.Map<String,String> environment,
+                                               java.nio.file.Path directory, int columns, int rows, String osName) {
+        return new com.pty4j.PtyProcessBuilder(command.toArray(String[]::new))
+            .setEnvironment(environment(environment))
+            .setDirectory(directory.toString())
+            .setInitialColumns(columns)
+            .setInitialRows(rows)
+            .setUseWinConPty(osName.startsWith("Windows"))
+            .setUnixOpenTtyToPreserveOutputAfterTermination(true);
     }
 
     private void closeStreams() {

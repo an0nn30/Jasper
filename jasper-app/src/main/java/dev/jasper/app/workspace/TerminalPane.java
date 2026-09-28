@@ -33,6 +33,14 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     static final int PADDING = 4;
     private final UUID id = UUID.randomUUID();
     private final Path launchDirectory;
+    /**
+     * Whether nobody asked for {@link #launchDirectory}: the pane started where a new shell starts (the user's home,
+     * which a WSL profile reads as its Linux home). Always true for a provided session.
+     */
+    private final boolean defaultDirectory;
+    /** The profile this local pane asked for (empty: the user's default), and the one its launch resolved to. */
+    private final Optional<String> requestedProfile;
+    private Optional<String> launchedProfile = Optional.empty();
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
@@ -164,10 +172,18 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     TerminalPane(Path directory, ShellLauncher launcher) { this(directory, launcher, null); }
 
     /** {@code requestOrNull} makes this a pane whose session somebody else provides; it never starts a local shell. */
-    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) {
+    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) { this(directory, launcher, requestOrNull, Optional.empty()); }
+
+    /**
+     * {@code profile} names the shell profile a local pane starts; empty means the user's default. A null
+     * {@code directory} means nobody asked for one: the pane starts where a new shell starts.
+     */
+    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile) {
         super(new BorderLayout());
-        this.launchDirectory = directory;
+        this.defaultDirectory = directory == null || requestOrNull != null;
+        this.launchDirectory = directory == null ? Path.of(System.getProperty("user.home")) : directory;
         this.launcher = launcher;
+        this.requestedProfile = java.util.Objects.requireNonNull(profile, "profile");
         this.request = requestOrNull;
         this.shellLabel = requestOrNull == null ? launcher.label() : requestOrNull.title();
         if (requestOrNull != null) reportedTitle = requestOrNull.title();
@@ -201,7 +217,14 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
 
     void start() {
         if (request != null) { connect(); return; }
-        shellLabel = launcher.launch(launchDirectory, (created, failure) -> {
+        ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory),
+                requestedProfile, replaced -> {
+            // Detection showed the profile resolved before it completed is missing: the default starts instead.
+            if (closed) return;
+            shellLabel = replaced.label();
+            launchedProfile = replaced.profile();
+            onChanged.run();
+        }, (created, failure) -> {
             if (closed) { if (created != null) created.close(); return; }
             if (failure != null) {
                 LOG.log(System.Logger.Level.ERROR, "Terminal pane launch failed", failure);
@@ -216,6 +239,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             }
             adopt(created);
         });
+        shellLabel = launched.label();
+        launchedProfile = launched.profile();
     }
 
     /** Shows a running session here: the local shell, a provider's connection, or a reconnect replacing the last one. */
@@ -432,6 +457,16 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     boolean running() { return !closed && session != null && !session.exitFuture().isDone(); }
     boolean shellIntegrationDetected() { return session != null && session.shellIntegrationDetected(); }
     public Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
+
+    /**
+     * Where a split of this pane, or a tab or window opened from it, starts: the directory the shell reported, else
+     * the one it was asked to start in; null when it started where a new shell starts and has reported nothing, so
+     * the new pane does too (a WSL profile then opens its Linux home, not {@code /mnt/c/Users/NAME}).
+     */
+    Path inheritableDirectory() {
+        Optional<Path> reported = session == null ? Optional.empty() : session.workingDirectory();
+        return reported.orElse(defaultDirectory ? null : launchDirectory);
+    }
     String title() {
         return TerminalTitle.singleLine(!reportedTitle.isBlank() ? reportedTitle : runningCommand.strip());
     }
@@ -446,6 +481,9 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         return TerminalTitle.singleLine(job.startsWith("-") ? job.substring(1) : job);
     }
     String shellLabel() { return shellLabel; }
+
+    /** The profile this local pane launched, or asked for before launching; empty for provided sessions and plain launchers. */
+    Optional<String> profile() { return request != null ? Optional.empty() : launchedProfile.or(() -> requestedProfile); }
     void focusTerminal() { if (!closed) (view == null ? this : view).requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;

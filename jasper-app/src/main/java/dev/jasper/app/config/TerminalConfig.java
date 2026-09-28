@@ -27,7 +27,14 @@ public record TerminalConfig(Shell shell, Map<String, String> env, int scrollbac
             copyOnSelect, bell, onExit, ShellIntegrationMode.AUTO);
     }
 
-    public record Shell(String program, List<String> args) {
+    /**
+     * The shell new panes start.
+     *
+     * @param program the Custom profile's executable; empty means the platform's default shell
+     * @param args the Custom profile's exact arguments
+     * @param profile the chosen profile id; empty means Custom when program or args are set, else the platform default
+     */
+    public record Shell(String program, List<String> args, String profile) {
         public Shell {
             Objects.requireNonNull(program, "program");
             if ((!program.isEmpty() && program.isBlank()) || program.indexOf('\0') >= 0) {
@@ -37,6 +44,22 @@ public record TerminalConfig(Shell shell, Map<String, String> env, int scrollbac
             if (args.stream().anyMatch(arg -> arg.indexOf('\0') >= 0)) {
                 throw new IllegalArgumentException("Shell arguments must contain no NUL.");
             }
+            Objects.requireNonNull(profile, "profile");
+            if (profile.indexOf('\0') >= 0) throw new IllegalArgumentException("Shell profile must contain no NUL.");
+        }
+
+        /** No profile chosen: the old program and args settings decide. */
+        public Shell(String program, List<String> args) { this(program, args, ""); }
+
+        /** Whether new panes run {@code program} and {@code args}. */
+        public boolean custom() { return custom(program, args, profile); }
+
+        /**
+         * Whether these settings mean the Custom profile: it is chosen, or no profile is chosen and program or args
+         * are set, which is how Jasper ran them before profiles existed.
+         */
+        public static boolean custom(String program, List<String> args, String profile) {
+            return profile.equals("custom") || profile.isEmpty() && (!program.isEmpty() || !args.isEmpty());
         }
     }
 

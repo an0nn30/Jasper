@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.terminals.PaneEntry;
 import dev.jasper.app.terminals.PaneSnapshot;
 import dev.jasper.app.terminals.SplitAxis;
@@ -7,21 +8,25 @@ import dev.jasper.app.terminals.TabEntry;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.terminals.WindowEntry;
 import dev.jasper.sdk.Capabilities;
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.Direction;
 import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import dev.jasper.app.terminals.OpenSpec;
@@ -43,11 +48,21 @@ final class HostedTerminals implements Terminals {
     private final BooleanSupplier onUi;
     private final BooleanSupplier open;
     private final HostedSessions sessions;
+    private final PluginRuntime.ShellProfiles shellProfiles;
+    private final Containment containment;
+    /** Live {@link #onProfilesChanged} registrations, closed with the plugin. UI thread. */
+    private final List<dev.jasper.app.lifecycle.Subscription> profileRegistrations = new ArrayList<>();
 
+    /** A view that lists no shell profiles, for tests that do not need them. */
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
                     BooleanSupplier open, HostedSessions sessions) {
+        this(pluginId, gate, registry, ui, onUi, open, sessions, PluginRuntime.ShellProfiles.NONE, new Containment(onUi));
+    }
+
+    HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
+                    BooleanSupplier open, HostedSessions sessions, PluginRuntime.ShellProfiles shellProfiles, Containment containment) {
         this.pluginId = pluginId; this.gate = gate; this.registry = registry; this.ui = ui; this.onUi = onUi; this.open = open;
-        this.sessions = sessions;
+        this.sessions = sessions; this.shellProfiles = shellProfiles; this.containment = containment;
     }
 
     private void requireUi(String what) {
@@ -211,6 +226,7 @@ final class HostedTerminals implements Terminals {
         Objects.requireNonNull(window, "window");
         OpenSpec spec = spec(request);
         requireUi("openTab");
+        if (!knownProfile(spec)) return Optional.empty();
         Optional<WindowEntry> target = registry.window(window.id());
         if (target.isEmpty()) return Optional.empty();
         gate.audit(capability(request), "opened a tab in window " + window.id());
@@ -222,6 +238,7 @@ final class HostedTerminals implements Terminals {
         Objects.requireNonNull(direction, "direction");
         OpenSpec spec = spec(request);
         requireUi("split");
+        if (!knownProfile(spec)) return Optional.empty();
         Optional<PaneEntry> entry = registry.pane(target.id());
         if (entry.isEmpty()) return Optional.empty();
         gate.audit(capability(request), "split pane " + target.id());
@@ -232,7 +249,7 @@ final class HostedTerminals implements Terminals {
     /** Every request kind names its capability here, before anything else happens. */
     private OpenSpec spec(OpenRequest request) {
         return switch (Objects.requireNonNull(request, "request")) {
-            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory()); }
+            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory(), local.spec().profile()); }
             case OpenRequest.Session session -> { gate.require(Capabilities.SESSION_PROVIDE); yield new OpenSpec.Session(sessions.request(session.spec())); }
         };
     }
@@ -241,9 +258,56 @@ final class HostedTerminals implements Terminals {
         return request instanceof OpenRequest.Session ? Capabilities.SESSION_PROVIDE : Capabilities.TERMINAL_OPEN;
     }
 
+    @Override public List<ShellProfileInfo> profiles() {
+        gate.require(Capabilities.TERMINAL_OPEN);
+        requireUi("profiles");
+        return shellProfiles.current().get().stream().map(HostedTerminals::profileInfo).toList();
+    }
+
+    @Override public Subscription onProfilesChanged(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        gate.require(Capabilities.TERMINAL_OPEN);
+        requireUi("onProfilesChanged");
+        dev.jasper.app.lifecycle.Subscription registration = shellProfiles.onChanged().apply(() -> {
+            if (open.getAsBoolean()) containment.run(pluginId, "shell profile listener", listener);
+        });
+        profileRegistrations.add(registration);
+        var closed = new AtomicBoolean();
+        Runnable removal = () -> { profileRegistrations.remove(registration); registration.close(); };
+        return () -> {
+            if (!closed.compareAndSet(false, true)) return;
+            if (onUi.getAsBoolean()) removal.run(); else ui.accept(removal);
+        };
+    }
+
+    /** The kinds map one to one. */
+    private static ShellProfileInfo profileInfo(ShellProfile profile) {
+        ShellProfileInfo.Kind kind = switch (profile.kind()) {
+            case LOGIN_SHELL -> ShellProfileInfo.Kind.LOGIN_SHELL;
+            case LOCAL_SHELL -> ShellProfileInfo.Kind.LOCAL_SHELL;
+            case WSL -> ShellProfileInfo.Kind.WSL;
+            case CUSTOM -> ShellProfileInfo.Kind.CUSTOM;
+        };
+        return new ShellProfileInfo(profile.id(), profile.name(), kind, profile.detail());
+    }
+
+    /** A named profile must be one the catalog lists; otherwise nothing opens and the plugin's mistake is logged. */
+    private boolean knownProfile(OpenSpec spec) {
+        if (!(spec instanceof OpenSpec.Local local) || local.profile().isEmpty()) return true;
+        String id = local.profile().get();
+        if (shellProfiles.current().get().stream().anyMatch(profile -> profile.id().equals(id))) return true;
+        LOG.log(System.Logger.Level.WARNING, "Plugin " + pluginId + " asked for the unknown shell profile " + id + "; nothing opened");
+        return false;
+    }
+
     /** A handle that finds its tab lazily, for callers that are not on the UI thread. */
     PaneHandle detachedPaneHandle(UUID id) { return new Pane(id, NOWHERE); }
 
-    /** The plugin is stopping. */
-    void closeAll() { sessions.cancelAll(); }
+    /** The plugin is stopping: cancel its sessions and drop its profile listeners. UI thread. */
+    void closeAll() {
+        sessions.cancelAll();
+        var registrations = List.copyOf(profileRegistrations);
+        profileRegistrations.clear();
+        registrations.forEach(dev.jasper.app.lifecycle.Subscription::close);
+    }
 }
