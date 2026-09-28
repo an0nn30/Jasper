@@ -27,8 +27,8 @@ class SftpPluginTest {
             assertThat(host.actions()).noneMatch(action->action.startsWith("dev.jasper.remote.transfers.toggle"));
             assertThat(host.openRequests()).isEmpty();assertThat(host.windows()).isEmpty();
             assertThat(plugin.transfers().job(restored).get(5,TimeUnit.SECONDS).state()).isEqualTo(TransferState.PAUSED);
-            host.setConfig("dev.jasper.remote",Map.of("sftp",Map.of("max_parallel_files",99L,"request_timeout_seconds",0L),"shortcuts",Map.of("toggle_sftp","cmd+alt+f","toggle_transfers","cmd+alt+t")));
-            assertThat(RemoteSettings.sftp(context.config()).maxParallelFiles()).isEqualTo(8);assertThat(RemoteSettings.sftp(context.config()).requestTimeout().toSeconds()).isEqualTo(1);
+            host.setSetting("dev.jasper.remote","sftp.max_parallel_files",8L);host.setSetting("dev.jasper.remote","sftp.request_timeout_seconds",1L);
+            assertThat(plugin.sftpSettings().maxParallelFiles()).isEqualTo(8);assertThat(plugin.sftpSettings().requestTimeout().toSeconds()).isEqualTo(1);
             UUID window=host.addTerminalWindow(),second=host.addTerminalWindow();host.invoke("dev.jasper.remote.transfers",window,null);host.invoke("dev.jasper.remote.transfers",second,null);
             assertThat(host.openRequests()).isEmpty();assertThat(host.failures()).isEmpty();
             assertThat(host.windows()).as("showing transfers never opens the host chooser").isEmpty();
