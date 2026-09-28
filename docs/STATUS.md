@@ -87,6 +87,19 @@
   inline (user choice) with checkpoints after Tasks 4, 7 and 12; no GUI launched. Deviations: see the
   plan's status banner. Next: sub-project B (Settings dialog), then C (SDK settings API). Not pushed; not merged.
 
+- **Windows tray icon and installer build script** (`codex/windows-build-script-and-resident`,
+  2026-09-27): user-approved amendment to the background-residency spec. A resident Windows
+  process shows a notification-area icon with Open Jasper (also double-click) and Quit Jasper;
+  Quit is the normal quit path with plugin guards. `platform.ResidentTray` is a no-op when
+  headless, outside Windows or when unsupported; `JasperApplication.residentIndicator` injects it.
+  Removed when residency ends or at shutdown. `packaging\windows\Build-Installer.ps1` finds an x64
+  JBR SDK 25 and WiX 3 and builds the setup EXE (or ZIP) on Windows ARM64; verified building
+  the installer and rejecting an ARM64 SDK. On Windows: `ResidentIndicatorTest` (6),
+  `ResidentTrayTest` (3), `ApplicationBootstrapTest` (13, one existing skip) and
+  `verifyApplicationArchitecture` pass. `JasperApplicationResidencyTest` stays disabled on
+  Windows (no recorded reason). Full `check` not run. Manual, user-run: the icon appears
+  when resident, Open/double-click reveals a window, Quit exits, no icon when not resident.
+  Not merged or pushed.
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
   Editor files now use the main workspace's tab strip, rounded content frame, commands,
   status and breadcrumbs. The tab menu moves live content to/from a separate app-owned
