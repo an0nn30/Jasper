@@ -1,0 +1,1193 @@
+# Search: / ? n N * # g* g#, offsets, the command line, and case rules.
+
+=== slash finds the next match
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: normal
+
+=== slash skips the match at the cursor
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,5
+keys: /cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,13
+expect-mode: normal
+
+=== slash wraps to the top
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 3,1
+keys: /cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: normal
+
+=== slash with nowrapscan fails at the bottom
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 3,1
+set: nowrapscan
+keys: /cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,1
+expect-mode: normal
+
+=== slash not found keeps the cursor
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,5
+keys: /zebra<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: normal
+
+=== slash with a count
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: 2/the<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,1
+expect-mode: normal
+
+=== question mark finds backward
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 3,5
+keys: ?cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,13
+expect-mode: normal
+
+=== question mark from column 0
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 2,1
+keys: ?the<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,16
+expect-mode: normal
+
+=== question mark wraps to the bottom
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: ?end<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,5
+expect-mode: normal
+
+=== n repeats forward
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /the<CR>n
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,1
+expect-mode: normal
+
+=== N repeats backward
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /the<CR>N
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+
+=== n after question mark goes backward
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 3,1
+keys: ?the<CR>n
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+
+=== N after question mark goes forward
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 3,1
+keys: ?the<CR>N
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,1
+expect-mode: normal
+
+=== n with a count
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /a<CR>3n
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,1
+expect-mode: normal
+
+=== n with no previous pattern fails
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: n
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+
+=== empty pattern reuses the last
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /the<CR>/<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,1
+expect-mode: normal
+
+=== slash with an e offset
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /cat/e<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,7
+expect-mode: normal
+
+=== slash with e+1
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /cat/e+1<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,8
+expect-mode: normal
+
+=== slash with e-1
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /cat/e-1<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,6
+expect-mode: normal
+
+=== slash with s+1
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /cat/s+1<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,6
+expect-mode: normal
+
+=== slash with b-1
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,6
+keys: /cat/b-1<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,12
+expect-mode: normal
+
+=== slash with a line offset
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /dog/+1<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,1
+expect-mode: normal
+
+=== slash with a line offset minus
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /end/-1<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,1
+expect-mode: normal
+
+=== slash with a bare line offset
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /dog/0<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,1
+expect-mode: normal
+
+=== n keeps the offset
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /a/e<CR>n
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,10
+expect-mode: normal
+
+=== empty pattern with a new offset
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /cat<CR>//e<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,7
+expect-mode: normal
+
+=== slash with e offset then n does not stick
+text:
+  xab xab xab
+cursor: 1,1
+keys: /ab/e<CR>nn
+--- vim 9.1
+expect-text:
+  xab xab xab
+expect-cursor: 1,11
+expect-mode: normal
+
+=== question mark with e offset
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 3,1
+keys: ?cat?e<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,15
+expect-mode: normal
+
+=== slash with semicolon chains
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /dog/;/cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,13
+expect-mode: normal
+
+=== slash with semicolon and offsets
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /dog/;/a/e<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,7
+expect-mode: normal
+
+=== slash semicolon question
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 3,1
+keys: /end/;?cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,13
+expect-mode: normal
+
+=== d slash deletes up to the match
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: d/cat<CR>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "the "
+expect-register 0: none
+expect-register 1: c "the "
+expect-register -: c "the "
+
+=== d slash with e offset is inclusive
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: d/cat/e<CR>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+   sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "the cat"
+expect-register 0: none
+expect-register 1: c "the cat"
+expect-register -: c "the cat"
+
+=== d slash with a line offset is linewise
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,5
+keys: d/dog/0<CR>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "the cat sat on the mat\na dog and a cat\n"
+expect-register 0: none
+expect-register 1: l "the cat sat on the mat\na dog and a cat\n"
+expect-register -: none
+
+=== d slash to the next line
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,5
+keys: d/dog<CR>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  the dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "cat sat on the mat\na "
+expect-register 0: none
+expect-register 1: c "cat sat on the mat\na "
+expect-register -: none
+
+=== c slash
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: c/sat<CR>X<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  Xsat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "the cat "
+expect-register 0: none
+expect-register 1: c "the cat "
+expect-register -: c "the cat "
+
+=== y slash then dot is not a change
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: y/cat<CR>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "the "
+expect-register 0: c "the "
+expect-register 1: none
+expect-register -: none
+
+=== d slash then dot
+text:
+  a1 a2 a3 a4 x
+cursor: 1,1
+keys: d/a<CR>.
+--- vim 9.1
+expect-text:
+  a3 a4 x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d n
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /on<CR>0dn
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "the cat sat "
+expect-register 0: none
+expect-register 1: c "the cat sat "
+expect-register -: c "the cat sat "
+
+=== slash then Esc cancels
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /cat<Esc>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+
+=== slash then BS on empty cancels
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /<BS>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+
+=== slash with BS editing
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /caz<BS>t<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: normal
+
+=== slash with C-u
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /xyz<C-u>dog<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,3
+expect-mode: normal
+
+=== slash with C-w
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /foo cat<C-w>dog<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+
+=== slash with C-r register
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: yiw/<C-r>"<CR>n
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 3,1
+expect-mode: normal
+
+=== slash with C-r C-w
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,5
+keys: /<C-r><C-w><CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,13
+expect-mode: normal
+
+=== slash with Left and insert
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /ct<Left>a<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: normal
+
+=== slash with Home and End
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /at<Home>c<End><CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: normal
+
+=== slash with Up recalls history
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /dog<CR>gg/<Up><CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,3
+expect-mode: normal
+
+=== slash to the end of the line
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: /$<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,22
+expect-mode: normal
+
+=== slash to the start of the line
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,5
+keys: /^<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,1
+expect-mode: normal
+
+=== v slash extends the selection
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: v/cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,5
+expect-mode: visual
+expect-visual: 1,1
+
+=== v slash then d
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: v/cat<CR>d
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  at sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "the c"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "the c"
+
+=== v slash cancelled keeps Visual mode
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: vl/cat<Esc>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 1,2
+expect-mode: visual
+expect-visual: 1,1
+
+=== star searches the word
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 1,1
+keys: *
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 1,9
+expect-mode: normal
+
+=== star skips words that contain it
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 1,1
+keys: **
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 2,5
+expect-mode: normal
+
+=== star with a count
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 1,1
+keys: 2*
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 2,5
+expect-mode: normal
+
+=== hash searches backward
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 2,5
+keys: #
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 1,9
+expect-mode: normal
+
+=== g star finds inside words
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 1,1
+keys: g*g*
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 2,5
+expect-mode: normal
+
+=== g hash
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 3,1
+keys: g#
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 3,1
+expect-mode: normal
+
+=== star on punctuation
+text:
+  a.b a.b
+cursor: 1,2
+keys: *
+--- vim 9.1
+expect-text:
+  a.b a.b
+expect-cursor: 1,7
+expect-mode: normal
+
+=== star after the cursor word
+text:
+    foo x foo
+cursor: 1,1
+keys: *
+--- vim 9.1
+expect-text:
+    foo x foo
+expect-cursor: 1,9
+expect-mode: normal
+
+=== star on a blank line fails
+text:
+  $
+  foo
+cursor: 1,1
+keys: *
+--- vim 9.1
+expect-text:
+  $
+  foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== star then n
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 1,1
+keys: *n
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 2,5
+expect-mode: normal
+
+=== star sets the pattern for slash
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 1,1
+keys: */<CR>
+--- vim 9.1
+expect-text:
+  foo bar foo
+  baz foo
+  foobar food
+expect-cursor: 2,5
+expect-mode: normal
+
+=== star with ignorecase
+text:
+  Foo foo FOO
+cursor: 1,1
+set: ignorecase
+keys: *
+--- vim 9.1
+expect-text:
+  Foo foo FOO
+expect-cursor: 1,5
+expect-mode: normal
+
+=== star ignores smartcase
+text:
+  Foo foo FOO
+cursor: 1,1
+set: ignorecase smartcase
+keys: *
+--- vim 9.1
+expect-text:
+  Foo foo FOO
+expect-cursor: 1,5
+expect-mode: normal
+
+=== d star
+text:
+  foo bar foo
+  baz foo
+  foobar food
+cursor: 1,1
+keys: d*
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  foo
+  baz foo
+  foobar food
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "foo bar "
+expect-register 0: none
+expect-register 1: c "foo bar "
+expect-register -: c "foo bar "
+
+=== ignorecase finds upper case
+text:
+  x ABC abc
+cursor: 1,1
+set: ignorecase
+keys: /abc<CR>
+--- vim 9.1
+expect-text:
+  x ABC abc
+expect-cursor: 1,3
+expect-mode: normal
+
+=== smartcase with upper case matches case
+text:
+  x abc Abc
+cursor: 1,1
+set: ignorecase smartcase
+keys: /Abc<CR>
+--- vim 9.1
+expect-text:
+  x abc Abc
+expect-cursor: 1,7
+expect-mode: normal
+
+=== smartcase with lower case ignores case
+text:
+  x Abc abc
+cursor: 1,1
+set: ignorecase smartcase
+keys: /abc<CR>
+--- vim 9.1
+expect-text:
+  x Abc abc
+expect-cursor: 1,3
+expect-mode: normal
+
+=== backslash c ignores case
+text:
+  x ABC abc
+cursor: 1,1
+keys: /\cabc<CR>
+--- vim 9.1
+expect-text:
+  x ABC abc
+expect-cursor: 1,3
+expect-mode: normal
+
+=== backslash C matches case
+text:
+  x ABC abc
+cursor: 1,1
+set: ignorecase
+keys: /\Cabc<CR>
+--- vim 9.1
+expect-text:
+  x ABC abc
+expect-cursor: 1,7
+expect-mode: normal
+
+=== smartcase ignores escaped letters
+text:
+  x Abc abc
+cursor: 1,1
+set: ignorecase smartcase
+keys: /\Sbc<CR>
+--- vim 9.1
+expect-text:
+  x Abc abc
+expect-cursor: 1,3
+expect-mode: normal
+
+=== match on the next line when the cursor is on the last character
+text:
+  abc
+  xabc
+cursor: 1,3
+keys: /abc<CR>
+--- vim 9.1
+expect-text:
+  abc
+  xabc
+expect-cursor: 2,2
+expect-mode: normal
+
+=== match at the cursor with a count wraps
+text:
+  abc
+cursor: 1,1
+keys: /abc<CR>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== empty match with star
+text:
+  aaa bbb
+cursor: 1,1
+keys: /b*<CR>
+--- vim 9.1
+expect-text:
+  aaa bbb
+expect-cursor: 1,2
+expect-mode: normal
+
+=== search in an empty line
+text:
+  $
+  x
+  $
+cursor: 1,1
+keys: /x<CR>
+--- vim 9.1
+expect-text:
+  $
+  x
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== backward search at column 1 of the first line
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 1,1
+keys: ?cat<CR>
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,13
+expect-mode: normal
+
+=== n after wrap
+text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+cursor: 2,15
+keys: /cat<CR>n
+--- vim 9.1
+expect-text:
+  the cat sat on the mat
+  a dog and a cat
+  the end
+expect-cursor: 2,13
+expect-mode: normal

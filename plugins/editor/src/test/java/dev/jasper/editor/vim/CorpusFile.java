@@ -92,7 +92,7 @@ final class CorpusFile {
     private static Parsed expectation(String file, List<String> lines, int i, String by) {
         List<String> text = List.of();
         int line = 1, col = 1;
-        String mode = "normal";
+        String mode = "normal", visual = null;
         Map<Character, CorpusCase.Register> registers = new LinkedHashMap<>();
         while (i < lines.size() && !lines.get(i).startsWith("=== ")) {
             String field = lines.get(i);
@@ -115,6 +115,7 @@ final class CorpusFile {
                     col = Integer.parseInt(parts[1].trim());
                 }
                 case "expect-mode" -> mode = value;
+                case "expect-visual" -> visual = value;
                 default -> {
                     if (!key.startsWith("expect-register ")) throw error(file, i, "unknown field " + key);
                     if (!value.equals("none")) registers.put(key.charAt(16), register(value));
@@ -122,11 +123,12 @@ final class CorpusFile {
             }
             i++;
         }
-        return new Parsed(new CorpusCase.Expected(by, text, line, col, mode, registers), i);
+        return new Parsed(new CorpusCase.Expected(by, text, line, col, mode, visual, registers), i);
     }
 
     private static CorpusCase.Register register(String value) {
-        return new CorpusCase.Register(value.charAt(0), Json.unquote(value.substring(1).trim()));
+        int space = value.indexOf(' ');
+        return new CorpusCase.Register(value.substring(0, space), Json.unquote(value.substring(space + 1).trim()));
     }
 
     /** Reads indented text lines until a line that is not indented; returns the index after them. */
@@ -180,6 +182,7 @@ final class CorpusFile {
         for (String line : expected.text()) out.add(textLine(line));
         out.add("expect-cursor: " + expected.line() + "," + expected.col());
         out.add("expect-mode: " + expected.mode());
+        if (expected.visual() != null) out.add("expect-visual: " + expected.visual());
         for (char name : c.registers()) {
             CorpusCase.Register register = expected.registers().get(name);
             out.add("expect-register " + name + ": " + (register == null ? "none" : register.type() + " " + Json.quote(register.text())));

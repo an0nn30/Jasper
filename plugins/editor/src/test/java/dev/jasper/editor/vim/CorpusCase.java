@@ -24,10 +24,29 @@ record CorpusCase(String file, String name, String divergent, String set, Map<Ch
     /**
      * A register's content as the corpus writes it.
      *
-     * @param type {@code c} charwise or {@code l} linewise
+     * @param type as getregtype() gives it, but in letters: {@code c} charwise, {@code l} linewise, or {@code b} and
+     *     the width for a block ({@code b3})
      * @param text its text, as getreg() gives it
      */
-    record Register(char type, String text) { }
+    record Register(String type, String text) {
+        /** @return the content a register holds for it */
+        Registers.Content content() {
+            if (type.startsWith("b")) {
+                return new Registers.Content(java.util.List.of(text.split("\n", -1)), Registers.Type.BLOCK, Integer.parseInt(type.substring(1)) - 1);
+            }
+            return Registers.Content.of(text, type.equals("l") ? Registers.Type.LINE : Registers.Type.CHAR);
+        }
+
+        /** @return how the corpus writes a register's content */
+        static Register of(Registers.Content content) {
+            String type = switch (content.type()) {
+                case CHAR -> "c";
+                case LINE -> "l";
+                case BLOCK -> "b" + (content.width() + 1);
+            };
+            return new Register(type, content.text());
+        }
+    }
 
     /**
      * The result.
@@ -37,9 +56,10 @@ record CorpusCase(String file, String name, String divergent, String set, Map<Ch
      * @param line the cursor line, 1-based
      * @param col the cursor column in characters, 1-based
      * @param mode {@link Mode#id()}
+     * @param visual in Visual mode, the other end of the area as {@code line,col} (1-based, in characters); else null
      * @param registers the compared registers; a missing value means empty
      */
-    record Expected(String recordedBy, List<String> text, int line, int col, String mode, Map<Character, Register> registers) { }
+    record Expected(String recordedBy, List<String> text, int line, int col, String mode, String visual, Map<Character, Register> registers) { }
 
     CorpusCase withExpected(Expected value) { return new CorpusCase(file, name, divergent, set, given, text, line, col, keys, registers, value); }
 

@@ -47,7 +47,7 @@ class VimCorpusTest {
             "expect-mode: insert", "expect-register \": c \"one\\ttwo\"", "expect-register a: none");
         CorpusCase c = CorpusFile.parse("inline", lines).getFirst();
         assertThat(c.text()).containsExactly("ends in space ", "", "cost $");
-        assertThat(c.given().get('a')).isEqualTo(new CorpusCase.Register('l', "x\n"));
+        assertThat(c.given().get('a')).isEqualTo(new CorpusCase.Register("l", "x\n"));
         assertThat(c.expected().registers()).containsOnlyKeys('"');
         assertThat(c.expected().registers().get('"').text()).isEqualTo("one\ttwo");
         assertThat(CorpusFile.format(c, c.expected())).containsExactly("--- vim 9.1", "expect-text:", "  done", "expect-cursor: 1,1",

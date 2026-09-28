@@ -1,0 +1,1374 @@
+# Marks, the jumplist, the change list and gi.
+
+=== m then backtick returns to the mark
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: majj`a
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,5
+expect-mode: normal
+
+=== m then quote goes to the first non-blank
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,7
+keys: majj'a
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== quote to an unset mark fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: 'b
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,5
+expect-mode: normal
+
+=== backtick to an unset mark fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: `b
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,5
+expect-mode: normal
+
+=== d backtick deletes to the mark
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,3
+keys: majjl d`a
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  li three
+  line four
+  line five
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": c "ne one\n  line two\nline"
+expect-register 0: none
+expect-register 1: c "ne one\n  line two\nline"
+expect-register -: none
+
+=== d quote deletes lines to the mark
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,3
+keys: majjd'a
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "line one\n  line two\nline three\n"
+expect-register 0: none
+expect-register 1: l "line one\n  line two\nline three\n"
+expect-register -: none
+
+=== y backtick
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,3
+keys: majly`a
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": c "ne one\n  l"
+expect-register 0: c "ne one\n  l"
+expect-register 1: none
+expect-register -: none
+
+=== mark follows inserted lines
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 3,3
+keys: maggOnew<Esc>`a
+--- vim 9.1
+expect-text:
+  new
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 4,3
+expect-mode: normal
+
+=== mark follows deleted lines above
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 3,3
+keys: maggdd`a
+--- vim 9.1
+expect-text:
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== mark on a deleted line is gone
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 3,3
+keys: maddk'a
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line four
+  line five
+expect-cursor: 2,1
+expect-mode: normal
+
+=== mark column stays after an edit in the line
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,6
+keys: ma0x`a
+--- vim 9.1
+expect-text:
+  ine one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,6
+expect-mode: normal
+
+=== mark after a join moves to the joined line
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: makJ`a
+--- vim 9.1
+expect-text:
+  line one line two
+  line three
+  line four
+  line five
+expect-cursor: 1,12
+expect-mode: normal
+
+=== mark on a blank line moves when joined
+text:
+  a
+  $
+  b
+cursor: 2,1
+keys: makJ`a
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== mark on a white line moves when joined
+text:
+  a
+     $
+  b
+cursor: 2,2
+keys: makJ`a
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== mark after gJ
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: makgJ`a
+--- vim 9.1
+expect-text:
+  line one  line two
+  line three
+  line four
+  line five
+expect-cursor: 1,13
+expect-mode: normal
+
+=== uppercase mark
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: mAG`A
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,5
+expect-mode: normal
+
+=== backtick backtick returns after G
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: G``
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,5
+expect-mode: normal
+
+=== quote quote returns after G
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: G''
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== backtick backtick twice toggles
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: G````
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 5,1
+expect-mode: normal
+
+=== backtick backtick after a search
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: /four<CR>``
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+
+=== backtick backtick after star
+text:
+  a foo b
+  foo
+cursor: 1,4
+keys: *``
+--- vim 9.1
+expect-text:
+  a foo b
+  foo
+expect-cursor: 1,4
+expect-mode: normal
+
+=== backtick backtick at start fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: ``
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+
+=== m quote sets the previous context
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,5
+keys: m'G``
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,5
+expect-mode: normal
+
+=== jumps with G and gg then C-o
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3GGgg<C-o>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 5,1
+expect-mode: normal
+
+=== C-o twice
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3GG<C-o><C-o>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-o then C-i
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3GG<C-o><C-o><C-i>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 3,1
+expect-mode: normal
+
+=== C-o then Tab
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3GG<C-o><C-o><Tab>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 3,1
+expect-mode: normal
+
+=== C-g does not move the cursor
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,3
+keys: <C-g>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== ga does not move the cursor
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,3
+keys: ga
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== C-o with a count
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2G3G4G2<C-o>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== C-o at the start fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: <C-o>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-i at the end fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3G<C-i>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 3,1
+expect-mode: normal
+
+=== C-o merges jumps on the same line
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3G1G3G5G<C-o><C-o>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+
+=== percent is a jump
+text:
+  (a
+  b)
+cursor: 1,1
+keys: %<C-o>
+--- vim 9.1
+expect-text:
+  (a
+  b)
+expect-cursor: 1,1
+expect-mode: normal
+
+=== brace is a jump
+text:
+  a
+  $
+  b
+cursor: 1,1
+keys: }<C-o>
+--- vim 9.1
+expect-text:
+  a
+  $
+  b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== search then C-o
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: /three<CR><C-o>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-o after an edit elsewhere
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 5Gx1G<C-o>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  ine five
+expect-cursor: 5,1
+expect-mode: normal
+
+=== g semicolon goes to the last change
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3Gx1Gg;
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  ine three
+  line four
+  line five
+expect-cursor: 3,1
+expect-mode: normal
+
+=== g semicolon twice
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gx4Gx1Gg;g;
+--- vim 9.1
+expect-text:
+  line one
+    ine two
+  line three
+  ine four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== g semicolon then g comma
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gx4Gx1Gg;g;g,
+--- vim 9.1
+expect-text:
+  line one
+    ine two
+  line three
+  ine four
+  line five
+expect-cursor: 4,1
+expect-mode: normal
+
+=== g semicolon with no changes fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: g;
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g semicolon past the start fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gxg;g;
+--- vim 9.1
+expect-text:
+  line one
+    ine two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== g comma at the end fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gxg,
+--- vim 9.1
+expect-text:
+  line one
+    ine two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== changes on one line make one entry
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: xxxwxg;g;
+--- vim 9.1
+expect-text:
+  e ne
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,3
+expect-mode: normal
+
+=== changes far apart on one line make two entries
+text:
+  abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbc
+cursor: 1,1
+keys: x$xg;g;
+--- vim 9.1
+expect-text:
+  bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+expect-cursor: 1,1
+expect-mode: normal
+
+=== quote dot goes to the last change
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3Gx1G'.
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  ine three
+  line four
+  line five
+expect-cursor: 3,1
+expect-mode: normal
+
+=== backtick dot
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3G$x1G`.
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line thre
+  line four
+  line five
+expect-cursor: 3,9
+expect-mode: normal
+
+=== backtick dot after dd
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 3Gdd1G`.
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line four
+  line five
+expect-cursor: 3,1
+expect-mode: normal
+
+=== backtick dot after o
+divergent: '. takes each typed character's column, as when typing; Vim fed a whole string at once records where it started
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Goxy<Esc>gg`.
+--- expected
+expect-text:
+  line one
+    line two
+  xy
+  line three
+  line four
+  line five
+expect-cursor: 3,2
+expect-mode: normal
+
+=== backtick dot after p
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: yy3Gpgg`.
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line one
+  line four
+  line five
+expect-cursor: 4,1
+expect-mode: normal
+
+=== backtick dot after dd at the end fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 5,1
+keys: ddgg`.
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+expect-cursor: 1,1
+expect-mode: normal
+
+=== backtick caret after insert
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2GAxyz<Esc>gg`^
+--- vim 9.1
+expect-text:
+  line one
+    line twoxyz
+  line three
+  line four
+  line five
+expect-cursor: 2,13
+expect-mode: normal
+
+=== gi goes back to the insert
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gix<Esc>ggiY<Esc>3Ggiz<Esc>
+--- vim 9.1
+expect-text:
+  Yzline one
+    xline two
+  line three
+  line four
+  line five
+expect-cursor: 1,2
+expect-mode: normal
+
+=== gi without an insert
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,3
+keys: giq<Esc>
+--- vim 9.1
+expect-text:
+  line one
+    qline two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== gi after the line got shorter
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2GA!<Esc>0Dgggiz<Esc>
+--- vim 9.1
+expect-text:
+  line one
+  z
+  line three
+  line four
+  line five
+expect-cursor: 2,1
+expect-mode: normal
+
+=== backtick bracket after yank
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gywgg`]
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,7
+expect-mode: normal
+
+=== quote bracket after yy
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gyjgg'[
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== backtick bracket after put
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: yiw3Gpgg`[
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  llineine three
+  line four
+  line five
+expect-cursor: 3,2
+expect-mode: normal
+
+=== backtick close bracket after put
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: yiw3Gpgg`]
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  llineine three
+  line four
+  line five
+expect-cursor: 3,5
+expect-mode: normal
+
+=== backtick close bracket after linewise put
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: yj3Gpgg`]
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line one
+    line two
+  line four
+  line five
+expect-cursor: 5,10
+expect-mode: normal
+
+=== backtick bracket after d
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gwdwgg`[
+--- vim 9.1
+expect-text:
+  line one
+    line $
+  line three
+  line four
+  line five
+expect-cursor: 2,7
+expect-mode: normal
+
+=== backtick lt after Visual
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gwvegg`<lt>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: visual
+expect-visual: 2,8
+
+=== backtick gt after Visual
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gwv$<Esc>gg`>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,10
+expect-mode: normal
+
+=== quote gt after V
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,3
+keys: Vj<Esc>gg'>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== backtick gt after V
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,3
+keys: Vj<Esc>gg`>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,10
+expect-mode: normal
+
+=== backtick lt after a backward Visual
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 3,5
+keys: vk<Esc>G`<lt>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,5
+expect-mode: normal
+
+=== m in Visual mode
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: vjmx<Esc>gg`x
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,1
+expect-mode: normal
+
+=== m lt sets the Visual start
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 2,3
+keys: m<lt>`<lt>
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 2,3
+expect-mode: normal
+
+=== marks survive undo
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 3,3
+keys: maggddu`a
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 3,3
+expect-mode: normal
+
+=== marks after undo of a line insert
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 3,3
+keys: maggOx<Esc>u`a
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 3,3
+expect-mode: normal
+
+=== d quote with an unset mark fails
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: d'q
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  line one
+    line two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": none
+expect-register 0: none
+expect-register 1: none
+expect-register -: none
+
+=== dot mark with count g semicolon
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gx3Gx4Gx1G2g;
+--- vim 9.1
+expect-text:
+  line one
+    ine two
+  ine three
+  ine four
+  line five
+expect-cursor: 3,1
+expect-mode: normal
+
+=== Visual backtick extends
+text:
+  line one
+    line two
+  line three
+  line four
+  line five
+cursor: 1,1
+keys: 2Gmagg0v`ad
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  ine two
+  line three
+  line four
+  line five
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "line one\n  l"
+expect-register 0: none
+expect-register 1: c "line one\n  l"
+expect-register -: none

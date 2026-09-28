@@ -1,0 +1,654 @@
+# The Vim regex translator, checked by searching.
+
+=== regex dot
+text:
+  abc axc
+cursor: 1,2
+keys: /a.c<CR>
+--- vim 9.1
+expect-text:
+  abc axc
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex star
+text:
+  xab abbbc
+cursor: 1,1
+keys: /ab*c<CR>
+--- vim 9.1
+expect-text:
+  xab abbbc
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex backslash plus
+text:
+  ac abbc
+cursor: 1,1
+keys: /ab\+c<CR>
+--- vim 9.1
+expect-text:
+  ac abbc
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex backslash equals
+text:
+  abd ad
+cursor: 1,1
+keys: /ab\=d<CR>
+--- vim 9.1
+expect-text:
+  abd ad
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex backslash question
+text:
+  abd ad
+cursor: 1,2
+keys: /ab\?d<CR>
+--- vim 9.1
+expect-text:
+  abd ad
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex brace exact
+text:
+  aa aaa
+cursor: 1,1
+keys: /a\{3}<CR>
+--- vim 9.1
+expect-text:
+  aa aaa
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex brace range
+text:
+  x aaaa
+cursor: 1,1
+keys: /a\{2,3}<CR>e
+--- vim 9.1
+expect-text:
+  x aaaa
+expect-cursor: 1,6
+expect-mode: normal
+
+=== regex brace lazy
+text:
+  x aaaa
+cursor: 1,1
+keys: /a\{-2,}<CR>
+--- vim 9.1
+expect-text:
+  x aaaa
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex brace lazy with e
+text:
+  x aaaa
+cursor: 1,1
+keys: /a\{-2,}/e<CR>
+--- vim 9.1
+expect-text:
+  x aaaa
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex empty brace
+text:
+  x aaaa
+cursor: 1,1
+keys: /xa\{}/e<CR>
+--- vim 9.1
+expect-text:
+  x aaaa
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex alternation
+text:
+  one two three
+cursor: 1,1
+keys: /three\|two<CR>
+--- vim 9.1
+expect-text:
+  one two three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex group and backreference
+text:
+  ab abab
+cursor: 1,1
+keys: /\(ab\)\1<CR>
+--- vim 9.1
+expect-text:
+  ab abab
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex non capturing group
+text:
+  ab abab
+cursor: 1,1
+keys: /\%(ab\)\{2}<CR>
+--- vim 9.1
+expect-text:
+  ab abab
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex word boundaries
+text:
+  cat concat cat
+cursor: 1,1
+keys: /\<cat\><CR>
+--- vim 9.1
+expect-text:
+  cat concat cat
+expect-cursor: 1,12
+expect-mode: normal
+
+=== regex word start only
+text:
+  concat catalog
+cursor: 1,1
+keys: /\<cat<CR>
+--- vim 9.1
+expect-text:
+  concat catalog
+expect-cursor: 1,8
+expect-mode: normal
+
+=== regex very magic
+text:
+  ab abab
+cursor: 1,1
+keys: /\v(ab){2}<CR>
+--- vim 9.1
+expect-text:
+  ab abab
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex very magic alternation
+text:
+  one two three
+cursor: 1,1
+keys: /\vthree|two<CR>
+--- vim 9.1
+expect-text:
+  one two three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex very magic word
+text:
+  cat concat cat
+cursor: 1,5
+keys: /\v<cat><CR>
+--- vim 9.1
+expect-text:
+  cat concat cat
+expect-cursor: 1,12
+expect-mode: normal
+
+=== regex nomagic
+text:
+  a.c abc
+cursor: 1,2
+keys: /\Ma.c<CR>
+--- vim 9.1
+expect-text:
+  a.c abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex very nomagic
+text:
+  a.c abc a*c
+cursor: 1,2
+keys: /\Va*c<CR>
+--- vim 9.1
+expect-text:
+  a.c abc a*c
+expect-cursor: 1,9
+expect-mode: normal
+
+=== regex very nomagic with magic dot
+text:
+  a.c abc
+cursor: 1,2
+keys: /\Va\.c<CR>
+--- vim 9.1
+expect-text:
+  a.c abc
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex caret in the middle is literal
+text:
+  a^b ab
+cursor: 1,3
+keys: /a^b<CR>
+--- vim 9.1
+expect-text:
+  a^b ab
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex dollar in the middle is literal
+text:
+  a$b ab
+cursor: 1,3
+keys: /a$b<CR>
+--- vim 9.1
+expect-text:
+  a$b ab
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex dollar at the end
+text:
+  ab
+  xab
+cursor: 1,1
+keys: /ab$<CR>
+--- vim 9.1
+expect-text:
+  ab
+  xab
+expect-cursor: 2,2
+expect-mode: normal
+
+=== regex caret at the start
+text:
+  xab
+  ab
+cursor: 1,1
+keys: /^ab<CR>
+--- vim 9.1
+expect-text:
+  xab
+  ab
+expect-cursor: 2,1
+expect-mode: normal
+
+=== regex caret after alternation
+text:
+  x ab
+  ab
+cursor: 1,1
+keys: /zz\|^ab<CR>
+--- vim 9.1
+expect-text:
+  x ab
+  ab
+expect-cursor: 2,1
+expect-mode: normal
+
+=== regex star at the start is literal
+text:
+  a*b *b
+cursor: 1,1
+keys: /*b<CR>
+--- vim 9.1
+expect-text:
+  a*b *b
+expect-cursor: 1,2
+expect-mode: normal
+
+=== regex newline
+text:
+  foo
+  bar
+cursor: 1,1
+keys: /o\nb<CR>
+--- vim 9.1
+expect-text:
+  foo
+  bar
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex underscore s
+text:
+  foo
+    bar
+cursor: 1,1
+keys: /o\_s*bar<CR>
+--- vim 9.1
+expect-text:
+  foo
+    bar
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex underscore dot
+text:
+  foo
+  bar baz
+cursor: 1,1
+keys: /f\_.*z<CR>
+--- vim 9.1
+expect-text:
+  foo
+  bar baz
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex class s
+text:
+  ab  cd
+cursor: 1,1
+keys: /\s\+c<CR>
+--- vim 9.1
+expect-text:
+  ab  cd
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex class d
+text:
+  ab 12
+cursor: 1,1
+keys: /\d\d<CR>
+--- vim 9.1
+expect-text:
+  ab 12
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex class w
+text:
+  -- ab_1
+cursor: 1,1
+keys: /\w\+<CR>
+--- vim 9.1
+expect-text:
+  -- ab_1
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex class a and l and u
+text:
+  12 aB
+cursor: 1,1
+keys: /\l\u<CR>
+--- vim 9.1
+expect-text:
+  12 aB
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex class x
+text:
+  zz 0xFF
+cursor: 1,1
+keys: /\x\x\x<CR>
+--- vim 9.1
+expect-text:
+  zz 0xFF
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex class k
+text:
+  -- ab
+cursor: 1,1
+keys: /\k<CR>
+--- vim 9.1
+expect-text:
+  -- ab
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex class h
+text:
+  12 _a
+cursor: 1,1
+keys: /\h\h<CR>
+--- vim 9.1
+expect-text:
+  12 _a
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex negated class S
+text:
+     ab
+cursor: 1,1
+keys: /\S<CR>
+--- vim 9.1
+expect-text:
+     ab
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex bracket
+text:
+  xyz abc
+cursor: 1,1
+keys: /[a-c]\+<CR>
+--- vim 9.1
+expect-text:
+  xyz abc
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex bracket negated
+text:
+  aaa aab
+cursor: 1,1
+keys: /a[^a ]<CR>
+--- vim 9.1
+expect-text:
+  aaa aab
+expect-cursor: 1,6
+expect-mode: normal
+
+=== regex bracket with dash first
+text:
+  x -y
+cursor: 1,1
+keys: /[-y]<CR>
+--- vim 9.1
+expect-text:
+  x -y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex bracket with right bracket first
+text:
+  x ]y
+cursor: 1,1
+keys: /[]y]<CR>
+--- vim 9.1
+expect-text:
+  x ]y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex bracket posix class
+text:
+  -- 42
+cursor: 1,1
+keys: /[[:digit:]]<CR>
+--- vim 9.1
+expect-text:
+  -- 42
+expect-cursor: 1,4
+expect-mode: normal
+
+=== regex bracket escape
+text:
+  a	b
+cursor: 1,1
+keys: /[\t]<CR>
+--- vim 9.1
+expect-text:
+  a	b
+expect-cursor: 1,2
+expect-mode: normal
+
+=== regex unmatched bracket is literal
+text:
+  x [a
+cursor: 1,1
+keys: /[a<CR>
+--- vim 9.1
+expect-text:
+  x [a
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex zs
+text:
+  foobar foobaz
+cursor: 1,1
+keys: /foo\zsbaz<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+expect-cursor: 1,11
+expect-mode: normal
+
+=== regex ze
+text:
+  foobar foobaz
+cursor: 1,2
+keys: /foo\zebaz<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+expect-cursor: 1,8
+expect-mode: normal
+
+=== regex zs with e offset
+text:
+  foobar foobaz
+cursor: 1,1
+keys: /foo\zsba/e<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+expect-cursor: 1,5
+expect-mode: normal
+
+=== regex tilde with no substitute
+text:
+  x~y
+cursor: 1,1
+keys: /\V~<CR>
+--- vim 9.1
+expect-text:
+  x~y
+expect-cursor: 1,2
+expect-mode: normal
+
+=== regex optional sequence
+text:
+  fu func
+cursor: 1,1
+keys: /\<fu\%[nction]\><CR>n
+--- vim 9.1
+expect-text:
+  fu func
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex decimal char
+text:
+  x A
+cursor: 1,1
+keys: /\%d65<CR>
+--- vim 9.1
+expect-text:
+  x A
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex hex char
+text:
+  x A
+cursor: 1,1
+keys: /\%x41<CR>
+--- vim 9.1
+expect-text:
+  x A
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex start of file
+text:
+  ab
+  ab
+cursor: 2,1
+keys: /\%^ab<CR>
+--- vim 9.1
+expect-text:
+  ab
+  ab
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex backslash t
+text:
+  a	b
+cursor: 1,1
+keys: /\t<CR>
+--- vim 9.1
+expect-text:
+  a	b
+expect-cursor: 1,2
+expect-mode: normal
+
+=== regex escaped slash
+text:
+  a/b
+cursor: 1,1
+keys: /\/<CR>
+--- vim 9.1
+expect-text:
+  a/b
+expect-cursor: 1,2
+expect-mode: normal
+
+=== regex backslash and
+text:
+  foobar barfoo
+cursor: 1,1
+keys: /.*bar\&foo<CR>
+--- vim 9.1
+expect-text:
+  foobar barfoo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== regex multibyte
+text:
+  x é ab
+cursor: 1,1
+keys: /é<CR>
+--- vim 9.1
+expect-text:
+  x é ab
+expect-cursor: 1,3
+expect-mode: normal
+
+=== regex ignorecase with class
+text:
+  ABC abc
+cursor: 1,1
+set: ignorecase
+keys: /[a-c]\{3}<CR>
+--- vim 9.1
+expect-text:
+  ABC abc
+expect-cursor: 1,5
+expect-mode: normal
