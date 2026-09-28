@@ -209,6 +209,7 @@ final class Ex {
             initial = "'<,'>";
         } else if (c.hasCount) initial = c.count > 1 ? ".,.+" + (c.count - 1) : ".";
         Vim vim = editor.vim();
+        editor.commandLine().completer(before -> Completion.complete(editor, before));
         editor.commandLine().start(':', vim.commandHistory(), initial, null, text -> {
             // Only a typed line joins the history; one typed by :normal does not.
             if (typed()) vim.rememberCommand(text);
