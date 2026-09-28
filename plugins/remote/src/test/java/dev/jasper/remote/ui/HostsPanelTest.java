@@ -68,14 +68,30 @@ class HostsPanelTest {
         panel.setDistros(List.of(pwsh), profile -> 0);
         assertThat(rows(panel)).isEmpty();
         assertThat(panel.empty.isVisible()).isTrue();
-        assertThat(panel.empty.getText()).isEqualTo("No hosts yet \u2014 Add or Import from ~/.ssh/config");
+        assertThat(panel.empty.getText()).as("without WSL the panel holds only hosts")
+            .isEqualTo("No hosts yet \u2014 Add or Import from ~/.ssh/config");
+        assertThat(panel.search.getClientProperty("JTextField.placeholderText")).isEqualTo("Search sessions\u2026");
         panel.setHosts(List.of(prod), Optional.empty());
         assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
     }
 
+    @Test void theEmptyHintSpeaksOfSshHostsWhenTheWslGroupIsShown() {
+        var panel = new HostsPanel(actions);
+        panel.setDistros(List.of(ubuntu), profile -> 0);
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
+        assertThat(panel.empty.isVisible()).isTrue();
+        assertThat(panel.empty.getText()).isEqualTo("No SSH hosts yet \u2014 Add or Import from ~/.ssh/config");
+        panel.setHosts(List.of(prod), Optional.empty());
+        panel.search.setText("zzz");
+        assertThat(rows(panel)).isEmpty();
+        assertThat(panel.empty.getText()).isEqualTo("No sessions match");
+        panel.setDistros(List.of(), profile -> 0);
+        assertThat(panel.empty.getText()).isEqualTo("No hosts match");
+    }
+
     @Test void wslDistributionsComeFirstWithBadgesSessionsAndTheirOwnCard() {
         var panel = withDistros(name -> null);
-        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 2, false, HostRows.WSL_KEY),
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 2, false, true),
             new HostRows.Distro(ubuntu, 0), new HostRows.Distro(debian, 2), new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
         var header = (javax.swing.JLabel) render(panel, 0);
         assertThat(header.getText()).isEqualTo("WSL   2");
@@ -105,7 +121,26 @@ class HostsPanelTest {
         assertThat(panel.cardCredential.isVisible()).isTrue();
     }
 
-    @Test void distroMenusOfferOnlyOpeningAndTheWslGroupCollapsesUnderItsOwnKey() {
+    @Test void aHostGroupNamedWslCollapsesApartFromTheWslGroup() {
+        var box = RemoteHost.create("box", "box.example", 22, "me", Auth.AGENT, "wsl", Optional.empty());
+        var panel = new HostsPanel(actions);
+        panel.setDistros(List.of(ubuntu), profile -> 0);
+        panel.setHosts(List.of(box), Optional.empty());
+        panel.setCollapsed(Set.of("wsl"));
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0),
+            new HostRows.Group("wsl", 1, true));
+        panel.toggle(0);
+        assertThat(panel.wslCollapsed()).isTrue();
+        assertThat(panel.collapsed()).containsExactly("wsl");
+        panel.toggle(1);
+        assertThat(panel.collapsed()).isEmpty();
+        assertThat(panel.wslCollapsed()).isTrue();
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, true, true), new HostRows.Group("wsl", 1, false), new HostRows.Host(box));
+        panel.setWslCollapsed(false);
+        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
+    }
+
+    @Test void distroMenusOfferOnlyOpeningAndTheWslGroupCollapsesOnItsOwn() {
         var icons = new java.util.EnumMap<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon>(dev.jasper.sdk.ui.BundledIcon.class);
         for (var name : List.of(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER, dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN,
                 dev.jasper.sdk.ui.BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL))
@@ -125,11 +160,12 @@ class HostsPanelTest {
         panel.onCollapsedChanged(() -> changes[0]++);
         panel.toggle(0);
         assertThat(changes[0]).isEqualTo(1);
-        assertThat(panel.collapsed()).containsExactly(HostRows.WSL_KEY);
-        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 2, true, HostRows.WSL_KEY), new HostRows.Group("Production", 1, false));
+        assertThat(panel.wslCollapsed()).isTrue();
+        assertThat(panel.collapsed()).as("the WSL group is not in the host groups' collapsed set").isEmpty();
+        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 2, true, true), new HostRows.Group("Production", 1, false));
         assertThat(((javax.swing.JLabel) render(panel, 0)).getIcon()).isSameAs(icons.get(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
         panel.search.setText("deb");
-        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, HostRows.WSL_KEY), new HostRows.Distro(debian, 2));
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(debian, 2));
         panel.search.setText("");
         panel.setDistros(List.of(), profile -> 0);
         assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));

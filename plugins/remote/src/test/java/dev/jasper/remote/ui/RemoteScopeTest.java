@@ -76,4 +76,25 @@ class RemoteScopeTest {
         assertThat(withDistros.search("", new PaletteQuery(window(), Optional.empty(), 1, true)).rows())
             .as("the result limit covers distributions and hosts together").extracting(PaletteRow::id).containsExactly("wsl.Ubuntu");
     }
+
+    @Test void distributionsMatchOnTheirNameOnlyAndLeaveHostsHalfTheSlots() {
+        var names = List.of("Ubuntu", "Debian", "kali-linux", "openSUSE-Leap", "Alpine", "Oracle");
+        var profiles = names.stream().map(name -> new ShellProfileInfo("wsl:" + name, name, ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"))).toList();
+        var swarm = List.of(RemoteHost.create("web-1", "web1.example", 22, "u", Auth.AGENT, "", Optional.empty()),
+            RemoteHost.create("web-2", "web2.example", 22, "u", Auth.AGENT, "", Optional.empty()),
+            RemoteHost.create("web-3", "web3.example", 22, "u", Auth.AGENT, "", Optional.empty()));
+        var withDistros = new RemoteScope(() -> swarm, () -> error, (w, h) -> { }, (p, h) -> { }, (w, h) -> { },
+            () -> profiles, (w, d) -> { }, (p, d) -> { });
+        assertThat(withDistros.search("wsl", query).rows()).as("the WSL tag is not searched").isEmpty();
+        assertThat(withDistros.search("LINUX", query).rows()).extracting(PaletteRow::title).containsExactly("kali-linux");
+        assertThat(withDistros.search("", query).rows()).extracting(PaletteRow::title)
+            .as("five slots: three distributions first, then the two hosts that half the limit keeps")
+            .containsExactly("Ubuntu", "Debian", "kali-linux", "web-1", "web-2");
+        assertThat(withDistros.search("b", query).rows()).extracting(PaletteRow::title)
+            .as("hosts fill slots the distributions do not use").containsExactly("Ubuntu", "Debian", "web-1", "web-2", "web-3");
+        var fewHosts = new RemoteScope(() -> List.of(nas), () -> error, (w, h) -> { }, (p, h) -> { }, (w, h) -> { },
+            () -> profiles, (w, d) -> { }, (p, d) -> { });
+        assertThat(fewHosts.search("", query).rows()).extracting(PaletteRow::title)
+            .as("and distributions fill slots the hosts do not use").containsExactly("Ubuntu", "Debian", "kali-linux", "openSUSE-Leap", "nas");
+    }
 }

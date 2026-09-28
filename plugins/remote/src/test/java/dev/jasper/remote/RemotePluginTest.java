@@ -591,7 +591,7 @@ class RemotePluginTest {
 
             host.setShellProfiles(List.of(UBUNTU));
             settle(host);
-            assertThat(list(panel).getModel().getElementAt(0)).isEqualTo(new HostRows.Group(HostRows.WSL, 1, false, HostRows.WSL_KEY));
+            assertThat(list(panel).getModel().getElementAt(0)).isEqualTo(new HostRows.Group(HostRows.WSL, 1, false, true));
             assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 0));
             activate(panel, 1);
             settle(host);
@@ -612,7 +612,9 @@ class RemotePluginTest {
             assertThat(host.status()).as("the status item counts SSH sessions only").isEmpty();
 
             toggle(panel, 0); settle(host);
-            assertThat(Files.readString(context.dataDirectory().resolve("panel-state.toml"))).contains("\"wsl\"");
+            assertThat(Files.readString(context.dataDirectory().resolve("panel-state.toml")))
+                .as("the WSL group's own flag, not a host group name").contains("wsl_collapsed = true").doesNotContain("\"wsl\"");
+            assertThat(new PanelState(context.dataDirectory().resolve("panel-state.toml")).collapsed()).isEmpty();
             host.setShellProfiles(List.of()); settle(host);
             assertThat(list(panel).getModel().getSize()).as("the group leaves with the last distribution").isZero();
             host.stopAll();

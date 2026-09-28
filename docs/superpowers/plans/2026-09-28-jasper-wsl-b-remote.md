@@ -15,6 +15,19 @@ Deviations so far: none in code. Tasks 1-3 applied as written: plan A landed `Sh
 rows, which items 11 to 14 did not exercise), item 13 names the "Detect shells again" button, the WSL-group checks
 are copied into `docs/windows-startup-verification.md`'s native checklist, and the full check ran as `check
 --continue` on Windows, where it is not green only because of the known failures (Step 4 expected BUILD SUCCESSFUL).
+Review fixes after Task 8: (1) the WSL group's collapsed state is no longer the key `wsl` in the host groups'
+`collapsed` set, which a host group named "wsl" (or the default group renamed so) shared; `PanelState` saves it as
+its own `wsl_collapsed` boolean (old files read as expanded, host-group entries are untouched), `HostRows.Group`
+carries a `boolean wsl` instead of a `String key` (`WSL_KEY` is gone), `HostRows.rows` takes `wslCollapsed`, and
+`HostsPanel` has `wslCollapsed()`/`setWslCollapsed`. (2) `>ssh` matches distributions on their names only
+(`HostRows.matchesName`; the `WSL` tag is not searched) and, still listing them first, keeps up to half the result
+limit (rounded down) for matching hosts; either side takes the rows the other leaves (`RemoteScope.distroSlots`).
+(3) `Terminals.onProfilesChanged`'s Javadoc says it fires after the first detection and after each later one with a
+changed result, and that Custom shell edits may not be reported; mirrored in `plugin-authoring.md`,
+`sdk-architecture.md` and the SDK README. (4) The panel's search placeholder reads "Search sessions…"; with the WSL
+group shown and no hosts the hint under it reads "No SSH hosts yet — Add or Import from ~/.ssh/config" and an empty
+search "No sessions match" (unchanged copy without WSL). Spec section 7 and `docs/remote.md` (item 14 gains the
+host-group-named-`wsl` check) follow. Remote tests 283/54 skipped/6 failed (the known Windows six).
 
 **Goal:** Plugins can list the shells Jasper detected (SDK 0.8.6 `Terminals.profiles()`) and open one by id; the
 Remote plugin uses that to show a read-only "WSL" group of distributions first in its panel (renamed "Sessions"),

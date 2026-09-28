@@ -21,7 +21,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /**
- * {@code >ssh}: WSL distributions, then saved hosts. Connect (Enter) opens a distribution or connects to a host,
+ * {@code >ssh}: WSL distributions (matched on their names), then saved hosts, which keep up to half the result limit.
+ * Connect (Enter) opens a distribution or connects to a host,
  * Connect in split (Cmd/Ctrl+Enter) does the same beside the current pane, Edit host (Shift+Enter) is for hosts only.
  */
 public final class RemoteScope implements PaletteScope {
@@ -64,15 +65,24 @@ public final class RemoteScope implements PaletteScope {
         var rows = new ArrayList<PaletteRow>();
         error.get().ifPresent(message -> rows.add(PaletteRow.of(ERROR_ROW, "hosts.toml has errors: " + message).withEnabled(false)));
         List<ShellProfileInfo> matchingDistros = distros.get().stream()
-            .filter(profile -> profile.kind() == ShellProfileInfo.Kind.WSL && HostRows.matches(profile, query))
-            .limit(context.maxResults()).toList();
-        matchingDistros.forEach(profile -> rows.add(PaletteRow.of("wsl." + profile.name(), profile.name())
+            .filter(profile -> profile.kind() == ShellProfileInfo.Kind.WSL && HostRows.matchesName(profile, query)).toList();
+        List<RemoteHost> matchingHosts = hosts.get().stream().filter(host -> HostRows.matches(host, query))
+            .sorted(Comparator.comparing((RemoteHost host) -> !host.favorite()).thenComparing(host -> host.name().toLowerCase(Locale.ROOT))).toList();
+        int max = Math.max(0, context.maxResults());
+        int distroCount = distroSlots(matchingDistros.size(), matchingHosts.size(), max);
+        matchingDistros.stream().limit(distroCount).forEach(profile -> rows.add(PaletteRow.of("wsl." + profile.name(), profile.name())
             .withDetail(profile.detail().orElse(null)).withTag(HostRows.WSL).withToken(profile)));
-        hosts.get().stream().filter(host -> HostRows.matches(host, query))
-            .sorted(Comparator.comparing((RemoteHost host) -> !host.favorite()).thenComparing(host -> host.name().toLowerCase(Locale.ROOT)))
-            .limit(context.maxResults() - matchingDistros.size())
+        matchingHosts.stream().limit(max - distroCount)
             .forEach(host -> rows.add(PaletteRow.of("host." + host.id(), host.name()).withDetail(host.label()).withTag(host.group().isEmpty() ? null : host.group()).withToken(host)));
         return PaletteResults.of(rows);
+    }
+
+    /**
+     * How many of {@code max} rows go to distributions, which come first: matching hosts keep up to half the rows
+     * (rounded down), and either side takes the rows the other does not fill.
+     */
+    static int distroSlots(int distros, int hosts, int max) {
+        return Math.min(distros, max - Math.min(hosts, max / 2));
     }
 
     @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteQuery context) {

@@ -59,6 +59,7 @@ The hint never becomes a local `Path`, changes command history, or emits `CWD_CH
 
 SDK 0.8.6 adds shell profiles: `Terminals.profiles()` lists the shells Jasper detected as
 `ShellProfileInfo` (PowerShell, Command Prompt and WSL distributions on Windows, the login shell
-elsewhere), `onProfilesChanged` reports a refresh, and `OpenRequest.localProfile(id)` opens one. An
+elsewhere), `onProfilesChanged` fires after a shell detection completes with a changed list (Custom
+shell edits may not be reported), and `OpenRequest.localProfile(id)` opens one. An
 id Jasper does not list opens nothing. Both methods need `terminal.open`; the testkit scripts the list
 with `FakePluginHost.setShellProfiles`.

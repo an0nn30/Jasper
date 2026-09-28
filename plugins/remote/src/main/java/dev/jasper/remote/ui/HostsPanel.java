@@ -55,6 +55,7 @@ public final class HostsPanel extends JPanel {
     private final Function<BundledIcon, javax.swing.Icon> icons;
     private final DefaultListModel<HostRows.Row> model = new DefaultListModel<>();
     private final Set<String> collapsed = new HashSet<>();
+    private boolean wslCollapsed;
     private final List<Runnable> collapseListeners = new ArrayList<>();
     private List<RemoteHost> hosts = List.of();
     private Optional<String> error = Optional.empty();
@@ -95,7 +96,7 @@ public final class HostsPanel extends JPanel {
         header.add(title); header.add(Box.createHorizontalGlue()); header.add(importButton); header.add(Box.createHorizontalStrut(4)); header.add(add);
         var north = new JPanel(new BorderLayout(0, 6));
         north.add(header, BorderLayout.NORTH);
-        search.putClientProperty("JTextField.placeholderText", "Search hosts\u2026");
+        search.putClientProperty("JTextField.placeholderText", "Search sessions\u2026");
         north.add(search, BorderLayout.SOUTH);
         add(north, BorderLayout.NORTH);
         list = new JList<>(model) {
@@ -189,8 +190,12 @@ public final class HostsPanel extends JPanel {
 
     public void setHosts(List<RemoteHost> hosts, Optional<String> error) { this.hosts = List.copyOf(hosts); this.error = error; rebuild(); }
     public void setCredentialLabels(Function<RemoteHost, String> labels) { credentialLabels = labels; refreshCard(); }
+    /** The collapsed host groups, by name; the WSL group is never among them (see {@link #wslCollapsed()}). */
     public Set<String> collapsed() { return Set.copyOf(collapsed); }
     public void setCollapsed(Set<String> groups) { collapsed.clear(); collapsed.addAll(groups); rebuild(); }
+    /** Whether the WSL group is collapsed, kept apart from the host groups so no host group name can share it. */
+    public boolean wslCollapsed() { return wslCollapsed; }
+    public void setWslCollapsed(boolean value) { wslCollapsed = value; rebuild(); }
     public Subscription onCollapsedChanged(Runnable listener) { collapseListeners.add(listener); return () -> collapseListeners.remove(listener); }
 
     public void select(UUID hostId) {
@@ -233,7 +238,8 @@ public final class HostsPanel extends JPanel {
 
     void toggle(int index) {
         if (!(model.get(index) instanceof HostRows.Group group)) return;
-        if (!collapsed.remove(group.key())) collapsed.add(group.key());
+        if (group.wsl()) wslCollapsed = !wslCollapsed;
+        else if (!collapsed.remove(group.name())) collapsed.add(group.name());
         collapseListeners.forEach(Runnable::run);
         rebuild();
     }
@@ -276,15 +282,18 @@ public final class HostsPanel extends JPanel {
             || metadata.apply(host).toLowerCase(java.util.Locale.ROOT).contains(query)).toList();
         List<HostRows.Distro> distroRows = distros.stream().filter(profile -> HostRows.matches(profile, query))
             .map(profile -> new HostRows.Distro(profile, distroSessions.applyAsInt(profile))).toList();
-        HostRows.rows(matching, "", query.isEmpty() ? collapsed : Set.of(), defaultGroup, distroRows).forEach(model::addElement);
+        HostRows.rows(matching, "", query.isEmpty() ? collapsed : Set.of(), defaultGroup, distroRows, query.isEmpty() && wslCollapsed)
+            .forEach(model::addElement);
         boolean searching = !search.getText().strip().isEmpty();
-        empty.setText(hosts.isEmpty() ? "No hosts yet \u2014 Add or Import from ~/.ssh/config" : "No hosts match");
+        // With a WSL group shown, the hint sits under it and speaks of SSH hosts only; without WSL the panel holds hosts alone.
+        empty.setText(hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " \u2014 Add or Import from ~/.ssh/config"
+            : distros.isEmpty() ? "No hosts match" : "No sessions match");
         empty.setVisible(hosts.isEmpty() || (searching && model.size() == (error.isPresent() ? 1 : 0)));
         if (keep != null) select(keep);
         else if (keepDistro != null) selectDistro(keepDistro);
         else if (previous instanceof HostRows.Group group) {
             for (int i = 0; i < model.size(); i++)
-                if (model.get(i) instanceof HostRows.Group next && next.key().equals(group.key())) {
+                if (model.get(i) instanceof HostRows.Group next && next.wsl() == group.wsl() && next.name().equals(group.name())) {
                     list.setSelectedIndex(i); break;
                 }
         }

@@ -10,7 +10,7 @@
   `PluginRuntime.ShellProfiles` and refuses unknown ids (empty result, warning); the testkit scripts profiles
   (`setShellProfiles`) and the contract suite covers known, unknown and default. Remote 0.5.0 (`sdk >=0.8.6`)
   titles its panel Sessions and shows a read-only WSL group first (badges, session dots, Open in new tab/split,
-  collapsed key `wsl`), lists distributions first in the Sessions dropdown (no separator: the SDK dropdown has
+  its own `wsl_collapsed` flag), lists distributions first in the Sessions dropdown (no separator: the SDK dropdown has
   none) and as `WSL` rows in `>ssh`. `./gradlew check --continue` on Windows: 3479 tests, 234
   skipped, 8 failed, all on the known list in `docs/windows-startup-verification.md` (app 1187/141 skipped/2 failed,
   terminal 391/19/0, Editor 1172/13/0, Remote 278/54/6, Vault 139/7/0, Buddy 163/0/0, History 40/0/0, SDK 27/0/0,
@@ -22,7 +22,12 @@
   `profiles()`); Tasks 5 and 6 left raw non-ASCII literals in `HostsPanel`, `RemoteScope` and `HostsPanelTest`,
   rewritten as Java escapes in Task 7; Task 8 adds native item 15 (Sessions dropdown and `>ssh`) to
   `docs/remote.md`, names the ↻ "Detect shells again" button in item 13, and copies the WSL-group checks into
-  `docs/windows-startup-verification.md`. Not pushed; not merged.
+  `docs/windows-startup-verification.md`. Review fixes after Task 8: the WSL group's collapsed state is its own
+  `wsl_collapsed` flag in `panel-state.toml` (no longer the `wsl` entry a host group of that name shared); `>ssh`
+  matches distributions on names only and keeps up to half the result limit for hosts; `onProfilesChanged`'s
+  Javadoc and docs say when it fires (first detection, then changed results; Custom edits may not be reported); the
+  panel reads "Search sessions…" and, beside a WSL group with no hosts, "No SSH hosts yet — …". Remote tests
+  283/54/6 (known six). Not pushed; not merged.
 - **WSL shell profiles, plan A** (branch `worktree-wsl-hosts`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`, spec
   `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`): Windows sessions run on ConPTY, so OSC

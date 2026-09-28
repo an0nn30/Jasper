@@ -567,7 +567,8 @@ public class RemotePlugin implements Plugin {
             profile -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitDistro(pane, profile)));
         panel.setDistros(distros, this::distroSessions);
         panel.setCollapsed(panelState.collapsed());
-        panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
+        panel.setWslCollapsed(panelState.wslCollapsed());
+        panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
         panels.put(window.id(), panel); panelHosts.put(window.id(), host);
         host.onVisibility(visible -> { if (visible) panel.focusWhenOpened(); });

@@ -26,8 +26,11 @@ badge. Double-click or Enter, **Open** on the card, or **Open in new tab** in th
 the distribution in a new local tab; **Open in split** splits the current pane. A dot and count mark
 the panes Remote opened for it whose shell still runs. Distributions are never saved in `hosts.toml`
 and cannot be edited, duplicated, deleted or browsed with SFTP; the group's collapsed state is saved
-as `wsl` in `panel-state.toml`, and search matches distribution names. The Sessions dropdown lists
-them first, titled with their version, and `>ssh` lists them as rows tagged `WSL`. To make a
+as its own `wsl_collapsed` flag in `panel-state.toml` (a host group named "wsl" keeps its own state),
+and **Search sessions...** matches distribution names. With no SSH hosts saved, the hint under the
+group reads "No SSH hosts yet — Add or Import from ~/.ssh/config". The Sessions dropdown lists
+them first, titled with their version, and `>ssh` lists them as rows tagged `WSL`, matched on their
+names; distributions come first but keep up to half the rows (rounded down) for matching hosts. To make a
 distribution the default shell for new panes, choose it under Settings › Terminal › Shell. The status
 bar still counts SSH sessions only. Without WSL, nothing here changes.
 
@@ -154,7 +157,8 @@ For the WSL group (Windows with at least one WSL 1 and one WSL 2 distribution), 
     pane: the dot disappears.
 13. Install or remove a distribution, then click **Detect shells again** (↻) under Settings › Terminal › Shell: the
     group, the Sessions dropdown and `>ssh` follow without a restart.
-14. Collapse the WSL group, restart Jasper, and confirm it stays collapsed.
+14. Collapse the WSL group, restart Jasper, and confirm it stays collapsed. A host group named `wsl`
+    collapses and expands on its own, without moving the WSL group.
 15. The toolbar's **Sessions** dropdown lists the distributions first (for example "Ubuntu (WSL 2)");
     choosing one opens it in a new tab. In `>ssh`, distributions are rows tagged `WSL`: Enter opens a
     tab, Cmd/Ctrl+Enter splits the current pane, and Shift+Enter (edit) does nothing.

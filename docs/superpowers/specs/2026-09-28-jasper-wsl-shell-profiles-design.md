@@ -168,8 +168,11 @@ Windows paths.
   - `HostRows.rows` adds a "WSL" group only when `profiles()` contains WSL entries,
     which means Windows with WSL installed.
   - The group sorts **first**, before the SSH groups, like MobaXterm.
-  - Its collapsed state uses the key `wsl` in `PanelState`.
-  - The search query matches distro names.
+  - Its collapsed state is its own `wsl_collapsed` flag in `PanelState`
+    (`panel-state.toml`), kept apart from the host groups' `collapsed` list, so no host
+    group (one named "wsl", or the default group renamed so) can share it.
+  - The panel's search matches distro names (and "WSL", the group's name); the `>ssh`
+    scope matches distro names only.
 - **Rendering.**
   - Row icon: `BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL`; there is no Linux icon.
   - Badge: "WSL 1" or "WSL 2", plus "default" for the default distro.
@@ -185,10 +188,15 @@ Windows paths.
   not SSH channels. The status item stays "N SSH sessions".
 - **Other surfaces.**
   - `SessionsToolbar` lists distros under a "WSL" separator.
-  - `RemoteScope` returns rows `wsl.<distro>` tagged "WSL".
+  - `RemoteScope` returns rows `wsl.<distro>` tagged "WSL", first; matching hosts keep
+    up to half the result limit (rounded down), and either side takes rows the other
+    does not fill.
 - **Copy changes.**
-  - Panel title: "SSH hosts" becomes "Sessions".
-  - The empty text is unchanged when WSL is absent.
+  - Panel title: "SSH hosts" becomes "Sessions"; the search placeholder reads
+    "Search sessions…".
+  - The empty text is unchanged when WSL is absent. With the WSL group shown and no
+    hosts saved it reads "No SSH hosts yet — Add or Import from ~/.ssh/config", under
+    the group, and a search that matches nothing reads "No sessions match".
   - Update docs/remote.md and its native acceptance checklist.
 - The manifest already has `terminal.open`, so no new capability is needed.
 

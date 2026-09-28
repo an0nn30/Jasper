@@ -289,7 +289,10 @@ private static void installTerminalDemo(PluginContext context) {
   such as PowerShell or a WSL distribution (`kind()` is `ShellProfileInfo.Kind.WSL` and `detail()`
   reads `WSL 1` or `WSL 2`). Open one with `OpenRequest.localProfile(profile.id())`; an id Jasper does
   not list opens nothing and returns empty. On Windows, detection may finish after your plugin starts:
-  subscribe with `onProfilesChanged` and read the list again. Declare `sdk = ">=0.8.6, <0.9"`.
+  subscribe with `onProfilesChanged` and read the list again. It fires after a detection completes:
+  the first one, and each later one whose result differs (a WSL distribution or PowerShell 7
+  appearing or disappearing). Edits to the Custom shell settings may not be reported, so read
+  `profiles()` again when the current list matters. Declare `sdk = ">=0.8.6, <0.9"`.
 
 ## Providing a session
 

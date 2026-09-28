@@ -368,7 +368,9 @@ and gutter colors. Jasper derives missing theme tokens; plugins retain syntax cl
 `Terminals.profiles()` lists the shells the application detected (`launch.ShellProfileCatalog`:
 PowerShell, PowerShell 7, Command Prompt and each WSL distribution on Windows, the login shell
 elsewhere, and Custom when `terminal.shell.program` is set) as `ShellProfileInfo(id, name, kind,
-detail)`, and `onProfilesChanged` reports a refresh. Both are binary-compatible default methods (an
+detail)`, and `onProfilesChanged` fires after a detection completes (the first one, then each later
+one whose result differs: WSL distributions or PowerShell 7 appearing or disappearing; the catalog's
+`onChanged`); edits to the Custom shell settings may not be reported. Both are binary-compatible default methods (an
 empty list, an inert subscription) and need `terminal.open`. Kinds mirror the application's one to one;
 the SDK does not say which profile the user chose as default, and a plugin cannot
 change that choice.

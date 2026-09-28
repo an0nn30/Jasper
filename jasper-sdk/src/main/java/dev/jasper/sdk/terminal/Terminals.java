@@ -82,9 +82,11 @@ public interface Terminals {
     default List<ShellProfileInfo> profiles() { return List.of(); }
 
     /**
-     * Calls the listener on the UI thread after {@link #profiles()} may have changed, for example when detection
-     * finishes or the user refreshes it after installing a WSL distribution. Needs {@code terminal.open}. The
-     * registration ends with the plugin.
+     * Calls the listener on the UI thread after a shell detection completes: the first one, which may finish after
+     * the plugin starts, and each later one (for example after the user asks Jasper to detect shells again) whose
+     * result differs, such as a WSL distribution or PowerShell 7 appearing or disappearing. Edits to the Custom shell
+     * settings may not be reported; read {@link #profiles()} again when the current list matters. Needs
+     * {@code terminal.open}. The registration ends with the plugin.
      *
      * @param listener called with nothing; read {@link #profiles()} again
      * @return the registration
