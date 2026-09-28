@@ -47,6 +47,7 @@ public final class PluginManager {
     private final AuxiliaryWindows windows;
     private final Hooks hooks;
     private Supplier<AuxiliarySurface> host;
+    private java.util.function.Consumer<String> navigate = id -> { };
     private PluginManagerPanel panel;
     private PluginRuntime.Snapshot snapshot = new PluginRuntime.Snapshot(List.of(), false, false);
     private AuxiliarySurface consentDialog;
@@ -74,9 +75,10 @@ public final class PluginManager {
     /** The Plugins page for one opening of Settings; it lists the plugins afresh. */
     public SettingsPage page(PageContext context) { return new PluginsPage(this, context); }
 
-    /** Builds the list for a page whose dialogs open over {@code host}; a later attachment replaces this one. */
-    PluginManagerPanel attach(Supplier<AuxiliarySurface> host) {
+    /** Builds the list for a page whose dialogs open over {@code host} and which moves Settings with {@code navigate}. */
+    PluginManagerPanel attach(Supplier<AuxiliarySurface> host, java.util.function.Consumer<String> navigate) {
         this.host = Objects.requireNonNull(host);
+        this.navigate = Objects.requireNonNull(navigate);
         panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall,
             this::install, this::openSettings, this::openFolder, this::openData));
         panel.show(snapshot);
@@ -89,6 +91,7 @@ public final class PluginManager {
         if (panel != detached) return;
         panel = null;
         host = null;
+        navigate = id -> { };
         hooks.restarts().cancel();
     }
 
@@ -162,8 +165,9 @@ public final class PluginManager {
         dialog.show();
     }
 
-    /** Off the EDT: seeds the file if needed, then hands it to the editor; a failure is shown on the page. */
+    /** A running plugin with a Settings page goes there; otherwise, off the EDT, its file is seeded and opened. */
     private void openSettings(PluginRuntime.Row row) {
+        if (runtime.hasSettingsPage(row.id())) { navigate.accept(PluginRuntime.settingsPageId(row.id())); return; }
         hooks.worker().execute(() -> {
             try { runtime.prepareSettings(row.id()); hooks.openInEditor().accept(row.settingsFile()); }
             catch (java.io.IOException | RuntimeException failure) { failed(failure); }
