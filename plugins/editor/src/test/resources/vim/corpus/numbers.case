@@ -1,0 +1,588 @@
+# CTRL-A and CTRL-X, in Normal and Visual mode.
+
+=== C-a increments the number under the cursor
+text:
+  x 41 y
+cursor: 1,4
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 42 y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-a finds the number after the cursor
+text:
+  x 41 y
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 42 y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-a with a count
+text:
+  x 41 y
+cursor: 1,1
+keys: 5<C-a>
+--- vim 9.1
+expect-text:
+  x 46 y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-x decrements
+text:
+  x 41 y
+cursor: 1,1
+keys: <C-x>
+--- vim 9.1
+expect-text:
+  x 40 y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-x through zero
+text:
+  x 1 y
+cursor: 1,1
+keys: 3<C-x>
+--- vim 9.1
+expect-text:
+  x -2 y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-a on a negative number
+text:
+  x -5 y
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x -4 y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-a on a negative number to zero
+text:
+  x -1 y
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 0 y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-a with the cursor on the minus
+text:
+  x -5 y
+cursor: 1,3
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x -4 y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-a on a word with a hyphen
+text:
+  foo-5
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  foo-4
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-a on hex
+text:
+  x 0x0f y
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 0x10 y
+expect-cursor: 1,6
+expect-mode: normal
+
+=== C-a on upper hex
+text:
+  x 0xFF y
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 0x100 y
+expect-cursor: 1,7
+expect-mode: normal
+
+=== C-a on hex keeps the width
+text:
+  x 0x00ff
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 0x0100
+expect-cursor: 1,8
+expect-mode: normal
+
+=== C-a with the cursor in hex digits
+text:
+  x 0x1f
+cursor: 1,6
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 0x20
+expect-cursor: 1,6
+expect-mode: normal
+
+=== C-x on hex wraps
+text:
+  x 0x0
+cursor: 1,1
+keys: <C-x>
+--- vim 9.1
+expect-text:
+  x 0xffffffffffffffff
+expect-cursor: 1,20
+expect-mode: normal
+
+=== C-a on binary
+text:
+  x 0b101
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 0b110
+expect-cursor: 1,7
+expect-mode: normal
+
+=== C-a on binary keeps the width
+text:
+  x 0b0011
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 0b0100
+expect-cursor: 1,8
+expect-mode: normal
+
+=== C-x on binary zero
+text:
+  x 0b0
+cursor: 1,1
+keys: <C-x>
+--- vim 9.1
+expect-text:
+  x 0b1111111111111111111111111111111111111111111111111111111111111111
+expect-cursor: 1,68
+expect-mode: normal
+
+=== C-a on octal
+text:
+  x 007
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 010
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-a on octal with 8 is decimal
+text:
+  x 008
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 9
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-a keeps leading zeros
+text:
+  x 0099
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 100
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-a on a number that grows
+text:
+  x 99
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 100
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-x on a number that shrinks with zeros
+text:
+  x 0100
+cursor: 1,1
+keys: <C-x>
+--- vim 9.1
+expect-text:
+  x 0077
+expect-cursor: 1,6
+expect-mode: normal
+
+=== C-a without octal
+text:
+  x 007
+cursor: 1,1
+set: nrformats=bin,hex
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 008
+expect-cursor: 1,5
+expect-mode: normal
+
+=== C-a with alpha
+text:
+  x a
+cursor: 1,1
+set: nrformats+=alpha
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  y a
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-a with alpha at z
+text:
+  x z
+cursor: 1,1
+set: nrformats+=alpha
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  y z
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-x with alpha
+text:
+  x B
+cursor: 1,1
+set: nrformats+=alpha
+keys: 2<C-x>
+--- vim 9.1
+expect-text:
+  v B
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-a with unsigned
+text:
+  x -5
+cursor: 1,1
+set: nrformats+=unsigned
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x -6
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-x with unsigned at zero
+text:
+  x 0
+cursor: 1,1
+set: nrformats+=unsigned
+keys: <C-x>
+--- vim 9.1
+expect-text:
+  x 0
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-a with blank after a letter
+text:
+  x-5
+cursor: 1,1
+set: nrformats+=blank
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x-6
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-a with no number fails
+text:
+  abc
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-a past the number fails
+text:
+  12 abc
+cursor: 1,4
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  12 abc
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-a on a big number
+text:
+  x 18446744073709551615
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x -18446744073709551615
+expect-cursor: 1,23
+expect-mode: normal
+
+=== C-a on an overflowing number
+text:
+  x 99999999999999999999
+cursor: 1,1
+keys: <C-a>
+--- vim 9.1
+expect-text:
+  x 18446744073709551615
+expect-cursor: 1,22
+expect-mode: normal
+
+=== C-a then dot
+text:
+  x 1 y 1
+cursor: 1,1
+keys: 3<C-a>.
+--- vim 9.1
+expect-text:
+  x 7 y 1
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-a then dot with a count
+text:
+  x 1
+cursor: 1,1
+keys: <C-a>5.
+--- vim 9.1
+expect-text:
+  x 7
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-a then u
+text:
+  x 1
+cursor: 1,1
+keys: <C-a>u
+--- vim 9.1
+expect-text:
+  x 1
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual C-a on lines
+text:
+  1
+  x 2
+  3 4
+cursor: 1,1
+keys: Vjj<C-a>
+--- vim 9.1
+expect-text:
+  2
+  x 3
+  4 4
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual g C-a
+text:
+  1
+  1
+  1
+cursor: 1,1
+keys: VGg<C-a>
+--- vim 9.1
+expect-text:
+  2
+  3
+  4
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual C-x on lines
+text:
+  5
+  x 7
+cursor: 1,1
+keys: Vj3<C-x>
+--- vim 9.1
+expect-text:
+  2
+  x 4
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual g C-x with a count
+text:
+  10
+  10
+  10
+cursor: 1,1
+keys: VG2g<C-x>
+--- vim 9.1
+expect-text:
+  8
+  6
+  4
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual g C-a skips lines without numbers
+text:
+  1
+  x
+  1
+cursor: 1,1
+keys: VGg<C-a>
+--- vim 9.1
+expect-text:
+  2
+  x
+  3
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual C-a in a charwise area
+text:
+  a1 b2 c3
+cursor: 1,4
+keys: vl<C-a>
+--- vim 9.1
+expect-text:
+  a1 b3 c3
+expect-cursor: 1,4
+expect-mode: normal
+
+=== Visual C-a on a negative in the area
+text:
+  x -5
+cursor: 1,3
+keys: vl<C-a>
+--- vim 9.1
+expect-text:
+  x -4
+expect-cursor: 1,3
+expect-mode: normal
+
+=== Visual C-a with the minus outside
+text:
+  x -5
+cursor: 1,4
+keys: v<C-a>
+--- vim 9.1
+expect-text:
+  x -6
+expect-cursor: 1,4
+expect-mode: normal
+
+=== Visual block C-a
+text:
+  a1 b2
+  a1 b2
+cursor: 1,4
+keys: <C-v>jl<C-a>
+--- vim 9.1
+expect-text:
+  a1 b3
+  a1 b3
+expect-cursor: 1,4
+expect-mode: normal
+
+=== Visual C-a then dot
+text:
+  1
+  1
+  1
+  1
+cursor: 1,1
+keys: Vj<C-a>jj.
+--- vim 9.1
+expect-text:
+  2
+  2
+  2
+  2
+expect-cursor: 3,1
+expect-mode: normal
+
+=== Visual C-a then gv
+text:
+  1 2
+  3 4
+cursor: 1,1
+keys: Vj<C-a>gv<Esc>
+--- vim 9.1
+expect-text:
+  2 2
+  4 4
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Visual dollar C-a
+text:
+  x 12
+  x 34
+cursor: 1,3
+keys: <C-v>j$<C-a>
+--- vim 9.1
+expect-text:
+  x 13
+  x 35
+expect-cursor: 1,3
+expect-mode: normal
+
+=== Visual C-a with no number
+text:
+  abc
+cursor: 1,1
+keys: v<C-a>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-a on hex then lower hex keeps case memory
+text:
+  0xAB 0xab
+cursor: 1,1
+keys: <C-a>w<C-a>
+--- vim 9.1
+expect-text:
+  0xAC 0xac
+expect-cursor: 1,9
+expect-mode: normal

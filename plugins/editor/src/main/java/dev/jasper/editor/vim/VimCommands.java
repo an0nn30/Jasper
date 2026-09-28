@@ -15,7 +15,7 @@ import java.util.Set;
  */
 public final class VimCommands {
     /** What an entry does. */
-    public enum Kind { MOTION, OPERATOR, ACTION, OBJECT, INSERT }
+    public enum Kind { MOTION, OPERATOR, ACTION, OBJECT, INSERT, VISUAL }
 
     @FunctionalInterface interface Motion { Target move(Context context); }
 
@@ -45,7 +45,8 @@ public final class VimCommands {
     private final Map<String, Entry> normal = new LinkedHashMap<>();
     private final Map<String, Entry> objects = new LinkedHashMap<>();
     private final Map<String, Entry> insert = new LinkedHashMap<>();
-    private final Set<String> normalPrefixes = new HashSet<>(), pendingPrefixes = new HashSet<>();
+    private final Map<String, Entry> visual = new LinkedHashMap<>();
+    private final Set<String> normalPrefixes = new HashSet<>(), pendingPrefixes = new HashSet<>(), visualPrefixes = new HashSet<>();
 
     private VimCommands() { }
 
@@ -57,6 +58,11 @@ public final class VimCommands {
         Operators.register(commands);
         NormalCommands.register(commands);
         InsertMode.register(commands);
+        Visual.register(commands);
+        Search.register(commands);
+        MarkCommands.register(commands);
+        Numbers.register(commands);
+        Format.register(commands);
         return commands;
     }
 
@@ -64,11 +70,23 @@ public final class VimCommands {
     public List<Entry> entries() {
         List<Entry> all = new ArrayList<>(normal.values());
         all.addAll(objects.values());
+        all.addAll(visual.values());
         all.addAll(insert.values());
         return Collections.unmodifiableList(all);
     }
 
     void motion(String keys, String description, Motion motion) { add(normal, new Entry(Kind.MOTION, keys, description, false, false, motion)); }
+
+    /** A motion that reads a command line first ({@code /} and {@code ?}); the line is in {@link Context#line}. */
+    void motionWithLine(String keys, String description, Motion motion) {
+        motion(keys, description, motion);
+        lineCommands.add(keys);
+    }
+
+    /** @return whether the entry reads a command line before it runs */
+    boolean needsLine(Entry entry) { return entry.kind() == Kind.MOTION && lineCommands.contains(entry.keys()); }
+
+    private final java.util.Set<String> lineCommands = new java.util.HashSet<>();
 
     void motionWithChar(String keys, String description, Motion motion) { add(normal, new Entry(Kind.MOTION, keys, description, true, false, motion)); }
 
@@ -81,6 +99,11 @@ public final class VimCommands {
     void object(String keys, String description, TextObject object) { add(objects, new Entry(Kind.OBJECT, keys, description, false, false, object)); }
 
     void insert(String keys, String description, InsertKey key) { add(insert, new Entry(Kind.INSERT, keys, description, false, false, key)); }
+
+    /** A Visual-mode command; {@code change} commands are repeated by {@code .} on an area of the same size. */
+    void visual(String keys, String description, boolean needsChar, boolean change, Action action) {
+        add(visual, new Entry(Kind.VISUAL, keys, description, needsChar, change, action));
+    }
 
     /** @return the Normal-mode command with exactly these keys, or null */
     Entry normal(String keys) { return normal.get(keys); }
@@ -95,6 +118,18 @@ public final class VimCommands {
     /** @return the Insert-mode key, or null */
     Entry insertKey(String keys) { return insert.get(keys); }
 
+    /** @return in Visual mode: a Visual command, else a motion or operator, else a text object; or null */
+    Entry visualKey(String keys) {
+        Entry entry = visual.get(keys);
+        if (entry != null) return entry;
+        entry = normal.get(keys);
+        if (entry != null && (entry.kind() == Kind.MOTION || entry.kind() == Kind.OPERATOR)) return entry;
+        return objects.get(keys);
+    }
+
+    /** @return whether more keys could complete a Visual-mode command */
+    boolean visualPrefix(String keys) { return visualPrefixes.contains(keys); }
+
     /** @return whether more keys could complete a command */
     boolean prefix(String keys, boolean pending) { return (pending ? pendingPrefixes : normalPrefixes).contains(keys); }
 
@@ -104,8 +139,9 @@ public final class VimCommands {
         List<KeyInput> keys = KeyInput.parse(entry.keys());
         for (int n = 1; n < keys.size(); n++) {
             String prefix = KeyInput.format(keys.subList(0, n));
-            if (entry.kind() != Kind.OBJECT) normalPrefixes.add(prefix);
+            if (entry.kind() != Kind.OBJECT && entry.kind() != Kind.VISUAL) normalPrefixes.add(prefix);
             if (entry.kind() == Kind.MOTION || entry.kind() == Kind.OBJECT) pendingPrefixes.add(prefix);
+            if (entry.kind() != Kind.ACTION) visualPrefixes.add(prefix);
         }
     }
 }

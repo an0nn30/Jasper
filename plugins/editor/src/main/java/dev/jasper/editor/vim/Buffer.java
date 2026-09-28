@@ -121,9 +121,21 @@ final class Buffer {
         } catch (BadLocationException bad) { throw new IllegalStateException(bad); }
     }
 
-    /** Replaces one line's text, leaving its newline. */
+    /**
+     * Replaces one line's text, leaving its newline. Only the part that differs is replaced, so the change starts
+     * where Vim's does (for the {@code '.} mark) and the undo holds only the change.
+     */
     void setLine(int line, String text) {
-        if (!text.equals(line(line))) replace(start(line), end(line), text);
+        String old = line(line);
+        if (text.equals(old)) return;
+        int prefix = 0, max = Math.min(old.length(), text.length());
+        while (prefix < max && old.charAt(prefix) == text.charAt(prefix)) prefix++;
+        if (prefix > 0 && Character.isHighSurrogate(old.charAt(prefix - 1))) prefix--;
+        int suffix = 0;
+        while (suffix < max - prefix && old.charAt(old.length() - 1 - suffix) == text.charAt(text.length() - 1 - suffix)) suffix++;
+        if (suffix > 0 && Character.isLowSurrogate(old.charAt(old.length() - suffix))) suffix--;
+        int start = start(line);
+        replace(start + prefix, start + old.length() - suffix, text.substring(prefix, text.length() - suffix));
     }
 
     /** Inserts whole lines before {@code line}; {@code line == count()} appends after the last line. */

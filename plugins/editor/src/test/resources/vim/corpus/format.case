@@ -1,0 +1,717 @@
+# gq and gw, and blockwise forced motions.
+
+=== gqq breaks a long line
+text:
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+cursor: 1,1
+keys: gqq
+--- vim 9.1
+expect-text:
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor
+  incididunt ut labore et dolore magna aliqua
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gqq with textwidth
+text:
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+cursor: 1,1
+set: textwidth=30
+keys: gqq
+--- vim 9.1
+expect-text:
+  lorem ipsum dolor sit amet
+  consectetur adipiscing elit
+  sed do eiusmod tempor
+  incididunt ut labore et dolore
+  magna aliqua
+expect-cursor: 5,1
+expect-mode: normal
+
+=== gqap joins and breaks a paragraph
+text:
+  one two
+  three four five
+  six
+  $
+  next para
+cursor: 1,1
+set: textwidth=12
+keys: gqap
+--- vim 9.1
+expect-text:
+  one two
+  three four
+  five six
+  $
+  next para
+expect-cursor: 4,1
+expect-mode: normal
+
+=== gqap leaves the cursor after the paragraph
+text:
+  one two
+  three
+  $
+  next
+cursor: 1,1
+set: textwidth=40
+keys: gqap
+--- vim 9.1
+expect-text:
+  one two three
+  $
+  next
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gwap keeps the cursor
+text:
+  one two
+  three four five
+  six
+cursor: 2,3
+set: textwidth=12
+keys: gwap
+--- vim 9.1
+expect-text:
+  one two
+  three four
+  five six
+expect-cursor: 2,3
+expect-mode: normal
+
+=== gq with j
+text:
+  a b c
+  d e f
+  g h i
+cursor: 1,1
+set: textwidth=5
+keys: gqj
+--- vim 9.1
+expect-text:
+  a b c
+  d e f
+  g h i
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gq brace
+text:
+  a b c
+  d e f
+  $
+  g
+cursor: 1,1
+set: textwidth=5
+keys: gq}
+--- vim 9.1
+expect-text:
+  a b c
+  d e f
+  $
+  g
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq keeps indent
+text:
+      one two three four five six
+cursor: 1,1
+set: textwidth=16
+keys: gqq
+--- vim 9.1
+expect-text:
+      one two
+  three four five
+  six
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq keeps indent with autoindent
+text:
+      one two three four five six
+cursor: 1,1
+set: textwidth=16 autoindent
+keys: gqq
+--- vim 9.1
+expect-text:
+      one two
+      three four
+      five six
+expect-cursor: 3,5
+expect-mode: normal
+
+=== gq converts space indent to a tab
+text:
+          one two three four five six seven
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  	one two
+  three four five six
+  seven
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq with expandtab keeps spaces
+text:
+          one two three four five six seven
+cursor: 1,1
+set: textwidth=20 expandtab
+keys: gqq
+--- vim 9.1
+expect-text:
+          one two
+  three four five six
+  seven
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq a word longer than textwidth
+text:
+  short averyveryverylongword x
+cursor: 1,1
+set: textwidth=10
+keys: gqq
+--- vim 9.1
+expect-text:
+  short
+  averyveryverylongword
+  x
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq removes trailing spaces at breaks
+text:
+  aaa   bbb   ccc   ddd
+cursor: 1,1
+set: textwidth=8
+keys: gqq
+--- vim 9.1
+expect-text:
+  aaa
+  bbb
+  ccc
+  ddd
+expect-cursor: 4,1
+expect-mode: normal
+
+=== gq joins with two spaces after a period
+text:
+  end.
+  next
+cursor: 1,1
+keys: gqj
+--- vim 9.1
+expect-text:
+  end.  next
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gq joins with one space with nojoinspaces
+text:
+  end.
+  next
+cursor: 1,1
+set: nojoinspaces
+keys: gqj
+--- vim 9.1
+expect-text:
+  end. next
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gq short lines stay
+text:
+  a
+  b
+cursor: 1,1
+keys: gqj
+--- vim 9.1
+expect-text:
+  a b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gq blank lines separate paragraphs
+text:
+  a
+  $
+  b
+cursor: 1,1
+keys: gqG
+--- vim 9.1
+expect-text:
+  a
+  $
+  b
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq with count
+text:
+  a
+  b
+  c
+  d
+cursor: 1,1
+keys: 3gqq
+--- vim 9.1
+expect-text:
+  a b c
+  d
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gq on hash comments
+text:
+  # one two three four five six seven eight
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  # one two three four
+  # five six seven
+  # eight
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq joins hash comments
+text:
+  # one two
+  # three four
+cursor: 1,1
+set: textwidth=40
+keys: gqj
+--- vim 9.1
+expect-text:
+  # one two three four
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gq on slash slash comments
+text:
+  // one two three four five six seven eight
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  // one two three
+  // four five six
+  // seven eight
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq on indented slash slash comments
+text:
+      // one two three four five six seven eight
+cursor: 1,1
+set: textwidth=24
+keys: gqq
+--- vim 9.1
+expect-text:
+      // one two three
+      // four five six
+      // seven eight
+expect-cursor: 3,5
+expect-mode: normal
+
+=== gq on quoted mail
+text:
+  > one two three four five six seven eight
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  > one two three four
+  > five six seven
+  > eight
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq on nested quotes
+text:
+  > > one two three four five six seven
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  > > one two three
+  > > four five six
+  > > seven
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq on a list item
+text:
+  - one two three four five six seven eight
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  - one two three four
+    five six seven
+  eight
+expect-cursor: 3,1
+expect-mode: normal
+
+=== gq on a block comment start
+text:
+  /* one two three four five six seven eight
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  /* one two three
+   * four five six
+   * seven eight
+expect-cursor: 3,2
+expect-mode: normal
+
+=== gq on block comment middle lines
+text:
+  /*
+   * one two three four five six seven eight
+   */
+cursor: 1,1
+set: textwidth=20
+keys: gqG
+--- vim 9.1
+expect-text:
+  /*
+   * one two three
+   * four five six
+   * seven eight
+   */
+expect-cursor: 5,2
+expect-mode: normal
+
+=== gq does not join different leaders
+text:
+  # one
+  // two
+cursor: 1,1
+set: textwidth=40
+keys: gqj
+--- vim 9.1
+expect-text:
+  # one
+  // two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gq does not join a comment and text
+text:
+  # one
+  two
+cursor: 1,1
+set: textwidth=40
+keys: gqj
+--- vim 9.1
+expect-text:
+  # one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gq with formatoptions without q
+text:
+  # one
+  # two
+cursor: 1,1
+set: textwidth=40 formatoptions=tc
+keys: gqj
+--- vim 9.1
+expect-text:
+  # one # two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual gq
+text:
+  one two
+  three four five
+  six
+cursor: 1,1
+set: textwidth=12
+keys: Vjgq
+--- vim 9.1
+expect-text:
+  one two
+  three four
+  five
+  six
+expect-cursor: 3,1
+expect-mode: normal
+
+=== Visual gw keeps the cursor
+text:
+  one two
+  three four five
+  six
+cursor: 2,2
+set: textwidth=12
+keys: Vkgw
+--- vim 9.1
+expect-text:
+  one two
+  three four
+  five
+  six
+expect-cursor: 1,2
+expect-mode: normal
+
+=== gq then dot
+text:
+  a b c d
+  $
+  e f g h
+cursor: 1,1
+set: textwidth=4
+keys: gqqjj.
+--- vim 9.1
+expect-text:
+  a b
+  c d
+  $
+  e f
+  g h
+expect-cursor: 5,1
+expect-mode: normal
+
+=== gq then u
+text:
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+cursor: 1,1
+set: textwidth=30
+keys: gqqu
+--- vim 9.1
+expect-text:
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gqgq
+text:
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+cursor: 1,1
+set: textwidth=30
+keys: gqgq
+--- vim 9.1
+expect-text:
+  lorem ipsum dolor sit amet
+  consectetur adipiscing elit
+  sed do eiusmod tempor
+  incididunt ut labore et dolore
+  magna aliqua
+expect-cursor: 5,1
+expect-mode: normal
+
+=== gww keeps the cursor
+text:
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+cursor: 1,20
+set: textwidth=30
+keys: gww
+--- vim 9.1
+expect-text:
+  lorem ipsum dolor sit amet
+  consectetur adipiscing elit
+  sed do eiusmod tempor
+  incididunt ut labore et dolore
+  magna aliqua
+expect-cursor: 1,20
+expect-mode: normal
+
+=== gq with tabs inside
+text:
+  a	b	c	d	e	f
+cursor: 1,1
+set: textwidth=20
+keys: gqq
+--- vim 9.1
+expect-text:
+  a	b	c
+  d	e	f
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gq on wide characters
+text:
+  日本語 日本語 日本語 日本語 日本語
+cursor: 1,1
+set: textwidth=12
+keys: gqq
+--- vim 9.1
+expect-text:
+  日本語
+  日本語
+  日本語
+  日本語
+  日本語
+expect-cursor: 5,1
+expect-mode: normal
+
+=== gq on a paragraph with a long joined line
+text:
+  a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a $
+  b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b b $
+cursor: 1,1
+set: textwidth=20
+keys: gqj
+--- vim 9.1
+expect-text:
+  a a a a a a a a a a
+  a a a a a a a a a a
+  a a a a a a a a a a
+  a a a a a a a a a a
+  b b b b b b b b b b
+  b b b b b b b b b b
+  b b b b b b b b b b
+  b b b b b b b b b b $
+expect-cursor: 8,1
+expect-mode: normal
+
+=== gq on nroff macro lines
+text:
+  .TH x
+  a
+  b
+cursor: 1,1
+keys: gqG
+--- vim 9.1
+expect-text:
+  .TH x a b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d C-v j deletes a block
+text:
+  abcd
+  efgh
+  ijkl
+cursor: 1,2
+keys: d<C-v>jl
+--- vim 9.1
+expect-text:
+  acd
+  egh
+  ijkl
+expect-cursor: 1,3
+expect-mode: normal
+
+=== y C-v then p
+text:
+  abcd
+  efgh
+  ijkl
+cursor: 1,2
+keys: y<C-v>jl$p
+registers: "
+--- vim 9.1
+expect-text:
+  abcdb
+  efghf
+  ijkl
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": b1 "b\nf"
+
+=== d C-v dollar
+text:
+  abcd
+  ef
+  ijkl
+cursor: 1,2
+keys: d<C-v>j$
+--- vim 9.1
+expect-text:
+  acd
+  e
+  ijkl
+expect-cursor: 1,3
+expect-mode: normal
+
+=== c C-v j
+text:
+  abcd
+  efgh
+cursor: 1,2
+keys: c<C-v>jX<Esc>
+--- vim 9.1
+expect-text:
+  aXcd
+  eXgh
+expect-cursor: 1,2
+expect-mode: normal
+
+=== d C-v j then dot
+text:
+  abcd
+  efgh
+  ijkl
+  mnop
+cursor: 1,2
+keys: d<C-v>jjj.
+--- vim 9.1
+expect-text:
+  acd
+  egh
+  ikl
+  mop
+expect-cursor: 3,2
+expect-mode: normal
+
+=== d C-v j then gv
+text:
+  abcd
+  efgh
+  ijkl
+cursor: 1,2
+keys: d<C-v>jgv
+--- vim 9.1
+expect-text:
+  acd
+  egh
+  ijkl
+expect-cursor: 2,2
+expect-mode: visual-block
+expect-visual: 1,2
+
+=== d C-v with a count
+text:
+  abcd
+  efgh
+  ijkl
+cursor: 1,1
+keys: d<C-v>2j
+--- vim 9.1
+expect-text:
+  bcd
+  fgh
+  jkl
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gU C-v j
+text:
+  abcd
+  efgh
+cursor: 1,2
+keys: gU<C-v>jl
+--- vim 9.1
+expect-text:
+  aBcd
+  eFgh
+expect-cursor: 1,3
+expect-mode: normal

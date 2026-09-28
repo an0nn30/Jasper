@@ -20,6 +20,8 @@ final class NormalCommands {
         commands.actionWithChar("r", "replace {count} characters with {char}", true, NormalCommands::replace);
         commands.action("~", "toggle the case of {count} characters", true, NormalCommands::tilde);
         commands.action("J", "join {count} lines, with a space", true, c -> join(c, true));
+        commands.action("<C-g>", "show the file name, line count and cursor position", false, NormalCommands::fileInfo);
+        commands.action("ga", "show the code of the character under the cursor", false, NormalCommands::ascii);
         commands.action("gJ", "join {count} lines, without a space", true, c -> join(c, false));
         commands.action("p", "put after the cursor", true, c -> put(c, true, false, false));
         commands.action("P", "put before the cursor", true, c -> put(c, false, false, false));
@@ -118,24 +120,37 @@ final class NormalCommands {
         joinLines(c, first, count, spaces);
     }
 
+    /**
+     * do_join. Each line joins the first in turn: the separator goes after the first line's text, then the line break
+     * and the next line's indent go, so marks on the joined line move as Vim's mark_col_adjust moves them.
+     */
     static void joinLines(Context c, int first, int count, boolean insertSpace) {
         Buffer b = c.buffer;
         boolean js = c.options.flag("joinspaces");
-        StringBuilder out = new StringBuilder();
         int col = 0, endcurr1 = 0, endcurr2 = 0;
-        for (int t = 0; t < count; t++) {
-            String curr = b.line(first + t);
-            int spaces = 0;
-            if (insertSpace && t > 0) {
-                curr = curr.substring(Text.firstNonBlank(curr));
-                if (!curr.isEmpty() && curr.charAt(0) != ')' && !out.isEmpty() && endcurr1 != '\t') {
+        String head = b.line(first);
+        if (insertSpace && !head.isEmpty()) {
+            int lastStart = head.offsetByCodePoints(head.length(), -1);
+            endcurr1 = head.codePointAt(lastStart);
+            if (lastStart > 0) endcurr2 = head.codePointBefore(lastStart);
+        }
+        for (int t = 1; t < count; t++) {
+            String curr = b.line(first + 1);
+            int removed = 0, spaces = 0;
+            if (insertSpace) {
+                removed = Text.firstNonBlank(curr);
+                curr = curr.substring(removed);
+                if (!curr.isEmpty() && curr.charAt(0) != ')' && b.line(first).length() > 0 && endcurr1 != '\t') {
                     if (endcurr1 == ' ') endcurr1 = endcurr2;
                     else spaces++;
                     if (js && (endcurr1 == '.' || endcurr1 == '?' || endcurr1 == '!')) spaces++;
                 }
             }
-            if (t == count - 1) col = out.length();
-            out.append(" ".repeat(spaces)).append(curr);
+            int end = b.end(first);
+            if (t == count - 1) col = b.line(first).length();
+            if (spaces > 0) b.insert(end, " ".repeat(spaces));
+            int from = b.end(first), to = b.start(first + 1) + removed;
+            c.editor.marks().joining(() -> b.remove(from, to));
             endcurr1 = endcurr2 = 0;
             if (insertSpace && !curr.isEmpty()) {
                 int lastStart = curr.offsetByCodePoints(curr.length(), -1);
@@ -143,50 +158,67 @@ final class NormalCommands {
                 if (lastStart > 0) endcurr2 = curr.codePointBefore(lastStart);
             }
         }
-        b.replace(b.start(first), b.end(first + count - 1), out.toString());
         c.editor.setCursor(new Pos(first, col));
     }
 
-    /** do_put. */
-    static void put(Context c, boolean after, boolean cursorAfter, boolean fixIndent) {
-        char requested = Registers.effective(c.register, c.options.string("clipboard"));
-        char name = requested == 0 ? '"' : requested;
-        Content content = c.registers.get(name).orElseThrow(() -> new VimFailure("E353: Nothing in register " + name));
+    /**
+     * fileinfo (buffer.c) with 'noruler': {@code "name" [Modified] line 2 of 10 --20%-- col 3}, the column shown as
+     * {@code 3-10} when the display column differs.
+     */
+    static void fileInfo(Context c) {
         Buffer b = c.buffer;
         Pos p = c.cursor();
-        if (content.type() == Registers.Type.LINE) {
-            List<String> lines = new ArrayList<>();
-            for (int n = 0; n < c.count; n++) lines.addAll(content.lines());
-            if (fixIndent) lines = reindented(c, lines, Text.indent(b.line(p.line), c.tabstop()));
-            int at = after ? p.line + 1 : p.line;
-            b.insertLines(at, lines);
-            if (cursorAfter) {
-                int line = at + lines.size();
-                c.editor.setCursor(new Pos(Math.min(line, b.count() - 1), 0));
-            } else c.editor.setCursor(new Pos(at, Text.firstNonBlank(b.line(at))));
-            return;
+        StringBuilder out = new StringBuilder("\"").append(c.editor.documentName()).append('"');
+        boolean modified = c.editor.documentModified();
+        out.append(modified ? " [Modified] " : " ");
+        if (b.length() == 0) out.append("--No lines in buffer--");
+        else {
+            int lines = b.count();
+            int percent = (int) ((long) (p.line + 1) * 100 / lines);
+            String line = b.line(p.line);
+            int col = p.col + 1, vcol = Text.virtcol(line, p.col, c.tabstop()) + 1;
+            out.append("line ").append(p.line + 1).append(" of ").append(lines).append(" --").append(percent).append("%-- col ");
+            out.append(col == vcol ? String.valueOf(col) : col + "-" + vcol);
         }
-        String line = b.line(p.line);
-        int col = after && !line.isEmpty() ? Text.next(line, p.col) : p.col;
-        String text = content.text().repeat(c.count);
-        int offset = b.offset(p.line, col);
-        b.insert(offset, text);
-        if (content.lines().size() == 1) {
-            if (cursorAfter) c.editor.setCursor(new Pos(p.line, col + text.length()));
-            else c.editor.setCursor(new Pos(p.line, col + Text.last(text)));
-        } else c.editor.setCursor(cursorAfter ? b.pos(offset + text.length()) : new Pos(p.line, col));
+        c.editor.message(out.toString(), false);
     }
 
-    /** ]p: the first line gets {@code target} indent and the others keep their indent relative to it. */
-    private static List<String> reindented(Context c, List<String> lines, int target) {
-        int ts = c.tabstop();
-        boolean et = c.options.flag("expandtab");
-        int delta = target - Text.indent(lines.getFirst(), ts);
-        List<String> out = new ArrayList<>();
-        for (String line : lines) {
-            if (Text.blank(line)) out.add(line);
-            else out.add(Text.makeIndent(Math.max(0, Text.indent(line, ts) + delta), ts, et) + line.substring(Text.firstNonBlank(line)));
+    /**
+     * do_ascii: the character under the cursor as {@code <a>  97,  Hex 61,  Octal 141}, or for a character above
+     * U+007F {@code <é> 233, Hex 00e9, Oct 351}, followed by any combining characters. Vim adds the character's
+     * digraph; Jasper has no digraph table (docs/vim-divergences.md).
+     */
+    static void ascii(Context c) {
+        Pos p = c.cursor();
+        String line = c.buffer.line(p.line);
+        if (p.col >= line.length()) {
+            c.editor.message("NUL", false);
+            return;
         }
-        return out;
+        StringBuilder out = new StringBuilder();
+        int i = p.col;
+        int cp = line.codePointAt(i);
+        if (cp < 0x80) {
+            String shown = cp < 0x20 ? "^" + (char) (cp + '@') : cp == 0x7f ? "^?" : String.valueOf((char) cp);
+            out.append('<').append(shown).append(">  ").append(cp).append(",  Hex ").append(String.format("%02x", cp))
+                .append(",  Octal ").append(String.format("%03o", cp));
+            i += 1;
+        } else {
+            out.append('<').append(Character.toString(cp)).append("> ").append(cp).append(", Hex ").append(String.format("%04x", cp))
+                .append(", Oct ").append(Integer.toOctalString(cp));
+            i += Character.charCount(cp);
+        }
+        while (i < line.length() && Character.getType(line.codePointAt(i)) == Character.NON_SPACING_MARK) {
+            int mark = line.codePointAt(i);
+            out.append(" < ").append(Character.toString(mark)).append("> ").append(mark).append(", Hex ").append(String.format("%04x", mark))
+                .append(", Oct ").append(Integer.toOctalString(mark));
+            i += Character.charCount(mark);
+        }
+        c.editor.message(out.toString(), false);
+    }
+
+    /** do_put: see {@link Put}. */
+    static void put(Context c, boolean after, boolean cursorAfter, boolean fixIndent) {
+        Put.put(c, after, c.count, (cursorAfter ? Put.CURSEND : 0) | (fixIndent ? Put.FIXINDENT : 0), -1);
     }
 }

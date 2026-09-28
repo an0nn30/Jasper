@@ -36,4 +36,52 @@ class VimBarTest {
             assertThat(bar.statusText()).as("a detached bar no longer follows the editor").isEmpty();
         });
     }
+
+    @Test void showsTheCommandLineWithItsCursor() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var area = new VimTextArea();
+            area.setText("one two\n");
+            area.setCaretPosition(0);
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            var bar = new VimBar();
+            bar.attach(editor);
+            type(editor, "/tw");
+            assertThat(bar.statusText()).isEqualTo("/tw");
+            assertThat(bar.commandLineCursor()).isEqualTo(3);
+            type(editor, "<Left>");
+            assertThat(bar.commandLineCursor()).isEqualTo(2);
+            type(editor, "<C-v><C-a>");
+            assertThat(bar.statusText()).as("a control character shows as ^A").isEqualTo("/t^Aw");
+            type(editor, "<Esc>");
+            assertThat(bar.commandLineCursor()).isEqualTo(-1);
+            type(editor, "/two<CR>");
+            assertThat(bar.statusText()).as("a search echoes its pattern").isEqualTo("/two");
+            type(editor, "n");
+            assertThat(bar.statusText()).isEqualTo("search hit BOTTOM, continuing at TOP");
+        });
+    }
+
+    @Test void showsTheVisualAreasSize() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var area = new VimTextArea();
+            area.setText("ab\u00e9d\nefgh\nijkl\n");
+            area.setCaretPosition(0);
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            var bar = new VimBar();
+            bar.attach(editor);
+            type(editor, "vl");
+            assertThat(bar.statusText()).isEqualTo("-- VISUAL --");
+            assertThat(bar.commandText()).isEqualTo("2");
+            type(editor, "l");
+            assertThat(bar.commandText()).as("characters, then UTF-8 bytes when they differ").isEqualTo("3-4");
+            type(editor, "j");
+            assertThat(bar.commandText()).isEqualTo("2");
+            type(editor, "<C-v>");
+            assertThat(bar.commandText()).isEqualTo("2x3");
+            type(editor, "V");
+            assertThat(bar.commandText()).isEqualTo("2");
+            type(editor, "\"");
+            assertThat(bar.commandText()).as("a pending key replaces the size").isEqualTo("\"");
+        });
+    }
 }

@@ -88,12 +88,14 @@ public final class RecordCorpus {
                 @SuppressWarnings("unchecked")
                 List<String> lines = (List<String>) entry.getValue().get(1);
                 if (type.isEmpty() || lines.isEmpty()) continue;
-                char kind = type.equals("V") ? 'l' : type.equals("v") ? 'c' : 'b';
-                String joined = String.join("\n", lines) + (kind == 'l' ? "\n" : "");
+                String kind = type.equals("V") ? "l" : type.equals("v") ? "c" : "b" + type.substring(1);
+                String joined = String.join("\n", lines) + (kind.equals("l") ? "\n" : "");
                 registers.put(entry.getKey().charAt(0), new CorpusCase.Register(kind, joined));
             }
+            @SuppressWarnings("unchecked")
+            List<Long> visual = (List<Long>) result.get("visual");
             return new CorpusCase.Expected(version, text, ((Long) result.get("line")).intValue(), ((Long) result.get("col")).intValue(),
-                mode((String) result.get("mode")), registers);
+                mode((String) result.get("mode")), visual.isEmpty() ? null : visual.get(0) + "," + visual.get(1), registers);
         } finally {
             try (Stream<Path> files = Files.list(folder)) { for (Path p : files.toList()) Files.deleteIfExists(p); }
             Files.deleteIfExists(folder);
@@ -106,6 +108,10 @@ public final class RecordCorpus {
         if (vim.equals("R")) return "replace";
         if (vim.equals("niI") || vim.equals("niR")) return "insert-normal";
         if (vim.startsWith("no")) return "operator-pending";
+        if (vim.equals("c")) return "command-line";
+        if (vim.equals("v")) return "visual";
+        if (vim.equals("V")) return "visual-line";
+        if (vim.equals("\u0016")) return "visual-block";
         return vim;
     }
 
@@ -116,7 +122,10 @@ public final class RecordCorpus {
         lines.add("scriptencoding utf-8");
         lines.add("set nocompatible");
         lines.add("function! JasperRecord()");
-        lines.add("  let g:jasper = {'text': getline(1, '$'), 'line': line('.'), 'col': charcol('.'), 'mode': mode(1), 'regs': {}}");
+        lines.add("  let g:jasper = {'text': getline(1, '$'), 'line': line('.'), 'col': charcol('.'), 'mode': mode(1), 'regs': {}, 'visual': []}");
+        lines.add("  if mode() =~# '^[vV\\x16]'");
+        lines.add("    let g:jasper.visual = [line('v'), charcol('v')]");
+        lines.add("  endif");
         lines.add("  for r in " + vimList(c.registers().stream().map(String::valueOf).toList()));
         lines.add("    let g:jasper.regs[r] = [getregtype(r), getreg(r, 1, 1)]");
         lines.add("  endfor");
@@ -127,8 +136,8 @@ public final class RecordCorpus {
         if (!c.set().isBlank()) lines.add("set " + c.set());
         for (var entry : c.given().entrySet()) {
             CorpusCase.Register register = entry.getValue();
-            String text = register.type() == 'l' && register.text().endsWith("\n") ? register.text().substring(0, register.text().length() - 1) : register.text();
-            lines.add("call setreg(" + Json.quote(String.valueOf(entry.getKey())) + ", " + vimList(List.of(text.split("\n", -1))) + ", " + (register.type() == 'l' ? "'l'" : "'c'") + ")");
+            String text = register.type().equals("l") && register.text().endsWith("\n") ? register.text().substring(0, register.text().length() - 1) : register.text();
+            lines.add("call setreg(" + Json.quote(String.valueOf(entry.getKey())) + ", " + vimList(List.of(text.split("\n", -1))) + ", " + Json.quote(register.type()) + ")");
         }
         // Editing a file, rather than setline(), leaves no undo history for u to reach.
         lines.add("call writefile(" + vimList(c.text()) + ", " + Json.quote(file.toString()) + ")");

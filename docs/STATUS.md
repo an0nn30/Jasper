@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-09-23
+## Current state — 2026-09-28
 
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
@@ -14,6 +14,20 @@
   Apply and use it; the plugin restart banner and an install's consent dialog over Settings; View choices in two
   windows; a View choice with a broken config.toml; Window Settings… Deviations: see the plan's status banner. Not
   pushed; not merged.
+
+- **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
+  linewise, blockwise, with block `I`/`A`/`c`, `p` over an area, `gv` and `.` on an area of the same size), `/` and `?`
+  with offsets and `;`, `n N * # g* g#`, the Vim regex translator (`dev.jasper.editor.vim.regex`), 'incsearch' and
+  'hlsearch' highlights, marks, the jumplist and change list, `gi`, `<C-a>`/`<C-x>` (and `g<C-a>`), `gq`/`gw`,
+  `<C-g>`, `ga`, blockwise registers and blockwise forced motions. Scrolling, the screen-line motions and folds moved
+  to plan V1c (spec 13). Every file in the plan was compiled and run against Vim 9.1 before the plan was written: 946
+  corpus cases (943 recorded, 3 divergent).
+  - Executed inline on 2026-09-28 (five task commits plus one fix: a marks case typed four backticks, which broke
+    `AppDocumentationTest`'s fence stripping inside the plan; it now types G, two backticks, 0, two backticks, with
+    Vim's result unchanged). `./gradlew check`: 3,372 tests, 0 failed, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (settings dialog B1) into the branch; not pushed.
+  - Not done: GUI checks 31–40 of the [checklist](editor-verification.md) (user-run); plans V1c, V2, V3 and V4; push.
 
 - **Settings dialog B1** (`claude/settings-dialog`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-settings-dialog-design.md`, plan

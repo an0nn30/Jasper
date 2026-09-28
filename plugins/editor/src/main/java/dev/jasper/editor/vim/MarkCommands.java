@@ -1,0 +1,127 @@
+package dev.jasper.editor.vim;
+
+/**
+ * Marks, the jumplist and the change list (spec 3.6), ported from Vim's normal.c (nv_mark, nv_gomark,
+ * nv_cursormark, nv_pcmark, {@code gi}) and mark.c (setmark_pos, getmark_buf_fnum, check_mark).
+ */
+final class MarkCommands {
+    private MarkCommands() { }
+
+    static void register(VimCommands commands) {
+        commands.actionWithChar("m", "set mark {char} at the cursor", false, MarkCommands::set);
+        commands.motionWithChar("'", "to the first non-blank of mark {char}'s line", c -> go(c, true));
+        commands.motionWithChar("`", "to mark {char}", c -> go(c, false));
+        commands.action("<C-o>", "to an older position in the jumplist", false, c -> jump(c, -c.count));
+        // CTRL-I arrives as <Tab>, as in Vim (KeyInput.normalized).
+        commands.action("<Tab>", "to a newer position in the jumplist (CTRL-I)", false, c -> jump(c, c.count));
+        commands.action("g;", "to an older position in the change list", false, c -> change(c, -c.count));
+        commands.action("g,", "to a newer position in the change list", false, c -> change(c, c.count));
+        commands.action("gi", "Insert mode where it was last left (the '^ mark)", true, MarkCommands::insertAgain);
+        commands.visual("m", "set mark {char} at the cursor", true, false, MarkCommands::set);
+    }
+
+    /** nv_mark and setmark_pos. */
+    static void set(Context c) {
+        int name = c.argumentChar();
+        Marks marks = c.editor.marks();
+        Pos cursor = c.cursor();
+        if (name == '\'' || name == '`') marks.setpcmarkKeep(cursor);
+        else if (name >= 'a' && name <= 'z' || name == '[' || name == ']' || name == '"') marks.set((char) name, cursor);
+        else if (name == '<') setVisual(c, Visual.START, cursor);
+        else if (name == '>') setVisual(c, Visual.END, cursor);
+        else if (name >= 'A' && name <= 'Z') c.vim.globalMark((char) name, c.editor, cursor);
+        else throw Context.fail();
+    }
+
+    private static void setVisual(Context c, char which, Pos cursor) {
+        Marks marks = c.editor.marks();
+        marks.set(which, cursor);
+        if (marks.visualMode == null) marks.visualMode = Mode.VISUAL;
+    }
+
+    /**
+     * getmark_buf_fnum.
+     *
+     * @return the mark's position, which may be past the end of its line or the text; null when it is not set
+     */
+    static Pos get(VimEditor editor, char name) {
+        Marks marks = editor.marks();
+        return switch (name) {
+            case '\'', '`' -> marks.pcmark();
+            case '<', '>' -> {
+                Pos start = marks.get(Visual.START), end = marks.get(Visual.END);
+                Pos pos;
+                if (start != null && ((name == '<') == (end == null || start.compareTo(end) < 0))) pos = start;
+                else pos = end;
+                if (pos != null && marks.visualMode == Mode.VISUAL_LINE) pos = new Pos(pos.line, name == '<' ? 0 : Visual.MAX);
+                yield pos;
+            }
+            default -> {
+                if (name >= 'A' && name <= 'Z') yield editor.vim().globalMark(name, editor);
+                yield marks.get(name);
+            }
+        };
+    }
+
+    /** nv_gomark: ' is linewise to the first non-blank, ` exclusive to the mark itself; both are jumps. */
+    static Target go(Context c, boolean linewise) {
+        int name = c.argumentChar();
+        if (name < 0) throw Context.fail();
+        Pos pos = get(c.editor, (char) name);
+        pos = check(c.buffer, pos);
+        if (linewise) {
+            String line = c.buffer.line(pos.line);
+            return Target.linewise(new Pos(pos.line, Text.firstNonBlank(line)), Target.Column.RESET).asJump();
+        }
+        String line = c.buffer.line(pos.line);
+        int col = Math.min(pos.col, line.length());
+        if (!c.inVisual() && col >= line.length() && !line.isEmpty()) col = Text.last(line);
+        return Target.exclusive(new Pos(pos.line, col)).asJump().usingRegisterOne().withoutAdjust();
+    }
+
+    /** check_mark: E20 for a mark that is not set, E19 for one past the last line. */
+    static Pos check(Buffer b, Pos pos) {
+        if (pos == null || pos.line < 0) throw new VimFailure("E20: Mark not set");
+        if (pos.line >= b.count()) throw new VimFailure("E19: Mark has invalid line number");
+        return pos;
+    }
+
+    /** nv_pcmark for CTRL-O and CTRL-I; not with an operator or in Visual mode. */
+    static void jump(Context c, int count) {
+        if (c.operator != null || c.inVisual()) throw Context.fail();
+        Pos pos = c.editor.marks().movemark(count, c.cursor());
+        if (pos == null) throw Context.fail();
+        moveTo(c, check(c.buffer, pos));
+    }
+
+    /** nv_pcmark for g; and g,. */
+    static void change(Context c, int count) {
+        if (c.operator != null || c.inVisual()) throw Context.fail();
+        Marks marks = c.editor.marks();
+        Pos pos = marks.movechangelist(count);
+        if (pos == null) {
+            if (marks.changes().isEmpty()) throw new VimFailure("E664: Changelist is empty");
+            throw new VimFailure(count < 0 ? "E662: At start of changelist" : "E663: At end of changelist");
+        }
+        moveTo(c, check(c.buffer, pos));
+    }
+
+    private static void moveTo(Context c, Pos pos) {
+        String line = c.buffer.line(pos.line);
+        int col = Math.min(pos.col, line.length());
+        if (col >= line.length() && !line.isEmpty()) col = Text.last(line);
+        c.editor.setCursor(new Pos(pos.line, col));
+        c.editor.forgetColumn();
+    }
+
+    /** gi: Insert mode at the {@code '^} mark, or at the cursor when it is not set. */
+    static void insertAgain(Context c) {
+        Pos last = c.editor.marks().get('^');
+        if (last != null) {
+            int line = Math.min(last.line, c.buffer.count() - 1);
+            int col = Math.min(last.col, c.buffer.line(line).length());
+            c.editor.setCursor(new Pos(line, col), true);
+        }
+        c.editor.insert().begin("i", c.count, false, -1);
+    }
+}

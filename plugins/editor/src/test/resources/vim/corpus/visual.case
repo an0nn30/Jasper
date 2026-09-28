@@ -1,0 +1,1850 @@
+# Visual mode: v and V, operators on the area, text objects, put, gv and repeat.
+
+=== v then l selects
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vll
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: visual
+expect-visual: 1,1
+
+=== v with a count
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: 3v
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: visual
+expect-visual: 1,1
+
+=== V with a count
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: 2V
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: visual-line
+expect-visual: 1,1
+
+=== v then Esc ends Visual mode
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vll<Esc>
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+
+=== v then v ends Visual mode
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vllv
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+
+=== v then V switches to linewise
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vlV
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,6
+expect-mode: visual-line
+expect-visual: 1,5
+
+=== v then C-v switches to blockwise
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vj<C-v>
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 2,5
+expect-mode: visual-block
+expect-visual: 1,5
+
+=== v at the end of the line goes to the line end with $
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: v$
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,14
+expect-mode: visual
+expect-visual: 1,5
+
+=== v then o goes to the other end
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vwo
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: visual
+expect-visual: 1,9
+
+=== v then w
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vw
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: visual
+expect-visual: 1,1
+
+=== v then e then d
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: ved
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+   two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "one"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "one"
+
+=== v then j then d
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vjd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two three\nfour "
+expect-register 0: none
+expect-register 1: c "two three\nfour "
+expect-register -: none
+
+=== v then $ then d takes the line break
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: v$d
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two three\n"
+expect-register 0: none
+expect-register 1: c "two three\n"
+expect-register -: none
+
+=== v then $ then d on the last line
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 3,5
+keys: v$d
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seve
+expect-cursor: 3,4
+expect-mode: normal
+expect-register ": c "n eight nine"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "n eight nine"
+
+=== v then x
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vlx
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one o three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "tw"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "tw"
+
+=== v then Del
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vl<Del>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one o three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "tw"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "tw"
+
+=== v then y keeps the cursor at the start
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vwy
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two t"
+expect-register 0: c "two t"
+expect-register 1: none
+expect-register -: none
+
+=== v backwards then y
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,9
+keys: vby
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two t"
+expect-register 0: c "two t"
+expect-register 1: none
+expect-register -: none
+
+=== v then y a register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: v"ay
+registers: " a 0
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "t"
+expect-register a: c "t"
+expect-register 0: none
+
+=== v with a register then y
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: "bvey
+registers: " b 0
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two"
+expect-register b: none
+expect-register 0: c "two"
+
+=== v then Y yanks lines
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vY
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one two three\n"
+expect-register 0: l "one two three\n"
+expect-register 1: none
+expect-register -: none
+
+=== v then c
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vec<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one  three
+  four five six
+  seven eight nine
+expect-cursor: 1,4
+expect-mode: normal
+expect-register ": c "two"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "two"
+
+=== v then c and text
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vecTWO<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one TWO three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": c "two"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "two"
+
+=== v then s
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vls!<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one !o three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "tw"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "tw"
+
+=== v then X deletes lines
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vjX
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one two three\nfour five six\n"
+expect-register 0: none
+expect-register 1: l "one two three\nfour five six\n"
+expect-register -: none
+
+=== v then D deletes lines
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,5
+keys: vD
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: none
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== v then C changes lines
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,5
+keys: vlCnew<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  new
+  seven eight nine
+expect-cursor: 2,3
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: none
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== v then S changes lines
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,5
+keys: vSnew<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  new
+  seven eight nine
+expect-cursor: 2,3
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: none
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== v then R changes lines
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,5
+keys: vRnew<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  new
+  seven eight nine
+expect-cursor: 2,3
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: none
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== v then u lowers
+text:
+  ONE TWO
+cursor: 1,1
+keys: veu
+--- vim 9.1
+expect-text:
+  one TWO
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then U uppers
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vjU
+--- vim 9.1
+expect-text:
+  ONE TWO THREE
+  Four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then tilde toggles
+text:
+  One Two
+cursor: 1,1
+keys: v$~
+--- vim 9.1
+expect-text:
+  oNE tWO
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then J joins
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vjJ
+--- vim 9.1
+expect-text:
+  one two three four five six
+  seven eight nine
+expect-cursor: 1,14
+expect-mode: normal
+
+=== v then J on one line joins two
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vJ
+--- vim 9.1
+expect-text:
+  one two three four five six
+  seven eight nine
+expect-cursor: 1,14
+expect-mode: normal
+
+=== v then gJ
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vjgJ
+--- vim 9.1
+expect-text:
+  one two threefour five six
+  seven eight nine
+expect-cursor: 1,14
+expect-mode: normal
+
+=== v then J on the last line fails
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 3,1
+keys: vJ
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 3,1
+expect-mode: normal
+
+=== v then r replaces
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: ver-
+--- vim 9.1
+expect-text:
+  one --- three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+
+=== v over lines then r
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,9
+keys: vjr*
+--- vim 9.1
+expect-text:
+  one two *****
+  ********* six
+  seven eight nine
+expect-cursor: 1,9
+expect-mode: normal
+
+=== V then r
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,9
+keys: Vr.
+--- vim 9.1
+expect-text:
+  .............
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then greater shifts
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vj>
+--- vim 9.1
+expect-text:
+  	one two three
+  	four five six
+  seven eight nine
+expect-cursor: 1,2
+expect-mode: normal
+
+=== v then 3 greater
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vj3>
+--- vim 9.1
+expect-text:
+  			one two three
+  			four five six
+  seven eight nine
+expect-cursor: 1,4
+expect-mode: normal
+
+=== v then less
+text:
+          a
+          b
+cursor: 1,9
+keys: vj<lt>
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then equals
+text:
+  if {
+  x
+  }
+cursor: 1,1
+keys: vjj=
+--- vim 9.1
+expect-text:
+  if {
+  	x
+  }
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then gU
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vegU
+--- vim 9.1
+expect-text:
+  one TWO three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+
+=== v then iw
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,6
+keys: viw
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: visual
+expect-visual: 1,5
+
+=== v then iw iw extends
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,6
+keys: viwiw
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,8
+expect-mode: visual
+expect-visual: 1,5
+
+=== v then aw
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,6
+keys: vaw
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,8
+expect-mode: visual
+expect-visual: 1,5
+
+=== v then 2aw
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,6
+keys: v2aw
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,13
+expect-mode: visual
+expect-visual: 1,4
+
+=== v then ip
+text:
+  a
+  b
+  $
+  c
+cursor: 1,1
+keys: vip
+--- vim 9.1
+expect-text:
+  a
+  b
+  $
+  c
+expect-cursor: 2,1
+expect-mode: visual-line
+expect-visual: 1,1
+
+=== v then ap then d
+text:
+  a
+  b
+  $
+  c
+cursor: 1,1
+keys: vapd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  c
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "a\nb\n\n"
+expect-register 0: none
+expect-register 1: l "a\nb\n\n"
+expect-register -: none
+
+=== v then i( then d
+text:
+  f(a, b) x
+cursor: 1,4
+keys: vi(d
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  f() x
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": c "a, b"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "a, b"
+
+=== v then a quote
+text:
+  say "hi there" now
+cursor: 1,7
+keys: va"
+--- vim 9.1
+expect-text:
+  say "hi there" now
+expect-cursor: 1,15
+expect-mode: visual
+expect-visual: 1,5
+
+=== v then i quote
+text:
+  say "hi there" now
+cursor: 1,7
+keys: vi"y
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  say "hi there" now
+expect-cursor: 1,6
+expect-mode: normal
+expect-register ": c "hi there"
+expect-register 0: c "hi there"
+expect-register 1: none
+expect-register -: none
+
+=== v then it
+text:
+  <a><b>x</b></a>
+cursor: 1,8
+keys: vit
+--- vim 9.1
+expect-text:
+  <a><b>x</b></a>
+expect-cursor: 1,7
+expect-mode: visual
+expect-visual: 1,7
+
+=== v then it it
+text:
+  <a><b>x</b></a>
+cursor: 1,8
+keys: vitit
+--- vim 9.1
+expect-text:
+  <a><b>x</b></a>
+expect-cursor: 1,11
+expect-mode: visual
+expect-visual: 1,4
+
+=== v then is
+text:
+  One. Two three. Four.
+cursor: 1,8
+keys: vis
+--- vim 9.1
+expect-text:
+  One. Two three. Four.
+expect-cursor: 1,15
+expect-mode: visual
+expect-visual: 1,6
+
+=== v then as then d
+text:
+  One. Two three. Four.
+cursor: 1,8
+keys: vasd
+--- vim 9.1
+expect-text:
+  One. Four.
+expect-cursor: 1,6
+expect-mode: normal
+
+=== V then d
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,3
+keys: Vd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: none
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== V then j then d
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,3
+keys: Vjd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one two three\nfour five six\n"
+expect-register 0: none
+expect-register 1: l "one two three\nfour five six\n"
+expect-register -: none
+
+=== V then k then y
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 3,3
+keys: Vky
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 2,3
+expect-mode: normal
+expect-register ": l "four five six\nseven eight nine\n"
+expect-register 0: l "four five six\nseven eight nine\n"
+expect-register 1: none
+expect-register -: none
+
+=== V then y a register append
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+register a: c "x"
+keys: V"Ay
+registers: " a
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "x\none two three\n"
+expect-register a: l "x\none two three\n"
+
+=== V then c
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,3
+keys: Vcnew<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  new
+  seven eight nine
+expect-cursor: 2,3
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: none
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== V then c with autoindent
+text:
+  alpha beta
+    gamma delta
+  epsilon
+cursor: 2,5
+set: autoindent
+keys: Vcnew<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  alpha beta
+    new
+  epsilon
+expect-cursor: 2,5
+expect-mode: normal
+expect-register ": l "  gamma delta\n"
+expect-register 0: none
+expect-register 1: l "  gamma delta\n"
+expect-register -: none
+
+=== V then J
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: VjJ
+--- vim 9.1
+expect-text:
+  one two three four five six
+  seven eight nine
+expect-cursor: 1,14
+expect-mode: normal
+
+=== V then greater
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: Vj>
+--- vim 9.1
+expect-text:
+  	one two three
+  	four five six
+  seven eight nine
+expect-cursor: 1,2
+expect-mode: normal
+
+=== V then o
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: Vjo
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: visual-line
+expect-visual: 2,5
+
+=== V then I inserts at the start
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: VjI+<Esc>
+--- vim 9.1
+expect-text:
+  +one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== V then A appends at the end
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: VjA+<Esc>
+--- vim 9.1
+expect-text:
+  one two three
+  four +five six
+  seven eight nine
+expect-cursor: 2,6
+expect-mode: normal
+
+=== v then I on one line
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vlI+<Esc>
+--- vim 9.1
+expect-text:
+  +one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then A on one line
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vlA+<Esc>
+--- vim 9.1
+expect-text:
+  one tw+o three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+
+=== V from below then I
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,5
+keys: VkI+<Esc>
+--- vim 9.1
+expect-text:
+  one +two three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+
+=== v then p replaces with a charwise register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+register a: c "X"
+keys: vep
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one  three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "two"
+
+=== yw then v then p
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: ywwvep
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one one  three
+  four five six
+  seven eight nine
+expect-cursor: 1,8
+expect-mode: normal
+expect-register ": c "two"
+expect-register 0: c "one "
+expect-register 1: none
+expect-register -: c "two"
+
+=== yw then v then P keeps the register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: ywwveP
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one one  three
+  four five six
+  seven eight nine
+expect-cursor: 1,8
+expect-mode: normal
+expect-register ": c "one "
+expect-register 0: c "one "
+expect-register 1: none
+expect-register -: none
+
+=== yy then v then p splits
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: yyjwvep
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  four $
+  one two three
+   six
+  seven eight nine
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": c "five"
+expect-register 0: l "one two three\n"
+expect-register 1: none
+expect-register -: c "five"
+
+=== yy then V then p
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: yyjVp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  one two three
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: l "one two three\n"
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== yw then V then p
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: ywjVp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one two three
+  one $
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "four five six\n"
+expect-register 0: c "one "
+expect-register 1: l "four five six\n"
+expect-register -: none
+
+=== v then p twice
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: ywwvepwvep
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one one  two
+  four five six
+  seven eight nine
+expect-cursor: 1,12
+expect-mode: normal
+expect-register ": c "three"
+expect-register 0: c "one "
+expect-register 1: none
+expect-register -: c "three"
+
+=== v then 2p
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: ywwve2p
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one one one  three
+  four five six
+  seven eight nine
+expect-cursor: 1,12
+expect-mode: normal
+expect-register ": c "two"
+expect-register 0: c "one "
+expect-register 1: none
+expect-register -: c "two"
+
+=== v then named register p
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+register a: c "X"
+keys: wve"ap
+registers: " a 0 1 -
+--- vim 9.1
+expect-text:
+  one X three
+  four five six
+  seven eight nine
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": c "two"
+expect-register a: c "X"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "two"
+
+=== v then gv reselects
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vly<Esc>jgv
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,2
+expect-mode: visual
+expect-visual: 1,1
+
+=== gv after V
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: Vjy<Esc>gv
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: visual-line
+expect-visual: 1,1
+
+=== gv in Visual mode swaps
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vly<Esc>jvlgv
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,2
+expect-mode: visual
+expect-visual: 1,1
+
+=== gv with nothing selected fails
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: gv
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then dot repeats on the same size
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vlldj0.
+--- vim 9.1
+expect-text:
+   two three
+  r five six
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+
+=== V then dot repeats on the same lines
+text:
+  a
+  b
+  c
+  d
+  e
+cursor: 1,1
+keys: Vjdj.
+--- vim 9.1
+expect-text:
+  c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then c then dot
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vlcX<Esc>w.
+--- vim 9.1
+expect-text:
+  Xe Xo three
+  four five six
+  seven eight nine
+expect-cursor: 1,4
+expect-mode: normal
+
+=== v then greater then dot
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vj>.
+--- vim 9.1
+expect-text:
+  		one two three
+  		four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: normal
+
+=== v then u then dot
+text:
+  ABC DEF
+cursor: 1,1
+keys: vlu$.
+--- vim 9.1
+expect-text:
+  abC DEf
+expect-cursor: 1,7
+expect-mode: normal
+
+=== v then r then dot
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vlr-w.
+--- vim 9.1
+expect-text:
+  ----two three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: normal
+
+=== v then y then dot does not repeat the yank
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: dwvly.
+--- vim 9.1
+expect-text:
+  three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v over lines then dot
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vjdk.
+--- vim 9.1
+expect-text:
+  one  eight nine
+expect-cursor: 1,5
+expect-mode: normal
+
+=== v then $ then dot
+text:
+  abc
+  def
+  ghi
+cursor: 1,2
+keys: v$dj.
+--- vim 9.1
+expect-text:
+  adef
+  g
+expect-cursor: 2,1
+expect-mode: normal
+
+=== v then o then d
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vllohd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  one three
+  four five six
+  seven eight nine
+expect-cursor: 1,4
+expect-mode: normal
+expect-register ": c " two"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c " two"
+
+=== v then d on an empty line
+text:
+  a
+  $
+  b
+cursor: 2,1
+keys: vd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": c "\n"
+expect-register 0: none
+expect-register 1: c "\n"
+expect-register -: none
+
+=== v then d on the only empty line
+text:
+  $
+cursor: 1,1
+keys: vd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": none
+expect-register 0: none
+expect-register 1: none
+expect-register -: none
+
+=== v then y on an empty line
+text:
+  a
+  $
+  b
+cursor: 2,1
+keys: vy
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  a
+  $
+  b
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": c "\n"
+expect-register 0: c "\n"
+expect-register 1: none
+expect-register -: none
+
+=== v then gg
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 2,5
+keys: vgg
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: visual
+expect-visual: 2,5
+
+=== v then G
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+keys: vG
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 3,1
+expect-mode: visual
+expect-visual: 1,5
+
+=== v then j keeps the column
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,9
+keys: vj
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 2,9
+expect-mode: visual
+expect-visual: 1,9
+
+=== v then j to a shorter line
+text:
+  long line here
+  ab
+cursor: 1,9
+keys: vj
+--- vim 9.1
+expect-text:
+  long line here
+  ab
+expect-cursor: 2,3
+expect-mode: visual
+expect-visual: 1,9
+
+=== v then j then d to a shorter line
+text:
+  long line here
+  ab
+  c
+cursor: 1,9
+keys: vjd
+--- vim 9.1
+expect-text:
+  long linc
+expect-cursor: 1,9
+expect-mode: normal
+
+=== v then f
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vfe
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: visual
+expect-visual: 1,1
+
+=== v then t then d
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vtwd
+--- vim 9.1
+expect-text:
+  wo three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then percent
+text:
+  (a (b) c)
+cursor: 1,1
+keys: v%
+--- vim 9.1
+expect-text:
+  (a (b) c)
+expect-cursor: 1,9
+expect-mode: visual
+expect-visual: 1,1
+
+=== v then dollar then j
+text:
+  ab
+  cdef
+  g
+cursor: 1,1
+keys: v$j
+--- vim 9.1
+expect-text:
+  ab
+  cdef
+  g
+expect-cursor: 2,5
+expect-mode: visual
+expect-visual: 1,1
+
+=== v then ESC keeps the cursor off the end
+text:
+  abc
+cursor: 1,1
+keys: v$<Esc>
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,3
+expect-mode: normal
+
+=== v then l stops at the end
+text:
+  abc
+cursor: 1,1
+keys: vllll
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,4
+expect-mode: visual
+expect-visual: 1,1
+
+=== v then l at the end with d
+text:
+  abc
+  def
+cursor: 1,1
+keys: vllld
+--- vim 9.1
+expect-text:
+  def
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v then iw on space
+text:
+  a   b
+cursor: 1,3
+keys: viw
+--- vim 9.1
+expect-text:
+  a   b
+expect-cursor: 1,4
+expect-mode: visual
+expect-visual: 1,2
+
+=== v then i bracket from outside fails
+text:
+  x (a) y
+cursor: 1,1
+keys: vi(d
+--- vim 9.1
+expect-text:
+  x () y
+expect-cursor: 1,4
+expect-mode: normal
+
+=== v then 2j then o then d
+text:
+  a
+  b
+  c
+  d
+cursor: 1,1
+keys: v2jod
+--- vim 9.1
+expect-text:
+  $
+  d
+expect-cursor: 1,1
+expect-mode: normal
+
+=== v with the unnamed clipboard off yanks to zero
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: vey"_dd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "one"
+expect-register 0: c "one"
+expect-register 1: none
+expect-register -: none

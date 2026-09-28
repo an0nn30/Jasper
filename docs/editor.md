@@ -87,28 +87,39 @@ A bad value is reported and its default used.
 
 ## Vim mode
 
-Vim mode edits the way IdeaVim and VSCodeVim do: Normal, Insert and Replace modes, counts, operators with motions
-and text objects, registers, `.`, and undo in Vim's steps. Turn it on with `vim = true` in the settings, the **Vim**
-item in the status bar, or **Toggle Vim Mode**: every tab switches at once, and the text and its undo history stay.
-The [supported keys](editor-vim-reference.md) are generated from the engine's command table, and
+Vim mode edits the way IdeaVim and VSCodeVim do: Normal, Insert, Replace and Visual modes, counts, operators with
+motions and text objects, registers, `.`, search, marks, and undo in Vim's steps. Turn it on with `vim = true` in the
+settings, the **Vim** item in the status bar, or **Toggle Vim Mode**: every tab switches at once, and the text and its
+undo history stay. The [supported keys](editor-vim-reference.md) are generated from the engine's command table, and
 [differences from Vim](vim-divergences.md) lists every deliberate one; the rest is checked against Vim 9 by a
 recorded corpus.
 
-- The strip under the text shows the mode (`-- INSERT --`), the partly typed command (`2d`), and messages such as
-  `E353: Nothing in register q`. A failing command flashes it; Jasper never beeps.
-- The caret is a block in Normal mode, a bar in Insert mode, and an underline after an operator and in Replace mode.
+- The strip under the text shows the mode (`-- INSERT --`, `-- VISUAL --`), the partly typed command (`2d`) or the
+  Visual area's size (`3`, `2x5`), and messages such as `E353: Nothing in register q`. A failing command flashes it;
+  Jasper never beeps.
+- `/` and `?` type their pattern in the strip, with Vim's command-line keys (`<C-r>` for a register, `<C-r><C-w>` for
+  the word under the cursor, `<Up>` and `<Down>` for history). While you type, the match it would find is highlighted
+  ('incsearch'); `<Esc>` puts everything back. Patterns are Vim's (`\v`, `\<`, `\zs`, `\{-}` and the rest); the few
+  items Jasper does not translate say so (`E869`).
+- Visual mode (`v`, `V`, `<C-v>`) draws the area in the theme's selection colour. Dragging the mouse in Normal mode
+  starts it.
+- The caret is a block in Normal and Visual mode, a bar in Insert mode, and an underline after an operator and in
+  Replace mode.
 - **Which keys Vim takes.** ⌘ shortcuts on macOS always stay with the Editor. Otherwise Vim takes a key when it has
-  a meaning for it in the current mode. In Insert and Replace mode the Editor gets the rest. In Normal mode (and
-  after an operator, or `<C-o>` from Insert mode) a key Vim does not use never runs one of the text area's own
-  editing actions: Tab, Shift+Tab and, on Linux and Windows, Ctrl+D or Alt+Up flash the Vim bar and change nothing.
-  The Editor's commands (Save, Find, Close Tab), Jasper's window shortcuts (such as Ctrl+Shift+T on Linux and
-  Windows) and keys a `sethandler` entry gives the Editor still work; a key nothing takes flashes the Vim bar. On Linux and Windows Ctrl+S
-  still saves (Vim has no `<C-s>`), while `<C-r>` redoes in Normal mode and `<C-w>` deletes a word in Insert mode.
+  a meaning for it in the current mode, and every key while the strip reads a pattern. In Insert and Replace mode the
+  Editor gets the rest. In Normal mode (and after an operator, or `<C-o>` from Insert mode) a key Vim does not use
+  never runs one of the text area's own editing actions: Shift+Tab and, on Linux and Windows, Ctrl+D or Alt+Up flash
+  the Vim bar and change nothing. The Editor's commands (Save, Find, Close Tab), Jasper's window shortcuts (such as
+  Ctrl+Shift+T on Linux and Windows) and keys a `sethandler` entry gives the Editor still work; a key nothing takes
+  flashes the Vim bar. On Linux and Windows Ctrl+S still saves (Vim has no `<C-s>`), while `<C-r>` redoes in Normal
+  mode, `<C-w>` deletes a word in Insert mode, and Tab (`<C-i>`) goes forward in the jumplist.
 - `"+` is the clipboard and `"*` the selection (the clipboard where there is none).
 - 'tabstop' and 'shiftwidth' start at `tab_size`, 'expandtab' follows the tab's Spaces or Tab setting, and
-  'autoindent' is on.
-- Not yet: Visual mode, search (`/`, `n`, `*`), marks, scrolling commands, the `:` command line, macros, a vimrc,
-  and emulated plugins such as surround and commentary. They follow in later releases.
+  'autoindent' is on. 'incsearch' is on; 'hlsearch' is off until the `:` command line (with `:noh`) arrives.
+- `<C-g>` shows the file, its line count and the cursor's position; `ga` the character's code.
+- Not yet: scrolling commands (`<C-d>`, `zz`), `H`, `M`, `L` and the other screen-line motions, folds, the `:`
+  command line, macros, a vimrc, and emulated plugins such as surround and commentary. They follow in later releases.
+  An uppercase mark (`mA`) works within its own tab.
 
 ## For other plugins
 

@@ -17,6 +17,8 @@ final class Machine {
     private char register;
     private String operator;
     private char forced;
+    /** The forced motion type for a block ({@code d<C-v>j}). */
+    static final char CTRL_V = (char) 0x16;
     private String keys = "";
     private final List<KeyInput> shown = new ArrayList<>();
     private Consumer<KeyInput> argument;
@@ -24,6 +26,10 @@ final class Machine {
     private final List<KeyInput> record = new ArrayList<>();
     private char recordRegister;
     private int recordCount;
+    /** For a Visual-mode change being recorded, the size of its area. */
+    private Visual.Redo recordVisual, visualRedo;
+    /** The command line typed for the motion being run ({@code /pattern}), or null. */
+    private String line;
     private boolean recordingInsert, replaying, resumeReplace;
     private int resumeEndLine = -1;
     private int changeDepth;
@@ -46,9 +52,10 @@ final class Machine {
     /** @return whether the key means something now, for the handler rule */
     boolean wants(KeyInput key) {
         if (argument != null || key.plainChar() >= 0 || key.is("<Esc>")) return true;
-        if (key.is("<C-c>")) return pending() || editor.mode() == Mode.INSERT_NORMAL;
+        if (key.is("<C-c>")) return pending() || editor.mode() == Mode.INSERT_NORMAL || editor.mode().visual();
         String candidate = keys + key.notation();
         VimCommands commands = vim.commands();
+        if (editor.mode().visual()) return commands.visualKey(candidate) != null || commands.visualPrefix(candidate);
         VimCommands.Entry entry = operator == null ? commands.normal(candidate) : commands.pending(candidate);
         return entry != null || commands.prefix(candidate, operator != null);
     }
@@ -68,6 +75,7 @@ final class Machine {
         }
         if (key.is("<Esc>") || key.is("<C-c>")) {
             reset();
+            if (editor.mode().visual()) Visual.end(editor);
             resumeIfInsertNormal();
             return;
         }
@@ -85,8 +93,14 @@ final class Machine {
             };
             return;
         }
-        if (operator != null && keys.isEmpty() && (c == 'v' || c == 'V')) {
-            forced = (char) c;
+        if (editor.mode().visual()) {
+            keys += key.notation();
+            record.add(key);
+            visualKey();
+            return;
+        }
+        if (operator != null && keys.isEmpty() && (c == 'v' || c == 'V' || key.is("<C-v>"))) {
+            forced = c == 'v' || c == 'V' ? (char) c : CTRL_V;
             record.add(key);
             return;
         }
@@ -111,7 +125,115 @@ final class Machine {
             };
             return;
         }
+        if (vim.commands().needsLine(entry)) {
+            readLine(entry, false);
+            return;
+        }
         run(entry, null);
+    }
+
+    /**
+     * {@code /} and {@code ?}: the command line reads the pattern; {@code <CR>} runs the motion with it, and
+     * cancelling drops the command (in Visual mode the area stays).
+     */
+    private void readLine(VimCommands.Entry entry, boolean visual) {
+        char type = entry.keys().charAt(0);
+        editor.commandLine().start(type, vim.search().history(), text -> editor.incsearch(type, text), text -> {
+            editor.incsearchDone();
+            record.addAll(editor.commandLine().typed());
+            line = text;
+            if (visual) runVisual(entry, null);
+            else run(entry, null);
+        }, () -> {
+            editor.incsearchDone();
+            reset();
+            resumeIfInsertNormal();
+        });
+    }
+
+    /** A key in Visual mode: a Visual command, a motion that moves the cursor, an operator, or a text object. */
+    private void visualKey() {
+        VimCommands.Entry entry = vim.commands().visualKey(keys);
+        if (entry == null) {
+            if (vim.commands().visualPrefix(keys)) return;
+            throw Context.fail();
+        }
+        if (entry.needsChar()) {
+            argument = arg -> {
+                record.add(arg);
+                runVisual(entry, arg);
+            };
+            return;
+        }
+        if (vim.commands().needsLine(entry)) {
+            readLine(entry, true);
+            return;
+        }
+        runVisual(entry, null);
+    }
+
+    private void runVisual(VimCommands.Entry entry, KeyInput argument) {
+        Context context = context(argument);
+        context.visual = editor.visualAnchor();
+        vim.covered(entry.id());
+        switch (entry.kind()) {
+            case MOTION -> {
+                Target target = ((VimCommands.Motion) entry.handler()).move(context);
+                if (target == null) throw Context.fail();
+                if (target.jump()) editor.marks().setpcmark(editor.cursor());
+                editor.moveTo(target);
+                complete(false);
+            }
+            case OBJECT -> {
+                if (((VimCommands.TextObject) entry.handler()).select(context) == null) throw Context.fail();
+                complete(false);
+            }
+            case OPERATOR -> Visual.operate(context, entry.keys(), false);
+            case VISUAL -> {
+                ((VimCommands.Action) entry.handler()).run(context);
+                if (!keys.isEmpty()) complete(false);
+            }
+            default -> throw Context.fail();
+        }
+    }
+
+    /**
+     * An operator on a Visual area (do_pending_operator with VIsual_active): Visual mode ends, the area is
+     * remembered for gv, and the operator runs on the span, recorded for {@code .} with the area's size.
+     */
+    void applyVisual(Context context, String operatorKeys, Visual.Range range, Mode original) {
+        Visual.remember(editor, original);
+        editor.visualAnchor(null);
+        editor.mode(Mode.NORMAL);
+        operator = operatorKeys;
+        visualRedo = range.redo();
+        Span span = range.span();
+        switch (operatorKeys) {
+            case "J", "gJ", "r", "I", "A", "<C-a>", "<C-x>", "g<C-a>", "g<C-x>" -> {
+                boolean change = true;
+                editor.forgetColumn();
+                editor.setCursor(span.start(), true);
+                beginChange();
+                try {
+                    switch (operatorKeys) {
+                        case "J", "gJ" -> Operators.joinVisual(context, span, operatorKeys.equals("J"));
+                        case "r" -> Operators.replace(context, span);
+                        case "<C-a>", "<C-x>", "g<C-a>", "g<C-x>" -> Numbers.visual(context, span, operatorKeys.endsWith("<C-x>"), operatorKeys.startsWith("g"));
+                        default -> Operators.insert(context, span, operatorKeys.equals("A"));
+                    }
+                } catch (RuntimeException failure) {
+                    endChangeUnlessInserting();
+                    throw failure;
+                }
+                complete(change);
+            }
+            default -> applyOperator(context, span);
+        }
+    }
+
+    /** A Visual-mode change that is not an operator (put): records it for {@code .} with the area's size. */
+    void visualChange(Visual.Redo redo) {
+        visualRedo = redo;
     }
 
     /** {@code dd}, {@code gUU}, {@code gUgU}, and {@code ~~} with 'tildeop'. */
@@ -129,6 +251,7 @@ final class Machine {
         context.argument = argument;
         context.operator = operator;
         context.forced = forced;
+        context.line = line;
         return context;
     }
 
@@ -145,6 +268,11 @@ final class Machine {
             case MOTION -> {
                 Target target = ((VimCommands.Motion) entry.handler()).move(context);
                 if (target == null) throw Context.fail();
+                if (target.jump()) editor.marks().setpcmark(editor.cursor());
+                if (operator != null && forced == CTRL_V) {
+                    forcedBlock(target);
+                    return;
+                }
                 if (operator == null) {
                     editor.moveTo(target);
                     complete(false);
@@ -223,7 +351,9 @@ final class Machine {
         if (forced == 'v') kind = kind == Kind.LINEWISE ? Kind.EXCLUSIVE : kind == Kind.EXCLUSIVE ? Kind.INCLUSIVE : Kind.EXCLUSIVE;
         else if (forced == 'V') kind = Kind.LINEWISE;
         Pos start = Pos.min(cursor, target.pos()).copy(), end = Pos.max(cursor, target.pos()).copy();
+        boolean adjusted = false;
         if (kind == Kind.EXCLUSIVE && forced == 0 && target.adjust() && end.col == 0 && end.line > start.line) {
+            adjusted = true;
             end.line--;
             if (context.walk(false).inIndent(start, 0)) kind = Kind.LINEWISE;
             else {
@@ -235,11 +365,29 @@ final class Machine {
                 }
             }
         }
-        return new Span(start, end, kind, target.regOne());
+        return new Span(start, end, kind, target.regOne(), null, false, adjusted);
+    }
+
+    /**
+     * An operator with a motion forced blockwise ({@code d<C-v>2j}): as in Vim, the motion's two ends become a
+     * Visual block and the operator runs on it; {@code .} repeats it on a block of the same size.
+     */
+    private void forcedBlock(Target target) {
+        Pos anchor = editor.cursor();
+        String keys = operator;
+        editor.visualAnchor(anchor);
+        editor.mode(Mode.VISUAL_BLOCK);
+        editor.moveTo(target);
+        Context context = context(null);
+        context.visual = anchor;
+        record.clear();
+        record.addAll(KeyInput.parse(keys));
+        applyVisual(context, keys, Visual.range(context, Mode.VISUAL_BLOCK, keys), Mode.VISUAL_BLOCK);
     }
 
     private void applyOperator(Context context, Span span) {
         boolean change = !operator.equals("y");
+        context.cursorStart = editor.cursor();
         editor.forgetColumn();
         editor.setCursor(span.start(), true);
         if (change) beginChange();
@@ -257,6 +405,38 @@ final class Machine {
         vim.covered(entry.id());
         editor.setCursor(span.start(), true);
         ((VimCommands.Operator) entry.handler()).apply(context, span);
+        setChangeMarks(span);
+    }
+
+    /**
+     * The {@code '[} and {@code ']} marks after an operator, as each of Vim's op_* functions sets them: a delete marks
+     * where the text was ({@code ']} in a block on its last line); the others mark the span, whole lines for a linewise one.
+     */
+    private void setChangeMarks(Span span) {
+        if (operator.equals("gq") || operator.equals("gw")) return;
+        Marks marks = editor.marks();
+        Pos start = span.start().copy(), end = span.end().copy();
+        end.line = Math.min(end.line, editor.buffer().count() - 1);
+        if (operator.equals("d") || operator.equals("c")) {
+            marks.set('[', start);
+            marks.set(']', span.blockwise() ? new Pos(end.line, start.col) : start);
+            return;
+        }
+        if (span.linewise()) {
+            start.col = 0;
+            end.col = Visual.MAX;
+            if (!operator.equals("y")) {
+                // op_shift and op_tilde: the last line's last character.
+                String last = editor.buffer().line(end.line);
+                end.col = last.isEmpty() ? 0 : Text.last(last);
+            }
+        } else if (!span.blockwise() && span.kind() == Target.Kind.EXCLUSIVE) Search.decl(editor.buffer(), end);
+        if (operator.equals(">") || operator.equals("<lt>")) {
+            String last = editor.buffer().line(end.line);
+            end.col = last.isEmpty() ? 0 : Text.last(last);
+        }
+        marks.set('[', start);
+        marks.set(']', end);
     }
 
     /** A command completed: records it for {@code .} and closes its undo step, unless it entered Insert mode. */
@@ -264,9 +444,11 @@ final class Machine {
         if (change && !replaying) {
             recordRegister = register;
             recordCount = count1 > 0 || count2 > 0 ? Math.max(count1, 1) * Math.max(count2, 1) : 0;
+            recordVisual = visualRedo;
             if (editor.mode().inserting()) recordingInsert = true;
-            else vim.lastChange(new Vim.Change(recordRegister, recordCount, List.copyOf(record)));
+            else vim.lastChange(new Vim.Change(recordRegister, recordCount, List.copyOf(record), recordVisual));
         }
+        visualRedo = null;
         if (change) endChangeUnlessInserting();
         reset();
         resumeIfInsertNormal();
@@ -287,6 +469,7 @@ final class Machine {
         record.add(KeyInput.of(resumeReplace ? 'R' : 'i'));
         recordRegister = 0;
         recordCount = 0;
+        recordVisual = null;
         recordingInsert = true;
     }
 
@@ -296,6 +479,8 @@ final class Machine {
         register = 0;
         operator = null;
         forced = 0;
+        visualRedo = null;
+        line = null;
         keys = "";
         argument = null;
         shown.clear();
@@ -317,7 +502,7 @@ final class Machine {
     void insertEnded() {
         if (recordingInsert && !replaying) {
             record.add(KeyInput.named("Esc"));
-            vim.lastChange(new Vim.Change(recordRegister, recordCount, List.copyOf(record)));
+            vim.lastChange(new Vim.Change(recordRegister, recordCount, List.copyOf(record), recordVisual));
         }
         recordingInsert = false;
         record.clear();
@@ -344,6 +529,7 @@ final class Machine {
         record.add(KeyInput.of('i'));
         recordRegister = 0;
         recordCount = 0;
+        recordVisual = null;
         recordingInsert = true;
     }
 
@@ -351,7 +537,8 @@ final class Machine {
     void repeat(Context context) {
         Vim.Change change = vim.lastChange();
         if (change == null) throw Context.fail();
-        int count = context.hasCount ? context.count : change.count();
+        // A Visual change repeats with its own count on an area of the same size (redo_VIsual).
+        int count = context.hasCount && change.visual() == null ? context.count : change.count();
         char reg = change.register();
         if (reg >= '1' && reg < '9') reg++;
         List<KeyInput> replay = new ArrayList<>();
@@ -364,6 +551,7 @@ final class Machine {
         replaying = true;
         beginChange();
         try {
+            if (change.visual() != null) Visual.reselectForRedo(editor, change.visual());
             for (KeyInput key : replay) editor.dispatch(key);
         } finally {
             replaying = false;
@@ -371,7 +559,7 @@ final class Machine {
             recordingInsert = false;
             reset();
         }
-        vim.lastChange(new Vim.Change(reg, count, change.keys()));
+        vim.lastChange(new Vim.Change(reg, count, change.keys(), change.visual()));
     }
 
     private void beginChange() {

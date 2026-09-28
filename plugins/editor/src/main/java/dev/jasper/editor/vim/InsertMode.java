@@ -30,6 +30,8 @@ final class InsertMode {
         final List<String> replaced = new ArrayList<>();
         /** The line whose indent autoindent made and nothing has been typed on (Vim's did_ai), or -1. */
         int autoIndentLine;
+        /** Runs when the insert ends (a Visual block insert copies its text to the other lines). */
+        Runnable onEnd;
 
         Session(String command, int count, boolean replace, boolean nested, Pos start, int autoIndentLine) {
             this.command = command;
@@ -86,6 +88,9 @@ final class InsertMode {
         session = new Session(command, count, replace, false, editor.cursor(), autoIndentLine);
         editor.mode(replace ? Mode.REPLACE : Mode.INSERT);
     }
+
+    /** @param hook runs when the current insert ends, after the cursor moves back */
+    void onEnd(Runnable hook) { session.onEnd = hook; }
 
     /** An insert run by a Normal-mode command itself ({@code r<CR>}): not recorded, and its end tells no one. */
     void beginNested(String command) {
@@ -252,9 +257,12 @@ final class InsertMode {
             removeAutoIndent();
             editor.vim().registers().lastInserted(s.inserted.toString());
             Pos p = editor.cursor();
+            // The '^ mark: where Insert mode ended, before the cursor moves back (ins_esc).
+            editor.marks().set('^', p);
             session = null;
             editor.mode(Mode.NORMAL);
             if (p.col > 0) editor.setCursor(new Pos(p.line, Text.previous(editor.buffer().line(p.line), p.col)));
+            if (s.onEnd != null) s.onEnd.run();
             if (!s.nested) editor.machine().insertEnded();
         }
     }

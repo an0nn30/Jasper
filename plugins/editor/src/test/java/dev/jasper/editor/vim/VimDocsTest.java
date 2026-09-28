@@ -40,10 +40,14 @@ class VimDocsTest {
         out.append("Generated from `VimCommands` by `VimDocsTest`; do not edit by hand. Regenerate with\n");
         out.append("`./gradlew :jasper-plugin-editor:test --tests '*VimDocsTest' -PupdateDocs=true`. How Vim mode works: [Editor](editor.md#vim-mode);\n");
         out.append("where it differs from Vim: [divergences](vim-divergences.md).\n");
-        section(out, commands, VimCommands.Kind.MOTION, "Motions", "In Normal mode and after an operator. A count repeats or scales them.");
-        section(out, commands, VimCommands.Kind.OPERATOR, "Operators", "Followed by a motion or text object; doubled (`dd`, `gUU`, `gUgU`) for whole lines.");
-        section(out, commands, VimCommands.Kind.OBJECT, "Text objects", "After an operator.");
+        section(out, commands, VimCommands.Kind.MOTION, "Motions",
+            "In Normal and Visual mode and after an operator. A count repeats or scales them. `/` and `?` read a pattern and an offset in the Vim bar, ended by `<CR>`.");
+        section(out, commands, VimCommands.Kind.OPERATOR, "Operators",
+            "Followed by a motion or text object, or on the Visual area; doubled (`dd`, `gUU`, `gUgU`) for whole lines.");
+        section(out, commands, VimCommands.Kind.OBJECT, "Text objects", "After an operator, and in Visual mode, where they extend the area.");
         section(out, commands, VimCommands.Kind.ACTION, "Normal-mode commands", "");
+        section(out, commands, VimCommands.Kind.VISUAL, "Visual-mode commands",
+            "In Visual mode, besides the motions, operators and text objects above. A change repeats with `.` on an area of the same size.");
         section(out, commands, VimCommands.Kind.INSERT, "Insert-mode keys", "Printable keys type text; these keys do more.");
         return out.toString();
     }

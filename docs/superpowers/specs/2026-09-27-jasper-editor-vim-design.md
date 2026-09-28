@@ -1,6 +1,6 @@
 # Editor Vim mode
 
-**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
+**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Plan V1b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`) amends sections 3.5, 3.6, 3.8, 5.2, 5.3, 11.1 and 13, as marked **Amended (V1b)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
 
 ## Purpose and scope
 
@@ -118,11 +118,11 @@ Normal, Insert, Replace, Visual (charwise, linewise, blockwise), Operator-pendin
 | `+`, `*` | system clipboard; `*` is the system selection where the toolkit has one, otherwise the clipboard |
 | `.` `:` `%` `/` | read-only: last insert, last command line, file name, last search |
 
-Each register holds text and a type: charwise, linewise or blockwise (with width). `clipboard=unnamed`/`unnamedplus` makes the unnamed register the clipboard. The clipboard is reached only through `VimHost`, so tests inject it; a clipboard read that fails reads as empty.
+Each register holds text and a type: charwise, linewise or blockwise (with width). **Amended (V1b):** setting a register directly (`setreg()`, the corpus's `register x:`) leaves the unnamed register where it points, as Vim does. `clipboard=unnamed`/`unnamedplus` makes the unnamed register the clipboard. The clipboard is reached only through `VimHost`, so tests inject it; a clipboard read that fails reads as empty.
 
 ### 3.6 Marks, jumplist and change list
 
-- `a`–`z` per tab; `A`–`Z` global, remembering the document key, so `'A` selects (or opens) that document's tab.
+- `a`–`z` per tab; `A`–`Z` global, remembering the document key, so `'A` selects (or opens) that document's tab. **Amended (V1b):** until plan V2's buffer commands, an uppercase mark works within its own tab.
 - Special marks: `` ` `` / `'` (previous context), `[` `]` (last change or yank), `<` `>` (last visual), `.` (last change), `^` (last insert exit), `"` (position when the tab was last left).
 - Marks move with edits: an insertion or deletion before a mark shifts it; deleting the mark's line removes a lowercase mark (as Vim does for `:d`, and keeps it for character deletes).
 - Jumplist: up to 100 entries per tab, filled by the motions Vim calls jumps (`G`, `gg`, `/`, `?`, `n`, `N`, `%`, `(`, `)`, `{`, `}`, `[[`, `]]`, `H`, `M`, `L`, `'x`, `` `x ``, `*`, `#`, `:{N}`), walked by `<C-o>`/`<C-i>` (with `<Tab>` = `<C-i>`). Change list: `g;`/`g,`.
@@ -144,7 +144,7 @@ Each register holds text and a type: charwise, linewise or blockwise (with width
 
 Options have global and, where Vim has them, buffer-local values (`tabstop`, `shiftwidth`, `softtabstop`, `expandtab`, `autoindent`, `textwidth`, `iskeyword`, `nrformats`, `matchpairs`) and window-local ones (`number`, `relativenumber`, `wrap`, `scrolloff`, `sidescrolloff`), which live on the tab. The full list is in section 6.3.
 
-Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the Editor's `tab_size`; `expandtab` = the tab's Spaces state; `autoindent` on, like the Editor's own auto-indent (**Amended (V1a)**); `wrap` = the tab's Wrap state; `number` on. Setting one of these through `:set` also changes the Editor's matching per-tab state, so the status line stays true. Other options default to Vim's (`-u NONE`) values, except `incsearch`, `hlsearch`, `showcmd` and `showmode`, which are on, as in IdeaVim.
+Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the Editor's `tab_size`; `expandtab` = the tab's Spaces state; `autoindent` on, like the Editor's own auto-indent (**Amended (V1a)**); `wrap` = the tab's Wrap state; `number` on. Setting one of these through `:set` also changes the Editor's matching per-tab state, so the status line stays true. Other options default to Vim's (`-u NONE`) values, except `incsearch`, `hlsearch`, `showcmd` and `showmode`, which are on, as in IdeaVim. **Amended (V1b):** `hlsearch` starts off until plan V2 adds `:noh` and `:set` to turn the highlight off.
 
 ### 3.9 Indentation
 
@@ -206,12 +206,12 @@ RTextArea's `CaretStyle`: block in Normal and Visual, underline in Operator-pend
 A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is on, using the Editor font:
 - left: the mode (`-- INSERT --`, `-- REPLACE --`, `-- VISUAL --`, `-- VISUAL LINE --`, `-- VISUAL BLOCK --`, `-- (insert) --`, plus `recording @q`) when `showmode` is on; messages (`3 lines yanked`, `search hit BOTTOM…`, errors as `E486: Pattern not found: foo` in the theme's error colour) replace it until the next key;
 - right: pending keys (`showcmd`, such as `2d` or `"a`) and, for a Visual selection, its size (`3`, `2x5`);
-- the command line: `:`, `/` and `?` turn the left part into an editable field with the prompt character. It has its own key handling (section 6.1) and returns focus to the text area when it closes.
+- the command line: `:`, `/` and `?` turn the left part into an editable field with the prompt character. It has its own key handling (section 6.1) and returns focus to the text area when it closes. **Amended (V1b):** the bar draws the command line and its cursor while keys keep going through the text area, which gives every key to the command line; `/` and `?` arrive in V1b, `:` in V2.
 - Multi-line output (`:reg`, `:marks`, `:ls`, `:jumps`, `:changes`, `:set all`) expands the bar upward into a scrollable read-only panel dismissed by any key, like Vim's more-prompt.
 
 ### 5.3 Highlights
 
-- Visual selections: charwise and linewise use the text area's selection; blockwise uses a highlighter painting one rectangle per line in display columns (tabs expanded), including past short lines when `$` was used.
+- Visual selections: charwise and linewise use the text area's selection; blockwise uses a highlighter painting one rectangle per line in display columns (tabs expanded), including past short lines when `$` was used. **Amended (V1b):** all three are drawn by a highlighter in the selection colour, one range per line for a block (a tab the block cuts is drawn whole); the text area's selection stays empty so the caret stays on the Vim cursor.
 - `hlsearch` and incremental-search matches use two highlight colours taken from the Editor theme's mark-all and selection colours; they update on edits.
 - highlightedyank (section 8) briefly highlights yanked text.
 
@@ -339,7 +339,7 @@ Everything else about Vim is configured in the vimrc, as with IdeaVim.
   expect-register 1: (empty)
   ```
 
-  Keys use the notation of section 2.1. Text lines are indented two spaces; trailing spaces are shown with a `$` end marker option (`text$:`) when significant. Optional fields: `set:` (options), `marks:` (initial marks), `clipboard:`, `vimrc:` (lines for mapping and extension cases), `ext:` (extensions to enable), `expect-marks:`, `expect-search:`, `expect-message:`.
+  Keys use the notation of section 2.1. Text lines are indented two spaces; trailing spaces are shown with a `$` end marker option (`text$:`) when significant. Optional fields: `set:` (options), `marks:` (initial marks), `clipboard:`, `vimrc:` (lines for mapping and extension cases), `ext:` (extensions to enable), `expect-marks:`, `expect-search:`, `expect-message:`. **Amended (V1b):** `expect-visual:` gives a Visual area's other end; a blockwise register's type is `b` and its width (`b3`, `getregtype()` in letters); the mode `command-line` is Vim's `c`.
 - **Recording:** `./gradlew :jasper-plugin-editor:recordVimCorpus` (not part of `check`; needs `vim` on `PATH`, or `-PvimBinary=…`). For each case it runs `vim -u NONE -i NONE -N -Es` with a generated script that sets options and the buffer, places the cursor, runs the vimrc lines, feeds the keys with `feedkeys(keys, 'xt')`, and writes text, cursor, mode, registers, marks and messages as JSON; the task rewrites everything below each case's `---` line. For `ext:` cases it first clones each extension's upstream repository at the commit pinned in `plugins/editor/vim-oracle.properties` into `build/vim-oracle/` and adds it to `runtimepath`. `-Pcase=<pattern>` records a subset.
 - **Replay:** a JUnit dynamic test per case builds a headless `VimTextArea` with a recording `VimHost`, applies the fields, feeds the keys through the same entry point real key events reach after normalization, and compares every recorded field. A case with no `---` block fails with "not recorded". `check` never runs Vim.
 - **Divergences:** a case with `divergent: <reason>` keeps a hand-written expected block and is exempt from recording. Every divergent case is listed with its reason in `docs/vim-divergences.md`; a test fails if the document and the corpus disagree.
@@ -376,7 +376,8 @@ No SDK change is needed.
 One plan per runnable deliverable, each written with `superpowers:writing-plans` and executed in order. Each ends with `./gradlew check` green and its corpus recorded.
 
 - **Plan V1a: engine foundation.** `VimTextArea`, key normalization, the handler rule, the `Machine`, Normal/Insert/Replace modes, counts, motions other than search and marks, text objects, operators, registers (including the clipboard), undo grouping, insert sessions and `.`, caret styles, the Vim bar without the command line, the setting, toggle and status item, the corpus format, recorder, replay test and coverage guard. Runnable: Vim-mode editing without Visual mode or search. **Amended (V1a):** the screen-line motions `H M L gj gk g0 g^ g$ gm`, `gi`, `<C-g>`, `ga` and blockwise forced motions (`d<C-v>j`) move to V1b; `ZZ` and `ZQ` to V2; `timeoutlen` and reading `sethandler` from the vimrc to V3.
-- **Plan V1b: Visual mode, search and navigation.** Visual char/line/block with the block highlighter, `VimRegex`, `/ ? n N * #` with offsets, `hlsearch`/`incsearch`, marks, jumplist and change list, scrolling, folds, `<C-a>`/`<C-x>`, `gq`/`gw`; and, moved from V1a, the screen-line motions, `gi`, `<C-g>`, `ga` and blockwise forced motions.
+- **Plan V1b: Visual mode, search and navigation.** Visual char/line/block with the block highlighter, `VimRegex`, `/ ? n N * #` with offsets, `hlsearch`/`incsearch`, marks, jumplist and change list, scrolling, folds, `<C-a>`/`<C-x>`, `gq`/`gw`; and, moved from V1a, the screen-line motions, `gi`, `<C-g>`, `ga` and blockwise forced motions. **Amended (V1b):** split in two by the user on 2026-09-28; scrolling, the screen-line motions (`H M L gj gk g0 g^ g$ gm`) and folds move to plan V1c.
+- **Plan V1c: the view.** Scrolling (`<C-d> <C-u> <C-f> <C-b> <C-e> <C-y> zz zt zb`), `H M L` and the other screen-line motions, and folds.
 - **Plan V2: ex command line.** Section 6, the output panel and the relative-number gutter; `ZZ` and `ZQ`.
 - **Plan V3: macros and mappings.** Section 4.3 and section 7, with `timeoutlen` (section 2.3) and `sethandler` lines.
 - **Plan V4: extensions.** Section 8, with the pinned-upstream oracle.

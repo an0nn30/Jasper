@@ -42,7 +42,7 @@ final class CorpusRunner {
         if (!c.set().isBlank()) editor.options().apply(c.set());
         for (var entry : c.given().entrySet()) {
             var register = entry.getValue();
-            vim.registers().set(entry.getKey(), Registers.Content.of(register.text(), register.type() == 'l' ? Registers.Type.LINE : Registers.Type.CHAR));
+            vim.registers().set(entry.getKey(), register.content());
         }
         String start = c.text().get(c.line() - 1);
         editor.setCursor(new Pos(c.line() - 1, Text.column(start, c.col() - 1)));
@@ -55,11 +55,14 @@ final class CorpusRunner {
         int col = Text.characters(buffer.line(cursor.line), cursor.col) + 1;
         Map<Character, CorpusCase.Register> registers = new LinkedHashMap<>();
         for (char name : c.registers()) {
-            vim.registers().get(name).ifPresent(content -> registers.put(name,
-                new CorpusCase.Register(content.type() == Registers.Type.LINE ? 'l' : 'c', content.text())));
+            vim.registers().get(name).ifPresent(content -> registers.put(name, CorpusCase.Register.of(content)));
         }
+        String visual = null;
+        Pos anchor = editor.visualAnchor();
+        if (editor.mode().visual() && anchor != null)
+            visual = (anchor.line + 1) + "," + (Text.characters(buffer.line(anchor.line), Math.min(anchor.col, buffer.line(anchor.line).length())) + 1);
         editor.close();
-        return new CorpusCase.Expected("jasper", text, cursor.line + 1, col, editor.mode().id(), registers);
+        return new CorpusCase.Expected("jasper", text, cursor.line + 1, col, editor.mode().id(), visual, registers);
     }
 
     /** @return the differences from the expectation, or empty */
@@ -69,6 +72,7 @@ final class CorpusRunner {
         if (expected.line() != actual.line() || expected.col() != actual.col())
             problems.add("cursor " + actual.line() + "," + actual.col() + " (Vim: " + expected.line() + "," + expected.col() + ")");
         if (!expected.mode().equals(actual.mode())) problems.add("mode " + actual.mode() + " (Vim: " + expected.mode() + ")");
+        if (!java.util.Objects.equals(expected.visual(), actual.visual())) problems.add("visual " + actual.visual() + " (Vim: " + expected.visual() + ")");
         if (!expected.registers().equals(actual.registers())) problems.add("registers " + show(actual.registers()) + " (Vim: " + show(expected.registers()) + ")");
         return String.join("; ", problems);
     }

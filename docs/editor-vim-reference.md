@@ -6,7 +6,7 @@ where it differs from Vim: [divergences](vim-divergences.md).
 
 ## Motions
 
-In Normal mode and after an operator. A count repeats or scales them.
+In Normal and Visual mode and after an operator. A count repeats or scales them. `/` and `?` read a pattern and an offset in the Vim bar, ended by `<CR>`.
 
 | Keys | What it does |
 |---|---|
@@ -65,10 +65,20 @@ In Normal mode and after an operator. A count repeats or scales them.
 | `[{` | back to the unmatched { |
 | `])` | forward to the unmatched ) |
 | `]}` | forward to the unmatched } |
+| `/` | search forward for a pattern, with an offset |
+| `?` | search backward for a pattern, with an offset |
+| `n` | repeat the last search |
+| `N` | repeat the last search in the other direction |
+| `*` | search forward for the keyword under the cursor |
+| `#` | search backward for the keyword under the cursor |
+| `g*` | search forward for the keyword under the cursor, also inside words |
+| `g#` | search backward for the keyword under the cursor, also inside words |
+| `'{char}` | to the first non-blank of mark {char}'s line |
+| `` `{char} `` | to mark {char} |
 
 ## Operators
 
-Followed by a motion or text object; doubled (`dd`, `gUU`, `gUgU`) for whole lines.
+Followed by a motion or text object, or on the Visual area; doubled (`dd`, `gUU`, `gUgU`) for whole lines.
 
 | Keys | What it does |
 |---|---|
@@ -82,10 +92,12 @@ Followed by a motion or text object; doubled (`dd`, `gUU`, `gUgU`) for whole lin
 | `gu` | lower case |
 | `gU` | upper case |
 | `g?` | rot13 |
+| `gq` | format the lines to 'textwidth', the cursor on the last formatted line |
+| `gw` | format the lines to 'textwidth', keeping the cursor |
 
 ## Text objects
 
-After an operator.
+After an operator, and in Visual mode, where they extend the area.
 
 | Keys | What it does |
 |---|---|
@@ -141,6 +153,8 @@ After an operator.
 | `r{char}` | replace {count} characters with {char} |
 | `~` | toggle the case of {count} characters |
 | `J` | join {count} lines, with a space |
+| `<C-g>` | show the file name, line count and cursor position |
+| `ga` | show the code of the character under the cursor |
 | `gJ` | join {count} lines, without a space |
 | `p` | put after the cursor |
 | `P` | put before the cursor |
@@ -163,6 +177,55 @@ After an operator.
 | `<C-r>` | redo {count} changes |
 | `.` | repeat the last change, with {count} replacing its count |
 | `<C-l>` | redraw (does nothing) |
+| `v` | start charwise Visual mode |
+| `V` | start linewise Visual mode |
+| `<C-v>` | start blockwise Visual mode |
+| `gv` | select the last Visual area again |
+| `m{char}` | set mark {char} at the cursor |
+| `<C-o>` | to an older position in the jumplist |
+| `<Tab>` | to a newer position in the jumplist (CTRL-I) |
+| `g;` | to an older position in the change list |
+| `g,` | to a newer position in the change list |
+| `gi` | Insert mode where it was last left (the '^ mark) |
+| `<C-a>` | add {count} to the number at or after the cursor |
+| `<C-x>` | subtract {count} from the number at or after the cursor |
+
+## Visual-mode commands
+
+In Visual mode, besides the motions, operators and text objects above. A change repeats with `.` on an area of the same size.
+
+| Keys | What it does |
+|---|---|
+| `v` | charwise Visual mode, or back to Normal mode |
+| `V` | linewise Visual mode, or back to Normal mode |
+| `<C-v>` | blockwise Visual mode, or back to Normal mode |
+| `o` | go to the other end of the area |
+| `O` | go to the other corner of the block (the other end otherwise) |
+| `gv` | swap with the last Visual area |
+| `x` | delete |
+| `<Del>` | delete |
+| `s` | change |
+| `X` | delete the lines (in a block, the block) |
+| `D` | delete the lines; in a block, to the end of each line |
+| `Y` | yank the lines (in a block, the block) |
+| `C` | change the lines; in a block, to the end of each line |
+| `S` | change the lines (in a block, the block) |
+| `R` | change the lines (in a block, the block) |
+| `u` | lower case |
+| `U` | upper case |
+| `~` | toggle case |
+| `J` | join the lines, with spaces |
+| `gJ` | join the lines, without spaces |
+| `r{char}` | replace every character with {char} |
+| `p` | replace with the register |
+| `P` | replace with the register, keeping the registers |
+| `I` | insert before the area (in a block, on every line) |
+| `A` | append after the area (in a block, on every line) |
+| `m{char}` | set mark {char} at the cursor |
+| `<C-a>` | add {count} to the first number in each line |
+| `<C-x>` | subtract {count} from the first number in each line |
+| `g<C-a>` | add {count}, 2 × {count}, … to the numbers of successive lines |
+| `g<C-x>` | subtract {count}, 2 × {count}, … from the numbers of successive lines |
 
 ## Insert-mode keys
 

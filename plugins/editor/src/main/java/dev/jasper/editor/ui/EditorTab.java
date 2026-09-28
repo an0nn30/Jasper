@@ -147,6 +147,7 @@ public final class EditorTab extends JPanel {
         if (global.isPresent() == (vim != null)) return;
         if (global.isPresent()) {
             vim = new VimEditor(global.get(), area, defaults());
+            vim.documentInfo(session::location, session::dirty);
             vimBar.attach(vim);
         } else {
             vimBar.detach();

@@ -1,0 +1,970 @@
+# Blockwise Visual mode and blockwise registers.
+
+=== C-v then j then l
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jl
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mnopqr
+expect-cursor: 2,3
+expect-mode: visual-block
+expect-visual: 1,2
+
+=== C-v then d
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jld
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  adef
+  gjkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: none
+expect-register 1: b2 "bc\nhi"
+expect-register -: none
+
+=== C-v then x
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jjlx
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  adef
+  gjkl
+  mpqr
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b2 "bc\nhi\nno"
+expect-register 0: none
+expect-register 1: b2 "bc\nhi\nno"
+expect-register -: none
+
+=== C-v then y
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jly
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: b2 "bc\nhi"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then y then P
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlyP
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcbcdef
+  ghihijkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: b2 "bc\nhi"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then y then p
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jly$p
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdefbc
+  ghijklhi
+  mnopqr
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: b2 "bc\nhi"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then y then p on the last line adds lines
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlyGp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mbcnopqr
+   hi
+expect-cursor: 3,2
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: b2 "bc\nhi"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then y then 2p
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jly2p
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abbcbccdef
+  ghhihiijkl
+  mnopqr
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: b2 "bc\nhi"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then y then gp
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlygp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abbccdef
+  ghhiijkl
+  mnopqr
+expect-cursor: 2,5
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: b2 "bc\nhi"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then y then gP
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlygP
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcbcdef
+  ghihijkl
+  mnopqr
+expect-cursor: 2,4
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: b2 "bc\nhi"
+expect-register 1: none
+expect-register -: none
+
+=== C-v y then p into a short line
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,3
+keys: <C-v>jjly$p
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdefcd
+  ab    $
+  abcdefcdgh
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": b2 "cd\n\ncd"
+expect-register 0: b2 "cd\n\ncd"
+expect-register 1: none
+expect-register -: none
+
+=== C-v over a short line then d
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,3
+keys: <C-v>jjlld
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abf
+  ab
+  abfgh
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": b3 "cde\n\ncde"
+expect-register 0: none
+expect-register 1: b3 "cde\n\ncde"
+expect-register -: none
+
+=== C-v over a short line then y
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,3
+keys: <C-v>jjlly
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdef
+  ab
+  abcdefgh
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": b3 "cde\n\ncde"
+expect-register 0: b3 "cde\n\ncde"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then dollar then y
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,2
+keys: <C-v>jj$y
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdef
+  ab
+  abcdefgh
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b7 "bcdef\nb\nbcdefgh"
+expect-register 0: b7 "bcdef\nb\nbcdefgh"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then dollar then d
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,2
+keys: <C-v>jj$d
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  a
+  a
+  a
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": b7 "bcdef\nb\nbcdefgh"
+expect-register 0: none
+expect-register 1: b7 "bcdef\nb\nbcdefgh"
+expect-register -: none
+
+=== C-v then dollar then A
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,2
+keys: <C-v>jj$A!<Esc>
+--- vim 9.1
+expect-text:
+  abcdef!
+  ab!
+  abcdefgh!
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then c
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlcXY<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  aXYdef
+  gXYjkl
+  mnopqr
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: none
+expect-register 1: b2 "bc\nhi"
+expect-register -: none
+
+=== C-v then c ended with C-c
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlcXY<C-c>
+--- vim 9.1
+expect-text:
+  aXYdef
+  gXYjkl
+  mnopqr
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-v then s
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jsZ<Esc>
+--- vim 9.1
+expect-text:
+  aZcdef
+  gZijkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then I
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,3
+keys: <C-v>jjI--<Esc>
+--- vim 9.1
+expect-text:
+  ab--cdef
+  gh--ijkl
+  mn--opqr
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-v then I ended with C-c
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,3
+keys: <C-v>jjI--<C-c>
+--- vim 9.1
+expect-text:
+  ab--cdef
+  gh--ijkl
+  mn--opqr
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-v then I over a short line
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,4
+keys: <C-v>jjI+<Esc>
+--- vim 9.1
+expect-text:
+  abc+def
+  ab
+  abc+defgh
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-v then A
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jjlA+<Esc>
+--- vim 9.1
+expect-text:
+  abc+def
+  ghi+jkl
+  mno+pqr
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then A over a short line pads
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,4
+keys: <C-v>jjA+<Esc>
+--- vim 9.1
+expect-text:
+  abcd+ef
+  ab  +
+  abcd+efgh
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-v then I then dot
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,1
+keys: <C-v>jI#<Esc>j.
+--- vim 9.1
+expect-text:
+  #abcdef
+  ##ghijkl
+  #mnopqr
+expect-cursor: 2,1
+expect-mode: normal
+
+=== C-v then C
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,3
+keys: <C-v>jCnew<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abnew
+  ghnew
+  mnopqr
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": b4 "cdef\nijkl"
+expect-register 0: none
+expect-register 1: b4 "cdef\nijkl"
+expect-register -: none
+
+=== C-v then D
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,3
+keys: <C-v>jD
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  ab
+  gh
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b4 "cdef\nijkl"
+expect-register 0: none
+expect-register 1: b4 "cdef\nijkl"
+expect-register -: none
+
+=== C-v then X
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,3
+keys: <C-v>jX
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abdef
+  ghjkl
+  mnopqr
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": b1 "c\ni"
+expect-register 0: none
+expect-register 1: b1 "c\ni"
+expect-register -: none
+
+=== C-v then Y
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,3
+keys: <C-v>jY
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mnopqr
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": b1 "c\ni"
+expect-register 0: b1 "c\ni"
+expect-register 1: none
+expect-register -: none
+
+=== C-v then r
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jjlr.
+--- vim 9.1
+expect-text:
+  a..def
+  g..jkl
+  m..pqr
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v over a short line then r
+text:
+  abcdef
+  ab
+  abcdefgh
+cursor: 1,3
+keys: <C-v>jjllr.
+--- vim 9.1
+expect-text:
+  ab...f
+  ab
+  ab...fgh
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-v then tilde
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jl~
+--- vim 9.1
+expect-text:
+  aBCdef
+  gHIjkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then U
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlU
+--- vim 9.1
+expect-text:
+  aBCdef
+  gHIjkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then J
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jJ
+--- vim 9.1
+expect-text:
+  abcdef ghijkl
+  mnopqr
+expect-cursor: 1,7
+expect-mode: normal
+
+=== C-v then greater
+text:
+  a  bc
+  d  ef
+cursor: 1,2
+keys: <C-v>j>
+--- vim 9.1
+expect-text:
+  a	   bc
+  d	   ef
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then greater past the text
+text:
+  ab cd
+  ef gh
+cursor: 1,4
+keys: <C-v>j>
+--- vim 9.1
+expect-text:
+  ab	   cd
+  ef	   gh
+expect-cursor: 1,4
+expect-mode: normal
+
+=== C-v then less
+text:
+  a    bc
+  d    ef
+cursor: 1,2
+keys: <C-v>j<lt>
+--- vim 9.1
+expect-text:
+  abc
+  def
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then o
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlo
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: visual-block
+expect-visual: 2,3
+
+=== C-v then O
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlO
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mnopqr
+expect-cursor: 2,2
+expect-mode: visual-block
+expect-visual: 1,3
+
+=== C-v then O then d
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jlOhd
+--- vim 9.1
+expect-text:
+  def
+  jkl
+  mnopqr
+expect-cursor: 1,1
+expect-mode: normal
+
+=== C-v over a tab then d
+text:
+  a	bc
+  defghijklm
+  x
+cursor: 1,1
+keys: <C-v>jld
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+        bc
+  fghijklm
+  x
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": b2 "a \nde"
+expect-register 0: none
+expect-register 1: b2 "a \nde"
+expect-register -: none
+
+=== C-v over a tab then y
+text:
+  a	bc
+  defghijklm
+  x
+cursor: 2,2
+keys: <C-v>kly
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  a	bc
+  defghijklm
+  x
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b8 "\tb\nefghijkl"
+expect-register 0: b8 "\tb\nefghijkl"
+expect-register 1: none
+expect-register -: none
+
+=== C-v inside a tab then I
+text:
+  a	bc
+  defghijklm
+  x
+cursor: 2,4
+keys: <C-v>kI+<Esc>
+--- vim 9.1
+expect-text:
+  a+	bc
+  d+efghijklm
+  x
+expect-cursor: 1,2
+expect-mode: normal
+
+=== C-v then p replaces the block
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: yl<C-v>jlp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abdef
+  gbjkl
+  mnopqr
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b2 "bc\nhi"
+expect-register 0: c "b"
+expect-register 1: b2 "bc\nhi"
+expect-register -: none
+
+=== C-v then p with a block register
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,1
+keys: <C-v>jy<C-v>jlp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  acdef
+  gijkl
+  mnopqr
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": b2 "ab\ngh"
+expect-register 0: b1 "a\ng"
+expect-register 1: b2 "ab\ngh"
+expect-register -: none
+
+=== C-v then p with a linewise register
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: yy<C-v>jp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  acdef
+  gijkl
+  abcdef
+  mnopqr
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": b1 "b\nh"
+expect-register 0: l "abcdef\n"
+expect-register 1: b1 "b\nh"
+expect-register -: none
+
+=== V then p with a block register
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,1
+keys: <C-v>jyjVp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdef
+  a
+  g
+  mnopqr
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "ghijkl\n"
+expect-register 0: b1 "a\ng"
+expect-register 1: l "ghijkl\n"
+expect-register -: none
+
+=== v then p with a block register
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,1
+keys: <C-v>jyGvlp
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  aopqr
+  g
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": c "mn"
+expect-register 0: b1 "a\ng"
+expect-register 1: none
+expect-register -: c "mn"
+
+=== C-v then gv
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jl<Esc>gg0gv
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mnopqr
+expect-cursor: 2,3
+expect-mode: visual-block
+expect-visual: 1,2
+
+=== C-v then dot
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,1
+keys: <C-v>jld$.
+--- vim 9.1
+expect-text:
+  cde
+  ijk
+  mnopqr
+expect-cursor: 1,3
+expect-mode: normal
+
+=== C-v with wide characters then d
+text:
+  a日本b
+  abcdef
+cursor: 1,2
+keys: <C-v>jld
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  a本b
+  adef
+expect-cursor: 1,2
+expect-mode: normal
+expect-register ": b2 "日\nbc"
+expect-register 0: none
+expect-register 1: b2 "日\nbc"
+expect-register -: none
+
+=== register a set blockwise then p
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+register a: b2 "xy\nzw"
+keys: "ap
+registers: a
+--- vim 9.1
+expect-text:
+  abxycdef
+  ghzwijkl
+  mnopqr
+expect-cursor: 1,3
+expect-mode: normal
+expect-register a: b2 "xy\nzw"
+
+=== register a set blockwise then P on the last line
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 3,2
+register a: b3 "xy\nz"
+keys: "aP
+registers: a
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mxy nopqr
+   z
+expect-cursor: 3,2
+expect-mode: normal
+expect-register a: b3 "xy\nz"
+
+=== yank appended to a block register
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,1
+keys: <C-v>j"ay<C-v>j"Ay
+registers: a
+--- vim 9.1
+expect-text:
+  abcdef
+  ghijkl
+  mnopqr
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: b1 "a\ng\na\ng"
+
+=== C-v then c with count text
+text:
+  abcdef
+  ghijkl
+  mnopqr
+cursor: 1,2
+keys: <C-v>jcA<CR>B<Esc>
+--- vim 9.1
+expect-text:
+  aA
+  Bcdef
+  gijkl
+  mnopqr
+expect-cursor: 2,1
+expect-mode: normal

@@ -13,6 +13,7 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 |---|---|---|
 | operators-other.case | equals reindents a block | = uses previous-line indent and bracket depth, not Vim's C-indenting |
 | operators-other.case | equals equals on a blank line | = uses previous-line indent and bracket depth, not Vim's C-indenting |
+| marks.case | backtick dot after o | '. takes each typed character's column, as when typing; Vim fed a whole string at once records where it started |
 
 ## Other differences
 
@@ -26,3 +27,10 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **The bell is visual.** A failing command flashes the Vim bar; Jasper never beeps. `<Esc>` in Normal mode is silent.
 - **Undo is linear.** There is no undo tree (`g-`, `g+`, `:earlier`) and no `U`.
 - **`go` counts characters.** Vim counts bytes.
+- **`ga` shows no digraph.** Vim ends the line with the character's digraph; Jasper has no digraph table.
+- **Search patterns are translated.** `VimRegex` turns a Vim pattern into a Java one, and the corpus's `regex.case`
+  checks the result against Vim. `\%V`, `\%#`, the `\%23l`-style position atoms, `\@` look-around, `\z(` and
+  equivalence classes (`[[=a=]]`) report `E869`. Character classes such as `\w` and `[:alpha:]` are ASCII, as in Vim;
+  `\k` and `\<` follow 'iskeyword', treating every letter above U+00FF as a word character.
+- **The `'.` mark and the change list follow each typed character**, as when typing in Vim. Keys fed to Vim all at
+  once (a mapping, `feedkeys()`) are inserted as one string, so there the mark stays at the insert's start.

@@ -11,7 +11,8 @@ import java.util.Optional;
  * Vim options (spec 3.8). The global instance holds global values; each editor has a local instance whose
  * buffer- and window-local options keep their own values. Setting an option on a local instance sets it there and
  * globally, as {@code :set} does. Defaults are Vim's with {@code -u NONE -N}, except where the Editor supplies them
- * ({@link EditorDefaults}) and 'showcmd', which is on.
+ * ({@link EditorDefaults}) and 'showcmd' and 'incsearch', which are on (spec 3.8; 'hlsearch' stays off until plan V2
+ * brings {@code :noh}).
  */
 public final class Options {
     enum Type { BOOLEAN, NUMBER, STRING }
@@ -30,7 +31,12 @@ public final class Options {
         new Def("autoindent", "ai", Type.BOOLEAN, false, true),
         new Def("backspace", "bs", Type.STRING, "indent,eol,start", false),
         new Def("clipboard", "cb", Type.STRING, "", false),
+        new Def("comments", "com", Type.STRING, "s1:/*,mb:*,ex:*/,://,b:#,:%,:XCOMM,n:>,fb:-", true),
         new Def("expandtab", "et", Type.BOOLEAN, false, true),
+        new Def("formatoptions", "fo", Type.STRING, "tcq", true),
+        new Def("hlsearch", "hls", Type.BOOLEAN, false, false),
+        new Def("ignorecase", "ic", Type.BOOLEAN, false, false),
+        new Def("incsearch", "is", Type.BOOLEAN, true, false),
         new Def("iskeyword", "isk", Type.STRING, "@,48-57,_,192-255", true),
         new Def("joinspaces", "js", Type.BOOLEAN, true, false),
         new Def("matchpairs", "mps", Type.STRING, "(:),{:},[:]", true),
@@ -40,11 +46,14 @@ public final class Options {
         new Def("shiftwidth", "sw", Type.NUMBER, 8, true),
         new Def("showcmd", "sc", Type.BOOLEAN, true, false),
         new Def("showmode", "smd", Type.BOOLEAN, true, false),
+        new Def("smartcase", "scs", Type.BOOLEAN, false, false),
         new Def("softtabstop", "sts", Type.NUMBER, 0, true),
         new Def("startofline", "sol", Type.BOOLEAN, true, false),
         new Def("tabstop", "ts", Type.NUMBER, 8, true),
+        new Def("textwidth", "tw", Type.NUMBER, 0, true),
         new Def("tildeop", "top", Type.BOOLEAN, false, false),
-        new Def("whichwrap", "ww", Type.STRING, "b,s", false));
+        new Def("whichwrap", "ww", Type.STRING, "b,s", false),
+        new Def("wrapscan", "ws", Type.BOOLEAN, true, false));
 
     private final Options global;
     private final Map<String, Object> values = new HashMap<>();
