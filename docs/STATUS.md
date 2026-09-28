@@ -2,6 +2,24 @@
 
 ## Current state — 2026-09-28
 
+- **Plugin settings C3** (`claude/plugin-settings-c3`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c3.md`): SDK 0.9.0. Editor, Shell History, Remote and
+  Credential Vault declare their settings and get generated pages under Settings › Tools; Snippets declares none.
+  `PluginConfig`, `PluginContext.config()`, the testkit's `setConfig` and `reports()`, and the application's
+  `PluginSettings` view are gone; every bundled plugin requires `>=0.9.0, <0.10`. Remote's `[shortcuts]` table is
+  gone: its actions keep Cmd+Shift+S and Cmd+Shift+H as default bindings, rebindable in Keymap, and old lines warn
+  as unknown keys. The Editor's Vim toggle saves through its setting. History's empty list means no trivial
+  commands. Values the plugins used to clamp now fall back to their defaults with a report. `./gradlew check`: 4,117 tests,
+  0 failures, 5 skipped. GUI checks pending with the user: each plugin's page under Tools; the Editor's Vim toggle
+  and its page's Vim mode; a Remote file with an old `[shortcuts]` table; Keymap rebinding Toggle SSH Hosts.
+  Still deferred from C2:
+  - a pending-changed callback for plugin controls
+  - per-page dedupe of warnings from a throwing `modified()`/`keywords()`
+  - the stub's Open in Editor failure going to a notice while Settings is modal
+  - section-heading carry-over for unsectioned settings
+  - the discard count per plugin page
+
+  Deviations: see the plan's status banner. Not pushed; not merged.
 - **Plugin settings C2** (`claude/plugin-settings-c2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c2.md`): Settings has a page under Tools for each running
   plugin with settings, generated from its declarations (`PluginSettingsPage`) or built by the plugin through the new

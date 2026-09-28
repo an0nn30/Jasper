@@ -189,7 +189,7 @@ done stays pending. An entry in `plugins.toml` means the user reviewed the plugi
 `PluginSettingsFiles` owns each plugin's `plugins/<id>/<id>.toml`: `PluginRuntime.start` prepares
 every discovered plugin's folder, data directory and settings file (seeded from an old
 `[plugins."<id>"]` table, else the jar's `settings.toml`, else a header) before loading, and a
-one-second poller re-reads changed files into `PluginSettings`, which fires `PluginConfig.onChanged`;
+one-second poller re-reads changed files, and each plugin's `DeclaredSettings` updates its handles and runs their listeners;
 a broken file keeps its last good values and is reported under `plugins.<id>`. `PluginRuntime.Row`
 carries the folder, settings file and data directory, which the manager's context menu opens
 through `ConfigEditor`.
@@ -372,7 +372,7 @@ saves through the same comment-preserving, atomic write as `config.toml`; `onCha
 application translates declarations into its own settings schema inside `dev.jasper.app.plugins`, reads the plugin's
 file with `dev.jasper.app.settings.SchemaReader`, and reports rejected values and undeclared keys against the file.
 The testkit's `FakePluginHost` offers `setSetting`, `savedSettings`, `settingsReports` and `declared`, and the contract
-suite holds the fake and the application to the same behaviour. `PluginConfig` remains until SDK 0.9 removes it.
+suite holds the fake and the application to the same behaviour. SDK 0.9.0 removed `PluginConfig`; every bundled plugin declares its settings.
 Settings shows the declarations as a page per plugin, described next.
 
 ### Plugin pages in Settings (plan C2)

@@ -54,10 +54,10 @@ through the consumer API.
 The encrypted file is `plugins/dev.jasper.vault/data/vault.jv`. A device-bound vault uses the
 platform keychain tool, with a file fallback shown in the manager's status line. An unbound vault
 uses the master password alone. The master password cannot be recovered. Change the live plugin
-settings through the Plugins manager's **Open Settings** action:
+settings in Settings › Tools › Credential Vault, or in the file through the Plugins manager's **Open Settings** action:
 
 ```toml
-auto_lock_minutes = 15            # 0 disables inactivity locking
+auto_lock_minutes = 15            # 0 to 1440; 0 disables inactivity locking
 keys_directory = ""              # empty uses this plugin's data/keys directory
 bind_new_vaults_to_device = true  # initial state of the create checkbox
 ```

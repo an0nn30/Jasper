@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-09-28 on `claude/plugin-settings-c3`; not executed.
+**Status:** Implemented on claude/plugin-settings-c3; ./gradlew check green, 4,117 tests, 0 failures (5 skipped).
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far:
@@ -13,6 +13,7 @@ Deviations so far:
   configuration is read, and `KeyBindingsTest.builtInsBeatPluginDefaultsAndEarlierPluginsBeatLaterOnes` already covers
   plugin defaults that collide.
 - Task 5: `BundledSamplePluginTest` expected the Sample at version 0.1.0; it now expects 0.2.0.
+- Tasks 1–4 and 6: none.
 
 Scope notes (decided while writing this plan):
 - The plugins move to declarations first (Tasks 1–4), while `PluginConfig` still exists and the SDK is still 0.8.5,

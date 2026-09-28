@@ -82,27 +82,22 @@ when the saved endpoint changes. Direct connections can show the connected IP wh
 the configured hostname; jump connections never show their local forwarding address as the host IP.
 Key-based connections use the same flow; opening the panel does not initiate network connections.
 
-Settings live in `plugins/dev.jasper.remote/dev.jasper.remote.toml` (Plugins manager > Open Settings):
+Settings live in `plugins/dev.jasper.remote/dev.jasper.remote.toml`; change them in Settings › Tools › Remote or in the
+file (Plugins manager > Open Settings):
 
 ```toml
-connect_timeout_seconds = 10
-auth_timeout_seconds = 30
+connect_timeout_seconds = 10    # 0 to 3600
+auth_timeout_seconds = 30       # 0 to 3600
 keepalive_seconds = 30          # 0 disables
 session_linger_seconds = 5
 read_user_known_hosts = true
 use_ssh_agent = true
-
-[shortcuts]
-toggle_panel = "cmd+shift+s"
-open_palette = "cmd+shift+h"
 ```
 
-Shortcut edits apply live to all open windows; no plugin restart is needed. Omitted keys use the
-defaults above; set a value to `""` to leave that action without a plugin shortcut. `cmd` means
-Command on macOS and Ctrl+Shift elsewhere. Syntax and collision handling follow Jasper’s normal
-keybindings: an invalid shortcut or one already claimed is left unbound. An explicit
-app-level `[keybindings]` override for the same action still takes priority, even when its plugin
-shortcut is disabled. Connection settings remain above the `[shortcuts]` table.
+Connection settings apply to the next connection. A value out of range is reported and its default used.
+Toggle SSH Hosts (Cmd+Shift+S), Connect to SSH Host… (Cmd+Shift+H) and Toggle SFTP (no default) are bound in
+Settings › Keymap like any other action; `cmd` means Command on macOS and Ctrl+Shift elsewhere. A `[shortcuts]`
+table from an older Remote is reported as unknown; delete it and rebind in Keymap.
 
 The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
 `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
@@ -241,16 +236,12 @@ hashes and decisions, not credentials or file payloads. A corrupt/newer queue or
 process holding its lock disables transfers with an error while ordinary SSH remains available.
 Do not remove the queue to resolve a cleanup issue: it contains the partial-file ownership record.
 
-Add these options to Remote's existing TOML tables (do not duplicate a table):
+SFTP limits are in the same file, and apply at once:
 
 ```toml
-[shortcuts]
-# Existing toggle_panel and open_palette entries may remain here.
-toggle_sftp = ""                 # e.g. "cmd+alt+f"
-
 [sftp]
-max_parallel_files = 2           # clamped to 1..8; at most two copies per endpoint
-request_timeout_seconds = 30    # clamped to 1..300
+max_parallel_files = 2           # 1 to 8; at most two copies per endpoint
+request_timeout_seconds = 30    # 1 to 300
 ```
 
 Shortcut changes apply live; app-level keybindings retain precedence. Actions are
