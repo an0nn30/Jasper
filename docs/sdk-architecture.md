@@ -374,3 +374,11 @@ file with `dev.jasper.app.settings.SchemaReader`, and reports rejected values an
 The testkit's `FakePluginHost` offers `setSetting`, `savedSettings`, `settingsReports` and `declared`, and the contract
 suite holds the fake and the application to the same behaviour. `PluginConfig` remains until SDK 0.9 removes it; the
 Settings pages for plugins arrive in plan C2.
+
+### Plugin pages in Settings (plan C2)
+
+`PluginSettings.page(SettingsPanel)` lets a plugin build its own page; `SettingsPanelHost` gives it standard rows
+and the page's unsaved values. The application's `PluginRuntime.settingsPages` returns a generated page
+(`PluginSettingsPage`, a `SchemaPage` over the plugin's own draft) or the plugin's own (`PluginPanelPage`, every call
+contained) for each running plugin with settings, and a `PluginStubPage` for each plugin that is enabled but not
+running; `CorePages` places them under Tools. Apply writes the plugin's file through `DeclaredSettings.save`.

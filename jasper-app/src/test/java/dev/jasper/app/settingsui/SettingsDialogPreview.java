@@ -60,6 +60,7 @@ public final class SettingsDialogPreview {
         var themes = new ThemeController[1];
         var runtime = new PluginRuntime[1];
         var manager = new PluginManager[1];
+        var previewPlugins = new dev.jasper.app.plugins.PluginPreviewSupport[1];
         SwingUtilities.invokeAndWait(() -> {
             themes[0] = new ThemeController();
             runtime[0] = new PluginRuntime(new PluginRuntime.Options(null, home.resolve("plugins"), null, false,
@@ -70,6 +71,7 @@ public final class SettingsDialogPreview {
                 Duration.ofMillis(20), Duration.ofMillis(1));
             manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
                 ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }));
+            previewPlugins[0] = new dev.jasper.app.plugins.PluginPreviewSupport(home.resolve("preview-plugins"));
         });
         var keymapHooks = new KeymapPage.Hooks(new Contributions(), Map::of, Map::of, true, edits -> CompletableFuture.completedFuture(null));
         try {
@@ -78,7 +80,7 @@ public final class SettingsDialogPreview {
                 var keymap = new KeymapPage[1];
                 var dialog = new SettingsDialog(windows, CorePages.pages(() -> List.of("Jasper Dark", "IntelliJ Light"),
                     new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
-                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context)),
+                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context), previewPlugins[0].pages()),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,
                         listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true));
                 SwingUtilities.invokeAndWait(() -> {
@@ -111,10 +113,15 @@ public final class SettingsDialogPreview {
                     .searchTerms().stream().anyMatch(term -> term.contains("dev.example.preview")));
                 SwingUtilities.invokeAndWait(() -> {
                     render(holder[0], output.resolve("plugins-" + suffix));
+                    dialog.select("plugin.dev.example.editor");
+                    render(holder[0], output.resolve("plugin-editor-" + suffix));
+                    dialog.select("plugin.dev.example.sample");
+                    render(holder[0], output.resolve("plugin-sample-" + suffix));
                     dialog.cancel();
                 });
             }
         } finally {
+            if (previewPlugins[0] != null) previewPlugins[0].close();
             var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
             SwingUtilities.invokeAndWait(() -> stopping.complete(runtime[0].stop()));
             CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);

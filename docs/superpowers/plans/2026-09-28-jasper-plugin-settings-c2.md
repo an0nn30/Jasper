@@ -2,8 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/plugin-settings-c2`, worktree `.worktrees/plugin-settings-c2`, from local `main` at 1032e797
-(C1 merged; `./gradlew check` on the merged tree: 3,648 tests, 0 failures, 5 skipped).
+**Status:** Implemented on claude/plugin-settings-c2; ./gradlew check green, 3,660 tests.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Scope notes (decided while writing this plan):
@@ -16,7 +15,13 @@ Scope notes (decided while writing this plan):
   file as before, instead of the stub page (which would only offer the same file).
 - The Sample plugin becomes the custom-page example here (it moves to declarations now, ahead of C3).
 
-Deviations so far: none.
+Deviations so far:
+- Task 2 fix round: `Editors.Executable` was removed. `Editors.executable()` now builds the new `Editors.Browse`
+  with the title "Choose a shell program". Behaviour is unchanged.
+- Task 4: `PluginManagerTest` already existed, so its new test was added to the existing file instead of a new file.
+- Ruling: `EditorHint.Directory` stays a text field, as the plan's scope notes above already say.
+- Task 6: no deviations; the preview's plugin pages rendered correctly on the first run, so no page-code fix was
+  needed.
 
 **Goal:** Each running plugin with settings gets a page under Tools in Settings, generated from its declarations or
 built by the plugin itself, and a plugin that is not running gets a stub page.

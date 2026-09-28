@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-28
 
+- **Plugin settings C2** (`claude/plugin-settings-c2`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c2.md`): Settings has a page under Tools for each running
+  plugin with settings, generated from its declarations (`PluginSettingsPage`) or built by the plugin through the new
+  SDK `SettingsPanel` and `SettingsPanelHost` (`PluginPanelPage`); plugins that are enabled but not running get a stub
+  with Open in Editor. Apply writes the plugin's own file. The Plugins page's Open Settings goes to a running plugin's
+  page. The Sample plugin declares its settings and has its own page. Previews: `settingsPreview` renders 44 images.
+  `./gradlew check`: 3,660 tests, 0 failures. GUI checks pending with the user: change a plugin setting and Apply; the
+  Sample page's slider; Open Settings from the Plugins page; a plugin in safe mode (stub page). Deviations: see the
+  plan's status banner. Not pushed; not merged.
+
 - **Plugin settings C1** (`claude/plugin-settings`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-plugin-settings-design.md`, plan
   `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c1.md`): SDK `dev.jasper.sdk.settings` (declarations,

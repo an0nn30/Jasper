@@ -43,6 +43,10 @@ sections holding them, are blue. Click one, press the new keys and click Set; Ap
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
 
+Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
+itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
+needs review, failed to start, or safe mode is on) shows why, with Open in Editor for its file.
+
 ## Supported settings
 
 These are the supported keys and defaults. Font and terminal behavior settings apply live; session and grid defaults take effect as described below.
@@ -463,10 +467,12 @@ first time the plugin loads: from the plugin's own example (a `settings.toml` it
 `[plugins."<id>"]` table still in `config.toml` (kept for that one seeding and reported as moved
 until you delete it), or as a two-line header. Jasper reads the file live, once a second, without a
 Reload Config; a file that fails to parse keeps its last good values and is reported in the
-Configuration status under `plugins.<id>`. Jasper never rewrites the file once it exists. Values may
+Configuration status under `plugins.<id>`. Settings writes the file when you change a plugin's settings there,
+keeping its comments. Values may
 be strings, integers, floats, booleans, arrays of strings and nested tables; a plugin reports
 problems with its settings through the same diagnostics. Right-click a plugin in Settings › Plugins
-(File → Manage Plugins…) and choose Open Settings to edit the file. The sample plugin's example, for instance:
+(File → Manage Plugins…) and choose Open Settings to go to its page in Settings (or to its file, when the plugin is
+not running). The sample plugin's example, for instance:
 
 ```toml
 # Settings for the sample plugin. Jasper reads this file live. Every demo is off until you set it.
