@@ -217,22 +217,12 @@ final class ExInfo {
     private static String fit(String text, int room, boolean strict) {
         StringBuilder out = new StringBuilder();
         int len = 0;
-        for (int i = 0; i < text.length(); ) {
-            int cp = text.codePointAt(i);
-            String shown = transchar(cp);
-            int cells = cp < 0x20 || cp == 0x7f ? 2 : Text.width(cp);
-            len += cells;
+        for (String shown : KeyCodes.shown(text)) {
+            len += KeyCodes.cells(shown);
             if (strict ? len >= room : len > room) break;
             out.append(shown);
-            i += Character.charCount(cp);
         }
         return out.toString();
-    }
-
-    private static String transchar(int cp) {
-        if (cp < 0x20) return "^" + (char) (cp + '@');
-        if (cp == 0x7f) return "^?";
-        return new String(Character.toChars(cp));
     }
 
     /** ex_display: {@code :registers} and {@code :display}, all registers or those named in the argument. */
@@ -258,13 +248,10 @@ final class ExInfo {
                     line.append("^J");
                     n -= 2;
                 }
-                String text = lines.get(j);
-                for (int k = 0; k < text.length(); ) {
-                    int cp = text.codePointAt(k);
-                    n -= cp < 0x20 || cp == 0x7f ? 2 : Text.width(cp);
+                for (String shown : KeyCodes.shown(lines.get(j))) {
+                    n -= KeyCodes.cells(shown);
                     if (n < 0) break;
-                    line.append(transchar(cp));
-                    k += Character.charCount(cp);
+                    line.append(shown);
                 }
             }
             if (n > 1 && c.type() == Registers.Type.LINE) line.append("^J");
