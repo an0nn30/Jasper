@@ -2,6 +2,7 @@ package dev.jasper.editor.vim;
 
 import javax.swing.UIManager;
 import javax.swing.event.UndoableEditEvent;
+import javax.swing.text.BadLocationException;
 import javax.swing.undo.CompoundEdit;
 import javax.swing.undo.UndoableEdit;
 import org.fife.ui.rtextarea.RTextArea;
@@ -132,14 +133,38 @@ final class VimUndoManager extends RUndoManager {
         return vimStep != null && vimStep.edits > 0 || internal != null && internal.edits > 0 || super.canUndo();
     }
 
+    /**
+     * An outside undo (⌘Z) while the engine has a step open: closes it so it is undoable, then reopens the same
+     * nesting once the undo runs, so the engine's own {@link #endStep} later balances (spec: the rest of an insert
+     * in progress stays one step).
+     */
     @Override public void undo() {
+        int depth = stepDepth;
         closeAll();
         super.undo();
+        reopen(depth);
     }
 
+    /** The redo counterpart of {@link #undo}. */
     @Override public void redo() {
+        int depth = stepDepth;
         closeAll();
         super.redo();
+        reopen(depth);
+    }
+
+    /** Reopens {@code depth} levels of Vim step after an outside undo/redo, cursor taken from the area's caret now. */
+    private void reopen(int depth) {
+        if (depth == 0) return;
+        int line = 0, col = 0;
+        try {
+            int offset = area.getCaretPosition();
+            line = area.getLineOfOffset(offset);
+            col = offset - area.getLineStartOffset(line);
+        } catch (BadLocationException ignored) {
+            // Falls back to (0, 0); the reopened step's remembered cursor is only advisory.
+        }
+        for (int n = 0; n < depth; n++) beginStep(line, col);
     }
 
     @Override public void discardAllEdits() {

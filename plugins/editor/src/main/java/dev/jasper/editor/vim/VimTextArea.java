@@ -27,6 +27,7 @@ public class VimTextArea extends RSyntaxTextArea {
 
     @Override protected RUndoManager createUndoManager() {
         undo = new VimUndoManager(this);
+        undo.vim(vim != null);
         return undo;
     }
 

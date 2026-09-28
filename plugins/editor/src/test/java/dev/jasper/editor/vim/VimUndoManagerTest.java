@@ -67,7 +67,9 @@ class VimUndoManagerTest {
             undo.beginStep(0, 0);
             area.replaceSelection("a");
             area.undoLastAction();
-            assertThat(undo.stepOpen()).isFalse();
+            // Bug fix (Task 4 review): undo() reopens the same nesting it closed, so a step open when an outside
+            // undo arrives (a real ⌘Z mid-insert) stays open afterward, ready for the engine's own endStep.
+            assertThat(undo.stepOpen()).as("the outside undo reopens the step it had to close").isTrue();
             assertThat(area.getText()).isEqualTo("x");
         });
     }

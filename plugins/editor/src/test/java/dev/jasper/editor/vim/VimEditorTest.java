@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import javax.swing.text.BadLocationException;
 import org.fife.ui.rtextarea.CaretStyle;
 import org.fife.ui.rtextarea.ConfigurableCaret;
 import org.junit.jupiter.api.Test;
@@ -196,5 +197,76 @@ class VimEditorTest {
             area.get().setCaretPosition(3);
         });
         onEdt(() -> assertThat(area.get().getCaretPosition()).isEqualTo(2));
+    }
+
+    @Test void discardAllEditsKeepsVimModeOnTheReplacedUndoManager() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\n");
+            // RTextArea.discardAllEdits() replaces the undo manager through createUndoManager(); the fresh one
+            // must still know Vim is on, or edits made outside a Vim command (a reload, the Editor's own actions)
+            // fall back to RSyntaxTextArea's own grouping instead of becoming their own step.
+            area.setText("y\n");
+            area.discardAllEdits();
+            editor.textReplaced();
+            try {
+                area.getDocument().insertString(0, "a", null);
+                area.getDocument().insertString(1, "b", null);
+            } catch (BadLocationException e) {
+                throw new IllegalStateException(e);
+            }
+            type(editor, "u");
+            assertThat(area.getText()).as("each edit outside Vim is its own step, even on the replaced manager").isEqualTo("ay\n");
+        });
+    }
+
+    @Test void anOutsideUndoDuringAnInsertReopensTheStepSoTheRestUndoesTogether() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "");
+            type(editor, "ihello");
+            // Simulates an outside undo (a real ⌘Z) arriving mid-insert: the engine still believes its step
+            // is open, so the undo manager must reopen it, or every later character becomes its own step.
+            area.undoLastAction();
+            type(editor, "world<Esc>");
+            type(editor, "u");
+            assertThat(area.getText()).as("the whole \"world\" insert undoes as one step").isEqualTo("");
+        });
+    }
+
+    @Test void aFailedRepeatOfAnInsertKeyIsNotReplayed() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc");
+            // <Del> at the end of the buffer fails every time (nothing follows to join); real Vim 9.1 does not
+            // replay a key that failed, so only the successful "z" repeats.
+            type(editor, "2A<Del>z<Esc>");
+            assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
+            assertThat(area.getText()).isEqualTo("abczz");
+        });
+    }
+
+    @Test void aFailedRepeatOfABackspaceIsNotReplayedEither() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc");
+            // Real Vim 9.1: the second <BS> hits the start of the insert and fails, so only "x<BS>y" (net "y")
+            // repeats, not "x<BS><BS>y".
+            type(editor, "2ix<BS><BS>y<Esc>");
+            assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
+            assertThat(area.getText()).isEqualTo("yyabc");
+        });
+    }
+
+    @Test void aFailureDuringTheRepeatStillLeavesInsertMode() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "a");
+            // The first <Del> succeeds (removing the only character); replaying it for the count then fails on
+            // the now-empty buffer. That failure must not leave the command stuck in Insert mode.
+            type(editor, "2i<Del><Esc>");
+            assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
+            assertThat(area.getText()).isEmpty();
+        });
     }
 }

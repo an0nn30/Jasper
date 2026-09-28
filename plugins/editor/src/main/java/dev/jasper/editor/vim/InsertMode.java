@@ -119,8 +119,8 @@ final class InsertMode {
             return;
         }
         if (key.plainChar() >= 0) {
-            record(key);
             character(key.key());
+            record(key);
             return;
         }
         VimCommands.Entry entry = editor.vim().commands().insertKey(key.notation());
@@ -129,8 +129,10 @@ final class InsertMode {
         // These record themselves (or, like <Esc>, are recorded by the machine), or end the recorded insert.
         boolean selfRecorded = key.is("<Esc>") || key.is("<C-c>") || key.is("<C-o>") || key.is("<C-r>") || key.is("<C-v>") || key.is("<C-q>")
             || key.is("<C-a>") || key.is("<C-e>") || key.is("<C-y>") || arrowKey(key);
-        if (!selfRecorded) record(key);
+        // A key recorded only after its handler returns: a failing key (e.g. <BS> or <Del> with nothing to
+        // remove) never joins the recorded insert, so <Esc>'s repeat and . never replay a no-op.
         ((VimCommands.InsertKey) entry.handler()).run(this, key);
+        if (!selfRecorded) record(key);
     }
 
     /** Text an input method committed; the text area has already inserted it. */
@@ -222,7 +224,11 @@ final class InsertMode {
         } finally { repeating = was; }
     }
 
-    /** ins_esc. */
+    /**
+     * ins_esc. A key recorded during the original typing succeeded then, but the buffer has moved on by the time
+     * the count replays it (spec: repeated {@code <BS>}/{@code <Del>} at an edge); a failure part-way through the
+     * repeat must still leave Insert mode, so the cleanup below runs in a {@code finally}.
+     */
     private void escape() {
         Session s = session;
         repeating = true;
@@ -236,14 +242,14 @@ final class InsertMode {
             }
         } finally {
             repeating = false;
+            removeAutoIndent();
+            editor.vim().registers().lastInserted(s.inserted.toString());
+            Pos p = editor.cursor();
+            session = null;
+            editor.mode(Mode.NORMAL);
+            if (p.col > 0) editor.setCursor(new Pos(p.line, Text.previous(editor.buffer().line(p.line), p.col)));
+            if (!s.nested) editor.machine().insertEnded();
         }
-        removeAutoIndent();
-        editor.vim().registers().lastInserted(s.inserted.toString());
-        Pos p = editor.cursor();
-        session = null;
-        editor.mode(Mode.NORMAL);
-        if (p.col > 0) editor.setCursor(new Pos(p.line, Text.previous(editor.buffer().line(p.line), p.col)));
-        if (!s.nested) editor.machine().insertEnded();
     }
 
     /** Vim's did_ai: an autoindented line that stayed blank loses its indent. */
