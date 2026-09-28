@@ -6,11 +6,15 @@ set -eu
 package=$1
 root=/opt/jasper
 
+# The package's install script registers the menu entry with xdg-desktop-menu, which needs an existing
+# applications directory; every desktop system has one, a minimal container does not.
+mkdir -p /usr/share/applications
+
 case "$package" in
     *.deb)
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -qq
-        apt-get install -y -qq "$package" >/dev/null
+        apt-get install -y -qq "$package"
         remove() { apt-get remove -y -qq jasper >/dev/null; }
         ;;
     *.rpm)
@@ -45,14 +49,19 @@ if [ -n "$missing" ]; then
     exit 1
 fi
 
-if ! grep -qs "$root/bin/Jasper" /usr/share/applications/*.desktop; then
-    echo "No desktop menu entry for Jasper under /usr/share/applications" >&2
+# xdg-desktop-menu uses the first existing applications directory in $XDG_DATA_DIRS.
+if ! grep -qs "$root/bin/Jasper" /usr/local/share/applications/*.desktop /usr/share/applications/*.desktop; then
+    echo "No desktop menu entry for Jasper under /usr/local/share/applications or /usr/share/applications" >&2
     exit 1
 fi
 
 remove
 if [ -e "$root/bin/Jasper" ]; then
     echo "Removing the package left $root/bin/Jasper behind" >&2
+    exit 1
+fi
+if grep -qs "$root/bin/Jasper" /usr/local/share/applications/*.desktop /usr/share/applications/*.desktop; then
+    echo "Removing the package left its desktop menu entry behind" >&2
     exit 1
 fi
 echo "Installed, checked and removed $package"
