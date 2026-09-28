@@ -101,12 +101,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private WindowTerminals terminals;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
-    private Runnable openSettings, reloadConfiguration;
+    private Runnable openSettings, reloadConfiguration, migrateConfiguration;
     private Runnable unregisterConfiguration = () -> {};
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
     Consumer<String> onTitle = title -> {};
     public Consumer<String> onError = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.ERROR_MESSAGE);
+    /** Shows a plain informational message, such as the result of Migrate Config. */
+    public Consumer<String> onInfo = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.INFORMATION_MESSAGE);
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     public Runnable onToggleBuddy = () -> {};
     public java.util.function.BooleanSupplier buddyEnabled = () -> false;
@@ -353,15 +355,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     public void connectConfiguration(Runnable settings, Runnable reload, Runnable unregister) {
+        connectConfiguration(settings, reload, null, unregister);
+    }
+
+    /** As the three-argument form, plus Migrate Config for the diagnostics dialog; {@code migrate} may be null. */
+    public void connectConfiguration(Runnable settings, Runnable reload, Runnable migrate, Runnable unregister) {
         if (closed) return;
-        openSettings = settings; reloadConfiguration = reload; unregisterConfiguration = unregister;
+        openSettings = settings; reloadConfiguration = reload; migrateConfiguration = migrate; unregisterConfiguration = unregister;
         action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, "Open configuration file");
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, "Reload configuration file");
         updateActions();
     }
 
     public void disconnectConfiguration() {
-        openSettings = null; reloadConfiguration = null; unregisterConfiguration = () -> {};
+        openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
@@ -377,7 +384,25 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             JTextArea text = new JTextArea(details, 12, 64);
             text.setEditable(false); text.setLineWrap(true); text.setWrapStyleWord(true); text.setCaretPosition(0);
             text.getAccessibleContext().setAccessibleName("Configuration details");
-            showConfigDiagnostics.accept(new JScrollPane(text));
+            JScrollPane scroll = new JScrollPane(text);
+            Runnable migrate = migrateConfiguration;
+            if (!state.migratable() || migrate == null) { showConfigDiagnostics.accept(scroll); return; }
+            var button = new JButton("Migrate Config\u2026");
+            button.setName("configuration.migrate");
+            button.setToolTipText("Rewrite old keys in this file to the current layout; the original is backed up first.");
+            button.addActionListener(event -> {
+                Window dialog = SwingUtilities.getWindowAncestor(button);
+                if (dialog != null) dialog.dispose();
+                migrate.run();
+            });
+            var actions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 0, 0));
+            actions.setOpaque(false);
+            actions.add(button);
+            var panel = new JPanel(new BorderLayout(0, 8));
+            panel.setOpaque(false);
+            panel.add(scroll, BorderLayout.CENTER);
+            panel.add(actions, BorderLayout.SOUTH);
+            showConfigDiagnostics.accept(panel);
         };
     }
 

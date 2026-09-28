@@ -82,6 +82,7 @@ public final class JasperApplication {
     private final NativeNotifier nativeNotifier = new NativeNotifier();
     private final CommandNotifier notifications;
     private PluginRuntime plugins;
+    private ActionEntry migrateAction;
     private UiState uiState = UiState.inMemory();
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
@@ -169,6 +170,7 @@ public final class JasperApplication {
             loginItems.accept(snapshot.backgroundEnabled());
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
             if (shortcutHelp != null) shortcutHelp.refresh();
+            updateMigrateAction();
         });
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler((event, response) -> {
@@ -340,6 +342,10 @@ public final class JasperApplication {
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
             Optional.empty(), invocation -> managePlugins());
         contributions.addMenuSection(MenuTarget.standard(MenuTarget.Slot.FILE)).set(List.of(new MenuEntry.Item("plugins.manage")));
+        if (configuration != null) configuration.pluginSettingsExist(plugins::settingsFileExists);
+        migrateAction = contributions.addAction("config.migrate", "Migrate Config", null,
+            List.of("configuration", "settings", "upgrade", "old keys", "config.toml"), Optional.empty(), invocation -> migrateConfiguration());
+        updateMigrateAction();
         contributions.content().setFactory(separate -> {
             var created = newWindow(separate ? null : Path.of(System.getProperty("user.home")));
             if (created == null) throw new IllegalStateException("Application is closing");
@@ -365,6 +371,25 @@ public final class JasperApplication {
         });
         reportBindingProblems();
     }
+
+        private void updateMigrateAction() {
+            if (migrateAction != null && configuration != null) migrateAction.setEnabled(configuration.migrationAvailable());
+        }
+
+        private void migrateConfiguration() {
+            if (configuration == null || quitting || stopped) return;
+            configuration.migrate().whenComplete((message, failure) -> javax.swing.SwingUtilities.invokeLater(() -> {
+                if (failure == null) info(message);
+                else notice((failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
+            }));
+        }
+
+        /** A plain informational message: the window the user used last, or the log when there is none. */
+        void info(String message) {
+            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
+            if (target == null) LOG.log(System.Logger.Level.INFO, message);
+            else target.content().onInfo.accept(message);
+        }
 
         /** A plugin's error notice: the window the user used last, or the log when there is none. */
         void notice(String message) {

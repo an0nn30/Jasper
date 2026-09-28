@@ -18,6 +18,9 @@ import java.util.function.Consumer;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Objects;
+import java.util.concurrent.CompletionException;
+import java.util.function.Predicate;
 import javax.swing.SwingUtilities;
 
 /** EDT-owned join between saved configuration and retained window contents. */
@@ -33,6 +36,7 @@ final class ConfigurationController implements AutoCloseable {
     private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
     /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
     private List<ConfigDiagnostic> themeProblems = List.of();
+    private Predicate<String> pluginSettingsExist = id -> false;
 
     /** The saved state plus theme problems and problems plugins reported about their own tables since the last reload. */
     ConfigService.State shown() {
@@ -40,7 +44,9 @@ final class ConfigurationController implements AutoCloseable {
         var merged = new java.util.ArrayList<>(state.diagnostics());
         merged.addAll(themeProblems);
         merged.addAll(reported);
-        return new ConfigService.State(state.snapshot(), merged, state.file(), state.present());
+        var removable = state.deadTables().stream()
+            .filter(table -> !table.getFirst().equals("plugins") || pluginSettingsExist.test(table.get(1))).toList();
+        return new ConfigService.State(state.snapshot(), merged, state.file(), state.present(), state.legacyKeys(), removable);
     }
 
     /** A plugin's complaint about one of its settings; shown with the file's diagnostics until the next reload. */
@@ -85,7 +91,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         if (closed || !owners.add(owner)) return;
         owner.connectConfiguration(() -> reportFailure(owner, service.openSettings(editor)),
-            () -> reportFailure(owner, service.reload()), () -> unregister(owner));
+            () -> reportFailure(owner, service.reload()), () -> migrateFor(owner), () -> unregister(owner));
         owner.applyConfiguration(state.snapshot(), service.macOs());
         owner.setConfigurationState(shown());
     }
@@ -102,6 +108,36 @@ final class ConfigurationController implements AutoCloseable {
             List<KeyBindings.Extension> extensions) {
         requireEdt();
         return service.saveKeybindings(state.snapshot().keybindings(), changes, extensions).thenApply(ignored -> null);
+    }
+
+    /** Which plugins already have their own settings file, so Migrate Config may drop their old tables. */
+    void pluginSettingsExist(Predicate<String> test) {
+        requireEdt();
+        pluginSettingsExist = Objects.requireNonNull(test, "test");
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+    }
+
+    /** Whether Migrate Config has anything to do for the file as last loaded. */
+    boolean migrationAvailable() {
+        requireEdt();
+        return shown().migratable();
+    }
+
+    /** Runs Migrate Config; completes with the message to show. */
+    CompletableFuture<String> migrate() {
+        requireEdt();
+        return service.migrate(pluginSettingsExist).thenApply(result -> result.changes() == 0
+            ? "Nothing to migrate: " + result.state().file().getFileName() + " already uses the current layout."
+            : "Migrated " + result.changes() + " old setting" + (result.changes() == 1 ? "" : "s") + " to the new layout. Backup: "
+                + result.backup().map(path -> path.getFileName().toString()).orElse("none") + ".");
+    }
+
+    private void migrateFor(WindowContent owner) {
+        migrate().whenComplete((message, failure) -> SwingUtilities.invokeLater(() -> {
+            if (closed || !owners.contains(owner)) return;
+            if (failure == null) owner.onInfo.accept(message);
+            else owner.onError.accept((failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
+        }));
     }
 
     void unregister(WindowContent owner) {

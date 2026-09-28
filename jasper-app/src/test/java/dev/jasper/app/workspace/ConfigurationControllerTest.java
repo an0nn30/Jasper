@@ -634,4 +634,46 @@ class ConfigurationControllerTest {
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));
         });
     }
+
+    @Test void diagnosticsOfferMigrateConfigWhichRewritesTheFileAndReportsIt() throws Exception {
+        start("[font]\nsize = 19\n"); edt(this::owner);
+        var owner = owners.getFirst();
+        var shown = new ArrayList<JComponent>();
+        var infos = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        edt(() -> {
+            owner.showConfigDiagnostics = shown::add;
+            owner.onInfo = infos::add;
+            assertThat(controller.migrationAvailable()).isTrue();
+            owner.status().configButton().doClick();
+        });
+        assertThat(shown).hasSize(1);
+        var button = find(shown.getFirst(), "configuration.migrate");
+        edt(button::doClick);
+        until(() -> !infos.isEmpty());
+        assertThat(infos).containsExactly("Migrated 1 old setting to the new layout. Backup: config.toml.v1.bak.");
+        assertThat(Files.readString(directory.resolve("config.toml"))).isEqualTo("version = 2\n[terminal.font]\nsize = 19\n");
+        edt(() -> {});
+        edt(() -> assertThat(controller.migrationAvailable()).isFalse());
+        var nothing = new AtomicReference<String>();
+        edt(() -> controller.migrate().thenAccept(nothing::set));
+        until(() -> nothing.get() != null);
+        assertThat(nothing.get()).isEqualTo("Nothing to migrate: config.toml already uses the current layout.");
+    }
+
+    @Test void oldPluginTablesCountOnlyWhenThePluginHasItsOwnFile() throws Exception {
+        start("[plugins.\"dev.x\"]\na = 1\n"); edt(this::owner);
+        edt(() -> assertThat(controller.migrationAvailable()).isFalse());
+        edt(() -> controller.pluginSettingsExist(id -> id.equals("dev.x")));
+        edt(() -> assertThat(controller.migrationAvailable()).isTrue());
+    }
+
+    private static JButton find(java.awt.Component root, String name) {
+        if (root instanceof JButton button && name.equals(button.getName())) return button;
+        if (root instanceof java.awt.Container container)
+            for (var child : container.getComponents()) {
+                JButton found = find(child, name);
+                if (found != null) return found;
+            }
+        return null;
+    }
 }

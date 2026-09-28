@@ -488,6 +488,16 @@ public final class PluginRuntime {
         }
     }
 
+    /**
+     * Whether a plugin's own settings file exists, so the old {@code [plugins."<id>"]} table in config.toml may go.
+     *
+     * @param id a plugin id
+     * @return whether {@code plugins/<id>/<id>.toml} is a regular file
+     */
+    public boolean settingsFileExists(String id) {
+        return java.nio.file.Files.isRegularFile(PluginSettingsFiles.file(options.userDirectory(), id));
+    }
+
     private void applySettings() { PluginHost current = host; if (current != null) current.settingsChanged(); }
 
     /** Test seam: what the settings poller does, now. */
