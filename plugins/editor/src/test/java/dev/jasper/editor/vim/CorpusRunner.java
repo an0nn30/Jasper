@@ -38,7 +38,11 @@ final class CorpusRunner {
         area.setCloseMarkupTags(false);
         area.setText(String.join("\n", c.text()) + "\n");
         area.discardAllEdits();
+        if (c.folds() != null) javaFolds(area, c.closedAtStart());
         var editor = new VimEditor(vim, area, EditorDefaults.VIM);
+        // Vim's window when the recorder starts: 80 columns, 23 rows (24 lines, one for the command line).
+        int[] size = c.window() != null ? c.windowSize() : new int[] { 80, 23 };
+        editor.view().resize(size[1], size[0]);
         if (!c.set().isBlank()) editor.options().apply(c.set());
         for (var entry : c.given().entrySet()) {
             var register = entry.getValue();
@@ -46,6 +50,8 @@ final class CorpusRunner {
         }
         String start = c.text().get(c.line() - 1);
         editor.setCursor(new Pos(c.line() - 1, Text.column(start, c.col() - 1)));
+        // Vim scrolls to the cursor before it reads the first key.
+        editor.view().updateTopline();
         for (KeyInput key : KeyInput.parse(c.keys())) editor.feed(key);
         Buffer buffer = editor.buffer();
         List<String> text = new ArrayList<>();
@@ -61,8 +67,48 @@ final class CorpusRunner {
         Pos anchor = editor.visualAnchor();
         if (editor.mode().visual() && anchor != null)
             visual = (anchor.line + 1) + "," + (Text.characters(buffer.line(anchor.line), Math.min(anchor.col, buffer.line(anchor.line).length())) + 1);
+        String view = c.window() == null ? null : editor.view().topline + "," + editor.view().leftcol;
+        String folds = c.folds() == null ? null : closedFolds(editor);
         editor.close();
-        return new CorpusCase.Expected("jasper", text, cursor.line + 1, col, editor.mode().id(), visual, registers);
+        return new CorpusCase.Expected("jasper", text, cursor.line + 1, col, editor.mode().id(), visual, registers, view, folds);
+    }
+
+    /** The text's code folds as RSyntaxTextArea's Java fold parser finds them, those starting on the given lines closed. */
+    static void javaFolds(VimTextArea area, List<Integer> closed) {
+        area.setSyntaxEditingStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA);
+        area.setCodeFoldingEnabled(true);
+        area.getFoldManager().reparse();
+        for (int line : closed) collapse(area.getFoldManager(), line - 1);
+    }
+
+    private static void collapse(org.fife.ui.rsyntaxtextarea.folding.FoldManager manager, int startLine) {
+        for (var fold : folds(manager)) if (fold.getStartLine() == startLine) fold.setCollapsed(true);
+    }
+
+    /** @return every fold, outer before inner */
+    static List<org.fife.ui.rsyntaxtextarea.folding.Fold> folds(org.fife.ui.rsyntaxtextarea.folding.FoldManager manager) {
+        List<org.fife.ui.rsyntaxtextarea.folding.Fold> out = new ArrayList<>();
+        for (int i = 0; i < manager.getFoldCount(); i++) add(manager.getFold(i), out);
+        return out;
+    }
+
+    private static void add(org.fife.ui.rsyntaxtextarea.folding.Fold fold, List<org.fife.ui.rsyntaxtextarea.folding.Fold> out) {
+        out.add(fold);
+        for (int i = 0; i < fold.getChildCount(); i++) add(fold.getChild(i), out);
+    }
+
+    /** @return the closed folds as Vim's foldclosed() reports them: {@code 2-5 8-9}, or {@code none} */
+    static String closedFolds(VimEditor editor) {
+        List<String> out = new ArrayList<>();
+        int count = editor.buffer().count();
+        for (int lnum = 1; lnum <= count; lnum++) {
+            int[] fold = editor.folds().closed(lnum);
+            if (fold != null && fold[0] == lnum) {
+                out.add(fold[0] + "-" + fold[1]);
+                lnum = fold[1];
+            }
+        }
+        return out.isEmpty() ? "none" : String.join(" ", out);
     }
 
     /** @return the differences from the expectation, or empty */
@@ -73,6 +119,8 @@ final class CorpusRunner {
             problems.add("cursor " + actual.line() + "," + actual.col() + " (Vim: " + expected.line() + "," + expected.col() + ")");
         if (!expected.mode().equals(actual.mode())) problems.add("mode " + actual.mode() + " (Vim: " + expected.mode() + ")");
         if (!java.util.Objects.equals(expected.visual(), actual.visual())) problems.add("visual " + actual.visual() + " (Vim: " + expected.visual() + ")");
+        if (!java.util.Objects.equals(expected.view(), actual.view())) problems.add("view " + actual.view() + " (Vim: " + expected.view() + ")");
+        if (!java.util.Objects.equals(expected.folds(), actual.folds())) problems.add("folds " + actual.folds() + " (Vim: " + expected.folds() + ")");
         if (!expected.registers().equals(actual.registers())) problems.add("registers " + show(actual.registers()) + " (Vim: " + show(expected.registers()) + ")");
         return String.join("; ", problems);
     }

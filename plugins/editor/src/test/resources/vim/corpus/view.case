@@ -1,0 +1,8943 @@
+# Scrolling, H M L and the screen-line motions, with the window's first line compared.
+
+=== the window scrolls to the cursor
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: 12G
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 12,1
+expect-mode: normal
+expect-view: 10,0
+
+=== the window scrolls to the cursor going up
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: 20G
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 18,0
+
+=== far jumps center the cursor
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: 30G
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 30,1
+expect-mode: normal
+expect-view: 28,0
+
+=== G shows the end
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: G
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 40,1
+expect-mode: normal
+expect-view: 36,0
+
+=== gg shows the start
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 40,1
+window: 20x5
+keys: gg
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 1,1
+expect-mode: normal
+expect-view: 1,0
+
+=== j past the bottom scrolls one line
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 5,1
+window: 20x5
+keys: j
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 6,1
+expect-mode: normal
+expect-view: 2,0
+
+=== k past the top scrolls one line
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: 16Gk
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 15,1
+expect-mode: normal
+expect-view: 14,0
+
+=== C-e scrolls up a line
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-e>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 2,0
+
+=== C-e moves the cursor off the top
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: 3<C-e>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: normal
+expect-view: 4,0
+
+=== C-e keeps the column
+text:
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+cursor: 1,4
+window: 20x5
+keys: 3<C-e>
+--- vim 9.1
+expect-text:
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+  abcdef
+expect-cursor: 4,4
+expect-mode: normal
+expect-view: 4,0
+
+=== C-e at the end stops
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 40,1
+window: 20x5
+keys: <C-e>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 40,1
+expect-mode: normal
+expect-view: 37,0
+
+=== C-y scrolls down a line
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: <C-y>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 17,0
+
+=== C-y moves the cursor off the bottom
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: 3<C-y>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 19,1
+expect-mode: normal
+expect-view: 15,0
+
+=== C-y at the top fails
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-y>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 1,1
+expect-mode: normal
+expect-view: 1,0
+
+=== C-d scrolls half a window
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 3,1
+expect-mode: normal
+expect-view: 3,0
+
+=== C-d twice
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-d><C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 5,1
+expect-mode: normal
+expect-view: 5,0
+
+=== C-d with a count sets scroll
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: 4<C-d><C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 9,1
+expect-mode: normal
+expect-view: 9,0
+
+=== C-d at the end moves the cursor
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 38,1
+window: 20x5
+keys: <C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 40,1
+expect-mode: normal
+expect-view: 36,0
+
+=== C-d on the last line fails
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 40,1
+window: 20x5
+keys: <C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 40,1
+expect-mode: normal
+expect-view: 36,0
+
+=== C-u scrolls up half a window
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: <C-u>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 28,1
+expect-mode: normal
+expect-view: 26,0
+
+=== C-u at the top moves the cursor
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 3,1
+window: 20x5
+keys: <C-u>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 1,1
+expect-mode: normal
+expect-view: 1,0
+
+=== C-d then C-u
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-d><C-u>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 1,1
+expect-mode: normal
+expect-view: 1,0
+
+=== C-d keeps the column with nostartofline
+text:
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+cursor: 1,5
+set: nostartofline
+window: 20x5
+keys: <C-d>
+--- vim 9.1
+expect-text:
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+  abcdefgh
+expect-cursor: 3,5
+expect-mode: normal
+expect-view: 3,0
+
+=== C-d goes to the first non-blank
+text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+cursor: 1,5
+window: 20x5
+keys: <C-d>
+--- vim 9.1
+expect-text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+expect-cursor: 3,3
+expect-mode: normal
+expect-view: 3,0
+
+=== C-f scrolls a page
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-f>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: normal
+expect-view: 4,0
+
+=== C-f twice
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-f><C-f>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 7,1
+expect-mode: normal
+expect-view: 7,0
+
+=== C-f with a count
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: 3<C-f>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 10,1
+expect-mode: normal
+expect-view: 10,0
+
+=== C-f at the end
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 35,1
+window: 20x5
+keys: <C-f><C-f>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 40,1
+expect-mode: normal
+expect-view: 40,0
+
+=== C-b scrolls back a page
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: <C-b>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 29,1
+expect-mode: normal
+expect-view: 25,0
+
+=== C-b at the top fails
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <C-b>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 1,1
+expect-mode: normal
+expect-view: 1,0
+
+=== PageDown
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <PageDown>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: normal
+expect-view: 4,0
+
+=== PageUp
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: <PageUp>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 29,1
+expect-mode: normal
+expect-view: 25,0
+
+=== S-Down
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: <S-Down>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: normal
+expect-view: 4,0
+
+=== S-Up
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: <S-Up>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 29,1
+expect-mode: normal
+expect-view: 25,0
+
+=== zt puts the line at the top
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: zt
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 20,0
+
+=== zt with a count
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: 10zt
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 10,1
+expect-mode: normal
+expect-view: 10,0
+
+=== z CR goes to the first non-blank
+text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+cursor: 20,1
+window: 20x5
+keys: z<CR>
+--- vim 9.1
+expect-text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+expect-cursor: 20,3
+expect-mode: normal
+expect-view: 20,0
+
+=== zz centers the line
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: zz
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 18,0
+
+=== zz near the start
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 2,1
+window: 20x5
+keys: zz
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 1,0
+
+=== zz near the end
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 39,1
+window: 20x5
+keys: zz
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 39,1
+expect-mode: normal
+expect-view: 37,0
+
+=== z dot
+text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+cursor: 20,1
+window: 20x5
+keys: z.
+--- vim 9.1
+expect-text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+expect-cursor: 20,3
+expect-mode: normal
+expect-view: 18,0
+
+=== zb puts the line at the bottom
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: zb
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 16,0
+
+=== zb near the start
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 2,1
+window: 20x5
+keys: zb
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 1,0
+
+=== z minus
+text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+cursor: 20,1
+window: 20x5
+keys: z-
+--- vim 9.1
+expect-text:
+    line 1
+    line 2
+    line 3
+    line 4
+    line 5
+    line 6
+    line 7
+    line 8
+    line 9
+    line 10
+    line 11
+    line 12
+    line 13
+    line 14
+    line 15
+    line 16
+    line 17
+    line 18
+    line 19
+    line 20
+    line 21
+    line 22
+    line 23
+    line 24
+    line 25
+    line 26
+    line 27
+    line 28
+    line 29
+    line 30
+    line 31
+    line 32
+    line 33
+    line 34
+    line 35
+    line 36
+    line 37
+    line 38
+    line 39
+    line 40
+expect-cursor: 20,3
+expect-mode: normal
+expect-view: 16,0
+
+=== z plus
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 10,1
+window: 20x5
+keys: z+
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 13,1
+expect-mode: normal
+expect-view: 13,0
+
+=== z caret
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: z^
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 17,1
+expect-mode: normal
+expect-view: 13,0
+
+=== H goes to the top line
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,3
+window: 20x5
+keys: H
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 18,1
+expect-mode: normal
+expect-view: 18,0
+
+=== H with a count
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: 3H
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 18,0
+
+=== L goes to the bottom line
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: L
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 22,1
+expect-mode: normal
+expect-view: 18,0
+
+=== L with a count
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: 2L
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 21,1
+expect-mode: normal
+expect-view: 18,0
+
+=== M goes to the middle
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: M
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 18,0
+
+=== M on a short text
+text:
+  a
+  b
+  c
+cursor: 1,1
+window: 20x5
+keys: M
+--- vim 9.1
+expect-text:
+  a
+  b
+  c
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 1,0
+
+=== H is a jump
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: H``
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 18,0
+
+=== d L deletes to the bottom
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: dL
+registers: "
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 18,0
+expect-register ": l "line 20\nline 21\nline 22\n"
+
+=== d H deletes to the top
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: dH
+registers: "
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 18,1
+expect-mode: normal
+expect-view: 18,0
+expect-register ": l "line 18\nline 19\nline 20\n"
+
+=== scrolloff keeps lines around the cursor
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+set: scrolloff=1
+window: 20x5
+keys: 12G
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 12,1
+expect-mode: normal
+expect-view: 10,0
+
+=== scrolloff with j
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 3,1
+set: scrolloff=1
+window: 20x5
+keys: jj
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 5,1
+expect-mode: normal
+expect-view: 2,0
+
+=== scrolloff with H
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+set: scrolloff=1
+window: 20x5
+keys: H
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 19,1
+expect-mode: normal
+expect-view: 18,0
+
+=== scrolloff with C-e
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+set: scrolloff=1
+window: 20x5
+keys: <C-e><C-e>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 21,1
+expect-mode: normal
+expect-view: 20,0
+
+=== scrolloff with C-y
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+set: scrolloff=1
+window: 20x5
+keys: <C-y>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: normal
+expect-view: 17,0
+
+=== scrolloff with C-d
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+set: scrolloff=2
+window: 20x5
+keys: <C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 5,1
+expect-mode: normal
+expect-view: 3,0
+
+=== scrolloff with C-f
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+set: scrolloff=1
+window: 20x5
+keys: <C-f>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 5,1
+expect-mode: normal
+expect-view: 4,0
+
+=== scrolloff larger than half
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+set: scrolloff=10
+window: 20x5
+keys: j
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 21,1
+expect-mode: normal
+expect-view: 19,0
+
+=== wrapped lines take more rows
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 1,1
+window: 20x5
+keys: 5G
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 5,1
+expect-mode: normal
+expect-view: 4,0
+
+=== wrapped lines with C-e
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 1,1
+window: 20x5
+keys: <C-e><C-e>
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 3,1
+expect-mode: normal
+expect-view: 3,0
+
+=== wrapped lines with C-d
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 1,1
+window: 20x5
+keys: <C-d>
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 2,0
+
+=== wrapped lines with C-f
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 1,1
+window: 20x5
+keys: <C-f>
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 3,1
+expect-mode: normal
+expect-view: 3,0
+
+=== wrapped lines with zt
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 5,1
+window: 20x5
+keys: zt
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 5,1
+expect-mode: normal
+expect-view: 5,0
+
+=== wrapped lines with zb
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 5,1
+window: 20x5
+keys: zb
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 5,1
+expect-mode: normal
+expect-view: 4,0
+
+=== wrapped lines with L
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 1,1
+window: 20x5
+keys: L
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 1,0
+
+=== a line taller than the window
+text:
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  b
+cursor: 1,1
+window: 20x5
+keys: j
+--- vim 9.1
+expect-text:
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  b
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 2,0
+
+=== gj moves down a screen line
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,3
+window: 20x5
+keys: gj
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,23
+expect-mode: normal
+expect-view: 1,0
+
+=== gj twice
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,3
+window: 20x5
+keys: gjgj
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,43
+expect-mode: normal
+expect-view: 1,0
+
+=== gj to the next line
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,43
+window: 20x5
+keys: gj
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 3,3
+expect-mode: normal
+expect-view: 2,0
+
+=== gk moves up a screen line
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,43
+window: 20x5
+keys: gk
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,23
+expect-mode: normal
+expect-view: 1,0
+
+=== gk to the previous line
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 3,2
+window: 20x5
+keys: gk
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,42
+expect-mode: normal
+expect-view: 2,0
+
+=== gj with a count
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,1
+window: 20x5
+keys: 4gj
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 3,21
+expect-mode: normal
+expect-view: 2,0
+
+=== gj on the last line fails
+text:
+  x
+  y
+cursor: 2,1
+window: 20x5
+keys: gj
+--- vim 9.1
+expect-text:
+  x
+  y
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 1,0
+
+=== gj without wrap is j
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,3
+set: nowrap
+window: 20x5
+keys: gj
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 3,3
+expect-mode: normal
+expect-view: 1,0
+
+=== gj after dollar sticks to the end
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,1
+window: 20x5
+keys: $gj
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 3,20
+expect-mode: normal
+expect-view: 2,0
+
+=== d gj
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,3
+window: 20x5
+keys: dgj
+registers: "
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,3
+expect-mode: normal
+expect-view: 1,0
+expect-register ": c "aaaaaaaaaaaaaaaaaaaa"
+
+=== g0 goes to the screen line start
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,30
+window: 20x5
+keys: g0
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,21
+expect-mode: normal
+expect-view: 1,0
+
+=== g Down moves down a screen line
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,3
+window: 20x5
+keys: g<Down>
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,23
+expect-mode: normal
+expect-view: 1,0
+
+=== g Up moves up a screen line
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,43
+window: 20x5
+keys: g<Up>
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,23
+expect-mode: normal
+expect-view: 1,0
+
+=== g Home goes to the screen line start
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,30
+window: 20x5
+keys: g<Home>
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,21
+expect-mode: normal
+expect-view: 1,0
+
+=== g End goes to the last non-blank of the screen line
+text:
+    aaaaaaaaaaaaaaaa  $
+  b
+cursor: 1,1
+window: 20x5
+keys: g<End>
+--- vim 9.1
+expect-text:
+    aaaaaaaaaaaaaaaa  $
+  b
+expect-cursor: 1,18
+expect-mode: normal
+expect-view: 1,0
+
+=== g caret
+text:
+     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+cursor: 1,30
+window: 20x5
+keys: g^
+--- vim 9.1
+expect-text:
+     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+expect-cursor: 1,21
+expect-mode: normal
+expect-view: 1,0
+
+=== gm goes to the middle
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,30
+window: 20x5
+keys: gm
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,31
+expect-mode: normal
+expect-view: 1,0
+
+=== g dollar goes to the screen line end
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,3
+window: 20x5
+keys: g$
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,20
+expect-mode: normal
+expect-view: 1,0
+
+=== g dollar on the second screen line
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,25
+window: 20x5
+keys: g$
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,40
+expect-mode: normal
+expect-view: 1,0
+
+=== g dollar with a count
+text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+cursor: 2,3
+window: 20x5
+keys: 2g$
+--- vim 9.1
+expect-text:
+  short
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  bbbbbbbbbbbbbbbbbbbbbbbbb
+  x
+  cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  end
+  l7
+  l8
+  l9
+  l10
+  l11
+  l12
+  l13
+  l14
+  l15
+  l16
+  l17
+  l18
+  l19
+  l20
+  l21
+  l22
+  l23
+  l24
+  l25
+  l26
+  l27
+  l28
+  l29
+  l30
+expect-cursor: 2,40
+expect-mode: normal
+expect-view: 1,0
+
+=== g0 without wrap
+text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cursor: 1,50
+set: nowrap
+window: 20x5
+keys: g0
+--- vim 9.1
+expect-text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect-cursor: 1,40
+expect-mode: normal
+expect-view: 1,39
+
+=== g dollar without wrap
+text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cursor: 1,5
+set: nowrap
+window: 20x5
+keys: g$
+--- vim 9.1
+expect-text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect-cursor: 1,20
+expect-mode: normal
+expect-view: 1,0
+
+=== nowrap scrolls sideways
+text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cursor: 1,1
+set: nowrap
+window: 20x5
+keys: 50|
+--- vim 9.1
+expect-text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect-cursor: 1,50
+expect-mode: normal
+expect-view: 1,39
+
+=== nowrap scrolls back
+text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cursor: 1,1
+set: nowrap
+window: 20x5
+keys: 50|0
+--- vim 9.1
+expect-text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect-cursor: 1,1
+expect-mode: normal
+expect-view: 1,0
+
+=== nowrap with sidescroll
+text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cursor: 1,1
+set: nowrap sidescroll=1
+window: 20x5
+keys: 25|
+--- vim 9.1
+expect-text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect-cursor: 1,25
+expect-mode: normal
+expect-view: 1,5
+
+=== nowrap with sidescrolloff
+text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cursor: 1,1
+set: nowrap sidescrolloff=3
+window: 20x5
+keys: 18|
+--- vim 9.1
+expect-text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect-cursor: 1,18
+expect-mode: normal
+expect-view: 1,7
+
+=== Visual C-d extends
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: v<C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 3,1
+expect-mode: visual
+expect-visual: 1,1
+expect-view: 3,0
+
+=== Visual C-f extends
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: V<C-f>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: visual-line
+expect-visual: 1,1
+expect-view: 4,0
+
+=== Visual C-e
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: v3<C-e>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: visual
+expect-visual: 1,1
+expect-view: 4,0
+
+=== Visual C-y
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: v2<C-y>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 20,1
+expect-mode: visual
+expect-visual: 20,1
+expect-view: 16,0
+
+=== Visual C-u
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: v<C-u>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 28,1
+expect-mode: visual
+expect-visual: 30,1
+expect-view: 26,0
+
+=== Visual C-b
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: v<C-b>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 29,1
+expect-mode: visual
+expect-visual: 30,1
+expect-view: 25,0
+
+=== Visual PageDown
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: v<PageDown>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: visual
+expect-visual: 1,1
+expect-view: 4,0
+
+=== Visual PageUp
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: v<PageUp>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 29,1
+expect-mode: visual
+expect-visual: 30,1
+expect-view: 25,0
+
+=== Visual S-Down
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: v<S-Down>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 4,1
+expect-mode: visual
+expect-visual: 1,1
+expect-view: 4,0
+
+=== Visual S-Up
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 30,1
+window: 20x5
+keys: v<S-Up>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 29,1
+expect-mode: visual
+expect-visual: 30,1
+expect-view: 25,0
+
+=== Visual H
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 20,1
+window: 20x5
+keys: vH
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 18,1
+expect-mode: visual
+expect-visual: 20,1
+expect-view: 18,0
+
+=== C-d after an operator fails
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: d<C-d>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 1,1
+expect-mode: normal
+expect-view: 1,0
+
+=== insert keeps the cursor shown
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 5,1
+window: 20x5
+keys: ox<Esc>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  x
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 6,1
+expect-mode: normal
+expect-view: 2,0
+
+=== dd at the bottom
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 40,1
+window: 20x5
+keys: dd
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+expect-cursor: 39,1
+expect-mode: normal
+expect-view: 36,0
+
+=== u scrolls to the change
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: Gddgg<C-e>u
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 40,1
+expect-mode: normal
+expect-view: 36,0
+
+=== search scrolls
+text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+cursor: 1,1
+window: 20x5
+keys: /line 25<CR>
+--- vim 9.1
+expect-text:
+  line 1
+  line 2
+  line 3
+  line 4
+  line 5
+  line 6
+  line 7
+  line 8
+  line 9
+  line 10
+  line 11
+  line 12
+  line 13
+  line 14
+  line 15
+  line 16
+  line 17
+  line 18
+  line 19
+  line 20
+  line 21
+  line 22
+  line 23
+  line 24
+  line 25
+  line 26
+  line 27
+  line 28
+  line 29
+  line 30
+  line 31
+  line 32
+  line 33
+  line 34
+  line 35
+  line 36
+  line 37
+  line 38
+  line 39
+  line 40
+expect-cursor: 25,1
+expect-mode: normal
+expect-view: 23,0
