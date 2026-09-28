@@ -397,14 +397,19 @@ macOS and `/bin/bash` on Linux when `SHELL` is unavailable or blank. `custom` ru
 program means the platform default with the configured arguments appended, and an explicit program gets only the
 configured arguments, with no implicit login flag. When `profile` is empty, a non-empty `program` or `args` means
 `custom`, so settings written before profiles existed keep working. A profile that is not installed starts the
-platform default and shows a warning with the configuration problems in the status bar. A split starts the profile of
+platform default and shows a warning with the configuration problems in the status bar. Until the startup detection
+finishes, a WSL or PowerShell 7 profile cannot be checked yet: a pane that starts one then waits for detection (at
+most 12 seconds, showing "Starting terminal…") and starts the platform default with that warning if the profile is
+missing; the warning also appears as soon as detection finds the configured profile missing. A split starts the profile of
 the pane it splits; New Tab starts the configured one. Jasper does not split strings, expand shell expressions or
 parse a shell command line.
 
 A WSL tab runs `wsl.exe -d <name> --cd <directory>` and is named after the distribution. The terminal process starts
 in your home folder; the directory goes to `--cd`: the Linux path when it is on that distribution's
-`\\wsl.localhost` share, any other existing Windows folder as it is, and `~` (the Linux home) otherwise, including
-for your Windows home folder, where every new window and tab asks to start. Jasper adds `TERM`, `COLORTERM`,
+`\\wsl.localhost` share, any other existing Windows folder as it is, and `~` (the Linux home) otherwise. A new
+window, and a new tab from a pane that has reported no directory, asks for no directory and gets `~`; a split or
+new tab from a pane that reported your Windows home (a WSL shell in `/mnt/c/Users/me`) passes that folder on, so it
+stays there. Jasper adds `TERM`, `COLORTERM`,
 `TERM_PROGRAM`, `JASPER_TERMINAL` and, when it is set, `JASPER_SHELL_INTEGRATION/p` to `WSLENV` (after any entries
 already there, however `WSLENV` is spelled), because only variables listed in `WSLENV` reach Linux; `/p` turns the
 script folder into its `/mnt/c/...` path. A working directory the WSL shell reports becomes a Windows path:

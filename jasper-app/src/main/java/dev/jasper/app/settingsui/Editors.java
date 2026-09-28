@@ -383,7 +383,12 @@ public final class Editors {
         private final SettingsDraft draft;
         private final Subscription listening;
         private String shown = "";
+        /** The id the box displays for {@link #shown} or the last edit; picking it again is no edit. */
+        private String current = "";
+        /** How many entries are choices; any after them is the one "(not detected)" entry. */
+        private int detected;
         private boolean showing;
+        private final List<Runnable> edits = new ArrayList<>();
 
         Profile(ShellChoices shells, SettingsDraft draft) {
             this.shells = shells;
@@ -393,6 +398,11 @@ public final class Editors {
             component = line(box, detect);
             fill();
             listening = shells.onChanged().apply(this::fill);
+            box.addActionListener(event -> {
+                if (showing || value().equals(current)) return;
+                current = value();
+                for (Runnable listener : List.copyOf(edits)) listener.run();
+            });
         }
 
         /** Rebuilds the entries from the current choices, keeping the selection. */
@@ -404,6 +414,7 @@ public final class Editors {
                 ids.clear();
                 for (ShellChoices.Choice choice : shells.choices().get()) add(choice.id(), choice.label());
                 if (!ids.contains(ShellChoices.CUSTOM)) add(ShellChoices.CUSTOM, "Custom");
+                detected = ids.size();
                 select(keep);
             } finally { showing = false; }
         }
@@ -411,6 +422,11 @@ public final class Editors {
         private void add(String id, String label) { ids.add(id); box.addItem(label); }
 
         private void select(String value) {
+            // At most one undetected entry: the one for the value shown now.
+            while (ids.size() > detected) {
+                ids.removeLast();
+                box.removeItemAt(box.getItemCount() - 1);
+            }
             String wanted = effective(value);
             // WSL distribution names ignore case, as the launcher's resolution does: select the detected spelling.
             String id = ids.stream().filter(known -> known.equals(wanted)
@@ -418,6 +434,7 @@ public final class Editors {
                 .findFirst().orElse(wanted);
             if (!ids.contains(id)) add(id, id + " (not detected)");
             box.setSelectedIndex(ids.indexOf(id));
+            current = id;
         }
 
         private static final String WSL_PREFIX = "wsl:";
@@ -439,7 +456,11 @@ public final class Editors {
             showing = true;
             try { shown = value; select(value); } finally { showing = false; }
         }
-        @Override public void onEdit(Runnable listener) { box.addActionListener(event -> { if (!showing) listener.run(); }); }
+        /**
+         * A pick that differs from what the box displayed. Swing reports picking the selected entry again too, which
+         * would turn an empty setting shown as its effective profile into an explicit one.
+         */
+        @Override public void onEdit(Runnable listener) { edits.add(listener); }
         @Override public void dispose() { listening.close(); }
     }
 }

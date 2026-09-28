@@ -138,6 +138,26 @@ class EditorsTest {
         assertThat(listeners).isEmpty();
     }
 
+    @Test void theProfileEditorKeepsOneUndetectedEntryAndIgnoresRepickingTheShownOne() {
+        var shells = new ShellChoices(() -> List.of(new ShellChoices.Choice("powershell", "PowerShell"),
+            new ShellChoices.Choice("custom", "Custom")), () -> { }, listener -> new Subscription(() -> { }));
+        var editor = (Editors.Profile) build(Editors.profile(shells), CoreSettings.TERMINAL_SHELL_PROFILE, context);
+        var edits = new ArrayList<String>();
+        editor.onEdit(() -> edits.add(editor.value()));
+        editor.show("wsl:Gone");
+        editor.show("pwsh");
+        assertThat(java.util.stream.IntStream.range(0, editor.box.getItemCount()).mapToObj(editor.box::getItemAt))
+            .as("an earlier undetected entry goes when another is shown").containsExactly("PowerShell", "Custom", "pwsh (not detected)");
+        editor.show("");
+        assertThat(java.util.stream.IntStream.range(0, editor.box.getItemCount()).mapToObj(editor.box::getItemAt))
+            .containsExactly("PowerShell", "Custom");
+        editor.box.setSelectedIndex(0);
+        assertThat(edits).as("picking the entry already shown for the default changes nothing").isEmpty();
+        editor.box.setSelectedIndex(1);
+        editor.box.setSelectedIndex(0);
+        assertThat(edits).as("moving away and back are both edits").containsExactly("custom", "powershell");
+    }
+
     @Test void anOldProgramSettingShowsAsCustom() {
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "[terminal.shell]\nprogram = '/bin/fish'\n", true).values());
         var legacy = new PageContext(draft, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { });

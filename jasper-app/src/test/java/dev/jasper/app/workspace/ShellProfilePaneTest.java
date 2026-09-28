@@ -80,6 +80,39 @@ class ShellProfilePaneTest {
         edt(() -> assertThat(owner[0].currentPane().profile()).contains("cmd"));
     }
 
+    /**
+     * A WSL pane nobody asked a directory for opens the Linux home; its splits, tabs and windows do too. A pane asked
+     * to start in the Windows home (or one that reported it, as a shell in /mnt/c/Users/NAME does) passes it on.
+     */
+    @Test void onlyPanesNobodyAskedADirectoryForStartInTheLinuxHome() throws Exception {
+        var wsl = new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.empty(), List.of("wsl.exe", "-d", "Ubuntu"));
+        var cds = new ArrayList<String>();
+        var windows = new ArrayList<Path>();
+        var launcher = new ShellLauncher(pending::add, (Optional<String> profile) -> new LaunchSettings(wsl.command(), Map.of(), 80, 24, 100, wsl),
+            (directory, settings) -> {
+                assertThat(directory).as("the PTY always starts in the Windows home").isEqualTo(HOME);
+                cds.add(settings.command().getLast());
+                return idle(directory);
+            });
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> owner[0] = content(launcher, windows::add));
+        launchAll();
+        edt(() -> owner[0].currentTab().split(SplitTree.Axis.RIGHT));
+        launchAll();
+        edt(() -> owner[0].newTab(owner[0].directory()));
+        launchAll();
+        edt(() -> {
+            owner[0].requestNewWindow();
+            owner[0].openTab(HOME, null, Optional.empty());
+        });
+        launchAll();
+        edt(() -> owner[0].currentTab().split(SplitTree.Axis.DOWN));
+        launchAll();
+        assertThat(cds).containsExactly("~", "~", "~", HOME.toString(), HOME.toString());
+        assertThat(windows).as("a new window from a pane without a directory of its own starts where a new shell starts")
+            .containsExactly((Path) null);
+    }
+
     @Test void anOpenSpecCarriesAProfileAndDefaultsToNone() {
         assertThat(new OpenSpec.Local(Optional.empty()).profile()).isEmpty();
         assertThat(new OpenSpec.Local(Optional.empty(), Optional.of("wsl:Ubuntu")).profile()).contains("wsl:Ubuntu");

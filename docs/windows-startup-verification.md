@@ -110,6 +110,10 @@ Native acceptance for the user (no GUI was launched):
 - [ ] With the manual `source` line from configuration.md in `~/.bashrc`: the status bar shows the Linux directory
       as a `\\wsl.localhost\...` path; `cd /mnt/c/Users` shows `C:\Users`.
 - [ ] A split of a WSL tab starts in the same Linux directory; New Tab starts the default profile.
+- [ ] A split of a WSL tab after `cd /mnt/c/Users/<you>` starts in `/mnt/c/Users/<you>`, not the Linux home.
+- [ ] A configured but uninstalled WSL/pwsh profile at startup (for example `profile = 'wsl:Gone'` in
+      `config.toml`, then start Jasper) starts PowerShell in the first window with a warning in the status bar, not a
+      failed pane.
 - [ ] Choosing a WSL distribution as the Profile and applying: the next New Tab starts it; an uninstalled profile id in
       `config.toml` starts PowerShell and shows a warning in the status bar.
 - [ ] ↻ next to the Profile dropdown detects the profiles again without freezing the dialog.

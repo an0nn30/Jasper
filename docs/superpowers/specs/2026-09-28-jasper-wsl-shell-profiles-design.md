@@ -1,7 +1,7 @@
 # Jasper WSL hosts and shell profiles
 
 **Date:** 2026-09-28  
-**Status:** Approved in conversation on 2026-09-28 (Remote panel group, detected shell profiles, ConPTY in scope; section 9 resolved). Plans A and B written. Nothing is implemented.  
+**Status:** Approved in conversation on 2026-09-28 (Remote panel group, detected shell profiles, ConPTY in scope; section 9 resolved). Plans A and B written. Plan A is implemented on `worktree-wsl-hosts` (not merged); plan B is not started.  
 **Baseline:** `7fd829cc` on `main`, branch `worktree-wsl-hosts`.  
 **Scope:** On Windows, detect installed WSL 1 and WSL 2 distributions, list them for connection in the Remote hosts panel (MobaXterm-style), and let the user pick any detected shell, including a WSL distro, as the default for new panes. Includes switching Windows PTYs from winpty to ConPTY.
 

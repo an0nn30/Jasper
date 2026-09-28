@@ -130,7 +130,8 @@ class WslDistributionsTest {
     }
 
     @Test void theRunnerAcceptsOnlyTheGivenExitCodes() {
-        String launcher = ProcessHandle.current().info().command().orElseThrow();
+        String launcher = java.nio.file.Path.of(System.getProperty("java.home"), "bin",
+            System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
         // With no arguments the launcher prints its usage to standard error and exits with 1, as reg.exe does for a missing key.
         assertThat(WslDistributions.run(List.of(launcher), Duration.ofSeconds(30), Set.of(0))).isEmpty();
         assertThat(WslDistributions.run(List.of(launcher), Duration.ofSeconds(30), Set.of(0, 1))).isPresent();

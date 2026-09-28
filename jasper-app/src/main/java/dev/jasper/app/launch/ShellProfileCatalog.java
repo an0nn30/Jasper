@@ -7,14 +7,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /**
  * The shell profiles this machine offers, for new panes, the Settings dropdown and plugins. Detection of WSL
- * distributions and PowerShell 7 runs off the EDT and is cached until {@link #refresh}; everything else is EDT
- * only. The Custom profile always follows the saved settings. The application creates one and closes it.
+ * distributions and PowerShell 7 runs off the EDT and is cached until {@link #refresh}; everything but
+ * {@link #awaitDetection}, which launches call off the EDT, is EDT only. The Custom profile always follows the saved settings. The application creates one and closes it.
  */
 public final class ShellProfileCatalog implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(ShellProfileCatalog.class.getName());
@@ -30,6 +35,9 @@ public final class ShellProfileCatalog implements AutoCloseable {
     private boolean complete;
     private long generation;
     private boolean closed;
+    /** True once a detection completed, false once closed first; read by {@link #awaitDetection} on any thread. */
+    private final CompletableFuture<Boolean> firstDetection = new CompletableFuture<>();
+    private volatile boolean detecting;
 
     /**
      * {@code shell} reads the saved shell settings on the EDT; {@code distros} and {@code pwsh} detect on
@@ -90,6 +98,7 @@ public final class ShellProfileCatalog implements AutoCloseable {
                 Optional<String> program = shell7;
                 SwingUtilities.invokeLater(() -> detected(ticket, distributions, program));
             });
+            detecting = true;
         } catch (RuntimeException rejected) {
             LOG.log(System.Logger.Level.WARNING, "Shell detection could not start", rejected);
         }
@@ -101,7 +110,29 @@ public final class ShellProfileCatalog implements AutoCloseable {
         detectedDistros = found;
         detectedPwsh = program;
         complete = true;
+        firstDetection.complete(true);
         if (changed) for (Runnable listener : List.copyOf(listeners)) listener.run();
+    }
+
+    /**
+     * Waits, off the EDT and at most {@code timeout}, for the first detection; true once it has completed. The EDT
+     * publishes detection, so waiting there would deadlock: it throws instead. A catalog nobody has refreshed (the
+     * benchmark and tests that supply their own launcher skip detection) or a closed one returns false at once,
+     * because nothing would complete it; so does an interrupted wait.
+     */
+    public boolean awaitDetection(Duration timeout) {
+        if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Waiting for shell detection would block the EDT");
+        if (!detecting && !firstDetection.isDone()) return false;
+        try {
+            return firstDetection.get(Math.max(0, timeout.toNanos()), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException slow) {
+            return false;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (ExecutionException impossible) {
+            return false;
+        }
     }
 
     /** Runs {@code listener} on the EDT after each detection that changed the profiles. */
@@ -114,6 +145,7 @@ public final class ShellProfileCatalog implements AutoCloseable {
     @Override public void close() {
         requireEdt();
         closed = true;
+        firstDetection.complete(false);
         listeners.clear();
     }
 

@@ -13,6 +13,7 @@ import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.launch.ShellProfileCatalog;
 import dev.jasper.app.launch.ShellProfiles;
 import dev.jasper.app.lifecycle.Subscription;
@@ -45,6 +46,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 import dev.jasper.app.contributions.MenuEntry;
@@ -82,6 +84,11 @@ public final class JasperApplication {
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
     private final ShellProfileCatalog shellProfiles;
+    /**
+     * How long a launch of a WSL or PowerShell 7 profile, resolved before the first detection completed, waits for it
+     * off the EDT: both of detection's process calls may take their full timeout.
+     */
+    static final Duration DETECTION_WAIT = Duration.ofSeconds(12);
     private final ApplicationShutdown shutdown;
     private final Path shellIntegrationDir;
     private final BuddyIntegration buddy;
@@ -173,8 +180,14 @@ public final class JasperApplication {
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog);
-        shellProfiles = ShellProfileCatalog.system(() -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell());
-        shellProfiles.refresh();
+        Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
+        shellProfiles = ShellProfileCatalog.system(savedShell);
+        // A supplied launcher (the benchmark, tests) never starts a detected profile, so reg.exe and wsl.exe stay
+        // unrun; nothing waits on that catalog, because awaitDetection returns at once when nobody refreshed it.
+        if (suppliedLauncher == null) {
+            warnWhenDetected(shellProfiles, savedShell, this::shellProfileProblem);
+            shellProfiles.refresh();
+        }
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
@@ -196,7 +209,7 @@ public final class JasperApplication {
         // Registered whether or not residency is on, because a window that is merely minimized
         // should come back the same way.
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
-            reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise(Path.of(System.getProperty("user.home"))));
+            reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise());
             Desktop.getDesktop().addAppEventListener(reopenListener);
         }
         if (supports(Desktop.Action.APP_PREFERENCES)) {
@@ -227,9 +240,15 @@ public final class JasperApplication {
         return timer::stop;
     }
 
-    public TerminalWindow newWindow(Path directory) {
+    /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
+    public TerminalWindow newWindow() { return openWindow(null, false); }
+
+    /** A window whose tab starts in {@code directory}; null opens a detached window with no tab. */
+    public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null); }
+
+    private TerminalWindow openWindow(Path directory, boolean detached) {
         contributions.content().setFactory(separate -> {
-            var created = newWindow(separate ? null : Path.of(System.getProperty("user.home")));
+            var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
         });
@@ -237,11 +256,13 @@ public final class JasperApplication {
         boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
-            (path, settings) -> track(startSession(path, settings)), shellIntegrationDir, shellProfiles::resolve, this::shellProfileProblem);
-        TerminalWindow window = new TerminalWindow(new WindowCallbacks(this::newWindow, this::quit,
+            (path, settings) -> track(startSession(path, settings)), shellIntegrationDir, shellProfiles::resolve,
+            () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem);
+        TerminalWindow window = new TerminalWindow(new WindowCallbacks(
+            requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quit,
             this::windowActivated, this::windowClosed,
             state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-            launcher, directory, themes, configuration == null ? null : configuration.snapshot(), history);
+            launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
         if (configuration != null) configuration.register(window.content());
         window.content().connectContributions(contributions, uiState);
         window.content().connectTerminals(terminals, window::toFront);
@@ -292,8 +313,7 @@ public final class JasperApplication {
 
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
-            removeIndicator = residentIndicator.apply(
-                () -> openOrRaise(Path.of(System.getProperty("user.home"))), this::quit);
+            removeIndicator = residentIndicator.apply(this::openOrRaise, this::quit);
         } else if (!show && removeIndicator != null) {
             Runnable remove = removeIndicator;
             removeIndicator = null;
@@ -328,7 +348,17 @@ public final class JasperApplication {
         if (configuration != null) loginItems.accept(configuration.snapshot().backgroundEnabled());
     }
 
-    /** The handoff and the macOS reopen event share this: raise what is open, or open the first window. */
+    /**
+     * The handoff, the macOS reopen event and the resident indicator share this: raise what is open, or open the
+     * first window where a new shell starts.
+     */
+    public void openOrRaise() {
+        if (quitting || stopped) return;
+        if (windows.isEmpty()) newWindow();
+        else raiseTerminal();
+    }
+
+    /** As {@link #openOrRaise()}, opening the first window in {@code directory}. */
     public void openOrRaise(Path directory) {
         if (quitting || stopped) return;
         if (windows.isEmpty()) newWindow(directory);
@@ -367,7 +397,7 @@ public final class JasperApplication {
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
-            () -> newWindow(Path.of(System.getProperty("user.home"))), this::quit);
+            () -> newWindow(), this::quit);
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
@@ -385,7 +415,7 @@ public final class JasperApplication {
             List.of("configuration", "settings", "upgrade", "old keys", "config.toml"), Optional.empty(), invocation -> migrateConfiguration());
         updateMigrateAction();
         contributions.content().setFactory(separate -> {
-            var created = newWindow(separate ? null : Path.of(System.getProperty("user.home")));
+            var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
         });
@@ -512,26 +542,61 @@ public final class JasperApplication {
         Map<String, String> environment = System.getenv();
         return windowLauncher(executor, snapshots, start, integrationDir, (requested, shell) -> ShellProfiles.resolve(requested,
                 ShellProfiles.available(os, environment, List.of(), Optional.empty(), shell), true, os, environment, shell),
-            message -> LOG.log(System.Logger.Level.WARNING, message));
+            () -> false, message -> LOG.log(System.Logger.Level.WARNING, message));
     }
 
     /**
      * Each request's profile is resolved on the EDT by {@code profiles}, from the requested id (empty: the configured
-     * default) and the saved shell settings; {@code problems} hears why a profile was replaced.
+     * default) and the saved shell settings; {@code problems} hears, on the EDT, why a profile was replaced.
+     *
+     * <p>Until detection completes, {@code profiles} trusts a WSL or PowerShell 7 id it cannot check yet. Such a
+     * launch waits on the launch executor, off the EDT, for {@code awaitDetection} (bounded; true once detection has
+     * completed) and then resolves again on the EDT, so a profile that turned out to be missing starts the platform
+     * default with a warning instead of failing the pane. When {@code awaitDetection} gives false (it timed out, or
+     * nothing detects) the trusted profile starts as resolved. {@link ShellLauncher#sessionDefaults} reports nothing:
+     * a provided session does not start the local profile.
      */
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
                                         BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
-                                        Consumer<String> problems) {
+                                        BooleanSupplier awaitDetection, Consumer<String> problems) {
         ConfigSnapshot initial = snapshots.get();
         String os = System.getProperty("os.name");
         Map<String, String> environment = System.getenv();
-        return new ShellLauncher(executor, (Optional<String> requested) -> {
+        Function<Optional<String>, LaunchSettings> settings = requested -> {
             ConfigSnapshot snapshot = snapshots.get();
             ShellProfiles.Resolution resolution = profiles.apply(requested, snapshot.terminal().shell());
             resolution.warning().ifPresent(problems);
             return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir);
+        };
+        BiFunction<Optional<String>, LaunchSettings, LaunchSettings> confirm = (requested, captured) -> {
+            ShellProfile profile = captured.profile();
+            boolean checkable = profile.kind() == ShellProfile.Kind.WSL || profile.id().equals(ShellProfiles.PWSH);
+            if (!checkable || SwingUtilities.isEventDispatchThread() || !awaitDetection.getAsBoolean()) return captured;
+            var confirmed = new java.util.concurrent.atomic.AtomicReference<LaunchSettings>();
+            try {
+                SwingUtilities.invokeAndWait(() -> confirmed.set(settings.apply(requested)));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return captured;
+            } catch (java.lang.reflect.InvocationTargetException failure) {
+                throw new IllegalStateException("The shell profile could not be resolved", failure.getCause());
+            }
+            return confirmed.get().profile().equals(profile) ? captured : confirmed.get();
+        };
+        return new ShellLauncher(executor, settings, confirm, () -> {
+            ConfigSnapshot snapshot = snapshots.get();
+            return new ShellLauncher.SessionDefaults(initial.columns(), initial.lines(), snapshot.terminal().scrollback());
         }, start);
+    }
+
+    /**
+     * After each detection that changed the profiles (the first always does), tells {@code problems} when the
+     * configured profile is missing, so a first window that started before detection completed still shows why its
+     * shell is not the configured one. EDT.
+     */
+    static Subscription warnWhenDetected(ShellProfileCatalog catalog, Supplier<TerminalConfig.Shell> shell, Consumer<String> problems) {
+        return catalog.onChanged(() -> catalog.resolve(Optional.empty(), shell.get()).warning().ifPresent(problems));
     }
 
     /** A shell profile that could not start: shown with the configuration problems until the next reload. */

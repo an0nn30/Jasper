@@ -26,8 +26,14 @@
   `WslDistributions.detect` asks `wsl.exe -l -v` only when `reg.exe` gives no answer (exit 1, a missing Lxss key,
   means "no WSL"), PowerShell 7 detection uses `NOFOLLOW_LINKS` and also finds the Store alias under
   `%LOCALAPPDATA%\Microsoft\WindowsApps`, the `SessionLaunchOptions` javadoc says the path mapper compares by
-  identity, and non-ASCII literals are Java escapes. Plan B (Remote panel WSL group, SDK 0.8.6) not started. Not
-  merged.
+  identity, and non-ASCII literals are Java escapes. Second review round after Task 11: a WSL/`pwsh` profile
+  trusted before startup detection completes waits for it off the EDT (at most 12 s) and falls back to the platform
+  default with a warning if missing, and detection completing reports a missing configured profile; only a pane
+  nobody asked a directory for gets `--cd ~` (`Optional<Path>` through `ShellLauncher.launch`/`LaunchSettings.at`,
+  `JasperApplication.newWindow()`), so a split of a WSL pane in `/mnt/c/Users/NAME` stays there;
+  `sessionDefaults` reports no profile warning for SSH panes; the Settings dropdown keeps one "(not detected)"
+  entry and ignores re-picking the shown entry; a supplied launcher skips detection; `WslDistributionsTest` runs
+  `java.home`'s java. Plan B (Remote panel WSL group, SDK 0.8.6) not started. Not merged.
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
   Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from

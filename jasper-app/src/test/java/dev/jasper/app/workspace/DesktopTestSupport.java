@@ -56,6 +56,13 @@ public final class DesktopTestSupport {
         OWNERS.add(owner);
         return owner;
     }
+    /** A window like a new one from the application: its tab starts where a new shell starts, not in a named directory. */
+    public static WindowContent content(ShellLauncher launcher, java.util.function.Consumer<Path> newWindow) {
+        WindowContent owner = new WindowContent(launcher, null, false, newWindow, () -> {}, () -> {}, new ThemeController(),
+            KeyBindings.defaults(false), new CommandHistory(), false);
+        OWNERS.add(owner);
+        return owner;
+    }
     public static WindowContent content(ShellLauncher launcher, ThemeController themes) {
         WindowContent owner = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, themes);
         OWNERS.add(owner);

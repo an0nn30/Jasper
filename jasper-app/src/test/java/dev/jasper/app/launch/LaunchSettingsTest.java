@@ -82,24 +82,32 @@ class LaunchSettingsTest {
         Path home = Path.of("home-directory");
         var wsl = new LaunchSettings(List.of("wsl.exe", "-d", "Ubuntu"), Map.of(), 80, 24, 0, wsl());
         java.util.function.Predicate<Path> untouchable = path -> { throw new AssertionError("the share is never touched: " + path); };
-        var linux = wsl.at(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me"), home, untouchable);
+        var linux = wsl.at(Optional.of(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me")), home, untouchable);
         assertThat(linux.directory()).isEqualTo(home);
         assertThat(linux.settings().command()).containsExactly("wsl.exe", "-d", "Ubuntu", "--cd", "/home/me");
-        var windows = wsl.at(Path.of("C:\\Users\\me"), home, path -> true);
+        var windows = wsl.at(Optional.of(Path.of("C:\\Users\\me")), home, path -> true);
         assertThat(windows.settings().command()).containsExactly("wsl.exe", "-d", "Ubuntu", "--cd", Path.of("C:\\Users\\me").toString());
-        assertThat(wsl.at(Path.of("C:\\gone"), home, path -> false).settings().command()).endsWith("--cd", "~");
-        assertThat(wsl.at(home, home, path -> true).settings().command()).as("the Windows home is the Linux home, not /mnt/c/Users/...")
+        assertThat(wsl.at(Optional.of(Path.of("C:\\gone")), home, path -> false).settings().command()).endsWith("--cd", "~");
+        var unspecified = wsl.at(Optional.empty(), home, untouchable);
+        assertThat(unspecified.directory()).isEqualTo(home);
+        assertThat(unspecified.settings().command()).as("no directory asked for: the Linux home, not /mnt/c/Users/...")
             .endsWith("--cd", "~");
-        assertThat(wsl.at(Path.of("\\\\wsl$\\Debian\\srv"), home, untouchable).settings().command()).as("another distribution's share")
+        assertThat(wsl.at(Optional.of(home), home, path -> true).settings().command())
+            .as("a pane that reported the Windows home (a split of one in /mnt/c/Users/NAME) stays there")
+            .endsWith("--cd", home.toString());
+        assertThat(wsl.at(Optional.of(Path.of("\\\\wsl$\\Debian\\srv")), home, untouchable).settings().command()).as("another distribution's share")
             .endsWith("--cd", "~");
         assertThat(wsl.command()).as("the captured settings are unchanged").containsExactly("wsl.exe", "-d", "Ubuntu");
         var local = new LaunchSettings(List.of("powershell.exe", "-NoLogo"), Map.of(), 80, 24, 0, powershell());
-        var fromShare = local.at(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me"), home, untouchable);
+        var fromShare = local.at(Optional.of(Path.of("\\\\wsl.localhost\\Ubuntu\\home\\me")), home, untouchable);
         assertThat(fromShare.directory()).isEqualTo(home);
         assertThat(fromShare.settings()).isSameAs(local);
-        assertThat(local.at(Path.of("C:\\Users\\me"), home, path -> true).directory()).isEqualTo(Path.of("C:\\Users\\me"));
-        assertThatIllegalArgumentException().isThrownBy(() -> local.at(Path.of("missing"), home, path -> false))
+        assertThat(local.at(Optional.of(Path.of("C:\\Users\\me")), home, path -> true).directory()).isEqualTo(Path.of("C:\\Users\\me"));
+        assertThatIllegalArgumentException().isThrownBy(() -> local.at(Optional.of(Path.of("missing")), home, path -> false))
             .withMessageContaining("Directory is unavailable");
+        var localHome = local.at(Optional.empty(), home, path -> path.equals(home));
+        assertThat(localHome.directory()).isEqualTo(home);
+        assertThat(localHome.settings()).isSameAs(local);
     }
 
     @Test void termProgramIsAlwaysJasperAndOnlyAutoInjects() {

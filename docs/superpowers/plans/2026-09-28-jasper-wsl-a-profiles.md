@@ -27,6 +27,23 @@ Deviations so far:
   2026-09-27 failure list with the re-verified 2026-09-28 one instead of only appending, and its checklist adds the
   Linux-home and refresh checks. The configuration text describes the review fixes (the `--cd ~` home rule, the
   `7-preview` and Store-alias PowerShell 7 locations, case-insensitive `wsl:` ids, the registry-first fallback).
+- Second review round after Task 11: (1) the startup race: a WSL or `pwsh` profile trusted before the first
+  detection completes now waits for it on the launch executor, off the EDT (`ShellProfileCatalog.awaitDetection`,
+  bounded by `JasperApplication.DETECTION_WAIT`, 12 s), and resolves again on the EDT, so a missing one starts the
+  platform default with the warning (`ShellLauncher` gained a confirmation step and a `replaced` callback that
+  updates the pane's label and profile); `JasperApplication.warnWhenDetected` reports a missing configured profile
+  when detection completes. (2) "No directory asked for" is explicit: `LaunchSettings.at` and
+  `ShellLauncher.launch` take `Optional<Path>`, panes remember whether their directory was asked for
+  (`TerminalPane.inheritableDirectory`), `WindowContent.directory()` returns null for "where a new shell starts",
+  and `JasperApplication.newWindow()`/`openOrRaise()` open such a window (`newWindow(null)` stays a detached one;
+  `ApplicationBootstrap.handoffHandler` lost its unused home argument); only the unspecified directory becomes
+  `--cd ~`, so a split of a WSL pane in `/mnt/c/Users/NAME` stays there. (3) `ShellLauncher.sessionDefaults` no
+  longer resolves the profile, so a provided (SSH) session reports no profile warning. (4) The Settings Profile
+  dropdown keeps at most one "(not detected)" entry (no "(detecting...)" label: `ShellChoices` does not know
+  whether detection completed). (5) Picking the entry already shown is not an edit, so an empty profile is not
+  turned into an explicit `powershell`. (6) An application with a supplied launcher (benchmark, tests) skips
+  detection; `awaitDetection` returns false at once for a catalog nobody refreshed, and the trusted profile starts.
+  (7) `WslDistributionsTest` runs `java.home`'s `java`/`java.exe` instead of `ProcessHandle`'s command.
 
 **Goal:** On Windows, sessions run on ConPTY, Jasper detects PowerShell, PowerShell 7, Command Prompt and every
 installed WSL 1 and WSL 2 distribution as shell profiles, `terminal.shell.profile` (and a Settings dropdown) makes

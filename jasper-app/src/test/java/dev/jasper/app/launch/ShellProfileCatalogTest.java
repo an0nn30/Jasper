@@ -3,7 +3,10 @@ package dev.jasper.app.launch;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.TerminalConfig;
+import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,6 +80,26 @@ class ShellProfileCatalogTest {
             catalog.get().refresh();
         });
         assertThat(background).as("a closed catalog detects nothing").isEmpty();
+    }
+
+    @Test void awaitingTheFirstDetectionIsBoundedOffTheEdtAndNeverWaitsForNothing() throws Exception {
+        var catalog = new AtomicReference<ShellProfileCatalog>();
+        edt(() -> catalog.set(catalog("Windows 11")));
+        long started = System.nanoTime();
+        assertThat(catalog.get().awaitDetection(Duration.ofSeconds(20))).as("nobody refreshed, so nothing will complete").isFalse();
+        edt(() -> catalog.get().refresh());
+        assertThat(catalog.get().awaitDetection(Duration.ofMillis(50))).as("still detecting: the wait times out").isFalse();
+        var waiting = CompletableFuture.supplyAsync(() -> catalog.get().awaitDetection(Duration.ofSeconds(20)));
+        detect();
+        assertThat(waiting.get(20, TimeUnit.SECONDS)).isTrue();
+        assertThat(catalog.get().awaitDetection(Duration.ZERO)).as("completed stays completed").isTrue();
+        edt(() -> assertThatIllegalStateException().as("the EDT publishes detection, so it must never wait for it")
+            .isThrownBy(() -> catalog.get().awaitDetection(Duration.ZERO)));
+        var closed = new AtomicReference<ShellProfileCatalog>();
+        edt(() -> { closed.set(catalog("Windows 11")); closed.get().refresh(); closed.get().close(); });
+        background.clear();
+        assertThat(closed.get().awaitDetection(Duration.ofSeconds(20))).as("a closed catalog completes nothing").isFalse();
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(10));
     }
 
     @Test void aFailedDetectionCountsAsNoneAndEverythingIsEdtOnly() throws Exception {

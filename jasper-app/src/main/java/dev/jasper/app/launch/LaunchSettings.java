@@ -129,20 +129,22 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
     }
 
     /**
-     * The start for {@code directory}. A WSL profile starts its PTY in {@code home} and passes the directory to
-     * {@code wsl.exe --cd}: the Linux path for its own distribution's share, a Windows directory other than
-     * {@code home} that exists as it is, and {@code ~} otherwise. Any other profile asked to start on a WSL share starts in {@code home}, because
-     * PowerShell and cmd misbehave in UNC directories and touching the share can start the WSL 2 VM; otherwise the
-     * directory must exist. {@code isDirectory} touches the file system: call this off the EDT.
+     * The start for {@code requested}; empty means nobody asked for a directory (a new window or tab), so the shell
+     * starts where a new shell starts: {@code home}, which a WSL profile reads as its Linux home ({@code --cd ~})
+     * rather than {@code /mnt/c/Users/NAME}. A WSL profile starts its PTY in {@code home} and passes a requested
+     * directory to {@code wsl.exe --cd}: the Linux path for its own distribution's share, a Windows directory that
+     * exists as it is (the Windows home included), and {@code ~} otherwise. Any other profile asked to start on a WSL
+     * share starts in {@code home}, because PowerShell and cmd misbehave in UNC directories and touching the share can
+     * start the WSL 2 VM; otherwise the directory must exist. {@code isDirectory} touches the file system: call this
+     * off the EDT.
      */
-    public Start at(Path directory, Path home, Predicate<Path> isDirectory) {
+    public Start at(Optional<Path> requested, Path home, Predicate<Path> isDirectory) {
+        Path directory = requested.orElse(home);
         boolean onShare = WslPaths.distroOf(directory).isPresent();
         Optional<String> distro = profile.distro();
         if (distro.isPresent()) {
-            // The Windows home stands for "wherever a new shell starts" (every new window and tab asks for it), so
-            // it becomes the Linux home rather than /mnt/c/Users/NAME.
-            String cd = WslPaths.toLinux(distro.get(), directory)
-                .orElseGet(() -> !onShare && !directory.equals(home) && isDirectory.test(directory) ? directory.toString() : "~");
+            String cd = requested.isEmpty() ? "~" : WslPaths.toLinux(distro.get(), directory)
+                .orElseGet(() -> !onShare && isDirectory.test(directory) ? directory.toString() : "~");
             var started = new ArrayList<>(command);
             started.add("--cd");
             started.add(cd);

@@ -34,11 +34,21 @@ public final class TerminalWindow implements AutoCloseable {
         @Override public void windowDeiconified(WindowEvent event) { reportState(); }
     };
 
+    /** A window with one tab in {@code directory}, or a detached one with no tab when it is null. */
     public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, ThemeController themes,
                    ConfigSnapshot initial, CommandHistory history) {
+        this(callbacks, launcher, directory, directory == null, themes, initial, history);
+    }
+
+    /**
+     * A {@code detached} window has no tab; any other starts one tab in {@code directory}, where null means where a
+     * new shell starts (the user's home, which a WSL profile reads as its Linux home).
+     */
+    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
+                   ThemeController themes, ConfigSnapshot initial, CommandHistory history) {
         this.callbacks = callbacks;
         frame.setIconImages(ApplicationIcon.images());
-        content = new WindowContent(launcher, directory, callbacks.newWindow(), callbacks.quit(), this::close, themes,
+        content = new WindowContent(launcher, directory, detached, callbacks.newWindow(), callbacks.quit(), this::close, themes,
             KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS);
         if (initial != null) {
             if (content.currentPane() != null) content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));

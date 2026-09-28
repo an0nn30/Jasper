@@ -35,7 +35,10 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
 
     TerminalTab(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) { this(directory, launcher, requestOrNull, Optional.empty()); }
 
-    /** {@code profile} names the first pane's shell profile when it is a local shell; empty means the user's default. */
+    /**
+     * {@code profile} names the first pane's shell profile when it is a local shell; empty means the user's default.
+     * A null {@code directory} means nobody asked for one: the pane starts where a new shell starts.
+     */
     TerminalTab(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile) {
         super(new BorderLayout());
         this.launcher = launcher;
@@ -99,7 +102,7 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull, SessionRequest requestOrNull, Optional<String> profile) {
         if (closed || target == null || panes.get(target.id()) != target || !target.running()) return null;
         if (focusedPane() != target) focus(target);
-        TerminalPane pane = createPane(directoryOrNull == null ? target.directory() : directoryOrNull, requestOrNull, profile);
+        TerminalPane pane = createPane(directoryOrNull == null ? target.inheritableDirectory() : directoryOrNull, requestOrNull, profile);
         tree.split(pane.id(), axis); render(); onChanged.run(); pane.start();
         return pane;
     }

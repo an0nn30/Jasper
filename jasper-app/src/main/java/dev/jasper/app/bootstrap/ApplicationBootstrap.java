@@ -83,11 +83,11 @@ public final class ApplicationBootstrap {
                     if (!residentRole(options, resident)) return null;
                     Path source = HandoffSocket.codeSource();
                     var bound = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
-                        handoffHandler(application, source, HandoffSocket.lastModified(source), home));
+                        handoffHandler(application, source, HandoffSocket.lastModified(source)));
                     endpoint.set(bound);
                     return bound;
                 }, application -> {
-                    if (!options.background()) { application.newWindow(home); return; }
+                    if (!options.background()) { application.newWindow(); return; }
                     if (!application.resident()) {
                         LOG.log(System.Logger.Level.WARNING, standalone
                             ? "Started with --background, but a --config, --safe-mode, --plugin-dir or --standalone launch is always standalone and cannot be resident; exiting"
@@ -269,7 +269,7 @@ public final class ApplicationBootstrap {
      * request runs the normal quit path; the endpoint is released by the application's shutdown, not here.
      */
     static java.util.function.Function<LaunchRequest, LaunchRequest.Response> handoffHandler(
-            JasperApplication application, Path source, long modified, Path home) {
+            JasperApplication application, Path source, long modified) {
         return request -> {
             // Before the staleness check: a recovery launch may well come from another build.
             if (request.kind() == LaunchRequest.Kind.RETIRE) {
@@ -280,7 +280,7 @@ public final class ApplicationBootstrap {
                 SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;
             }
-            SwingUtilities.invokeLater(() -> application.openOrRaise(home));
+            SwingUtilities.invokeLater(application::openOrRaise);
             return LaunchRequest.Response.OK;
         };
     }
