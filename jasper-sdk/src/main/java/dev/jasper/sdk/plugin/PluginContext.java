@@ -4,6 +4,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.services.Services;
+import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.Menus;
@@ -53,6 +54,13 @@ public interface PluginContext {
      * @return the read-only view
      */
     PluginConfig config();
+
+    /**
+     * The plugin's declared settings.
+     *
+     * @return this plugin's settings
+     */
+    PluginSettings settings();
 
     /**
      * A plugin-scoped executor for slow work. It stops admitting tasks at shutdown; tasks already

@@ -15,6 +15,17 @@
   - `./gradlew check`: 4,068 tests, 0 failed, 0 errors, 5 skipped.
   - Not done: GUI checks 51–60 of the [checklist](editor-verification.md) (user-run); plans V2b, V3 and V4; merge;
     push.
+- **Plugin settings C1** (`claude/plugin-settings`, 2026-09-28; spec
+  `docs/superpowers/specs/2026-09-28-jasper-plugin-settings-design.md`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c1.md`): SDK `dev.jasper.sdk.settings` (declarations,
+  kinds, typed handles) and `PluginContext.settings()`; the application reads each plugin's declared settings with its
+  own schema (`SchemaReader`, moved out of `ConfigLoader`), reports bad values and unknown keys against the file,
+  runs listeners on the UI thread and saves through a comment-preserving atomic write; the testkit fake and the
+  contract suite cover the same behaviour. `PluginConfig` stays until C3; Settings pages come in C2.
+  `./gradlew check`: 3,450 tests, 0 failures, 0 errors, 5 skipped. Executed inline with checkpoints after Tasks 3 and 5. Deviations: see the plan's status banner.
+  Merged into local `main` on 2026-09-28 after merging main (Linux packages, Vim V1c) into the branch; `./gradlew check`
+  on the merged tree: 3,648 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+
 - **Editor Vim mode, plan V1c** (branch `claude/vim-v1c`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`, written 2026-09-28): the view — scrolling
   (`<C-e> <C-y> <C-d> <C-u> <C-f> <C-b>`, page keys, `zt z<CR> zz z. zb z- z+ z^`), `H M L`, the screen-line motions
@@ -37,6 +48,7 @@
   - `./gradlew check`: 3,599 tests, 0 failed, 0 errors, 5 skipped.
   - Merged into local `main` on 2026-09-28 after merging main (settings dialog B2) into the branch; not pushed.
   - Not done: GUI checks 41–50 of the [checklist](editor-verification.md) (user-run); plans V2, V3 and V4; push.
+
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
   Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from

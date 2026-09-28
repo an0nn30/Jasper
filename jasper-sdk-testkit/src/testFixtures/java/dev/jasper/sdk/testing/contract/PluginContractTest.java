@@ -67,6 +67,13 @@ import dev.jasper.sdk.palette.PaletteStep;
 import dev.jasper.sdk.palette.PaletteVerb;
 import dev.jasper.sdk.palette.ScopeSpec;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import dev.jasper.sdk.settings.SettingSpec;
+import dev.jasper.sdk.settings.SettingKind;
+import dev.jasper.sdk.settings.Setting;
+import dev.jasper.sdk.settings.PluginSettings;
 
 import static dev.jasper.sdk.activity.ActivityEvent.State.FAILED;
 import static dev.jasper.sdk.activity.ActivityEvent.State.PROGRESS;
@@ -1096,5 +1103,87 @@ public abstract class PluginContractTest {
                 assertThatIllegalArgumentException().isThrownBy(() -> windows.dialog(new DialogSpec("Closed", tab, true)));
             });
         }
+    }
+
+    @Test void declaredSettingsReadTheirFileAndABadValueFallsBackWithOneReport() {
+        h.setSetting("test.settings", "font_size", 99L);
+        h.setSetting("test.settings", "tab_size", 6L);
+        var size = new AtomicReference<Setting<Integer>>();
+        var tab = new AtomicReference<Setting<Integer>>();
+        h.start(info("test.settings"), Set.of(), Set.of(), context -> {
+            size.set(context.settings().declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")));
+            tab.set(context.settings().declare(SettingSpec.of("tab_size", SettingKind.integer(1, 16), 4).label("Tab size")));
+        });
+        assertThat(h.active("test.settings")).isTrue();
+        assertThat(size.get().get()).isEqualTo(13);
+        assertThat(tab.get().get()).isEqualTo(6);
+        assertThat(h.settingsReports("test.settings")).singleElement().asString().startsWith("font_size: ");
+    }
+
+    @Test void settingsAreDeclaredOnlyWhileStartingWithUniqueLabelledKeys() {
+        var settings = new AtomicReference<PluginSettings>();
+        h.start(info("test.declare"), Set.of(), Set.of(), context -> {
+            settings.set(context.settings());
+            context.settings().declare(SettingSpec.of("a", SettingKind.bool(), false).label("A"));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.settings().declare(SettingSpec.of("a", SettingKind.bool(), true).label("Again")));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.settings().declare(SettingSpec.of("a.b", SettingKind.bool(), true).label("Inside")));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.settings().declare(SettingSpec.of("b", SettingKind.bool(), true)));
+        });
+        assertThat(h.active("test.declare")).isTrue();
+        h.ui(() -> assertThatIllegalStateException()
+            .isThrownBy(() -> settings.get().declare(SettingSpec.of("late", SettingKind.bool(), false).label("Late"))));
+    }
+
+    @Test void setSavesTheValueAndItsListenersHearIt() throws Exception {
+        var vim = new AtomicReference<Setting<Boolean>>();
+        var size = new AtomicReference<Setting<Integer>>();
+        var seen = new CopyOnWriteArrayList<Boolean>();
+        var any = new AtomicInteger();
+        h.start(info("test.save"), Set.of(), Set.of(), context -> {
+            vim.set(context.settings().declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode")));
+            size.set(context.settings().declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")));
+            vim.get().onChanged(seen::add);
+            context.settings().onChanged(any::incrementAndGet);
+        });
+        var saved = new AtomicReference<CompletableFuture<Void>>();
+        h.ui(() -> saved.set(vim.get().set(true)));
+        saved.get().get(5, TimeUnit.SECONDS);
+        h.flush();
+        assertThat(vim.get().get()).isTrue();
+        assertThat(seen).containsExactly(true);
+        assertThat(any.get()).isEqualTo(1);
+        assertThat(h.savedSetting("test.save", "vim")).contains(true);
+        var refused = new AtomicReference<CompletableFuture<Void>>();
+        h.ui(() -> refused.set(size.get().set(99)));
+        assertThatThrownBy(() -> refused.get().get(5, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(IllegalArgumentException.class);
+        assertThat(h.savedSetting("test.save", "font_size")).isEmpty();
+    }
+
+    @Test void editsToTheFileReachListenersAndUnknownKeysAreReported() {
+        var vim = new AtomicReference<Setting<Boolean>>();
+        var seen = new CopyOnWriteArrayList<Boolean>();
+        h.start(info("test.edit"), Set.of(), Set.of(), context -> {
+            vim.set(context.settings().declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode")));
+            vim.get().onChanged(seen::add);
+        });
+        h.setSetting("test.edit", "vim", true);
+        h.flush();
+        assertThat(seen).containsExactly(true);
+        h.setSetting("test.edit", "mystery", 1L);
+        h.flush();
+        assertThat(seen).containsExactly(true);
+        assertThat(h.settingsReports("test.edit")).anySatisfy(line -> assertThat(line).startsWith("mystery: "));
+    }
+
+    @Test void aValueOfTheWrongTypeKeepsTheLastGoodValue() {
+        var vim = new AtomicReference<Setting<Boolean>>();
+        h.start(info("test.wrong"), Set.of(), Set.of(), context ->
+            vim.set(context.settings().declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"))));
+        h.setSetting("test.wrong", "vim", true);
+        h.setSetting("test.wrong", "vim", "yes");
+        h.flush();
+        assertThat(vim.get().get()).isTrue();
+        assertThat(h.settingsReports("test.wrong")).anySatisfy(line -> assertThat(line).startsWith("vim: "));
     }
 }

@@ -3,19 +3,14 @@ package dev.jasper.app.config;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.settings.LegacyKey;
 import dev.jasper.app.settings.Reading;
-import dev.jasper.app.settings.Setting;
+import dev.jasper.app.settings.SchemaReader;
 import dev.jasper.app.settings.SettingValues;
-import dev.jasper.app.settings.SettingsSchema;
-import org.tomlj.Toml;
 import org.tomlj.TomlArray;
-import org.tomlj.TomlParseResult;
-import org.tomlj.TomlPosition;
 import org.tomlj.TomlTable;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,23 +53,16 @@ public final class ConfigLoader {
     private static final List<String> VERSION_KEY = List.of("version");
     private static final java.util.regex.Pattern PLUGIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
 
-    private record AliasHit(Setting<?> setting, List<String> path, Object value) { }
-
-    private final SettingsSchema schema = CoreSettings.SCHEMA;
     private final Path file;
-    private final TomlParseResult toml;
+    private final SchemaReader reader;
     private final boolean macOs;
-    private final List<ConfigDiagnostic> diagnostics = new ArrayList<>();
-    private final SettingValues.Builder values = SettingValues.builder(CoreSettings.SCHEMA);
-    private final List<AliasHit> aliasHits = new ArrayList<>();
     private final List<List<String>> deadTables = new ArrayList<>();
-    private boolean rejected;
     private Map<String, String> keybindings = Map.of();
     private Map<String, Map<String, Object>> plugins = Map.of();
 
     private ConfigLoader(Path file, String text, boolean macOs) {
         this.file = Objects.requireNonNull(file, "file");
-        this.toml = Toml.parse(text);
+        this.reader = new SchemaReader(CoreSettings.SCHEMA, text);
         this.macOs = macOs;
     }
 
@@ -83,63 +71,28 @@ public final class ConfigLoader {
     }
 
     private Result parse() {
-        if (toml.hasErrors()) {
-            toml.errors().forEach(error -> diagnostics.add(new ConfigDiagnostic(
-                ConfigDiagnostic.Severity.ERROR, file, error.position().line(), error.position().column(), "",
-                "Invalid TOML syntax or duplicate definition; check this location.")));
-            return new Result(ConfigSnapshot.defaults(), diagnostics, true, SettingValues.defaults(schema), List.of(), List.of());
-        }
-        readTable(List.of(), toml);
-        List<LegacyKey> legacyKeys = resolveAliases();
-        diagnostics.sort(Comparator.comparingInt(ConfigDiagnostic::line).thenComparingInt(ConfigDiagnostic::column));
-        SettingValues loaded = values.build();
-        return new Result(ConfigSnapshot.from(loaded, keybindings, plugins), diagnostics, rejected, loaded, legacyKeys, deadTables);
+        SchemaReader.Result read = reader.read(this::special);
+        List<ConfigDiagnostic> diagnostics = read.problems().stream().map(this::diagnostic).toList();
+        if (read.syntaxError())
+            return new Result(ConfigSnapshot.defaults(), diagnostics, true, read.values(), List.of(), List.of());
+        return new Result(ConfigSnapshot.from(read.values(), keybindings, plugins), diagnostics, read.rejected(), read.values(),
+            read.legacyKeys(), deadTables);
     }
 
-    private void readTable(List<String> parent, TomlTable table) {
-        for (String key : table.keySet()) {
-            List<String> path = append(parent, key);
-            Object value = table.get(List.of(key));
-            if (path.equals(VERSION_KEY)) { readVersion(path, value); continue; }
-            var current = schema.find(path);
-            if (current.isPresent()) { read(current.get(), path, value); continue; }
-            var aliased = schema.aliasOf(path);
-            if (aliased.isPresent()) { aliasHits.add(new AliasHit(aliased.get(), path, value)); continue; }
-            if (!schema.reserved(path) && !schema.knownTable(path)) { warning(path, "Unknown setting or table; ignored."); continue; }
-            if (!(value instanceof TomlTable nested)) typeError(path, "a table");
-            else if (path.equals(KEYBINDINGS)) readBindings(nested);
-            else if (path.equals(PLUGINS)) readPlugins(nested);
-            else if (path.equals(PALETTE_SCOPES)) readOldScopes(nested);
-            else readTable(path, nested);
-        }
+    /** The version key and the tables other readers own. */
+    private boolean special(List<String> path, Object value) {
+        if (path.equals(VERSION_KEY)) { readVersion(path, value); return true; }
+        if (!path.equals(KEYBINDINGS) && !path.equals(PLUGINS) && !path.equals(PALETTE_SCOPES)) return false;
+        if (!(value instanceof TomlTable table)) { typeError(path, "a table"); return true; }
+        if (path.equals(KEYBINDINGS)) readBindings(table);
+        else if (path.equals(PLUGINS)) readPlugins(table);
+        else readOldScopes(table);
+        return true;
     }
 
-    private <T> void read(Setting<T> setting, List<String> path, Object value) {
-        Reading<T> reading = setting.kind().read(value, setting.defaultValue());
-        for (Reading.Issue issue : reading.issues()) {
-            if (issue.rejectsFile()) rejected = true;
-            var at = new ArrayList<>(path);
-            at.addAll(issue.subPath());
-            diagnostic(issue.severity() == Reading.Severity.WARNING ? ConfigDiagnostic.Severity.WARNING : ConfigDiagnostic.Severity.ERROR,
-                at, issue.message());
-        }
-        values.put(setting, reading.value(), path);
-    }
-
-    /** Old keys are read after the walk, so a current key wins wherever it appears in the file. */
-    private List<LegacyKey> resolveAliases() {
-        aliasHits.sort(Comparator.comparingInt((AliasHit hit) -> line(hit.path())).thenComparingInt(hit -> column(hit.path())));
-        var legacy = new ArrayList<LegacyKey>();
-        for (AliasHit hit : aliasHits) {
-            Setting<?> setting = hit.setting();
-            legacy.add(new LegacyKey(hit.path(), setting.key()));
-            if (values.present(setting)) warning(hit.path(), "Superseded by " + setting.name() + "; ignored.");
-            else {
-                read(setting, hit.path(), hit.value());
-                warning(hit.path(), "Moved to " + setting.name() + ". Use Migrate Config to update the file.");
-            }
-        }
-        return legacy;
+    private ConfigDiagnostic diagnostic(SchemaReader.Problem problem) {
+        return new ConfigDiagnostic(problem.severity() == Reading.Severity.WARNING ? ConfigDiagnostic.Severity.WARNING
+            : ConfigDiagnostic.Severity.ERROR, file, problem.line(), problem.column(), problem.key(), problem.message());
     }
 
     private void readVersion(List<String> path, Object value) {
@@ -264,33 +217,9 @@ public final class ConfigLoader {
         return List.copyOf(path);
     }
 
-    private int line(List<String> path) {
-        TomlPosition position = toml.inputPositionOf(path);
-        return position == null ? 0 : position.line();
-    }
+    private void typeError(List<String> path, String expected) { reader.typeError(path, expected); }
 
-    private int column(List<String> path) {
-        TomlPosition position = toml.inputPositionOf(path);
-        return position == null ? 0 : position.column();
-    }
+    private void warning(List<String> path, String message) { reader.warning(path, message); }
 
-    private void typeError(List<String> path, String expected) {
-        rejected = true;
-        valueError(path, "Expected " + expected + "; configuration was not applied.");
-    }
-
-    private void warning(List<String> path, String message) {
-        diagnostic(ConfigDiagnostic.Severity.WARNING, path, message);
-    }
-
-    private void valueError(List<String> path, String message) {
-        diagnostic(ConfigDiagnostic.Severity.ERROR, path, message);
-    }
-
-    private void diagnostic(ConfigDiagnostic.Severity severity, List<String> path, String message) {
-        TomlPosition position = toml.inputPositionOf(path);
-        diagnostics.add(new ConfigDiagnostic(severity, file,
-            position == null ? 0 : position.line(), position == null ? 0 : position.column(),
-            Toml.joinKeyPath(path), message));
-    }
+    private void valueError(List<String> path, String message) { reader.error(path, message); }
 }
