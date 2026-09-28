@@ -53,7 +53,7 @@ class PluginRuntimeTest {
         var created = new AtomicReference<PluginRuntime>();
         onEdt(() -> created.set(new PluginRuntime(new PluginRuntime.Options(bundled, user, dev, safeMode,
             root.resolve("plugins.toml"), root.resolve("plugins.lock")),
-            new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> reports.add(key + ": " + message),
+            new ActivityNotifier(deck.companion(), () -> { }), new PluginRuntime.SettingsReports(d -> reports.add(d.file().getFileName() + ": " + d.message()), file -> reports.add("clear " + file.getFileName())),
             new dev.jasper.app.contributions.Contributions(),
             AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry())));
         return created.get();
@@ -196,7 +196,7 @@ class PluginRuntimeTest {
             Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
             onEdt(runtime::pollSettingsNow);
             settle();
-            assertThat(reports).singleElement().asString().startsWith("plugins.dev.example.probe: ");
+            assertThat(reports).filteredOn(r -> !r.startsWith("clear ")).singleElement().asString().startsWith("dev.example.probe.toml: ");
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);

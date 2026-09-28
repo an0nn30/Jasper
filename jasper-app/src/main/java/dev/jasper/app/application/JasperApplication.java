@@ -336,7 +336,9 @@ public final class JasperApplication {
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
-            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary, terminals,
+            new PluginRuntime.SettingsReports(
+                diagnostic -> { if (configuration != null) configuration.report(diagnostic); },
+                file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
             this::notice, new dev.jasper.app.platform.ConfigEditor()::open);
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),

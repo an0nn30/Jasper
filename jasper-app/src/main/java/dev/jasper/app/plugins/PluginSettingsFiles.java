@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigLoader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,18 +11,21 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.jar.JarFile;
 import org.tomlj.Toml;
+import org.tomlj.TomlParseError;
 import org.tomlj.TomlParseResult;
+import org.tomlj.TomlPosition;
 
 /**
  * Each plugin's settings file, {@code plugins/<id>/<id>.toml}: seeded once when missing, read into the
- * map {@code PluginSettings} serves, re-read when its size or modification time changes. A file that
- * fails to parse keeps its last good values and is reported under {@code plugins.<id>}.
+ * map {@code PluginSettings} serves, re-read when its size or modification time changes. A file that fails to
+ * parse keeps its last good values and is reported against that file; recovering from that counts as a change.
  */
 final class PluginSettingsFiles {
     static final String TEMPLATE = "settings.toml";
@@ -29,13 +33,24 @@ final class PluginSettingsFiles {
     private static final System.Logger LOG = System.getLogger(PluginSettingsFiles.class.getName());
 
     private record Fingerprint(FileTime modified, long size) { }
-    private static final class Known { Fingerprint fingerprint; Map<String, Object> values = Map.of(); boolean broken; }
+    /** A 1-based line and column in a plugin's settings file. */
+    record Position(int line, int column) { }
+
+    private static final class Known { Fingerprint fingerprint; Map<String, Object> values = Map.of(); TomlParseResult parsed; boolean broken; }
 
     private final Path userDirectory;
-    private final BiConsumer<String, String> report;
+    private final Consumer<ConfigDiagnostic> report;
     private final Map<String, Known> known = new HashMap<>();
 
-    PluginSettingsFiles(Path userDirectory, BiConsumer<String, String> report) { this.userDirectory = userDirectory; this.report = report; }
+    PluginSettingsFiles(Path userDirectory, Consumer<ConfigDiagnostic> report) { this.userDirectory = userDirectory; this.report = report; }
+
+    /** Where {@code path} is in the plugin's file as last read successfully. */
+    synchronized Optional<Position> position(String id, List<String> path) {
+        Known state = known.get(id);
+        if (state == null || state.parsed == null) return Optional.empty();
+        TomlPosition position = state.parsed.inputPositionOf(path);
+        return position == null ? Optional.empty() : Optional.of(new Position(position.line(), position.column()));
+    }
 
     static Path folder(Path userDirectory, String id) { return userDirectory.resolve(id); }
     static Path file(Path userDirectory, String id) { return folder(userDirectory, id).resolve(id + ".toml"); }
@@ -82,7 +97,7 @@ final class PluginSettingsFiles {
         return known.get(id).values;
     }
 
-    /** Re-reads every known file whose fingerprint changed ({@code force}: all of them); the ids whose values changed. */
+    /** Re-reads every known file whose fingerprint changed ({@code force}: all of them); the ids whose values changed or that recovered from a broken file. */
     synchronized Set<String> refresh(boolean force) {
         Set<String> changed = new LinkedHashSet<>();
         for (var entry : known.entrySet()) if (read(entry.getKey(), entry.getValue(), force)) changed.add(entry.getKey());
@@ -100,21 +115,34 @@ final class PluginSettingsFiles {
             try (var input = Files.newInputStream(file)) { bytes = input.readNBytes(MAX_BYTES + 1); }
             if (bytes.length > MAX_BYTES) throw new IOException("larger than 1 MiB");
             TomlParseResult parsed = Toml.parse(new String(bytes, StandardCharsets.UTF_8));
-            if (parsed.hasErrors()) throw new IOException(parsed.errors().getFirst().toString());
+            if (parsed.hasErrors()) {
+                TomlParseError error = parsed.errors().getFirst();
+                broken(state, file, error.position().line(), error.position().column(), error.toString());
+                return false;
+            }
             Map<String, Object> values = ConfigLoader.freeze(parsed);
+            boolean recovered = state.broken;
             state.broken = false;
-            if (values.equals(state.values)) return false;
+            state.parsed = parsed;
+            if (values.equals(state.values) && !recovered) return false;
             state.values = values;
             return true;
         } catch (NoSuchFileException absent) {
             state.fingerprint = null;
-            boolean had = !state.values.isEmpty();
+            state.parsed = null;
+            boolean had = !state.values.isEmpty() || state.broken;
+            state.broken = false;
             state.values = Map.of();
             return had;
         } catch (IOException failure) {
-            if (!state.broken) report.accept("plugins." + id, file.getFileName() + " could not be read: " + failure.getMessage() + "; the last good settings stay in force.");
-            state.broken = true;
+            broken(state, file, 0, 0, failure.getMessage());
             return false;
         }
+    }
+
+    private void broken(Known state, Path file, int line, int column, String why) {
+        if (!state.broken) report.accept(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, file, line, column, "",
+            file.getFileName() + " could not be read: " + why + "; the last good settings stay in force."));
+        state.broken = true;
     }
 }

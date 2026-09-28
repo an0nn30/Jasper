@@ -667,6 +667,19 @@ class ConfigurationControllerTest {
         edt(() -> assertThat(controller.migrationAvailable()).isTrue());
     }
 
+    @Test void pluginReportsSurviveAppReloadsAndClearPerFile() throws Exception {
+        start(""); edt(this::owner);
+        Path a = directory.resolve("plugins/a/a.toml"), b = directory.resolve("plugins/b/b.toml");
+        edt(() -> {
+            controller.report(new dev.jasper.app.config.ConfigDiagnostic(dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING, a, 2, 1, "x", "bad x"));
+            controller.report(new dev.jasper.app.config.ConfigDiagnostic(dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING, b, 0, 0, "", "bad file"));
+        });
+        reload("[window]\ntab_height = 40\n");
+        edt(() -> assertThat(controller.shown().diagnostics()).extracting(d -> d.file()).containsExactly(a, b));
+        edt(() -> controller.clearReports(a));
+        edt(() -> assertThat(controller.shown().diagnostics()).extracting(d -> d.file()).containsExactly(b));
+    }
+
     private static JButton find(java.awt.Component root, String name) {
         if (root instanceof JButton button && name.equals(button.getName())) return button;
         if (root instanceof java.awt.Container container)

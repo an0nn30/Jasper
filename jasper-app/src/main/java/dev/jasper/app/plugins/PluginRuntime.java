@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 import javax.swing.SwingUtilities;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -129,13 +128,24 @@ public final class PluginRuntime {
      */
     public record Outcome(boolean ok, String message, Snapshot snapshot) { }
 
+    /**
+     * Where plugin settings problems go, on the UI thread.
+     *
+     * @param report adds one problem, attributed to the plugin's own settings file
+     * @param clear forgets every problem in one settings file, before its plugin sees the reloaded values
+     */
+    public record SettingsReports(Consumer<dev.jasper.app.config.ConfigDiagnostic> report, Consumer<Path> clear) {
+        /** Drops every report. */
+        public static final SettingsReports IGNORED = new SettingsReports(diagnostic -> { }, file -> { });
+    }
+
     private static final System.Logger LOG = System.getLogger(PluginRuntime.class.getName());
     private static final Duration DRAIN_GRACE = Duration.ofMillis(1500);
     private static final Duration LOCK_WAIT = Duration.ofSeconds(2);
 
     private final Options options;
     private final ActivityNotifier notifier;
-    private final BiConsumer<String, String> configReport;
+    private final SettingsReports reports;
     private final Contributions contributions;
     private final AuxiliaryWindows windows;
     private final TerminalRegistry terminals;
@@ -158,14 +168,14 @@ public final class PluginRuntime {
      *
      * @param options locations and mode
      * @param notifier receives plugin activities for Buddy
-     * @param configReport receives plugin complaints about their settings as key and message
+     * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
      * @param windows builds plugin windows and dialogs
      * @param terminals the application-wide directory of terminal windows, tabs and panes
      */
-    public PluginRuntime(Options options, ActivityNotifier notifier, BiConsumer<String, String> configReport,
+    public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals) {
-        this(options, notifier, configReport, contributions, windows, terminals,
+        this(options, notifier, reports, contributions, windows, terminals,
             message -> LOG.log(System.Logger.Level.WARNING, "Plugin notice: " + message), new dev.jasper.app.platform.ConfigEditor()::open);
     }
 
@@ -174,22 +184,22 @@ public final class PluginRuntime {
      *
      * @param options locations and mode
      * @param notifier receives plugin activities for Buddy
-     * @param configReport receives plugin complaints about their settings as key and message
+     * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
      * @param windows builds plugin windows and dialogs
      * @param terminals the application-wide directory of terminal windows, tabs and panes
      * @param notice shows a plugin's error notice to the user, on the UI thread
      * @param editor opens a file in the user's editor, off the UI thread; may throw
      */
-    public PluginRuntime(Options options, ActivityNotifier notifier, BiConsumer<String, String> configReport,
+    public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals,
                          Consumer<String> notice, Consumer<Path> editor) {
         this.notice = Objects.requireNonNull(notice);
         this.editor = Objects.requireNonNull(editor);
         this.options = Objects.requireNonNull(options);
         this.notifier = Objects.requireNonNull(notifier);
-        this.configReport = Objects.requireNonNull(configReport);
-        this.settingsFiles = new PluginSettingsFiles(options.userDirectory(), configReport);
+        this.reports = Objects.requireNonNull(reports);
+        this.settingsFiles = new PluginSettingsFiles(options.userDirectory(), diagnostic -> onUi(() -> reports.report().accept(diagnostic)));
         this.contributions = Objects.requireNonNull(contributions);
         this.windows = Objects.requireNonNull(windows);
         this.terminals = Objects.requireNonNull(terminals);
@@ -267,13 +277,15 @@ public final class PluginRuntime {
         statuses.addAll(resolution.rejected());
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
-            id -> settingsFiles.current(id), id -> PluginSettingsFiles.file(options.userDirectory(), id), configReport, DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor));
+            id -> settingsFiles.current(id), id -> PluginSettingsFiles.file(options.userDirectory(), id), settingsFiles::position, reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
                 settingsPoller = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
                     Thread.ofPlatform().daemon().name("jasper-plugin-settings").factory());
-                settingsPoller.scheduleWithFixedDelay(() -> { if (!settingsFiles.refresh(false).isEmpty()) SwingUtilities.invokeLater(this::applySettings); },
-                    1, 1, java.util.concurrent.TimeUnit.SECONDS);
+                settingsPoller.scheduleWithFixedDelay(() -> {
+                    Set<String> changed = settingsFiles.refresh(false);
+                    if (!changed.isEmpty()) SwingUtilities.invokeLater(() -> applySettings(changed));
+                }, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
         Map<String, PluginLoader.Loaded> loaded = new LinkedHashMap<>();
         for (PluginCandidate candidate : resolution.load()) {
             PluginLoader.Loaded unit;
@@ -307,8 +319,7 @@ public final class PluginRuntime {
     public void configurationChanged(Map<String, Map<String, Object>> pluginTables) {
         PluginHost current = host;
         if (current == null) return;
-        settingsFiles.refresh(true);
-        current.settingsChanged();
+        applySettings(settingsFiles.refresh(true));
         current.bus.publish(EventBus.APP, AppEvents.CONFIG_RELOADED, new AppEvents.ConfigReloaded());
     }
 
@@ -498,10 +509,23 @@ public final class PluginRuntime {
         return java.nio.file.Files.isRegularFile(PluginSettingsFiles.file(options.userDirectory(), id));
     }
 
-    private void applySettings() { PluginHost current = host; if (current != null) current.settingsChanged(); }
+    /** Forgets each reloaded file's problems, then lets its plugin see the values again. */
+    private void applySettings(Set<String> reloaded) {
+        for (String id : reloaded) reports.clear().accept(PluginSettingsFiles.file(options.userDirectory(), id));
+        PluginHost current = host;
+        if (current != null) current.settingsChanged(reloaded);
+    }
+
+    /** The settings poller reads files off the UI thread; reports always reach the application on it. */
+    private static void onUi(Runnable task) {
+        if (SwingUtilities.isEventDispatchThread()) task.run(); else SwingUtilities.invokeLater(task);
+    }
 
     /** Test seam: what the settings poller does, now. */
-    void pollSettingsNow() { if (!settingsFiles.refresh(false).isEmpty()) applySettings(); }
+    void pollSettingsNow() {
+        Set<String> changed = settingsFiles.refresh(false);
+        if (!changed.isEmpty()) applySettings(changed);
+    }
 
         /**
          * Seeds the settings file and creates the data directory of a plugin the launch found, if they are missing;

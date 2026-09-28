@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -26,7 +25,7 @@ import dev.jasper.app.terminals.TerminalRegistry;
  */
 final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
-                       Function<String, Map<String, Object>> settings, Function<String, Path> settingsFile, BiConsumer<String, String> configReport,
+                       Function<String, Map<String, Object>> settings, Function<String, Path> settingsFile, java.util.function.BiFunction<String, List<String>, java.util.Optional<PluginSettingsFiles.Position>> positions, Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
                        AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor) { }
 
@@ -67,7 +66,7 @@ final class PluginHost {
                 + (why == PluginStatus.State.FAILED ? "failed to start" : why == PluginStatus.State.SKIPPED ? "was skipped" : "is not running"));
         }
         var context = new HostedContext(this, hosted, new PluginSettings(id, environment.settingsFile().apply(id), environment.settings().apply(id),
-            containment, environment.configReport()));
+            containment, path -> environment.positions().apply(id, path), environment.configReport()));
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());
         providers.addAll(hosted.optional());
@@ -95,11 +94,16 @@ final class PluginHost {
         return context != null && context.state == HostedContext.State.ACTIVE;
     }
 
-    void settingsChanged() {
+    void settingsChanged() { settingsChanged(Set.of()); }
+
+    /** Pushes each active plugin's current values; plugins in {@code reloaded} rerun their listeners even when equal. */
+    void settingsChanged(Set<String> reloaded) {
         requireUi();
         for (HostedContext context : List.copyOf(contexts.values()))
-            if (context.state == HostedContext.State.ACTIVE)
-                context.settings.update(environment.settings().apply(context.hosted.info().id()));
+            if (context.state == HostedContext.State.ACTIVE) {
+                String id = context.hosted.info().id();
+                context.settings.update(environment.settings().apply(id), reloaded.contains(id));
+            }
     }
 
     /** Reverse start order. The returned futures complete when each plugin's background work has drained. */

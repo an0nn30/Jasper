@@ -37,19 +37,36 @@ final class ConfigurationController implements AutoCloseable {
     /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
     private List<ConfigDiagnostic> themeProblems = List.of();
     private Predicate<String> pluginSettingsExist = id -> false;
+    private final java.util.Map<Path, java.util.LinkedHashSet<ConfigDiagnostic>> pluginReports = new java.util.LinkedHashMap<>();
 
-    /** The saved state plus theme problems and problems plugins reported about their own tables since the last reload. */
+    /** The saved state plus theme problems, application problems since the last reload, and problems plugins reported about their own settings files. */
     ConfigService.State shown() {
         requireEdt();
         var merged = new java.util.ArrayList<>(state.diagnostics());
         merged.addAll(themeProblems);
         merged.addAll(reported);
+        pluginReports.values().forEach(merged::addAll);
         var removable = state.deadTables().stream()
             .filter(table -> !table.getFirst().equals("plugins") || pluginSettingsExist.test(table.get(1))).toList();
         return new ConfigService.State(state.snapshot(), merged, state.file(), state.present(), state.legacyKeys(), removable);
     }
 
-    /** A plugin's complaint about one of its settings; shown with the file's diagnostics until the next reload. */
+    /** A plugin's problem with its own settings file; shown until that file is reloaded. */
+    void report(ConfigDiagnostic diagnostic) {
+        requireEdt();
+        if (closed) return;
+        pluginReports.computeIfAbsent(diagnostic.file(), file -> new java.util.LinkedHashSet<>()).add(diagnostic);
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+    }
+
+    /** Forgets every plugin problem in {@code file}. */
+    void clearReports(Path file) {
+        requireEdt();
+        if (closed || pluginReports.remove(file) == null) return;
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+    }
+
+    /** An application problem with a key of config.toml; shown with the file's diagnostics until the next reload. */
     void report(String key, String message) {
         requireEdt();
         if (closed) return;
