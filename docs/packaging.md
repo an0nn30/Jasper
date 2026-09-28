@@ -1,9 +1,10 @@
 # Native packaging
 
 Jasper packages a native image with the JetBrains Runtime. Packaging must run on
-the target operating system: macOS builds the macOS app and DMG, while Windows
-builds the portable Windows ZIP or setup wizard. Interactive installation and
-desktop acceptance remain user-run checks.
+the target operating system and architecture: macOS builds the macOS app and DMG,
+Windows builds the portable Windows ZIP or setup wizard, and Linux builds the
+`.deb` and `.rpm` packages. Interactive installation and desktop acceptance remain
+user-run checks.
 
 Install a JBR **SDK** 25 whose architecture matches the host. Gradle normally
 finds it through Java toolchain discovery. If it does not, set `JAVA_HOME` and
@@ -35,6 +36,50 @@ in `image/`, and distributions are
 or `jasper-app/build/packaging/dist/Jasper-<version>-windows-x64.zip`. The unpacked
 image is `jasper-app/build/packaging/image/Jasper.app` on macOS and
 `jasper-app/build/packaging/image/Jasper` on Windows.
+
+## Linux packages
+
+`:jasper-app:packageDist` on Linux runs `packageDeb` and `packageRpm`, which build
+`jasper-app/build/packaging/dist/Jasper-<version>-linux-<amd64|arm64>.deb` and
+`Jasper-<version>-linux-<x86_64|aarch64>.rpm` from the verified application image
+(`jasper-app/build/packaging/image/Jasper`). Each format names the architecture
+its own way: Debian's `amd64`/`arm64` are RPM's `x86_64`/`aarch64`. jpackage builds
+only for its host, so an x64 machine produces the x64 pair and an aarch64 machine
+the aarch64 pair. JetBrains ships no 32-bit Linux runtime.
+
+Build on the target architecture with a JBR SDK 25 of that architecture and:
+
+- `.deb`: `dpkg-deb` and `fakeroot`;
+- `.rpm`: `rpmbuild` (the `rpm` package on Debian and Ubuntu), `readelf` (binutils),
+  `rpm2cpio` and `cpio`.
+
+```bash
+sudo apt-get install fakeroot rpm cpio binutils
+./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
+./gradlew :jasper-app:packageDeb    # or packageRpm, for one format only
+```
+
+Both packages install the image to `/opt/jasper`, with the launcher at
+`/opt/jasper/bin/Jasper` and a desktop menu entry (categories `System;TerminalEmulator;`,
+icon `/opt/jasper/lib/Jasper.png`) registered through `xdg-utils`. The package name
+is `jasper`. The `.deb` depends on the Debian packages that jpackage finds for the
+runtime's shared libraries on the build machine. The `.rpm` requires the same
+libraries by soname (for example `libX11.so.6()(64bit)`), which every RPM
+distribution resolves: jpackage's own RPM lookup queries the build machine's RPM
+database, which is empty on a Debian-family host. Before publishing either
+package, the task checks its name, version and architecture, unpacks it without
+installing it, and compares every file with the verified image byte for byte.
+The packages are unsigned.
+
+The [`linux-packages` workflow](../.github/workflows/linux-packages.yml) builds both
+architectures on native GitHub runners. It uses Ubuntu 22.04 so that the detected
+`.deb` dependencies keep their pre-t64 names, which Debian 12 has and newer releases
+still provide. It then installs each package into disposable Debian 12,
+Ubuntu 24.04, Fedora and openSUSE Tumbleweed containers with
+[`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh). That
+script checks that every shared library resolves, runs the bundled Java, checks
+the menu entry and removes the package. It never opens a window. Run the workflow
+manually to choose a version, and download the packages from the run's artifacts.
 
 ## Windows setup wizard
 
@@ -155,9 +200,9 @@ Linux windows and taskbar integration use the dedicated Linux PNG set. Portable
 `packaging/icons/Jasper.png` is a 512px package input for downstream packaging.
 The generator and tests verify it against the runtime image.
 
-Native Linux installers are not implemented by the current `packageDist` task;
-this icon update does not imply a new Linux installer. Validate launcher/window
-appearance on the target desktop environment when integrating a Linux package.
+The [Linux packages](#linux-packages) use the 512px `packaging/icons/Jasper.png`
+for their menu entry and do not install the hicolor hierarchy. Validate
+launcher/window appearance on the target desktop environment.
 
 ## Native acceptance checklist
 
@@ -210,6 +255,19 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm `AF_UNIX` sockets work: with `[system] run_in_background = true`, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
 - [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident.
 - [ ] Confirm Quit exits completely and that setting `enabled = false` removes the Run value.
+
+### Linux
+
+- [ ] Install the `.deb` on Debian/Ubuntu and the `.rpm` on Fedora (or openSUSE), on x64 and on aarch64, with no external Java installed.
+- [ ] Launch Jasper from the desktop menu; confirm the Ember icon in the menu, the dock/taskbar and the window switcher, and that the running window groups with its launcher (not a generic icon) on GNOME and KDE, under X11 and Wayland.
+- [ ] Confirm the shell starts, UTF-8 text renders, and Settings lives under `~/.config/jasper` (or `$XDG_CONFIG_HOME/jasper`).
+- [ ] Confirm switching between the bundled Light and Dark themes, multiple windows, and shell-exit cleanup.
+- [ ] Confirm tmux mouse input including right-click and pane drag resizing.
+- [ ] Confirm vim and htop behavior.
+- [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
+- [ ] Confirm clipboard (including primary selection, if supported) and links.
+- [ ] Confirm Remote SSH connections.
+- [ ] Upgrade to a higher `-PjasperVersion` package and confirm settings, Vault data and plugins are preserved; remove the package and confirm `/opt/jasper` and the menu entry are gone while `~/.config/jasper` remains.
 
 ## Historical terminal readiness verification
 

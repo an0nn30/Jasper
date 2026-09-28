@@ -81,6 +81,16 @@ To set a package version:
 
 Versions use `X.Y.Z`: major 1–255, minor 0–255, patch 0–65535, with no leading zeroes. The native macOS packager requires a positive major version.
 
+## Build Linux packages
+
+Run this **on Linux x64 or aarch64**, with a JBR SDK 25 of the same architecture, plus `fakeroot` and `dpkg-deb` for the `.deb` and `rpmbuild`, `readelf`, `rpm2cpio` and `cpio` for the `.rpm` (on Ubuntu: `sudo apt-get install fakeroot rpm cpio binutils`):
+
+```bash
+./gradlew check :jasper-app:packageDist
+```
+
+This produces `jasper-app/build/packaging/dist/Jasper-<version>-linux-<amd64|arm64>.deb` and `Jasper-<version>-linux-<x86_64|aarch64>.rpm` for the build machine's architecture. Both install to `/opt/jasper` with a desktop menu entry. The [`linux-packages` workflow](.github/workflows/linux-packages.yml) builds all four on native x64 and arm64 runners and test-installs them on Debian, Ubuntu, Fedora and openSUSE. See [Linux packages](docs/packaging.md#linux-packages).
+
 ## Build a Windows portable ZIP
 
 For a setup wizard with per-user installation, shortcut choices, upgrades, and

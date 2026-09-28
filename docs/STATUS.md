@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-28
 
+- **Linux .deb and .rpm packages** (branch `claude/linux-packages`, 2026-09-28, no plan; the user chose native
+  Linux builds plus CI over cross-building from macOS): on Linux, `:jasper-app:packageDist` runs `packageDeb` and
+  `packageRpm` (jpackage from the verified app image, installed to `/opt/jasper` with a menu entry), for x64 and
+  aarch64 hosts. `verifyPackage` gained the Linux image layout, the ELF machine of the launcher and bundled Java, and
+  the icon. The `.rpm` requires libraries by soname, read with `readelf`, because jpackage's lookup needs an RPM
+  database. Each package is unpacked and compared byte for byte with the image before it is published. The new
+  `linux-packages` workflow builds on `ubuntu-22.04` and `ubuntu-22.04-arm`, then installs every package into
+  Debian 12, Ubuntu 24.04, Fedora and openSUSE Tumbleweed containers (`packaging/linux/check-install.sh`). See
+  [Linux packages](packaging.md#linux-packages). Verified on macOS only: `./gradlew check` (3,410 tests, 0
+  failures, 5 skipped), macOS `verifyPackage`, and configuration of the Linux tasks with `-Dos.name=Linux`. **The
+  Linux tasks have not run yet**; the first proof is a `linux-packages` workflow run, which needs a push. Linux
+  desktop acceptance (checklist in `packaging.md`) is the user's. Not pushed; not merged.
+
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
   linewise, blockwise, with block `I`/`A`/`c`, `p` over an area, `gv` and `.` on an area of the same size), `/` and `?`
