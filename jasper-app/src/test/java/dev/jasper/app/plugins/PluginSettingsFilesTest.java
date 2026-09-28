@@ -62,7 +62,6 @@ class PluginSettingsFilesTest {
             assertThat(d.line()).isEqualTo(2);
             assertThat(d.message()).contains(file.getFileName().toString());
         });
-        assertThat(files.position("dev.example.tool", List.of("greeting"))).hasValue(new PluginSettingsFiles.Position(1, 1));
         Files.writeString(file, "greeting = \"hi\"\n[proxy]\nport = 22\n");
         Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 7000));
         assertThat(files.refresh(false)).as("recovering from a broken file counts as a reload").containsExactly("dev.example.tool");

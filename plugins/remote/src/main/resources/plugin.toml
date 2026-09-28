@@ -1,8 +1,8 @@
 id = "dev.jasper.remote"
 name = "Remote"
-version = "0.4.1"
+version = "0.5.0"
 entry = "dev.jasper.remote.RemotePlugin"
-sdk = ">=0.8.5, <0.9"
+sdk = ">=0.9.0, <0.10"
 description = "SSH and SFTP: browsing, persistent file transfers, editing remote files in the Editor, and saved hosts with groups and favorites, managed Vault imports and optional SSH-agent authentication, ProxyJump, host-key trust, a hosts panel and a palette scope."
 vendor = "Jasper"
 capabilities = ["terminal.open", "session.provide", "terminal.observe", "palette.contribute"]

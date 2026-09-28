@@ -1,6 +1,7 @@
-# Settings for Shell History. Jasper reads this file live.
+# Settings for Shell History. Change them in Settings > Tools > Shell History or here; changes apply at once.
 # On an empty History query these commands rank below more substantial ones. Each entry is a single
 # word compared with a command's first word; a command of at most two words counts. Setting the key
-# replaces the default list; deprioritize_trivial = false turns the rule off.
+# replaces the default list, and an empty list means no trivial commands; deprioritize_trivial = false
+# turns the rule off.
 # trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
 # deprioritize_trivial = true

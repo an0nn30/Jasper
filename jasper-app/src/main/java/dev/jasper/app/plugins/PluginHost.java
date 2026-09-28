@@ -27,7 +27,7 @@ import dev.jasper.app.terminals.TerminalRegistry;
  */
 final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
-                       Function<String, Map<String, Object>> settings, Function<String, Path> settingsFile, java.util.function.BiFunction<String, List<String>, java.util.Optional<PluginSettingsFiles.Position>> positions, Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
+                       Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
                        AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports) { }
@@ -70,8 +70,7 @@ final class PluginHost {
         }
         var declared = new DeclaredSettings(id, environment.settingsFiles(), containment, environment.ui(), environment.configReport(),
             () -> settingsWritten(id));
-        var context = new HostedContext(this, hosted, new PluginSettings(id, environment.settingsFile().apply(id), environment.settings().apply(id),
-            containment, path -> environment.positions().apply(id, path), environment.configReport()), declared);
+        var context = new HostedContext(this, hosted, declared);
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());
         providers.addAll(hosted.optional());
@@ -108,7 +107,6 @@ final class PluginHost {
         for (HostedContext context : List.copyOf(contexts.values()))
             if (context.state == HostedContext.State.ACTIVE) {
                 String id = context.hosted.info().id();
-                context.settings.update(environment.settings().apply(id), reloaded.contains(id));
                 context.declared.reload(reloaded.contains(id));
             }
     }

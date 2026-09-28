@@ -180,21 +180,24 @@ public final class EditorWindow {
     public boolean vimOn() { return vimToggled != null ? vimToggled : environment.settings().get().vim(); }
 
     /**
-     * Toggle Vim Mode and the Vim status item: switches every tab at once and writes {@code vim} to the settings
-     * file so the choice lasts (Vim spec 1.2).
+     * Toggle Vim Mode and the Vim status item: switches every tab at once and saves {@code vim} through the declared
+     * setting so the choice lasts (Vim spec 1.2). A failed save keeps the choice for this session and says so.
      */
     public void toggleVim() {
         boolean on = !vimOn();
         vimToggled = on;
         for (EditorTab tab : editorTabs()) tab.vim(on ? Optional.of(vim) : Optional.empty());
         refreshStatus();
-        try {
-            SettingsFile.setBoolean(context.config().file(), "vim", on);
-        } catch (IOException | RuntimeException failed) {
-            String reason = failed.getMessage() == null ? failed.getClass().getSimpleName() : failed.getMessage();
-            ask.apply(new Question("Vim mode", "Vim mode is " + (on ? "on" : "off") + " until the Editor closes: the setting could not be saved ("
-                + reason + ").", List.of("OK")));
-        }
+        CompletableFuture<Void> saved;
+        try { saved = environment.saveVim().apply(on); }
+        catch (RuntimeException failed) { saved = CompletableFuture.failedFuture(failed); }
+        saved.whenComplete((done, failed) -> {
+            if (failed == null) return;
+            Throwable cause = failed instanceof java.util.concurrent.CompletionException && failed.getCause() != null ? failed.getCause() : failed;
+            String reason = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+            environment.ui().execute(() -> ask.apply(new Question("Vim mode", "Vim mode is " + (on ? "on" : "off")
+                + " until the Editor closes: the setting could not be saved (" + reason + ").", List.of("OK"))));
+        });
     }
 
     /** Checks open local files for outside changes; the window's timer calls this every 2 s. */

@@ -1,4 +1,4 @@
-# Settings for the sample plugin. Jasper reads this file live. Every demo is off until you set it.
+# Settings for the sample plugin. Change them in Settings > Tools > Sample or here; each applies after Jasper restarts. Every demo is off until you set it.
 # demo_activity = true      # a short demonstration activity on Buddy at startup
 # demo_step_millis = 300    # 0 to 5000
 # demo_ui = true            # the sample's action on the toolbar, in the menus and the status bar

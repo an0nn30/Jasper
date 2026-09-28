@@ -3,7 +3,11 @@ package dev.jasper.app.plugins;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.settings.Setting;
+import dev.jasper.sdk.settings.SettingKind;
+import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.testing.contract.PluginContractTest;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -30,7 +34,7 @@ class PluginHostTest {
     }
 
     @Test void registrationCallsAreRejectedOffTheUiThread() {
-        PluginHost host = AppContractTest.host(data, Map.of(), Duration.ofMillis(200));
+        PluginHost host = AppContractTest.host(data, Duration.ofMillis(200));
         var context = new AtomicReference<PluginContext>();
         onEdt(() -> host.start(hosted("test.alpha", Set.of(), context::set)));
         assertThatIllegalStateException().isThrownBy(() ->
@@ -41,7 +45,7 @@ class PluginHostTest {
     }
 
     @Test void reportsStartOutcomesWithReasons() {
-        PluginHost host = AppContractTest.host(data, Map.of(), Duration.ofMillis(200));
+        PluginHost host = AppContractTest.host(data, Duration.ofMillis(200));
         var outcomes = new ConcurrentHashMap<String, PluginHost.Outcome>();
         onEdt(() -> {
             outcomes.put("ok", host.start(hosted("test.ok", Set.of(), context -> assertThat(host.executing()).contains("test.ok", "start"))));
@@ -65,7 +69,7 @@ class PluginHostTest {
     }
 
     @Test void backgroundWorkIsContainedDrainedAndInterruptedAfterTheGrace() throws Exception {
-        PluginHost host = AppContractTest.host(data, Map.of(), Duration.ofMillis(150));
+        PluginHost host = AppContractTest.host(data, Duration.ofMillis(150));
         var interrupted = new CountDownLatch(1);
         var running = new CountDownLatch(1);
         var quick = new CountDownLatch(1);
@@ -87,22 +91,23 @@ class PluginHostTest {
         assertThat(host.failures("test.worker")).isEqualTo(1);
     }
 
-    @Test void stopRunsInReverseOrderAndSettingsChangesReachOnlyChangedPlugins() {
-        var tables = new ConcurrentHashMap<String, Map<String, Object>>();
-        tables.put("test.first", Map.<String, Object>of("k", "v"));
-        PluginHost host = AppContractTest.host(data, tables, Duration.ofMillis(200));
+    @Test void stopRunsInReverseOrderAndSettingsChangesReachOnlyChangedPlugins() throws Exception {
+        Files.createDirectories(data.resolve("test.first"));
+        Files.writeString(data.resolve("test.first/test.first.toml"), "k = \"v\"\n");
+        PluginHost host = AppContractTest.host(data, Duration.ofMillis(200));
         List<String> order = Collections.synchronizedList(new ArrayList<>());
         for (String id : List.of("test.first", "test.second")) {
             onEdt(() -> host.start(hosted(id, Set.of(), new Plugin() {
                 @Override public void start(PluginContext context) {
                     assertThat(context.dataDirectory()).isDirectory().hasFileName(id);
-                    context.config().onChanged(() -> order.add("changed:" + id + ":" + context.config().string("k").orElse("")));
+                    Setting<String> k = context.settings().declare(SettingSpec.of("k", SettingKind.text(), "").label("K"));
+                    k.onChanged(value -> order.add("changed:" + id + ":" + value));
                 }
                 @Override public void stop() { order.add("stop:" + id); }
             })));
         }
-        tables.put("test.first", Map.<String, Object>of("k", "w"));
-        onEdt(host::settingsChanged);
+        Files.writeString(data.resolve("test.first/test.first.toml"), "k = \"w\"\n");
+        onEdt(() -> host.settingsChanged(host.environment.settingsFiles().refresh(true)));
         onEdt(host::stop);
         assertThat(order).containsExactly("changed:test.first:w", "stop:test.second", "stop:test.first");
     }

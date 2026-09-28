@@ -32,7 +32,7 @@ public final class PluginPreviewSupport implements AutoCloseable {
     private final PluginHost host;
 
     public PluginPreviewSupport(Path data) {
-        host = AppContractTest.host(data, Map.of(), Duration.ofMillis(200), new Contributions(), new AtomicBoolean(true),
+        host = AppContractTest.host(data, Duration.ofMillis(200), new Contributions(), new AtomicBoolean(true),
             AppContractTest.headlessWindows(), new TerminalRegistry(), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>());
         start("dev.example.editor", "Editor", context -> {
             var settings = context.settings();

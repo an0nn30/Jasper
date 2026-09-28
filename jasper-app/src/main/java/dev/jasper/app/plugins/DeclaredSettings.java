@@ -96,11 +96,11 @@ final class DeclaredSettings implements PluginSettings {
 
     /**
      * Reads the file again; {@code report}: the file was reloaded and its earlier reports are gone. A rejected file
-     * keeps the last good values. Listeners of changed values run. A plugin that declared nothing still reads its file
-     * through {@code PluginConfig} until SDK 0.9, so nothing is read or reported for it here. UI thread.
+     * keeps the last good values. Listeners of changed values run; a plugin that declared nothing has every key
+     * reported as unknown. UI thread.
      */
     void reload(boolean report) {
-        if (closed || open || handles.isEmpty()) return;
+        if (closed || open) return;
         var result = SchemaReader.read(schema, files.text(pluginId));
         if (report) for (SchemaReader.Problem problem : result.problems()) this.report.accept(diagnostic(problem));
         rejected = result.rejected();

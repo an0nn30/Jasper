@@ -11,7 +11,6 @@ import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
-import dev.jasper.sdk.plugin.PluginConfig;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
 import dev.jasper.sdk.services.Services;
@@ -53,7 +52,6 @@ final class HostedContext implements PluginContext {
 
     private final PluginHost host;
     final HostedPlugin hosted;
-    final PluginSettings settings;
     final DeclaredSettings declared;
     private final String id;
     private final List<Subscription> owned = new ArrayList<>();
@@ -66,8 +64,8 @@ final class HostedContext implements PluginContext {
     private boolean observing;
     Plugin plugin;
 
-    HostedContext(PluginHost host, HostedPlugin hosted, PluginSettings settings, DeclaredSettings declared) {
-        this.host = host; this.hosted = hosted; this.settings = settings; this.declared = declared;
+    HostedContext(PluginHost host, HostedPlugin hosted, DeclaredSettings declared) {
+        this.host = host; this.hosted = hosted; this.declared = declared;
         this.id = hosted.info().id();
         this.executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("jasper-plugin-" + id + "-", 0).factory());
         this.gate = new CapabilityGate(id, hosted.info().capabilities());
@@ -103,7 +101,6 @@ final class HostedContext implements PluginContext {
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
         host.bus.removeAll(id);
         host.activities.failAll(id, reason);
-        settings.close();
         declared.close();
         if (interrupt) executor.shutdownNow(); else executor.shutdown();
     }
@@ -131,7 +128,6 @@ final class HostedContext implements PluginContext {
         catch (IOException failure) { throw new UncheckedIOException(failure); }
     }
 
-    @Override public PluginConfig config() { return settings; }
     @Override public dev.jasper.sdk.settings.PluginSettings settings() { return declared; }
 
     @Override public Actions actions() { return ui.actions(); }

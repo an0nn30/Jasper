@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.6, <0.7"
+sdk = ">=0.9, <0.10"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute
 exports = []                       # packages other plugins may use
 
@@ -104,7 +104,7 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
-  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
+  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.9.0, <0.10"`
   (Vault `>=0.8.2` for icon meanings; Remote `>=0.8.3` for remote directory hints; Editor
   `>=0.8.4` for `onCloseCommand`, quit guards and `chooseSaveFile`).
   Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
@@ -444,9 +444,9 @@ is reported as a notice.
   `publish` or, to learn who is calling, `publishPerConsumer`. Consumers must declare
   `requires` on the provider. Put the interfaces in a separate API jar that consumers compile
   against.
-- **Configuration.** Users edit `plugins/<id>/<id>.toml`; see [plugin settings](configuration.md#plugins). It is read-only to
-  the plugin; keep your own state under `context.dataDirectory()`. Problems you report with
-  `config().report(key, message)` are shown against that file, at the key's line, until the file is next reloaded.
+- **Settings.** Declare them while starting (see "Declared settings" below); users edit them in Settings › Tools or in
+  `plugins/<id>/<id>.toml` (see [plugin settings](configuration.md#plugins)). Jasper checks and reports the values;
+  keep your own state under `context.dataDirectory()`.
 - **Your own threads and sockets** are yours to release, including before `start` throws.
 
 ## Declared settings
@@ -464,7 +464,7 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
 
 Kinds are `bool`, `integer`, `number`, `text` (optionally with a rule and message), `choice` and `stringList`. A value
 the kind rejects falls back to the default and is reported against the file with its line; keys nothing declares are
-reported as unknown. Declaring after `start` returns throws. `context.config()` still works until SDK 0.9 removes it.
+reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `PluginConfig` and `context.config()`.
 
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
 heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
@@ -481,13 +481,16 @@ plugin's `SampleSettingsPanel` is a complete example; the testkit's `settingsPan
 
 ```java
 try (var host = new FakePluginHost()) {
-    host.setConfig("dev.example.tool", Map.of("enabled", true));
+    host.setSetting("dev.example.tool", "enabled", true);   // as if the user edited the file
     host.start(new PluginInfo("dev.example.tool", "Tool", "1.0.0", Set.of()), Set.of(), Set.of(), new ToolPlugin());
     host.runBackground();   // background tasks run when you say so
     host.flush();           // events are delivered when you say so
     assertThat(host.activityLog()).isNotEmpty();
 }
 ```
+
+`host.settingsReports(id)` lists what the last read of the plugin's file reported, as `key: message`, and
+`host.savedSettings(id)` what `set` wrote.
 
 `host.actions()`, `host.toolbar()`, `host.menu("VIEW")`, `host.status()` and
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.

@@ -342,7 +342,7 @@ is real work, and `clearcache --all` is not caught by `clear`. An entry containi
 never match and is rejected with a diagnostic.
 
 Setting the key **replaces** the default list rather than adding to it, so include any defaults you
-want to keep. `deprioritize_trivial = false` turns trivial-command de-ranking off;
+want to keep; an empty list means no trivial commands. `deprioritize_trivial = false` turns trivial-command de-ranking off;
 other ordering rules, including timestamps and query match quality, still apply. De-ranked commands remain listed and searchable. A nonempty query ranks match
 quality first, then working-directory affinity and recency; it does not apply this
 trivial-command partition.
@@ -368,7 +368,7 @@ name steps.
 ### Editor
 
 The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see [Plugins](#plugins)):
-`font_family`, `font_size`, `tab_size`, `soft_wrap` and `max_file_mib`, applied live. See
+`font_family`, `font_size`, `tab_size`, `soft_wrap`, `max_file_mib` and `vim`, applied live; they are also on its page under Settings › Tools. See
 [Editor](editor.md#settings) for defaults and ranges.
 
 ### Live settings and temporary choices
@@ -469,14 +469,14 @@ first time the plugin loads: from the plugin's own example (a `settings.toml` it
 until you delete it), or as a two-line header. Jasper reads the file live, once a second, without a
 Reload Config; a file that fails to parse keeps its last good values and is reported in the
 Configuration status under `plugins.<id>`. Settings writes the file when you change a plugin's settings there,
-keeping its comments. Values may
-be strings, integers, floats, booleans, arrays of strings and nested tables; a plugin reports
-problems with its settings through the same diagnostics. Right-click a plugin in Settings › Plugins
+keeping its comments. Each plugin declares its settings: a value its declaration
+does not allow is reported with its line and the default is used, and a key the plugin does not declare is reported
+as unknown and ignored. Right-click a plugin in Settings › Plugins
 (File → Manage Plugins…) and choose Open Settings to go to its page in Settings (or to its file, when the plugin is
 not running). The sample plugin's example, for instance:
 
 ```toml
-# Settings for the sample plugin. Jasper reads this file live. Every demo is off until you set it.
+# Settings for the sample plugin. Change them in Settings > Tools > Sample or here; each applies after Jasper restarts. Every demo is off until you set it.
 # demo_activity = true      # a short demonstration activity on Buddy at startup
 # demo_step_millis = 300    # 0 to 5000
 # demo_ui = true            # the sample's action on the toolbar, in the menus and the status bar

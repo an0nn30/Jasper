@@ -49,13 +49,6 @@ public interface PluginContext {
     Path dataDirectory();
 
     /**
-     * The plugin's configuration table.
-     *
-     * @return the read-only view
-     */
-    PluginConfig config();
-
-    /**
      * The plugin's declared settings.
      *
      * @return this plugin's settings

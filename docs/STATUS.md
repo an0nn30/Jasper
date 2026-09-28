@@ -14,6 +14,26 @@
   - `./gradlew check`: 4,311 tests, 0 failed, 0 errors, 5 skipped.
   - Not done: GUI checks 71–79 of the [checklist](editor-verification.md) (user-run); plan V3b
     (the vimrc, `sethandler` lines, `let mapleader`, `<Action>`); V4; push.
+- **Plugin settings C3** (`claude/plugin-settings-c3`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c3.md`): SDK 0.9.0. Editor, Shell History, Remote and
+  Credential Vault declare their settings and get generated pages under Settings › Tools; Snippets declares none.
+  `PluginConfig`, `PluginContext.config()`, the testkit's `setConfig` and `reports()`, and the application's
+  `PluginSettings` view are gone; every bundled plugin requires `>=0.9.0, <0.10`. Remote's `[shortcuts]` table is
+  gone: its actions keep Cmd+Shift+S and Cmd+Shift+H as default bindings, rebindable in Keymap, and old lines warn
+  as unknown keys. The Editor's Vim toggle saves through its setting. History's empty list means no trivial
+  commands. Values the plugins used to clamp now fall back to their defaults with a report. `./gradlew check`: 4,117 tests,
+  0 failures, 5 skipped. GUI checks pending with the user: each plugin's page under Tools; the Editor's Vim toggle
+  and its page's Vim mode; a Remote file with an old `[shortcuts]` table; Keymap rebinding Toggle SSH Hosts.
+  Still deferred from C2:
+  - a pending-changed callback for plugin controls
+  - per-page dedupe of warnings from a throwing `modified()`/`keywords()`
+  - the stub's Open in Editor failure going to a notice while Settings is modal
+  - section-heading carry-over for unsectioned settings
+  - the discard count per plugin page
+
+  Deviations: see the plan's status banner. Merged into local `main` on 2026-09-28 after merging main (Vim V2b)
+  into the branch, which needed `EditorWindow`'s `IOException` import back for V2b's new catch; `./gradlew check` on the
+  merged tree: 4,153 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
 - **Editor Vim mode, plan V2b** (branch `claude/vim-v2b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`, written 2026-09-28): the Editor's tabs as Vim's buffers — `:w :wq :x :exi :sav :wa :xa :wqa :q :qa
   :quita :e :ene :r :ls :buffers :files :b :bn :bN :bp :tabn :tabN :tabp :tabnew :tabe`, `ZZ`, `ZQ`, `gt`, `gT`,

@@ -76,6 +76,7 @@ public class VaultPlugin implements Plugin {
     private VaultScope scope;
     private SecretClipboard clipboard;
     private VaultSettings settings;
+    private VaultSettings.Declared declared;
     public static final String GENERATE = "dev.jasper.vault.generate_key";
     private VaultManager manager;
     private VaultManagerWindow managerWindow;
@@ -104,7 +105,8 @@ public class VaultPlugin implements Plugin {
         this.context = context;
         stopped = false;
         Files.createDirectories(context.dataDirectory());
-        settings = VaultSettings.read(context.config(), context.dataDirectory());
+        declared = new VaultSettings.Declared(context.settings());
+        settings = declared.read(context.dataDirectory());
         timer = new InactivityTimer(() -> clock >= 0 ? clock : System.currentTimeMillis());
         timer.setTimeout(settings.autoLock());
         lock = new LockManager(new VaultFile(context.dataDirectory().resolve("vault.jv")), secretsFactory.apply(context), context.background(), ui, this::lockStateChanged);
@@ -135,7 +137,7 @@ public class VaultPlugin implements Plugin {
         status.setText("Vault");
 //        context.rail().add(OPEN);
         refreshStatus();
-        context.config().onChanged(() -> { settings = VaultSettings.read(context.config(), context.dataDirectory()); timer.setTimeout(settings.autoLock()); refreshStatus(); vaultChanged(); });
+        context.settings().onChanged(() -> { settings = declared.read(context.dataDirectory()); timer.setTimeout(settings.autoLock()); refreshStatus(); vaultChanged(); });
         activity = event -> timer.touch();
         Toolkit.getDefaultToolkit().addAWTEventListener(activity, AWTEvent.KEY_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK);
         ticker = new Timer(TICK_MILLIS, event -> tick());
@@ -301,6 +303,7 @@ public class VaultPlugin implements Plugin {
     LockManager lockManager() { return lock; }
     VaultService service() { return service; }
     InactivityTimer timer() { return timer; }
+    VaultSettings settings() { return settings; }
     UnlockPrompt currentUnlock() { return currentUnlock; }
     GrantPrompt currentGrant() { return currentGrant; }
     VaultScope scope() { return scope; }

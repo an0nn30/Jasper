@@ -73,6 +73,38 @@ class RemotePluginTest {
         }
     }
 
+    @Test void navigationActionsKeepTheirDefaultBindingsAndAnOldShortcutsTableIsUnknown(@TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            host.setSetting("dev.jasper.remote", "shortcuts.toggle_panel", "cmd+alt+p");
+            var delegate = plugin(dir.resolve("ssh"));
+            var bindings = new java.util.LinkedHashMap<String, Optional<String>>();
+            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
+                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
+                    var actions = (dev.jasper.sdk.ui.Actions) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Actions.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("register") && args != null && args[0] instanceof dev.jasper.sdk.ui.ActionSpec spec)
+                                bindings.put(spec.id(), spec.defaultBinding());
+                            try { return method.invoke(context.actions(), args); }
+                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("actions")) return actions;
+                            try { return method.invoke(context, args); }
+                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    delegate.start(wrapped);
+                }
+                public void stop() { delegate.stop(); }
+            });
+            settle(host);
+            assertThat(host.failures()).isEmpty();
+            assertThat(bindings).containsEntry(RemotePlugin.HOSTS, Optional.of("cmd+shift+s"))
+                .containsEntry(RemotePlugin.CONNECT, Optional.of("cmd+shift+h")).containsEntry(RemotePlugin.SFTP_TOGGLE, Optional.empty());
+            assertThat(host.settingsReports("dev.jasper.remote")).containsExactly("shortcuts.toggle_panel: Unknown setting or table; ignored.");
+        }
+    }
+
     static javax.swing.JMenuItem menuItem(javax.swing.JPopupMenu menu,String text) {
         return java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance).map(javax.swing.JMenuItem.class::cast).filter(item->item.getText().equals(text)).findFirst().orElseThrow();
     }
