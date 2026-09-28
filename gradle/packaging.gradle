@@ -39,6 +39,7 @@ def normalizedHost = {
     }
     if (os.startsWith('mac')) return [os: 'macos', architecture: normalizedArchitecture]
     if (os.startsWith('windows')) return [os: 'windows', architecture: normalizedArchitecture]
+    if (os.startsWith('linux')) return [os: 'linux', architecture: normalizedArchitecture]
     return [os: os, architecture: normalizedArchitecture]
 }
 
@@ -69,8 +70,9 @@ def nativeContext = {
     String packageVersion = validatedVersion()
     def host = normalizedHost()
     if (!(host.os == 'macos' && host.architecture in ['aarch64', 'x64']) &&
-            !(host.os == 'windows' && host.architecture == 'x64')) {
-        throw new GradleException("Native packaging supports only macOS aarch64/x64 and Windows x64; this host is ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
+            !(host.os == 'windows' && host.architecture == 'x64') &&
+            !(host.os == 'linux' && host.architecture in ['aarch64', 'x64'])) {
+        throw new GradleException("Native packaging supports only macOS aarch64/x64, Windows x64 and Linux aarch64/x64; this host is ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
     }
     def selectedLauncher = launcher.get()
     File sdkHome = selectedLauncher.metadata.installationPath.asFile
@@ -245,6 +247,8 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/app/libjasper-notifications.dylib').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 resignImage(image)
+            } else if (context.host.os == 'linux') {
+                removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
             }
@@ -266,9 +270,14 @@ def verifyPackage = tasks.register('verifyPackage') {
     doLast {
         def context = nativeContext()
         File image = new File(imageDirectory.get().asFile, context.host.os == 'macos' ? 'Jasper.app' : 'Jasper')
-        File appDir = context.host.os == 'macos' ? new File(image, 'Contents/app') : new File(image, 'app')
-        File runtimeHome = context.host.os == 'macos' ? new File(image, 'Contents/runtime/Contents/Home') : new File(image, 'runtime')
-        File nativeLauncher = context.host.os == 'macos' ? new File(image, 'Contents/MacOS/Jasper') : new File(image, 'Jasper.exe')
+        def layoutFor = [
+            macos: [app: 'Contents/app', runtime: 'Contents/runtime/Contents/Home', launcher: 'Contents/MacOS/Jasper'],
+            windows: [app: 'app', runtime: 'runtime', launcher: 'Jasper.exe'],
+            linux: [app: 'lib/app', runtime: 'lib/runtime', launcher: 'bin/Jasper'],
+        ][context.host.os]
+        File appDir = new File(image, layoutFor.app)
+        File runtimeHome = new File(image, layoutFor.runtime)
+        File nativeLauncher = new File(image, layoutFor.launcher)
         File config = new File(appDir, 'Jasper.cfg')
         [image, appDir, runtimeHome, nativeLauncher, config].each { candidate ->
             if (!candidate.exists()) throw new GradleException("Package verification failed: missing ${candidate}")
@@ -313,8 +322,13 @@ def verifyPackage = tasks.register('verifyPackage') {
         File ptyJar = appDir.listFiles().find { it.name.startsWith('pty4j-') && it.name.endsWith('.jar') }
         File jnaJar = appDir.listFiles().find { it.name.startsWith('jna-') && !it.name.startsWith('jna-platform') && it.name.endsWith('.jar') }
         if (ptyJar == null || jnaJar == null) throw new GradleException('Package verification failed: pty4j or JNA dependency is missing')
-        [[jar: ptyJar, prefix: context.host.os == 'macos' ? 'resources/com/pty4j/native/darwin/' : 'resources/com/pty4j/native/win/x86-64/'],
-         [jar: jnaJar, prefix: context.host.os == 'macos' ? "com/sun/jna/darwin-${context.host.architecture == 'aarch64' ? 'aarch64' : 'x86-64'}/" : 'com/sun/jna/win32-x86-64/']].each { expected ->
+        String nativeArchitecture = context.host.architecture == 'aarch64' ? 'aarch64' : 'x86-64'
+        def nativePrefixes = [
+            macos: [pty: 'resources/com/pty4j/native/darwin/', jna: "com/sun/jna/darwin-${nativeArchitecture}/"],
+            windows: [pty: 'resources/com/pty4j/native/win/x86-64/', jna: 'com/sun/jna/win32-x86-64/'],
+            linux: [pty: "resources/com/pty4j/native/linux/${nativeArchitecture}/", jna: "com/sun/jna/linux-${nativeArchitecture}/"],
+        ][context.host.os]
+        [[jar: ptyJar, prefix: nativePrefixes.pty], [jar: jnaJar, prefix: nativePrefixes.jna]].each { expected ->
             File nativeJar = expected.jar
             ZipFile zip = new ZipFile(nativeJar)
             try {
@@ -386,6 +400,22 @@ def verifyPackage = tasks.register('verifyPackage') {
                 if (!executableBytes.contains(frameBytes)) {
                     throw new GradleException("Package verification failed: Windows launcher omits official icon frame ${i}")
                 }
+            }
+        }
+        if (context.host.os == 'linux') {
+            // Read the ELF header rather than trusting `file`: e_machine at offset 18 is 0x3E for x86-64, 0xB7 for AArch64.
+            int expectedMachine = context.host.architecture == 'aarch64' ? 0xB7 : 0x3E
+            [nativeLauncher, new File(runtimeHome, 'bin/java')].each { binary ->
+                byte[] header = new byte[20]
+                binary.withInputStream { it.readNBytes(header, 0, header.length) }
+                boolean elf = header[0] == 0x7F && header[1] == ('E' as char) && header[2] == ('L' as char) && header[3] == ('F' as char)
+                int machine = ByteBuffer.wrap(header, 18, 2).order(ByteOrder.LITTLE_ENDIAN).getShort() & 0xFFFF
+                if (!elf || machine != expectedMachine) throw new GradleException("Package verification failed: ${binary} is not a ${context.host.architecture} ELF binary")
+            }
+            if (!nativeLauncher.canExecute()) throw new GradleException("Package verification failed: ${nativeLauncher} is not executable")
+            File packagedIcon = new File(image, 'lib/Jasper.png')
+            if (!packagedIcon.isFile() || Files.mismatch(nativeIcon.get().toPath(), packagedIcon.toPath()) != -1L) {
+                throw new GradleException('Package verification failed: bundled Linux icon differs from the official icon')
             }
         }
         File bundledJava = new File(runtimeHome, "bin/java${context.host.os == 'windows' ? '.exe' : ''}")
@@ -467,6 +497,178 @@ if (normalizedHost().os == 'windows') {
         preserveFileTimestamps = false
         reproducibleFileOrder = true
         doFirst { nativeContext() }
+    }
+} else if (normalizedHost().os == 'linux') {
+    // jpackage builds only for the host, so each architecture needs its own Linux build machine.
+    // Each package format names the architecture its own way.
+    def linuxArchitecture = [
+        x64: [deb: 'amd64', rpm: 'x86_64'],
+        aarch64: [deb: 'arm64', rpm: 'aarch64'],
+    ][normalizedHost().architecture]
+    def installRoot = '/opt/jasper'
+
+    // jpackage's rpm spec turns rpmbuild's dependency scan off and asks the host's rpm database instead,
+    // which is empty on a Debian-family build machine. Require the image's external shared libraries by
+    // soname, as rpmbuild itself would: every rpm distribution resolves "libX11.so.6()(64bit)".
+    def rpmLibraryRequirements = { File image ->
+        List<File> elfFiles = []
+        image.eachFileRecurse(groovy.io.FileType.FILES) { candidate ->
+            byte[] magic = new byte[4]
+            int read = candidate.withInputStream { it.readNBytes(magic, 0, 4) }
+            if (read == 4 && magic[0] == 0x7F && magic[1] == ('E' as char) && magic[2] == ('L' as char) && magic[3] == ('F' as char)) {
+                elfFiles << candidate
+            }
+        }
+        Set<String> bundled = elfFiles.collect { it.name } as Set
+        Set<String> needed = new TreeSet<>()
+        elfFiles.each { elf ->
+            String dynamic = executeNative(['readelf', '--dynamic', '--wide', elf.absolutePath], "readelf ${elf.name} (install binutils)").stdout
+            (dynamic =~ /\(NEEDED\)\s+Shared library: \[([^\]]+)\]/).each { needed << it[1] }
+        }
+        (needed - bundled).collect { "${it}()(64bit)".toString() }
+    }
+
+    // jpackage's install scripts register the menu entry with xdg-desktop-menu under `set -e`. xdg-desktop-menu fails
+    // unless /usr/share/applications (or /usr/local/...) and /usr/share/desktop-directories already exist, as on
+    // minimal and headless systems, and the install then fails and leaves the package unconfigured. Rewrite the selected
+    // JBR's own templates so the scripts create those directories and never fail the install or removal over the menu
+    // entry. Every other line stays jpackage's; a template without the expected placeholder fails the build.
+    String menuDirectories = 'mkdir -p /usr/share/applications /usr/share/desktop-directories'
+    Map<String, String> menuCommands = [
+        DESKTOP_COMMANDS_INSTALL: "jasper_menu_install () {\nDESKTOP_COMMANDS_INSTALL\n}\n${menuDirectories}\n" +
+            'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2',
+        DESKTOP_COMMANDS_UNINSTALL: 'jasper_menu_uninstall () {\nDESKTOP_COMMANDS_UNINSTALL\n}\n' +
+            'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2',
+    ]
+    def writeInstallScripts = { File sdkHome, File resources, String type ->
+        // Resource-directory names jpackage looks for, and the placeholders each template must contain.
+        Map<String, List> overrides = type == 'deb' ?
+            ['template.postinst': ['postinst', ['DESKTOP_COMMANDS_INSTALL']], 'template.prerm': ['prerm', ['DESKTOP_COMMANDS_UNINSTALL']]] :
+            ['template.spec': ['jasper.spec', ['DESKTOP_COMMANDS_INSTALL', 'DESKTOP_COMMANDS_UNINSTALL']]]
+        new ZipFile(new File(sdkHome, 'jmods/jdk.jpackage.jmod')).withCloseable { archive ->
+            overrides.each { template, override ->
+                def entry = archive.getEntry("classes/jdk/jpackage/internal/resources/${template}")
+                if (entry == null) throw new GradleException("The JBR SDK's jpackage has no Linux ${template}")
+                List<String> lines = archive.getInputStream(entry).withCloseable { new String(it.readAllBytes(), StandardCharsets.UTF_8) }.split('\n', -1) as List
+                override[1].each { String placeholder ->
+                    if (lines.count { it == placeholder } != 1) throw new GradleException("jpackage's ${template} no longer has exactly one ${placeholder} line; review the install-script override")
+                    lines[lines.indexOf(placeholder)] = menuCommands[placeholder]
+                }
+                new File(resources, override[0]).setText(lines.join('\n'), 'UTF-8')
+            }
+        }
+    }
+
+    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, all placeholders filled.
+    def verifyInstallScripts = { String scripts, String label ->
+        [menuDirectories, 'jasper_menu_install "$@" || ', 'jasper_menu_uninstall "$@" || ',
+         'xdg-desktop-menu install /opt/jasper/lib/jasper-Jasper.desktop', 'xdg-desktop-menu uninstall'].each { expected ->
+            if (!scripts.contains(expected)) throw new GradleException("${label} verification failed: install scripts lack '${expected}'\n${scripts}")
+        }
+        if (scripts.contains('DESKTOP_COMMANDS_')) throw new GradleException("${label} verification failed: install scripts keep an unfilled placeholder\n${scripts}")
+    }
+
+    // Compares an unpacked package with the verified image (same bytes, no lost executable bits) and checks the menu entry.
+    // jpackage rewrites its own app-image metadata, lib/app/.jpackage.xml, when it builds a package.
+    def verifyUnpackedPackage = { File image, File unpacked, String label ->
+        File installed = new File(unpacked, installRoot.substring(1))
+        File jpackageMetadata = new File(image, 'lib/app/.jpackage.xml')
+        image.eachFileRecurse(groovy.io.FileType.FILES) { expected ->
+            if (expected == jpackageMetadata) return
+            File actual = new File(installed, image.toPath().relativize(expected.toPath()).toString())
+            if (!actual.isFile() || Files.mismatch(expected.toPath(), actual.toPath()) != -1L) {
+                throw new GradleException("${label} verification failed: ${actual} differs from the verified image or is missing")
+            }
+            if (expected.canExecute() && !actual.canExecute()) throw new GradleException("${label} verification failed: ${actual} lost its executable bit")
+        }
+        File desktop = new File(installed, 'lib').listFiles()?.find { it.name.endsWith('.desktop') }
+        String entry = desktop?.getText('UTF-8') ?: ''
+        if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains('TerminalEmulator')) {
+            throw new GradleException("${label} verification failed: the desktop entry is missing or incomplete\n${entry}")
+        }
+    }
+
+    def linuxPackage = { String type, String taskName, String requirement ->
+        String packageArchitecture = linuxArchitecture[type]
+        tasks.register(taskName) {
+            group = 'distribution'
+            description = "Creates and verifies the Linux .${type} package for this host's architecture (requires ${requirement})."
+            dependsOn(verifyPackage)
+            inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+            inputs.property('version', version)
+            outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-linux-${packageArchitecture}.${type}") })
+            doLast {
+                def context = nativeContext()
+                File image = new File(imageDirectory.get().asFile, 'Jasper')
+                File distDir = distributionDirectory.get().asFile
+                distDir.mkdirs()
+                File artifact = new File(distDir, "Jasper-${context.version}-linux-${packageArchitecture}.${type}")
+                File temporary = new File(packagingRoot.get().asFile, "${type}-work")
+                delete(artifact, temporary)
+                temporary.mkdirs()
+                try {
+                    File output = new File(temporary, 'output')
+                    // Packaging an app image, jpackage ignores --icon and installs its generic 32px Java icon
+                    // as lib/Jasper.png (the menu entry's icon) unless the resource directory supplies one.
+                    File resources = new File(temporary, 'resources')
+                    resources.mkdirs()
+                    Files.copy(nativeIcon.get().toPath(), new File(resources, 'Jasper.png').toPath())
+                    writeInstallScripts(context.sdkHome, resources, type)
+                    List<String> args = [context.jpackage.absolutePath, '--type', type, '--name', 'Jasper',
+                        '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
+                        '--about-url', 'https://github.com/an0nn30/moray',
+                        '--icon', nativeIcon.get().absolutePath,
+                        '--app-image', image.absolutePath, '--resource-dir', resources.absolutePath,
+                        '--dest', output.absolutePath, '--temp', new File(temporary, 'jpackage').absolutePath,
+                        '--linux-package-name', 'jasper', '--linux-shortcut',
+                        '--linux-menu-group', 'System;TerminalEmulator;',
+                        '--linux-app-category', type == 'deb' ? 'x11' : 'Applications/System']
+                    if (type == 'rpm') {
+                        List<String> requirements = rpmLibraryRequirements(image)
+                        if (requirements) args.addAll(['--linux-package-deps', requirements.join(', ')])
+                    }
+                    executeNative(args, "jpackage Linux .${type} (install ${requirement})")
+                    File generated = output.listFiles()?.find { it.name.endsWith(".${type}") }
+                    if (generated == null) throw new GradleException("jpackage completed without producing a .${type}; inspect ${temporary}")
+
+                    // Check the package's identity, then unpack it without installing and compare it with the image.
+                    File unpacked = new File(temporary, 'unpacked')
+                    unpacked.mkdirs()
+                    String identity
+                    if (type == 'deb') {
+                        String fields = executeNative(['dpkg-deb', '--field', generated.absolutePath, 'Package', 'Version', 'Architecture'], 'dpkg-deb --field').stdout
+                        identity = ['Package', 'Version', 'Architecture'].collect { name ->
+                            def field = fields =~ /(?m)^${name}: (\S+)$/
+                            field.find() ? field.group(1) : ''
+                        }.join(' ')
+                        executeNative(['dpkg-deb', '--extract', generated.absolutePath, unpacked.absolutePath], 'dpkg-deb --extract')
+                        verifyInstallScripts(['postinst', 'prerm'].collect { script ->
+                            executeNative(['dpkg-deb', '--info', generated.absolutePath, script], "dpkg-deb --info ${script}").stdout
+                        }.join('\n'), '.deb')
+                    } else {
+                        identity = executeNative(['rpm', '--query', '--package', '--queryformat', '%{NAME} %{VERSION} %{ARCH}', generated.absolutePath], 'rpm --query').stdout.trim()
+                        executeNative(['bash', '-c', 'set -o pipefail; cd "$1" && rpm2cpio "$2" | cpio --extract --make-directories --preserve-modification-time --quiet',
+                            'bash', unpacked.absolutePath, generated.absolutePath], 'rpm2cpio | cpio (install rpm2cpio and cpio)')
+                        verifyInstallScripts(executeNative(['rpm', '--query', '--package', '--scripts', generated.absolutePath], 'rpm --scripts').stdout, '.rpm')
+                    }
+                    def expectedIdentity = ~/^jasper ${java.util.regex.Pattern.quote(context.version)}(-[0-9]+)? ${packageArchitecture}$/
+                    if (!(identity ==~ expectedIdentity)) throw new GradleException(".${type} verification failed: package identity is '${identity}'")
+                    verifyUnpackedPackage(image, unpacked, ".${type}")
+                    Files.move(generated.toPath(), artifact.toPath())
+                } finally {
+                    // Keep failed build inputs for diagnosis; never publish an unverified package.
+                    if (artifact.isFile()) delete(temporary)
+                }
+                logger.lifecycle("Created ${artifact}")
+            }
+        }
+    }
+    def packageDeb = linuxPackage('deb', 'packageDeb', 'dpkg-deb and fakeroot')
+    def packageRpm = linuxPackage('rpm', 'packageRpm', 'rpmbuild, readelf, rpm2cpio and cpio')
+    tasks.register('packageDist') {
+        group = 'distribution'
+        description = 'Creates the Linux .deb and .rpm packages after verifying their image.'
+        dependsOn(packageDeb, packageRpm)
     }
 } else {
     tasks.register('packageDist') {

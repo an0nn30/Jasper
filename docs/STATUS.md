@@ -38,6 +38,28 @@
   Merged into local `main` on 2026-09-28 after merging main (Vim V1b) into the branch; `./gradlew check` on the
   merged tree: 3,419 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
 
+- **Linux .deb and .rpm packages** (branch `claude/linux-packages`, 2026-09-28, no plan; the user chose native
+  Linux builds plus CI over cross-building from macOS): on Linux, `:jasper-app:packageDist` runs `packageDeb` and
+  `packageRpm` (jpackage from the verified app image, installed to `/opt/jasper` with a menu entry), for x64 and
+  aarch64 hosts. `verifyPackage` gained the Linux image layout, the ELF machine of the launcher and bundled Java, and
+  the icon. The `.rpm` requires libraries by soname, read with `readelf`, because jpackage's lookup needs an RPM
+  database. Each package is unpacked and compared byte for byte with the image before it is published. The new
+  `linux-packages` workflow builds on `ubuntu-22.04` and `ubuntu-22.04-arm`, then installs every package into
+  Debian 12, Ubuntu 24.04, Fedora and openSUSE Tumbleweed containers (`packaging/linux/check-install.sh`). See
+  [Linux packages](packaging.md#linux-packages). Locally: `./gradlew check` (3,410 tests, 0 failures, 5 skipped)
+  and macOS `verifyPackage`. Pushed with the user's approval; the
+  [fifth `linux-packages` run](https://github.com/an0nn30/Jasper/actions/runs/36449030992) passed all ten jobs:
+  both packages on both architectures, and install/library/menu/removal checks on Debian 12, Ubuntu 24.04, Fedora
+  and openSUSE Tumbleweed for x64 and aarch64 (`.deb` ~97 MB, `.rpm` ~119 MB). Earlier runs found and fixed
+  jpackage replacing the menu icon with its generic Java icon (now supplied through `--resource-dir`) and the
+  install-check's container setup. At the user's request the install scripts are now generated from the JBR's
+  own templates with the menu registration made safe on headless systems (it creates the two directories
+  `xdg-desktop-menu` needs and never fails the install or removal); the install check no longer prepares them.
+  Open: the regular `ci` workflow is red for unrelated tests already failing on `main`; Linux
+  desktop acceptance (checklist in `packaging.md`) is the user's. Final run
+  [36450141658](https://github.com/an0nn30/Jasper/actions/runs/36450141658) green on all ten jobs; merged into local
+  `main` on 2026-09-28 at the user's request (the branch is on origin; `main` not pushed).
+
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
   linewise, blockwise, with block `I`/`A`/`c`, `p` over an area, `gv` and `.` on an area of the same size), `/` and `?`
@@ -109,6 +131,19 @@
   inline (user choice) with checkpoints after Tasks 4, 7 and 12; no GUI launched. Deviations: see the
   plan's status banner. Next: sub-project B (Settings dialog), then C (SDK settings API). Not pushed; not merged.
 
+- **Windows tray icon and installer build script** (`codex/windows-build-script-and-resident`,
+  2026-09-27): user-approved amendment to the background-residency spec. A resident Windows
+  process shows a notification-area icon with Open Jasper (also double-click) and Quit Jasper;
+  Quit is the normal quit path with plugin guards. `platform.ResidentTray` is a no-op when
+  headless, outside Windows or when unsupported; `JasperApplication.residentIndicator` injects it.
+  Removed when residency ends or at shutdown. `packaging\windows\Build-Installer.ps1` finds an x64
+  JBR SDK 25 and WiX 3 and builds the setup EXE (or ZIP) on Windows ARM64; verified building
+  the installer and rejecting an ARM64 SDK. On Windows: `ResidentIndicatorTest` (6),
+  `ResidentTrayTest` (3), `ApplicationBootstrapTest` (13, one existing skip) and
+  `verifyApplicationArchitecture` pass. `JasperApplicationResidencyTest` stays disabled on
+  Windows (no recorded reason). Full `check` not run. Manual, user-run: the icon appears
+  when resident, Open/double-click reveals a window, Quit exits, no icon when not resident.
+  Not merged or pushed.
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
   Editor files now use the main workspace's tab strip, rounded content frame, commands,
   status and breadcrumbs. The tab menu moves live content to/from a separate app-owned
