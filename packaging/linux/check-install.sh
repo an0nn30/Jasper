@@ -6,9 +6,10 @@ set -eu
 package=$1
 root=/opt/jasper
 
-# The package's install script registers the menu entry with xdg-desktop-menu, which needs an existing
-# applications directory; every desktop system has one, a minimal container does not.
-mkdir -p /usr/share/applications
+# The package's install script registers the menu entry with xdg-desktop-menu, which needs existing
+# system menu (/etc/xdg/menus) and applications directories; desktop systems have both, a minimal
+# container may not.
+mkdir -p /etc/xdg/menus /usr/share/applications
 
 case "$package" in
     *.deb)
