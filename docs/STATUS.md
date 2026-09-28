@@ -12,6 +12,8 @@
   before the plan was written: 1714 corpus cases (133 new in `macros.case` and `mappings.case`, 2 divergent).
   - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
   - `./gradlew check`: 4,311 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (plugin settings C3) into the branch; `./gradlew check`
+    on the merged tree: 4,311 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
   - Not done: GUI checks 71–79 of the [checklist](editor-verification.md) (user-run); plan V3b
     (the vimrc, `sethandler` lines, `let mapleader`, `<Action>`); V4; push.
 - **Plugin settings C3** (`claude/plugin-settings-c3`, 2026-09-28; plan
