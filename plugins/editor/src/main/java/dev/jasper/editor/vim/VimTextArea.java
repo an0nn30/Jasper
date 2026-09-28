@@ -56,54 +56,87 @@ public class VimTextArea extends RSyntaxTextArea {
 
     @Override protected void processKeyEvent(KeyEvent event) {
         VimEditor editor = vim;
-        if (editor != null && handled(editor, event)) {
-            event.consume();
-            return;
+        Verdict verdict = editor == null ? Verdict.PASS : handled(editor, event);
+        switch (verdict) {
+            case TAKEN -> event.consume();
+            case PASS -> super.processKeyEvent(event);
+            case HELD_BACK, HELD_BACK_RING -> {
+                if (verdict == Verdict.HELD_BACK_RING) editor.declined();
+                event.consume();
+            }
+            case ANCESTORS, ANCESTORS_RING -> {
+                // Ancestor, window and menu bindings (the app's shortcuts, the Editor's hosted Close Tab) still run;
+                // nothing in the text area's own map would, as handled() checked.
+                super.processKeyEvent(event);
+                if (!event.isConsumed() && verdict == Verdict.ANCESTORS_RING) editor.declined();
+                event.consume();
+            }
         }
-        super.processKeyEvent(event);
     }
 
-    private boolean handled(VimEditor editor, KeyEvent event) {
+    /** What happens to a key event with Vim on. */
+    private enum Verdict {
+        /** Vim took it. */
+        TAKEN,
+        /** It goes on to every binding as usual (Insert mode, ⌘, an Editor command, a sethandler ide entry). */
+        PASS,
+        /** Outside Insert mode it would run one of RSyntaxTextArea's editing actions: consumed. */
+        HELD_BACK,
+        /** As {@link #HELD_BACK}, and the bell rings: Vim would own the key. */
+        HELD_BACK_RING,
+        /** Outside Insert mode, bound nowhere in the text area: ancestors and the window may still take it. */
+        ANCESTORS,
+        /** As {@link #ANCESTORS}, and the bell rings if nothing takes it. */
+        ANCESTORS_RING
+    }
+
+    private Verdict handled(VimEditor editor, KeyEvent event) {
         switch (event.getID()) {
             case KeyEvent.KEY_PRESSED -> {
                 swallowTyped = false;
                 Optional<KeyInput> key = KeyTranslator.pressed(event.getKeyCode(), event.getModifiersEx(), MAC);
-                if (key.isPresent() && editor.offer(key.get())) return swallowTyped = true;
-                if (key.isPresent() ? editor.passesOn(key.get()) : !editor.editing()) return false;
-                if (reachesEditor(event)) return false;
-                // A key the translator leaves to KEY_TYPED (a plain character, a lone modifier) is not a Vim key:
-                // only a binding it would trigger is held back, and its character still reaches Vim.
-                if (key.isEmpty()) return bound(event) != null;
-                editor.declined();
-                return swallowTyped = true;
+                if (key.isPresent() && editor.offer(key.get())) {
+                    swallowTyped = true;
+                    return Verdict.TAKEN;
+                }
+                Verdict verdict = declined(editor, event, key);
+                // A key the translator leaves to KEY_TYPED (a plain character, a lone modifier) keeps its character
+                // for Vim; any other declined key's character must not reach DefaultKeyTypedAction in Normal mode.
+                swallowTyped = verdict != Verdict.PASS && key.isPresent();
+                return verdict;
             }
             case KeyEvent.KEY_TYPED -> {
-                if (swallowTyped) return true;
+                if (swallowTyped) return Verdict.TAKEN;
                 char c = event.getKeyChar();
                 if (Character.isHighSurrogate(c)) {
                     highSurrogate = c;
-                    return true;
+                    return Verdict.TAKEN;
                 }
                 int codePoint = Character.isLowSurrogate(c) && highSurrogate != 0 ? Character.toCodePoint(highSurrogate, c) : c;
                 highSurrogate = 0;
                 Optional<KeyInput> key = KeyTranslator.typed(codePoint, event.getModifiersEx(), MAC);
-                if (key.isPresent() && editor.offer(key.get())) return true;
-                if (key.isPresent() ? editor.passesOn(key.get()) : !editor.editing()) return false;
-                if ((event.getModifiersEx() & InputEvent.META_DOWN_MASK) != 0) return false;
-                if (key.isPresent()) editor.declined();
-                return true;
+                if (key.isPresent() && editor.offer(key.get())) return Verdict.TAKEN;
+                return declined(editor, event, key);
             }
             default -> {
-                return false;
+                return Verdict.PASS;
             }
         }
     }
 
-    /** @return whether a key Vim declined outside Insert mode goes on: a ⌘ key, or one bound to an Editor command */
-    private boolean reachesEditor(KeyEvent event) {
-        if ((event.getModifiersEx() & InputEvent.META_DOWN_MASK) != 0) return true;
+    /**
+     * The handler rule for a key Vim declined (spec 2.2): in Insert and Replace mode, for ⌘ and for a {@code sethandler}
+     * ide entry it goes on. Otherwise it is held back only when the text area's own map binds it to something other
+     * than an Editor command (one of RSyntaxTextArea's editing actions); any other key goes on to the ancestors'
+     * bindings, and rings the bell if none takes a key Vim would own.
+     */
+    private Verdict declined(VimEditor editor, KeyEvent event, Optional<KeyInput> key) {
+        if (key.isPresent() ? editor.passesOn(key.get()) : !editor.editing()) return Verdict.PASS;
+        if ((event.getModifiersEx() & InputEvent.META_DOWN_MASK) != 0) return Verdict.PASS;
         Object name = bound(event);
-        return name != null && editorCommands.contains(name);
+        if (name != null && editorCommands.contains(name)) return Verdict.PASS;
+        if (name != null) return key.isPresent() ? Verdict.HELD_BACK_RING : Verdict.HELD_BACK;
+        return key.isPresent() ? Verdict.ANCESTORS_RING : Verdict.ANCESTORS;
     }
 
     /** @return the action name the text area's focused input map (or a parent) binds the event's stroke to, or null */

@@ -18,15 +18,17 @@
     undo from outside Vim during an insert reopens the insert's undo step, and a failing Insert-mode key is not
     recorded (so a count or `.` does not replay it, and `<Esc>` always leaves Insert mode); three corpus cases cover
     the last point.
-  - Final review fixes: (1) outside Insert and Replace mode a key Vim declines reaches the text area only if it is a
-    ⌘ key or bound to an Editor command (`VimTextArea.allowInNormalMode`), otherwise it rings the bell; (2) a
+  - Final review fixes: (1) outside Insert and Replace mode a key Vim declines never runs one of RSyntaxTextArea's
+    editing actions (only Editor commands, registered with `VimTextArea.allowInNormalMode`, run from the text area's
+    own map) and rings the bell, while ancestor and window bindings (the app's shortcuts, the hosted Close Tab)
+    still fire, as a re-review required; (2) a
     failing Insert-mode key rings the bell and the insert goes on, so `.` still ends in Normal mode; (3) no redo
     while an insert's undo step has edits, and undo/redo reopen the step in a `finally`; (4) `SettingsFile` keeps
     the file's own line breaks, and the save-failure dialog names the exception; (5) `"+`/`"*` text has `\r\n` and
     `\r` turned into `\n`; (6) `Buffer` reads the document's line elements instead of re-splitting the text after
     every edit; (7) the deferred caret clamp checks the editor is still attached, and committed IME text is dropped
     outside Insert mode. Two corpus cases cover (2).
-  - `./gradlew check`: 2822 tests, 2817 passed, 0 failed, 5 skipped.
+  - `./gradlew check`: 2823 tests, 2818 passed, 0 failed, 5 skipped.
   - Not done: GUI checks 21–30 of the [checklist](editor-verification.md) (user-run); plans V1b, V2, V3 and V4; push.
 
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):

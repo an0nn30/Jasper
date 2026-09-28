@@ -147,6 +147,7 @@ public final class VimEditor {
     void insertKeyFailed(VimFailure failure) {
         bells++;
         if (!failure.getMessage().isEmpty()) message(failure.getMessage(), true);
+        fire();
     }
 
     /**

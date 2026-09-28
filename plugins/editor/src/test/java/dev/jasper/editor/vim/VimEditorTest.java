@@ -392,4 +392,44 @@ class VimEditorTest {
         }));
         System.out.println("1000 xj on a 1 MB document: " + took[0] + " ms");
     }
+
+    /** Puts the area in a panel whose ancestor map binds the stroke, as the app's workspace and hosted commands are. */
+    private static AtomicInteger bindInAncestor(VimTextArea area, KeyStroke stroke, String id) {
+        var parent = new javax.swing.JPanel();
+        parent.add(area);
+        var runs = new AtomicInteger();
+        parent.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(stroke, id);
+        parent.getActionMap().put(id, new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent event) { runs.incrementAndGet(); }
+        });
+        return runs;
+    }
+
+    @Test void theAppsShortcutsOnAncestorsStillFireInNormalMode() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\n");
+            int ctrlShift = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+            var newTab = bindInAncestor(area, KeyStroke.getKeyStroke(KeyEvent.VK_T, ctrlShift), "app.newTab");
+            ((JComponent) area.getParent()).getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK), "app.newTab");
+            int bells = editor.bells();
+            var event = pressed(area, ctrlShift, KeyEvent.VK_T);
+            area.processKeyEvent(event);
+            assertThat(newTab).as("Ctrl+Shift+T reaches the workspace's binding").hasValue(1);
+            assertThat(event.isConsumed()).isTrue();
+            var closeTab = pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_W);
+            area.processKeyEvent(closeTab);
+            area.processKeyEvent(typed(area, InputEvent.CTRL_DOWN_MASK, (char) 23));
+            assertThat(newTab).as("Ctrl+W reaches the hosted Close Tab binding").hasValue(2);
+            assertThat(editor.bells()).as("a key an ancestor handled does not ring").isEqualTo(bells);
+            area.processKeyEvent(pressed(area, 0, KeyEvent.VK_TAB));
+            area.processKeyEvent(typed(area, 0, '\t'));
+            area.processKeyEvent(pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_F11));
+            assertThat(area.getText()).isEqualTo("abc\n");
+            assertThat(editor.bells()).as("Tab (held back) and an unhandled Ctrl+F11 ring").isEqualTo(bells + 2);
+            area.processKeyEvent(pressed(area, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_SHIFT));
+            assertThat(editor.bells()).as("a lone modifier never rings").isEqualTo(bells + 2);
+        });
+    }
 }
