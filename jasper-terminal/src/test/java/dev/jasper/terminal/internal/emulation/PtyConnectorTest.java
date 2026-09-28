@@ -44,6 +44,26 @@ class PtyConnectorTest {
         }
     }
 
+    /** winpty dropped OSC; ConPTY must pass the title and the working-directory report through (spec section 4). */
+    @Test
+    @org.junit.jupiter.api.condition.EnabledOnOs(OS.WINDOWS)
+    void conPtyPassesTitlesAndWorkingDirectoryReportsThrough() throws Exception {
+        String script = "[Console]::Write(-join ([char]27, ']2;jasper-conpty', [char]7, [char]27, ']7;file://localhost/C:/Windows', [char]7));"
+            + " Start-Sleep -Seconds 3";
+        var options = SessionLaunchOptions.builder()
+            .command(List.of("powershell.exe", "-NoLogo", "-NoProfile", "-Command", script))
+            .environment(System.getenv()).workingDirectory(Path.of(System.getProperty("user.home"))).build();
+        try (TerminalSession session = TerminalSession.start(options)) {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (!"jasper-conpty".equals(session.title()) || session.workingDirectory().isEmpty()) {
+                if (System.nanoTime() > deadline) throw new AssertionError("title " + session.title() + ", directory "
+                    + session.workingDirectory() + ", screen:\n" + screenText(session));
+                Thread.sleep(10);
+            }
+            assertThat(session.workingDirectory()).contains(Path.of("C:\\Windows"));
+        }
+    }
+
     @Test
     void programOutputReachesTheScreenAndExitCodeIsReported() throws Exception {
         List<String> command = WINDOWS

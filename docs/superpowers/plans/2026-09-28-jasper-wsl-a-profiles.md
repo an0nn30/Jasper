@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-1 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -74,7 +74,7 @@ Modified: `jasper-terminal` (`internal/process/PtyChild.java`, `internal/shell/D
 
 ### Task 0: Commit the spec and plans
 
-- [ ] **Step 1: Commit the untracked design documents**
+- [x] **Step 1: Commit the untracked design documents**
 
 ```bash
 git branch --show-current
@@ -101,7 +101,7 @@ Skip the commit if `git status` shows these files already committed.
 - Produces: package-private `PtyChild.builder(List<String> command, Map<String,String> environment, Path directory, int columns, int rows, String osName)` returning a configured `com.pty4j.PtyProcessBuilder`; `PtyChild.start` uses it with `System.getProperty("os.name")`.
 - Consumes: pty4j 0.13.10 `PtyProcessBuilder.setUseWinConPty(boolean)` (verified with `javap`; the private field is `myUseWinConPty`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `PtyChildBuilderTest.java`:
 
@@ -157,12 +157,12 @@ Add to `PtyConnectorTest.java`, after `powershellStartsWithInheritedWindowsDrive
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-terminal:test --tests 'dev.jasper.terminal.internal.process.PtyChildBuilderTest' --tests 'dev.jasper.terminal.internal.emulation.PtyConnectorTest'`
 Expected: FAIL: compilation error, `builder` does not exist in `PtyChild`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `PtyChild.java`, replace the whole `start` method with:
 
@@ -194,7 +194,7 @@ In `PtyChild.java`, replace the whole `start` method with:
     }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-terminal:test --tests 'dev.jasper.terminal.internal.process.PtyChildBuilderTest' --tests 'dev.jasper.terminal.internal.emulation.PtyConnectorTest'`
 Expected on Windows: PASS, including `powershellStartsWithInheritedWindowsDriveEnvironment`,
@@ -206,7 +206,7 @@ arrives, or any existing PTY test regresses: **stop**, keep the failure output, 
 spec's escape-hatch question (section 4). Do not continue to Task 2 without their decision, because every WSL
 directory feature depends on OSC 7 reaching Jasper.
 
-- [ ] **Step 5: Record the known-failure comparison**
+- [x] **Step 5: Record the known-failure comparison**
 
 Run: `./gradlew :jasper-terminal:test --continue`
 Note which of `ShellIntegrationSessionTest > aDirectoryReportedUnderAnotherHostIsRemoteUntilALocalOneFollows()` and
@@ -214,7 +214,7 @@ Note which of `ShellIntegrationSessionTest > aDirectoryReportedUnderAnotherHostI
 Windows, and any other failure; Task 11 writes these into `docs/windows-startup-verification.md`. Neither test uses a
 PTY, so ConPTY is not expected to change them.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git branch --show-current
