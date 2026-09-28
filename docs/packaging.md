@@ -60,6 +60,12 @@ $env:PATH = "C:\path\to\wix;$env:JAVA_HOME\bin;$env:PATH"
     '-Dorg.gradle.java.installations.auto-detect=false' :jasper-app:packageInstaller
 ```
 
+`packaging\windows\Build-Installer.ps1` does the same without changing the calling
+shell: it finds an x64 JBR SDK 25 (`JAVA_HOME`, `~\.jdks`, `~\.gradle\jdks`) and WiX
+3 (PATH, Tauri's `%LOCALAPPDATA%\tauri\WixTools314`, the WiX v3 installer), and
+rejects an ARM64 SDK. Options: `-Package Dist` builds the ZIP instead,
+`-Version 1.0.1`, `-JavaHome` and `-WixPath` override discovery.
+
 Selecting the x64 SDK explicitly matters when both ARM64 and x64 SDKs are installed.
 On Windows ARM64 the x64 build tools run under Windows emulation and still produce
 an **x64** installer, not a native ARM64 package. The Gradle JVM and selected JBR
