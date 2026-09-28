@@ -5,7 +5,17 @@ package dev.jasper.editor.vim;
  * pending command and stops a running repeat. Thrown from anywhere inside a command; it carries no stack trace.
  */
 final class VimFailure extends RuntimeException {
-    VimFailure(String message) { super(message, null, false, false); }
+    /** A failure Vim gives no sign of: no message and no bell (an Ex address that stops short). */
+    final boolean quiet;
+
+    VimFailure(String message) { this(message, false); }
+
+    private VimFailure(String message, boolean quiet) {
+        super(message, null, false, false);
+        this.quiet = quiet;
+    }
 
     static VimFailure bell() { return new VimFailure(""); }
+
+    static VimFailure quiet() { return new VimFailure("", true); }
 }

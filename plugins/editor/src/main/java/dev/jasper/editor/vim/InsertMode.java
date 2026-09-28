@@ -85,6 +85,9 @@ final class InsertMode {
      * @param autoIndentLine the line autoindent just indented (for Vim's did_ai), or -1
      */
     void begin(String command, int count, boolean replace, int autoIndentLine) {
+        // Vim saves for undo at the first character typed, so undo puts the cursor where the insert began.
+        Pos at = editor.cursor();
+        editor.area().vimUndo().stepCursor(at.line, at.col);
         session = new Session(command, count, replace, false, editor.cursor(), autoIndentLine);
         editor.mode(replace ? Mode.REPLACE : Mode.INSERT);
     }
@@ -257,8 +260,11 @@ final class InsertMode {
             removeAutoIndent();
             editor.vim().registers().lastInserted(s.inserted.toString());
             Pos p = editor.cursor();
-            // The '^ mark: where Insert mode ended, before the cursor moves back (ins_esc).
+            // The '^ mark: where Insert mode ended, before the cursor moves back (ins_esc); '[ and '] around the
+            // inserted text (stop_insert).
             editor.marks().set('^', p);
+            editor.marks().set('[', s.start);
+            editor.marks().set(']', p);
             session = null;
             editor.mode(Mode.NORMAL);
             if (p.col > 0) editor.setCursor(new Pos(p.line, Text.previous(editor.buffer().line(p.line), p.col)));

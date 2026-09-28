@@ -20,23 +20,27 @@ final class MarkCommands {
         commands.visual("m", "set mark {char} at the cursor", true, false, MarkCommands::set);
     }
 
-    /** nv_mark and setmark_pos. */
+    /** nv_mark. */
     static void set(Context c) {
         int name = c.argumentChar();
-        Marks marks = c.editor.marks();
-        Pos cursor = c.cursor();
-        if (name == '\'' || name == '`') marks.setpcmarkKeep(cursor);
-        else if (name >= 'a' && name <= 'z' || name == '[' || name == ']' || name == '"') marks.set((char) name, cursor);
-        else if (name == '<') setVisual(c, Visual.START, cursor);
-        else if (name == '>') setVisual(c, Visual.END, cursor);
-        else if (name >= 'A' && name <= 'Z') c.vim.globalMark((char) name, c.editor, cursor);
-        else throw Context.fail();
+        if (name < 0 || !setmark(c.editor, (char) name, c.cursor())) throw Context.fail();
     }
 
-    private static void setVisual(Context c, char which, Pos cursor) {
-        Marks marks = c.editor.marks();
-        marks.set(which, cursor);
-        if (marks.visualMode == null) marks.visualMode = Mode.VISUAL;
+    /**
+     * setmark_pos with the cursor at {@code pos}, for {@code m} and {@code :mark}.
+     *
+     * @return false for a name that is not a mark
+     */
+    static boolean setmark(VimEditor editor, char name, Pos pos) {
+        Marks marks = editor.marks();
+        if (name == '\'' || name == '`') marks.setpcmarkKeep(pos);
+        else if (name >= 'a' && name <= 'z' || name == '[' || name == ']' || name == '"') marks.set(name, pos);
+        else if (name == '<' || name == '>') {
+            marks.set(name == '<' ? Visual.START : Visual.END, pos);
+            if (marks.visualMode == null) marks.visualMode = Mode.VISUAL;
+        } else if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') editor.vim().globalMark(name, editor, pos);
+        else return false;
+        return true;
     }
 
     /**
@@ -57,7 +61,7 @@ final class MarkCommands {
                 yield pos;
             }
             default -> {
-                if (name >= 'A' && name <= 'Z') yield editor.vim().globalMark(name, editor);
+                if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') yield editor.vim().globalMark(name, editor);
                 yield marks.get(name);
             }
         };

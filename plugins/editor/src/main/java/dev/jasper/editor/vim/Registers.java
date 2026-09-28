@@ -55,6 +55,7 @@ public final class Registers {
     private final VimHost host;
     private char previous;
     private String lastInserted = "";
+    private String lastCommand = "";
     private Content clipboardWritten;
 
     /** @param host reaches the clipboard */
@@ -70,6 +71,7 @@ public final class Registers {
             case '"' -> previous == 0 ? Optional.empty() : get(previous);
             case '*', '+' -> clipboard(register);
             case '.' -> lastInserted.isEmpty() ? Optional.empty() : Optional.of(Content.of(lastInserted, Type.CHAR));
+            case ':' -> lastCommand.isEmpty() ? Optional.empty() : Optional.of(Content.of(lastCommand, Type.CHAR));
             case '_' -> Optional.empty();
             default -> Optional.ofNullable(values.get(register));
         };
@@ -106,7 +108,7 @@ public final class Registers {
     /** @return whether the name is a register a command may name */
     static boolean valid(char name, boolean writing) {
         if (Character.isLetterOrDigit(name) && name < 128 || "\"-_*+".indexOf(name) >= 0) return true;
-        return !writing && name == '.';
+        return !writing && (name == '.' || name == ':');
     }
 
     /**
@@ -169,6 +171,9 @@ public final class Registers {
 
     /** @param text the text of the last insert, for {@code ".} and {@code i_CTRL-A} */
     void lastInserted(String text) { lastInserted = text; }
+
+    /** The {@code :} register: the last command line run. */
+    void lastCommand(String text) { lastCommand = text; }
 
     String lastInserted() { return lastInserted; }
 

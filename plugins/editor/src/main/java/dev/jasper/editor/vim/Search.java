@@ -8,7 +8,9 @@ import java.util.regex.Matcher;
 /**
  * Pattern search (spec 3.7), ported from Vim's search.c: searchit (the count loop, where a forward search may start
  * and 'wrapscan') and do_search (offsets and {@code ;}), with normal.c's normal_search, nv_next and nv_ident for
- * {@code n}, {@code N}, {@code *} and {@code #}. The last pattern, its direction and offset are global, as in Vim.
+ * {@code n}, {@code N}, {@code *} and {@code #}. As in Vim, the last search pattern and the last substitute pattern
+ * are kept apart (spats[RE_SEARCH] and spats[RE_SUBST]) with a note of which was used last; an empty pattern means the
+ * last used one. The patterns, direction, offset and the substitute command's remembered state are global.
  */
 final class Search {
     /** The last search's offset (Vim's soffset): a line offset, or a character offset from the match's start or end. */
@@ -19,14 +21,66 @@ final class Search {
     /** A match: its start, and the position after its end. */
     record Match(Pos start, Pos end) { }
 
-    private String pattern;
+    /** Vim's RE_SEARCH and RE_SUBST. */
+    static final int SEARCH = 0, SUBSTITUTE = 1;
+    /** The last search and substitute patterns (spats), and which one was used last (last_idx). */
+    private final String[] patterns = new String[2];
+    private int lastIdx;
+    /** The pattern the last search or substitute used, for messages (mr_pattern). */
+    private String used;
     private char direction = '/';
+    /** The last substitute string, for {@code :s} without a pattern (ex_cmds.c's old_sub), or null. */
+    String oldSub;
+    /** The last substitute string after {@code ~} expansion, for {@code ~} (regexp.c's reg_prev_sub), or null. */
+    String prevSub;
+    /** The flags {@code :s} keeps for {@code :&&} (ex_cmds.c's static subflags). */
+    boolean subAll, subAsk, subCount, subError = true, subPrint, subList, subNumber;
+    char subIgnoreCase;
     private Offset offset = Offset.NONE;
     private boolean noHighlight;
     private final List<String> history = new ArrayList<>();
 
-    /** @return the last search pattern, or null */
-    String pattern() { return pattern; }
+    /** @return the last used pattern, search or substitute (last_search_pat), or null */
+    String pattern() { return patterns[lastIdx]; }
+
+    /** @return the last search pattern ({@code /} register), or null */
+    String searchPattern() { return patterns[SEARCH]; }
+
+    /** @return the pattern the last search or substitute used (get_search_pat) */
+    String usedPattern() { return used; }
+
+    /** save_re_pat: a pattern given to a search or substitute becomes the last one of its kind, and the last used. */
+    void save(int idx, String pat) {
+        patterns[idx] = pat;
+        lastIdx = idx;
+        noHighlight = false;
+    }
+
+    /**
+     * search_regcomp's choice of pattern: an empty one means the last pattern of kind {@code use} (-1 for the last
+     * used), which fails when there is none; a new one is remembered as {@code saveAs} (-1 for both kinds).
+     *
+     * @return the pattern to compile
+     */
+    String choose(String pat, int saveAs, int use) {
+        if (pat == null || pat.isEmpty()) {
+            int i = use < 0 ? lastIdx : use;
+            if (patterns[i] == null)
+                throw new VimFailure(use == SUBSTITUTE ? "E33: No previous substitute regular expression" : "E35: No previous regular expression");
+            pat = patterns[i];
+            if (saveAs >= 0 && saveAs != i) save(saveAs, pat);
+            else if (saveAs < 0) {
+                if (i != SEARCH) save(SEARCH, pat);
+                if (i != SUBSTITUTE) save(SUBSTITUTE, pat);
+            }
+        } else {
+            remember(pat);
+            if (saveAs == SEARCH || saveAs < 0) save(SEARCH, pat);
+            if (saveAs == SUBSTITUTE || saveAs < 0) save(SUBSTITUTE, pat);
+        }
+        used = pat;
+        return pat;
+    }
 
     /** @return {@code /} or {@code ?} */
     char direction() { return direction; }
@@ -184,8 +238,11 @@ final class Search {
         while (true) {
             String searchstr = rest;
             if (rest == null || rest.isEmpty() || rest.charAt(0) == dir) {
-                if (pattern == null) throw new VimFailure("E35: No previous regular expression");
-                searchstr = "";
+                // do_search: with no search pattern yet, the substitute pattern is searched for.
+                if (patterns[SEARCH] == null) {
+                    if (patterns[SUBSTITUTE] == null) throw new VimFailure("E35: No previous regular expression");
+                    searchstr = patterns[SUBSTITUTE];
+                } else searchstr = "";
             }
             String after = null;
             if (rest != null && !rest.isEmpty()) {
@@ -212,7 +269,9 @@ final class Search {
                 offset = new Offset(line, endOff, off);
                 after = p.substring(i);
             }
-            if (!searchstr.isEmpty()) pattern = searchstr;
+            String pattern = searchstr.isEmpty() ? patterns[lastIdx] : searchstr;
+            if (!searchstr.isEmpty()) save(SEARCH, searchstr);
+            used = pattern;
             end = offset.end();
             // A character offset is taken off the start position, so ?pat?e+2 and /pat/s-2 do not get stuck.
             if (!offset.line() && offset.off() != 0) {
@@ -225,6 +284,8 @@ final class Search {
                     if (n < 0) pos = new Pos(b.count(), 0);
                 }
             }
+            // do_search echoes the search ("/pattern/e ") before it searches; a warning or error then replaces it.
+            c.editor.message(echo(dir) + " ", false);
             VimRegex re = compile(c, pattern, noSmartcase);
             Pos found = searchit(c, pos, dir == '/', re, c.count, end, pattern);
             if (found == null) return null;
@@ -246,8 +307,6 @@ final class Search {
             dir = after.charAt(1);
             rest = after.substring(2);
         }
-        // do_search echoes the search ("/pattern/e"), unless wrapping gave its warning.
-        if (!lastWrapped) c.editor.message(echo(dir), false);
         // check_cursor: in Normal mode and with an operator the cursor stays on a character.
         String text = b.line(pos.line);
         if (!c.inVisual() && pos.col >= text.length() && !text.isEmpty()) pos = new Pos(pos.line, Text.last(text));
@@ -256,9 +315,62 @@ final class Search {
         return target;
     }
 
+    /**
+     * An Ex address {@code /pat/} or {@code ?pat?} (get_address calling do_search without SEARCH_OPT): the pattern,
+     * and a line offset after it, become the last search, and the search starts after the end of line {@code from}
+     * going forward, or at its start going back, so it never matches in that line. Line 0 is before the first line.
+     *
+     * @param text the text after the {@code /} or {@code ?}
+     * @return the line found (1-based) and how many characters of {@code text} the pattern and offset took
+     */
+    int[] address(Context c, char dir, String text, int from) {
+        direction = dir;
+        int stop = skipPattern(text, dir);
+        String pat = text.substring(0, stop);
+        int p = stop < text.length() ? stop + 1 : stop;
+        boolean lineOffset = false;
+        long off = 0;
+        if (p < text.length() && (text.charAt(p) == '+' || text.charAt(p) == '-' || Character.isDigit(text.charAt(p)))) {
+            lineOffset = true;
+            char sign = text.charAt(p);
+            if (Character.isDigit(sign) || p + 1 < text.length() && Character.isDigit(text.charAt(p + 1))) {
+                int q = sign == '+' || sign == '-' ? p + 1 : p, e = q;
+                while (e < text.length() && Character.isDigit(text.charAt(e))) e++;
+                off = Long.parseLong(text.substring(q, Math.min(e, q + 18))) * (sign == '-' ? -1 : 1);
+                p = e;
+            } else {
+                off = sign == '-' ? -1 : 1;
+                p++;
+            }
+        }
+        offset = new Offset(lineOffset, false, off);
+        String pattern = choose(pat, SEARCH, -1);
+        Buffer b = c.buffer;
+        Pos start = from <= 0 ? new Pos(-1, 0) : new Pos(from - 1, dir == '/' ? Integer.MAX_VALUE : 0);
+        lastWrapped = false;
+        Pos found = searchit(c, start, dir == '/', compile(c, pattern, false), 1, false, pattern);
+        int lnum = found.line + 1;
+        if (lineOffset) lnum = (int) Math.max(1, Math.min(b.count(), lnum + off));
+        return new int[] { lnum, p };
+    }
+
+    /**
+     * {@code \/}, {@code \?} and {@code \&} as an Ex address: the next line after {@code from} (or before it)
+     * matching the last search pattern, or for {@code \&} the last substitute pattern.
+     *
+     * @return the line found (1-based)
+     */
+    int repeatAddress(Context c, char which, int from) {
+        String pattern = choose("", SEARCH, which == '&' ? SUBSTITUTE : SEARCH);
+        Pos start = new Pos(Math.max(0, from) - 1, which != '?' ? Integer.MAX_VALUE : 0);
+        if (from <= 0) start = new Pos(-1, 0);
+        Pos found = searchit(c, start, which != '?', compile(c, pattern, false), 1, false, pattern);
+        return found.line + 1;
+    }
+
     /** @return the search as do_search echoes it: the pattern and any offset */
     private String echo(char dir) {
-        StringBuilder out = new StringBuilder().append(dir).append(pattern);
+        StringBuilder out = new StringBuilder().append(dir).append(used);
         if (offset.line() || offset.end() || offset.off() != 0) {
             out.append(dir);
             if (offset.end()) out.append('e');
@@ -291,7 +403,7 @@ final class Search {
         Options o = c.options;
         try {
             return VimRegex.compile(pat, new VimRegex.Settings(o.flag("ignorecase"), o.flag("smartcase") && !noSmartcase,
-                o.keywords().javaClass(), null));
+                o.keywords().javaClass(), prevSub));
         } catch (IllegalArgumentException bad) {
             throw new VimFailure(bad.getMessage());
         }
@@ -480,6 +592,7 @@ final class Search {
 
     /** @return every match in the text, for 'hlsearch'; empty when there is no pattern or it is invalid */
     List<Match> all(VimEditor editor) {
+        String pattern = pattern();
         if (pattern == null || noHighlight) return List.of();
         VimRegex re = quietly(editor, pattern);
         return re == null ? List.of() : matches(editor.buffer(), re);
@@ -493,7 +606,7 @@ final class Search {
      */
     Match preview(VimEditor editor, char type, String line) {
         String pat = line.substring(0, skipPattern(line, type));
-        if (pat.isEmpty()) pat = pattern;
+        if (pat.isEmpty()) pat = pattern();
         if (pat == null) return null;
         VimRegex re = quietly(editor, pat);
         if (re == null) return null;
@@ -512,7 +625,7 @@ final class Search {
     private static VimRegex quietly(VimEditor editor, String pat) {
         try {
             Options o = editor.options();
-            return VimRegex.compile(pat, new VimRegex.Settings(o.flag("ignorecase"), o.flag("smartcase"), o.keywords().javaClass(), null));
+            return VimRegex.compile(pat, new VimRegex.Settings(o.flag("ignorecase"), o.flag("smartcase"), o.keywords().javaClass(), editor.vim().search().prevSub));
         } catch (IllegalArgumentException bad) {
             return null;
         }
