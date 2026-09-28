@@ -36,13 +36,39 @@ import java.util.function.Consumer;
 
 /** Application-owned config I/O. Construct off EDT; subsequent work is serialized on one worker. */
 public final class ConfigService implements AutoCloseable {
-    public record State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present) {
+    /**
+     * The published configuration.
+     *
+     * @param legacyKeys old keys the file still uses
+     * @param deadTables old tables Migrate Config may remove
+     */
+    public record State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present,
+                        List<LegacyKey> legacyKeys, List<List<String>> deadTables) {
         public State {
             Objects.requireNonNull(snapshot, "snapshot");
             Objects.requireNonNull(file, "file");
             diagnostics = List.copyOf(diagnostics);
+            legacyKeys = List.copyOf(legacyKeys);
+            deadTables = deadTables.stream().map(List::copyOf).toList();
         }
+
+        /** A state with nothing to migrate. */
+        public State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present) {
+            this(snapshot, diagnostics, file, present, List.of(), List.of());
+        }
+
+        /** Whether Migrate Config has old keys or dead tables to rewrite. */
+        public boolean migratable() { return !legacyKeys.isEmpty() || !deadTables.isEmpty(); }
     }
+
+    /**
+     * What Migrate Config did.
+     *
+     * @param changes old keys and tables rewritten; zero when there was nothing to migrate
+     * @param backup the copy of the original file
+     * @param state the state published afterwards
+     */
+    public record Migration(int changes, Optional<Path> backup, State state) { }
 
     private record Fingerprint(boolean present, FileTime modified, long size) { }
     private static final int MAX_BYTES = 1024 * 1024;
@@ -173,6 +199,36 @@ public final class ConfigService implements AutoCloseable {
                 refresh(true, true);
                 throw stale;
             }
+        });
+    }
+
+    /**
+     * Migrate Config: backs the file up beside itself, then rewrites old keys to the current layout, on the config
+     * worker. Nothing is written when there is nothing to migrate or the file is missing; a rejected file is refused.
+     *
+     * @param pluginSettingsExist whether a plugin already has its own settings file, so its old table may go
+     */
+    public CompletableFuture<Migration> migrate(java.util.function.Predicate<String> pluginSettingsExist) {
+        Objects.requireNonNull(pluginSettingsExist, "pluginSettingsExist");
+        return submit(() -> {
+            if (TomlStateFile.readBounded(file, MAX_BYTES, "Configuration").isEmpty())
+                return new Migration(0, Optional.empty(), refresh(true, true));
+            var planned = new java.util.concurrent.atomic.AtomicReference<ConfigMigration.Outcome>();
+            var backup = new java.util.concurrent.atomic.AtomicReference<Path>();
+            State state = transact(".migrate-", source -> {
+                var outcome = ConfigMigration.plan(source.text(), source.parsed(), pluginSettingsExist);
+                if (outcome.isEmpty()) return source.text();
+                planned.set(outcome.get());
+                try {
+                    backup.set(ConfigMigration.backUp(target(), source.text()));
+                } catch (IOException failure) {
+                    throw new UncheckedIOException(failure);
+                }
+                return outcome.get().text();
+            });
+            return planned.get() == null
+                ? new Migration(0, Optional.empty(), state)
+                : new Migration(planned.get().changes(), Optional.of(backup.get()), state);
         });
     }
 
@@ -312,7 +368,9 @@ public final class ConfigService implements AutoCloseable {
             }
             String text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
             var parsed = ConfigLoader.parse(file, text, macOs);
-            return new State(parsed.rejected() ? lastGood : parsed.snapshot(), parsed.diagnostics(), file, true);
+            return parsed.rejected()
+                ? new State(lastGood, parsed.diagnostics(), file, true)
+                : new State(parsed.snapshot(), parsed.diagnostics(), file, true, parsed.legacyKeys(), parsed.deadTables());
         } catch (NoSuchFileException ignored) {
             return missingState(lastGood);
         } catch (CharacterCodingException ignored) {
