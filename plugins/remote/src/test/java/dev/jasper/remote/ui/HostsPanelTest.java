@@ -68,7 +68,7 @@ class HostsPanelTest {
         panel.setDistros(List.of(pwsh), profile -> 0);
         assertThat(rows(panel)).isEmpty();
         assertThat(panel.empty.isVisible()).isTrue();
-        assertThat(panel.empty.getText()).isEqualTo("No hosts yet — Add or Import from ~/.ssh/config");
+        assertThat(panel.empty.getText()).isEqualTo("No hosts yet \u2014 Add or Import from ~/.ssh/config");
         panel.setHosts(List.of(prod), Optional.empty());
         assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
     }
@@ -81,9 +81,9 @@ class HostsPanelTest {
         assertThat(header.getText()).isEqualTo("WSL   2");
         assertThat(header.getToolTipText()).as("only the default host group can be renamed").isNull();
         var busy = render(panel, 2);
-        assertThat(labels(busy)).contains("Debian", "WSL 2", "●", "2");
+        assertThat(labels(busy)).contains("Debian", "WSL 2", "\u25CF", "2");
         assertThat(busy.getAccessibleContext().getAccessibleName()).isEqualTo("Debian, WSL 2, 2 sessions");
-        assertThat(labels(render(panel, 1))).contains("Ubuntu", "WSL 1").doesNotContain("●");
+        assertThat(labels(render(panel, 1))).contains("Ubuntu", "WSL 1").doesNotContain("\u25CF");
         assertThat(panel.selectedDistro()).as("the first selectable row").contains(ubuntu);
         assertThat(panel.card.isVisible()).isTrue();
         assertThat(panel.cardName.getText()).isEqualTo("Ubuntu");
@@ -282,17 +282,17 @@ class HostsPanelTest {
 
     @Test void rowsKeepSessionCountsAndSearchableDetails() {
         var panel = new HostsPanel(actions);
-        panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu · 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
+        panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu \u00B7 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
         panel.setHosts(List.of(nas, prod), Optional.empty());
         panel.search.setText("ubuntu");
         assertThat(panel.list.getModel().getSize()).isEqualTo(2);
         var component = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(1), 1, false, false);
         assertThat(labels(component)).contains("nas");
         assertThat(component.getAccessibleContext().getAccessibleName()).contains("2 sessions");
-        assertThat(((javax.swing.JComponent) component).getToolTipText()).contains("me@nas.local:2222", "Ubuntu · 10.0.0.2");
+        assertThat(((javax.swing.JComponent) component).getToolTipText()).contains("me@nas.local:2222", "Ubuntu \u00B7 10.0.0.2");
         panel.select(nas.id());
         assertThat(panel.cardAddress.getText()).isEqualTo("me@nas.local:2222");
-        assertThat(panel.cardInfo.getText()).isEqualTo("Ubuntu · 10.0.0.2");
+        assertThat(panel.cardInfo.getText()).isEqualTo("Ubuntu \u00B7 10.0.0.2");
     }
     private static List<String> labels(java.awt.Component component) {
         var out = new ArrayList<String>();

@@ -2,10 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 1-6 done (plan A is implemented on this branch, which satisfies "plan A merged").
+**Status:** In progress: Tasks 1-7 done (plan A is implemented on this branch, which satisfies "plan A merged").
 Record every deviation from this text here and in `docs/STATUS.md`.
 
-Deviations so far: none in code. Tasks 1-3 applied as written: plan A landed `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)`, `OpenSpec.Local(Optional<Path>, Optional<String>)` and the `JasperApplication.shellProfiles` field (created in the constructor, before `startPlugins`) under the names this plan assumed, and every edit anchor still matched. `knownProfile` compares ids exactly (as the fake does), although plan A resolves `wsl:` ids case-insensitively when launching. Plugins match profile ids exactly; they receive canonical ids from profiles(), so plan A's case-insensitive wsl: matching is not needed there. Tasks 4-6 applied as written.
+Deviations so far: none in code. Tasks 1-3 applied as written: plan A landed `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)`, `OpenSpec.Local(Optional<Path>, Optional<String>)` and the `JasperApplication.shellProfiles` field (created in the constructor, before `startPlugins`) under the names this plan assumed, and every edit anchor still matched. `knownProfile` compares ids exactly (as the fake does), although plan A resolves `wsl:` ids case-insensitively when launching. Plugins match profile ids exactly; they receive canonical ids from profiles(), so plan A's case-insensitive wsl: matching is not needed there. Tasks 4-7 applied as written, with one hygiene fix: the Task 5 and 6 commits left the replaced `HostsPanel.java` and `RemoteScope.java` (and `HostsPanelTest.java`) with raw non-ASCII literals (the dash, ellipsis, stars, dot and middle dot, as the files had before); Task 7's commit rewrites them as Java escapes, as the plan's code intended.
 
 **Goal:** Plugins can list the shells Jasper detected (SDK 0.8.6 `Terminals.profiles()`) and open one by id; the
 Remote plugin uses that to show a read-only "WSL" group of distributions first in its panel (renamed "Sessions"),
@@ -1991,7 +1991,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   titled `<name> (<detail>)`, placed before the hosts in the Sessions dropdown; `SessionsToolbar.distroActionId(String)`.
 - Consumes: Tasks 1 to 6; `FakePluginHost.setShellProfiles` (Task 3).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `RemotePluginTest.java`:
 - Add imports `import dev.jasper.remote.ui.HostRows;` (after `import dev.jasper.remote.ui.HostsPanel;`),
@@ -2078,12 +2078,12 @@ In `RemotePluginTest.java`:
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test --tests "dev.jasper.remote.RemotePluginTest"`
 Expected: FAIL: the panel title assertions (still "SSH hosts"), no WSL rows, and no distribution action in the toolbar.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Replace `SessionsToolbar.java` with:
 
@@ -2345,7 +2345,7 @@ with
 11. In the class Javadoc, change "the provider, the panel, the scope" wording to read "the session provider, the Sessions panel
     (saved hosts and WSL distributions), the scope". `refreshStatus` is unchanged: the status item counts SSH channels only.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `./gradlew :jasper-plugin-remote:test`
 Expected: BUILD SUCCESSFUL; the two new tests pass and every existing Remote test still passes.
@@ -2353,7 +2353,7 @@ Expected: BUILD SUCCESSFUL; the two new tests pass and every existing Remote tes
 Run: `./gradlew verifyPluginArchitecture :jasper-app:test --tests "dev.jasper.app.plugins.BundledSamplePluginTest" --tests "dev.jasper.app.plugins.RemoteShortcutConfigTest"`
 Expected: BUILD SUCCESSFUL (the staged Remote 0.5.0 loads against SDK 0.8.6 and keeps its toggle title).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current

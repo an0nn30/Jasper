@@ -24,7 +24,9 @@ import dev.jasper.sdk.terminal.Direction;
 import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.PendingSession;
+import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionSpec;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -63,7 +65,7 @@ import javax.swing.Timer;
 
 /**
  * Wires the plugin: the hosts store and its poll, trust, the agent, the connection registry, the session
- * provider, the panel, the scope, the actions, the SSH menu, the status item and the dialogs.
+ * provider, the Sessions panel (saved hosts and WSL distributions), the scope, the actions, the SSH menu, the status item and the dialogs.
  */
 public class RemotePlugin implements Plugin {
     public static final String CONNECT = "dev.jasper.remote.connect", HOSTS = "dev.jasper.remote.hosts", SPLIT = "dev.jasper.remote.split";
@@ -114,6 +116,10 @@ public class RemotePlugin implements Plugin {
     private HostInfoCache hostInfo;
     private final Set<ConnectAttempt> attempts = new java.util.HashSet<>();
     private final java.util.LinkedHashMap<UUID, UUID> recentPanes = new java.util.LinkedHashMap<>();
+    /** Panes Remote opened for a WSL distribution: pane id to profile id. Local panes, so not in {@link #panes}. */
+    private final Map<UUID, String> distroPanes = new HashMap<>();
+    /** The WSL profiles the application lists now, in its order. */
+    private List<ShellProfileInfo> distros = List.of();
 
     public RemotePlugin() {
         this(SwingUtilities::invokeLater, context -> AgentClient.forEnvironment(System.getenv(), System.getProperty("os.name", "")),
@@ -184,25 +190,33 @@ public class RemotePlugin implements Plugin {
         menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
         // View > Tools lists HOSTS and SFTP_TOGGLE: the panels name them as their toggles.
 
-        scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)));
+        distros = wslProfiles();
+        scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)),
+            () -> distros, this::openDistro, this::splitDistro);
         context.palette().register(scope);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
         status.setIcon(icon); status.setAction(HOSTS); status.setVisible(false);
-        context.panels().register(new PanelSpec(PANEL, "SSH hosts", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
+        context.panels().register(new PanelSpec(PANEL, "Sessions", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
             PanelHost panel = panelHosts.get(window.id());
             if (panel == null) showPanel(window); else panel.show();
-        });
+        }, () -> distros, this::openDistro);
 
         store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
         store.load();
         poll = new Timer(1000, event -> store.poll());
         poll.start();
+        context.terminals().onProfilesChanged(() -> {
+            if (stopped) return;
+            distros = wslProfiles();
+            scope.changed(); sessionsToolbar.refresh(); refreshPanels();
+        });
         context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, event -> {
             event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit();
         });
         context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); });
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); distroPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.SESSION_STATE_CHANGED, event -> { if (distroPanes.containsKey(event.paneId())) refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
         });
@@ -319,6 +333,37 @@ public class RemotePlugin implements Plugin {
             if (pane.isPresent() && pane.get().info().state() == dev.jasper.sdk.terminal.SessionState.RUNNING) { pane.get().focus(); return; }
         }
         openHost(window, host);
+    }
+
+    /** Opens a WSL distribution in a new local tab; the application runs it, Remote only counts the pane. */
+    void openDistro(WindowHandle window, ShellProfileInfo profile) {
+        if (stopped || !window.isOpen()) return;
+        context.terminals().openTab(window, OpenRequest.localProfile(profile.id())).ifPresent(pane -> trackDistro(pane, profile));
+    }
+
+    void splitDistro(PaneHandle pane, ShellProfileInfo profile) {
+        if (stopped) return;
+        context.terminals().split(pane, Direction.RIGHT, OpenRequest.localProfile(profile.id())).ifPresent(created -> trackDistro(created, profile));
+    }
+
+    private void trackDistro(PaneHandle pane, ShellProfileInfo profile) {
+        distroPanes.put(pane.id(), profile.id());
+        refreshPanels();
+    }
+
+    private List<ShellProfileInfo> wslProfiles() {
+        return context.terminals().profiles().stream().filter(profile -> profile.kind() == ShellProfileInfo.Kind.WSL).toList();
+    }
+
+    /** Local panes Remote opened for this distribution whose shell still runs. */
+    private int distroSessions(ShellProfileInfo profile) {
+        int count = 0;
+        for (var entry : distroPanes.entrySet()) {
+            if (!entry.getValue().equals(profile.id())) continue;
+            var info = context.terminals().pane(entry.getKey()).map(PaneHandle::info);
+            if (info.isPresent() && info.get().kind() == SessionKind.LOCAL && info.get().state() != dev.jasper.sdk.terminal.SessionState.EXITED) count++;
+        }
+        return count;
     }
 
     private void rememberPane(UUID id) {
@@ -518,6 +563,9 @@ public class RemotePlugin implements Plugin {
         panel.onActivate(h -> activateHost(window, h));
         panel.onBrowseFiles(h->sftpUi.browse(window,h));
         panel.setHostDetails(this::hostDetails, this::sessionCount);
+        panel.onDistros(profile -> openDistro(window, profile),
+            profile -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitDistro(pane, profile)));
+        panel.setDistros(distros, this::distroSessions);
         panel.setCollapsed(panelState.collapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
@@ -552,6 +600,7 @@ public class RemotePlugin implements Plugin {
             panel.setCredentialLabels(this::credentialLabel);
             panel.setDefaultGroup(panelState.defaultGroup());
             panel.setHostDetails(this::hostDetails, this::sessionCount);
+            panel.setDistros(distros, this::distroSessions);
             panel.setHosts(store.hosts(), store.error());
         }
     }

@@ -6,10 +6,12 @@ import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.trust.KnownHosts;
 import dev.jasper.remote.ui.HostsPanel;
+import dev.jasper.remote.ui.HostRows;
 import dev.jasper.remote.ui.RemoteScope;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -69,7 +72,7 @@ class RemotePluginTest {
             assertThat(icons).as("session tab icon").anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.SERVER);
             assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
             assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT|dev.jasper.remote.sftp.toggle",
-                "dev.jasper.remote.panel|SSH hosts|LEFT|dev.jasper.remote.hosts");
+                "dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
         }
     }
 
@@ -238,7 +241,7 @@ class RemotePluginTest {
             assertThat(host.actions()).contains("dev.jasper.remote.connect|Connect to SSH Host...|true", "dev.jasper.remote.hosts|Toggle SSH hosts|true", "dev.jasper.remote.sftp.toggle|Toggle SFTP|true",
                 "dev.jasper.remote.split|Split with Same Host|false", "dev.jasper.remote.import|Import from ~/.ssh/config...|true");
             assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT|dev.jasper.remote.sftp.toggle",
-                "dev.jasper.remote.panel|SSH hosts|LEFT|dev.jasper.remote.hosts");
+                "dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
             assertThat(host.scopes()).containsExactly("dev.jasper.remote.scope|SSH|connect,split,edit");
             assertThat(host.menu("top:dev.jasper.remote.menu")).isNotEmpty();
             assertThat(host.menu("VIEW")).as("View > Tools already toggles both panels").isEmpty();
@@ -571,6 +574,81 @@ class RemotePluginTest {
                 group -> assertThat(group.name()).isEqualTo("My machines"));
             assertThat(new PanelState(context.dataDirectory().resolve("panel-state.toml")).defaultGroup()).isEqualTo("My machines");
             assertThat(plugin.store().hosts().getFirst().group()).isEmpty();
+        }
+    }
+
+    static final ShellProfileInfo UBUNTU = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
+
+    @Test void wslDistributionsOpenLocalPanesFromThePanelAndCountTheirSessions(@TempDir Path dir) throws Exception {
+        try (var host = new FakePluginHost()) {
+            host.setShellProfiles(List.of(new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty())));
+            RemotePlugin plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
+            assertThat(list(panel).getModel().getSize()).as("no WSL group without distributions").isZero();
+
+            host.setShellProfiles(List.of(UBUNTU));
+            settle(host);
+            assertThat(list(panel).getModel().getElementAt(0)).isEqualTo(new HostRows.Group(HostRows.WSL, 1, false, HostRows.WSL_KEY));
+            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 0));
+            activate(panel, 1);
+            settle(host);
+            assertThat(host.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu");
+            UUID first = host.terminalPanes().getLast();
+            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 1));
+
+            host.focusTerminalPane(first); host.flush();
+            menuItem(menuFor(panel, 1), "Open in split").doClick();
+            settle(host);
+            assertThat(host.openRequests()).last().isEqualTo("split|" + first + "|RIGHT|-|wsl:Ubuntu");
+            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 2));
+            UUID second = host.terminalPanes().getLast();
+            host.sessionExited(second, OptionalInt.of(0)); settle(host);
+            assertThat(list(panel).getModel().getElementAt(1)).as("an exited shell is not a session").isEqualTo(new HostRows.Distro(UBUNTU, 1));
+            host.closeTerminalPane(first); settle(host);
+            assertThat(list(panel).getModel().getElementAt(1)).isEqualTo(new HostRows.Distro(UBUNTU, 0));
+            assertThat(host.status()).as("the status item counts SSH sessions only").isEmpty();
+
+            toggle(panel, 0); settle(host);
+            assertThat(Files.readString(context.dataDirectory().resolve("panel-state.toml"))).contains("\"wsl\"");
+            host.setShellProfiles(List.of()); settle(host);
+            assertThat(list(panel).getModel().getSize()).as("the group leaves with the last distribution").isZero();
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void sessionsToolbarAndPaletteListWslDistributionsFirst(@TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            host.setShellProfiles(List.of(UBUNTU));
+            RemotePlugin plugin = plugin(dir);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            String manage = "dev.jasper.remote.sessions.manage";
+            String ubuntu = "dev.jasper.remote.session.w" + UUID.nameUUIDFromBytes("wsl:Ubuntu".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var alpha = RemoteHost.create("alpha", "a.example", 22, "root", new Auth.Agent(), "", Optional.empty());
+            plugin.store().put(alpha); settle(host);
+            String alphaAction = "dev.jasper.remote.session.h" + alpha.id();
+            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + ubuntu + "," + alphaAction + "," + manage);
+            assertThat(host.actions()).contains(ubuntu + "|Ubuntu (WSL 2)|true");
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            assertThat(host.invoke(ubuntu, window, null)).isTrue();
+            assertThat(host.openRequests()).containsExactly("tab|" + window + "|-|wsl:Ubuntu");
+
+            assertThat(host.searchScope(RemoteScope.ID, "", window, null)).containsExactly("wsl.Ubuntu|Ubuntu|true", "host." + alpha.id() + "|alpha|true");
+            assertThat(host.availableInScope(RemoteScope.ID, "wsl.Ubuntu", "edit", window, null)).isFalse();
+            host.executeInScope(RemoteScope.ID, "wsl.Ubuntu", "connect", window, null);
+            assertThat(host.openRequests()).hasSize(2).last().isEqualTo("tab|" + window + "|-|wsl:Ubuntu");
+
+            host.setShellProfiles(List.of()); settle(host);
+            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + manage);
+            assertThat(host.invoke(ubuntu, window, null)).isFalse();
+            assertThat(host.searchScope(RemoteScope.ID, "", window, null)).containsExactly("host." + alpha.id() + "|alpha|true");
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
         }
     }
 

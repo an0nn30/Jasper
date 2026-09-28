@@ -50,7 +50,7 @@ public final class HostsPanel extends JPanel {
     final JLabel title = heading("Sessions");
     final JLabel cardName = heading(""), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel(), cardInfo = new JLabel();
     final JButton connect = new JButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
-    final JLabel empty = new JLabel("No hosts yet — Add or Import from ~/.ssh/config");
+    final JLabel empty = new JLabel("No hosts yet \u2014 Add or Import from ~/.ssh/config");
     private final Actions actions;
     private final Function<BundledIcon, javax.swing.Icon> icons;
     private final DefaultListModel<HostRows.Row> model = new DefaultListModel<>();
@@ -95,7 +95,7 @@ public final class HostsPanel extends JPanel {
         header.add(title); header.add(Box.createHorizontalGlue()); header.add(importButton); header.add(Box.createHorizontalStrut(4)); header.add(add);
         var north = new JPanel(new BorderLayout(0, 6));
         north.add(header, BorderLayout.NORTH);
-        search.putClientProperty("JTextField.placeholderText", "Search hosts…");
+        search.putClientProperty("JTextField.placeholderText", "Search hosts\u2026");
         north.add(search, BorderLayout.SOUTH);
         add(north, BorderLayout.NORTH);
         list = new JList<>(model) {
@@ -247,7 +247,7 @@ public final class HostsPanel extends JPanel {
             return menu;
         }
         if (model.get(index) instanceof HostRows.Group group && !group.wsl() && group.name().equals(defaultGroup)) {
-            var menu = new JPopupMenu(); menu.add(item("Rename group…", renameDefaultGroup)); return menu;
+            var menu = new JPopupMenu(); menu.add(item("Rename group\u2026", renameDefaultGroup)); return menu;
         }
         if (!(model.get(index) instanceof HostRows.Host row)) return null;
         RemoteHost host = row.host();
@@ -255,9 +255,9 @@ public final class HostsPanel extends JPanel {
         menu.add(item("Connect in new tab", () -> actions.connect().accept(host)));
         menu.add(item("Connect in split", () -> actions.connectSplit().accept(host)));
         if(browseFiles!=null) menu.add(item("Browse files",()->browseFiles.accept(host)));
-        menu.add(item("Edit…", () -> actions.edit().accept(Optional.of(host))));
+        menu.add(item("Edit\u2026", () -> actions.edit().accept(Optional.of(host))));
         menu.add(item("Duplicate", () -> actions.duplicate().accept(host)));
-        menu.add(item("Delete…", () -> actions.delete().accept(host)));
+        menu.add(item("Delete\u2026", () -> actions.delete().accept(host)));
         menu.add(item(host.favorite() ? "Remove from favorites" : "Add to favorites", () -> actions.favorite().accept(host, !host.favorite())));
         return menu;
     }
@@ -278,7 +278,7 @@ public final class HostsPanel extends JPanel {
             .map(profile -> new HostRows.Distro(profile, distroSessions.applyAsInt(profile))).toList();
         HostRows.rows(matching, "", query.isEmpty() ? collapsed : Set.of(), defaultGroup, distroRows).forEach(model::addElement);
         boolean searching = !search.getText().strip().isEmpty();
-        empty.setText(hosts.isEmpty() ? "No hosts yet — Add or Import from ~/.ssh/config" : "No hosts match");
+        empty.setText(hosts.isEmpty() ? "No hosts yet \u2014 Add or Import from ~/.ssh/config" : "No hosts match");
         empty.setVisible(hosts.isEmpty() || (searching && model.size() == (error.isPresent() ? 1 : 0)));
         if (keep != null) select(keep);
         else if (keepDistro != null) selectDistro(keepDistro);
@@ -352,7 +352,7 @@ public final class HostsPanel extends JPanel {
 
     private static int favoriteWidth(JList<?> owner) {
         var metrics = owner.getFontMetrics(owner.getFont().deriveFont(owner.getFont().getSize2D() + 1));
-        return Math.max(16, Math.max(metrics.stringWidth("★"), metrics.stringWidth("☆")) + 2);
+        return Math.max(16, Math.max(metrics.stringWidth("\u2605"), metrics.stringWidth("\u2606")) + 2);
     }
 
     private Component hostRow(JList<?> owner, RemoteHost host, boolean selected) {
@@ -362,7 +362,7 @@ public final class HostsPanel extends JPanel {
         row.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 8));
         java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
         Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 1);
-        var favorite = text(host.favorite() ? "★" : "☆", foreground, font);
+        var favorite = text(host.favorite() ? "\u2605" : "\u2606", foreground, font);
         favorite.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), favorite.getPreferredSize().height));
         row.add(favorite, BorderLayout.WEST);
         row.add(text(host.name(), foreground, font), BorderLayout.CENTER);
@@ -370,7 +370,7 @@ public final class HostsPanel extends JPanel {
         if (sessions > 0) {
             var status = new JPanel(new BorderLayout(4, 0)); status.setOpaque(false);
             java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
-            var dot = text("●", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f)));
+            var dot = text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f)));
             status.add(dot, BorderLayout.WEST);
             if (sessions > 1) status.add(text(String.valueOf(sessions), foreground, owner.getFont()), BorderLayout.CENTER);
             row.add(status, BorderLayout.EAST);
@@ -407,7 +407,7 @@ public final class HostsPanel extends JPanel {
         if (sessions > 0) {
             java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
             east.add(Box.createHorizontalStrut(6));
-            east.add(text("●", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f))));
+            east.add(text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f))));
             if (sessions > 1) { east.add(Box.createHorizontalStrut(4)); east.add(text(String.valueOf(sessions), foreground, owner.getFont())); }
         }
         row.add(east, BorderLayout.EAST);

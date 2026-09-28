@@ -28,7 +28,7 @@ public final class RemoteScope implements PaletteScope {
     public static final String ID = "dev.jasper.remote.scope";
     public static final PaletteVerb CONNECT = new PaletteVerb("connect", "Connect");
     public static final PaletteVerb SPLIT = new PaletteVerb("split", "Connect in split");
-    public static final PaletteVerb EDIT = new PaletteVerb("edit", "Edit host…");
+    public static final PaletteVerb EDIT = new PaletteVerb("edit", "Edit host\u2026");
     static final String CONNECT_ACTION = "dev.jasper.remote.connect";
     static final String ERROR_ROW = "error";
 
