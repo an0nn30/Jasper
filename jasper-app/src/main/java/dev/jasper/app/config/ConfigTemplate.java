@@ -1,140 +1,47 @@
 package dev.jasper.app.config;
 
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.commands.Command;
+import dev.jasper.app.settings.Setting;
+import dev.jasper.app.settings.SettingKind;
+import dev.jasper.app.settings.TomlLiterals;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
 
 /** The editable, commented defaults for settings supported by this application. */
 public final class ConfigTemplate {
     private ConfigTemplate() { }
 
+    private static final String HEADER = """
+        # Jasper settings
+        # Uncomment a setting to change its saved default. Live settings reload across windows.
+        # View menu choices are temporary overrides until that saved setting changes.
+        # Session and grid defaults affect new panes/windows as described below.
+        # Reload Config forces a fresh read.
+        # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
+        version = 2
+        """;
+
+    /** The commented defaults for every setting in {@link CoreSettings#SCHEMA}, then the platform's shortcuts. */
     public static String text(boolean macOs) {
-        var text = new StringBuilder("""
-            # Jasper settings
-            # Uncomment a setting to change its saved default. Live settings reload across windows.
-            # View menu choices are temporary overrides until that saved setting changes.
-            # Session and grid defaults affect new panes/windows as described below.
-            # Reload Config forces a fresh read.
-            # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
-
-            [window]
-            # Tab height in logical pixels, 20-72; out-of-range values use the nearest limit. Updates live.
-            # tab_height = 30
-            # Panel rail width in logical pixels, 28-64; out-of-range values use the nearest limit. Updates live.
-            # rail_width = 28
-            # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
-            # toolbar = "icons_and_labels"
-            # Toolbar/title-bar height in logical pixels, 28-64; out-of-range values use the nearest limit. Updates live.
-            # toolbar_height = 30
-            # Show the status bar; updates live.
-            # status_bar = true
-            # Status bar height in logical pixels, 20-48; never shorter than its text. Updates live.
-            # status_bar_height = 24
-
-            # Initial terminal grid for new windows only; existing windows keep their size.
-            # columns = 100
-            # lines = 35
-            # Columns: 5-500; lines: 2-200. The window is clamped to the usable screen.
-
-            [buddy]
-            # Show the pixel-art Jasper floating above your windows while a terminal is open; off by default,
-            # updates live. View > Show Jasper and a right-click on Jasper toggle him for this session only.
-            # enabled = false
-
-            [notifications]
-            # Live. Notify when a command that ran at least this long finishes in a pane you are not
-            # looking at. Needs shell integration: the duration comes from its command marks.
-            # Zero disables notifications. Range 0-3600.
-            # long_command_seconds = 10
-
-            [system]
-            # Keep Jasper running with no windows after the last one closes to reduce next-launch startup
-            # work, and start it in the background at login. Quit still exits completely.
-            # Residency applies from the next start; the login item updates as soon as you save.
-            # Autostart needs an installed Jasper, not a development run.
-            # run_in_background = false
-
-            [palette]
-            # Rows each palette scope shows, and the All tab shows per scope, 1-20; updates live.
-            # max_results = 5
-
-            [terminal.font]
-            # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.
-            # family = "JetBrains Mono"
-            # fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
-            # Fallback names must be nonblank; an empty fallback list is allowed.
-            # ligatures = true
-            # Line height multiplier, 0.5-3.0; updates live. Below 1.0 rows are tighter and glyphs may overlap.
-            # line_height = 1.0
-            # Font size in points, 6-72; changes update all panes live.
-            # Reset Font Size restores this saved default.
-            # Temporary size/appearance choices survive reloads until their respective saved value changes.
-            # size = 16.0
-
-            [terminal]
-            # Scrollback lines, 0-1000000; new panes only. Existing sessions keep their capacity.
-            # scrollback = 10000
-            # Option key sending Meta: "left", "right", "both", or "none"; updates live.
-            # option_as_meta = "left"
-            # Inactive pane dimming, 0.0-1.0; updates live.
-            # dim_inactive_panes = 0.3
-            # Copy a completed selection to the clipboard; updates live.
-            # copy_on_select = false
-            # Bell: "visual", "sound", or "none"; updates live.
-            # bell = "visual"
-            # Shell process exit: "keep_open", "close_on_success" (code 0), or "close" (any exit).
-            # Only the exited pane closes; its tab/window closes when empty. Live for future exits.
-            # "keep_open" retains output from the stopped shell; reload never closes retained output.
-            # on_exit = "keep_open"
-            # Shell integration: "auto" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),
-            # "manual" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, "off" does neither.
-            # shell_integration = "auto"
-            # Terminal colors: "match" uses the theme's console colours (Jasper's palette when it has
-            # none); "light" or "dark" keeps Jasper's palette. Switches live.
-            # colors = "match"
-
-            [terminal.shell]
-            # New panes only. Empty program resolves the default shell and appends configured args.
-            # An explicit program gets only configured args, with no implicit login flag.
-            # program = ""
-            # Arguments are exact strings, without shell parsing; preserve each argument separately.
-            # args = []
-            # Program and arguments must not contain NUL; a nonempty program cannot be blank.
-
-            [terminal.cursor]
-            # Live fallback when the running program has not set its own cursor style.
-            # Shape: "block", "beam", or "underline".
-            # shape = "block"
-            # blink = true
-
-            [terminal.env]
-            # New panes only: add string values to the inherited environment.
-            # Names use letters, digits and underscore, starting with a letter or underscore.
-            # Values must not contain NUL. Desktop launches remove inherited TERM_PROGRAM,
-            # TERM_PROGRAM_VERSION, TERM_SESSION_ID, TMUX, TMUX_PANE, and ITERM_* variables,
-            # then apply this overlay.
-            # Explicit configured values are intentional overrides. On macOS, LANG defaults to
-            # en_US.UTF-8 only when absent or blank; LC_* values are preserved. TERM and COLORTERM
-            # remain reserved and are always forced to xterm-256color and truecolor.
-            # This table does not change which default login shell is selected.
-
-            [ui.font]
-            # UI font for app chrome and plugin controls; updates live, independently of [font].
-            # "system" uses the platform font on macOS, Linux and Windows.
-            # A missing named font falls back to that platform font.
-            # Omit size to retain platform sizing. Use 8-32 points, including fractions, when set.
-            # family = "system"
-            # size = 14
-
-            [ui.theme]
-            # The UI theme by name: "Jasper Dark" (the default), "IntelliJ Light", or a theme plugin
-            # installed in the themes folder beside this file. Switches live across windows.
-            # name = "Jasper Dark"
+        var text = new StringBuilder(HEADER);
+        List<String> table = null;
+        for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
+            boolean map = setting.kind() instanceof SettingKind.StringMap;
+            List<String> next = map ? setting.key() : setting.table();
+            if (!next.equals(table)) {
+                table = next;
+                text.append("\n[").append(TomlLiterals.path(table)).append("]\n");
+                CoreSettings.SCHEMA.tableNote(table).ifPresent(note -> comment(text, note));
+            }
+            comment(text, setting.description());
+            if (!map) text.append("# ").append(TomlLiterals.key(setting.leaf())).append(" = ").append(literal(setting)).append('\n');
+        }
+        text.append("""
 
             [keybindings]
             # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.
@@ -149,6 +56,14 @@ public final class ConfigTemplate {
                 .append(KeyBindings.effectiveDefaultBinding(action, macOs)).append("\"\n");
         }
         return text.toString();
+    }
+
+    private static void comment(StringBuilder text, String lines) {
+        for (String line : lines.split("\n", -1)) text.append("# ").append(line).append('\n');
+    }
+
+    private static <T> String literal(Setting<T> setting) {
+        return setting.kind().literal(setting.example().orElse(setting.defaultValue()));
     }
 
     static void ensureExists(Path file, boolean macOs) throws IOException {

@@ -30,6 +30,8 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 These are the supported keys and defaults. Font and terminal behavior settings apply live; session and grid defaults take effect as described below.
 
 ```toml
+version = 2
+
 [window]
 tab_height = 30
 rail_width = 28
@@ -46,18 +48,11 @@ enabled = false
 [notifications]
 long_command_seconds = 10
 
-[background]
-enabled = false
+[system]
+run_in_background = false
 
 [palette]
 max_results = 5
-
-[font]
-family = "JetBrains Mono"
-size = 16.0
-fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
-ligatures = true
-line_height = 1.0
 
 [terminal]
 scrollback = 10000
@@ -67,6 +62,14 @@ copy_on_select = false
 bell = "visual"
 on_exit = "keep_open"
 shell_integration = "auto"
+colors = "match"
+
+[terminal.font]
+family = "JetBrains Mono"
+size = 16.0
+fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
+ligatures = true
+line_height = 1.0
 
 [terminal.shell]
 program = ""
@@ -87,8 +90,6 @@ family = "system"
 [ui.theme]
 # A built-in or installed theme's name; see Themes.
 name = "Jasper Dark"
-# "match" (the theme's console colours), "light" or "dark" terminal colors.
-terminal = "match"
 
 [keybindings]
 # Optional action overrides; see examples below.
@@ -106,15 +107,15 @@ terminal = "match"
 | `window.lines` | `35` | Integer 2–200 | New windows |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
-| `background.enabled` | `false` | Boolean | Next start (residency); live (login item) |
+| `system.run_in_background` | `false` | Boolean | Next start (residency); live (login item) |
 | `palette.max_results` | `5` | Integer 1–20 | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
 | `ui.font.size` | Platform default (omit key) | Finite number 8–32 points | Live, app and plugins |
-| `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
-| `font.size` | `16.0` | Finite number 6–72 points | Live |
-| `font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
-| `font.ligatures` | `true` | Boolean | Live |
-| `font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
+| `terminal.font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
+| `terminal.font.size` | `16.0` | Finite number 6–72 points | Live |
+| `terminal.font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
+| `terminal.font.ligatures` | `true` | Boolean | Live |
+| `terminal.font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
 | `terminal.shell.program` | `""` | Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
 | `terminal.shell.args` | `[]` | Array of exact argument strings without NUL; empty strings allowed | New pane requests |
 | `terminal.env` | `{}` | Table of string values without NUL; names match `[A-Za-z_][A-Za-z0-9_]*` | New pane requests |
@@ -128,7 +129,7 @@ terminal = "match"
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
-| `ui.theme.terminal` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
+| `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
