@@ -30,6 +30,10 @@ Deviations so far:
   Apply calls `SettingsPanel.reset()` before `dispose()`. Minors: staging a default for an unset key stages "unset";
   a failure without a message shows its type; `SettingsPanelHost.changed()` Javadoc no longer mentions validity;
   docs (SDK architecture, configuration's stub reasons, plugin authoring's reset note).
+- Rulings on the final fixes: F2 blocks only edits to the declared settings (`draft.modified()`), so state of a
+  panel's own can still apply while its file is rejected; F1 also gives no stub to an id whose copy is running
+  without a page; F4 cannot see state a panel changes silently after Apply (the C3 pending-changed callback covers
+  it); only a page that was shown gets `reset()`.
 
 **Goal:** Each running plugin with settings gets a page under Tools in Settings, generated from its declarations or
 built by the plugin itself, and a plugin that is not running gets a stub page.

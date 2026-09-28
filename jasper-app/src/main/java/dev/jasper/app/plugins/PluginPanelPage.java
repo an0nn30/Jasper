@@ -132,12 +132,12 @@ final class PluginPanelPage implements SettingsPage {
         containment.run(pluginId, "settings page highlight", () -> panel.highlight(query));
     }
 
-    /** Lets the panel drop state of its own that was not applied, then release it. */
+    /** Lets a page that was shown drop state of its own that was not applied, then releases it. */
     @Override public void dispose() {
         stopListening.run();
         draftListening.close();
         rows.forEach(SchemaPage::dispose);
-        if (!applied) containment.run(pluginId, "settings page reset", panel::reset);
+        if (body != null && !applied) containment.run(pluginId, "settings page reset", panel::reset);
         containment.run(pluginId, "settings page dispose", panel::dispose);
     }
 
