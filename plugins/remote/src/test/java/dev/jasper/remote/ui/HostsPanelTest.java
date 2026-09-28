@@ -2,6 +2,7 @@ package dev.jasper.remote.ui;
 
 import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +39,101 @@ class HostsPanelTest {
         (h, favorite) -> events.add("favorite " + h.name() + " " + favorite), () -> events.add("import"));
     final RemoteHost prod = RemoteHost.create("prod", "api.example", 22, "deploy", new Auth.Vault(UUID.randomUUID()), "Production", Optional.empty());
     final RemoteHost nas = RemoteHost.create("nas", "nas.local", 2222, "me", Auth.AGENT, "", Optional.of(prod.id()));
+
+    final ShellProfileInfo ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 1"));
+    final ShellProfileInfo debian = new ShellProfileInfo("wsl:Debian", "Debian", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
+    final ShellProfileInfo pwsh = new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty());
+
+    HostsPanel withDistros(java.util.function.Function<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon> icons) {
+        var panel = new HostsPanel(actions, icons);
+        panel.onDistros(profile -> events.add("open " + profile.name()), profile -> events.add("split " + profile.name()));
+        panel.setDistros(List.of(ubuntu, pwsh, debian), profile -> profile.equals(debian) ? 2 : 0);
+        panel.setHosts(List.of(prod), Optional.empty());
+        return panel;
+    }
+
+    static List<HostRows.Row> rows(HostsPanel panel) {
+        var out = new ArrayList<HostRows.Row>();
+        for (int i = 0; i < panel.list.getModel().getSize(); i++) out.add(panel.list.getModel().getElementAt(i));
+        return out;
+    }
+
+    static java.awt.Component render(HostsPanel panel, int index) {
+        return panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(index), index, false, false);
+    }
+
+    @Test void theHeadingReadsSessionsAndThereIsNoWslGroupWithoutDistributions() {
+        var panel = new HostsPanel(actions);
+        assertThat(panel.title.getText()).isEqualTo("Sessions");
+        panel.setDistros(List.of(pwsh), profile -> 0);
+        assertThat(rows(panel)).isEmpty();
+        assertThat(panel.empty.isVisible()).isTrue();
+        assertThat(panel.empty.getText()).isEqualTo("No hosts yet — Add or Import from ~/.ssh/config");
+        panel.setHosts(List.of(prod), Optional.empty());
+        assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+    }
+
+    @Test void wslDistributionsComeFirstWithBadgesSessionsAndTheirOwnCard() {
+        var panel = withDistros(name -> null);
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 2, false, HostRows.WSL_KEY),
+            new HostRows.Distro(ubuntu, 0), new HostRows.Distro(debian, 2), new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+        var header = (javax.swing.JLabel) render(panel, 0);
+        assertThat(header.getText()).isEqualTo("WSL   2");
+        assertThat(header.getToolTipText()).as("only the default host group can be renamed").isNull();
+        var busy = render(panel, 2);
+        assertThat(labels(busy)).contains("Debian", "WSL 2", "●", "2");
+        assertThat(busy.getAccessibleContext().getAccessibleName()).isEqualTo("Debian, WSL 2, 2 sessions");
+        assertThat(labels(render(panel, 1))).contains("Ubuntu", "WSL 1").doesNotContain("●");
+        assertThat(panel.selectedDistro()).as("the first selectable row").contains(ubuntu);
+        assertThat(panel.card.isVisible()).isTrue();
+        assertThat(panel.cardName.getText()).isEqualTo("Ubuntu");
+        assertThat(panel.cardAddress.getText()).isEqualTo("WSL 1");
+        assertThat(panel.cardInfo.getText()).isEqualTo("wsl.exe -d Ubuntu");
+        assertThat(panel.cardCredential.isVisible()).isFalse();
+        assertThat(panel.edit.isVisible()).isFalse();
+        assertThat(panel.connect.getText()).isEqualTo("Open");
+        panel.connect.doClick();
+        panel.activate(2);
+        assertThat(events).containsExactly("open Ubuntu", "open Debian");
+        panel.selectDistro("wsl:Debian");
+        panel.setDistros(List.of(ubuntu, debian), profile -> 1);
+        assertThat(panel.selectedDistro()).as("a refresh keeps the selection").contains(debian);
+        panel.select(prod.id());
+        assertThat(panel.selectedDistro()).isEmpty();
+        assertThat(panel.connect.getText()).isEqualTo("Connect");
+        assertThat(panel.edit.isVisible()).isTrue();
+        assertThat(panel.cardCredential.isVisible()).isTrue();
+    }
+
+    @Test void distroMenusOfferOnlyOpeningAndTheWslGroupCollapsesUnderItsOwnKey() {
+        var icons = new java.util.EnumMap<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon>(dev.jasper.sdk.ui.BundledIcon.class);
+        for (var name : List.of(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER, dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN,
+                dev.jasper.sdk.ui.BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL))
+            icons.put(name, new dev.jasper.sdk.testing.FakeBundledIcon(name));
+        var panel = withDistros(icons::get);
+        var row = (java.awt.Container) render(panel, 1);
+        assertThat(((javax.swing.JLabel) row.getComponent(0)).getIcon()).isSameAs(icons.get(dev.jasper.sdk.ui.BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL));
+        javax.swing.JPopupMenu menu = panel.menuFor(1);
+        assertThat(menu.getComponentCount()).isEqualTo(2);
+        assertThat(((javax.swing.JMenuItem) menu.getComponent(0)).getText()).isEqualTo("Open in new tab");
+        assertThat(((javax.swing.JMenuItem) menu.getComponent(1)).getText()).isEqualTo("Open in split");
+        ((javax.swing.JMenuItem) menu.getComponent(0)).doClick();
+        ((javax.swing.JMenuItem) menu.getComponent(1)).doClick();
+        assertThat(events).containsExactly("open Ubuntu", "split Ubuntu");
+        assertThat(panel.menuFor(0)).as("the WSL header offers no rename").isNull();
+        int[] changes = {0};
+        panel.onCollapsedChanged(() -> changes[0]++);
+        panel.toggle(0);
+        assertThat(changes[0]).isEqualTo(1);
+        assertThat(panel.collapsed()).containsExactly(HostRows.WSL_KEY);
+        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 2, true, HostRows.WSL_KEY), new HostRows.Group("Production", 1, false));
+        assertThat(((javax.swing.JLabel) render(panel, 0)).getIcon()).isSameAs(icons.get(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
+        panel.search.setText("deb");
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, HostRows.WSL_KEY), new HostRows.Distro(debian, 2));
+        panel.search.setText("");
+        panel.setDistros(List.of(), profile -> 0);
+        assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+    }
 
     @Test void showingSelectsFirstHostAndArrowKeysNavigateImmediately() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {

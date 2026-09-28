@@ -2,10 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 1-4 done (plan A is implemented on this branch, which satisfies "plan A merged").
+**Status:** In progress: Tasks 1-5 done (plan A is implemented on this branch, which satisfies "plan A merged").
 Record every deviation from this text here and in `docs/STATUS.md`.
 
-Deviations so far: none in code. Tasks 1-3 applied as written: plan A landed `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)`, `OpenSpec.Local(Optional<Path>, Optional<String>)` and the `JasperApplication.shellProfiles` field (created in the constructor, before `startPlugins`) under the names this plan assumed, and every edit anchor still matched. `knownProfile` compares ids exactly (as the fake does), although plan A resolves `wsl:` ids case-insensitively when launching. Plugins match profile ids exactly; they receive canonical ids from profiles(), so plan A's case-insensitive wsl: matching is not needed there. Task 4 applied as written.
+Deviations so far: none in code. Tasks 1-3 applied as written: plan A landed `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)`, `OpenSpec.Local(Optional<Path>, Optional<String>)` and the `JasperApplication.shellProfiles` field (created in the constructor, before `startPlugins`) under the names this plan assumed, and every edit anchor still matched. `knownProfile` compares ids exactly (as the fake does), although plan A resolves `wsl:` ids case-insensitively when launching. Plugins match profile ids exactly; they receive canonical ids from profiles(), so plan A's case-insensitive wsl: matching is not needed there. Tasks 4-5 applied as written.
 
 **Goal:** Plugins can list the shells Jasper detected (SDK 0.8.6 `Terminals.profiles()`) and open one by id; the
 Remote plugin uses that to show a read-only "WSL" group of distributions first in its panel (renamed "Sessions"),
@@ -1246,7 +1246,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   `UiTestAccess.activate(HostsPanel, int)`.
 - Consumes: Task 4's `HostRows`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `HostsPanelTest.java`, add `import dev.jasper.sdk.terminal.ShellProfileInfo;` after `import dev.jasper.remote.hosts.RemoteHost;`,
 and add inside the class:
@@ -1354,12 +1354,12 @@ In `UiTestAccess.java`, after `public static void toggle(HostsPanel panel, int i
     public static void activate(HostsPanel panel, int index) { panel.activate(index); }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test --tests "dev.jasper.remote.ui.HostsPanelTest"`
 Expected: FAIL: compilation errors (`title`, `onDistros`, `setDistros`, `selectedDistro`, `selectDistro` do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Replace `HostsPanel.java` with:
 
@@ -1791,12 +1791,12 @@ public final class HostsPanel extends JPanel {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `./gradlew :jasper-plugin-remote:test --tests "dev.jasper.remote.ui.*"`
 Expected: BUILD SUCCESSFUL; every earlier `HostsPanelTest` test still passes (the heading's text is the only visible change without distributions).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
