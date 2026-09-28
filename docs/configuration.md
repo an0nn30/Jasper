@@ -153,9 +153,10 @@ windows, holding the initialized toolkit, fonts and theme, so the next launch re
 without a cold start. **Quit (Cmd+Q, the palette's Quit, or Quit from the Dock) still exits
 completely** — closing a window and quitting are different things, and quitting is the off switch.
 
-On Windows, that windowless process has no UI at all — no tray icon, nothing to Quit from (Jasper
-does not put an icon in the notification area). It is not a lockout: launch Jasper again and the
-handoff reveals a window, from which Quit works normally.
+On Windows, the resident process shows a Jasper icon in the notification area (it may sit in the
+taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens
+a window or raises the open one; **Quit Jasper** exits completely, the same as Quit from a window.
+Launching Jasper again also reveals a window. macOS keeps using the Dock icon and has no tray icon.
 
 Residency keeps no pane session alive intentionally: once pane cleanup completes, it holds no shell, PTY or child process.
 Closing panes requests shell termination; process cleanup is asynchronous, so a child can briefly be finishing cleanup after the last window disappears.
