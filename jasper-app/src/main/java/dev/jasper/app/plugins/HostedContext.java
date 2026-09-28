@@ -130,6 +130,9 @@ final class HostedContext implements PluginContext {
     }
 
     @Override public PluginConfig config() { return settings; }
+    @Override public dev.jasper.sdk.settings.PluginSettings settings() {
+        throw new UnsupportedOperationException("Declared settings arrive in plan C1 Task 5");
+    }
 
     @Override public Actions actions() { return ui.actions(); }
     @Override public Toolbar toolbar() { return ui.toolbar(); }

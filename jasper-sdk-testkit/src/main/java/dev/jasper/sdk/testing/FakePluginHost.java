@@ -71,6 +71,8 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, Map<String, Object>> presets = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final List<String> reports = new CopyOnWriteArrayList<>();
+    final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
+    final Map<String, List<String>> settingsReports = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<UUID, FakeUi.FakeWindow> overlays = new HashMap<>();
     private Path dataRoot;
     private final boolean ownsRoot;
@@ -120,6 +122,7 @@ public final class FakePluginHost implements AutoCloseable {
             plugin.start(context);
             committed.putAll(staged.getOrDefault(info.id(), Map.of()));
             context.state = FakePluginContext.State.ACTIVE;
+            context.settings.complete();
         } catch (Exception | LinkageError failure) {
             failures.add(info.id() + " start: " + failure);
             teardown(context, "Plugin failed to start");
@@ -184,6 +187,51 @@ public final class FakePluginHost implements AutoCloseable {
         if (context == null) return;
         context.table = Map.copyOf(table);
         for (Runnable listener : context.configListeners) listener.run();
+    }
+
+    Map<String, Object> settingFile(String pluginId) {
+        return settingFiles.computeIfAbsent(pluginId, id -> new java.util.LinkedHashMap<>());
+    }
+
+    /**
+     * Sets a raw value in a plugin's settings file, as a user editing the file would. Before the plugin starts this
+     * is part of the file it starts with; afterwards its declared settings reload and their listeners run.
+     *
+     * @param pluginId the plugin
+     * @param key the dotted key
+     * @param rawValue a String, Long, Double, Boolean or List of String, as TOML reads them
+     */
+    public void setSetting(String pluginId, String key, Object rawValue) {
+        settingFile(pluginId).put(Objects.requireNonNull(key, "key"), Objects.requireNonNull(rawValue, "rawValue"));
+        FakePluginContext context = contexts.get(pluginId);
+        if (context != null && context.state == FakePluginContext.State.ACTIVE) context.settings.reload();
+    }
+
+    /**
+     * The raw values in a plugin's settings file, including what the plugin saved.
+     *
+     * @param pluginId the plugin
+     * @return the values by dotted key
+     */
+    public Map<String, Object> savedSettings(String pluginId) { return Map.copyOf(settingFile(pluginId)); }
+
+    /**
+     * The problems the last read of a plugin's settings found.
+     *
+     * @param pluginId the plugin
+     * @return lines of the form {@code key: message}
+     */
+    public List<String> settingsReports(String pluginId) { return settingsReports.getOrDefault(pluginId, List.of()); }
+
+    /**
+     * The keys a plugin declared.
+     *
+     * @param pluginId the plugin
+     * @return the keys in declaration order
+     */
+    public List<String> declared(String pluginId) {
+        FakePluginContext context = contexts.get(pluginId);
+        return context == null ? List.of() : context.settings.keys();
     }
 
     /**
@@ -358,6 +406,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.state = FakePluginContext.State.CLOSED;
         workspace.sessions.stopping(context);
         context.closeOwned();
+        context.settings.close();
         context.ui.closeAll();
         context.palette.closeAll();
         String id = context.plugin().id();
