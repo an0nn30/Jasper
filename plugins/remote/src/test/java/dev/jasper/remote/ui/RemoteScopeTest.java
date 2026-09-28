@@ -4,6 +4,7 @@ import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteRow;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.util.ArrayList;
@@ -52,5 +53,27 @@ class RemoteScopeTest {
         List<PaletteRow> withError = scope.search("", query).rows();
         assertThat(withError.getFirst().title()).contains("hosts.toml has errors");
         assertThat(withError.getFirst().enabled()).isFalse();
+    }
+
+    @Test void wslDistributionsLeadTaggedWslAndCannotBeEdited() {
+        var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 1"));
+        var pwsh = new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty());
+        var withDistros = new RemoteScope(() -> List.of(nas, prod), () -> error, (w, h) -> events.add("connect " + h.name()),
+            (p, h) -> events.add("split " + h.name()), (w, h) -> events.add("edit " + h.name()),
+            () -> List.of(ubuntu, pwsh), (w, d) -> events.add("open " + d.name()), (p, d) -> events.add("split " + d.name()));
+        List<PaletteRow> rows = withDistros.search("", query).rows();
+        assertThat(rows).extracting(PaletteRow::id).containsExactly("wsl.Ubuntu", "host." + prod.id(), "host." + nas.id());
+        assertThat(rows.getFirst().title()).isEqualTo("Ubuntu");
+        assertThat(rows.getFirst().tag()).contains("WSL");
+        assertThat(rows.getFirst().detail()).contains("WSL 1");
+        assertThat(withDistros.search("ubu", query).rows()).extracting(PaletteRow::title).containsExactly("Ubuntu");
+        assertThat(withDistros.available(rows.getFirst(), RemoteScope.EDIT, query)).isFalse();
+        assertThat(withDistros.available(rows.getFirst(), RemoteScope.SPLIT, query)).as("no target pane").isFalse();
+        assertThat(withDistros.available(rows.getFirst(), RemoteScope.CONNECT, query)).isTrue();
+        withDistros.execute(rows.getFirst(), RemoteScope.CONNECT, query);
+        withDistros.execute(rows.getFirst(), RemoteScope.EDIT, query);
+        assertThat(events).containsExactly("open Ubuntu");
+        assertThat(withDistros.search("", new PaletteQuery(window(), Optional.empty(), 1, true)).rows())
+            .as("the result limit covers distributions and hosts together").extracting(PaletteRow::id).containsExactly("wsl.Ubuntu");
     }
 }
