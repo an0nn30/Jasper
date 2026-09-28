@@ -2,6 +2,12 @@ package dev.jasper.app.config;
 
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.persistence.TomlStateFile;
+import dev.jasper.app.settings.LegacyKey;
+import dev.jasper.app.settings.Setting;
+import dev.jasper.app.settings.SettingWriter;
+import dev.jasper.app.settings.TomlDocument;
+import java.io.UncheckedIOException;
+import java.util.function.Function;
 import java.util.Map;
 import java.util.Optional;
 import java.util.LinkedHashMap;
@@ -125,6 +131,67 @@ public final class ConfigService implements AutoCloseable {
         });
     }
 
+    /** The file's text (the template when it is missing) and how it parsed. */
+    private record Source(String text, ConfigLoader.Result parsed) { }
+
+    /** A caller's view of the file is out of date; the state is republished before this reaches the caller. */
+    private static final class StaleSetting extends IllegalArgumentException {
+        StaleSetting(String message) { super(message); }
+    }
+
+    /**
+     * Writes settings on the config worker, then publishes them through the normal reload. Refuses a rejected file,
+     * a value its setting does not accept, and a setting whose saved value is no longer the one {@code edit} expects.
+     */
+    public CompletableFuture<State> save(SettingsEdit edit) {
+        Objects.requireNonNull(edit, "edit");
+        return submit(() -> {
+            try {
+                return transact(".settings-", source -> {
+                    var parsed = source.parsed();
+                    if (parsed.rejected()) throw new IllegalArgumentException("Fix config.toml's errors before saving settings.");
+                    for (var change : edit.changes().entrySet()) {
+                        Setting<?> setting = change.getKey();
+                        if (!parsed.values().saved(setting).equals(edit.expected().get(setting)))
+                            throw new StaleSetting(setting.name() + " changed on disk. Review the new value and try again.");
+                        change.getValue().ifPresent(value -> check(setting, value));
+                    }
+                    TomlDocument document = TomlDocument.parse(source.text());
+                    for (var change : edit.changes().entrySet()) {
+                        for (LegacyKey legacy : parsed.legacyKeys())
+                            if (legacy.to().equals(change.getKey().key())) document = document.remove(legacy.from());
+                        document = write(document, change.getKey(), change.getValue());
+                    }
+                    String updated = document.text();
+                    var checked = ConfigLoader.parse(file, updated, macOs);
+                    if (checked.rejected() || edit.changes().entrySet().stream()
+                            .anyMatch(change -> !checked.values().saved(change.getKey()).equals(change.getValue())))
+                        throw new IllegalArgumentException("Cannot safely save these settings; review config.toml.");
+                    return updated;
+                });
+            } catch (StaleSetting stale) {
+                refresh(true, true);
+                throw stale;
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> void check(Setting<T> setting, Object value) {
+        Optional<String> problem;
+        try {
+            problem = setting.kind().check((T) value);
+        } catch (ClassCastException wrongType) {
+            problem = Optional.of("Not a value for this setting.");
+        }
+        problem.ifPresent(message -> { throw new IllegalArgumentException(setting.name() + ": " + message); });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> TomlDocument write(TomlDocument document, Setting<T> setting, Optional<?> value) {
+        return SettingWriter.write(document, setting, (Optional<T>) value);
+    }
+
     /** Applies explicit shortcut edits on the config worker, then publishes them through normal reload. */
     public CompletableFuture<State> saveKeybindings(Map<String, String> expected,
             Map<String, Optional<String>> changes, List<KeyBindings.Extension> extensions) {
@@ -132,48 +199,73 @@ public final class ConfigService implements AutoCloseable {
         var edits = Map.copyOf(changes);
         var actions = List.copyOf(extensions);
         return submit(() -> {
-            Path target = Files.exists(file) || Files.isSymbolicLink(file) ? file.toRealPath() : file.toAbsolutePath();
-            var original = TomlStateFile.readBounded(file, MAX_BYTES, "Configuration");
-            String source = original.orElseGet(() -> ConfigTemplate.text(macOs));
-            var parsed = ConfigLoader.parse(file, source, macOs);
-            if (parsed.rejected() || parsed.diagnostics().stream().anyMatch(d ->
-                    d.severity() == ConfigDiagnostic.Severity.ERROR || d.key().startsWith("keybindings")))
-                throw new IllegalArgumentException("Fix the settings file's keybinding or configuration errors before saving shortcuts.");
-            if (!parsed.snapshot().keybindings().equals(before)) {
+            try {
+                return transact(".shortcuts-", source -> {
+                    var parsed = source.parsed();
+                    if (parsed.rejected() || parsed.diagnostics().stream().anyMatch(d ->
+                            d.severity() == ConfigDiagnostic.Severity.ERROR || d.key().startsWith("keybindings")))
+                        throw new IllegalArgumentException("Fix the settings file's keybinding or configuration errors before saving shortcuts.");
+                    if (!parsed.snapshot().keybindings().equals(before))
+                        throw new StaleSetting("Shortcuts changed on disk. Review the updated bindings and try again.");
+                    var next = new LinkedHashMap<>(before);
+                    edits.forEach((id, value) -> { if (value.isPresent()) next.put(id, value.get()); else next.remove(id); });
+                    var oldBindings = KeyBindings.withOverrides(macOs, before).withExtensions(actions).bindings();
+                    var newBindings = KeyBindings.withOverrides(macOs, next).withExtensions(actions).bindings();
+                    for (var bound : oldBindings.strokes().entrySet()) {
+                        if (!edits.containsKey(bound.getKey()) && !newBindings.strokeFor(bound.getKey()).filter(bound.getValue()::equals).isPresent())
+                            throw new IllegalArgumentException("Shortcut is used by " + bound.getKey() + ". Reassign it explicitly first.");
+                    }
+                    for (var edit : edits.entrySet()) {
+                        var builtIn = ActionId.forId(edit.getKey());
+                        var extension = actions.stream().filter(a -> a.id().equals(edit.getKey())).findFirst();
+                        if (builtIn.isEmpty() && extension.isEmpty()) continue;
+                        String intended = edit.getValue().orElseGet(() -> builtIn
+                            .map(a -> KeyBindings.effectiveDefaultBinding(a, macOs))
+                            .orElseGet(() -> extension.orElseThrow().defaultBinding().orElse("none")));
+                        if (!KeyBindings.parse(intended, macOs).equals(newBindings.strokeFor(edit.getKey())))
+                            throw new IllegalArgumentException("The default shortcut for " + edit.getKey() + " is unavailable. Assign a shortcut explicitly instead.");
+                    }
+                    String updated = KeybindingText.update(source.text(), edits);
+                    var checked = ConfigLoader.parse(file, updated, macOs);
+                    if (checked.rejected() || !checked.snapshot().keybindings().equals(next))
+                        throw new IllegalArgumentException("Cannot safely save these shortcuts; review the settings file.");
+                    return updated;
+                });
+            } catch (StaleSetting stale) {
                 refresh(true, true);
-                throw new IllegalArgumentException("Shortcuts changed on disk. Review the updated bindings and try again.");
+                throw stale;
             }
-            var next = new LinkedHashMap<>(before);
-            edits.forEach((id, value) -> { if (value.isPresent()) next.put(id, value.get()); else next.remove(id); });
-            var oldBindings = KeyBindings.withOverrides(macOs, before).withExtensions(actions).bindings();
-            var newBindings = KeyBindings.withOverrides(macOs, next).withExtensions(actions).bindings();
-            for (var bound : oldBindings.strokes().entrySet()) {
-                if (!edits.containsKey(bound.getKey()) && !newBindings.strokeFor(bound.getKey()).filter(bound.getValue()::equals).isPresent())
-                    throw new IllegalArgumentException("Shortcut is used by " + bound.getKey() + ". Reassign it explicitly first.");
-            }
-            for (var edit : edits.entrySet()) {
-                var builtIn = ActionId.forId(edit.getKey());
-                var extension = actions.stream().filter(a -> a.id().equals(edit.getKey())).findFirst();
-                if (builtIn.isEmpty() && extension.isEmpty()) continue;
-                String intended = edit.getValue().orElseGet(() -> builtIn
-                    .map(a -> KeyBindings.effectiveDefaultBinding(a, macOs))
-                    .orElseGet(() -> extension.orElseThrow().defaultBinding().orElse("none")));
-                if (!KeyBindings.parse(intended, macOs).equals(newBindings.strokeFor(edit.getKey())))
-                    throw new IllegalArgumentException("The default shortcut for " + edit.getKey() + " is unavailable. Assign a shortcut explicitly instead.");
-            }
-            String updated = KeybindingText.update(source, edits);
-            var checked = ConfigLoader.parse(file, updated, macOs);
-            if (checked.rejected() || !checked.snapshot().keybindings().equals(next))
-                throw new IllegalArgumentException("Cannot safely save these shortcuts; review the settings file.");
-            if (updated.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES)
-                throw new IOException("Configuration exceeds 1 MiB.");
-            if (!TomlStateFile.readBounded(file, MAX_BYTES, "Configuration").equals(original))
-                throw new IOException("Settings changed while saving. Try again.");
-            Path currentTarget = Files.exists(file) || Files.isSymbolicLink(file) ? file.toRealPath() : file.toAbsolutePath();
-            if (!target.equals(currentTarget)) throw new IOException("Settings location changed while saving. Try again.");
-            TomlStateFile.writeAtomically(target, ".shortcuts-", updated);
-            return refresh(true, true);
         });
+    }
+
+    /** The file itself, through any symbolic link, or its absolute path when it does not exist yet. */
+    private Path target() throws IOException {
+        return Files.exists(file) || Files.isSymbolicLink(file) ? file.toRealPath() : file.toAbsolutePath();
+    }
+
+    /**
+     * Reads the file (the template when it is missing), lets {@code edit} produce the new text or refuse by throwing,
+     * then writes it atomically unless the file or its location changed meanwhile, and publishes the reload.
+     * An {@link UncheckedIOException} from {@code edit} is rethrown as its cause.
+     */
+    private State transact(String prefix, Function<Source, String> edit) throws IOException {
+        Path target = target();
+        var original = TomlStateFile.readBounded(file, MAX_BYTES, "Configuration");
+        String source = original.orElseGet(() -> ConfigTemplate.text(macOs));
+        String updated;
+        try {
+            updated = edit.apply(new Source(source, ConfigLoader.parse(file, source, macOs)));
+        } catch (UncheckedIOException failure) {
+            throw failure.getCause();
+        }
+        // An edit that changes nothing (Migrate Config with nothing to do) leaves the file and its timestamp alone.
+        if (original.isPresent() && updated.equals(original.get())) return refresh(true, true);
+        if (updated.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES) throw new IOException("Configuration exceeds 1 MiB.");
+        if (!TomlStateFile.readBounded(file, MAX_BYTES, "Configuration").equals(original))
+            throw new IOException("Settings changed while saving. Try again.");
+        if (!target.equals(target())) throw new IOException("Settings location changed while saving. Try again.");
+        TomlStateFile.writeAtomically(target, prefix, updated);
+        return refresh(true, true);
     }
 
     private State refresh(boolean force, boolean publishUnchanged) {
