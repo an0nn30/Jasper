@@ -11,6 +11,7 @@ import dev.jasper.app.settings.TomlDocument;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.SettingSpec;
+import dev.jasper.sdk.settings.SettingsPanel;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ final class DeclaredSettings implements PluginSettings {
     private volatile SettingValues values = SettingValues.defaults(schema);
     private volatile boolean open = true;
     private volatile boolean closed;
+    private volatile SettingsPanel panel;
 
     // written: runs on the UI thread after a save; the host clears the file's reports and reloads it.
     DeclaredSettings(String pluginId, PluginSettingsFiles files, Containment containment, Consumer<Runnable> ui,
@@ -73,6 +75,15 @@ final class DeclaredSettings implements PluginSettings {
         listeners.add(Objects.requireNonNull(handler, "handler"));
         return () -> listeners.remove(handler);
     }
+
+    @Override public void page(SettingsPanel panel) {
+        Objects.requireNonNull(panel, "panel");
+        if (!open) throw new IllegalStateException("Give a settings page while the plugin starts");
+        if (this.panel != null) throw new IllegalStateException("A plugin has one settings page");
+        this.panel = panel;
+    }
+
+    Optional<SettingsPanel> panel() { return Optional.ofNullable(panel); }
 
     /** The plugin's start returned: declarations close, and the file's problems are reported. UI thread. */
     void complete() {
