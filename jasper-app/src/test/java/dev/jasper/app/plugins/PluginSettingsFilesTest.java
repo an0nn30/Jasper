@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import java.nio.file.attribute.FileTime;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.testsupport.PluginJars;
 import java.nio.file.Files;
@@ -69,5 +70,38 @@ class PluginSettingsFilesTest {
         Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
         assertThat(files.refresh(true)).containsExactly("dev.example.tool");
         assertThat(files.current("dev.example.tool")).containsEntry("greeting", "again").doesNotContainKey("proxy");
+    }
+
+    @Test void theLastGoodTextIsKeptAndSavesEditItAtomically() throws Exception {
+        var files = new PluginSettingsFiles(root, diagnostic -> { });
+        Path file = files.file("dev.test");
+        assertThat(files.text("dev.test")).as("no file yet").isEmpty();
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, "# Settings\nsize = 13\n");
+        files.refresh(true);
+        assertThat(files.text("dev.test")).isEqualTo("# Settings\nsize = 13\n");
+        Files.writeString(file, "size = \n");
+        files.refresh(true);
+        assertThat(files.text("dev.test")).as("a broken file keeps the last good text").isEqualTo("# Settings\nsize = 13\n");
+        Files.writeString(file, "# Settings\nsize = 13\n");
+        files.save("dev.test", text -> text.replace("13", "15"));
+        assertThat(Files.readString(file)).isEqualTo("# Settings\nsize = 15\n");
+        assertThat(files.text("dev.test")).isEqualTo("# Settings\nsize = 15\n");
+        assertThat(files.current("dev.test")).containsEntry("size", 15L);
+        try (var listing = Files.list(file.getParent())) {
+            assertThat(listing.map(path -> path.getFileName().toString())).containsExactly("dev.test.toml");
+        }
+    }
+
+    @Test void aSaveCreatesAMissingFileAndLeavesAnUnchangedFileAlone() throws Exception {
+        var files = new PluginSettingsFiles(root, diagnostic -> { });
+        files.save("dev.new", text -> text + "vim = true\n");
+        assertThat(Files.readString(files.file("dev.new"))).isEqualTo("vim = true\n");
+        var before = FileTime.fromMillis(1_000_000);
+        Files.setLastModifiedTime(files.file("dev.new"), before);
+        files.save("dev.new", text -> text);
+        assertThat(Files.getLastModifiedTime(files.file("dev.new"))).isEqualTo(before);
+        assertThatThrownBy(() -> files.save("dev.new", text -> "x".repeat(1024 * 1024 + 1)))
+            .isInstanceOf(java.io.IOException.class).hasMessageContaining("1 MiB");
     }
 }

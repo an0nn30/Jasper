@@ -36,7 +36,7 @@ final class PluginSettingsFiles {
     /** A 1-based line and column in a plugin's settings file. */
     record Position(int line, int column) { }
 
-    private static final class Known { Fingerprint fingerprint; Map<String, Object> values = Map.of(); TomlParseResult parsed; boolean broken; }
+    private static final class Known { Fingerprint fingerprint; Map<String, Object> values = Map.of(); String text = ""; TomlParseResult parsed; boolean broken; }
 
     private final Path userDirectory;
     private final Consumer<ConfigDiagnostic> report;
@@ -55,6 +55,33 @@ final class PluginSettingsFiles {
     static Path folder(Path userDirectory, String id) { return userDirectory.resolve(id); }
     static Path file(Path userDirectory, String id) { return folder(userDirectory, id).resolve(id + ".toml"); }
     static Path data(Path userDirectory, String id) { return folder(userDirectory, id).resolve("data"); }
+
+    /** This store's settings file for {@code id}. */
+    Path file(String id) { return file(userDirectory, id); }
+
+    /** The file's last good text for {@code id}, empty when it is absent; reads the file on first use. Safe from any thread. */
+    synchronized String text(String id) {
+        current(id);
+        return known.get(id).text;
+    }
+
+    /**
+     * Edits the plugin's file: reads it (empty when absent), applies {@code edit}, and writes the result atomically
+     * unless nothing changed, then re-reads it here. Refuses a file that grew past 1 MiB or changed during the edit.
+     * Off the UI thread; {@code edit} may throw to refuse the change.
+     */
+    synchronized void save(String id, java.util.function.UnaryOperator<String> edit) throws IOException {
+        Path file = file(userDirectory, id);
+        var original = dev.jasper.app.persistence.TomlStateFile.readBounded(file, MAX_BYTES, "Plugin settings");
+        String updated = edit.apply(original.orElse(""));
+        if (original.isPresent() && updated.equals(original.get())) return;
+        if (updated.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES) throw new IOException("Plugin settings exceed 1 MiB.");
+        if (!dev.jasper.app.persistence.TomlStateFile.readBounded(file, MAX_BYTES, "Plugin settings").equals(original))
+            throw new IOException("Settings changed while saving. Try again.");
+        dev.jasper.app.persistence.TomlStateFile.writeAtomically(file, ".settings-", updated);
+        Known state = known.computeIfAbsent(id, key -> new Known());
+        read(id, state, true);
+    }
 
     /** Creates the folder and data directory and seeds a missing settings file; an existing file is never touched. */
     static void prepare(Path userDirectory, PluginCandidate candidate, Map<String, Object> legacyTableOrNull) throws IOException {
@@ -114,7 +141,8 @@ final class PluginSettingsFiles {
             byte[] bytes;
             try (var input = Files.newInputStream(file)) { bytes = input.readNBytes(MAX_BYTES + 1); }
             if (bytes.length > MAX_BYTES) throw new IOException("larger than 1 MiB");
-            TomlParseResult parsed = Toml.parse(new String(bytes, StandardCharsets.UTF_8));
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            TomlParseResult parsed = Toml.parse(text);
             if (parsed.hasErrors()) {
                 TomlParseError error = parsed.errors().getFirst();
                 broken(state, file, error.position().line(), error.position().column(), error.toString());
@@ -124,12 +152,14 @@ final class PluginSettingsFiles {
             boolean recovered = state.broken;
             state.broken = false;
             state.parsed = parsed;
+            state.text = text;
             if (values.equals(state.values) && !recovered) return false;
             state.values = values;
             return true;
         } catch (NoSuchFileException absent) {
             state.fingerprint = null;
             state.parsed = null;
+            state.text = "";
             boolean had = !state.values.isEmpty() || state.broken;
             state.broken = false;
             state.values = Map.of();
