@@ -66,7 +66,16 @@ public final class EditorWindow {
     private final Icon fileIcon, serverIcon;
     private boolean showingEmpty = true;
     private boolean guarding;
-    private final Vim vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write));
+    private final Vim vim;
+    /** Each tab's Vim buffer number (Vim spec 6.2), kept while it is open. */
+    private final java.util.Map<DocumentSession, Integer> numbers = new java.util.HashMap<>();
+    private int nextNumber = 1;
+    /** The tab selected before the current one: Vim's alternate buffer. */
+    private EditorTab previous;
+    /** Untitled tabs {@code :e} opened for files that do not exist yet: their first save creates the file. */
+    private final java.util.Map<DocumentSession, Path> newFiles = new java.util.HashMap<>();
+    /** Tabs {@code :q!} closes: their changes go without asking. */
+    private final Set<EditorTab> discarding = new java.util.HashSet<>();
     /** Vim mode as toggled in this session, until the settings file says the same; null to follow the settings. */
     private Boolean vimToggled;
 
@@ -103,6 +112,7 @@ public final class EditorWindow {
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
             new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap),
             new Command("toggle-vim", "Toggle Vim Mode", Optional.empty(), false, this::toggleVim));
+        vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write, documents()));
         watcher = new LocalWatcher(context.background(), environment.ui(), model::sessions);
         ticker = new Timer(2000, event -> watcher.tick());
         noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> tab.session().clearNotice()));
@@ -211,6 +221,7 @@ public final class EditorWindow {
 
     private CompletableFuture<Boolean> approveTab(EditorTab tab) {
         if (!hosted.containsKey(tab)) return CompletableFuture.completedFuture(true);
+        if (discarding.remove(tab)) return CompletableFuture.completedFuture(true);
         DocumentSession session = tab.session();
         var pending = session.pendingSave();
         if (pending.isPresent()) return pending.get().thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
@@ -321,7 +332,71 @@ public final class EditorWindow {
     }
 
     private CompletableFuture<Boolean> saveSession(DocumentSession session) {
+        Path created = newFiles.get(session);
+        if (created != null && session.untitled())
+            return session.saveAs(new LocalDocument(created, context.background())).thenApply(saved -> {
+                if (saved) newFiles.remove(session);
+                return saved;
+            });
         return session.untitled() ? saveAsSession(session) : session.save();
+    }
+
+    /** The tabs as Vim's buffers (Vim spec 6.2): numbered, and saved, closed, selected and opened the Editor's way. */
+    private VimHost.Documents documents() {
+        return new VimHost.Documents(this::buffers,
+            number -> tabNumbered(number).map(tab -> saveSession(tab.session())).orElse(CompletableFuture.completedFuture(false)),
+            (number, file) -> tabNumbered(number).map(tab -> tab.session().saveAs(new LocalDocument(file, context.background())))
+                .orElse(CompletableFuture.completedFuture(false)),
+            (number, discard) -> tabNumbered(number).ifPresent(tab -> {
+                if (discard) discarding.add(tab);
+                closeTab(tab);
+            }),
+            number -> tabNumbered(number).ifPresent(tab -> select(tab.session())),
+            number -> tabNumbered(number).ifPresent(tab -> tab.session().reload()),
+            (editor, file) -> {
+                WindowOwner owner = tabOf(editor).map(hosted::get).map(WindowOwner.class::cast).orElseGet(this::owner);
+                if (file.isEmpty()) newUntitled(owner);
+                else if (java.nio.file.Files.exists(file.get())) openLocal(file.get(), owner);
+                else newFile(file.get(), owner);
+            },
+            EditorWindow::readText);
+    }
+
+    private List<VimHost.Buffer> buffers(dev.jasper.editor.vim.VimEditor editor) {
+        var current = tabOf(editor).orElse(null);
+        return editorTabs().stream().map(tab -> {
+            DocumentSession session = tab.session();
+            Optional<Path> file = localFile(session).or(() -> Optional.ofNullable(newFiles.get(session)));
+            return new VimHost.Buffer(numbers.get(session), session.location(), file, tab == current, tab == previous && tab != current,
+                session.dirty(), session.untitled() && !newFiles.containsKey(session), tab.area().getCaretLineNumber() + 1);
+        }).toList();
+    }
+
+    private Optional<EditorTab> tabNumbered(int number) {
+        return editorTabs().stream().filter(tab -> numbers.get(tab.session()) == number).findFirst();
+    }
+
+    private Optional<EditorTab> tabOf(dev.jasper.editor.vim.VimEditor editor) {
+        return editorTabs().stream().filter(tab -> tab.vimEditor().orElse(null) == editor).findFirst();
+    }
+
+    /** {@code :e newfile}: an empty tab named after the file, which its first save creates. */
+    private void newFile(Path file, WindowOwner owner) {
+        origin = owner;
+        var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
+        var session = DocumentSession.untitled(String.valueOf(file.getFileName()), sessionEnvironment(ref));
+        newFiles.put(session, file);
+        add(session, ref);
+        select(session);
+    }
+
+    /** {@code :r}: a local file's text, decoded as the Editor decodes it; empty when it cannot be read. */
+    private static Optional<String> readText(Path file) {
+        try {
+            return Optional.of(dev.jasper.editor.text.TextCodec.decode(java.nio.file.Files.readAllBytes(file)).text());
+        } catch (IOException | RuntimeException unreadable) {
+            return Optional.empty();
+        }
     }
 
     private CompletableFuture<Boolean> saveAsSession(DocumentSession session) {
@@ -388,6 +463,7 @@ public final class EditorWindow {
             if (selected().orElse(null) == tab) refreshStatus();
         });
         model.add(session);
+        numbers.put(session, nextNumber++);
         var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab);
         hosted.put(tab, handle); ownerRef.set(handle);
         handle.setFocusTarget(tab.area()::requestFocusInWindow);
@@ -409,6 +485,10 @@ public final class EditorWindow {
     private void remove(EditorTab tab) {
         if (hosted.remove(tab) == null) return;
         tab.dispose(); tab.session().cancelLoad(); model.remove(tab.session());
+        numbers.remove(tab.session());
+        newFiles.remove(tab.session());
+        discarding.remove(tab);
+        if (previous == tab) previous = null;
         if (selectedTab == tab) selectedTab = hosted.keySet().stream().findFirst().orElse(null);
         if (selectedTab != null) activate(selectedTab);
         refresh();
@@ -418,7 +498,10 @@ public final class EditorWindow {
     }
     private void activate(EditorTab tab) {
         if (!hosted.containsKey(tab)) return;
-        if (selectedTab != tab && selectedTab != null) selectedTab.remove(findBar);
+        if (selectedTab != tab && selectedTab != null) {
+            selectedTab.remove(findBar);
+            previous = selectedTab;
+        }
         selectedTab = tab; tab.add(findBar, BorderLayout.SOUTH); tab.revalidate(); refreshStatus();
     }
     private void step(int delta) {
