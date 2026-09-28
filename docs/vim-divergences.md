@@ -86,3 +86,21 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   `\k` and `\<` follow 'iskeyword', treating every letter above U+00FF as a word character.
 - **The `'.` mark and the change list follow each typed character**, as when typing in Vim. Keys fed to Vim all at
   once (a mapping, `feedkeys()`) are inserted as one string, so there the mark stays at the insert's start.
+- **One typeahead per tab.** Keys wait, and mappings and macros insert theirs, in the tab's own typeahead; a mapping or
+  macro that selects another tab (`:bn`, `gt`) goes on in the tab it started in. Vim's typeahead is global.
+- **`q:`, `q/` and `q?` fail.** Jasper has no command-line window.
+- **Mapping arguments.** `<buffer>`, `<expr>` and `<script>` are refused with `Not supported in Jasper: <expr>`.
+  `<silent>` is accepted and changes nothing, since Jasper never echoes the command line a mapping types. `<Leader>`
+  and `<LocalLeader>` are a backslash until the vimrc brings `let mapleader`.
+- **No Select, Lang-Arg or terminal mappings.** `:smap`, `:lmap`, `:tmap` and their forms fail with E319; `:vmap` and
+  `:map` still include Select mode, so their listings show `v` as Vim's do.
+- **Listings show Jasper's keys.** Jasper reads `<C-i>`, `<C-m>` and `<C-[>` as `<Tab>`, `<CR>` and `<Esc>`, and
+  `:map` lists them so; `<M-x>` is listed as `<M-x>`, where Vim shows the character with its top bit set (`ø`).
+- **Recorded keys.** A macro keeps named keys in Vim's codes (`:reg` shows `<BS>` as `<80>kb`). A key with modifiers
+  that Vim has no code of its own for is kept with Vim's modifier prefix (`<80><fc>`), which Vim would write only for
+  some of them.
+- **CTRL-C in a mapping or macro that runs on** is noticed every 1000 keys, when Jasper looks for it among the window's
+  pending key events; it cannot read keys while the others run.
+- **`<nowait>` in the corpus.** The recorder types a case's keys all at once, so Vim sees a longer mapping's keys
+  together and `<nowait>` never matters there; Jasper's corpus runner gives the keys one at a time, as typing does, and
+  the case that shows the difference is divergent.

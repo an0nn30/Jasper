@@ -135,8 +135,17 @@ recorded corpus.
 - The fold commands (`zo`, `zc`, `za`, `zR`, `zM`, `zj`, `[z`) work on the Editor's code folds. A closed fold counts as
   one line for `j`, `k` and scrolling, an operator takes it whole, and the motions Vim's 'foldopen' names (`l`, `w`,
   searches, marks, `%`, `{`, `u`) open the fold they land in.
-- Not yet: macros, a vimrc, and emulated plugins such as surround and commentary. They follow in later releases. An
-  uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
+- Macros: `qa` … `q` records the keys you type into register `a` (the strip shows `recording @a`), `@a` runs them,
+  `5@a` five times, `@@` the last register again and `@:` the last command line; `qA` appends to `a`. A macro stops
+  at the first command that fails, so one that ends with `@a` runs to the end of the file; `u` undoes everything a
+  macro or mapping changed at once. Ctrl+C stops a macro or mapping that runs on.
+- Mappings: `:nmap`, `:vmap`, `:xmap`, `:omap`, `:imap`, `:cmap`, `:map` and `:map!`, their `noremap` forms, and the
+  `unmap` and `mapclear` forms, as in Vim (`:nnoremap <Space>w :w<CR>`); without a right-hand side they list the
+  mappings. Keys that start a longer mapping wait 'timeoutlen' (1000 ms) for the rest, and the strip shows them.
+  `<nowait>`, `<unique>`, `<Plug>`, `<Nop>` and `<Leader>` (a backslash for now) work as in Vim. A key that starts a
+  mapping is Vim's, even a ⌘ key.
+- Not yet: a vimrc, `sethandler` lines and emulated plugins such as surround and commentary. They follow in later
+  releases. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 

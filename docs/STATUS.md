@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V3a** (branch `claude/vim-v3a`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3a.md`, written 2026-09-28): macros (`q`, `@`, `@@`, `{n}@`, `@:`, `@.`,
+  `recording @q` in the Vim bar) and the mapping commands typed on the command line (`:map :nmap :vmap :xmap :omap
+  :imap :cmap :map!`, their `noremap`, `unmap` and `mapclear` forms, and the listings), through a per-tab typeahead
+  ported from Vim's getchar.c: recursion and E223 ('maxmapdepth'), 'timeout' and 'timeoutlen' on a Swing timer,
+  `<nowait>`, `<unique>`, `<Plug>`, `<Nop>`, `<Leader>`; a failing command ends a mapping or macro, a mapping's changes
+  undo as one step, and Ctrl+C stops one that runs on. Every file in the plan was compiled and run against Vim 9.1
+  before the plan was written: 1714 corpus cases (133 new in `macros.case` and `mappings.case`, 2 divergent).
+  - Not done: executing the plan; GUI checks 71–79 of the [checklist](editor-verification.md) (user-run); plan V3b
+    (the vimrc, `sethandler` lines, `let mapleader`, `<Action>`); V4; push.
 - **Editor Vim mode, plan V2b** (branch `claude/vim-v2b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`, written 2026-09-28): the Editor's tabs as Vim's buffers — `:w :wq :x :exi :sav :wa :xa :wqa :q :qa
   :quita :e :ene :r :ls :buffers :files :b :bn :bN :bp :tabn :tabN :tabp :tabnew :tabe`, `ZZ`, `ZQ`, `gt`, `gT`,

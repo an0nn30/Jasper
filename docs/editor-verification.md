@@ -94,3 +94,15 @@ unverified.
 - [ ] 68. `mA` in one tab, then `'A` in another tab, selects the first tab with the cursor on the mark.
 - [ ] 69. `:r other.txt` puts the other file's lines below the cursor; `u` takes them away.
 - [ ] 70. A remote file saved with `:w` goes through the Editor's remote save (conflict check and all).
+
+## Vim mode (plan V3a)
+
+- [ ] 71. `qa`, `dwj`, `q`: the Vim bar shows `recording @a` while recording (`-- INSERT --recording @a` in Insert mode); `@a` repeats it, `3@a` three times, `@@` once more.
+- [ ] 72. `qaq`, then `qa0xj@aq`, then `@a`: the macro runs down to the last line and stops; `u` undoes everything it changed in one step.
+- [ ] 73. `:nnoremap <Space>w :w<CR>`, then Space and `w` saves the tab; `:nmap` lists the mapping above the Vim bar.
+- [ ] 74. `:imap jk <Esc>`: typing `jk` quickly leaves Insert mode; typing `j` and waiting a second inserts the `j`, and while it waits the right of the Vim bar shows `j`.
+- [ ] 75. `:nmap ab dd`, then `a`: after a second Insert mode starts; after `:set tm=3000` it takes three seconds; after `:set notimeout` it waits for the next key.
+- [ ] 76. `:nmap <F2> dd` makes F2 delete a line; `:nmap <D-k> dd` makes ⌘K delete a line in Normal mode, and ⌘K in Insert mode still does what the Editor does.
+- [ ] 77. `:nmap x ggx` and then `x` runs on; Ctrl+C stops it, the Vim bar flashes, and the Editor answers again.
+- [ ] 78. `:s/a/b/`, `j`, `@:` repeats the substitution on the next line.
+- [ ] 79. `qai`, typing 日本 with the Japanese input method, `<Esc>q`, then `@a` on another line inserts 日本 again.
