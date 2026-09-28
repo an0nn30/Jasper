@@ -407,7 +407,10 @@ public final class VimEditor {
     }
 
     /** Text an input method committed in Insert mode, recorded for {@code .}. */
-    void typedByInputMethod(String text) { insert.typedByInputMethod(text); }
+    void typedByInputMethod(String text) {
+        text.codePoints().forEach(cp -> vim.macros().typed(KeyInput.of(cp)));
+        insert.typedByInputMethod(text);
+    }
 
     /** @return the mode */
     public Mode mode() {
@@ -462,6 +465,16 @@ public final class VimEditor {
 
     /** @param listener no longer runs */
     public void removeListener(Runnable listener) { listeners.remove(listener); }
+
+    /**
+     * @return what the Vim bar shows when there is no message: the mode with 'showmode', then {@code recording @q}
+     *     while a macro is recorded (showmode)
+     */
+    public String modeText() {
+        String label = showmode() ? mode().label() : "";
+        char recording = vim.macros().recording();
+        return recording == 0 ? label : label + "recording @" + recording;
+    }
 
     /** @return whether the Vim bar shows the mode ('showmode') */
     public boolean showmode() { return options.flag("showmode"); }

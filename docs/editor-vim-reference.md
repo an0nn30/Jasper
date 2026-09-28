@@ -240,6 +240,8 @@ After an operator, and in Visual mode, where they extend the area.
 | `gT` | {count} tabs back |
 | `&` | repeat the last `:s` on the line, without its flags |
 | `g&` | repeat the last `:s` on every line, with its flags (`:%s//~/&`) |
+| `q{char}` | `q{reg}` records typed keys into a register; `q` again stops (`{A-Z}` appends) |
+| `@{char}` | run a register's keys, [count] times; `@@` the last one run, `@:` the last command line |
 
 ## Visual-mode commands
 
@@ -288,6 +290,8 @@ In Visual mode, besides the motions, operators and text objects above. A change 
 | `<PageUp>` | scroll up {count} pages |
 | `<S-Up>` | scroll up {count} pages |
 | `:` | a command line for the Visual lines (`:'<,'>`) |
+| `q{char}` | record into a register, or stop recording, as `q` |
+| `@{char}` | run a register's keys in Visual mode, as `@` |
 
 ## Insert-mode keys
 

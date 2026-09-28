@@ -55,6 +55,9 @@ final class Machine {
 
     boolean replaying() { return replaying; }
 
+    /** @return whether {@code i_CTRL-O} was typed in Replace mode, so Replace mode comes back after the command */
+    boolean pausedReplace() { return resumeReplace; }
+
     /** @return whether the key means something now, for the handler rule */
     boolean wants(KeyInput key) {
         if (argument != null || key.plainChar() >= 0 || key.is("<Esc>")) return true;
@@ -123,7 +126,7 @@ final class Machine {
             if (vim.commands().prefix(keys, operator != null)) return;
             throw Context.fail();
         }
-        if (entry.needsChar()) {
+        if (needsChar(entry)) {
             VimCommands.Entry waiting = entry;
             argument = arg -> {
                 record.add(arg);
@@ -200,7 +203,7 @@ final class Machine {
             if (vim.commands().visualPrefix(keys)) return;
             throw Context.fail();
         }
-        if (entry.needsChar()) {
+        if (needsChar(entry)) {
             argument = arg -> {
                 record.add(arg);
                 runVisual(entry, arg);
@@ -278,6 +281,11 @@ final class Machine {
     /** A Visual-mode change that is not an operator (put): records it for {@code .} with the area's size. */
     void visualChange(Visual.Redo redo) {
         visualRedo = redo;
+    }
+
+    /** Whether the command reads a key as its argument; {@code q} does not while recording or while a register runs. */
+    private boolean needsChar(VimCommands.Entry entry) {
+        return entry.needsChar() && !(entry.keys().equals("q") && vim.macros().qTakesNoRegister());
     }
 
     /** {@code dd}, {@code gUU}, {@code gUgU}, and {@code ~~} with 'tildeop'. */

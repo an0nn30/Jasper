@@ -37,6 +37,22 @@ class VimBarTest {
         });
     }
 
+    @Test void showsRecordingAfterTheMode() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var area = new VimTextArea();
+            area.setText("abc\n");
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            var bar = new VimBar();
+            bar.attach(editor);
+            type(editor, "qq");
+            assertThat(bar.statusText()).isEqualTo("recording @q");
+            type(editor, "i");
+            assertThat(bar.statusText()).isEqualTo("-- INSERT --recording @q");
+            type(editor, "<Esc>q");
+            assertThat(bar.statusText()).isEmpty();
+        });
+    }
+
     @Test void showsTheCommandLineWithItsCursor() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var area = new VimTextArea();

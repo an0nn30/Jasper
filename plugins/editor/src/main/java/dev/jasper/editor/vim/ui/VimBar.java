@@ -126,7 +126,7 @@ public final class VimBar extends JPanel {
             status.caret = -1;
         } else {
             String message = editor.message();
-            String text = message.isEmpty() ? editor.showmode() ? editor.mode().label() : "" : message;
+            String text = message.isEmpty() ? editor.modeText() : message;
             // A space keeps the bar one line high when there is nothing to show.
             status.setText(text.isEmpty() ? " " : text);
             status.caret = -1;

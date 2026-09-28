@@ -210,6 +210,9 @@ final class Typeahead {
         timeoutFired = false;
         tookTyped = false;
         int depth = 0;
+        Macros macros = editor.vim().macros();
+        macros.nextKey();
+        if (!mapped()) macros.doneExecuting();
         while (!keys.isEmpty()) {
             Key head = keys.getFirst();
             int state = editor.mapState(head.key());
@@ -260,8 +263,14 @@ final class Typeahead {
         return null;
     }
 
-    /** The first {@code n} keys are taken. */
+    /** The first {@code n} keys are taken; the typed ones are recorded when a macro is being recorded. */
     private void consume(int n) {
-        for (int i = 0; i < n; i++) if (keys.removeFirst().typed()) tookTyped = true;
+        Macros macros = editor.vim().macros();
+        for (int i = 0; i < n; i++) {
+            Key key = keys.removeFirst();
+            if (!key.typed()) continue;
+            macros.typed(key.key());
+            tookTyped = true;
+        }
     }
 }
