@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V2a** (branch `claude/vim-v2a`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`, written 2026-09-28): the Ex command line — ranges (`;`, searches, marks, folds, `*`), `|`, Vim's 600
+  command names for abbreviations (E319 for those Jasper lacks), `:s` with every flag including confirmation, `:&`,
+  `:&&`, `:~`, `&`, `g&`, `:g`/`:g!`/`:v`, `:d :y :> :< :pu :j :m :t :co :norm :sort :left :right :center`,
+  `:p :P :l :nu :# :=`, `:k :mark :delm :marks :jumps :changes :reg :di`, `:u :red :noh`, `:set`/`:setlocal`/
+  `:setglobal` with do_set's syntax, the output panel (Vim's hit-enter prompt), questions that pause a command,
+  'report' messages, 'hlsearch' on and 'gdefault'. The corpus compares output (`output: yes`). Every file in the plan
+  was compiled and run against Vim 9.1 before the plan was written: 1565 corpus cases
+  (1560 recorded, 5 divergent).
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,068 tests, 0 failed, 0 errors, 5 skipped.
+  - Not done: GUI checks 51–60 of the [checklist](editor-verification.md) (user-run); plans V2b, V3 and V4; merge;
+    push.
 - **Editor Vim mode, plan V1c** (branch `claude/vim-v1c`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`, written 2026-09-28): the view — scrolling
   (`<C-e> <C-y> <C-d> <C-u> <C-f> <C-b>`, page keys, `zt z<CR> zz z. zb z- z+ z^`), `H M L`, the screen-line motions
