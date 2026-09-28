@@ -362,7 +362,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void connectConfiguration(Runnable settings, Runnable reload, Runnable migrate, Runnable unregister) {
         if (closed) return;
         openSettings = settings; reloadConfiguration = reload; migrateConfiguration = migrate; unregisterConfiguration = unregister;
-        action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, "Open configuration file");
+        action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, "Open Settings");
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, "Reload configuration file");
         updateActions();
     }
