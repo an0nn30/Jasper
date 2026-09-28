@@ -6,19 +6,35 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
+import java.util.function.Supplier;
 
 /**
- * What the Vim engine needs from the Editor (spec 1.1): the clipboard, and the Editor's tabs as Vim's buffers.
+ * What the Vim engine needs from the Editor (spec 1.1): the clipboard, the Editor's tabs as Vim's buffers, and its
+ * commands for {@code <Action>(id)} and {@code :action}.
  *
  * @param readClipboard reads {@code '+'} (the clipboard) or {@code '*'} (the selection, or the clipboard where there
  *     is none); empty when it holds no text or cannot be read
  * @param writeClipboard writes {@code '+'} or {@code '*'}
  * @param documents the tabs, for the file, buffer and tab commands
+ * @param actions the Editor's commands, for {@code <Action>(id)}, {@code :action} and {@code :actionlist}
  */
-public record VimHost(Function<Character, Optional<String>> readClipboard, BiConsumer<Character, String> writeClipboard, Documents documents) {
+public record VimHost(Function<Character, Optional<String>> readClipboard, BiConsumer<Character, String> writeClipboard, Documents documents,
+                      Actions actions) {
+    /**
+     * A host with a clipboard and tabs and no commands.
+     *
+     * @param readClipboard reads {@code '+'} or {@code '*'}
+     * @param writeClipboard writes {@code '+'} or {@code '*'}
+     * @param documents the tabs
+     */
+    public VimHost(Function<Character, Optional<String>> readClipboard, BiConsumer<Character, String> writeClipboard, Documents documents) {
+        this(readClipboard, writeClipboard, documents, Actions.NONE);
+    }
+
     /**
      * A host with a clipboard and no tabs.
      *
@@ -31,6 +47,25 @@ public record VimHost(Function<Character, Optional<String>> readClipboard, BiCon
 
     /** @return a host with no clipboard and no tabs: reads are empty and writes are dropped */
     public static VimHost detached() { return new VimHost(register -> Optional.empty(), (register, text) -> { }); }
+
+    /**
+     * An Editor command a mapping or {@code :action} can run (spec 7.2).
+     *
+     * @param id its id, as the Editor's commands name it ({@code save}, {@code find})
+     * @param title what menus call it
+     */
+    public record Action(String id, String title) { }
+
+    /**
+     * The Editor's commands, on the UI thread.
+     *
+     * @param list every command, in the Editor's order
+     * @param run runs a command, for the tab Vim is in; false when no command has the id
+     */
+    public record Actions(Supplier<List<Action>> list, BiPredicate<VimEditor, String> run) {
+        /** No commands: every id is unknown. */
+        public static final Actions NONE = new Actions(List::of, (editor, id) -> false);
+    }
 
     /**
      * An Editor tab as a Vim buffer (spec 6.2).

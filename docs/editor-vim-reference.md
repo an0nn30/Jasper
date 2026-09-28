@@ -431,5 +431,8 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:let` | `:let mapleader = ","`, `:let @a = "…"`, `:let &tw = 80`, `:let g:name = …`: a variable, register or option |
 | `:so[urce]` | run {file}'s lines as command lines, as the vimrc's |
 | `:mes[sages]` | the message history: errors, and the vimrc's skipped lines; `:messages clear` |
+| `:seth[andler]` | `:sethandler {key} {modes}:{vim\|ide} …`: who gets a key in each mode |
+| `:ac[tion]` | run the Editor command {id}, as `<Action>(id)` does in a mapping |
+| `:actionl[ist]` | list the Editor's command ids, or those holding [text] |
 | `:sy[ntax]` | accepted and ignored: the Editor highlights by language |
 | `:filet[ype]` | accepted and ignored: the Editor knows each file's language |

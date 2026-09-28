@@ -392,6 +392,12 @@ public final class VimEditor {
 
     /** Runs one key without the failure handling, for {@code .}, a count's repeat and {@code :normal}. */
     void dispatch(KeyInput key) {
+        String action = key.actionId();
+        if (action != null) {
+            // <Action>(id) runs the Editor's command where it is reached, in any mode (IdeaVim).
+            if (!vim.host().actions().run().test(this, action)) throw new VimFailure("Not an Editor command: " + action);
+            return;
+        }
         if (promptHandler != null) {
             answer(key);
             return;

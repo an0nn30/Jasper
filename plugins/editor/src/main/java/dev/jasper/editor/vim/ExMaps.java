@@ -188,6 +188,7 @@ final class ExMaps {
     /** get_special_key_name for one key (modifiers in Vim's order M, C, S, D), or the character itself. */
     static String name(KeyInput key) {
         int modifiers = key.modifiers();
+        if (key.actionId() != null) return key.notation();
         if (key.isChar() && modifiers == 0) return key.key();
         if (key.isChar() && modifiers == KeyInput.CTRL) {
             char c = key.key().charAt(0);
@@ -214,8 +215,8 @@ final class ExMaps {
     /**
      * replace_termcodes: a left- or right-hand side as typed after {@code :map}, as keys. {@code <>} names a key
      * ({@code <lt>} is {@code <}); {@code <Leader>} and {@code <LocalLeader>} are {@code leader} and
-     * {@code localLeader}; {@code <Nop>} is no key; CTRL-V takes the next character
-     * literally (a CTRL-V ending a left-hand side stays); a left-hand side starting {@code #1} is
+     * {@code localLeader}; {@code <Action>(id)} runs an Editor command; {@code <Nop>} is no key; CTRL-V takes the
+     * next character literally (a CTRL-V ending a left-hand side stays); a left-hand side starting {@code #1} is
      * {@code <F1>}. A control character is its CTRL key. A backslash is an ordinary character, as with Vim's default
      * 'cpoptions'.
      *
@@ -239,6 +240,15 @@ final class ExMaps {
                         keys.addAll(KeyCodes.keys(body.equals("leader") ? leader : localLeader));
                         i = close + 1;
                         continue;
+                    }
+                    // IdeaVim's <Action>(id): an Editor command, run where the key is reached.
+                    if (body.equals("action") && close + 1 < text.length() && text.charAt(close + 1) == '(') {
+                        int end = text.indexOf(')', close + 2);
+                        if (end > close + 2) {
+                            keys.add(KeyInput.action(text.substring(close + 2, end)));
+                            i = end + 1;
+                            continue;
+                        }
                     }
                     if (body.equals("nop")) {
                         i = close + 1;

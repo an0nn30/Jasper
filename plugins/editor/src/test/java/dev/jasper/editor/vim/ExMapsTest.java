@@ -34,6 +34,13 @@ class ExMapsTest {
         assertThat(ExMaps.parse("<leader>\\", false, "\u00e9", "\\")).as("any text, even a backslash").isEqualTo(KeyInput.parse("\u00e9\\"));
     }
 
+    @Test void actionsInARightHandSide() {
+        assertThat(ExMaps.parse("<Action>(find)n", false)).containsExactly(KeyInput.action("find"), KeyInput.of('n'));
+        assertThat(ExMaps.parse("<action>(find)", false)).containsExactly(KeyInput.action("find"));
+        assertThat(ExMaps.parse("<Action>x", false)).as("not followed by an id").isEqualTo(KeyInput.parse("<lt>Action>x"));
+        assertThat(ExMaps.display(ExMaps.parse("<Action>(save)", false), false)).isEqualTo("<Action>(save)");
+    }
+
     @Test void showsKeysAsVimsListingDoes() {
         assertThat(ExMaps.display(KeyInput.parse("<Space>a b<Space>"), false)).isEqualTo("<Space>a b<Space>");
         assertThat(ExMaps.display(KeyInput.parse("a b"), true)).isEqualTo("a<Space>b");

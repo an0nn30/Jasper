@@ -73,6 +73,8 @@ final class KeyCodes {
     }
 
     private static String text(KeyInput key) {
+        // An Editor command from a mapping is never typed, so never recorded; it has no text.
+        if (key.actionId() != null) return "";
         String code = CODES.get(key.notation());
         if (code != null) return SPECIAL + code;
         int modifiers = key.modifiers();

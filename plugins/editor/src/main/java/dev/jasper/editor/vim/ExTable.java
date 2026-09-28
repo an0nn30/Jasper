@@ -3,7 +3,8 @@ package dev.jasper.editor.vim;
 import java.util.List;
 
 /**
- * Every Ex command name Vim 9.1 knows, in the order of its command table (ex_cmds.h). A typed name stands for the
+ * Every Ex command name Vim 9.1 knows, in the order of its command table (ex_cmds.h), and IdeaVim's
+ * {@code :sethandler}, {@code :action} and {@code :actionlist} after them. A typed name stands for the
  * first command in this order that starts with it, as Vim's find_ex_command resolves abbreviations: {@code :s} is
  * {@code :substitute} and {@code :d} is {@code :delete}. Jasper implements some of them ({@link Ex}); the others fail
  * with E319.
@@ -72,7 +73,9 @@ final class ExTable {
         "vnew", "vnoremenu", "vsplit", "vunmap", "vunmenu", "write", "wNext", "wall", "while", "winsize", "wincmd",
         "windo", "winpos", "wlrestore", "wnext", "wprevious", "wq", "wqall", "wundo", "wviminfo", "xit", "xall",
         "xmap", "xmapclear", "xmenu", "xnoremap", "xnoremenu", "xrestore", "xunmap", "xunmenu", "yank", "z", "!",
-        "#", "&", "*", "<", "=", ">", "@", "{", "}", "~", "Next", "Print", "X", "++", "--");
+        "#", "&", "*", "<", "=", ">", "@", "{", "}", "~", "Next", "Print", "X", "++", "--",
+        // IdeaVim's own, after Vim's so that no Vim abbreviation changes.
+        "sethandler", "action", "actionlist");
 
     /**
      * @param typed a command name as typed, perhaps abbreviated

@@ -162,6 +162,9 @@ final class Ex {
         def("let", EXTRA | NOTRLCOM, Addr.NONE, "`:let mapleader = \",\"`, `:let @a = \"…\"`, `:let &tw = 80`, `:let g:name = …`: a variable, register or option", ExVimrc::let);
         def("source", EXTRA | NEEDARG | TRLBAR, Addr.NONE, "run {file}'s lines as command lines, as the vimrc's", ExVimrc::source);
         def("messages", RANGE | EXTRA | TRLBAR, Addr.OTHER, "the message history: errors, and the vimrc's skipped lines; `:messages clear`", ExVimrc::messages);
+        def("sethandler", EXTRA | TRLBAR, Addr.NONE, "`:sethandler {key} {modes}:{vim|ide} …`: who gets a key in each mode", ExVimrc::sethandler);
+        def("action", EXTRA | NEEDARG | TRLBAR, Addr.NONE, "run the Editor command {id}, as `<Action>(id)` does in a mapping", ExVimrc::action);
+        def("actionlist", EXTRA | TRLBAR, Addr.NONE, "list the Editor's command ids, or those holding [text]", ExVimrc::actionlist);
         def("syntax", EXTRA | NOTRLCOM | TRLBAR, Addr.NONE, "accepted and ignored: the Editor highlights by language", ExVimrc::ignored);
         def("filetype", EXTRA | TRLBAR, Addr.NONE, "accepted and ignored: the Editor knows each file's language", ExVimrc::ignored);
     }

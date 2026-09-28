@@ -221,6 +221,47 @@ final class ExVimrc {
         for (String line : List.copyOf(history.subList(from, history.size()))) cmd.editor.say(line);
     }
 
+    /**
+     * IdeaVim's {@code :sethandler {key} {modes}:{vim|ide} …} (spec 2.2): who gets a key in each mode; modes
+     * {@code n i v x o c}, or {@code a} for all, joined with {@code -}.
+     */
+    static void sethandler(ExCommand cmd) {
+        String[] parts = cmd.arg.strip().split("\\s+");
+        if (parts.length < 2 || parts[0].isEmpty()) throw new VimFailure("E471: Argument required");
+        List<KeyInput> keys = KeyInput.parse(parts[0]);
+        if (keys.size() != 1) throw new VimFailure("E474: Invalid argument: " + parts[0]);
+        KeyHandlers handlers = cmd.editor.vim().handlers();
+        for (int i = 1; i < parts.length; i++) {
+            String part = parts[i];
+            int colon = part.indexOf(':');
+            String who = colon < 0 ? "" : part.substring(colon + 1).toLowerCase(Locale.ROOT);
+            if (colon <= 0 || !who.equals("vim") && !who.equals("ide")) throw new VimFailure("E474: Invalid argument: " + part);
+            try {
+                handlers.set(keys.getFirst(), part.substring(0, colon), who.equals("vim") ? KeyHandlers.Handler.VIM : KeyHandlers.Handler.IDE);
+            } catch (IllegalArgumentException bad) {
+                throw new VimFailure("E474: Invalid argument: " + part);
+            }
+        }
+    }
+
+    /** {@code :action {id}}: runs one of the Editor's commands, as {@code <Action>(id)} does. */
+    static void action(ExCommand cmd) {
+        String id = cmd.arg.strip();
+        if (!cmd.editor.vim().host().actions().run().test(cmd.editor, id)) throw new VimFailure("Not an Editor command: " + id);
+    }
+
+    /** {@code :actionlist [pattern]}: the Editor's command ids and titles, those holding the text if one is given. */
+    static void actionlist(ExCommand cmd) {
+        String pattern = cmd.arg.strip().toLowerCase(Locale.ROOT);
+        VimEditor editor = cmd.editor;
+        editor.say("--- Actions ---");
+        for (VimHost.Action action : editor.vim().host().actions().list().get()) {
+            if (!pattern.isEmpty() && !action.id().toLowerCase(Locale.ROOT).contains(pattern)
+                && !action.title().toLowerCase(Locale.ROOT).contains(pattern)) continue;
+            editor.say(String.format("%-24s %s", action.id(), action.title()));
+        }
+    }
+
     /** {@code :syntax} and {@code :filetype}: accepted, as vimrcs say them, and nothing happens. */
     static void ignored(ExCommand cmd) { }
 }

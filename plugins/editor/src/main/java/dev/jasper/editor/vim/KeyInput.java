@@ -10,7 +10,8 @@ import java.util.Objects;
  * never carries Shift (it is part of the character), and Ctrl with a letter always holds the lower-case letter, so
  * equal keys are equal records.
  *
- * @param key one code point as a string, or a name from {@link #NAMES}
+ * @param key one code point as a string, a name from {@link #NAMES}, or {@code Action(id)} for an Editor command a
+ *     mapping runs ({@code <Action>(id)}, spec 7.2)
  * @param modifiers {@link #SHIFT}, {@link #CTRL}, {@link #ALT} and {@link #META} combined
  */
 public record KeyInput(String key, int modifiers) {
@@ -29,7 +30,7 @@ public record KeyInput(String key, int modifiers) {
     /** Checks the key is one code point or a known name. */
     public KeyInput {
         Objects.requireNonNull(key, "key");
-        if (key.isEmpty() || key.codePointCount(0, key.length()) != 1 && !NAMES.contains(key))
+        if (key.isEmpty() || key.codePointCount(0, key.length()) != 1 && !NAMES.contains(key) && !isAction(key))
             throw new IllegalArgumentException("Not a key: " + key);
     }
 
@@ -51,6 +52,17 @@ public record KeyInput(String key, int modifiers) {
      */
     public static KeyInput ctrl(char letter) { return normalize(String.valueOf(letter), CTRL); }
 
+    /**
+     * @param id an Editor command id
+     * @return the key that runs it from a mapping, {@code <Action>(id)}
+     */
+    public static KeyInput action(String id) { return new KeyInput("Action(" + id + ")", 0); }
+
+    private static boolean isAction(String key) { return key.startsWith("Action(") && key.endsWith(")") && key.length() > 8; }
+
+    /** @return the Editor command id of an {@code <Action>(id)} key, or null for any other key */
+    public String actionId() { return isAction(key) ? key.substring(7, key.length() - 1) : null; }
+
     /** @return whether this is a character rather than a named key */
     public boolean isChar() { return key.codePointCount(0, key.length()) == 1; }
 
@@ -69,6 +81,7 @@ public record KeyInput(String key, int modifiers) {
     /** @return Vim notation: {@code a}, {@code <lt>}, {@code <C-w>}, {@code <S-Tab>} */
     public String notation() {
         if (modifiers == 0 && isChar()) return key.equals("<") ? "<lt>" : key;
+        if (isAction(key)) return "<Action>(" + actionId() + ")";
         StringBuilder out = new StringBuilder("<");
         if ((modifiers & SHIFT) != 0) out.append("S-");
         if ((modifiers & CTRL) != 0) out.append("C-");
@@ -94,6 +107,14 @@ public record KeyInput(String key, int modifiers) {
         List<KeyInput> keys = new ArrayList<>();
         int i = 0;
         while (i < notation.length()) {
+            if (notation.regionMatches(true, i, "<Action>(", 0, 9)) {
+                int close = notation.indexOf(')', i + 9);
+                if (close > i + 9) {
+                    keys.add(action(notation.substring(i + 9, close)));
+                    i = close + 1;
+                    continue;
+                }
+            }
             if (notation.charAt(i) == '<') {
                 int close = notation.indexOf('>', i + 1);
                 if (close > i + 1) {

@@ -27,6 +27,14 @@ class KeyInputTest {
         assertThat(KeyInput.named("Plug").notation()).isEqualTo("<Plug>");
     }
 
+    @Test void anActionKeyCarriesAnEditorCommandId() {
+        assertThat(KeyInput.parse("<Action>(save)x")).containsExactly(KeyInput.action("save"), KeyInput.of('x'));
+        assertThat(KeyInput.action("find").notation()).isEqualTo("<Action>(find)");
+        assertThat(KeyInput.action("find").actionId()).isEqualTo("find");
+        assertThat(KeyInput.of('a').actionId()).isNull();
+        assertThat(KeyInput.parse("<Action>()")).as("no id: literal").hasSize(10);
+    }
+
     @Test void normalizesCtrlAndShiftAsVimDoes() {
         assertThat(KeyInput.parse("<C-W>")).containsExactly(new KeyInput("w", KeyInput.CTRL));
         assertThat(KeyInput.parse("<C-[>")).containsExactly(KeyInput.named("Esc"));

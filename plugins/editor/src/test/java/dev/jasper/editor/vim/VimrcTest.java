@@ -2,6 +2,7 @@ package dev.jasper.editor.vim;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -11,14 +12,15 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The vimrc and the commands the corpus cannot record (spec 7.1): reading files, {@code :source} and Reload
- * vimrc.
+ * The vimrc and the commands the corpus cannot record (spec 7.1 and 7.2): reading files, {@code :source},
+ * IdeaVim's {@code :sethandler}, {@code :action} and {@code :actionlist}, and Reload vimrc.
  */
 class VimrcTest {
-    /** The commands whose cases need files, which this class runs instead of the corpus. */
-    static final Set<String> NOT_IN_VIM = Set.of("ex source");
+    /** The commands whose cases need files or the Editor's commands, which this class runs instead of the corpus. */
+    static final Set<String> NOT_IN_VIM = Set.of("ex source", "ex sethandler", "ex action", "ex actionlist");
 
     @TempDir Path folder;
+    private final List<String> ran = new ArrayList<>();
     private final Set<String> covered = new java.util.HashSet<>();
 
     private static void onEdt(Runnable test) throws Exception { SwingUtilities.invokeAndWait(test); }
@@ -26,7 +28,13 @@ class VimrcTest {
     private static void type(VimEditor editor, String keys) { for (KeyInput key : KeyInput.parse(keys)) editor.feed(key); }
 
     private VimEditor editor(String text) {
-        var vim = new Vim(new VimHost(r -> Optional.empty(), (r, t) -> { }));
+        var actions = new VimHost.Actions(() -> List.of(new VimHost.Action("save", "Save"), new VimHost.Action("find", "Find…"),
+            new VimHost.Action("toggle-comment", "Toggle Comment")), (editor, id) -> {
+                if (!List.of("save", "find", "toggle-comment").contains(id)) return false;
+                ran.add(id);
+                return true;
+            });
+        var vim = new Vim(new VimHost(r -> Optional.empty(), (r, t) -> { }, VimHost.Documents.NONE, actions));
         vim.coverage(covered::add);
         var area = new VimTextArea();
         area.setText(text);
@@ -192,15 +200,67 @@ class VimrcTest {
         });
     }
 
+    @Test void sethandlerGivesKeysToVimOrTheEditor() throws Exception {
+        onEdt(() -> {
+            var editor = editor("one\ntwo\n");
+            type(editor, ":sethandler <lt>C-d> n:ide i-v:vim<CR>");
+            KeyHandlers handlers = editor.vim().handlers();
+            assertThat(handlers.handler(KeyInput.ctrl('d'), 'n')).isEqualTo(KeyHandlers.Handler.IDE);
+            assertThat(handlers.handler(KeyInput.ctrl('d'), 'i')).isEqualTo(KeyHandlers.Handler.VIM);
+            assertThat(handlers.handler(KeyInput.ctrl('d'), 'x')).isEqualTo(KeyHandlers.Handler.DEFAULT);
+            assertThat(editor.offer(KeyInput.ctrl('d'))).as("Normal mode: the Editor's").isFalse();
+            type(editor, ":sethandler <lt>C-e> a:ide<CR>");
+            assertThat(handlers.handler(KeyInput.ctrl('e'), 'o')).isEqualTo(KeyHandlers.Handler.IDE);
+            type(editor, ":sethandler <lt>C-e> q:ide<CR>");
+            assertThat(editor.message()).isEqualTo("E474: Invalid argument: q:ide");
+            type(editor, ":sethandler <lt>C-e> n:emacs<CR>");
+            assertThat(editor.message()).isEqualTo("E474: Invalid argument: n:emacs");
+            type(editor, ":sethandler <lt>C-e><CR>");
+            assertThat(editor.message()).isEqualTo("E471: Argument required");
+        });
+    }
+
+    @Test void actionsRunTheEditorsCommands() throws Exception {
+        onEdt(() -> {
+            var editor = editor("one\n");
+            type(editor, ":action save<CR>");
+            assertThat(ran).containsExactly("save");
+            type(editor, ":action nothing<CR>");
+            assertThat(editor.message()).isEqualTo("Not an Editor command: nothing");
+            type(editor, ":inoremap <lt>C-s> <lt>Action>(save)<CR>:nnoremap gc <lt>Action>(toggle-comment)j<CR>");
+            type(editor, "ia<C-s>b");
+            assertThat(ran).containsExactly("save", "save");
+            assertThat(editor.mode()).as("an action does not leave Insert mode").isEqualTo(Mode.INSERT);
+            assertThat(editor.buffer().line(0)).isEqualTo("abone");
+            type(editor, "<Esc>:nmap gc<CR>");
+            assertThat(editor.message()).isEqualTo("n  gc          * <Action>(toggle-comment)j");
+            type(editor, ":nmap x <lt>Action>(nothing)dd<CR>x");
+            assertThat(editor.message()).as("an unknown action fails and ends the mapping").isEqualTo("Not an Editor command: nothing");
+            assertThat(editor.buffer().count()).isEqualTo(1);
+        });
+    }
+
+    @Test void actionlistListsTheIds() throws Exception {
+        onEdt(() -> {
+            var editor = editor("one\n");
+            type(editor, ":actionlist<CR>");
+            assertThat(editor.output()).extracting(VimEditor.OutputLine::text).containsExactly("--- Actions ---",
+                "save                     Save", "find                     Find…", "toggle-comment           Toggle Comment");
+            type(editor, "<CR>:actionlist COMM<CR>");
+            assertThat(editor.output()).extracting(VimEditor.OutputLine::text).containsExactly("--- Actions ---", "toggle-comment           Toggle Comment");
+        });
+    }
+
     @Test void resetForgetsWhatTheVimrcSetButNotRegisters() throws Exception {
         onEdt(() -> {
             var editor = editor("one\n");
-            type(editor, ":nmap x dd<CR>:set ic tm=50<CR>:let mapleader = ','<CR>\"ayy");
+            type(editor, ":nmap x dd<CR>:set ic tm=50<CR>:let mapleader = ','<CR>:sethandler <lt>C-d> a:ide<CR>\"ayy");
             editor.vim().reset();
             assertThat(editor.vim().mappings().isEmpty()).isTrue();
             assertThat(editor.options().flag("ignorecase")).isFalse();
             assertThat(editor.options().number("timeoutlen")).isEqualTo(1000);
             assertThat(editor.vim().variables()).isEmpty();
+            assertThat(editor.vim().handlers().handler(KeyInput.ctrl('d'), 'n')).isEqualTo(KeyHandlers.Handler.DEFAULT);
             assertThat(editor.vim().registers().get('a')).isPresent();
         });
     }
@@ -221,11 +281,11 @@ class VimrcTest {
         });
     }
 
-    @Test void everyCommandThatNeedsFilesRunsHere() throws Exception {
+    @Test void everyCommandThatNeedsFilesOrTheEditorRunsHere() throws Exception {
         Path script = file("s.vim", "set ts=4");
         onEdt(() -> {
             var editor = editor("x\n");
-            type(editor, ":source " + script + "<CR>");
+            type(editor, ":source " + script + "<CR>:sethandler <lt>C-d> n:ide<CR>:action save<CR>:actionlist<CR><CR>");
         });
         assertThat(covered).containsAll(NOT_IN_VIM);
     }
