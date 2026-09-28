@@ -514,6 +514,14 @@ public final class Options {
         return DEFS.stream().filter(def -> def.name().equals(lower) || def.abbreviation().equals(lower)).findFirst();
     }
 
+    /** Reload vimrc: every global value goes back to its default (spec 7.1); local instances keep theirs. */
+    void resetGlobal() {
+        if (global != null) throw new IllegalStateException("Only the global options are reset");
+        if (values.isEmpty()) return;
+        values.clear();
+        for (Runnable listener : List.copyOf(listeners)) listener.run();
+    }
+
     private void put(Def def, Object value) {
         Object old = values.put(def.name(), value);
         if (!value.equals(old)) for (Runnable listener : List.copyOf(listeners)) listener.run();

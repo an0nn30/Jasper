@@ -69,6 +69,7 @@ class CompletionTest {
             assertThat(matches(editor, "e .")).containsExactly(".hidden");
             assertThat(matches(editor, "w src/")).containsExactly("src/deep/", "src/one.java", "src/two\\ words.txt");
             assertThat(matches(editor, "r src/t")).containsExactly("src/two\\ words.txt");
+            assertThat(matches(editor, "so src/o")).as(":source completes paths").containsExactly("src/one.java");
             assertThat(matches(editor, "tabnew " + folder + "/m")).containsExactly(folder + "/main.txt");
             assertThat(matches(editor, "e nowhere/")).isEmpty();
         });

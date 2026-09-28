@@ -508,7 +508,7 @@ public final class VimEditor {
 
     void message(String text, boolean error) {
         messageLog.add(text);
-        if (error) vim.remember(text);
+        if (error && !quiet) vim.remember(text);
         if (collecting != null) {
             collecting.add(new OutputLine(text, error));
             return;
@@ -536,6 +536,28 @@ public final class VimEditor {
 
     /** @return the Ex command line */
     Ex ex() { return ex; }
+
+    /** While a sourced file's line runs: what it says goes nowhere, and its errors do not join the history yet. */
+    private boolean quiet;
+
+    /**
+     * Runs work with everything it says gathered and returned instead of shown (a line of a sourced file).
+     *
+     * @return what it said
+     */
+    List<OutputLine> quietly(Runnable work) {
+        List<OutputLine> before = collecting;
+        boolean wasQuiet = quiet;
+        collecting = new ArrayList<>();
+        quiet = true;
+        try {
+            work.run();
+            return collecting;
+        } finally {
+            collecting = before;
+            quiet = wasQuiet;
+        }
+    }
 
     /**
      * Starts gathering what is said for the output panel; returns the list gathered before, for {@link #stopCollecting}.

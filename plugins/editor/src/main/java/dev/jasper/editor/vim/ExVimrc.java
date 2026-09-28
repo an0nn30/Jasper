@@ -1,5 +1,8 @@
 package dev.jasper.editor.vim;
 
+import java.io.IOException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -170,6 +173,35 @@ final class ExVimrc {
             }
         }
         throw new VimFailure("E114: Missing double quote: " + t);
+    }
+
+    /**
+     * ex_source: {@code :source {file}} runs the file's lines; the file is relative to the file being read, or typed,
+     * to the current file's folder. Typed, what failed is shown as Vim shows it; inside a vimrc it joins the vimrc's
+     * report.
+     */
+    static void source(ExCommand cmd) {
+        VimEditor editor = cmd.editor;
+        String name = ExFiles.fileArg(cmd);
+        if (name == null) throw new VimFailure("E471: Argument required");
+        Vim vim = editor.vim();
+        Vimrc.Reading reading = vim.reading();
+        Path file;
+        if (reading != null) {
+            String home = System.getProperty("user.home");
+            String expanded = name.equals("~") ? home : name.startsWith("~/") ? home + name.substring(1) : name;
+            Path path = Path.of(expanded);
+            file = path.isAbsolute() ? path.normalize() : reading.file.toAbsolutePath().getParent().resolve(path).normalize();
+        } else file = ExFiles.resolve(name, ExFiles.current(ExFiles.buffers(cmd)));
+        Vimrc.Reading into = reading != null ? reading : new Vimrc.Reading();
+        try {
+            Vimrc.source(editor, file, into);
+        } catch (NoSuchFileException missing) {
+            throw new VimFailure("E484: Can't open file " + name);
+        } catch (IOException unreadable) {
+            throw new VimFailure("E484: Can't open file " + name);
+        }
+        if (reading == null) for (String line : into.report) editor.message(line, true);
     }
 
     /**

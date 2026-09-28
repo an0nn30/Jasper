@@ -160,6 +160,7 @@ final class Ex {
         def("imapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Insert-mode mapping", ExMaps::mapclear);
         def("cmapclear", EXTRA | TRLBAR, Addr.NONE, "remove every command-line mapping", ExMaps::mapclear);
         def("let", EXTRA | NOTRLCOM, Addr.NONE, "`:let mapleader = \",\"`, `:let @a = \"…\"`, `:let &tw = 80`, `:let g:name = …`: a variable, register or option", ExVimrc::let);
+        def("source", EXTRA | NEEDARG | TRLBAR, Addr.NONE, "run {file}'s lines as command lines, as the vimrc's", ExVimrc::source);
         def("messages", RANGE | EXTRA | TRLBAR, Addr.OTHER, "the message history: errors, and the vimrc's skipped lines; `:messages clear`", ExVimrc::messages);
         def("syntax", EXTRA | NOTRLCOM | TRLBAR, Addr.NONE, "accepted and ignored: the Editor highlights by language", ExVimrc::ignored);
         def("filetype", EXTRA | TRLBAR, Addr.NONE, "accepted and ignored: the Editor knows each file's language", ExVimrc::ignored);
@@ -186,6 +187,26 @@ final class Ex {
         });
         commands.action("g&", "repeat the last `:s` on every line, with its flags (`:%s//~/&`)", false,
             c -> c.editor.ex().execute("%s//~/&"));
+    }
+
+    /**
+     * A line of a sourced file (do_source's do_cmdline): it runs as a command line in one undo step, and what it says
+     * is dropped.
+     *
+     * @return its error message, or null when it did not fail with one
+     */
+    String sourceLine(String line) {
+        String error = null;
+        // A line that fails is reported with the file's other errors; it does not fail the command line that sourced it.
+        boolean outerFailed = failed;
+        editor.beginUndoStep();
+        try {
+            for (VimEditor.OutputLine said : editor.quietly(() -> runLine(line))) if (said.error()) error = said.text();
+        } finally {
+            editor.endUndoStep();
+            failed = outerFailed;
+        }
+        return error;
     }
 
     /** A continuation: work left for after a question, or the end of a command line's run (closing its undo step). */

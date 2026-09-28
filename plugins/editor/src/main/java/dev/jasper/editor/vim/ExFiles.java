@@ -22,9 +22,9 @@ final class ExFiles {
 
     private static Documents documents(ExCommand cmd) { return cmd.editor.vim().host().documents(); }
 
-    private static List<Buffer> buffers(ExCommand cmd) { return documents(cmd).buffers().apply(cmd.editor); }
+    static List<Buffer> buffers(ExCommand cmd) { return documents(cmd).buffers().apply(cmd.editor); }
 
-    private static Buffer current(List<Buffer> buffers) {
+    static Buffer current(List<Buffer> buffers) {
         return buffers.stream().filter(Buffer::current).findFirst().orElseThrow(() -> new IllegalStateException("No current buffer"));
     }
 

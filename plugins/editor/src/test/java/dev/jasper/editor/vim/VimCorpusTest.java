@@ -40,7 +40,8 @@ class VimCorpusTest {
         List<String> ids = new java.util.ArrayList<>(VimCommands.standard().entries().stream().map(VimCommands.Entry::id).toList());
         for (Ex.Def def : Ex.implemented()) ids.add("ex " + def.name());
         // The file, buffer and tab commands need the Editor's tabs behind Vim; ExFilesTest checks them.
-        List<String> missing = ids.stream().filter(id -> !used.contains(id) && !ExFilesTest.NEEDS_TABS.contains(id)).toList();
+        List<String> missing = ids.stream().filter(id -> !used.contains(id) && !ExFilesTest.NEEDS_TABS.contains(id)
+            && !VimrcTest.NOT_IN_VIM.contains(id)).toList();
         assertThat(missing).as("commands with no corpus case").isEmpty();
     }
 

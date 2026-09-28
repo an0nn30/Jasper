@@ -31,6 +31,8 @@ public final class Vim {
     private final Macros macros = new Macros();
     /** The global variables {@code :let} sets ({@code g:mapleader}, extension settings), by name without {@code g:}. */
     private final java.util.Map<String, Object> variables = new java.util.HashMap<>();
+    /** The vimrc or {@code :source} file being read, or null. */
+    private Vimrc.Reading reading;
     /** The message history {@code :messages} shows, oldest first (Vim's 'msghistory', 500). */
     private final java.util.List<String> messages = new java.util.ArrayList<>();
     private final VimCommands commands = VimCommands.standard();
@@ -80,6 +82,10 @@ public final class Vim {
         return text.isEmpty() || text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 48 ? "\\" : text;
     }
 
+    Vimrc.Reading reading() { return reading; }
+
+    void reading(Vimrc.Reading value) { reading = value; }
+
     /** An error given, or a line the vimrc skipped, joins the message history. */
     void remember(String message) {
         messages.add(message);
@@ -88,6 +94,17 @@ public final class Vim {
 
     /** @return the message history, oldest first */
     java.util.List<String> messages() { return messages; }
+
+    /**
+     * Reload vimrc (spec 7.1): mappings, options' global values, the handler table and the variables go back to
+     * their defaults; registers, marks and history stay.
+     */
+    public void reset() {
+        mappings.clear(Mappings.MAP | Mappings.MAP_BANG);
+        options.resetGlobal();
+        handlers.clear();
+        variables.clear();
+    }
 
     /** @return macro recording and execution */
     Macros macros() { return macros; }

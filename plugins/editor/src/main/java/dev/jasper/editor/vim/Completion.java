@@ -31,7 +31,7 @@ final class Completion {
         static final Result NO_MATCH = new Result(0, List.of(), true);
     }
 
-    private static final List<String> FILE_COMMANDS = List.of("edit", "write", "read", "saveas", "tabnew", "tabedit", "wq", "xit", "exit");
+    private static final List<String> FILE_COMMANDS = List.of("edit", "write", "read", "saveas", "tabnew", "tabedit", "wq", "xit", "exit", "source");
 
     /**
      * @param editor the editor the command line is in
