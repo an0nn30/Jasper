@@ -1,6 +1,8 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.plugin.Plugin;
 import java.nio.file.Path;
@@ -135,6 +137,29 @@ final class PluginHost {
         }
         pending.add(cleanup.drained());
         return pending;
+    }
+
+    /** Settings pages for running plugins that declared settings or gave a page of their own, in start order. UI thread. */
+    List<SettingsPage> settingsPages(PageContext context) {
+        requireUi();
+        var pages = new ArrayList<SettingsPage>();
+        for (HostedContext hosted : contexts.values()) {
+            if (hosted.state != HostedContext.State.ACTIVE) continue;
+            var info = hosted.hosted.info();
+            var panel = hosted.declared.panel();
+            if (panel.isPresent())
+                pages.add(new PluginPanelPage(info.id(), info.name(), hosted.declared, panel.get(), containment, context));
+            else if (hosted.declared.declaresAnything())
+                pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context));
+        }
+        return pages;
+    }
+
+    /** Whether a running plugin has a page in Settings. UI thread. */
+    boolean hasSettingsPage(String pluginId) {
+        HostedContext hosted = contexts.get(pluginId);
+        return hosted != null && hosted.state == HostedContext.State.ACTIVE
+            && (hosted.declared.panel().isPresent() || hosted.declared.declaresAnything());
     }
 
     String executing() { return containment.executing(); }

@@ -21,6 +21,7 @@ final class FakePluginSettings implements PluginSettings {
     private final List<FakeSetting<?>> declared = new ArrayList<>();
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private boolean open = true;
+    private dev.jasper.sdk.settings.SettingsPanel panel;
 
     FakePluginSettings(FakePluginHost host, String pluginId, Path file) {
         this.host = host; this.pluginId = pluginId; this.file = file;
@@ -51,6 +52,29 @@ final class FakePluginSettings implements PluginSettings {
     Map<String, Object> raw() { return host.settingFile(pluginId); }
 
     List<String> keys() { return declared.stream().map(FakeSetting::key).toList(); }
+
+    @Override public void page(dev.jasper.sdk.settings.SettingsPanel panel) {
+        Objects.requireNonNull(panel, "panel");
+        if (!open) throw new IllegalStateException("Give a settings page while the plugin starts");
+        if (this.panel != null) throw new IllegalStateException("A plugin has one settings page");
+        this.panel = panel;
+    }
+
+    java.util.Optional<dev.jasper.sdk.settings.SettingsPanel> panel() {
+        return java.util.Optional.ofNullable(panel);
+    }
+
+    /**
+     * The handle this plugin declared, by identity.
+     *
+     * @param setting the setting to look up
+     * @return the fake setting handle
+     * @throws IllegalArgumentException if the setting is not from this plugin
+     */
+    FakeSetting<?> handle(dev.jasper.sdk.settings.Setting<?> setting) {
+        for (FakeSetting<?> declared : this.declared) if (declared == setting) return declared;
+        throw new IllegalArgumentException("Not a setting of this plugin: " + setting.key());
+    }
 
     /** The plugin's start returned: declarations close, and the file's problems are reported. */
     void complete() {

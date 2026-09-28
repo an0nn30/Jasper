@@ -30,6 +30,8 @@ final class FakeSetting<T> implements Setting<T> {
 
     @Override public T get() { return value; }
 
+    SettingSpec<T> spec() { return spec; }
+
     @Override public CompletableFuture<Void> set(T next) {
         Objects.requireNonNull(next, "value");
         Optional<String> problem = spec.kind().check(next);

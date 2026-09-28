@@ -80,7 +80,7 @@ class EditorsTest {
         assertThat(env.value()).containsExactly(Map.entry("A", "1"), Map.entry("B", "2"));
         env.addRow("C", "3");
         assertThat(env.value()).containsEntry("C", "3");
-        var shell = (Editors.Executable) build(Editors.executable(), CoreSettings.TERMINAL_SHELL_PROGRAM, context);
+        var shell = (Editors.Browse) build(Editors.executable(), CoreSettings.TERMINAL_SHELL_PROGRAM, context);
         shell.browse();
         assertThat(shell.value()).isEqualTo("/bin/zsh");
     }
@@ -101,5 +101,13 @@ class EditorsTest {
     @Test void fontsListInstalledFamiliesAndAMonospacedSubset() {
         assertThat(Fonts.families(false)).contains("Monospaced", "Dialog");
         assertThat(Fonts.families(true)).contains("Monospaced").doesNotContain("Dialog");
+    }
+
+    @Test void aPathEditorBrowsesForAFile() {
+        var tool = dev.jasper.app.settings.Setting.of("tool", dev.jasper.app.settings.SettingKind.string(text -> true, ""), "")
+            .label("Tool").build();
+        var editor = (Editors.Browse) build(Editors.path("Choose a file"), tool, context);
+        editor.browse();
+        assertThat(editor.value()).isEqualTo("/bin/zsh");
     }
 }

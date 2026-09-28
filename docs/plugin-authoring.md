@@ -28,7 +28,7 @@ optional = false
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
-their meaning; `context.config()` reads that file live and `config().file()` names it.
+their meaning; declare each key with `context.settings()` (see "Declared settings" below), and `settings().file()` names the file.
 Compile against `jasper-sdk` as `compileOnly`; ship any other library as a jar in the same
 directory. A plugin cannot see the application's classes or libraries, and may not define
 classes in `dev.jasper.*` platform packages or in a package a dependency exports.
@@ -41,18 +41,14 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
     context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
     context.events().subscribe(AppEvents.THEME_CHANGED,
         event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
-    long delay = context.config().integer("demo_step_millis").orElse(300);
-    if (delay < 0 || delay > 5000) {
-        context.config().report("demo_step_millis", "Use 0 to 5000; using 300.");
-        delay = 300;
-    }
-    long stepMillis = delay;
-    if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
-    if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
-    if (context.config().bool("demo_session").orElse(false)) installSessionDemo(context, stepMillis);
-            if (context.config().bool("demo_scope").orElse(false)) installPaletteDemo(context);
-    if (context.config().bool("demo_activity").orElse(false))
-        context.background().execute(() -> demo(context, stepMillis));
+    var settings = new SampleSettings(context.settings());
+    context.settings().page(new SampleSettingsPanel(settings));
+    long stepMillis = settings.stepMillis.get();
+    if (settings.ui.get()) installUi(context, stepMillis);
+    if (settings.terminal.get()) installTerminalDemo(context);
+    if (settings.session.get()) installSessionDemo(context, stepMillis);
+    if (settings.scope.get()) installPaletteDemo(context);
+    if (settings.activity.get()) context.background().execute(() -> demo(context, stepMillis));
 }
 ```
 
@@ -469,6 +465,17 @@ size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
 Kinds are `bool`, `integer`, `number`, `text` (optionally with a rule and message), `choice` and `stringList`. A value
 the kind rejects falls back to the default and is reported against the file with its line; keys nothing declares are
 reported as unknown. Declaring after `start` returns throws. `context.config()` still works until SDK 0.9 removes it.
+
+Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
+heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
+`editor(EditorHint...)`. To build the page yourself, call `context.settings().page(panel)` during `start` with a
+`SettingsPanel`: `create(host)` builds the component, `host.row(setting)` gives you the standard row for a declared
+setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
+`modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
+lives as long as your plugin, so Settings calls `reset` before `dispose` whenever it closes a page it showed without a
+successful Apply, as on Cancel; drop unapplied state of your own there. The Sample
+plugin's `SampleSettingsPanel` is a complete example; the testkit's `settingsPanel`, `pendingSettings` and
+`settingsPanelChanges` let you test it without a window.
 
 ## Testing
 

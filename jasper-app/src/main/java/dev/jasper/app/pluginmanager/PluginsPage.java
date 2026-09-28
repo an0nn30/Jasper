@@ -44,7 +44,7 @@ public final class PluginsPage implements SettingsPage {
 
     @Override public JComponent component() {
         if (body != null) return body;
-        panel = manager.attach(context.surface());
+        panel = manager.attach(context.surface(), context.navigate());
         body = new FillingPage(panel);
         return body;
     }

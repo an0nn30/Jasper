@@ -8,11 +8,14 @@ import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.SettingSpec;
+import dev.jasper.sdk.settings.SettingsPanel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -87,5 +90,33 @@ class FakePluginSettingsTest {
             settings.get().declare(SettingSpec.of("late", SettingKind.bool(), false).label("Late")))
             .withMessage("Declare settings while the plugin starts: late");
         assertThat(settings.get().file()).isEqualTo(host.dataRoot().resolve("test.fake").resolve("test.fake.toml"));
+    }
+
+    @Test void aPluginsOwnPageGetsRowsAndStagesValues() {
+        var size = new AtomicReference<Setting<Integer>>();
+        var settings = new AtomicReference<PluginSettings>();
+        var seen = new ArrayList<String>();
+        host.start(INFO, Set.of(), Set.of(), context -> {
+            settings.set(context.settings());
+            size.set(context.settings().declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")));
+            context.settings().page(rows -> {
+                var panel = new JPanel();
+                panel.add(rows.row(size.get()));
+                seen.add("pending " + rows.pending(size.get()));
+                rows.stage(size.get(), 20);
+                seen.add("pending " + rows.pending(size.get()));
+                assertThatIllegalArgumentException().isThrownBy(() -> rows.stage(size.get(), 99));
+                rows.changed();
+                return panel;
+            });
+            assertThatIllegalStateException().isThrownBy(() -> context.settings().page(rows -> new JPanel()));
+        });
+        var component = host.settingsPanel("test.fake").orElseThrow();
+        assertThat(((JLabel) component.getComponent(0)).getText()).isEqualTo("Font size");
+        assertThat(seen).containsExactly("pending 13", "pending 20");
+        assertThat(host.pendingSettings("test.fake")).containsEntry("font_size", 20);
+        assertThat(host.settingsPanelChanges("test.fake")).isEqualTo(1);
+        assertThat(size.get().get()).as("staging saves nothing").isEqualTo(13);
+        assertThatIllegalStateException().isThrownBy(() -> settings.get().page(rows -> new JPanel()));
     }
 }

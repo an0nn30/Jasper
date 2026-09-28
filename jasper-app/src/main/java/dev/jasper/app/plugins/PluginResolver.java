@@ -33,7 +33,7 @@ final class PluginResolver {
             PluginCandidate winner = wins ? candidate : rival, loser = wins ? rival : candidate;
             chosen.put(candidate.id(), winner);
             rejected.add(PluginStatus.of(loser, PluginStatus.State.SKIPPED,
-                "superseded by version " + winner.descriptor().version() + " from " + winner.origin()));
+                PluginStatus.SUPERSEDED + " version " + winner.descriptor().version() + " from " + winner.origin()));
         }
         for (PluginCandidate candidate : List.copyOf(chosen.values())) {
             PluginStatus status = admit(candidate, state.get(candidate.id()), sdk);

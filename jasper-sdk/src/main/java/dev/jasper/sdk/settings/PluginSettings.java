@@ -35,4 +35,13 @@ public interface PluginSettings {
      * @return the registration; the runtime closes it when the plugin stops
      */
     Subscription onChanged(Runnable handler);
+
+    /**
+     * Shows a page of the plugin's own in Settings instead of the page generated from its declarations. UI thread,
+     * while the plugin starts; at most once.
+     *
+     * @param panel the page
+     * @throws IllegalStateException after the plugin's start has returned, or when a page was already given
+     */
+    void page(SettingsPanel panel);
 }
