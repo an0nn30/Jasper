@@ -52,6 +52,7 @@ public final class VimEditor {
     private final View view = new View(this);
     private final ViewportSync viewport;
     private final Folds folds;
+    private final LineNumbers lineNumbers;
     /** The text area's word-wrapping, put back when Vim turns off (Vim wraps at any character). */
     private final boolean originalWrapStyleWord;
     /** The text area's fold-aware navigation, put back when Vim turns off (Vim's cursor may be inside a closed fold). */
@@ -100,6 +101,7 @@ public final class VimEditor {
         this.highlights = new Highlights(area);
         this.folds = new Folds(area);
         this.viewport = new ViewportSync(this, area);
+        this.lineNumbers = new LineNumbers(this, area);
         this.originalWrapStyleWord = area.getWrapStyleWord();
         area.setWrapStyleWord(false);
         this.originalNavigation = area.getNavigationFilter();
@@ -137,6 +139,7 @@ public final class VimEditor {
         area.setWrapStyleWord(originalWrapStyleWord);
         area.setNavigationFilter(originalNavigation);
         viewport.close();
+        lineNumbers.close();
         highlights.clear();
         vim.forget(this);
         buffer.close();

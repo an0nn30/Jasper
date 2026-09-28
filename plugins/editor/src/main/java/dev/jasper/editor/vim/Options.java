@@ -42,6 +42,8 @@ public final class Options {
         new Def("joinspaces", "js", Type.BOOLEAN, true, false),
         new Def("matchpairs", "mps", Type.STRING, "(:),{:},[:]", true),
         new Def("nrformats", "nf", Type.STRING, "bin,octal,hex", true),
+        new Def("number", "nu", Type.BOOLEAN, true, true),
+        new Def("relativenumber", "rnu", Type.BOOLEAN, false, true),
         new Def("report", "report", Type.NUMBER, 2, false),
         new Def("scrolljump", "sj", Type.NUMBER, 1, false),
         new Def("scrolloff", "so", Type.NUMBER, 0, false),
