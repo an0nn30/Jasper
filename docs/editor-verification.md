@@ -42,3 +42,16 @@ unverified.
 - [ ] 28. Clicking past the end of a line in Normal mode puts the caret on the line's last character.
 - [ ] 29. A remote file opened from the SFTP browser edits and saves in Vim mode as it does without it.
 - [ ] 30. In Normal mode, Tab and Shift+Tab change nothing and flash the Vim bar; on Linux or Windows so do Ctrl+D, Ctrl+Y and Alt+Up. macOS: holding a letter for its accent menu, or the emoji picker, types nothing in Normal mode.
+
+## Vim mode (plan V1b)
+
+- [ ] 31. `v`, `V` and `<C-v>` draw the area in the theme's selection colour, the block following tabs and `$`; `<Esc>` clears it; the caret stays a block on the Vim cursor (the text area's own selection stays empty).
+- [ ] 32. Dragging the mouse in Normal mode starts Visual mode over exactly the dragged characters (`d` deletes them); dragging backwards works the same.
+- [ ] 33. `/` shows `/` and a thin cursor in the Vim bar; typing highlights the match it would find and scrolls to it without moving the caret; `<Esc>` returns the view; `<CR>` jumps and the bar shows `/pattern`.
+- [ ] 34. `n` past the last match shows `search hit BOTTOM, continuing at TOP` in the error colour; a pattern with no match shows `E486: Pattern not found: …` and flashes.
+- [ ] 35. `*` on a word, `n` and `N` cycle through its occurrences; `<C-o>` then Tab (`<C-i>`) walk back and forward.
+- [ ] 36. `<C-v>jjI// <Esc>` comments three lines; `<C-v>jj$A;<Esc>` appends to each.
+- [ ] 37. `gqap` on a long paragraph wraps it at 79 columns, keeping `//` or `#` comment leaders.
+- [ ] 38. `<C-g>` shows the file's path, line count and position (`[Modified]` after an edit); `ga` shows the code of the character under the cursor.
+- [ ] 39. `<C-a>` on `0x0f` gives `0x10`; `V` over three lines of `0` then `g<C-a>` numbers them 1, 2, 3.
+- [ ] 40. After edits in two places, `g;` returns to each in turn and `` `. `` to the last; `ma`, then `'a` elsewhere, returns to it.

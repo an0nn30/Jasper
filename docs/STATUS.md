@@ -1,7 +1,20 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-09-23
+## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
+  linewise, blockwise, with block `I`/`A`/`c`, `p` over an area, `gv` and `.` on an area of the same size), `/` and `?`
+  with offsets and `;`, `n N * # g* g#`, the Vim regex translator (`dev.jasper.editor.vim.regex`), 'incsearch' and
+  'hlsearch' highlights, marks, the jumplist and change list, `gi`, `<C-a>`/`<C-x>` (and `g<C-a>`), `gq`/`gw`,
+  `<C-g>`, `ga`, blockwise registers and blockwise forced motions. Scrolling, the screen-line motions and folds moved
+  to plan V1c (spec 13). Every file in the plan was compiled and run against Vim 9.1 before the plan was written: 946
+  corpus cases (943 recorded, 3 divergent).
+  - Executed inline on 2026-09-28 (five task commits plus one fix: a marks case typed four backticks, which broke
+    `AppDocumentationTest`'s fence stripping inside the plan; it now types G, two backticks, 0, two backticks, with
+    Vim's result unchanged). `./gradlew check`: 3,372 tests, 0 failed, 5 skipped.
+  - Not done: GUI checks 31–40 of the [checklist](editor-verification.md) (user-run); merging and pushing; plans V1c,
+    V2, V3 and V4.
 - **Editor Vim mode, plan V1a** (branch `claude/vim-mode`, plan
   `docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`, spec
   `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md`, 2026-09-27): a headless Vim engine in
