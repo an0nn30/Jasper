@@ -339,8 +339,17 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>ReplaceWithRegisterLine` (Normal) | replace [count] lines with the register (`grr`) |
 | `<Plug>Commentary` (operator) | comment or uncomment {motion}'s lines, or the Visual lines (`gc`, with `set commentary`) |
 | `<Plug>CommentaryLine` (Normal) | comment or uncomment [count] lines (`gcc`) |
+| `<Plug>Dsurround` (Normal) | delete the surroundings {char} (`ds`, with `set surround`) |
+| `<Plug>Csurround` (Normal) | change the surroundings {char} to {char} (`cs`) |
+| `<Plug>CSurround` (Normal) | change the surroundings, the text on lines of its own (`cS`) |
+| `<Plug>Ysurround` (operator) | surround {motion} with {char} (`ys`) |
+| `<Plug>YSurround` (operator) | surround {motion} with {char}, on lines of its own (`yS`) |
+| `<Plug>Yssurround` (Normal) | surround [count] lines' text with {char} (`yss`) |
+| `<Plug>YSsurround` (Normal) | surround [count] lines with {char}, on lines of their own (`ySS`) |
 | `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
 | `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
+| `<Plug>VSurround` (Visual) | surround the Visual area with {char} (`S`) |
+| `<Plug>VgSurround` (Visual) | surround the Visual area with {char}, the other way about lines (`gS`) |
 
 ## Ex commands
 

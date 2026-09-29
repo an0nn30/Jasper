@@ -1,0 +1,150 @@
+# Put: the [ and ] marks after a put of several lines.
+
+=== vp multi-line charwise then backtick bracket
+text:
+  one two three
+  four five
+cursor: 1,5
+register a: c "x\ny"
+keys: viw"ap`[
+--- vim 9.1
+expect-text:
+  one x
+  y three
+  four five
+expect-cursor: 1,5
+expect-mode: normal
+
+=== vp linewise then backtick bracket
+text:
+  one two three
+  four five
+cursor: 1,5
+register a: l "x\ny\n"
+keys: viw"ap`[
+--- vim 9.1
+expect-text:
+  one $
+  x
+  y
+   three
+  four five
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Vp linewise then backtick bracket
+text:
+  one two three
+  four five
+cursor: 2,3
+register a: l "x\ny\n"
+keys: V"ap`[
+--- vim 9.1
+expect-text:
+  one two three
+  x
+  y
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Vp charwise then backtick bracket
+text:
+  one two three
+  four five
+cursor: 2,3
+register a: c "x\ny"
+keys: V"ap`[
+--- vim 9.1
+expect-text:
+  one two three
+  x
+  y
+expect-cursor: 2,1
+expect-mode: normal
+
+=== P multi-line charwise then backtick bracket
+text:
+  one two three
+  four five
+cursor: 1,5
+register a: c "x\ny"
+keys: "aP`[
+--- vim 9.1
+expect-text:
+  one x
+  ytwo three
+  four five
+expect-cursor: 1,5
+expect-mode: normal
+
+=== P linewise then backtick bracket
+text:
+  one two three
+  four five
+cursor: 2,3
+register a: l "x\ny\n"
+keys: "aP`[
+--- vim 9.1
+expect-text:
+  one two three
+  x
+  y
+  four five
+expect-cursor: 2,1
+expect-mode: normal
+
+=== p linewise then backtick bracket
+text:
+  one two three
+  four five
+cursor: 1,3
+register a: l "x\ny\n"
+keys: "ap`[
+--- vim 9.1
+expect-text:
+  one two three
+  x
+  y
+  four five
+expect-cursor: 2,1
+expect-mode: normal
+
+=== marks after vp multi-line
+text:
+  one two three
+  four five
+cursor: 1,5
+register a: c "x\ny"
+keys: viw"ap:marks []<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one x
+  y three
+  four five
+expect-cursor: 1,5
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   [      1    4 one x
+   ]      2    0 y three
+
+=== marks after Vp
+text:
+  one two three
+  four five
+cursor: 2,3
+register a: l "x\ny\n"
+keys: V"ap:marks []<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  x
+  y
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   [      2    0 x
+   ]      3    0 y

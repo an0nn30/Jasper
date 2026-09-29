@@ -1,0 +1,831 @@
+# surround (tpope/vim-surround): ds, cs, cS, ys, yS, yss, ySS and Visual S and gS.
+
+=== ds removes double quotes
+text:
+  He said "hello" to (them) now
+cursor: 1,11
+ext: surround
+keys: ds"
+registers: "
+--- vim 9.1
+expect-text:
+  He said hello to (them) now
+expect-cursor: 1,9
+expect-mode: normal
+expect-register ": c ""
+
+=== ds removes parentheses
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: ds(
+--- vim 9.1
+expect-text:
+  He said "hello" to them now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== ds with b
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: dsb
+--- vim 9.1
+expect-text:
+  He said "hello" to them now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== ds with a closing parenthesis
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: ds)
+--- vim 9.1
+expect-text:
+  He said "hello" to them now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== ds removes brackets
+text:
+  x [a, b] {c} <d> y
+cursor: 1,4
+ext: surround
+keys: ds[
+--- vim 9.1
+expect-text:
+  x a, b {c} <d> y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== ds with r
+text:
+  x [a, b] {c} <d> y
+cursor: 1,4
+ext: surround
+keys: dsr
+--- vim 9.1
+expect-text:
+  x a, b {c} <d> y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== ds removes braces
+text:
+  x [a, b] {c} <d> y
+cursor: 1,11
+ext: surround
+keys: ds{
+--- vim 9.1
+expect-text:
+  x [a, b] c <d> y
+expect-cursor: 1,10
+expect-mode: normal
+
+=== ds with B
+text:
+  x [a, b] {c} <d> y
+cursor: 1,11
+ext: surround
+keys: dsB
+--- vim 9.1
+expect-text:
+  x [a, b] c <d> y
+expect-cursor: 1,10
+expect-mode: normal
+
+=== ds removes angle brackets
+text:
+  x [a, b] {c} <d> y
+cursor: 1,15
+ext: surround
+keys: ds<lt>
+--- vim 9.1
+expect-text:
+  x [a, b] {c} d y
+expect-cursor: 1,14
+expect-mode: normal
+
+=== ds with a
+text:
+  x [a, b] {c} <d> y
+cursor: 1,15
+ext: surround
+keys: dsa
+--- vim 9.1
+expect-text:
+  x [a, b] {c} d y
+expect-cursor: 1,14
+expect-mode: normal
+
+=== ds removes single quotes
+text:
+  'single' `tick` z
+cursor: 1,3
+ext: surround
+keys: ds'
+--- vim 9.1
+expect-text:
+  single `tick` z
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ds removes backticks
+text:
+  'single' `tick` z
+cursor: 1,11
+ext: surround
+keys: ds`
+--- vim 9.1
+expect-text:
+  'single' tick z
+expect-cursor: 1,10
+expect-mode: normal
+
+=== ds with an opening bracket trims spaces
+text:
+  f( a b )
+cursor: 1,5
+ext: surround
+keys: ds(
+--- vim 9.1
+expect-text:
+  fa b
+expect-cursor: 1,2
+expect-mode: normal
+
+=== ds with a closing bracket keeps spaces
+text:
+  f( a b )
+cursor: 1,5
+ext: surround
+keys: ds)
+--- vim 9.1
+expect-text:
+  f a b $
+expect-cursor: 1,2
+expect-mode: normal
+
+=== ds with a count
+text:
+  ((a) b)
+cursor: 1,3
+ext: surround
+keys: 2ds(
+--- vim 9.1
+expect-text:
+  (a) b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ds with a count in the target
+text:
+  ((a) b)
+cursor: 1,3
+ext: surround
+keys: ds2(
+--- vim 9.1
+expect-text:
+  (a) b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ds removes a tag
+text:
+  <p><b>bold</b> text</p>
+cursor: 1,8
+ext: surround
+keys: dst
+--- vim 9.1
+expect-text:
+  <p>bold text</p>
+expect-cursor: 1,4
+expect-mode: normal
+
+=== ds removes punctuation
+text:
+  x |a b| y
+cursor: 1,5
+ext: surround
+keys: ds|
+--- vim 9.1
+expect-text:
+  x a b y
+expect-cursor: 1,3
+expect-mode: normal
+
+=== ds with no target does nothing
+text:
+  abc
+cursor: 1,2
+ext: surround
+keys: ds(
+--- vim 9.1
+expect-text:
+  abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== ds with Esc does nothing
+text:
+  He said "hello" to (them) now
+cursor: 1,11
+ext: surround
+keys: ds<Esc>
+--- vim 9.1
+expect-text:
+  He said "hello" to (them) now
+expect-cursor: 1,11
+expect-mode: normal
+
+=== ds over lines
+text:
+  f(
+    a,
+    b
+  )
+cursor: 2,3
+ext: surround
+keys: ds(
+--- vim 9.1
+expect-text:
+  fa,
+    b
+  $
+expect-cursor: 1,2
+expect-mode: normal
+
+=== cs changes double to single quotes
+text:
+  He said "hello" to (them) now
+cursor: 1,11
+ext: surround
+keys: cs"'
+--- vim 9.1
+expect-text:
+  He said 'hello' to (them) now
+expect-cursor: 1,9
+expect-mode: normal
+
+=== cs changes parentheses to brackets
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: cs(]
+--- vim 9.1
+expect-text:
+  He said "hello" to [them] now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== cs to an opening bracket adds spaces
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: cs)[
+--- vim 9.1
+expect-text:
+  He said "hello" to [ them ] now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== cs to braces
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: cs(}
+--- vim 9.1
+expect-text:
+  He said "hello" to {them} now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== cs to a tag
+text:
+  He said "hello" to (them) now
+cursor: 1,11
+ext: surround
+keys: cs"<lt>em>
+--- vim 9.1
+expect-text:
+  He said <em>hello</em> to (them) now
+expect-cursor: 1,9
+expect-mode: normal
+
+=== cs with t reads the tag
+text:
+  He said "hello" to (them) now
+cursor: 1,11
+ext: surround
+keys: cs"tem<CR>
+--- vim 9.1
+expect-text:
+  He said <em>hello</em> to (them) now
+expect-cursor: 1,9
+expect-mode: normal
+
+=== cs from a tag to quotes
+text:
+  <b>bold</b>
+cursor: 1,5
+ext: surround
+keys: cst"
+--- vim 9.1
+expect-text:
+  "bold"
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cs from a tag keeps its attributes
+text:
+  <a href="x">t</a>
+cursor: 1,14
+ext: surround
+keys: csttb<CR>
+--- vim 9.1
+expect-text:
+  <b href="x">t</b>
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cs from a tag drops the attributes with a closing bracket
+text:
+  <a href="x">t</a>
+cursor: 1,14
+ext: surround
+keys: cstt<lt>b>
+--- vim 9.1
+expect-text:
+  <<b>t</<b>
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cs to a function
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: cs(fprint<CR>
+--- vim 9.1
+expect-text:
+  He said "hello" to print(them) now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== cs to a space-padded bracket
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: cs( [
+--- vim 9.1
+expect-text:
+  He said "hello" to [  them  ] now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== cS puts the text on lines of its own
+text:
+  He said "hello" to (them) now
+cursor: 1,22
+ext: surround
+keys: cS({
+--- vim 9.1
+expect-text:
+  He said "hello" to {
+  	them
+  } now
+expect-cursor: 1,20
+expect-mode: normal
+
+=== cs with Esc for the replacement does nothing
+text:
+  He said "hello" to (them) now
+cursor: 1,11
+ext: surround
+keys: cs"<Esc>
+--- vim 9.1
+expect-text:
+  He said "hello" to (them) now
+expect-cursor: 1,11
+expect-mode: normal
+
+=== ys surrounds a word with parentheses
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw)
+--- vim 9.1
+expect-text:
+  one (two) three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with an opening parenthesis adds spaces
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw(
+--- vim 9.1
+expect-text:
+  one ( two ) three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with b
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiwb
+--- vim 9.1
+expect-text:
+  one (two) three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with brackets
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw]
+--- vim 9.1
+expect-text:
+  one [two] three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with braces
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw}
+--- vim 9.1
+expect-text:
+  one {two} three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with angle brackets
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw>
+--- vim 9.1
+expect-text:
+  one <two> three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with quotes
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw"
+--- vim 9.1
+expect-text:
+  one "two" three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with a tag
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiwtem<CR>
+--- vim 9.1
+expect-text:
+  one <em>two</em> three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with a tag closed by its bracket
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw<lt>em>
+--- vim 9.1
+expect-text:
+  one <em>two</em> three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with a tag and attributes
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiwta href="x"<CR>
+--- vim 9.1
+expect-text:
+  one <a href="x">two</a> three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with a function
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiwfprint<CR>
+--- vim 9.1
+expect-text:
+  one print(two) three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with a spaced function
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiwFprint<CR>
+--- vim 9.1
+expect-text:
+  one print( two ) three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys with a space before the character
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw )
+--- vim 9.1
+expect-text:
+  one ( two ) three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys over a motion
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ys$"
+--- vim 9.1
+expect-text:
+  one "two three"
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ys over two words
+text:
+  one two three
+cursor: 1,1
+ext: surround
+keys: ys2w*
+--- vim 9.1
+expect-text:
+  *one two* three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ys over a linewise motion
+text:
+  one
+  two
+  three
+cursor: 1,1
+ext: surround
+keys: ysj)
+--- vim 9.1
+expect-text:
+  (
+  one
+  two
+  )
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== yss surrounds the line's text
+text:
+    one two  $
+cursor: 1,4
+ext: surround
+keys: yss)
+--- vim 9.1
+expect-text:
+    (one two)  $
+expect-cursor: 1,3
+expect-mode: normal
+
+=== yss with a count
+text:
+  one
+  two
+  three
+cursor: 1,1
+ext: surround
+keys: 2yss]
+--- vim 9.1
+expect-text:
+  [one
+  two]
+  three
+expect-cursor: 1,1
+expect-mode: normal
+
+=== yS puts the text on lines of its own
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ySiw{
+--- vim 9.1
+expect-text:
+  one {
+  	two
+  } three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== ySS surrounds the line on lines of its own
+text:
+    one two
+cursor: 1,4
+ext: surround
+keys: ySS{
+--- vim 9.1
+expect-text:
+    {
+  	  one two
+    }
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ys with Esc does nothing
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: ysiw<Esc>
+--- vim 9.1
+expect-text:
+  one two three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== Visual S
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: viwS"
+--- vim 9.1
+expect-text:
+  one "two" three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== Visual S with a tag
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: viwStb<CR>
+--- vim 9.1
+expect-text:
+  one <b>two</b> three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== Visual line S
+text:
+  one
+  two
+cursor: 1,1
+ext: surround
+keys: VjS(
+--- vim 9.1
+expect-text:
+  (
+  	one
+  	two
+  )
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual block S
+text:
+  abc
+  def
+cursor: 1,1
+ext: surround
+keys: <C-v>jlS)
+--- vim 9.1
+expect-text:
+  (ab)c
+  (de)f
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual gS
+text:
+  one two three
+cursor: 1,5
+ext: surround
+keys: viwgS{
+--- vim 9.1
+expect-text:
+  one {
+  	two
+  } three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== dot repeats ds
+text:
+  "a" "b"
+cursor: 1,2
+ext: surround
+keys: ds"w.
+--- vim 9.1
+expect-text:
+  a b
+expect-cursor: 1,3
+expect-mode: normal
+
+=== dot repeats cs
+text:
+  "a" "b"
+cursor: 1,2
+ext: surround
+keys: cs"'w.
+--- vim 9.1
+expect-text:
+  'a' 'b'
+expect-cursor: 1,5
+expect-mode: normal
+
+=== dot repeats ys
+text:
+  one two three
+cursor: 1,1
+ext: surround
+keys: ysiw)ww.
+--- vim 9.1
+expect-text:
+  (one()) two three
+expect-cursor: 1,5
+expect-mode: normal
+
+=== dot repeats cs with a tag
+text:
+  "a" "b"
+cursor: 1,2
+ext: surround
+keys: cs"tp<CR>w.
+--- vim 9.1
+expect-text:
+  <p>a</p> <p>b</p>
+expect-cursor: 1,10
+expect-mode: normal
+
+=== u undoes ds in one step
+text:
+  He said "hello" to (them) now
+cursor: 1,11
+ext: surround
+keys: ds"u
+--- vim 9.1
+expect-text:
+  He said "hello" to (them) now
+expect-cursor: 1,10
+expect-mode: normal
+
+=== the default mappings
+text:
+  x
+cursor: 1,1
+ext: surround
+keys: :nmap ys<CR>:nmap cs<CR>:nmap ds<CR>:xmap S<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  yss           <Plug>Yssurround
+  n  ys            <Plug>Ysurround
+  n  cs            <Plug>Csurround
+  n  ds            <Plug>Dsurround
+  x  S             <Plug>VSurround

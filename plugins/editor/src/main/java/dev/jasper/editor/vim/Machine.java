@@ -36,6 +36,11 @@ final class Machine {
     private boolean recordingInsert, replaying, resumeReplace;
     private int resumeEndLine = -1;
     private int changeDepth;
+    /**
+     * A command that reads more keys (a ported plugin's getchar() or input()) is suspended: it completes when the
+     * last of them has run; {@code suspendedChange} says whether it changes text.
+     */
+    private boolean suspended, suspendedChange;
 
     Machine(VimEditor editor) {
         this.editor = editor;
@@ -77,7 +82,8 @@ final class Machine {
         if (argument != null) {
             Consumer<KeyInput> handler = argument;
             argument = null;
-            if (key.is("<Esc>")) {
+            // A suspended command gets <Esc> too: a plugin's getchar() returns it.
+            if (key.is("<Esc>") && !suspended) {
                 reset();
                 resumeIfInsertNormal();
                 return;
@@ -551,6 +557,10 @@ final class Machine {
 
     /** A command completed: records it for {@code .} and closes its undo step, unless it entered Insert mode. */
     private void complete(boolean change) {
+        if (suspended) {
+            suspendedChange |= change;
+            return;
+        }
         if (change && !replaying) {
             recordRegister = register;
             recordCount = count1 > 0 || count2 > 0 ? Math.max(count1, 1) * Math.max(count2, 1) : 0;
@@ -584,6 +594,55 @@ final class Machine {
     }
 
     /**
+     * A command asks for one more key, which is not mapped (a ported plugin's getchar()): {@code next} gets it,
+     * {@code <Esc>} included. The command completes when {@code next} returns without asking again; the key joins what
+     * {@code .} repeats and the command stays one undo step.
+     */
+    void readKey(Consumer<KeyInput> next) {
+        suspended = true;
+        argument = key -> resume(() -> {
+            record.add(key);
+            next.accept(key);
+        });
+    }
+
+    /**
+     * A command asks for a line (a ported plugin's input()): the command line shows {@code prompt} and
+     * {@code initial}, and {@code <CR>} gives {@code next} the text, {@code <Esc>} an empty one. {@code end}, when not 0, also ends the line and is kept
+     * (surround's tag, which {@code >} ends). The keys typed join what {@code .} repeats.
+     */
+    void readLine(String prompt, String initial, char end, Consumer<String> next) {
+        suspended = true;
+        CommandLine line = editor.commandLine();
+        line.input(prompt, initial, end, text -> resume(() -> {
+            record.addAll(line.typed());
+            next.accept(text);
+        }), () -> resume(() -> {
+            record.addAll(line.typed());
+            next.accept("");
+        }));
+    }
+
+    /** A suspended command goes on; if it fails, its undo step closes, and if it asks nothing more, it completes. */
+    private void resume(Runnable body) {
+        suspended = false;
+        boolean change = suspendedChange;
+        suspendedChange = false;
+        try {
+            body.run();
+        } catch (RuntimeException failure) {
+            if (suspended) {
+                suspended = false;
+                change |= suspendedChange;
+                suspendedChange = false;
+            }
+            if (change) endChangeUnlessInserting();
+            throw failure;
+        }
+        complete(change);
+    }
+
+    /**
      * Keys a ported plugin runs with {@code :normal!} in the middle of a command (surround's {@code norm! d2i(}): the
      * command's own state is kept aside while they run and comes back after. What they change joins the command's undo
      * step, and {@code .} goes on repeating the command, not them.
@@ -595,8 +654,10 @@ final class Machine {
         List<KeyInput> sh = List.copyOf(shown), rec = List.copyOf(record);
         Consumer<KeyInput> arg = argument;
         Visual.Redo rv = recordVisual, vr = visualRedo;
-        boolean ri = recordingInsert, rep = replaying;
+        boolean ri = recordingInsert, rep = replaying, sus = suspended, susc = suspendedChange;
         recordingInsert = false;
+        suspended = false;
+        suspendedChange = false;
         reset();
         replaying = true;
         try {
@@ -620,6 +681,8 @@ final class Machine {
             visualRedo = vr;
             recordingInsert = ri;
             replaying = rep;
+            suspended = sus;
+            suspendedChange = susc;
         }
     }
 
@@ -634,6 +697,8 @@ final class Machine {
         keys = "";
         argument = null;
         shorter = null;
+        suspended = false;
+        suspendedChange = false;
         shown.clear();
         if (!recordingInsert) record.clear();
     }

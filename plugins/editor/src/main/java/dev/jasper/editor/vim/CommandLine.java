@@ -13,6 +13,10 @@ import java.util.function.Consumer;
 final class CommandLine {
     private final VimEditor editor;
     private char type;
+    /** What shows before the text: the type, or input()'s prompt. */
+    private String prompt = "";
+    /** For input(): a character that also ends the line, kept in the text; 0 for none. */
+    private char end;
     private final StringBuilder text = new StringBuilder();
     private int cursor;
     private final List<KeyInput> typed = new ArrayList<>();
@@ -49,6 +53,8 @@ final class CommandLine {
         if (type != ':') completer = null;
         matches = null;
         this.type = type;
+        prompt = String.valueOf(type);
+        end = 0;
         this.history = history;
         this.changed = changed;
         this.done = done;
@@ -73,6 +79,22 @@ final class CommandLine {
     /** @return {@code /}, {@code ?} or {@code :} */
     char type() { return type; }
 
+    /** @return what shows before the text: {@code :}, {@code /}, {@code ?}, or input()'s prompt */
+    String prompt() { return prompt; }
+
+    /**
+     * input(): reads a line after {@code prompt}, starting with {@code initial}, with no history; {@code end} (when
+     * not 0) also ends it and is kept.
+     *
+     * @param done runs with the text on {@code <CR>}
+     * @param cancelled runs on {@code <Esc>}
+     */
+    void input(String prompt, String initial, char end, Consumer<String> done, Runnable cancelled) {
+        start('@', List.of(), initial, null, done, cancelled);
+        this.prompt = prompt;
+        this.end = end;
+    }
+
     String text() { return text.toString(); }
 
     /** @return the cursor's index in the text */
@@ -95,6 +117,7 @@ final class CommandLine {
         int ch = key.plainChar();
         if (ch >= 0) {
             insert(new String(Character.toChars(ch)));
+            if (end != 0 && ch == end) finish();
             return;
         }
         switch (key.notation()) {

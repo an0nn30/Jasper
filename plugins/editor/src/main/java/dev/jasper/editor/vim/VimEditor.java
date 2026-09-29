@@ -967,11 +967,11 @@ public final class VimEditor {
 
     /** @return while a command line is typed, its text with the {@code :}, {@code /} or {@code ?} in front; else empty */
     public java.util.Optional<String> commandLineText() {
-        return commandLine.active() ? java.util.Optional.of(commandLine.type() + commandLine.text()) : java.util.Optional.empty();
+        return commandLine.active() ? java.util.Optional.of(commandLine.prompt() + commandLine.text()) : java.util.Optional.empty();
     }
 
     /** @return the command line's cursor, as an index into {@link #commandLineText()} */
-    public int commandLineCursor() { return commandLine.cursor() + 1; }
+    public int commandLineCursor() { return commandLine.cursor() + commandLine.prompt().length(); }
 
     /**
      * @param name the document's name for {@code <C-g>}

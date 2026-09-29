@@ -86,6 +86,8 @@ final class Put {
             simple(c, cursor, lnum, col, count, first, flags, visualEnd, ts);
             return;
         }
+        // '[ as it is now: set again after the text goes in, which would carry a mark set before along with it.
+        Pos opStart = cursor.copy();
         Pos newCursor = cursor.copy();
         int newLine = newCursor.line;
         int origIndent = (flags & FIXINDENT) != 0 ? Text.indent(b.line(cursor.line), ts) : 0;
@@ -131,12 +133,11 @@ final class Put {
             }
             if (n == 1) newLine = lnum;
         }
-        Pos opStart = marks.get('[');
         if (type == Type.LINE) {
             opStart.col = 0;
             if (forward) opStart.line++;
-            marks.set('[', opStart);
         }
+        marks.set('[', opStart);
         int lastLen = Math.max(0, y.getLast().length() - lenDiff);
         marks.set(']', new Pos(newLine, lastLen > 1 ? Text.previous(y.getLast(), lastLen) : 0));
         if ((flags & CURSLINE) != 0) c.editor.setCursor(new Pos(lnum, Text.firstNonBlank(b.line(lnum))));

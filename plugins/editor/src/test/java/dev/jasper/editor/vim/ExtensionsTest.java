@@ -68,6 +68,19 @@ class ExtensionsTest {
         });
     }
 
+    @Test void anExtensionThatIsOffCannotRun() throws Exception {
+        onEdt(() -> {
+            var editor = editor("(a)\n");
+            type(editor, ":nmap Q <lt>Plug>Dsurround<CR>");
+            int bells = editor.bells();
+            type(editor, "lQ(");
+            assertThat(editor.bells()).isEqualTo(bells + 1);
+            assertThat(editor.buffer().line(0)).isEqualTo("(a)");
+            type(editor, ":set surround<CR>Q(");
+            assertThat(editor.buffer().line(0)).isEqualTo("a");
+        });
+    }
+
     @Test void reloadingSwitchesTheExtensionsOff() throws Exception {
         onEdt(() -> {
             var editor = editor("x\n");
@@ -93,6 +106,25 @@ class ExtensionsTest {
             assertThat(editor.buffer().line(0)).isEqualTo("# x");
             area.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);
             assertThat(editor.options().string("commentstring")).as("no line comment: kept").isEqualTo("#%s");
+        });
+    }
+
+    @Test void surroundAsksForATagOnTheCommandLine() throws Exception {
+        onEdt(() -> {
+            var editor = editor("one two\n");
+            type(editor, ":set surround<CR>ysiwt");
+            assertThat(editor.commandLineText()).contains("<");
+            type(editor, "em");
+            assertThat(editor.commandLineText()).contains("<em");
+            type(editor, ">");
+            assertThat(editor.commandLineText()).as("> ends the tag").isEmpty();
+            assertThat(editor.buffer().line(0)).isEqualTo("<em>one</em> two");
+            type(editor, "wdst");
+            assertThat(editor.buffer().line(0)).isEqualTo("one two");
+            type(editor, "ysiwT");
+            assertThat(editor.commandLineText()).as("T offers the last tag removed").contains("<em");
+            type(editor, "<Esc>");
+            assertThat(editor.buffer().line(0)).as("no tag: nothing around it").isEqualTo("one two");
         });
     }
 }
