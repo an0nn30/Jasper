@@ -42,7 +42,7 @@ public final class EditorPlugin implements Plugin {
     private EditorEnvironment environment;
     private EditorWindow window;
     private RecentFiles recent;
-    private final Openers openers = new Openers();
+    private Openers openers;
 
     /** The production plugin: Swing's event queue, modal dialogs and running timers. */
     public EditorPlugin() {
@@ -60,6 +60,8 @@ public final class EditorPlugin implements Plugin {
         Set<String> fonts = Set.copyOf(Arrays.asList(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()));
         EditorSettings.Declared settings = new EditorSettings.Declared(context.settings(), fonts);
         environment = environments.apply(context, settings);
+        openers = new Openers(failure -> context.log().log(System.Logger.Level.WARNING,
+            "Open in Editor: an opener failed, so the next opener or the local chooser answers instead", failure));
         Reopeners reopeners = new Reopeners(file -> new LocalDocument(file, context.background()));
         recent = RecentFiles.load(context.dataDirectory().resolve("recent-files.toml"), context.background(), settings::recentFilesDays, Instant.now());
         var scope = new RecentFilesScope(recent, reopeners, Instant::now, (document, owner) -> window().open(document, owner),

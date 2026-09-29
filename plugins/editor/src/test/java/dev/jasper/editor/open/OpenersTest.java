@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OpenersTest {
-    private final Openers openers = new Openers();
+    private final List<RuntimeException> failures = new ArrayList<>();
+    private final Openers openers = new Openers(failures::add);
     private final List<String> asked = new ArrayList<>();
     private static final OpenRequest REQUEST = new OpenRequest(null, Optional.empty(), Optional.of("remote:x"));
 
@@ -21,11 +22,19 @@ class OpenersTest {
         assertThat(asked).containsExactly("first", "second");
     }
 
-    @Test void aHandlerThatThrowsCountsAsFalse() {
-        openers.register(request -> { throw new IllegalStateException("boom"); });
+    @Test void aHandlerThatThrowsCountsAsFalseAndIsReported() {
+        var boom = new IllegalStateException("boom");
+        openers.register(request -> { throw boom; });
         openers.register(request -> { asked.add("next"); return true; });
         assertThat(openers.handle(REQUEST)).isTrue();
         assertThat(asked).containsExactly("next");
+        assertThat(failures).containsExactly(boom);
+    }
+
+    @Test void handlersThatAnswerNormallyReportNothing() {
+        openers.register(request -> false);
+        assertThat(openers.handle(REQUEST)).isFalse();
+        assertThat(failures).isEmpty();
     }
 
     @Test void withNoHandlerOrAfterUnsubscribingNothingIsHandled() {
