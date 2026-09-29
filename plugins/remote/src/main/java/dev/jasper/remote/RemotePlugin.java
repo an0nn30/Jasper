@@ -80,6 +80,7 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.edit.EditChannels editChannels;
     private dev.jasper.sdk.Subscription reopener;
     private boolean openFile;
+    private dev.jasper.sdk.Subscription opener;
     private final Map<UUID, PendingSession> attachedPanes = new java.util.HashMap<>();
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE, OPEN_FILE="dev.jasper.remote.open-file";
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
@@ -180,6 +181,10 @@ public class RemotePlugin implements Plugin {
                         sftpUi.openRemoteFile(invoked.window(),target.map(dev.jasper.remote.ui.sftp.SftpUi.PaneTarget::identity),target.map(dev.jasper.remote.ui.sftp.SftpUi.PaneTarget::directory).orElse("")); });
                 context.menus().standard(dev.jasper.sdk.ui.StandardMenu.FILE).add(OPEN_FILE);
                 openFile=true;
+                var opening=new dev.jasper.remote.edit.RemoteOpening(editor.orElseThrow(),editing,
+                    pane->sftpPane(pane).map(target->new dev.jasper.remote.edit.RemoteOpening.Target(target.identity(),target.directory())),
+                    (window,target)->sftpUi.openRemoteFile(window,Optional.of(target.identity()),target.directory()));
+                try { opener=opening.register(); } catch(NoSuchMethodError older) { /* an Editor before 0.5 opens only local files */ }
             }
         } catch(NoClassDefFoundError absent) { /* the Editor is not installed: files in the SFTP panel do not open */ }
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
@@ -248,7 +253,7 @@ public class RemotePlugin implements Plugin {
 
     @Override public void stop() {
         stopped = true;
-        if(follower!=null)follower.close();if(sftpUi!=null)sftpUi.close();if(reopener!=null)reopener.close();if(editChannels!=null)editChannels.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
+        if(follower!=null)follower.close();if(sftpUi!=null)sftpUi.close();if(opener!=null)opener.close();if(reopener!=null)reopener.close();if(editChannels!=null)editChannels.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
         if (configImport != null) configImport.close();
         for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);

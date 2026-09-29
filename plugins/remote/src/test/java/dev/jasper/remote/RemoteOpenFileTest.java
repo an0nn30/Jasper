@@ -1,9 +1,11 @@
 package dev.jasper.remote;
 
 import dev.jasper.editor.api.EditorDocument;
+import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.remote.client.LoopbackServer;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.ui.sftp.RemoteFilePicker;
+import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -107,6 +109,26 @@ class RemoteOpenFileTest {
             assertThat(host.windowContent("dev.jasper.remote", "Open Remote File")).isEmpty();
             assertThat(editor.documents).isEmpty();
             host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void theEditorsOpenInEditorOpensThePickerFromAnSshPane(@TempDir Path dir) throws Exception {
+        Path files = Files.createDirectories(dir.resolve("files"));
+        Files.writeString(files.resolve("notes.toml"), "a = 1\n");
+        var editor = new FakeEditor();
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var set = setUp(host, server, files, dir, Optional.of(editor), 1, new SftpSubsystemFactory());
+            assertThat(editor.openers).hasSize(1);
+            WindowHandle window = set.context().terminals().window(set.window()).orElseThrow();
+            var pane = set.context().terminals().pane(set.pane()).orElseThrow();
+            assertThat(editor.openers.getFirst().test(new OpenRequest(window, Optional.of(pane), Optional.empty()))).isTrue();
+            var picker = picker(host);
+            assertThat(((RemoteHost) picker.hosts().getSelectedItem()).name()).isEqualTo("prod");
+            picker.cancelButton().doClick();
+            assertThat(editor.openers.getFirst().test(new OpenRequest(window, Optional.empty(), Optional.of("local:/tmp/a.txt")))).isFalse();
+            host.stopAll();
+            assertThat(editor.openers).as("stopping Remote removes its opener").isEmpty();
             assertThat(host.failures()).isEmpty();
         }
     }
