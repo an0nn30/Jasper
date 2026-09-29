@@ -98,10 +98,21 @@ final class ExMaps {
             }
             throw new VimFailure("E31: No such mapping");
         }
+        if (unique && mappings.all().stream().anyMatch(m -> (m.modes & mode) != 0 && m.lhs.equals(lhs)))
+            throw new VimFailure("E227: Mapping already exists for " + display(lhs, true));
+        define(mappings, mode, lhs, rhs, noremap, nowait);
+    }
+
+    /**
+     * Defines a mapping as do_map does: the mapping of the same keys in these modes loses them, and one left with no
+     * modes takes the new right-hand side in its place.
+     *
+     * @return the mapping that now holds it
+     */
+    static Mapping define(Mappings mappings, int mode, List<KeyInput> lhs, List<KeyInput> rhs, boolean noremap, boolean nowait) {
         Mapping reused = null;
         for (Mapping m : mappings.all()) {
             if ((m.modes & mode) == 0 || !m.lhs.equals(lhs)) continue;
-            if (unique) throw new VimFailure("E227: Mapping already exists for " + display(lhs, true));
             m.modes &= ~mode;
             if (m.modes == 0 && reused == null) {
                 // A mapping left with no modes takes the new right-hand side, keeping its place.
@@ -112,7 +123,7 @@ final class ExMaps {
                 reused = m;
             } else if (m.modes == 0) mappings.remove(m);
         }
-        if (reused == null) mappings.add(mode, lhs, rhs, noremap, nowait);
+        return reused != null ? reused : mappings.add(mode, lhs, rhs, noremap, nowait);
     }
 
     /**

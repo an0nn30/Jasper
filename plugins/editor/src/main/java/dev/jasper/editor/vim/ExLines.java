@@ -195,7 +195,12 @@ final class ExLines {
                 editor.machine().resumeIfInsertNormal();
             }
         }
-        // Out of keys: whatever still waits for one gets <Esc>.
+        endPending(editor);
+        if (failed != null && !failed.getMessage().isEmpty()) throw VimFailure.quiet();
+    }
+
+    /** Out of keys ({@code :normal}'s, or a ported plugin's): whatever still waits for one gets {@code <Esc>}. */
+    static void endPending(VimEditor editor) {
         for (int n = 0; n < 100 && pending(editor); n++) {
             try {
                 editor.dispatch(KeyInput.named("Esc"));
@@ -203,7 +208,6 @@ final class ExLines {
                 editor.machine().reset();
             }
         }
-        if (failed != null && !failed.getMessage().isEmpty()) throw VimFailure.quiet();
     }
 
     private static boolean pending(VimEditor editor) {

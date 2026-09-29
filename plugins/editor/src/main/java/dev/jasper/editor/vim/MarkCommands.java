@@ -11,6 +11,8 @@ final class MarkCommands {
         commands.actionWithChar("m", "set mark {char} at the cursor", false, MarkCommands::set);
         commands.motionWithChar("'", "to the first non-blank of mark {char}'s line", c -> go(c, true));
         commands.motionWithChar("`", "to mark {char}", c -> go(c, false));
+        commands.motionWithChar("g'", "to the first non-blank of mark {char}'s line, leaving the jumplist alone", c -> go(c, true, false));
+        commands.motionWithChar("g`", "to mark {char}, leaving the jumplist alone", c -> go(c, false, false));
         commands.action("<C-o>", "to an older position in the jumplist", false, c -> jump(c, -c.count));
         // CTRL-I arrives as <Tab>, as in Vim (KeyInput.normalized).
         commands.action("<Tab>", "to a newer position in the jumplist (CTRL-I)", false, c -> jump(c, c.count));
@@ -68,7 +70,10 @@ final class MarkCommands {
     }
 
     /** nv_gomark: ' is linewise to the first non-blank, ` exclusive to the mark itself; both are jumps. */
-    static Target go(Context c, boolean linewise) {
+    static Target go(Context c, boolean linewise) { return go(c, linewise, true); }
+
+    /** nv_gomark: with {@code jump} false ({@code g'}, {@code g`}) the jumplist is left alone. */
+    static Target go(Context c, boolean linewise, boolean jump) {
         int name = c.argumentChar();
         if (name < 0) throw Context.fail();
         if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') {
@@ -82,12 +87,14 @@ final class MarkCommands {
         pos = check(c.buffer, pos);
         if (linewise) {
             String line = c.buffer.line(pos.line);
-            return Target.linewise(new Pos(pos.line, Text.firstNonBlank(line)), Target.Column.RESET).asJump();
+            Target target = Target.linewise(new Pos(pos.line, Text.firstNonBlank(line)), Target.Column.RESET);
+            return jump ? target.asJump() : target;
         }
         String line = c.buffer.line(pos.line);
         int col = Math.min(pos.col, line.length());
         if (!c.inVisual() && col >= line.length() && !line.isEmpty()) col = Text.last(line);
-        return Target.exclusive(new Pos(pos.line, col)).asJump().usingRegisterOne().withoutAdjust();
+        Target target = Target.exclusive(new Pos(pos.line, col)).usingRegisterOne().withoutAdjust();
+        return jump ? target.asJump() : target;
     }
 
     /**

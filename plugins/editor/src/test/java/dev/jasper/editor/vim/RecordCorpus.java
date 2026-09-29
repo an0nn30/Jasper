@@ -19,13 +19,20 @@ import java.util.stream.Stream;
  * Each case runs in its own {@code vim -u NONE -i NONE -N}, which types the keys with feedkeys() and writes the text,
  * cursor, mode and registers as JSON. Divergent cases are skipped. Not part of {@code check}.
  *
- * <p>Arguments: the corpus folder, the Vim binary, and an optional case-name filter (a substring).
+ * <p>Arguments: the corpus folder, the Vim binary, and an optional case-name filter (a substring). A case with
+ * {@code ext:} runs with its extensions' plugins, cloned at the commits {@code vim-oracle.properties} (in the Editor
+ * plugin's folder) pins into {@code build/vim-oracle}, and tpope/vim-repeat, which lets {@code .} repeat them.
  */
 public final class RecordCorpus {
     private RecordCorpus() { }
 
+    /** The Editor plugin's folder: the nearest one above the corpus that holds {@code vim-oracle.properties}. */
+    private static Path project;
+
     public static void main(String[] arguments) throws Exception {
         Path folder = Path.of(arguments[0]);
+        project = folder.toAbsolutePath().normalize();
+        while (project != null && !Files.exists(project.resolve("vim-oracle.properties"))) project = project.getParent();
         String vim = arguments.length > 1 && !arguments[1].isBlank() ? arguments[1] : "vim";
         String filter = arguments.length > 2 ? arguments[2] : "";
         String version = version(vim);
@@ -52,6 +59,42 @@ public final class RecordCorpus {
             }
         } finally { pool.shutdownNow(); }
         System.out.println("Recorded " + recorded + " cases with " + version + ".");
+    }
+
+    /**
+     * The plugin an extension's cases are recorded against, cloned the first time at the commit
+     * {@code vim-oracle.properties} pins ({@code name = url commit}).
+     *
+     * @return its folder under {@code build/vim-oracle}
+     */
+    static synchronized Path oracle(String name) {
+        try {
+            return clone(name);
+        } catch (IOException | InterruptedException failure) {
+            throw new IllegalStateException("Could not clone the plugin for " + name + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    private static Path clone(String name) throws IOException, InterruptedException {
+        if (project == null) throw new IOException("no vim-oracle.properties above the corpus folder");
+        var pins = new java.util.Properties();
+        try (var in = Files.newBufferedReader(project.resolve("vim-oracle.properties"))) { pins.load(in); }
+        String pin = pins.getProperty(name);
+        if (pin == null) throw new IllegalStateException("vim-oracle.properties pins no plugin for " + name);
+        String[] parts = pin.trim().split("\\s+");
+        Path folder = project.resolve("build/vim-oracle").resolve(name);
+        if (!Files.isDirectory(folder.resolve(".git"))) {
+            Files.createDirectories(folder.getParent());
+            run(folder.getParent(), "git", "clone", "--quiet", parts[0], folder.getFileName().toString());
+        }
+        run(folder, "git", "checkout", "--quiet", parts[1]);
+        return folder;
+    }
+
+    private static void run(Path in, String... command) throws IOException, InterruptedException {
+        Process process = new ProcessBuilder(command).directory(in.toFile()).redirectErrorStream(true).start();
+        String said = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (process.waitFor() != 0) throw new IllegalStateException(String.join(" ", command) + " failed: " + said);
     }
 
     static String version(String vim) throws IOException, InterruptedException {
@@ -169,6 +212,15 @@ public final class RecordCorpus {
             lines.add("set columns=" + size[0] + " lines=" + (size[1] + 1));
         }
         if (!c.set().isBlank()) lines.add("set " + c.set());
+        if (!c.extensions().isEmpty()) {
+            // The plugins load as Vim's startup would load them, before the file is edited.
+            List<Path> plugins = new ArrayList<>();
+            plugins.add(oracle("repeat"));
+            for (String extension : c.extensions()) plugins.add(oracle(extension.toLowerCase(java.util.Locale.ROOT)));
+            for (Path plugin : plugins) lines.add("set rtp^=" + plugin.toString().replace(" ", "\\ "));
+            for (Path plugin : plugins)
+                lines.add("for s:f in glob(" + Json.quote(plugin + "/plugin/*.vim") + ", 0, 1) | execute 'source' fnameescape(s:f) | endfor");
+        }
         for (var entry : c.given().entrySet()) {
             CorpusCase.Register register = entry.getValue();
             String text = register.type().equals("l") && register.text().endsWith("\n") ? register.text().substring(0, register.text().length() - 1) : register.text();

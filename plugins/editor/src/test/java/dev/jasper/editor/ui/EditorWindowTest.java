@@ -421,7 +421,7 @@ class EditorWindowTest {
     @Test void theVimrcIsReadWhenVimFirstTurnsOnAndReloadReadsItAgain() throws Exception {
         Path vimrc = window.vimrcFile();
         assertThat(vimrc).isEqualTo(home.resolve("plugins/dev.jasper.editor/data/vimrc"));
-        Files.writeString(vimrc, "nnoremap x dd\nbogus\nPlug 'tpope/vim-surround'\n");
+        Files.writeString(vimrc, "nnoremap x dd\nbogus\nNERDTreeToggle\n");
         EditorTab tab = opened(file("rc.txt", "one\ntwo\nthree\n"));
         assertThat(host.notices()).as("Vim is off: nothing is read").isEmpty();
         window.toggleVim();

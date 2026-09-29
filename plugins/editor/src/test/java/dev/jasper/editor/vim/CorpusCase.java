@@ -11,6 +11,8 @@ import java.util.Map;
  * @param name its title
  * @param divergent why Jasper deliberately differs, or null; a divergent case's expectation is written by hand
  * @param set {@code :set} arguments applied first, or empty
+ * @param ext the extensions switched on (spec 8), by their switches ({@code surround}), separated by spaces; empty
+ *     for none. The recorder loads each one's plugin, at the commit {@code vim-oracle.properties} pins
  * @param given registers set first
  * @param text the starting lines
  * @param line the cursor's line, 1-based
@@ -23,7 +25,7 @@ import java.util.Map;
  * @param output whether what the keys said (messages, listings, errors) is compared
  * @param expected what Vim did, or null when the case has not been recorded
  */
-record CorpusCase(String file, String name, String divergent, String set, Map<Character, Register> given, List<String> text,
+record CorpusCase(String file, String name, String divergent, String set, String ext, Map<Character, Register> given, List<String> text,
                   int line, int col, String keys, List<Character> registers, String window, String folds, boolean output, Expected expected) {
     /**
      * A register's content as the corpus writes it.
@@ -70,8 +72,11 @@ record CorpusCase(String file, String name, String divergent, String set, Map<Ch
                     String view, String folds, List<String> output) { }
 
     CorpusCase withExpected(Expected value) {
-        return new CorpusCase(file, name, divergent, set, given, text, line, col, keys, registers, window, folds, output, value);
+        return new CorpusCase(file, name, divergent, set, ext, given, text, line, col, keys, registers, window, folds, output, value);
     }
+
+    /** @return the extensions switched on, from {@link #ext} */
+    List<String> extensions() { return ext.isBlank() ? List.of() : List.of(ext.trim().split("\\s+")); }
 
     /** @return the window's columns and rows, from {@link #window} */
     int[] windowSize() {

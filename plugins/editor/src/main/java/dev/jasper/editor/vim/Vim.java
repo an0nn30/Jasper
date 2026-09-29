@@ -29,6 +29,7 @@ public final class Vim {
     private final KeyHandlers handlers = new KeyHandlers();
     private final Mappings mappings = new Mappings();
     private final Macros macros = new Macros();
+    private final Extensions extensions = new Extensions(this);
     /** The global variables {@code :let} sets ({@code g:mapleader}, extension settings), by name without {@code g:}. */
     private final java.util.Map<String, Object> variables = new java.util.HashMap<>();
     /** The vimrc or {@code :source} file being read, or null. */
@@ -54,6 +55,8 @@ public final class Vim {
     public Vim(VimHost host) {
         this.host = host;
         registers = new Registers(host);
+        // An extension's switch (set surround) adds or takes away its mappings.
+        options.onChanged(extensions::sync);
     }
 
     /** @return what the engine needs from the Editor */
@@ -105,6 +108,9 @@ public final class Vim {
         handlers.clear();
         variables.clear();
     }
+
+    /** @return the emulated extensions */
+    Extensions extensions() { return extensions; }
 
     /** @return macro recording and execution */
     Macros macros() { return macros; }

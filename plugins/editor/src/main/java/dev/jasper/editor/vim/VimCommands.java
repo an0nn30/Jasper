@@ -66,6 +66,7 @@ public final class VimCommands {
         ViewCommands.register(commands);
         Ex.register(commands);
         Macros.register(commands);
+        ReplaceWithRegister.register(commands);
         return commands;
     }
 

@@ -492,7 +492,8 @@ final class Machine {
      * where the text was ({@code ']} in a block on its last line); the others mark the span, whole lines for a linewise one.
      */
     private void setChangeMarks(Span span) {
-        if (operator.equals("gq") || operator.equals("gw")) return;
+        // A ported plugin's operator sets the marks itself, as g@ does before the operator function runs.
+        if (operator.equals("gq") || operator.equals("gw") || operator.startsWith("<Plug>")) return;
         Marks marks = editor.marks();
         Pos start = span.start().copy(), end = span.end().copy();
         end.line = Math.min(end.line, editor.buffer().count() - 1);
@@ -550,6 +551,46 @@ final class Machine {
         recordCount = 0;
         recordVisual = null;
         recordingInsert = true;
+    }
+
+    /**
+     * Keys a ported plugin runs with {@code :normal!} in the middle of a command (surround's {@code norm! d2i(}): the
+     * command's own state is kept aside while they run and comes back after. What they change joins the command's undo
+     * step, and {@code .} goes on repeating the command, not them.
+     */
+    void nested(Runnable work) {
+        int c1 = count1, c2 = count2, rc = recordCount;
+        char reg = register, forc = forced, rr = recordRegister;
+        String op = operator, k = keys, ln = line;
+        List<KeyInput> sh = List.copyOf(shown), rec = List.copyOf(record);
+        Consumer<KeyInput> arg = argument;
+        Visual.Redo rv = recordVisual, vr = visualRedo;
+        boolean ri = recordingInsert, rep = replaying;
+        recordingInsert = false;
+        reset();
+        replaying = true;
+        try {
+            work.run();
+        } finally {
+            count1 = c1;
+            count2 = c2;
+            recordCount = rc;
+            register = reg;
+            forced = forc;
+            recordRegister = rr;
+            operator = op;
+            keys = k;
+            line = ln;
+            shown.clear();
+            shown.addAll(sh);
+            record.clear();
+            record.addAll(rec);
+            argument = arg;
+            recordVisual = rv;
+            visualRedo = vr;
+            recordingInsert = ri;
+            replaying = rep;
+        }
     }
 
     /** Drops the partly typed command, keeping an insert being recorded. */

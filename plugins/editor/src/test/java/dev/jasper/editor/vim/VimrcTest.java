@@ -16,8 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * IdeaVim's {@code :sethandler}, {@code :action} and {@code :actionlist}, and Reload vimrc.
  */
 class VimrcTest {
-    /** The commands whose cases need files or the Editor's commands, which this class runs instead of the corpus. */
-    static final Set<String> NOT_IN_VIM = Set.of("ex source", "ex sethandler", "ex action", "ex actionlist");
+    /** The commands whose cases need files, the Editor's commands or vim-plug, which this class runs instead of the corpus. */
+    static final Set<String> NOT_IN_VIM = Set.of("ex source", "ex sethandler", "ex action", "ex actionlist", "ex Plug");
 
     @TempDir Path folder;
     private final List<String> ran = new ArrayList<>();
@@ -111,7 +111,7 @@ class VimrcTest {
     @Test void failingLinesAreSkippedAndReportedAsVimReportsThem() throws Exception {
         Path vimrc = file("vimrc",
             "set ts=4",
-            "Plug 'tpope/vim-surround'",
+            "NERDTreeToggle",
             "set nosuchoption",
             "let s:x = 1",
             "set sw=2",
@@ -124,7 +124,7 @@ class VimrcTest {
             assertThat(editor.vim().messages()).containsExactly(
                 "Error detected while processing " + vimrc + ":",
                 "line    2:",
-                "E492: Not an editor command: Plug 'tpope/vim-surround'",
+                "E492: Not an editor command: NERDTreeToggle",
                 "line    3:",
                 "E518: Unknown option: nosuchoption",
                 "line    4:",
@@ -286,6 +286,7 @@ class VimrcTest {
         onEdt(() -> {
             var editor = editor("x\n");
             type(editor, ":source " + script + "<CR>:sethandler <lt>C-d> n:ide<CR>:action save<CR>:actionlist<CR><CR>");
+            type(editor, ":Plug 'tpope/vim-surround'<CR>");
         });
         assertThat(covered).containsAll(NOT_IN_VIM);
     }

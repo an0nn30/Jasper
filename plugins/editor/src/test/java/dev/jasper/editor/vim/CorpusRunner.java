@@ -44,6 +44,7 @@ final class CorpusRunner {
         int[] size = c.window() != null ? c.windowSize() : new int[] { 80, 23 };
         editor.view().resize(size[1], size[0]);
         if (!c.set().isBlank()) editor.options().apply(c.set());
+        for (String extension : c.extensions()) editor.options().set(extension, true);
         for (var entry : c.given().entrySet()) {
             var register = entry.getValue();
             vim.registers().set(entry.getKey(), register.content());

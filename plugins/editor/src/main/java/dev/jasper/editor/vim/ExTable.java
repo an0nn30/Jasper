@@ -75,7 +75,7 @@ final class ExTable {
         "xmap", "xmapclear", "xmenu", "xnoremap", "xnoremenu", "xrestore", "xunmap", "xunmenu", "yank", "z", "!",
         "#", "&", "*", "<", "=", ">", "@", "{", "}", "~", "Next", "Print", "X", "++", "--",
         // IdeaVim's own, after Vim's so that no Vim abbreviation changes.
-        "sethandler", "action", "actionlist");
+        "sethandler", "action", "actionlist", "Plug");
 
     /**
      * @param typed a command name as typed, perhaps abbreviated

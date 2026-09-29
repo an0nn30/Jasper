@@ -1,0 +1,273 @@
+# ReplaceWithRegister (vim-scripts/ReplaceWithRegister): gr{motion}, grr and Visual gr.
+
+=== gr replaces a word with the unnamed register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yiwwgriw
+registers: " 0
+--- vim 9.1
+expect-text:
+  one one three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": c "one"
+expect-register 0: c "one"
+
+=== gr with a named register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: "ayiwwgriw"agriw
+registers: " a
+--- vim 9.1
+expect-text:
+  one one three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": c "one"
+expect-register a: c "one"
+
+=== gr with a register before it
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: "ayiww"agriw
+registers: " a
+--- vim 9.1
+expect-text:
+  one one three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": c "one"
+expect-register a: c "one"
+
+=== gr over a motion
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yiwwgr$
+registers: "
+--- vim 9.1
+expect-text:
+  one one
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": c "one"
+
+=== gr with a linewise register over a word
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yyjwgriw
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  four one two three six
+  seven eight nine
+expect-cursor: 2,18
+expect-mode: normal
+expect-register ": l "one two three\n"
+
+=== grr replaces the line
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yyjgrr
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  one two three
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "one two three\n"
+
+=== grr with a count
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yyj2grr
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  one two three
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "one two three\n"
+
+=== grr with a charwise register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yiwjgrr
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  one
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": c "one"
+
+=== Visual gr
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yiwwviwgr
+registers: "
+--- vim 9.1
+expect-text:
+  one one three
+  four five six
+  seven eight nine
+expect-cursor: 1,7
+expect-mode: normal
+expect-register ": c "one"
+
+=== Visual gr over lines
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yiwjVjgr
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  one
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": c "one"
+
+=== gr over a block repeats the register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yiw<C-v>jlgr
+registers: "
+--- vim 9.1
+expect-text:
+  onee two three
+  oneur five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "one"
+
+=== dot repeats gr
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yiwwgriwj0.
+registers: "
+--- vim 9.1
+expect-text:
+  one one three
+  one five six
+  seven eight nine
+expect-cursor: 2,3
+expect-mode: normal
+expect-register ": c "one"
+
+=== dot repeats grr
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: yyjgrrj.
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  one two three
+  one two three
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "one two three\n"
+
+=== gr over nothing puts before the cursor
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,5
+ext: replacewithregister
+keys: yiwgr0
+--- vim 9.1
+expect-text:
+  twotwo three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: normal
+
+=== the default mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+ext: replacewithregister
+keys: :nmap gr<CR>:xmap gr<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  grr           <Plug>ReplaceWithRegisterLine
+  n  gr            <Plug>ReplaceWithRegisterOperator
+  x  gr            <Plug>ReplaceWithRegisterVisual

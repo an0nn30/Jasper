@@ -1,0 +1,86 @@
+# g` and g': to a mark without changing the jumplist.
+
+=== g backtick goes to a mark
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: jwmaggg`a
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 2,6
+expect-mode: normal
+
+=== g backtick leaves the jumplist alone
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten
+  eleven
+cursor: 1,1
+keys: jjmaggGg`a``
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten
+  eleven
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g quote goes to a mark's line
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: jwwmaggg'a
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+
+=== g quote leaves the jumplist alone
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten
+  eleven
+cursor: 1,1
+keys: jjmaggGg'a''
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten
+  eleven
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d g backtick
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: wwmagg0dg`a
+registers: "
+--- vim 9.1
+expect-text:
+  three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "one two "

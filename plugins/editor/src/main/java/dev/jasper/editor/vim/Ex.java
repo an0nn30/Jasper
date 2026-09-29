@@ -164,6 +164,7 @@ final class Ex {
         def("messages", RANGE | EXTRA | TRLBAR, Addr.OTHER, "the message history: errors, and the vimrc's skipped lines; `:messages clear`", ExVimrc::messages);
         def("sethandler", EXTRA | TRLBAR, Addr.NONE, "`:sethandler {key} {modes}:{vim|ide} …`: who gets a key in each mode", ExVimrc::sethandler);
         def("action", EXTRA | NEEDARG | TRLBAR, Addr.NONE, "run the Editor command {id}, as `<Action>(id)` does in a mapping", ExVimrc::action);
+        def("Plug", EXTRA | NOTRLCOM | TRLBAR, Addr.NONE, "`Plug 'tpope/vim-surround'`: switch on the extension Jasper emulates for the plugin; others are ignored", Extensions::plug);
         def("actionlist", EXTRA | TRLBAR, Addr.NONE, "list the Editor's command ids, or those holding [text]", ExVimrc::actionlist);
         def("syntax", EXTRA | NOTRLCOM | TRLBAR, Addr.NONE, "accepted and ignored: the Editor highlights by language", ExVimrc::ignored);
         def("filetype", EXTRA | TRLBAR, Addr.NONE, "accepted and ignored: the Editor knows each file's language", ExVimrc::ignored);

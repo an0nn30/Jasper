@@ -26,7 +26,7 @@ class ExTest {
     private static List<String> output(VimEditor editor) { return editor.output().stream().map(VimEditor.OutputLine::text).toList(); }
 
     @Test void namesResolveAsVimAbbreviatesThem() {
-        assertThat(ExTable.NAMES).as("Vim's 600 and IdeaVim's sethandler, action and actionlist").hasSize(603);
+        assertThat(ExTable.NAMES).as("Vim's 600, IdeaVim's sethandler, action and actionlist, and vim-plug's Plug").hasSize(604);
         assertThat(ExTable.resolve("s")).isEqualTo("substitute");
         assertThat(ExTable.resolve("d")).isEqualTo("delete");
         assertThat(ExTable.resolve("p")).isEqualTo("print");

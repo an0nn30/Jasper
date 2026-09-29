@@ -49,8 +49,29 @@ class VimDocsTest {
         section(out, commands, VimCommands.Kind.VISUAL, "Visual-mode commands",
             "In Visual mode, besides the motions, operators and text objects above. A change repeats with `.` on an area of the same size.");
         section(out, commands, VimCommands.Kind.INSERT, "Insert-mode keys", "Printable keys type text; these keys do more.");
+        extensions(out, commands);
         exCommands(out);
         return out.toString();
+    }
+
+    /** The extensions' {@code <Plug>} commands, which their default keys (in each description) or a user's mapping reach. */
+    private static void extensions(StringBuilder out, VimCommands commands) {
+        out.append("\n## Extensions\n\n");
+        out.append("Switched on with `set {name}` or the plugin's `Plug '…'` line, each extension maps its plugin's default keys to\n");
+        out.append("these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>s <Plug>Ysurround`).\n\n");
+        out.append("| Command | What it does |\n|---|---|\n");
+        for (VimCommands.Entry entry : commands.entries()) {
+            if (!entry.keys().startsWith("<Plug>")) continue;
+            String keys = entry.keys() + (entry.needsChar() ? "{char}" : "");
+            String kind = switch (entry.kind()) {
+                case OPERATOR -> "operator";
+                case OBJECT -> "text object";
+                case VISUAL -> "Visual";
+                default -> "Normal";
+            };
+            out.append("| `").append(keys.replace("|", "\\|")).append("` (").append(kind).append(") | ")
+                .append(entry.description().replace("|", "\\|")).append(" |\n");
+        }
     }
 
     /** The Ex commands, with Vim's shortest abbreviation outside the brackets ({@code :s[ubstitute]}). */
@@ -73,7 +94,7 @@ class VimDocsTest {
         if (!note.isEmpty()) out.append(note).append("\n\n");
         out.append("| Keys | What it does |\n|---|---|\n");
         for (VimCommands.Entry entry : commands.entries()) {
-            if (entry.kind() != kind) continue;
+            if (entry.kind() != kind || entry.keys().startsWith("<Plug>")) continue;
             String keys = entry.keys().equals(" ") ? "<Space>" : entry.keys();
             if (entry.needsChar()) keys += "{char}";
             String code = keys.contains("`") ? "`` " + keys + " ``" : "`" + keys + "`";

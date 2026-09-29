@@ -75,6 +75,8 @@ In Normal and Visual mode and after an operator. A count repeats or scales them.
 | `g#` | search backward for the keyword under the cursor, also inside words |
 | `'{char}` | to the first non-blank of mark {char}'s line |
 | `` `{char} `` | to mark {char} |
+| `g'{char}` | to the first non-blank of mark {char}'s line, leaving the jumplist alone |
+| `` g`{char} `` | to mark {char}, leaving the jumplist alone |
 | `H` | to line {count} from the top of the window |
 | `M` | to the middle line of the window |
 | `L` | to line {count} from the bottom of the window |
@@ -326,6 +328,17 @@ Printable keys type text; these keys do more.
 | `<Home>` | move the cursor, starting a new insert for undo and . |
 | `<End>` | move the cursor, starting a new insert for undo and . |
 
+## Extensions
+
+Switched on with `set {name}` or the plugin's `Plug '…'` line, each extension maps its plugin's default keys to
+these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>s <Plug>Ysurround`).
+
+| Command | What it does |
+|---|---|
+| `<Plug>ReplaceWithRegisterOperator` (operator) | replace {motion}'s text with the register (`gr`, with `set ReplaceWithRegister`) |
+| `<Plug>ReplaceWithRegisterLine` (Normal) | replace [count] lines with the register (`grr`) |
+| `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
+
 ## Ex commands
 
 Typed after `:` and ended by `<CR>`. A range goes before the name: `3`, `.`, `$`, `%`, `'x`, `/pattern/`, `?pattern?`,
@@ -433,6 +446,7 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:mes[sages]` | the message history: errors, and the vimrc's skipped lines; `:messages clear` |
 | `:seth[andler]` | `:sethandler {key} {modes}:{vim\|ide} …`: who gets a key in each mode |
 | `:ac[tion]` | run the Editor command {id}, as `<Action>(id)` does in a mapping |
+| `:Pl[ug]` | `Plug 'tpope/vim-surround'`: switch on the extension Jasper emulates for the plugin; others are ignored |
 | `:actionl[ist]` | list the Editor's command ids, or those holding [text] |
 | `:sy[ntax]` | accepted and ignored: the Editor highlights by language |
 | `:filet[ype]` | accepted and ignored: the Editor knows each file's language |
