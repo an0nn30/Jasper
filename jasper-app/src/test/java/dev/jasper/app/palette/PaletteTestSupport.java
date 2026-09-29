@@ -76,6 +76,8 @@ public final class PaletteTestSupport {
     /** The scope hints along the bottom edge, as their text; empty while a chip is set. */
     public static List<String> scopeHints(CommandPalette palette) { return palette.scopeHintTexts(); }
     public static void clickScopeHint(CommandPalette palette, String text) { palette.clickScopeHint(text); }
+    /** The key shown on each scope hint, in order; empty for a scope without one. */
+    public static List<String> scopeHintKeys(CommandPalette palette) { return palette.scopeHintKeys(); }
     public static boolean backspace(PaletteController controller) { return controller.backspacePressed(); }
     public static String placeholder(CommandPalette palette) { return (String) palette.queryField().getClientProperty("JTextField.placeholderText"); }
     public static JPanel hintBar(CommandPalette palette) { return palette.hintBar(); }

@@ -135,6 +135,13 @@ class WindowContributionsTest {
                 owner.connectContributions(model);
                 var palette = owner.commandPalette();
                 assertThat(owner.scopes().find("dev.x.scope")).as("registered in the window on connect").isPresent();
+                palette.toggle();
+                assertThat(PaletteTestSupport.scopeHints(palette.component())).containsExactly("> commands", "dev.x.scope >");
+                assertThat(PaletteTestSupport.scopeHintKeys(palette.component())).as("each pill shows the key that selects it")
+                    .containsExactly(">", "\u2325\u2318H");
+                assertThat(owner.dispatchShortcut(stroke("cmd+alt+h"), null)).as("the shown key selects the scope").isTrue();
+                assertThat(palette.activeScopeId()).isEqualTo("dev.x.scope");
+                palette.dismiss();
 
                 assertThat(owner.dispatchShortcut(stroke("cmd+alt+h"), null)).as("closed: the plugin's handler runs").isTrue();
                 assertThat(palette.isOpen()).isTrue();

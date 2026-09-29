@@ -235,6 +235,13 @@ public final class CommandPalette extends JPanel {
         return texts;
     }
 
+    /** The key each hint shows, in order: {@code >} for Commands, a scope's shortcut, or empty when it has none. */
+    List<String> scopeHintKeys() {
+        var keys = new ArrayList<String>();
+        for (Component pill : scopeHints.getComponents()) keys.add(((HintPill) pill).key);
+        return keys;
+    }
+
     /** As a click on the hint reading {@code text}. */
     void clickScopeHint(String text) {
         for (Component pill : scopeHints.getComponents())
@@ -753,21 +760,39 @@ public final class CommandPalette extends JPanel {
         }
     }
 
-    /** One scope hint: its prefix on a rounded pill; a click sets the scope's chip. */
+    /**
+     * One scope hint: its prefix and the key that selects it (a key cap: {@code >} for Commands, else the scope's own
+     * shortcut, which switches scope while the palette is open) on a rounded pill; a click sets the scope's chip.
+     */
     private final class HintPill extends SizedLabel {
+        private static final int GAP = 6, CAP_PADDING = 4;
         private final PaletteScope scope;
+        private final String key;
 
         HintPill(PaletteScope scope, String shortcut) {
             super(hintText(scope), 18);
             this.scope = scope;
-            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(7), 0, UIScale.scale(7)));
+            this.key = PaletteScope.COMMANDS_ID.equals(scope.id()) ? ">" : shortcut == null ? "" : shortcut;
+            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(7), 0, UIScale.scale(7) + capWidth()));
             String tip = scope.description().isBlank() ? scope.label() : scope.description();
-            setToolTipText(shortcut == null || shortcut.isBlank() ? tip : tip + " (" + shortcut + ")");
-            getAccessibleContext().setAccessibleName("Search " + scope.label());
+            setToolTipText(key.isEmpty() ? tip : tip + " (" + key + ")");
+            getAccessibleContext().setAccessibleName("Search " + scope.label() + (key.isEmpty() ? "" : ", " + key));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             addMouseListener(new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) chipTyped.accept(scope); }
             });
+        }
+
+        /** The key cap's width plus its gap from the text; zero without a key. */
+        private int capWidth() {
+            if (key.isEmpty()) return 0;
+            return UIScale.scale(GAP) + getFontMetrics(smallFont != null ? smallFont : getFont()).stringWidth(key) + 2 * UIScale.scale(CAP_PADDING);
+        }
+
+        @Override public void setFont(Font font) {
+            super.setFont(font);
+            // The key cap's room follows the font; the constructor's border predates the theme's font.
+            if (key != null) setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(7), 0, UIScale.scale(7) + capWidth()));
         }
 
         @Override public Dimension getPreferredSize() {
@@ -776,15 +801,26 @@ public final class CommandPalette extends JPanel {
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            if (chipBackground != null) {
-                var g = (Graphics2D) graphics.create();
-                try {
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-                    int width = getWidth() - UIScale.scale(6), height = getHeight();
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                int width = getWidth() - UIScale.scale(6), height = getHeight();
+                if (chipBackground != null) {
                     g.setColor(chipBackground);
                     g.fillRoundRect(0, 0, width, height, height, height);
-                } finally { g.dispose(); }
-            }
+                }
+                if (!key.isEmpty()) {
+                    var metrics = g.getFontMetrics(getFont());
+                    int capWidth = metrics.stringWidth(key) + 2 * UIScale.scale(CAP_PADDING), capHeight = height - UIScale.scale(4);
+                    int x = width - UIScale.scale(7) - capWidth, y = (height - capHeight) / 2, arc = UIScale.scale(6);
+                    g.setColor(separatorColor != null ? separatorColor : getForeground());
+                    g.drawRoundRect(x, y, capWidth - 1, capHeight - 1, arc, arc);
+                    g.setFont(getFont());
+                    g.setColor(getForeground());
+                    g.drawString(key, x + UIScale.scale(CAP_PADDING), y + (capHeight - metrics.getHeight()) / 2 + metrics.getAscent());
+                }
+            } finally { g.dispose(); }
             super.paintComponent(graphics);
         }
     }

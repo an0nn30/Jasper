@@ -12,8 +12,10 @@ topped up with each scope's own suggestions (Commands' starters, …) until ther
 shell commands and Vault's entries never appear here unprompted; they show once you type. A row
 that no longer exists (a deleted host or snippet) drops out. Uses are saved with the command
 history (`command-history.toml`, at most 50). Along the bottom edge, pills name each scope's
-prefix (`> commands`, `history >`, `snippets >`, `ssh >`, `vault >`); clicking one sets that chip,
-and its tooltip shows the scope's shortcut. Typing anything else searches every scope at once and groups the matches
+prefix (`> commands`, `history >`, `snippets >`, `ssh >`, `vault >`); each pill also shows, as a key cap, the
+key that selects that scope from the keyboard: `>` for Commands, and each scope's own shortcut
+(Cmd+J Snippets, Cmd+R History, F8 Vault, Shift+Cmd+H SSH on macOS), which switches scope while the
+palette is open. Clicking a pill does the same. Typing anything else searches every scope at once and groups the matches
 under each scope's name, at most `palette.max_results` per scope; when a scope has more, a "More in
 <Scope>…" row sets that scope's chip with the query kept. Vault's secrets stay out of that search;
 its chip searches them.
