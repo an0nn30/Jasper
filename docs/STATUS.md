@@ -2,6 +2,17 @@
 
 ## Current state — 2026-09-28
 
+- **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
+  `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
+  - **Centring:** the search field is always centred on the window, and the sides give way first.
+  - **Palette:** the card is one colour.
+  - **Windows and Linux:** get FlatLaf's title bar with the app icon, menus (folding to "…" then ☰), field,
+    toolbar and window buttons; `window.native_decorations` (restart) keeps the system title bar.
+  - Executed inline 2026-09-29 (6b7e0334..536ff95c); `./gradlew check` 6,535 tests green (6 skipped).
+  - Deviations: listed in the plan's banner.
+  - Merged into local main 2026-09-29; not pushed.
+  - Not done: GUI checks on Windows and Linux (Snap Layouts, double-click maximise, dragging the empty title
+    bar and toolbar gaps, both menu folds, F10), the macOS look after the centring change, push.
 - **Editor Vim mode, plan V4b** (branch `claude/vim-v4b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v4b.md`, written 2026-09-28): the extensions paragraph-motion, textobj-entire,
   textobj-indent, argtextobj and highlightedyank, switched on by IdeaVim's names (`:set` takes hyphens) or `Plug`

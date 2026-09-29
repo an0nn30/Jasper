@@ -134,4 +134,15 @@ class SchemaPageTest {
         page.reset();
         assertThat(height.isEnabled()).isTrue();
     }
+
+    @Test void aRowShownOnlyElsewhereKeepsItsSettingButBuildsNoControl() {
+        var spec = SchemaPage.page("window", "Window")
+            .row(CoreSettings.WINDOW_STATUS_BAR)
+            .row(CoreSettings.WINDOW_NATIVE_DECORATIONS).shownWhen(false);
+        assertThat(spec.settings()).containsExactly(CoreSettings.WINDOW_STATUS_BAR, CoreSettings.WINDOW_NATIVE_DECORATIONS);
+        var page = spec.build(context);
+        page.component();
+        assertThat(page.rows()).hasSize(1);
+        assertThat(page.searchTerms()).doesNotContain(CoreSettings.WINDOW_NATIVE_DECORATIONS.label());
+    }
 }

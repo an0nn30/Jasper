@@ -31,7 +31,7 @@ public final class SchemaPage implements SettingsPage {
     public record Button(String label, Runnable action, BooleanSupplier enabled) { }
 
     private sealed interface Item permits RowItem, SectionItem, ActionItem { }
-    private record RowItem(Setting<?> setting, Editors.Factory<?> editor, String note, Predicate<SettingsDraft> enabled) implements Item { }
+    private record RowItem(Setting<?> setting, Editors.Factory<?> editor, String note, Predicate<SettingsDraft> enabled, boolean shown) implements Item { }
     private record SectionItem(String title) implements Item { }
     private record ActionItem(Supplier<String> text, List<Button> buttons) implements Item { }
 
@@ -53,13 +53,13 @@ public final class SchemaPage implements SettingsPage {
         public Spec anchor(String value) { anchor = value; return this; }
         public Spec section(String value) { items.add(new SectionItem(value)); return this; }
         public <T> Spec row(Setting<T> setting) { return row(setting, Editors.byKind(setting)); }
-        public <T> Spec row(Setting<T> setting, Editors.Factory<T> editor) { items.add(new RowItem(setting, editor, "", draft -> true)); return this; }
+        public <T> Spec row(Setting<T> setting, Editors.Factory<T> editor) { items.add(new RowItem(setting, editor, "", draft -> true, true)); return this; }
 
         /** Adds a note to the previous row's comment. */
         public Spec note(String text) {
             if (items.isEmpty() || !(items.getLast() instanceof RowItem)) throw new IllegalStateException("A note follows a row");
             RowItem row = (RowItem) items.removeLast();
-            items.add(new RowItem(row.setting(), row.editor(), text, row.enabled()));
+            items.add(new RowItem(row.setting(), row.editor(), text, row.enabled(), row.shown()));
             return this;
         }
 
@@ -67,7 +67,18 @@ public final class SchemaPage implements SettingsPage {
         public Spec enabledWhen(Predicate<SettingsDraft> condition) {
             if (items.isEmpty() || !(items.getLast() instanceof RowItem)) throw new IllegalStateException("A condition follows a row");
             RowItem row = (RowItem) items.removeLast();
-            items.add(new RowItem(row.setting(), row.editor(), row.note(), java.util.Objects.requireNonNull(condition, "condition")));
+            items.add(new RowItem(row.setting(), row.editor(), row.note(), java.util.Objects.requireNonNull(condition, "condition"), row.shown()));
+            return this;
+        }
+
+        /**
+         * Builds the previous row only when {@code shown}; the page still owns its setting (for example a setting that
+         * only one platform uses).
+         */
+        public Spec shownWhen(boolean shown) {
+            if (items.isEmpty() || !(items.getLast() instanceof RowItem)) throw new IllegalStateException("A condition follows a row");
+            RowItem row = (RowItem) items.removeLast();
+            items.add(new RowItem(row.setting(), row.editor(), row.note(), row.enabled(), shown));
             return this;
         }
 
@@ -150,7 +161,7 @@ public final class SchemaPage implements SettingsPage {
         var terms = new ArrayList<String>();
         terms.add(spec.title);
         for (Item item : spec.items) {
-            if (item instanceof RowItem row) {
+            if (item instanceof RowItem row && row.shown()) {
                 terms.add(row.setting().label());
                 terms.add(row.setting().description());
                 terms.add(String.join(" ", row.setting().keywords()));
@@ -178,7 +189,7 @@ public final class SchemaPage implements SettingsPage {
                     c.insets = new Insets(first ? 0 : 14, 0, 6, 0);
                     panel.add(new TitledSeparator(section.title()), c);
                 }
-                case RowItem row -> y = addRow(row, y);
+                case RowItem row -> { if (row.shown()) y = addRow(row, y); }
                 case ActionItem action -> y = addAction(action, y);
             }
             first = false;

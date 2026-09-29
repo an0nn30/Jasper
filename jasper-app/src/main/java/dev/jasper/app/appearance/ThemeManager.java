@@ -96,6 +96,8 @@ public final class ThemeManager {
             defaults.put(component + ".margin", "5,8,5,8");
         defaults.put("SplitPane.dividerSize", "8");
         defaults.put("SplitPaneDivider.border", "dev.jasper.app.workspace.SplitDividerBorder");
+        // Windows and Linux dialogs and auxiliary windows: centred titles, like the macOS title rows.
+        defaults.put("TitlePane.centerTitle", "true");
         return Collections.unmodifiableMap(defaults);
     }
 

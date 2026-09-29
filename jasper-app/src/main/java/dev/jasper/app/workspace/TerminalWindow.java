@@ -55,6 +55,7 @@ public final class TerminalWindow implements AutoCloseable {
             content.applyConfiguration(initial, SystemInfo.isMacOS);
         }
         titleBar = WindowContent.installTitleBar(frame.getRootPane(), content, MacTitleBar.isSupported(), frame::setTitle);
+        if (titleBar == null) WindowContent.installCustomTitleBar(frame.getRootPane(), content);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         if (titleBar != null) titleBar.setMenuBar(content.menuBar());
         else frame.setJMenuBar(content.menuBar());

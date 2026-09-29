@@ -131,6 +131,7 @@ name = "Jasper Dark"
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
+| `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `system.run_in_background` | `false` | Boolean | Next start (residency); live (login item) |

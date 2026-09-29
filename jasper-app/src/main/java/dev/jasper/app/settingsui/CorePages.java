@@ -52,6 +52,7 @@ public final class CorePages {
                 .row(WINDOW_TOOLBAR_HEIGHT, Editors.integer("px"))
                 .row(WINDOW_STATUS_BAR)
                 .row(WINDOW_STATUS_BAR_HEIGHT, Editors.integer("px"))
+                .row(WINDOW_NATIVE_DECORATIONS).shownWhen(!com.formdev.flatlaf.util.SystemInfo.isMacOS)
                 .section("Tabs and panels")
                 .row(WINDOW_TAB_HEIGHT, Editors.integer("px"))
                 .row(WINDOW_RAIL_WIDTH, Editors.integer("px"))

@@ -17,7 +17,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                       int maxResults, int longCommandSeconds, boolean backgroundEnabled,
                       Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
-                      int railWidth, int toolbarHeight, int statusBarHeight) {
+                      int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations) {
     /** The theme a configuration without {@code ui.theme.name} uses. */
     public static final String DEFAULT_THEME = "Jasper Dark";
     /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
@@ -70,7 +70,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                           Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
             maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, DEFAULT_RAIL_WIDTH,
-            DEFAULT_TOOLBAR_HEIGHT, DEFAULT_STATUS_BAR_HEIGHT);
+            DEFAULT_TOOLBAR_HEIGHT, DEFAULT_STATUS_BAR_HEIGHT, false);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -160,7 +160,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             values.get(CoreSettings.NOTIFICATIONS_LONG_COMMAND_SECONDS), values.get(CoreSettings.SYSTEM_RUN_IN_BACKGROUND), plugins,
             new UiFontConfig(values.get(CoreSettings.UI_FONT_FAMILY), values.get(CoreSettings.UI_FONT_SIZE)),
             values.get(CoreSettings.TERMINAL_COLORS), values.get(CoreSettings.WINDOW_RAIL_WIDTH),
-            values.get(CoreSettings.WINDOW_TOOLBAR_HEIGHT), values.get(CoreSettings.WINDOW_STATUS_BAR_HEIGHT));
+            values.get(CoreSettings.WINDOW_TOOLBAR_HEIGHT), values.get(CoreSettings.WINDOW_STATUS_BAR_HEIGHT),
+            values.get(CoreSettings.WINDOW_NATIVE_DECORATIONS));
     }
 
     public KeyBindings bindings(boolean macOs) {
@@ -191,6 +192,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private int railWidth;
         private int toolbarHeight;
         private int statusBarHeight;
+        private boolean nativeDecorations;
         private Builder(ConfigSnapshot source) {
             tabHeight = source.tabHeight();
             toolbar = source.toolbar();
@@ -211,11 +213,13 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             railWidth = source.railWidth();
             toolbarHeight = source.toolbarHeight();
             statusBarHeight = source.statusBarHeight();
+            nativeDecorations = source.nativeDecorations();
         }
         public Builder tabHeight(int value) { tabHeight = value; return this; }
         public Builder railWidth(int value) { railWidth = value; return this; }
         public Builder toolbarHeight(int value) { toolbarHeight = value; return this; }
         public Builder statusBarHeight(int value) { statusBarHeight = value; return this; }
+        public Builder nativeDecorations(boolean value) { nativeDecorations = value; return this; }
         public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
         public Builder statusBar(boolean value) { statusBar = value; return this; }
         public Builder uiFont(UiFontConfig value) { uiFont = value; return this; }
@@ -232,7 +236,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder terminalColors(TerminalColors value) { terminalColors = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth, toolbarHeight, statusBarHeight);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth, toolbarHeight, statusBarHeight, nativeDecorations);
         }
     }
 }

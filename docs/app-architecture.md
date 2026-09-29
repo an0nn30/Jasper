@@ -180,11 +180,13 @@ Javadoc and copied guide examples are normal check dependencies. See the
 Every window has a header row and `WindowTabs` below it. `WindowHeader` (workspace) centres
 `TitleSearchField` on the window and packs `WindowChrome`'s IntelliJ-style toolbar (tab/window,
 pane, plugin, then Find/Settings groups; tooltips carry live shortcuts) against the trailing edge.
-As space runs out, toolbar controls move whole into the ⋮ overflow menu, then the field shrinks to
-240 px, then it collapses to its magnifier. `toolbar = "hidden"` hides only the buttons. On macOS,
-`MacTitleBar` (platform) hosts the header in the native title row and gives it insets that keep
-clear of the traffic lights; elsewhere the header is the top row of `WindowContent` under the
-native decorations. The field shows `WindowHeaderContext` and opens the palette, which
+The field is always centred on the window; the sides give way first (toolbar labels, then controls into
+the ⋮ menu; on Windows and Linux the menus fold into "…" and then ☰), and only then does the field shrink
+and collapse to its magnifier. `toolbar = "hidden"` hides only the buttons. `TitleBarStyle` (platform) is
+chosen at startup: on macOS `MacTitleBar` hosts the header in the native title row and gives it insets
+that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds
+`CollapsingMenuBar`, which carries the header under the menus; with `window.native_decorations = true`
+the system title bar stays and the header is the top row of `WindowContent`. The field shows `WindowHeaderContext` and opens the palette, which
 `WindowCommandPalette` anchors to the field's bounds. `WindowTabs` are IntelliJ editor tabs sized
 to content with a 3 px selection underline, wheel scrolling and a ▾ list of all tabs. Each pane's
 `FindBar` is IntelliJ's single-line find row. App icons resolve from bundled assets. Since SDK

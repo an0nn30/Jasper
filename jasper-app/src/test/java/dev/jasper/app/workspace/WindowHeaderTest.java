@@ -37,41 +37,39 @@ class WindowHeaderTest {
         header.setSize(width, 30); header.doLayout(); header.toolbar().doLayout();
     }
 
-    @Test void theFieldIsCentredOnTheWindowAndTheToolbarPacksRight() {
+    @Test void theFieldIsCentredAndTheToolbarTakesTheRightSide() {
         var header = header();
         layout(header, 1400);
-        assertThat(header.toolbar().getBounds()).isEqualTo(new Rectangle(1400 - 268, 0, 268, 30));
         assertThat(header.field().getBounds()).isEqualTo(new Rectangle(420, 4, 560, 22));
-        assertThat(header.field().collapsed()).isFalse();
+        assertThat(header.toolbar().getBounds()).isEqualTo(new Rectangle(992, 0, 408, 30));
         assertThat(header.toolbar().overflowButton().isVisible()).isFalse();
     }
 
-    @Test void theFieldSlidesOffCentreBeforeAnythingShrinks() {
+    @Test void theFieldStaysCentredWhileToolbarButtonsOverflow() {
         var header = header();
         layout(header, 900);
-        assertThat(header.toolbar().getWidth()).isEqualTo(268);
-        assertThat(header.field().getBounds()).isEqualTo(new Rectangle(60, 4, 560, 22));
+        assertThat(header.field().getBounds()).isEqualTo(new Rectangle(170, 4, 560, 22));
+        assertThat(header.toolbar().getBounds()).isEqualTo(new Rectangle(742, 0, 158, 30));
+        assertThat(header.toolbar().overflowButton().isVisible()).isTrue();
+        layout(header, 700);
+        assertThat(header.field().getBounds()).isEqualTo(new Rectangle(70, 4, 560, 22));
+        assertThat(header.toolbar().getWidth()).isEqualTo(58);
     }
 
-    @Test void toolbarButtonsOverflowThenTheFieldShrinksThenItCollapses() {
+    @Test void theFieldShrinksAroundTheCentreOnlyWhenASideCannotGiveWayAndThenCollapses() {
         var header = header();
-        layout(header, 700);
-        assertThat(header.toolbar().getWidth()).as("room after the field's preferred width").isEqualTo(116);
-        assertThat(header.toolbar().overflowButton().isVisible()).isTrue();
-        assertThat(header.field().getWidth()).as("the field has not shrunk yet").isEqualTo(560);
-        layout(header, 500);
-        assertThat(header.toolbar().getWidth()).isEqualTo(40);
-        assertThat(header.field().getWidth()).isEqualTo(436);
+        layout(header, 600);
+        assertThat(header.field().getBounds()).isEqualTo(new Rectangle(52, 4, 496, 22));
         assertThat(header.field().collapsed()).isFalse();
         layout(header, 250);
         assertThat(header.field().collapsed()).isTrue();
-        assertThat(header.field().getSize()).isEqualTo(new Dimension(22, 22));
+        assertThat(header.field().getBounds()).isEqualTo(new Rectangle(114, 4, 22, 22));
         layout(header, 1400);
-        assertThat(header.field().collapsed()).as("widening restores it").isFalse();
+        assertThat(header.field().collapsed()).isFalse();
         assertThat(header.field().getWidth()).isEqualTo(560);
     }
 
-    @Test void aHiddenToolbarLeavesTheFieldAndInsetsKeepClearOfNativeControls() {
+    @Test void aHiddenToolbarAndInsetsLeaveTheFieldCentred() {
         var header = header();
         header.toolbar().setVisible(false);
         layout(header, 900);
@@ -80,10 +78,33 @@ class WindowHeaderTest {
         header.toolbar().setVisible(true);
         header.setBorder(BorderFactory.createEmptyBorder(0, 100, 0, 50));
         layout(header, 1400);
+        assertThat(header.field().getX()).isEqualTo(420);
         assertThat(header.toolbar().getX() + header.toolbar().getWidth()).isEqualTo(1350);
-        assertThat(header.field().getX()).as("still centred on the whole header").isEqualTo(420);
-        assertThat(header.getMinimumSize().width).isEqualTo(150 + 2 * 12 + 22 + 40);
-        assertThat(header.getPreferredSize().height).isEqualTo(30);
+        assertThat(header.getMinimumSize().width).as("symmetric around the centre").isEqualTo(2 * (100 + 12) + 22);
+    }
+
+    @Test void theLeadingSideGetsTheRoomLeftOfTheFieldAndItsMinimumCanShrinkTheField() {
+        var header = header();
+        var room = new AtomicInteger(-1);
+        header.setLeading(space -> { room.set(space); return Math.min(space, 300); }, () -> 100);
+        layout(header, 1400);
+        assertThat(room).hasValue(408);
+        assertThat(header.field().getX()).isEqualTo(420);
+        layout(header, 600);
+        assertThat(header.field().getBounds()).isEqualTo(new Rectangle(112, 4, 376, 22));
+        assertThat(room).hasValue(100);
+    }
+
+    @Test void theCentreIsTheRootPanesNotTheHeaders() {
+        var header = header();
+        var root = new JRootPane();
+        var content = new JPanel(null);
+        root.setContentPane(content);
+        root.setSize(1400, 800); root.doLayout(); root.getLayeredPane().doLayout();
+        content.add(header);
+        header.setBounds(100, 0, 1000, 30); header.doLayout();
+        assertThat(header.centre()).isEqualTo(600);
+        assertThat(header.field().getX()).isEqualTo(600 - 280);
     }
 
     @Test void barHeightChangesAreForwarded() {
