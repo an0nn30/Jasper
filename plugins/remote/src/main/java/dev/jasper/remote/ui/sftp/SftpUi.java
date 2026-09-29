@@ -93,6 +93,25 @@ public final class SftpUi implements AutoCloseable {
     public void onFollowRequested(Consumer<UUID> listener) { followRequested=listener; }
     /** Sends files to the Editor. Call before any panel opens, and only when the Editor is installed. */
     public void editing(RemoteEditing editing) { this.editing=editing; }
+    /**
+     * Open Remote File…: a modal picker whose files open in the Editor, starting on {@code identity} at {@code directory}
+     * (the home folder when blank), or with no host chosen. Does nothing without the Editor.
+     */
+    public void openRemoteFile(WindowHandle window,Optional<ConnectionIdentity> identity,String directory) {
+        if(closed || editing==null) return;
+        var dialog=context.windows().dialog(new DialogSpec("Open Remote File",window,true));dialogs.add(dialog);
+        var reference=new java.util.concurrent.atomic.AtomicReference<RemoteFilePicker>();
+        Supplier<EditorOpening.Browser> browser=()-> { var picker=reference.get();return new EditorOpening.Browser(ui,()->!closed && window.isOpen() && !picker.closed(),
+            capture->picker.capture().filter(now->now.identity().equals(capture.identity()) && now.directory().equals(capture.directory())).isPresent(),picker::error,picker::navigate,dialog::close); };
+        var picker=new RemoteFilePicker(hosts.get(),context.dataDirectory().resolve("browser-cache"),background,ui,context.appearance()::icon,
+            id->connections.resolveIdentity(id,window),value->endpoints.open(Optional.of(value),window,status->{}),
+            (capture,entry)->EditorOpening.activate(editing,browser.get(),capture,entry,window),capture->EditorOpening.openSelected(editing,browser.get(),capture,window),dialog::close);
+        reference.set(picker);
+        dialog.onClosed(()-> { dialogs.remove(dialog);picker.close(); });
+        dialog.setContent(picker);
+        identity.ifPresent(value->picker.start(value,directory));
+        dialog.show();
+    }
     /** True while any visible view follows {@code pane}. */
     public boolean following(UUID pane) { return views.values().stream().anyMatch(view->view.controller().following(pane)); }
     public void notice(UUID pane,String text) { for(var view:views.values()) view.controller().notice(pane,text); }
