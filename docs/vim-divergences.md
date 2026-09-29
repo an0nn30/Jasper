@@ -161,3 +161,7 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   strings. `:MatchEnable`, `:MatchDisable` and `:MatchDebug` are not there, and `g:no_plugin_maps` counts only when it
   is not 0. 'matchpairs' gains the pairs the language's filetype plugin adds (`<:>` for HTML) whether matchit is on
   or not.
+- **sneak** has no label mode (`<Plug>SneakLabel_s`, `g:sneak#label`), no `g:sneak#prompt` and no not-found message.
+  `.` repeats the keys rather than vim-repeat's `<Plug>SneakRepeat`, with the same result. A letter finds the letters
+  whose Unicode decomposition starts with it (`e` finds `é`), where Vim has its own table. Its default mappings check
+  each mode on its own, and `,` does not move to `\` when you have mapped `,`.

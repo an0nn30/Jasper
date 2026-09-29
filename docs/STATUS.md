@@ -2,6 +2,12 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V4d** (branch `claude/vim-v4d`, plan
+  `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4d.md`, written 2026-09-29): sneak, the last of spec 8's extensions (`s`, `S`, `z`,
+  `Z`, `;`, `,`, vertical scope, the one-character `<Plug>Sneak_f` forms; no label mode), on motions that read their
+  keys first (`VimCommands.motionWithKeys`). Every file in the plan was compiled and run against Vim 9.1 with the
+  pinned sneak before the plan was written: 2211 corpus cases (47 new), with and without a final line break.
+  - Not done: executing the plan; GUI checks 110–114 of the [checklist](editor-verification.md) (user-run); push.
 - **Editor Vim mode, plan V4c** (branch `claude/vim-v4c`, plan
   `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4c.md`, written 2026-09-29): matchit, ported from Vim 9.1's matchit.vim (`%`, `g%`,
   `[%`, `]%`, Visual `a%`; `set matchit`, `packadd matchit`), with the languages' `b:match_*` from Vim's filetype

@@ -170,7 +170,10 @@ recorded corpus.
   `if`, `else` and `fi` in shell scripts, a tag and its end tag in HTML and XML, `\begin` and `\end` in TeX, `#if`
   and `#endif` and `/*` and `*/` everywhere; `g%` goes the other way, `[%` and `]%` to the start and end of the group
   around the cursor, and Visual `a%` takes it. Matches in comments and strings are passed over.
-- Not yet: sneak. It follows in a later release. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
+- `set sneak` (opt-in, as it takes over `s` and `S`): `s` and two characters goes to the next place they stand together,
+  `S` back; after an operator `z` and `Z` do the same (`dzab`); `;` and `,` repeat it, and after `f` or `t` they are
+  Vim's again. A count keeps `s` to the columns near the cursor (`5sab`). The matches ahead are drawn until the
+  cursor moves on. Map `f` and `t` to `<Plug>Sneak_f` and `<Plug>Sneak_t` for one-character sneaks that `;` repeats. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 

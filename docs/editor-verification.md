@@ -148,3 +148,11 @@ unverified.
 - [ ] 107. `d%` on `#if` deletes up to and including `#else`; `u` undoes it in one step.
 - [ ] 108. Visual `a%` on a word inside parentheses selects the parentheses and what is between them.
 - [ ] 109. `/\(foo\)\@<=bar` finds the `bar` of `foobar` and not a `bar` alone.
+
+## Vim mode (plan V4d)
+
+- [ ] 110. With `set sneak` in the vimrc, `s` and two characters jumps to them, the other matches ahead are drawn in magenta, and `l` clears them.
+- [ ] 111. `;` goes on to the next match, `,` back; after `fx`, `;` repeats the `f` again.
+- [ ] 112. `dzab` deletes up to `ab`; `.` repeats it at the next `ab`.
+- [ ] 113. `v` then `sab` extends the Visual area to `ab`.
+- [ ] 114. `3sab` only stops at an `ab` within about three columns of the cursor.
