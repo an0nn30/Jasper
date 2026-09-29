@@ -416,31 +416,18 @@ final class TextObjects {
                     colEnd = cursor.col;
                 }
             }
-        } else if (at(line, colStart) == quote || !visEmpty) {
+        } else {
             int firstCol = colStart;
             if (!visEmpty) firstCol = visBefore ? nextQuote(line, colStart, quote, false) : previousQuote(line, colStart, quote, false);
-            colStart = 0;
-            while (true) {
-                colStart = nextQuote(line, colStart, quote, false);
-                if (colStart < 0 || colStart > firstCol) return null;
-                colEnd = nextQuote(line, colStart + 1, quote, true);
-                if (colEnd < 0) return null;
-                if (colStart <= firstCol && firstCol <= colEnd) break;
-                colStart = colEnd + 1;
-            }
-        } else {
-            colStart = previousQuote(line, colStart, quote, true);
-            if (at(line, colStart) != quote) {
-                colStart = nextQuote(line, colStart, quote, false);
-                if (colStart < 0) return null;
-            }
-            colEnd = nextQuote(line, colStart + 1, quote, true);
-            if (colEnd < 0) return null;
+            int[] pair = at(line, colStart) == quote || !visEmpty ? pairAround(line, firstCol, quote) : pairFrom(line, colStart, quote);
+            if (pair == null) return null;
+            colStart = pair[0];
+            colEnd = pair[1];
         }
         if (include) {
-            if (white(at(line, colEnd + 1))) {
-                while (white(at(line, colEnd + 1))) colEnd++;
-            } else while (colStart > 0 && white(at(line, colStart - 1))) colStart--;
+            int[] area = withWhite(line, colStart, colEnd);
+            colStart = area[0];
+            colEnd = area[1];
         }
         if (!include && c.count < 2 && (visEmpty || !insideQuotes)) colStart++;
         Pos start = new Pos(cursor.line, colStart);
@@ -470,6 +457,47 @@ final class TextObjects {
             return visual(c, newVisual, newCursor, charwise(c));
         }
         return new Span(start, end, inclusive ? Kind.INCLUSIVE : Kind.EXCLUSIVE);
+    }
+
+    /** The quoted string holding {@code firstCol}, a quote itself, counting pairs of quotes from the line's start. */
+    private static int[] pairAround(String line, int firstCol, char quote) {
+        int colStart = 0;
+        while (true) {
+            colStart = nextQuote(line, colStart, quote, false);
+            if (colStart < 0 || colStart > firstCol) return null;
+            int colEnd = nextQuote(line, colStart + 1, quote, true);
+            if (colEnd < 0) return null;
+            if (colStart <= firstCol && firstCol <= colEnd) return new int[] { colStart, colEnd };
+            colStart = colEnd + 1;
+        }
+    }
+
+    /** The quoted string {@code col} is in (from the quote before it), or else the next one on the line. */
+    private static int[] pairFrom(String line, int col, char quote) {
+        int colStart = previousQuote(line, col, quote, true);
+        if (at(line, colStart) != quote) {
+            colStart = nextQuote(line, colStart, quote, false);
+            if (colStart < 0) return null;
+        }
+        int colEnd = nextQuote(line, colStart + 1, quote, true);
+        return colEnd < 0 ? null : new int[] { colStart, colEnd };
+    }
+
+    /** {@code a"}'s white space: after the closing quote, or before the opening one when there is none after. */
+    private static int[] withWhite(String line, int colStart, int colEnd) {
+        if (white(at(line, colEnd + 1))) while (white(at(line, colEnd + 1))) colEnd++;
+        else while (colStart > 0 && white(at(line, colStart - 1))) colStart--;
+        return new int[] { colStart, colEnd };
+    }
+
+    /**
+     * What {@code v} then {@code a"} selects at {@code col} (current_quote with an empty Visual area), on a line
+     * that need not be the text's: the string and its white space, as {@code {start, end}}, both included; null
+     * when there is none.
+     */
+    static int[] aroundQuote(String line, int col, char quote) {
+        int[] pair = at(line, col) == quote ? pairAround(line, col, quote) : pairFrom(line, col, quote);
+        return pair == null ? null : withWhite(line, pair[0], pair[1]);
     }
 
     private static char at(String line, int col) { return col >= 0 && col < line.length() ? line.charAt(col) : 0; }

@@ -33,6 +33,8 @@ final class Machine {
     private Visual.Redo recordVisual, visualRedo;
     /** Whether the Visual area an operator is about to act on is one an extension's object selected. */
     private boolean objectArea;
+    /** Where the undo step's cursor is, when an extension's script changed the text before the operator did. */
+    private Pos undoCursor;
     /** The command line typed for the motion being run ({@code /pattern}), or null. */
     private String line;
     private boolean recordingInsert, replaying, resumeReplace;
@@ -317,6 +319,12 @@ final class Machine {
         }
     }
 
+    /**
+     * An extension's script changed the text (and put it back) before the pending operator changes it: the undo
+     * step remembers the cursor as it was then, where {@code u} puts it back.
+     */
+    void undoCursor(Pos at) { undoCursor = at.copy(); }
+
     /** A Visual-mode change that is not an operator (put): records it for {@code .} with the area's size. */
     void visualChange(Visual.Redo redo) {
         visualRedo = redo;
@@ -531,7 +539,9 @@ final class Machine {
         VimCommands.Entry entry = vim.commands().normal(operator);
         vim.covered(entry.id());
         editor.setCursor(span.start(), true);
-        editor.area().vimUndo().stepCursor(span.start().line, span.start().col);
+        Pos at = undoCursor != null ? undoCursor : span.start();
+        undoCursor = null;
+        editor.area().vimUndo().stepCursor(at.line, at.col);
         ((VimCommands.Operator) entry.handler()).apply(context, span);
         setChangeMarks(span);
     }
@@ -712,6 +722,7 @@ final class Machine {
         shorter = null;
         suspended = false;
         suspendedChange = false;
+        undoCursor = null;
         shown.clear();
         if (!recordingInsert) record.clear();
     }

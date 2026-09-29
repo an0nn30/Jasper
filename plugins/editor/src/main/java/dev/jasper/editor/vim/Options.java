@@ -27,6 +27,7 @@ public final class Options {
 
     /** Every option this version knows. */
     static final List<Def> DEFS = List.of(
+        new Def("argtextobj", "argtextobj", Type.BOOLEAN, false, false),
         new Def("autoindent", "ai", Type.BOOLEAN, false, true),
         new Def("backspace", "bs", Type.STRING, "indent,eol,start", false),
         new Def("belloff", "bo", Type.STRING, "", false),

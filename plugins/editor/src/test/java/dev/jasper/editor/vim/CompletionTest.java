@@ -49,7 +49,9 @@ class CompletionTest {
             assertThat(matches(editor, "set sh")).containsExactly("shiftround", "shiftwidth", "showcmd", "showmode");
             assertThat(matches(editor, "setl nowr")).containsExactly("nowrap", "nowrapscan");
             assertThat(matches(editor, "set invhl")).containsExactly("invhlsearch");
-            assertThat(matches(editor, "set a")).containsExactly("all", "autoindent");
+            assertThat(matches(editor, "set a")).containsExactly("all", "argtextobj", "autoindent");
+            assertThat(matches(editor, "set textobj-")).as("IdeaVim's switches have hyphens").containsExactly("textobj-entire", "textobj-indent");
+            assertThat(matches(editor, "set notextobj-e")).containsExactly("notextobj-entire");
             assertThat(matches(editor, "set ts=")).containsExactly("8");
             assertThat(Completion.complete(editor, "set ts=").start()).isEqualTo(7);
             assertThat(matches(editor, "set et=")).as("a boolean has no value").isEmpty();

@@ -358,6 +358,8 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>textobj-indent-aI` (text object) | the lines at the cursor's indent and deeper, and the lines above and below (`aI`) |
 | `<Plug>textobj-indent-ii` (text object) | the lines at the cursor's indent and deeper (`ii`) |
 | `<Plug>textobj-indent-iI` (text object) | the lines at the cursor's indent and deeper (`iI`) |
+| `<Plug>InnerArgument` (text object) | the function argument at the cursor (`ia`, with `set argtextobj`) |
+| `<Plug>OuterArgument` (text object) | the function argument with its comma and the space after it (`aa`) |
 | `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
 | `<Plug>VSurround` (Visual) | surround the Visual area with {char} (`S`) |
 | `<Plug>VgSurround` (Visual) | surround the Visual area with {char}, the other way about lines (`gS`) |

@@ -62,7 +62,10 @@ final class Extensions {
             map("omap", "ai", "<Plug>textobj-indent-ai"), map("omap", "ii", "<Plug>textobj-indent-ii"),
             map("xmap", "ai", "<Plug>textobj-indent-ai"), map("xmap", "ii", "<Plug>textobj-indent-ii"),
             map("omap", "aI", "<Plug>textobj-indent-aI"), map("omap", "iI", "<Plug>textobj-indent-iI"),
-            map("xmap", "aI", "<Plug>textobj-indent-aI"), map("xmap", "iI", "<Plug>textobj-indent-iI"))));
+            map("xmap", "aI", "<Plug>textobj-indent-aI"), map("xmap", "iI", "<Plug>textobj-indent-iI"))),
+        new Extension("argtextobj", "vim-scripts/argtextobj.vim", null, Check.NONE, List.of(
+            map("xmap", "ia", "<Plug>InnerArgument"), map("xmap", "aa", "<Plug>OuterArgument"),
+            map("omap", "ia", "<Plug>InnerArgument"), map("omap", "aa", "<Plug>OuterArgument"))));
 
     private final Vim vim;
     /** The default mappings each switched-on extension added. */
