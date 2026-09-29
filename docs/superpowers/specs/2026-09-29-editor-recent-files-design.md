@@ -88,7 +88,10 @@ default Subscription reopener(String keyPrefix, Function<String, Optional<Functi
   SDK". No SDK change.
 
 **Remote's reopener.** In `RemotePlugin`, inside the block that constructs `RemoteEditing` (so it exists only when the
-Editor is installed), Remote registers `remote:` and keeps the subscription to close in `stop()`.
+Editor is installed), Remote calls `RemoteEditing.registerReopener()`, which registers `remote:` and returns the SDK
+`Subscription` that `stop()` closes. An Editor older than 0.4 has no `reopener` method, so the call throws
+`NoSuchMethodError`; Remote catches it and keeps no recent files for that Editor. `RemoteEditing` gains a constructor
+parameter that finds a saved host by id in memory (`store.hosts()`).
 
 - `RemoteDocument.parseKey(String key)` is the inverse of `RemoteDocument.key(identity, path)`: it returns the hop list
   (saved-host id and login per hop, target first) and the path, or empty when the key is malformed. The key format is
@@ -114,11 +117,11 @@ Editor is installed), Remote registers `remote:` and keeps the subscription to c
 - **Search:** the empty query lists entries newest first. A query matches case-insensitively as a substring of the
   name, the host or the location; rows whose name matches come before rows that match only the host or location, each
   group newest first. At most `context.maxResults()` rows.
-- **Rows:** id = key; title = name; tag = host (remote entries only); detail = location; token = the entry. A row whose
+- **Rows:** id = the SHA-256 of the key in hex (row ids are at most 256 characters; keys may be longer); title = name; tag = host (remote entries only); detail = location; token = the entry. A row whose
   key cannot be resolved (no reopener for its prefix, or the resolver returns empty) is shown with
   `withEnabled(false)` and the detail "Can't reopen: host or plugin unavailable · <location>".
 - **Verbs:** `OPEN` ("Open", Enter) resolves the key again and calls the Editor window's `open(document,
-  context.window())`. `REMOVE` ("Remove from recent files") removes the entry. `available` allows `REMOVE` on every
+  context.window())`. `REMOVE` ("Remove from recent files", the second verb, so Cmd/Ctrl+Enter) removes the entry. `available` allows `REMOVE` on every
   row and `OPEN` only when the key resolves now.
 - **Local files** always resolve, because the scope may not touch the disk; a file that no longer exists fails on open
   with the Editor's usual "not found" notice, and its entry stays until removed.
@@ -144,8 +147,8 @@ In `EditorSettings.Declared` and `plugins/editor/src/main/resources/settings.tom
 - Remote names Editor types only in `dev.jasper.remote.edit` (`RemoteDocument`, `RemoteEditing`), as today;
   `RemotePlugin` calls `RemoteEditing.reopen` through a signature that names no Editor type, so Remote still loads
   without the Editor.
-- No SDK change. The Editor's manifest `version` becomes `0.4.0`; Remote's use of the new default method needs no
-  manifest change, since an older Editor's default returns a no-op.
+- No SDK change. The Editor's manifest `version` becomes `0.4.0` and Remote's `0.6.2`; Remote's requirement on the
+  Editor stays `>=0.2`, since it tolerates an older Editor (see Remote's reopener).
 
 ## Testing
 
