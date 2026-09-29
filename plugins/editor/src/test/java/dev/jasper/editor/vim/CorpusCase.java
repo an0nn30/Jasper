@@ -15,6 +15,8 @@ import java.util.Map;
  *     for none. The recorder loads each one's plugin, at the commit {@code vim-oracle.properties} pins
  * @param let {@code :let} commands run before the extensions' plugins load ({@code g:surround_no_mappings = 1}),
  *     one for each {@code let:} line
+ * @param filetype Vim's name for the text's language ({@code html}): the tab gets the RSyntaxTextArea style
+ *     {@link MatchitLanguages} gives it, and the recorder has Vim load its filetype plugin and syntax; null for none
  * @param given registers set first
  * @param text the starting lines
  * @param line the cursor's line, 1-based
@@ -27,7 +29,7 @@ import java.util.Map;
  * @param output whether what the keys said (messages, listings, errors) is compared
  * @param expected what Vim did, or null when the case has not been recorded
  */
-record CorpusCase(String file, String name, String divergent, String set, String ext, List<String> let, Map<Character, Register> given, List<String> text,
+record CorpusCase(String file, String name, String divergent, String set, String ext, List<String> let, String filetype, Map<Character, Register> given, List<String> text,
                   int line, int col, String keys, List<Character> registers, String window, String folds, boolean output, Expected expected) {
     /**
      * A register's content as the corpus writes it.
@@ -74,7 +76,7 @@ record CorpusCase(String file, String name, String divergent, String set, String
                     String view, String folds, List<String> output) { }
 
     CorpusCase withExpected(Expected value) {
-        return new CorpusCase(file, name, divergent, set, ext, let, given, text, line, col, keys, registers, window, folds, output, value);
+        return new CorpusCase(file, name, divergent, set, ext, let, filetype, given, text, line, col, keys, registers, window, folds, output, value);
     }
 
     /** @return the extensions switched on, from {@link #ext} */

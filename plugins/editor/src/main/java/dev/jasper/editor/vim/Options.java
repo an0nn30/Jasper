@@ -50,6 +50,7 @@ public final class Options {
         new Def("iskeyword", "isk", Type.STRING, "@,48-57,_,192-255", true),
         new Def("joinspaces", "js", Type.BOOLEAN, true, false),
         new Def("laststatus", "ls", Type.NUMBER, 1, false),
+        new Def("matchit", "matchit", Type.BOOLEAN, false, false),
         new Def("matchpairs", "mps", Type.STRING, "(:),{:},[:]", true),
         new Def("maxmapdepth", "mmd", Type.NUMBER, 1000, false),
         new Def("mouse", "mouse", Type.STRING, "", false),

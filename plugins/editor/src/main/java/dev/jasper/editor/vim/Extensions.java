@@ -66,7 +66,15 @@ final class Extensions {
         new Extension("argtextobj", "vim-scripts/argtextobj.vim", null, Check.NONE, List.of(
             map("xmap", "ia", "<Plug>InnerArgument"), map("xmap", "aa", "<Plug>OuterArgument"),
             map("omap", "ia", "<Plug>InnerArgument"), map("omap", "aa", "<Plug>OuterArgument"))),
-        new Extension("highlightedyank", "machakann/vim-highlightedyank", null, Check.NONE, List.of()));
+        new Extension("highlightedyank", "machakann/vim-highlightedyank", null, Check.NONE, List.of()),
+        new Extension("matchit", "chrisbra/matchit", "no_plugin_maps", Check.NONE, List.of(
+            map("nmap", "%", "<Plug>(MatchitNormalForward)"), map("nmap", "g%", "<Plug>(MatchitNormalBackward)"),
+            map("xmap", "%", "<Plug>(MatchitVisualForward)"), map("xmap", "g%", "<Plug>(MatchitVisualBackward)"),
+            map("omap", "%", "<Plug>(MatchitOperationForward)"), map("omap", "g%", "<Plug>(MatchitOperationBackward)"),
+            map("nmap", "[%", "<Plug>(MatchitNormalMultiBackward)"), map("nmap", "]%", "<Plug>(MatchitNormalMultiForward)"),
+            map("xmap", "[%", "<Plug>(MatchitVisualMultiBackward)"), map("xmap", "]%", "<Plug>(MatchitVisualMultiForward)"),
+            map("omap", "[%", "<Plug>(MatchitOperationMultiBackward)"), map("omap", "]%", "<Plug>(MatchitOperationMultiForward)"),
+            map("xmap", "a%", "<Plug>(MatchitVisualTextObject)"))));
 
     private final Vim vim;
     /** The default mappings each switched-on extension added. */

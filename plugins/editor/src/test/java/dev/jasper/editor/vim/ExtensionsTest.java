@@ -177,4 +177,35 @@ class ExtensionsTest {
                 .as("switching off keeps the user's own").hasSize(1);
         });
     }
+
+    @Test void matchitSwitchesOnWithPackaddAsWell() throws Exception {
+        onEdt(() -> {
+            var editor = editor("(a)\n");
+            type(editor, ":packadd matchit<CR>");
+            assertThat(editor.options().flag("matchit")).isTrue();
+            assertThat(mapped(editor, Mappings.NORMAL, "%")).isTrue();
+            assertThat(mapped(editor, Mappings.VISUAL, "a%")).isTrue();
+            type(editor, ":packadd nothing<CR>");
+            assertThat(editor.message()).isEqualTo("E919: Directory not found in 'packpath': \"pack/*/opt/nothing\"");
+            var plugged = editor("x\n");
+            type(plugged, ":Plug 'chrisbra/matchit'<CR>");
+            assertThat(plugged.options().flag("matchit")).isTrue();
+        });
+    }
+
+    @Test void matchpairsFollowTheLanguageAsItsFiletypePluginAddsThem() throws Exception {
+        onEdt(() -> {
+            var editor = editor("<a>\n");
+            var area = (org.fife.ui.rsyntaxtextarea.RSyntaxTextArea) editor.area();
+            area.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_HTML);
+            assertThat(editor.options().string("matchpairs")).as("html adds <:>").isEqualTo("(:),{:},[:],<:>");
+            area.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);
+            assertThat(editor.options().string("matchpairs")).isEqualTo("(:),{:},[:]");
+            type(editor, ":set mps+=\u00ab:\u00bb<CR>");
+            area.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);
+            assertThat(editor.options().string("matchpairs")).as("added to the global value").isEqualTo("(:),{:},[:],\u00ab:\u00bb,<:>");
+            assertThat(MatchitLanguages.byFiletype("sh")).map(MatchitLanguages.Language::style).contains(SyntaxConstants.SYNTAX_STYLE_UNIX_SHELL);
+            assertThat(MatchitLanguages.of(SyntaxConstants.SYNTAX_STYLE_HTML).words()).contains("<\\@<=/\\1>");
+        });
+    }
 }

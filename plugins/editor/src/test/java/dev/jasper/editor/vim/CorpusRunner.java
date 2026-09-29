@@ -44,6 +44,8 @@ final class CorpusRunner {
         area.setText(String.join("\n", c.text()) + (finalBreak ? "\n" : ""));
         area.discardAllEdits();
         if (c.folds() != null) javaFolds(area, c.closedAtStart());
+        if (c.filetype() != null) area.setSyntaxEditingStyle(MatchitLanguages.byFiletype(c.filetype())
+            .orElseThrow(() -> new IllegalStateException(c + ": no language for filetype " + c.filetype())).style());
         var editor = new VimEditor(vim, area, EditorDefaults.VIM);
         // Vim's window when the recorder starts: 80 columns, 23 rows (24 lines, one for the command line).
         int[] size = c.window() != null ? c.windowSize() : new int[] { 80, 23 };

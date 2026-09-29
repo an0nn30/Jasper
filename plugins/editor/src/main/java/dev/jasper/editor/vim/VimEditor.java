@@ -82,6 +82,8 @@ public final class VimEditor {
     };
     /** The text exchange's first {@code cx} marked (the plugin's b:exchange), or null. */
     private Exchange.Region exchange;
+    /** Whether the tab's 'matchpairs' has pairs its language added. */
+    private boolean languagePairs;
     /** The highlightedyank extension's highlight of the last yank. */
     private final HighlightedYank highlightedYank = new HighlightedYank(this);
     /** A new language gives the tab its line comment as 'commentstring'. */
@@ -161,9 +163,17 @@ public final class VimEditor {
 
     /**
      * The tab's language changed: 'commentstring' becomes its line comment ({@code //%s}, {@code <!--%s-->}), as a
-     * filetype plugin sets it in Vim; a language with none keeps the value it had.
+     * filetype plugin sets it in Vim; a language with none keeps the value it had. The pairs a language's filetype
+     * plugin adds to 'matchpairs' ({@code setlocal matchpairs+=<:>} for HTML) are added to the global value.
      */
     private void languageChanged() {
+        List<String> added = MatchitLanguages.of(this).addedPairs();
+        if (!added.isEmpty() || languagePairs) {
+            List<String> pairs = new ArrayList<>(List.of(vim.options().string("matchpairs").split(",")));
+            for (String pair : added) if (!pairs.contains(pair)) pairs.add(pair);
+            options.setLocal("matchpairs", String.join(",", pairs));
+            languagePairs = !added.isEmpty();
+        }
         if (!(area.getDocument() instanceof org.fife.ui.rsyntaxtextarea.RSyntaxDocument document)) return;
         String[] tokens = document.getLineCommentStartAndEnd(0);
         if (tokens == null || tokens[0] == null) return;
