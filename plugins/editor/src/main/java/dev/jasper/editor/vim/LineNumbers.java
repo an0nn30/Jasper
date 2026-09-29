@@ -11,8 +11,8 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 /**
  * 'number' and 'relativenumber' on the text area's gutter (spec 5.4). The gutter shows line numbers while either is
  * on; with 'relativenumber' each line shows its distance from the cursor line, counting a closed fold as one line,
- * and the cursor line shows its own number with 'number' and 0 without. When Vim turns off, the gutter is put back
- * as it was.
+ * and the cursor line shows its own number with 'number' and 0 without. The text area's row after a final line break
+ * is not a line (see {@link Buffer}) and shows no number. When Vim turns off, the gutter is put back as it was.
  */
 final class LineNumbers {
     private final VimEditor editor;
@@ -24,7 +24,7 @@ final class LineNumbers {
     private int shownLine = -1;
     private final HierarchyListener moved = event -> find();
     private final CaretListener caret = event -> caretMoved();
-    private final LineNumberFormatter relative = new LineNumberFormatter() {
+    private final LineNumberFormatter vimNumbers = new LineNumberFormatter() {
         @Override public String format(int lineNumber) { return LineNumbers.this.format(lineNumber); }
 
         @Override public int getMaxLength(int maxLineNumber) { return LineNumberList.DEFAULT_LINE_NUMBER_FORMATTER.getMaxLength(maxLineNumber); }
@@ -59,7 +59,7 @@ final class LineNumbers {
         boolean number = options.flag("number"), relativeNumber = options.flag("relativenumber");
         pane.setLineNumbersEnabled(number || relativeNumber);
         Gutter gutter = pane.getGutter();
-        gutter.setLineNumberFormatter(relativeNumber ? relative : originalFormatter);
+        gutter.setLineNumberFormatter(vimNumbers);
         gutter.repaint();
     }
 
@@ -72,8 +72,13 @@ final class LineNumbers {
         pane.getGutter().repaint();
     }
 
-    /** @return what 'relativenumber' shows for a line (1-based) */
+    /**
+     * @return what the gutter shows for a line (1-based): nothing on the text area's row after a final line break,
+     *     which is not a line in Vim; the distance from the cursor line with 'relativenumber'; else the number
+     */
     String format(int lineNumber) {
+        if (lineNumber > editor.buffer().count()) return "";
+        if (!editor.options().flag("relativenumber")) return originalFormatter.format(lineNumber);
         int cursor = editor.cursor().line + 1;
         if (lineNumber == cursor) return editor.options().flag("number") ? Integer.toString(lineNumber) : "0";
         int from = Math.min(lineNumber, cursor), to = Math.max(lineNumber, cursor);

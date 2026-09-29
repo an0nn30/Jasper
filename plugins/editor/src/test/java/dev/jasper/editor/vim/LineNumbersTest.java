@@ -36,6 +36,24 @@ class LineNumbersTest {
         });
     }
 
+    @Test void theRowAfterAFinalLineBreakHasNoNumber() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var area = new VimTextArea();
+            area.setText("");
+            var pane = new RTextScrollPane(area);
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            type(editor, "i<CR>");
+            var formatter = pane.getGutter().getLineNumberFormatter();
+            assertThat(formatter.format(1)).isEqualTo("1");
+            assertThat(formatter.format(2)).isEqualTo("2");
+            assertThat(formatter.format(3)).as("the text area's row after the final break is not a line").isEmpty();
+            type(editor, "<Esc>:set rnu<CR>");
+            assertThat(formatter.format(3)).isEmpty();
+            editor.close();
+            assertThat(pane.getGutter().getLineNumberFormatter()).isSameAs(LineNumberList.DEFAULT_LINE_NUMBER_FORMATTER);
+        });
+    }
+
     @Test void aClosedFoldCountsAsOneLine() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var area = new VimTextArea();
