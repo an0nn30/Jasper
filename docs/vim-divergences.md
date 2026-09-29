@@ -18,6 +18,7 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 | ex-substitute.case | s expression is not available | Jasper has no expressions: \= in a substitute string fails with E319 (docs/vim-divergences.md) |
 | mappings.case | nowait does not wait for a longer mapping | the recorder types every key at once, so Vim sees ab whole and never waits; Jasper gets the keys one at a time, as typing does |
 | macros.case | q colon is not a register | Jasper has no command-line window; q: fails (docs/vim-divergences.md) |
+| ext-paragraph-motion.case | the default mappings | the extension's mappings go to its <Plug> commands, where the plugin's call its function (docs/vim-divergences.md) |
 
 ## Other differences
 

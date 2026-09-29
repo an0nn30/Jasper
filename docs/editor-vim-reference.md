@@ -349,6 +349,8 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>(Exchange)` (operator) | mark {motion}'s text for an exchange, or swap it with the text marked (`cx`, with `set exchange`) |
 | `<Plug>(ExchangeLine)` (Normal) | exchange [count] lines (`cxx`) |
 | `<Plug>(ExchangeClear)` (Normal) | forget the text marked for an exchange (`cxc`) |
+| `<Plug>(ParagraphNextMotion)` (Normal) | forward [count] paragraphs, lines of white space ending them too (`}`, with `set vim-paragraph-motion`) |
+| `<Plug>(ParagraphPrevMotion)` (Normal) | back [count] paragraphs, lines of white space ending them too (`{`) |
 | `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
 | `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
 | `<Plug>VSurround` (Visual) | surround the Visual area with {char} (`S`) |

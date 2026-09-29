@@ -70,6 +70,7 @@ public final class VimCommands {
         Commentary.register(commands);
         Surround.register(commands);
         Exchange.register(commands);
+        ParagraphMotion.register(commands);
         return commands;
     }
 

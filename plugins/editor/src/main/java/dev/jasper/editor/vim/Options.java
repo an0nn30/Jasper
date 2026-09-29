@@ -78,6 +78,7 @@ public final class Options {
         new Def("ttimeout", "ttimeout", Type.BOOLEAN, false, false),
         new Def("ttimeoutlen", "ttm", Type.NUMBER, -1, false),
         new Def("undolevels", "ul", Type.NUMBER, 1000, false),
+        new Def("vim-paragraph-motion", "vim-paragraph-motion", Type.BOOLEAN, false, false),
         new Def("visualbell", "vb", Type.BOOLEAN, false, false),
         new Def("whichwrap", "ww", Type.STRING, "b,s", false),
         new Def("wrap", "wrap", Type.BOOLEAN, true, true),
@@ -235,7 +236,10 @@ public final class Options {
             i += 3;
         }
         int len = 0;
-        while (i + len < arg.length() && (isAlnum(arg.charAt(i + len)) || arg.charAt(i + len) == '_')) len++;
+        // IdeaVim's extension switches have hyphens (textobj-entire); a hyphen before '=' is the -= operator.
+        while (i + len < arg.length() && (isAlnum(arg.charAt(i + len)) || arg.charAt(i + len) == '_'
+            || arg.charAt(i + len) == '-' && len > 0 && i + len + 1 < arg.length() && isAlpha(arg.charAt(i + len + 1))))
+            len++;
         Def def = def(arg.substring(i, i + len)).orElse(null);
         char afterchar = i + len < arg.length() ? arg.charAt(i + len) : 0;
         while (i + len < arg.length() && isWhite(arg.charAt(i + len))) len++;

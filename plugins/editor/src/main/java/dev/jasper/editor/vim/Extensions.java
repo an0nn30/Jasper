@@ -27,8 +27,11 @@ final class Extensions {
      */
     record Extension(String option, String repository, String noMappings, Check check, List<String[]> mappings) { }
 
-    /** How a plugin checks hasmapto() before it maps. */
-    enum Check { NONE, ALL, EACH }
+    /**
+     * How a plugin checks before it maps: not at all, hasmapto() once for all its mappings or for each, or with
+     * {@code <unique>}, which leaves out a key the user mapped already in that mode.
+     */
+    enum Check { NONE, ALL, EACH, UNIQUE }
 
     private static String[] map(String command, String lhs, String rhs) { return new String[] { command, lhs, rhs }; }
 
@@ -47,7 +50,11 @@ final class Extensions {
             map("nmap", "cxx", "<Plug>(ExchangeLine)"))),
         new Extension("replacewithregister", "vim-scripts/ReplaceWithRegister", null, Check.EACH, List.of(
             map("nmap", "gr", "<Plug>ReplaceWithRegisterOperator"), map("nmap", "grr", "<Plug>ReplaceWithRegisterLine"),
-            map("xmap", "gr", "<Plug>ReplaceWithRegisterVisual"))));
+            map("xmap", "gr", "<Plug>ReplaceWithRegisterVisual"))),
+        new Extension("vim-paragraph-motion", "dbakker/vim-paragraph-motion", null, Check.UNIQUE, List.of(
+            map("nmap", "}", "<Plug>(ParagraphNextMotion)"), map("omap", "}", "<Plug>(ParagraphNextMotion)"),
+            map("xmap", "}", "<Plug>(ParagraphNextMotion)"), map("nmap", "{", "<Plug>(ParagraphPrevMotion)"),
+            map("omap", "{", "<Plug>(ParagraphPrevMotion)"), map("xmap", "{", "<Plug>(ParagraphPrevMotion)"))));
 
     private final Vim vim;
     /** The default mappings each switched-on extension added. */
@@ -102,6 +109,9 @@ final class Extensions {
             List<KeyInput> lhs = ExMaps.parse(m[1], true), rhs = ExMaps.parse(m[2], false);
             // hasmapto(): the user mapped this <Plug> name already, so the plugin leaves its default out.
             if (extension.check() == Check.EACH && mappings.all().stream().anyMatch(existing -> (existing.modes & modes) != 0 && contains(existing.rhs, rhs)))
+                continue;
+            // <unique>: the key is mapped already in the mode (E227 in Vim, which the plugin's loading shows).
+            if (extension.check() == Check.UNIQUE && mappings.all().stream().anyMatch(existing -> (existing.modes & modes) != 0 && existing.lhs.equals(lhs)))
                 continue;
             made.add(ExMaps.define(mappings, modes, lhs, rhs, false, false));
         }

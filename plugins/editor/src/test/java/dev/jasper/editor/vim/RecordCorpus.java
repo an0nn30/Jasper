@@ -61,6 +61,22 @@ public final class RecordCorpus {
         System.out.println("Recorded " + recorded + " cases with " + version + ".");
     }
 
+    /** @return the pins a plugin needs loaded before it: the names after its commit ({@code name = url commit needed…}) */
+    static List<String> needs(String name) {
+        String[] parts = pin(name);
+        return List.of(parts).subList(Math.min(2, parts.length), parts.length);
+    }
+
+    private static String[] pin(String name) {
+        if (project == null) throw new IllegalStateException("no vim-oracle.properties above the corpus folder");
+        var pins = new java.util.Properties();
+        try (var in = Files.newBufferedReader(project.resolve("vim-oracle.properties"))) { pins.load(in); }
+        catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        String pin = pins.getProperty(name);
+        if (pin == null) throw new IllegalStateException("vim-oracle.properties pins no plugin for " + name);
+        return pin.trim().split("\\s+");
+    }
+
     /**
      * The plugin an extension's cases are recorded against, cloned the first time at the commit
      * {@code vim-oracle.properties} pins ({@code name = url commit}).
@@ -76,12 +92,7 @@ public final class RecordCorpus {
     }
 
     private static Path clone(String name) throws IOException, InterruptedException {
-        if (project == null) throw new IOException("no vim-oracle.properties above the corpus folder");
-        var pins = new java.util.Properties();
-        try (var in = Files.newBufferedReader(project.resolve("vim-oracle.properties"))) { pins.load(in); }
-        String pin = pins.getProperty(name);
-        if (pin == null) throw new IllegalStateException("vim-oracle.properties pins no plugin for " + name);
-        String[] parts = pin.trim().split("\\s+");
+        String[] parts = pin(name);
         Path folder = project.resolve("build/vim-oracle").resolve(name);
         if (!Files.isDirectory(folder.resolve(".git"))) {
             Files.createDirectories(folder.getParent());
@@ -212,14 +223,19 @@ public final class RecordCorpus {
             lines.add("set columns=" + size[0] + " lines=" + (size[1] + 1));
         }
         if (!c.set().isBlank()) lines.add("set " + c.set());
+        for (String let : c.let()) lines.add("let " + let);
         if (!c.extensions().isEmpty()) {
             // The plugins load as Vim's startup would load them, before the file is edited.
             List<Path> plugins = new ArrayList<>();
             plugins.add(oracle("repeat"));
-            for (String extension : c.extensions()) plugins.add(oracle(extension.toLowerCase(java.util.Locale.ROOT)));
+            for (String extension : c.extensions()) {
+                String name = extension.toLowerCase(java.util.Locale.ROOT);
+                for (String needed : needs(name)) if (!plugins.contains(oracle(needed))) plugins.add(oracle(needed));
+                plugins.add(oracle(name));
+            }
             for (Path plugin : plugins) lines.add("set rtp^=" + plugin.toString().replace(" ", "\\ "));
             for (Path plugin : plugins)
-                lines.add("for s:f in glob(" + Json.quote(plugin + "/plugin/*.vim") + ", 0, 1) | execute 'source' fnameescape(s:f) | endfor");
+                lines.add("for s:f in glob(" + Json.quote(plugin + "/plugin/**/*.vim") + ", 0, 1) | execute 'source' fnameescape(s:f) | endfor");
         }
         for (var entry : c.given().entrySet()) {
             CorpusCase.Register register = entry.getValue();
