@@ -11,7 +11,9 @@
   the commits `plugins/editor/vim-oracle.properties` pins. Also `g'` and `` g` ``, and the `'[` mark after a put of
   several lines (fixed). Every file in the plan was compiled and run against Vim 9.1 with the pinned plugins before the
   plan was written: 1880 corpus cases (138 new).
-  - Not done: executing the plan; GUI checks 89–96 of the [checklist](editor-verification.md) (user-run); plan V4b
+  - Executed inline on 2026-09-28 (bf4dab73..ee1ab3fa): every step's expected result matched; `./gradlew check`
+    4,505 tests green.
+  - Not done: GUI checks 89–96 of the [checklist](editor-verification.md) (user-run); plan V4b
     (argtextobj, textobj-entire, textobj-indent, matchit, paragraph-motion, highlightedyank, sneak); push.
 - **Editor Vim mode, plan V3b** (branch `claude/vim-v3b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3b.md`, written 2026-09-28): the vimrc (`plugins/dev.jasper.editor/data/vimrc`), read the
