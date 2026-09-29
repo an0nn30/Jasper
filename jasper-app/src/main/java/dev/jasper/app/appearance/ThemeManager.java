@@ -25,12 +25,24 @@ import javax.swing.plaf.ColorUIResource;
  */
 public final class ThemeManager {
     private static final String BASE = "dev/jasper/app/themes/";
-    /** Each theme {@code name} a {@code parentTheme} may name, with its file under {@link #BASE}. */
-    private static final Map<String, String> FILES = Map.of(
-        "IntelliJ Light", "intellij/Light.theme.json",
-        "IntelliJ", "intellij/intellijlaf.theme.json",
-        "Darcula", "intellij/darcula.theme.json",
-        "Jasper Dark", "jasper-dark.theme.json");
+    /**
+     * Each theme a {@code parentTheme} may name, with its file under {@link #BASE}. IntelliJ's themes are
+     * keyed by the id IntelliJ registers them under, which is what a {@code parentTheme} names; the classic
+     * IntelliJ Light and Jasper Dark are also reachable by name.
+     */
+    private static final Map<String, String> FILES = Map.ofEntries(
+        Map.entry("IntelliJ Light", "intellij/Light.theme.json"),
+        Map.entry("JetBrainsLightTheme", "intellij/Light.theme.json"),
+        Map.entry("IntelliJ", "intellij/intellijlaf.theme.json"),
+        Map.entry("Darcula", "intellij/darcula.theme.json"),
+        Map.entry("ExperimentalDark", "intellij/expUI/expUI_dark.theme.json"),
+        Map.entry("ExperimentalLight", "intellij/expUI/expUI_light.theme.json"),
+        Map.entry("ExperimentalLightWithLightHeader", "intellij/expUI/expUI_light_with_light_header.theme.json"),
+        Map.entry("Islands Dark", "intellij/islands/ManyIslandsDark.theme.json"),
+        Map.entry("Islands Light", "intellij/islands/ManyIslandsLight.theme.json"),
+        Map.entry("Islands Darcula", "intellij/islands/ManyIslandsDarcula.theme.json"),
+        Map.entry("JetBrainsHighContrastTheme", "intellij/islands/HighContrast.theme.json"),
+        Map.entry("Jasper Dark", "jasper-dark.theme.json"));
     /** Theme-independent application defaults: form typography, input geometry and the split divider. Every theme gets them. */
     public static final Map<String, String> APP_DEFAULTS = appDefaults();
     private static final ThemeLoader LOADER = new ThemeLoader(ThemeManager::read, FILES);

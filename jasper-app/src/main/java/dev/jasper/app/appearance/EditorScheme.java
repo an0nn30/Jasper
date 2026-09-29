@@ -15,7 +15,7 @@ import org.w3c.dom.Element;
 /**
  * Turns an IntelliJ editor colour scheme into a terminal palette: the console colours, then the
  * editor text colours IntelliJ's console falls back to. Keys a scheme leaves out come from its parent
- * scheme (IntelliJ's own Default or Darcula, vendored), and only then from Jasper's palette. Scheme
+ * schemes (the schemes IntelliJ bundles, vendored), and only then from Jasper's palette. Scheme
  * colours are used as the theme author chose them: no contrast floor applies.
  */
 final class EditorScheme {
@@ -27,7 +27,11 @@ final class EditorScheme {
     private record Attribute(String base, Map<String, String> values) {}
     private record Scheme(String name, String parent, Map<String, String> colors, Map<String, Attribute> attributes) {}
 
-    private static final String PARENTS_FILE = "dev/jasper/app/themes/intellij/DefaultColorSchemesManager.xml";
+    private static final String BASE = "dev/jasper/app/themes/intellij/";
+    /** IntelliJ's Default and Darcula, then each scheme it bundles, one per file. */
+    private static final List<String> PARENT_FILES = List.of(
+        "DefaultColorSchemesManager.xml", "Light.xml", "expUI/expUI_lightScheme.xml", "expUI/expUI_darkScheme.xml",
+        "expUI/expUI_darculaContrastScheme.xml", "islands/highContrastScheme.xml", "islands/IslandSchemeDark.xml");
     private static final List<String> ANSI = List.of(
         "CONSOLE_BLACK_OUTPUT", "CONSOLE_RED_OUTPUT", "CONSOLE_GREEN_OUTPUT", "CONSOLE_YELLOW_OUTPUT",
         "CONSOLE_BLUE_OUTPUT", "CONSOLE_MAGENTA_OUTPUT", "CONSOLE_CYAN_OUTPUT", "CONSOLE_GRAY_OUTPUT",
@@ -172,13 +176,15 @@ final class EditorScheme {
     }
 
     private static Map<String, Scheme> readParents() {
-        try (InputStream in = EditorScheme.class.getClassLoader().getResourceAsStream(PARENTS_FILE)) {
-            if (in == null) throw new IllegalStateException("Missing " + PARENTS_FILE);
-            var schemes = new HashMap<String, Scheme>();
-            for (Scheme scheme : schemes(SafeXml.parse(in.readAllBytes()))) schemes.put(scheme.name(), scheme);
-            return Map.copyOf(schemes);
-        } catch (IOException failure) {
-            throw new UncheckedIOException(failure);
+        var schemes = new HashMap<String, Scheme>();
+        for (String file : PARENT_FILES) {
+            try (InputStream in = EditorScheme.class.getClassLoader().getResourceAsStream(BASE + file)) {
+                if (in == null) throw new IllegalStateException("Missing " + BASE + file);
+                for (Scheme scheme : schemes(SafeXml.parse(in.readAllBytes()))) schemes.put(scheme.name(), scheme);
+            } catch (IOException failure) {
+                throw new UncheckedIOException(failure);
+            }
         }
+        return Map.copyOf(schemes);
     }
 }

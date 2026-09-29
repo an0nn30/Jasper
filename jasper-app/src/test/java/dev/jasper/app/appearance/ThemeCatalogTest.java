@@ -113,14 +113,14 @@ class ThemeCatalogTest {
             "META-INF/plugin.xml", pluginXml("Mixed", "/good.theme.json", "/bad.theme.json", "/newui.theme.json"),
             "good.theme.json", theme("Good", false, null, "#fefefe"),
             "bad.theme.json", "{\"name\": \"Bad\", \"colors\": {\"a\": \"nowhere\"}}",
-            "newui.theme.json", "{\"name\": \"New UI\", \"dark\": true, \"parentTheme\": \"ExperimentalDark\"}"));
+            "newui.theme.json", "{\"name\": \"New UI\", \"dark\": true, \"parentTheme\": \"SomeoneElsesTheme\"}"));
         var snapshot = catalog().scan();
         assertThat(snapshot.find("Good").map(Theme::palette)).contains(Palette.jasperLight());
         assertThat(snapshot.find("Bad")).isEmpty();
         assertThat(snapshot.find("New UI")).isPresent();
         assertThat(snapshot.problems()).extracting(ThemeCatalog.Problem::message)
             .anySatisfy(message -> assertThat(message).contains("mixed.jar!/bad.theme.json").contains("nowhere"))
-            .anySatisfy(message -> assertThat(message).contains("ExperimentalDark").contains("Darcula"));
+            .anySatisfy(message -> assertThat(message).contains("SomeoneElsesTheme").contains("Darcula"));
     }
 
     @Test void aReaderThatThrowsAnErrorBecomesAProblemAndTheScanContinues() throws Exception {

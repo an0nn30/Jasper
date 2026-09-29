@@ -109,8 +109,22 @@ class EditorSchemeTest {
     }
 
     @Test void aSchemeNameJasperDoesNotHaveFallsBack() {
-        var result = EditorScheme.named("IntelliJ Light", "t.theme.json", false);
+        var result = EditorScheme.named("Nobody's Scheme", "t.theme.json", false);
         assertThat(result.palette()).isEqualTo(Palette.jasperLight());
-        assertThat(result.warnings()).singleElement().asString().contains("IntelliJ Light");
+        assertThat(result.warnings()).singleElement().asString().contains("Nobody's Scheme");
+    }
+
+    @Test void theNewUiAndIslandsSchemesAreNamedSchemesAndParents() {
+        var islands = EditorScheme.named("Islands Dark", "t.theme.json", true);
+        assertThat(islands.warnings()).isEmpty();
+        assertThat(islands.palette().background()).isEqualTo(new Color(0x191a1c));
+        assertThat(islands.palette().foreground()).isEqualTo(new Color(0xbcbec4));
+        var child = read("<scheme name=\"Child\" parent_scheme=\"Dark\"><colors/></scheme>", true);
+        assertThat(child.warnings()).isEmpty();
+        assertThat(child.palette().background()).as("the New UI Dark scheme's console").isEqualTo(new Color(0x1e1f22));
+        var light = EditorScheme.named("Light", "t.theme.json", false);
+        assertThat(light.warnings()).isEmpty();
+        assertThat(light.palette().selection()).as("Light's own, over Default's 5974ab").isEqualTo(new Color(0xa6d2ff));
+        assertThat(light.palette().foreground()).as("console output inherited from Default").isEqualTo(Color.BLACK);
     }
 }
