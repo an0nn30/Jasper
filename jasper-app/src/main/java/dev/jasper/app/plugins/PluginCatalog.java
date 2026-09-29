@@ -94,7 +94,8 @@ final class PluginCatalog {
                 entry == null || entry.enabled(), needsConsent,
                 !pendingRemoval && !(user && entry == null), user, pendingRemoval, pendingInstall,
                 pending(id, launch, willRun, rejectedNext, pendingRemoval, pendingInstall, descriptor),
-                PluginSettingsFiles.folder(userDirectory, id), PluginSettingsFiles.file(userDirectory, id), PluginSettingsFiles.data(userDirectory, id)));
+                PluginSettingsFiles.folder(userDirectory, id), PluginSettingsFiles.file(userDirectory, id), PluginSettingsFiles.data(userDirectory, id),
+                descriptor.homepage(), List.copyOf(new TreeSet<>(descriptor.exports())), PluginIconFiles.read(shown)));
         }
         boolean restartNeeded = !launch.safeMode()
             && (!willRun.equals(launch.selected()) || disk.pending().keySet().stream().anyMatch(id -> !removed(disk, id)));

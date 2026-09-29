@@ -24,7 +24,7 @@ class PluginManagerPanelTest {
             state.equals("SKIPPED") ? "requires dev.example.base, which is not available" : "", List.of("terminal.inject", "made.up"),
             needsConsent ? List.of("terminal.inject") : List.of(), List.of("dev.example.base >=1.0.0"), 2, enabled, needsConsent, canToggle,
             canRemove, pendingRemoval, pendingInstall, pending,
-            java.nio.file.Path.of("/plugins/" + id), java.nio.file.Path.of("/plugins/" + id + "/" + id + ".toml"), java.nio.file.Path.of("/plugins/" + id + "/data"));
+            java.nio.file.Path.of("/plugins/" + id), java.nio.file.Path.of("/plugins/" + id + "/" + id + ".toml"), java.nio.file.Path.of("/plugins/" + id + "/data"), "", List.of(), java.util.Optional.empty());
     }
 
     @Test void listsPluginsAndOffersOnlyWhatTheSelectedRowAllows() {
