@@ -101,6 +101,7 @@ final class HostedPalette implements Palette {
         @Override public List<dev.jasper.app.palette.PaletteVerb> verbs() { return verbs; }
         @Override public boolean monospaceRows() { return spec.monospaceRows(); }
         @Override public boolean inAll() { return spec.inAll(); }
+        @Override public boolean inRecents() { return spec.inAll() && spec.inRecents(); }
         @Override public Optional<String> shortcutActionId() { return spec.shortcutActionId(); }
 
         private Optional<PaletteVerb> own(dev.jasper.app.palette.PaletteVerb verb) {

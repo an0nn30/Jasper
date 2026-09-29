@@ -23,9 +23,12 @@ import javax.swing.Icon;
  * @param shortcutActionId one of the plugin's own actions: while the palette is open, that action's
  *                         shortcut switches to or dismisses this scope's tab instead of running the handler
  * @param inAll            whether the All tab searches this scope too (since 0.8.0)
+ * @param inRecents        whether the palette may offer this scope's rows before anything is typed, among the
+ *                         recently and most used items (since 0.9.2)
  */
 public record ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
-                        boolean monospaceRows, Optional<Icon> icon, Optional<String> shortcutActionId, boolean inAll) {
+                        boolean monospaceRows, Optional<Icon> icon, Optional<String> shortcutActionId, boolean inAll,
+                        boolean inRecents) {
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]*(\\.[a-z0-9_-]+)+");
 
     /** Validates every part and copies the verbs. */
@@ -43,6 +46,24 @@ public record ScopeSpec(String id, String label, String description, String plac
     }
 
     /**
+     * The 0.9.1 shape, offered among recent items.
+     *
+     * @param id               the scope id
+     * @param label            the tab text
+     * @param description      the tooltip line
+     * @param placeholder      the query hint
+     * @param verbs            the verbs
+     * @param monospaceRows    whether rows use the terminal font
+     * @param icon             the tab icon
+     * @param shortcutActionId the plugin's action whose shortcut reaches this scope
+     * @param inAll            whether the All tab searches this scope
+     */
+    public ScopeSpec(String id, String label, String description, String placeholder, List<PaletteVerb> verbs,
+                     boolean monospaceRows, Optional<Icon> icon, Optional<String> shortcutActionId, boolean inAll) {
+        this(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, true);
+    }
+
+    /**
      * The minimum: no description, icon or shortcut, proportional rows, searched by the All tab.
      *
      * @param id          the scope id
@@ -52,7 +73,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @return the spec
      */
     public static ScopeSpec of(String id, String label, String placeholder, List<PaletteVerb> verbs) {
-        return new ScopeSpec(id, label, "", placeholder, verbs, false, Optional.empty(), Optional.empty(), true);
+        return new ScopeSpec(id, label, "", placeholder, verbs, false, Optional.empty(), Optional.empty(), true, true);
     }
 
     /**
@@ -61,7 +82,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value the tooltip line
      * @return a copy with that description
      */
-    public ScopeSpec withDescription(String value) { return new ScopeSpec(id, label, value, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll); }
+    public ScopeSpec withDescription(String value) { return new ScopeSpec(id, label, value, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, inRecents); }
 
     /**
      * Derives a value.
@@ -69,7 +90,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value whether rows use the terminal font
      * @return a copy with that setting
      */
-    public ScopeSpec withMonospaceRows(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, value, icon, shortcutActionId, inAll); }
+    public ScopeSpec withMonospaceRows(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, value, icon, shortcutActionId, inAll, inRecents); }
 
     /**
      * Derives a value.
@@ -77,7 +98,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value the tab icon, or null for none
      * @return a copy with that icon
      */
-    public ScopeSpec withIcon(Icon value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, Optional.ofNullable(value), shortcutActionId, inAll); }
+    public ScopeSpec withIcon(Icon value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, Optional.ofNullable(value), shortcutActionId, inAll, inRecents); }
 
     /**
      * Derives a value.
@@ -85,7 +106,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param value the plugin's action whose shortcut reaches this scope, or null for none
      * @return a copy naming it
      */
-    public ScopeSpec withShortcutActionId(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, Optional.ofNullable(value), inAll); }
+    public ScopeSpec withShortcutActionId(String value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, Optional.ofNullable(value), inAll, inRecents); }
 
     /**
      * Derives a value. A scope whose rows should not appear beside others, such as secrets, opts out.
@@ -94,5 +115,14 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @return a copy with that setting
      * @since 0.8.0
      */
-    public ScopeSpec withInAll(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, value); }
+    public ScopeSpec withInAll(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, value, inRecents); }
+
+    /**
+     * Derives a value. A scope whose rows should appear only when searched for, such as shell history, opts out.
+     *
+     * @param value whether the palette may offer this scope's rows before anything is typed
+     * @return a copy with that setting
+     * @since 0.9.2
+     */
+    public ScopeSpec withInRecents(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, monospaceRows, icon, shortcutActionId, inAll, value); }
 }
