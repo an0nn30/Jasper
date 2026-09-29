@@ -58,7 +58,7 @@ final class PluginManagerPanel extends JPanel {
     private final Handlers handlers;
 
     /** Swing renders label text that starts with an html tag; plugin-supplied text must never be markup. */
-    private static <T extends javax.swing.JComponent> T plain(T component) {
+    static <T extends javax.swing.JComponent> T plain(T component) {
         component.putClientProperty("html.disable", Boolean.TRUE);
         return component;
     }
