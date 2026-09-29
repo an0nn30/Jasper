@@ -11,6 +11,7 @@
   plugins before the plan was written: 2066 corpus cases (160 new), with and without a final line break.
   - Executed inline on 2026-09-29 (fd2bca5b..ba1aa09d): every step's expected result matched; `./gradlew check`
     6,809 tests green.
+  - Merged into local main (fast-forward, after merging main: 6,827 tests green) on 2026-09-29; not pushed.
   - Not done: GUI checks 97–103 of the [checklist](editor-verification.md) (user-run); plan V4c
     (matchit, sneak); push.
 - **Title-bar command centre, plan A** (branch `claude/titlebar-command-center`, spec
