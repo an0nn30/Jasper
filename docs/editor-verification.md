@@ -118,3 +118,14 @@ unverified.
 - [ ] 86. `:nnoremap <Space>f <Action>(find)`: Space and `f` opens the Find bar; `:actionlist` lists the Editor's command ids; `:action wrap` toggles soft wrap.
 - [ ] 87. `source ~/.vimrc` in the vimrc reads a Vim vimrc; the lines Jasper lacks are counted in the notice.
 - [ ] 88. A folder named `vimrc` in place of the file shows `vimrc: could not read …; Vim runs with its defaults.`, and Vim still works.
+
+## Vim mode (plan V4a)
+
+- [ ] 89. With `set surround` in the vimrc, `ysiw)` puts a word in parentheses, `cs)]` changes them to brackets, `ds]` removes them, and `.` repeats each.
+- [ ] 90. `ysiwt`, typing `em` and `>`: the Vim bar shows `<em` as you type, and the word gets `<em>`…`</em>`.
+- [ ] 91. With `set commentary` in a Java file, `gcc` comments the line with `//`, `gcc` again uncomments it, and `gcip` comments a paragraph; in a Python file `#` is used.
+- [ ] 92. `Plug 'tpope/vim-commentary'` in the vimrc (instead of `set commentary`) switches it on too; a `Plug` line for another plugin causes no notice.
+- [ ] 93. With `set exchange`, `cxiw` on one word highlights it; `cxiw` on another swaps the two and the highlight goes; `cxc` forgets a first word.
+- [ ] 94. With `set ReplaceWithRegister`, `yiw` on one word, then `griw` on another replaces it and `p` still puts the first word.
+- [ ] 95. `:nmap <Leader>s <Plug>Ysurround` then `\siw"` quotes a word.
+- [ ] 96. `u` after each of these undoes it in one step.

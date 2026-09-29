@@ -153,8 +153,14 @@ recorded corpus.
 - `sethandler <C-f> n:vim i:ide` decides who gets a key in each mode (`n i v x o c`, or `a` for all), as in IdeaVim.
 - `<Action>(id)` in a mapping runs one of the Editor's commands (`:nnoremap <Space>w <Action>(save)`), in any mode;
   `:action id` runs one, and `:actionlist` lists the ids.
-- Not yet: emulated plugins such as surround and commentary. They follow in a later release. An uppercase mark
-  (`mA`) set in one tab takes you back to that tab (`'A`).
+- Extensions, as IdeaVim has them: `set surround` (or the plugin's `Plug 'tpope/vim-surround'` line) in the vimrc
+  switches one on, with its plugin's keys. surround: `ds"`, `cs"'`, `ysiw)`, `yss]`, Visual `S`, tags with `t`
+  (`cst<em>`). commentary: `gcc`, `gc{motion}`, Visual `gc`, `gcu`, and `dgc` for a comment block, with the tab's
+  language's comments. exchange: `cx{motion}` twice swaps two texts; `cxx` lines, Visual `X`, `cxc` to forget.
+  ReplaceWithRegister (`set ReplaceWithRegister`): `gr{motion}`, `grr` and Visual `gr` put a register over text. Each
+  extension's `<Plug>` names can be mapped as in Vim (`:nmap <Leader>s <Plug>Ysurround`).
+- Not yet: argtextobj, textobj-entire, textobj-indent, matchit, paragraph-motion, highlightedyank and sneak. They
+  follow in a later release. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 

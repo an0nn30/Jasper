@@ -109,8 +109,10 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **Vim script is literals only.** `:let` sets a global variable (`mapleader`, `g:name`), a register (`@a`, `@/`) or
   an option (`&tw`, `&l:sw`) to one string or number; expressions, `s:` variables, functions and `:echo` fail with
   E319. In a vimrc `if` is true only for `has('ide')`, `has('jasper')` and a number other than 0.
-- **Extensions come later.** `Plug '…'` and `packadd` lines fail, and are counted in the vimrc's notice, as in a Vim
-  without a plugin manager; `let g:…` settings for extensions are kept for when they come.
+- **Extensions are ports.** surround, commentary, exchange and ReplaceWithRegister follow their plugins' scripts on
+  Jasper's own commands, and the corpus's `ext:` cases are recorded against the plugins, with tpope/vim-repeat, at the
+  commits `plugins/editor/vim-oracle.properties` pins. A `Plug` line switches on an extension Jasper has and is
+  otherwise ignored; `packadd` fails with E319 until matchit comes. `let g:…` settings are kept for the extensions.
 - **`:messages` keeps errors.** Jasper's history holds the errors given and the vimrc's report of skipped lines;
   Vim's holds every message.
 - **`:source` paths.** In a vimrc a relative name starts from the sourcing file's folder, and typed from the current
@@ -122,3 +124,12 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   limit applies. `:syntax` and `:filetype` do nothing; the Editor highlights and indents by language.
 - **`<Action>(id)`, `:action` and `:actionlist`** are IdeaVim's, with the Editor's command ids (`save`, `find`,
   `toggle-comment`, `reload-vimrc`); an unknown id fails with `Not an Editor command: id`.
+- **surround** has no Insert-mode `<C-s>` or `<C-g>s`, does not re-indent after surrounding lines (the plugin does
+  only with 'indentexpr', 'cindent' or 'smartindent', which Jasper does not have), has no `ds/` (there is no `[/`
+  motion), and takes `g:surround_{n}` custom surroundings without their `\1`…`\7` prompts. There are no buffer
+  variables, so no `b:surround_…`.
+- **commentary** takes 'commentstring' from the tab's language: the line comment RSyntaxTextArea knows for it
+  (`//%s`, `#%s`), or Vim's `/* %s */`. There is no `:Commentary` command and no `b:commentary_format`.
+- **exchange** highlights the first text in the 'hlsearch' colour; `:XchangeHighlightToggle`,
+  `:XchangeClear` and `g:exchange_indent = '=='` are not there.
+- **ReplaceWithRegister** cannot use the expression register (`"=`): Jasper has no expressions.

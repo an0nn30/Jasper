@@ -2,6 +2,17 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V4a** (branch `claude/vim-v4a`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v4a.md`, written 2026-09-28): the extension framework (`set {name}` and `Plug` lines switch
+  one on, with its plugin's default mappings over `<Plug>` commands, hasmapto() and `g:…_no_mappings`) and ports of
+  surround, commentary ('commentstring' from the tab's language), exchange and ReplaceWithRegister, which follow
+  their plugins' scripts on the engine's commands (`Script`, `Machine.nested`; surround's getchar() and input() through
+  `Machine.readKey` and `readLine`). The corpus's `ext:` cases are recorded against the plugins and tpope/vim-repeat at
+  the commits `plugins/editor/vim-oracle.properties` pins. Also `g'` and `` g` ``, and the `'[` mark after a put of
+  several lines (fixed). Every file in the plan was compiled and run against Vim 9.1 with the pinned plugins before the
+  plan was written: 1880 corpus cases (138 new).
+  - Not done: executing the plan; GUI checks 89–96 of the [checklist](editor-verification.md) (user-run); plan V4b
+    (argtextobj, textobj-entire, textobj-indent, matchit, paragraph-motion, highlightedyank, sneak); push.
 - **Editor Vim mode, plan V3b** (branch `claude/vim-v3b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3b.md`, written 2026-09-28): the vimrc (`plugins/dev.jasper.editor/data/vimrc`), read the
   first time Vim turns on and on Reload vimrc, with comments, continuation, `source` (10 deep), `if has('ide')`, and
