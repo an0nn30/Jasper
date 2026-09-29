@@ -111,25 +111,19 @@ class CommandPaletteTest {
         });
     }
 
-    @Test void modeRowsShowTheScopeItsPrefixAndItsShortcutAndChoosingOneReportsIt() throws Exception {
+    @Test void scopeHintsSitAlongTheBottomAndAClickReportsTheirScope() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var events = new ArrayList<String>();
             var palette = palette(events);
-            palette.setEntries(List.of(new PaletteEntry.Mode(COMMANDS, ">", ""),
-                new PaletteEntry.Mode(HISTORY, "history >", "\u2318R")), null, "Nothing found");
-            assertThat(PaletteTestSupport.describe(palette.selectedEntry())).isEqualTo("mode:jasper.commands");
-            var list = palette.entryList();
-            var rendered = (Container) list.getCellRenderer()
-                .getListCellRendererComponent(list, list.getModel().getElementAt(1), 1, false, false);
-            assertThat(label(rendered, "History")).isNotNull();
-            assertThat(label(rendered, "history >").getForeground()).isEqualTo(UIManager.getColor("SearchEverywhere.SearchField.infoForeground"));
-            assertThat(label(rendered, "\u2318R")).isNotNull();
-            palette.selectRelative(1);
-            palette.executeSelected();
-            assertThat(events).containsExactly("mode:test.history:0");
+            palette.setScopeHints(List.of(COMMANDS, HISTORY));
+            assertThat(palette.scopeHintTexts()).containsExactly("> commands", "history >");
+            assertThat(labels(palette.hintBar())).extracting(JLabel::getText).contains("> commands", "history >");
+            palette.clickScopeHint("history >");
+            assertThat(events).containsExactly("chip:test.history");
+            palette.setScopeHints(List.of());
+            assertThat(palette.scopeHintTexts()).isEmpty();
         });
     }
-
     @Test void allGroupsRowsUnderHeadersAndSelectionSkipsThem() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var palette = palette(new ArrayList<>());

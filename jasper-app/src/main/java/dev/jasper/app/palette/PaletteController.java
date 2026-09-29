@@ -19,7 +19,10 @@ import javax.swing.SwingUtilities;
  */
 public final class PaletteController implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(PaletteController.class.getName());
+    /** Rows the empty query offers: this many recently used, then ranked ones up to the total. */
+    static final int RECENT_ROWS = 2, SUGGESTED_ROWS = 10;
     private final ScopeRegistry scopes;
+    private final dev.jasper.app.commands.CommandHistory history;
     private final boolean macOs;
     private final CommandPalette palette;
     private final Runnable layout, dismissed, updateActions;
@@ -40,10 +43,11 @@ public final class PaletteController implements AutoCloseable {
     private long generation;
     private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
 
-    public PaletteController(ScopeRegistry scopes, boolean macOs, Runnable layout, Runnable dismissed,
+    public PaletteController(ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
+                      Runnable layout, Runnable dismissed,
                       Function<String, String> shortcut, BooleanSupplier batching, Runnable updateActions,
                       Consumer<String> reportError, Consumer<String> reopen) {
-        this.scopes = scopes; this.macOs = macOs; this.layout = layout; this.dismissed = dismissed;
+        this.scopes = scopes; this.history = java.util.Objects.requireNonNull(history); this.macOs = macOs; this.layout = layout; this.dismissed = dismissed;
         this.shortcut = shortcut; this.batching = batching; this.updateActions = updateActions;
         this.reportError = reportError; this.reopen = reopen;
         context = new PaletteContext(macOs, PaletteTarget.none());
@@ -117,6 +121,7 @@ public final class PaletteController implements AutoCloseable {
 
     private void showChip() {
         palette.setChip(active == null ? null : active.label(), active == null ? null : active.icon());
+        palette.setScopeHints(active == null ? modeScopes() : List.of(), shortcut);
         palette.setPlaceholder(active == null ? "Search everything" : active.placeholder());
     }
 
@@ -179,6 +184,57 @@ public final class PaletteController implements AutoCloseable {
         scopes.find(PaletteScope.COMMANDS_ID).ifPresent(ordered::add);
         for (PaletteScope scope : scopes.scopes()) if (!PaletteScope.COMMANDS_ID.equals(scope.id())) ordered.add(scope);
         return ordered;
+    }
+
+    /**
+     * The empty query's rows: the last {@link #RECENT_ROWS} rows run, then rows ranked by use (frecency), topped up with
+     * each scope's own empty-query rows. Only scopes that allow it ({@link PaletteScope#inRecents()}) appear; a row that
+     * its scope no longer finds drops out.
+     */
+    private void suggestions(List<PaletteEntry> entries) {
+        long now = System.currentTimeMillis();
+        var seen = new java.util.HashSet<String>();
+        var recent = new ArrayList<PaletteEntry.Item>();
+        var uses = history.uses();
+        for (int i = 0; i < uses.size() && i < 20 && recent.size() < RECENT_ROWS; i++)
+            resolve(uses.get(i)).filter(item -> seen.add(item.key())).ifPresent(recent::add);
+        var ranked = new ArrayList<PaletteEntry.Item>();
+        var byScore = new ArrayList<>(uses);
+        byScore.sort(java.util.Comparator.comparingDouble((dev.jasper.app.commands.PaletteUse use) -> use.score(now)).reversed());
+        for (int i = 0; i < byScore.size() && i < 30 && ranked.size() < SUGGESTED_ROWS - recent.size(); i++)
+            resolve(byScore.get(i)).filter(item -> seen.add(item.key())).ifPresent(ranked::add);
+        boolean used = !ranked.isEmpty();
+        for (PaletteScope scope : modeScopes()) {
+            if (recent.size() + ranked.size() >= SUGGESTED_ROWS) break;
+            if (!scope.inRecents()) continue;
+            PaletteResults results;
+            try { results = scope.search("", context); }
+            catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.ERROR, "Palette scope failed to search: " + scope.id(), failure);
+                continue;
+            }
+            for (PaletteRow row : results.rows()) {
+                if (recent.size() + ranked.size() >= SUGGESTED_ROWS) break;
+                var item = new PaletteEntry.Item(scope, row);
+                if (seen.add(item.key())) ranked.add(item);
+            }
+        }
+        if (!recent.isEmpty()) { entries.add(new PaletteEntry.Header("Recently used")); entries.addAll(recent); }
+        if (!ranked.isEmpty()) { entries.add(new PaletteEntry.Header(used ? "Most used" : "Suggested")); entries.addAll(ranked); }
+    }
+
+    /** The row a use names, found by searching its title in its scope; empty when the scope or row is gone. */
+    private Optional<PaletteEntry.Item> resolve(dev.jasper.app.commands.PaletteUse use) {
+        Optional<PaletteScope> scope = scopes.find(use.scopeId()).filter(PaletteScope::inRecents);
+        if (scope.isEmpty()) return Optional.empty();
+        PaletteResults results;
+        try { results = scope.get().search(use.title(), new PaletteContext(macOs, context.target(), 50)); }
+        catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.ERROR, "Palette scope failed to search: " + use.scopeId(), failure);
+            return Optional.empty();
+        }
+        return results.rows().stream().filter(row -> row.id().equals(use.rowId())).findFirst()
+            .map(row -> new PaletteEntry.Item(scope.get(), row));
     }
 
     static String prefixText(PaletteScope scope) {
@@ -300,8 +356,7 @@ public final class PaletteController implements AutoCloseable {
             for (PaletteRow row : results.rows()) entries.add(new PaletteEntry.Item(active, row));
             if (results.initialSelectionId() != null) initial = PaletteEntry.key(active, results.initialSelectionId());
         } else if (query.isBlank()) {
-            for (PaletteScope scope : modeScopes())
-                entries.add(new PaletteEntry.Mode(scope, prefixText(scope), shortcut.apply(scope.id())));
+            suggestions(entries);
         } else {
             // One row more than shown tells whether a scope has more matches than All has room for.
             var probe = new PaletteContext(macOs, context.target(), maxResults + 1);
@@ -338,7 +393,6 @@ public final class PaletteController implements AutoCloseable {
     private void execute(PaletteEntry entry, int verbIndex) {
         if (!open) return;
         if (entry instanceof PaletteEntry.More more) { selectTab(more.scope().id()); return; }
-        if (entry instanceof PaletteEntry.Mode mode) { selectTab(mode.scope().id()); return; }
         if (!(entry instanceof PaletteEntry.Item item)) return;
         PaletteScope scope = item.scope();
         PaletteRow row = item.row();
@@ -347,6 +401,7 @@ public final class PaletteController implements AutoCloseable {
         PaletteVerb verb = scope.verbs().get(verbIndex);
         updateActions.run();
         if (!valid() || !scopes.contains(scope) || !scope.available(row, verb, context)) { refresh(); return; }
+        if (scope.inRecents()) history.recordUse(scope.id(), row.id(), row.title(), System.currentTimeMillis());
         PaletteStep pending = scope.step(row, verb, context);
         if (pending != null) { showStep(pending, scope); return; }
         PaletteContext target = context;

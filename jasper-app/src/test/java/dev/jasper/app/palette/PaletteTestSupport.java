@@ -31,7 +31,6 @@ public final class PaletteTestSupport {
             case PaletteEntry.Header header -> "# " + header.label();
             case PaletteEntry.Item item -> item.scope().id() + "/" + item.row().id();
             case PaletteEntry.More more -> "more:" + more.scope().id();
-            case PaletteEntry.Mode mode -> "mode:" + mode.scope().id();
         };
     }
 
@@ -74,6 +73,9 @@ public final class PaletteTestSupport {
     /** The chip's label, or null while no chip is set. */
     public static String chipText(CommandPalette palette) { return palette.chipText(); }
     public static JLabel chip(CommandPalette palette) { return palette.chip(); }
+    /** The scope hints along the bottom edge, as their text; empty while a chip is set. */
+    public static List<String> scopeHints(CommandPalette palette) { return palette.scopeHintTexts(); }
+    public static void clickScopeHint(CommandPalette palette, String text) { palette.clickScopeHint(text); }
     public static boolean backspace(PaletteController controller) { return controller.backspacePressed(); }
     public static String placeholder(CommandPalette palette) { return (String) palette.queryField().getClientProperty("JTextField.placeholderText"); }
     public static JPanel hintBar(CommandPalette palette) { return palette.hintBar(); }
