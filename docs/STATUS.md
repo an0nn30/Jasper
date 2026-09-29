@@ -10,6 +10,7 @@
   - Executed subagent-driven on 2026-09-29 (c18ceb96, 8f030022; final-review fixes f731d93e: the sneak highlight ends
     when the text changes, scripted `F`/`T` leave sneak's `;` alone, `g:sneak#f_reset` and `t_reset`); `./gradlew check`
     7,157 tests green.
+  - Merged into local main (fast-forward, after merging main: 7,178 tests green) on 2026-09-29; not pushed.
   - Not done: GUI checks 110–114 of the [checklist](editor-verification.md) (user-run); push.
 - **Settings fixes and the Plugins page** (`claude/settings-polish`, 2026-09-29; spec
   `docs/superpowers/specs/2026-09-29-jasper-plugins-page-design.md`, plan
