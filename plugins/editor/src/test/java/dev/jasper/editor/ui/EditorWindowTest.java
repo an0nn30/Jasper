@@ -478,6 +478,18 @@ class EditorWindowTest {
             .startsWith("dev.jasper.editor: vimrc: could not read " + window.vimrcFile()).endsWith("; Vim runs with its defaults.");
     }
 
+    @Test void theOpenCommandHasNoKeyButVimStillRunsIt() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        EditorTab tab = opened(file("from.txt", "one\n"));
+        assertThat(tab.area().getInputMap(javax.swing.JComponent.WHEN_FOCUSED).get(KeyNames.stroke(java.awt.event.KeyEvent.VK_O, 0)))
+            .as("Cmd/Ctrl+O is left to the Keymap's Open in Editor\u2026").isNotEqualTo("open");
+        Path other = file("other.txt", "two\n");
+        host.queuePathSelection(List.of(other));
+        vimKeys(tab, ":action open<CR>");
+        drain();
+        assertThat(window.selected().orElseThrow().session().name()).isEqualTo("other.txt");
+    }
+
     @Test void vimActionsAreTheEditorsCommands() throws Exception {
         settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
         EditorTab tab = opened(file("act.txt", "one\n"));

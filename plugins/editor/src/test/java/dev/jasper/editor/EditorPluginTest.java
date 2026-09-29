@@ -1,6 +1,7 @@
 package dev.jasper.editor;
 
 import dev.jasper.editor.api.Editor;
+import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.editor.session.Question;
 import dev.jasper.editor.testsupport.StubDocument;
 import dev.jasper.editor.ui.EditorEnvironment;
@@ -113,6 +114,46 @@ class EditorPluginTest {
             assertThat(reopened).hasSize(1);
             registration.close();
             assertThat(host.searchScope(RECENT, "", terminal, null)).containsExactly(rowId(rows) + "|app.conf|false");
+        }
+    }
+
+    @Test void openInEditorShowsTheLocalChooserWhenNoOpenerAnswers() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID terminal = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            var asked = new ArrayList<OpenRequest>();
+            consumer.get().services().require(Editor.class).opener(request -> { asked.add(request); return false; });
+            host.queuePathSelection(List.of(Files.writeString(home.resolve("local.txt"), "x\n")));
+            assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
+            drain(host);
+            assertThat(asked).singleElement().satisfies(request -> {
+                assertThat(request.window().id()).isEqualTo(terminal);
+                assertThat(request.pane()).isEmpty();
+                assertThat(request.documentKey()).isEmpty();
+            });
+            assertThat(host.contentTabs()).hasSize(1);
+        }
+    }
+
+    @Test void anOpenerThatAnswersReplacesTheChooserAndSeesTheActiveEditorTabsKey() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID terminal = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            editor.open(new StubDocument("stub:/srv/app.conf", "app.conf", "dustin@prod:/srv/app.conf", "prod"));
+            drain(host);
+            var asked = new ArrayList<OpenRequest>();
+            Subscription registration = editor.opener(request -> { asked.add(request); return true; });
+            host.queuePathSelection(List.of(Files.writeString(home.resolve("unused.txt"), "x\n")));
+            assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
+            drain(host);
+            assertThat(asked).singleElement().satisfies(request -> assertThat(request.documentKey()).contains("stub:/srv/app.conf"));
+            assertThat(host.contentTabs()).as("the chooser never ran").hasSize(1);
+            registration.close();
         }
     }
 
