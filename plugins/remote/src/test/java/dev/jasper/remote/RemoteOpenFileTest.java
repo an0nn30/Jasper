@@ -104,6 +104,7 @@ class RemoteOpenFileTest {
             assertThat(picker.hosts().getSelectedIndex()).isEqualTo(-1);
             assertThat(picker.openButton().isEnabled()).isFalse();
             picker.hosts().setSelectedIndex(0);
+            picker.connectButton().doClick();
             RemotePluginTest.awaitRowCount(host, picker.browser(), 1);
             picker.cancelButton().doClick();
             assertThat(host.windowContent("dev.jasper.remote", "Open Remote File")).isEmpty();
