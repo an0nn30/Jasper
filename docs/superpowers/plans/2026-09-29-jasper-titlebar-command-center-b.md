@@ -2,8 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-09-29 on `claude/titlebar-plan-b`. Not started.
+**Status:** Implemented inline 2026-09-29 (6b7e0334..536ff95c); `./gradlew check` 6,535 tests green (6 skipped).
 Record every deviation from this text here and in `docs/STATUS.md`.
+
+Deviations:
+- Task 1: `WindowHeader.getPreferredSize()` returns its minimum size instead of the symmetric preferred width the plan gave:
+  twice the toolbar's full width plus the field widened new windows past their terminal area
+  (`InitialWindowSizeTest` expected 970 px, got 1020). The header adapts to the window; the terminal sizes it.
+- Task 5: FlatLaf's menu bar border has a 1 px bottom inset, so `withoutAHeaderTheBarFoldsAgainstItsOwnWidth` checks the
+  first menu's bounds against the bar's insets instead of a fixed 24 px height.
+- Task 6: `WindowChromeContributionsTest.menuRefreshDuringNativeMenuMutationDoesNotDuplicateTopLevelMenus` listed every
+  menu-bar component, which now includes the two fold controls; it reads `CollapsingMenuBar.menus()` instead.
 
 **Goal:** Keep the title search field dead centre on every window, make the palette card one colour, and give Windows and Linux a custom title bar: app icon, menus that fold into "…" and then ☰, the centred field, the toolbar, and the window buttons. A `window.native_decorations` setting opts out.
 

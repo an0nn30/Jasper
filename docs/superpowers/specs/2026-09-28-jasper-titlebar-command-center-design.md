@@ -1,6 +1,6 @@
 # Title-bar command centre, scope chips and custom title bars
 
-**Status:** Design approved in chat by the user on 2026-09-28; written specification approved the same day. Plan A implemented on `claude/titlebar-command-center`; plan B not written.
+**Status:** Design approved in chat by the user on 2026-09-28; written specification approved the same day. Plan A merged 2026-09-29; plan B implemented 2026-09-29 on `claude/titlebar-plan-b`, with the user's 2026-09-29 amendments (the field always centred; the palette card one colour).
 
 It amends:
 - [the unified header](2026-09-27-jasper-unified-header-design.md), where the header layout changes;
@@ -41,9 +41,8 @@ A new `workspace/WindowHeader` panel has three regions and a custom layout manag
 - **Native-decoration fallback:** empty.
 
 **Centre: `TitleSearchField`** (§2)
-- It is centred on the **window**, not on the space left between the other regions.
+- It is always centred on the **window**, never slid off centre (user decision, 2026-09-29). Each side gives way instead: toolbar labels drop, then toolbar controls move into ⋮; on Windows and Linux the menus fold into "…" and then ☰. Only when a side can give way no further does the field shrink around the centre, and then collapse to its magnifier, still centred.
 - Preferred width is 560 logical pixels, clamped to 240–640.
-- When the side regions would overlap the centred field, it first slides off centre toward the larger gap, then shrinks toward its minimum.
 
 **Trailing: the existing `WindowToolbar`, right-aligned**
 - The glue that pinned Find and Settings to the right is removed. The whole group packs against the right edge, before the window controls on Windows and Linux.
@@ -51,11 +50,14 @@ A new `workspace/WindowHeader` panel has three regions and a custom layout manag
 - Hiding is still by priority and unchanged (lowest first, later controls first within a priority). The toolbar gets its full width, capped by what is left after the leading slot and the field's **preferred** width, and never less than its own minimum (padding plus ⋮). That is what makes buttons overflow before the field shrinks. (Corrected by plan A; the first version said the field's minimum width, which contradicted the squeeze order.)
 
 **Squeeze order as the window narrows**
-1. Toolbar buttons overflow into ⋮.
-2. The field shrinks to its minimum.
+1. Toolbar labels drop (icons only).
+2. Toolbar buttons overflow into ⋮.
 3. The menus fold into "…" (Windows and Linux custom decorations only).
 4. The menus collapse to ☰ (Windows and Linux custom decorations only).
-5. The field collapses to a magnifier icon button with the same tooltip and click action.
+5. The field shrinks around the centre to its minimum.
+6. The field collapses to a magnifier icon button with the same tooltip and click action.
+
+The two sides give way independently; the field keeps the window's centre throughout.
 
 Widening reverses each step.
 
@@ -121,6 +123,7 @@ A lightweight `JComponent` painted by hand: a button that looks like a field. It
 - It has a 1-pixel `Popup.borderColor` hairline and the existing drop shadow.
 - There is no gap above the card.
 - It appears instantly, with no animation.
+- The card is one colour throughout: the query row, the field, the list, a step form and the hint bar all use `List.background`; the field keeps its border and the hint bar its top rule (user decision, 2026-09-29).
 
 **Card sections, top to bottom**
 - The query row: an optional chip (§3.1), then the text.
@@ -194,10 +197,10 @@ The tab strip is removed.
 
 Rules for both stages:
 - The collapsed menus are the same `JMenu` objects, re-parented and never copied. Accelerators, enablement and mnemonics keep working.
-- Alt and F10 mnemonics still open the first visible menu.
+- F10 opens the first showing menu; Alt mnemonics work for menus that are showing.
 - The popup uses the app's rounded popup styling.
 
-**Dialogs and auxiliary frames** (the `NativeShells` frames: Settings, the plugin manager, …) use the same FlatLaf decorations, show their title centred, and have no header, no field and no menus. This mirrors how dialogs look on macOS.
+**Dialogs and auxiliary frames** (the `NativeShells` frames: Settings, the plugin manager, …) use the same FlatLaf decorations and show their title centred, with no header and no field. Auxiliary frames keep their existing File menu (New Window, Close Window, Quit), now embedded in the title pane. This mirrors how dialogs look on macOS.
 
 **Native fallback**
 - `window.native_decorations = true` keeps the native frame and `frame.setJMenuBar(...)`, as today.

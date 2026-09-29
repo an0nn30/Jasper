@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-28
 
+- **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
+  `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
+  - **Centring:** the search field is always centred on the window, and the sides give way first.
+  - **Palette:** the card is one colour.
+  - **Windows and Linux:** get FlatLaf's title bar with the app icon, menus (folding to "…" then ☰), field,
+    toolbar and window buttons; `window.native_decorations` (restart) keeps the system title bar.
+  - Executed inline 2026-09-29 (6b7e0334..536ff95c); `./gradlew check` 6,535 tests green (6 skipped).
+  - Deviations: listed in the plan's banner.
+  - Not done: GUI checks on Windows and Linux (Snap Layouts, double-click maximise, dragging the empty title
+    bar and toolbar gaps, both menu folds, F10), the macOS look after the centring change, merge and push.
 - **Title-bar command centre, plan A** (branch `claude/titlebar-command-center`, spec
   `docs/superpowers/specs/2026-09-28-jasper-titlebar-command-center-design.md`, plan
   `docs/superpowers/plans/2026-09-28-jasper-titlebar-command-center-a.md`):
