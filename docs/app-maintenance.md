@@ -35,7 +35,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ## Palette scope
 
-Implement the existing [PaletteScope](../jasper-app/src/main/java/dev/jasper/app/palette/PaletteScope.java) contract, following `CommandsScope` in the same package (the History and Snippets scopes are plugins now; see below). Register it when WindowContent composes scopes; use WindowCommandPalette for overlay/focus/target integration; return bounded rows using context.maxResults. Keep search/availability free of I/O, refresh provider data on its worker, and notify via a closeable subscription. PaletteController owns queued completion generations; never bypass its stale-origin checks. Those checks protect UI publication, not cancellation of already-submitted provider work. Providers own cancellation and side-effect lifetime checks. Return dev.jasper.app.lifecycle.Subscription from onChanged.
+Implement the existing [PaletteScope](../jasper-app/src/main/java/dev/jasper/app/palette/PaletteScope.java) contract, following `CommandsScope` in the same package (the History and Snippets scopes are plugins now; see below). Register it when WindowContent composes scopes; use WindowCommandPalette for overlay/focus/target integration; return at most context.maxResults rows (the list scrolls through them). Keep search/availability free of I/O, refresh provider data on its worker, and notify via a closeable subscription. PaletteController owns queued completion generations; never bypass its stale-origin checks. Those checks protect UI publication, not cancellation of already-submitted provider work. Providers own cancellation and side-effect lifetime checks. Return dev.jasper.app.lifecycle.Subscription from onChanged.
 
 <!-- example:scope -->
 ```java

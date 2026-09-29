@@ -40,6 +40,24 @@ class CustomTitleBarTest {
         });
     }
 
+    @Test void decorationsThatArriveWithTheNativePeerStillGetTheCustomTitleBar() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var root = new JRootPane();
+            WindowContent.installTitleBar(root, owner, false, title -> { });
+            assertThat(WindowContent.installCustomTitleBar(root, owner)).isFalse();
+            root.setJMenuBar(owner.menuBar());
+            // Windows 10 and 11: FlatLaf decorates the frame only once its peer exists.
+            root.setWindowDecorationStyle(JRootPane.FRAME);
+            assertThat(owner.chrome().header().getParent()).isSameAs(owner.chrome().menuBar());
+            assertThat(root.getClientProperty(FlatClientProperties.TITLE_BAR_SHOW_TITLE)).isEqualTo(false);
+            root.setWindowDecorationStyle(JRootPane.NONE);
+            root.setWindowDecorationStyle(JRootPane.FRAME);
+            assertThat(owner.chrome().menuBar().getComponents())
+                .as("installed once").filteredOn(child -> child == owner.chrome().header()).hasSize(1);
+        });
+    }
+
     @Test void theHeaderJoinsTheMenusInTheTitlePaneWithTheFieldCentredOnTheWindow() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

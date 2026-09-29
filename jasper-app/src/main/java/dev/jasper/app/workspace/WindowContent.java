@@ -242,10 +242,26 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /**
      * Windows and Linux custom title bar: the header joins the menus in FlatLaf's title pane, which embeds the menu bar.
      * The title pane shows no title text (the field shows the context) and follows the toolbar height and chrome colours.
-     * Returns false, changing nothing, when {@code root} has no look-and-feel decorations.
+     * Returns true when {@code root} already has look-and-feel decorations. Otherwise it changes nothing yet and returns
+     * false, installing once decorations arrive: on Windows 10 and 11 FlatLaf decorates a frame only when its native peer
+     * is created (on {@code pack} or first show), so a new frame's root pane still reads {@code NONE} here.
      */
     static boolean installCustomTitleBar(JRootPane root, WindowContent content) {
-        if (root.getWindowDecorationStyle() == JRootPane.NONE) return false;
+        if (root.getWindowDecorationStyle() != JRootPane.NONE) {
+            decorateTitleBar(root, content);
+            return true;
+        }
+        root.addPropertyChangeListener("windowDecorationStyle", new java.beans.PropertyChangeListener() {
+            @Override public void propertyChange(java.beans.PropertyChangeEvent event) {
+                if (root.getWindowDecorationStyle() == JRootPane.NONE) return;
+                root.removePropertyChangeListener("windowDecorationStyle", this);
+                decorateTitleBar(root, content);
+            }
+        });
+        return false;
+    }
+
+    private static void decorateTitleBar(JRootPane root, WindowContent content) {
         WindowHeader header = content.chrome.header();
         content.remove(header);
         content.chrome.menuBar().setHeader(header);
@@ -260,7 +276,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         colors.run();
         content.onThemeChanged = theme -> colors.run();
         content.revalidate();
-        return true;
     }
 
     void installRootBindings(JRootPane root) {
