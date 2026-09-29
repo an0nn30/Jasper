@@ -57,6 +57,11 @@ public final class CoreSettings {
     public static final Setting<Integer> WINDOW_LINES = Setting.of("window.lines", SettingKind.integer(2, 200, DEFAULT), 35)
         .label("Initial lines").keywords("grid", "height", "size", "rows").applies(Applies.NEW_WINDOWS)
         .description("Initial rows for new windows only, 2-200.").build();
+    public static final Setting<Boolean> WINDOW_NATIVE_DECORATIONS = Setting.of("window.native_decorations", SettingKind.bool(), false)
+        .label("Use the system title bar").keywords("title bar", "decorations", "window frame", "menu bar")
+        .applies(Applies.RESTART)
+        .description("Windows and Linux only: use the operating system's title bar, with the menus and the toolbar in\n"
+            + "rows of their own, instead of Jasper's title bar. macOS always uses its own title bar.").build();
     public static final Setting<Boolean> BUDDY_ENABLED = Setting.of("buddy.enabled", SettingKind.bool(), false)
         .label("Show Jasper").keywords("buddy", "desk buddy", "mascot")
         .description("Show the pixel-art Jasper floating above your windows while a terminal is open; off by default,\n"
@@ -194,7 +199,7 @@ public final class CoreSettings {
 
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
-            WINDOW_COLUMNS, WINDOW_LINES, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
+            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_MAX_RESULTS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_COLORS, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,

@@ -18,7 +18,7 @@ class CoreSettingsTest {
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(34);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(35);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -64,5 +64,14 @@ class CoreSettingsTest {
         assertThat(snapshot.terminal().env()).containsExactly(Map.entry("A", "1"));
         assertThat(snapshot.statusBarHeight()).isEqualTo(30);
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));
+    }
+
+    @org.junit.jupiter.api.Test void nativeDecorationsIsARestartOnlyWindowSettingOffByDefault() {
+        var setting = CoreSettings.WINDOW_NATIVE_DECORATIONS;
+        assertThat(setting.name()).isEqualTo("window.native_decorations");
+        assertThat(setting.defaultValue()).isFalse();
+        assertThat(setting.applies()).isEqualTo(dev.jasper.app.settings.Applies.RESTART);
+        assertThat(dev.jasper.app.config.ConfigSnapshot.defaults().nativeDecorations()).isFalse();
+        assertThat(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder().nativeDecorations(true).build().nativeDecorations()).isTrue();
     }
 }
