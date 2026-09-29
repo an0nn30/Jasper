@@ -149,6 +149,31 @@ class ShortcutEditingTest {
         });
     }
 
+    /**
+     * Container.validateTree lays out hidden children too, so the hidden edit card is laid out at 0x0 before its first
+     * edit. Its wrapped note then measured a negative width and asked for a card ten times too tall.
+     */
+    @Test void theEditCardKeepsItsHeightAfterBeingLaidOutWhileHidden() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var panel = new ShortcutPanel(true, changes -> new CompletableFuture<>());
+            panel.setRows(ShortcutCatalog.rows(KeyBindings.withOverrides(true, Map.of("copy", "none")), List.of(), Map.of(), true));
+            panel.setSize(560, 600);
+            layoutAll(panel);
+            panel.search.setText("Copy"); clickShortcut(panel);
+            assertThat(panel.editor.isVisible()).isTrue();
+            layoutAll(panel);
+            assertThat(panel.editor.getPreferredSize().height).as("the card's preferred height").isLessThan(200);
+            assertThat(panel.editor.getHeight()).as("the card's height").isLessThan(200);
+            panel.close();
+        });
+    }
+
+    /** Lays out every container, hidden ones included, as Container.validateTree does. */
+    private static void layoutAll(java.awt.Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layoutAll(nested);
+    }
+
     private static void clickShortcut(ShortcutPanel panel) {
         panel.tree.setSize(900, 400); panel.tree.doLayout();
         var cell = panel.tree.getRowBounds(1);

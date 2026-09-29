@@ -29,7 +29,18 @@ final class ShortcutEditPanel extends JPanel {
     final JButton restore = new JButton("Restore default");
     final JButton record = new JButton("Record shortcut");
     final JCheckBox reassign = new JCheckBox("Reassign from conflicting action");
-    final JTextArea message = new JTextArea(2, 20);
+    /**
+     * The card's note. Container.validateTree lays out hidden children too, so while the card is hidden at 0x0 the note
+     * is given a negative width; a wrapped text area keeps measuring at that width, a character per line, and the card
+     * would ask to be ten times too tall on its first edit. A degenerate size is taken as none, which the text UI
+     * measures as never laid out.
+     */
+    final JTextArea message = new JTextArea(2, 20) {
+        @Override public void setBounds(int x, int y, int width, int height) {
+            if (width <= 0 || height <= 0) { width = 0; height = 0; }
+            super.setBounds(x, y, width, height);
+        }
+    };
     private final JLabel title = new JLabel();
     private final JTextField value = new JTextField();
     private final boolean macOs;
