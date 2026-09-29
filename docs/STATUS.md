@@ -9,7 +9,9 @@
   functions (`VimStrings`) and searchpair(). The corpus gains `filetype:` (Vim loads the filetype plugin and syntax).
   Every file in the plan was compiled and run against Vim 9.1 before the plan was written: 2164 corpus cases
   (98 new), with and without a final line break.
-  - Not done: executing the plan; GUI checks 104–109 of the [checklist](editor-verification.md) (user-run); plan V4d
+  - Executed inline on 2026-09-29 (9f85bd53..4ce02518): every step's expected result matched; `./gradlew check`
+    7,031 tests green.
+  - Not done: GUI checks 104–109 of the [checklist](editor-verification.md) (user-run); plan V4d
     (sneak); push.
 - **Editor Vim mode, plan V4b** (branch `claude/vim-v4b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v4b.md`, written 2026-09-28): the extensions paragraph-motion, textobj-entire,
