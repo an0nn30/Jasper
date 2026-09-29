@@ -12,6 +12,8 @@
   `EditorWindowTest`.
   - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
   - `./gradlew check`: 4,359 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 as a fast-forward (main had not moved); the check above is the merged
+    tree's. Not pushed.
   - Not done: GUI checks 80–88 of the [checklist](editor-verification.md) (user-run); plan V4
     (extensions); push.
 - **Editor Vim mode, plan V3a** (branch `claude/vim-v3a`, plan
