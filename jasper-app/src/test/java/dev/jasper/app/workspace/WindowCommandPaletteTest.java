@@ -77,21 +77,51 @@ class WindowCommandPaletteTest {
             }
         });
     }
-    @Test void overlayDoesNotResizeTerminalAndAnchorsTheCardTopInTheWholeWindow() throws Exception {
+    @Test void anAnchoredCardCoversTheFieldIsAtLeast560WideAndStaysInTheWindow() {
+        var window = new Rectangle(0, 0, 1400, 900);
+        var field = new Rectangle(420, 4, 560, 22);
+        assertThat(WindowCommandPalette.anchored(field, window, new Dimension(680, 300), 560, 16))
+            .isEqualTo(new Rectangle(420, 4, 560, 300));
+        var narrow = new Rectangle(500, 4, 300, 22);
+        assertThat(WindowCommandPalette.anchored(narrow, window, new Dimension(680, 300), 560, 16))
+            .as("centred on the field, widened to the minimum").isEqualTo(new Rectangle(370, 4, 560, 300));
+        var edge = new Rectangle(20, 4, 300, 22);
+        assertThat(WindowCommandPalette.anchored(edge, window, new Dimension(680, 300), 560, 16).x).isEqualTo(16);
+        var small = new Rectangle(0, 0, 350, 210);
+        assertThat(WindowCommandPalette.anchored(new Rectangle(20, 4, 286, 22), small, new Dimension(680, 400), 560, 16))
+            .isEqualTo(new Rectangle(16, 4, 318, 210 - 16 - 4));
+    }
+    @Test void overlayDoesNotResizeTerminalAndTheCardDropsFromTheTitleField() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner); var before = owner.tabStrip().getBounds();
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 assertThat(owner.tabStrip().getBounds()).isEqualTo(before);
                 var palette = owner.commandPalette().component();
-                var deck = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), palette.getParent());
-                assertThat(Math.abs(palette.getBounds().getCenterX() - deck.getCenterX())).isLessThanOrEqualTo(1);
-                assertThat(palette.getBounds().y).isEqualTo(deck.y + deck.height / 5);
+                var search = owner.chrome().search();
+                var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());
+                assertThat(palette.getY()).as("the card covers the field").isEqualTo(field.y);
+                assertThat(Math.abs(palette.getBounds().getCenterX() - field.getCenterX())).isLessThanOrEqualTo(1);
+                assertThat(palette.getWidth()).isEqualTo(Math.max(field.width, 560));
                 owner.setActive(false); assertThat(owner.commandPalette().isOpen()).isFalse();
             }
         });
     }
-    @Test void toolPanelsDoNotShiftOrConstrainTheWindowCenteredPalette() throws Exception {
+    @Test void aCollapsedFieldFallsBackToTheCentredCard() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var root = install(owner);
+                owner.chrome().search().setCollapsed(true);
+                owner.commandPalette().toggle();
+                owner.chrome().search().setCollapsed(true);
+                ((JComponent) owner.commandPalette().component().getParent()).doLayout();
+                var palette = owner.commandPalette().component();
+                var deck = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), palette.getParent());
+                assertThat(palette.getBounds().y).isEqualTo(deck.y + deck.height / 5);
+            }
+        });
+    }
+    @Test void toolPanelsDoNotShiftOrConstrainTheDroppedPalette() throws Exception {
         DesktopTestSupport.edt(() -> {
             for (boolean nativeHeader : new boolean[]{false, true}) {
                 try (var owner = owner(new CommandHistory())) {
@@ -101,25 +131,24 @@ class WindowCommandPaletteTest {
                         LayoutTestSupport.layoutTree(root);
                         owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                         var palette = owner.commandPalette().component();
-                        int top = palette.getY();
+                        var placed = palette.getBounds();
                         for (int sideWidth : new int[]{260, 400}) {
                             owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, new JPanel(), sideWidth);
                             owner.regions().show(dev.jasper.app.contributions.PanelRegion.RIGHT, new JPanel(), 220);
                             owner.regions().show(dev.jasper.app.contributions.PanelRegion.BOTTOM, new JPanel(), 180);
                             LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root);
-                            assertThat(Math.abs(palette.getBounds().getCenterX() - root.getLayeredPane().getWidth() / 2.0))
-                                .as("centered across the window with tool panels").isLessThanOrEqualTo(1);
-                            assertThat(palette.getWidth()).isEqualTo(palette.getPreferredSize().width);
-                            assertThat(palette.getY()).isEqualTo(top);
+                            assertThat(palette.getBounds()).as("panels leave the card where it is").isEqualTo(placed);
                         }
                         root.setSize(900, 700); LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root);
-                        assertThat(Math.abs(palette.getBounds().getCenterX() - 450)).isLessThanOrEqualTo(1);
+                        var search = owner.chrome().search();
+                        var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());
+                        assertThat(Math.abs(palette.getBounds().getCenterX() - field.getCenterX())).isLessThanOrEqualTo(1);
+                        assertThat(palette.getY()).isEqualTo(field.y);
                     }
                 }
             }
         });
     }
-
     @Test void overlayShadowTintsTowardThePopupDropShadowColour() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {

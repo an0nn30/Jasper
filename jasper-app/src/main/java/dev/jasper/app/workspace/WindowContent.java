@@ -446,6 +446,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
     }
     WindowCommandPalette commandPalette() { return commandPalette; }
+    /** The title field's bounds in {@code target}'s coordinates while the palette can drop from it; null otherwise. */
+    java.awt.Rectangle paletteAnchor(Component target) {
+        TitleSearchField field = chrome.search();
+        if (!field.isVisible() || field.collapsed() || field.getWidth() <= 0 || field.getParent() == null) return null;
+        if (SwingUtilities.getRootPane(field) != SwingUtilities.getRootPane(target)) return null;
+        return SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), target);
+    }
     WindowChrome chrome() { return chrome; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
