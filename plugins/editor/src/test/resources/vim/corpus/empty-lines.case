@@ -1,0 +1,334 @@
+# An empty last line, and the text with no lines but an empty one: each case also runs without a final line break.
+
+=== P puts a line above the one empty line
+register a: l "x\n"
+text:
+  $
+cursor: 1,1
+keys: "aP
+--- vim 9.1
+expect-text:
+  x
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== p puts a line below the one empty line
+register a: l "x\n"
+text:
+  $
+cursor: 1,1
+keys: "ap
+--- vim 9.1
+expect-text:
+  $
+  x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== put puts a line below the one empty line
+register a: l "x\n"
+text:
+  $
+cursor: 1,1
+keys: :put a<CR>
+--- vim 9.1
+expect-text:
+  $
+  x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== 0put puts a line above the one empty line
+register a: l "x\n"
+text:
+  $
+cursor: 1,1
+keys: :0put a<CR>
+--- vim 9.1
+expect-text:
+  x
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== O on the one empty line
+text:
+  $
+cursor: 1,1
+keys: O<Esc>
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== o on the one empty line
+text:
+  $
+cursor: 1,1
+keys: o<Esc>
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Enter on the one empty line
+text:
+  $
+cursor: 1,1
+keys: i<CR><Esc>
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Enter twice then text on the one empty line
+text:
+  $
+cursor: 1,1
+keys: i<CR><CR>x<Esc>
+--- vim 9.1
+expect-text:
+  $
+  $
+  x
+expect-cursor: 3,1
+expect-mode: normal
+
+=== x on the only character
+text:
+  a
+cursor: 1,1
+keys: x
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dd on the only line then o
+text:
+  a
+cursor: 1,1
+keys: ddo<Esc>
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dG then P keeps the empty line
+register a: l "x\n"
+text:
+  one
+  two
+cursor: 1,1
+keys: dG"aP
+--- vim 9.1
+expect-text:
+  x
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== dG then p keeps the empty line
+register a: l "x\n"
+text:
+  one
+  two
+cursor: 1,1
+keys: dG"ap
+--- vim 9.1
+expect-text:
+  $
+  x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Visual line p over every line leaves no empty line
+register a: l "x\n"
+text:
+  one
+  two
+cursor: 1,1
+keys: Vj"ap
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual line p over every line with two lines
+register b: l "x\ny\n"
+text:
+  one
+  two
+cursor: 1,1
+keys: Vj"bp
+--- vim 9.1
+expect-text:
+  x
+  y
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual line P over every line
+register a: l "x\n"
+text:
+  one
+  two
+cursor: 1,1
+keys: Vj"aP
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual p over every character
+register a: l "x\n"
+text:
+  one
+cursor: 1,1
+keys: v$"ap
+--- vim 9.1
+expect-text:
+  $
+  x
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== percent d then put
+register a: l "x\n"
+text:
+  one
+  two
+cursor: 1,1
+keys: :%d<CR>:put a<CR>
+--- vim 9.1
+expect-text:
+  $
+  x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== yy P on the one empty line
+text:
+  $
+cursor: 1,1
+keys: yyP
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== t0 copies the one empty line
+text:
+  $
+cursor: 1,1
+keys: :t0<CR>
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== D on the last line then o
+text:
+  a
+  b
+cursor: 1,1
+keys: jDo<Esc>
+--- vim 9.1
+expect-text:
+  a
+  $
+  $
+expect-cursor: 3,1
+expect-mode: normal
+
+=== dd on the last line
+text:
+  a
+  b
+cursor: 1,1
+keys: jdd
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+
+=== x on the last line character then u
+text:
+  a
+  b
+cursor: 1,1
+keys: jxu
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 2,1
+expect-mode: normal
+
+=== x on the last line character then u and CTRL-R
+text:
+  a
+  b
+cursor: 1,1
+keys: jxu<C-r>
+--- vim 9.1
+expect-text:
+  a
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== A Enter on the last line
+text:
+  a
+cursor: 1,1
+keys: A<CR><Esc>
+--- vim 9.1
+expect-text:
+  a
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s on the last character of the last line
+text:
+  a
+  b
+cursor: 1,1
+keys: js<Esc>
+--- vim 9.1
+expect-text:
+  a
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== J on the last two lines leaving
+text:
+  a
+  $
+cursor: 1,1
+keys: J
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal

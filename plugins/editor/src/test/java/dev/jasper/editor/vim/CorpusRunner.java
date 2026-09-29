@@ -8,16 +8,21 @@ import java.util.function.Consumer;
 
 /**
  * Replays a corpus case on Jasper's engine (spec 11.1): a headless {@link VimTextArea} holding the text with a final
- * line break, Vim's own option defaults, and the keys fed as typed.
+ * line break (or, for {@link VimCorpusTest}'s second run, without one), Vim's own option defaults, and the keys fed as
+ * typed.
  */
 final class CorpusRunner {
     private CorpusRunner() { }
 
     /** @return what the engine did, in the corpus's terms; runs on the event thread, as the Editor does */
-    static CorpusCase.Expected run(CorpusCase c, Consumer<String> coverage) {
+    static CorpusCase.Expected run(CorpusCase c, Consumer<String> coverage) { return run(c, coverage, true); }
+
+    /** @return what the engine did, on the text with or without a final line break */
+
+    static CorpusCase.Expected run(CorpusCase c, Consumer<String> coverage, boolean finalBreak) {
         var result = new java.util.concurrent.atomic.AtomicReference<CorpusCase.Expected>();
         try {
-            javax.swing.SwingUtilities.invokeAndWait(() -> result.set(runHere(c, coverage)));
+            javax.swing.SwingUtilities.invokeAndWait(() -> result.set(runHere(c, coverage, finalBreak)));
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(interrupted);
@@ -29,14 +34,14 @@ final class CorpusRunner {
         return result.get();
     }
 
-    private static CorpusCase.Expected runHere(CorpusCase c, Consumer<String> coverage) {
+    private static CorpusCase.Expected runHere(CorpusCase c, Consumer<String> coverage, boolean finalBreak) {
         var vim = new Vim(VimHost.detached());
         vim.coverage(coverage);
         var area = new VimTextArea();
         area.setInsertPairedCharacters(false);
         area.setCloseCurlyBraces(false);
         area.setCloseMarkupTags(false);
-        area.setText(String.join("\n", c.text()) + "\n");
+        area.setText(String.join("\n", c.text()) + (finalBreak ? "\n" : ""));
         area.discardAllEdits();
         if (c.folds() != null) javaFolds(area, c.closedAtStart());
         var editor = new VimEditor(vim, area, EditorDefaults.VIM);

@@ -260,6 +260,9 @@ final class Visual {
         Context delete = new Context(editor);
         delete.register = keepRegisters ? '_' : 0;
         editor.setCursor(range.span().start(), true);
+        // A linewise delete of every line leaves Vim's buffer empty (ML_EMPTY).
+        Buffer b = editor.buffer();
+        boolean empty = range.span().linewise() && range.span().start().line == 0 && range.span().end().line == b.count() - 1;
         Operators.delete(delete, range.span(), false);
         editor.marks().set('[', range.span().start());
         char target = 0;
@@ -283,6 +286,13 @@ final class Visual {
         put.hasCount = c.hasCount;
         try {
             Put.put(put, forward, c.count, flags, mode == Mode.VISUAL_BLOCK ? visualEnd : -1);
+            // When all lines were selected and deleted, the put leaves the empty line that was left, which goes now;
+            // the cursor, if it was on it, goes to the end of the last line.
+            if (empty && b.count() > 1 && b.line(b.count() - 1).isEmpty()) {
+                int last = b.count() - 1;
+                b.deleteLines(last, last);
+                if (editor.cursor().line >= last) editor.setCursor(new Pos(last - 1, Math.max(0, Text.last(b.line(last - 1)))));
+            }
         } finally {
             if (saving) c.registers.restore(target, deleted);
             editor.machine().visualChange(range.redo());

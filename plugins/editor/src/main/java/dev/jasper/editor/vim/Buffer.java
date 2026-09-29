@@ -97,14 +97,18 @@ final class Buffer {
 
     void insert(int offset, String text) {
         if (text.isEmpty()) return;
+        boolean ended = finalBreak();
         try { document.insertString(offset, text, null); }
         catch (BadLocationException bad) { throw new IllegalStateException(bad); }
+        keepLastLine(ended);
     }
 
     void remove(int from, int to) {
         if (to <= from) return;
+        boolean ended = finalBreak();
         try { document.remove(from, to - from); }
         catch (BadLocationException bad) { throw new IllegalStateException(bad); }
+        keepLastLine(ended);
     }
 
     void replace(int from, int to, String text) {
@@ -112,6 +116,7 @@ final class Buffer {
             insert(from, text);
             return;
         }
+        boolean ended = finalBreak();
         try {
             if (document instanceof AbstractDocument abstractDocument) abstractDocument.replace(from, to - from, text, null);
             else {
@@ -119,6 +124,18 @@ final class Buffer {
                 document.insertString(from, text, null);
             }
         } catch (BadLocationException bad) { throw new IllegalStateException(bad); }
+        keepLastLine(ended);
+    }
+
+    /**
+     * Keeps an empty last line that an edit left in a text without a final line break: the text now ends with the
+     * break that only ended the line before, so it gets the final break that makes the empty line a line (as Vim
+     * writes a file with 'eol'). A text that had its final break keeps it, and the edit decided that.
+     */
+    private void keepLastLine(boolean ended) {
+        if (ended || !finalBreak()) return;
+        try { document.insertString(document.getLength(), "\n", null); }
+        catch (BadLocationException bad) { throw new IllegalStateException(bad); }
     }
 
     /**
@@ -126,7 +143,6 @@ final class Buffer {
      * where Vim's does (for the {@code '.} mark) and the undo holds only the change.
      */
     void setLine(int line, String text) {
-        if (text.endsWith("\n") && line == count() - 1 && !finalBreak()) text += "\n";
         String old = line(line);
         if (text.equals(old)) return;
         int prefix = 0, max = Math.min(old.length(), text.length());
@@ -146,14 +162,10 @@ final class Buffer {
             insert(start(line), block + "\n");
             return;
         }
-        if (finalBreak()) insert(length(), block + "\n");
-        else insert(length(), "\n" + block + (!text.isEmpty() && text.getLast().isEmpty() ? "\n" : ""));
+        insert(length(), finalBreak() ? block + "\n" : "\n" + block);
     }
 
-    /**
-     * @return whether the text ends with a line break; without one an empty last line added by an edit needs one,
-     *     or it would only end the line before it
-     */
+    /** @return whether the text ends with a line break, which ends its last line */
     private boolean finalBreak() {
         int length = length();
         return length > 0 && charAt(length - 1) == '\n';

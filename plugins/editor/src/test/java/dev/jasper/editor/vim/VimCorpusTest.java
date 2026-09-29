@@ -34,6 +34,17 @@ class VimCorpusTest {
         }));
     }
 
+    /**
+     * A file without a final line break edits as one with it in Vim (only 'eol' differs), so every case runs again
+     * on its text without one. A text ending in an empty line has no such form: without the break that would end it,
+     * {@code "a\n"} is the one line {@code a}.
+     */
+    @TestFactory Stream<DynamicTest> everyCaseDoesTheSameWithoutAFinalLineBreak() {
+        return cases().stream().filter(c -> c.expected() != null && !(c.text().size() > 1 && c.text().getLast().isEmpty()))
+            .map(c -> DynamicTest.dynamicTest("no final break: " + c, () ->
+                assertThat(CorpusRunner.compare(c.expected(), CorpusRunner.run(c, id -> { }, false))).as("%s without a final break, keys %s", c, c.keys()).isEmpty()));
+    }
+
     @Test void everyCommandHasACase() {
         Set<String> used = new TreeSet<>();
         for (CorpusCase c : cases()) CorpusRunner.run(c, used::add);

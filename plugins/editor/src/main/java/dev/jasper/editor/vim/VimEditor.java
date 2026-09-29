@@ -802,9 +802,14 @@ public final class VimEditor {
         }
     }
 
-    /** @return the first line an undo event changed; text inserted at a line's end that starts with a break changes the next line */
+    /**
+     * @return the first line an undo event changed; text inserted at a line's end that starts with a break changes the
+     *     next line. An event past the last line's break (a text without a final break passes through one while an
+     *     empty last line comes back) changes the line after it.
+     */
     private int changedLine(DocumentEvent event, boolean inserted) {
-        int line = buffer.lineOf(event.getOffset());
+        int line = buffer.document().getDefaultRootElement().getElementIndex(event.getOffset());
+        if (line >= buffer.count()) return line;
         if (inserted && event.getOffset() == buffer.end(line) && buffer.charAt(event.getOffset()) == '\n') return line + 1;
         return line;
     }
