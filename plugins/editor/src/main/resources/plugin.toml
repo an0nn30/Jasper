@@ -6,5 +6,5 @@ sdk = ">=0.9.3, <0.10"
 description = "Edit local and remote text files in tabs, with syntax highlighting."
 vendor = "Jasper"
 icon = "icons/editor.svg"
-capabilities = []
+capabilities = ["palette.contribute"]
 exports = ["dev.jasper.editor.api"]
