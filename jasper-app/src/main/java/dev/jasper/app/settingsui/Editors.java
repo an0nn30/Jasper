@@ -1,6 +1,9 @@
 package dev.jasper.app.settingsui;
 
 import com.formdev.flatlaf.FlatClientProperties;
+import dev.jasper.app.config.CoreSettings;
+import dev.jasper.app.config.TerminalConfig;
+import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settings.SettingKind;
 import java.awt.BorderLayout;
@@ -123,6 +126,12 @@ public final class Editors {
     /** A checkbox meaning "use the default", and a spinner enabled when it is cleared; the default removes the key. */
     public static Factory<Float> optionalNumber(String label, double step, String unit) {
         return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit), List.of());
+    }
+
+    /** The detected shell profiles and a button that detects them again; an empty value shows the effective profile. */
+    public static Factory<String> profile(ShellChoices shells) {
+        return new Factory<>((setting, context) -> new Profile(shells, context.draft()),
+            List.of("PowerShell", "Command Prompt", "WSL", "Custom", "default shell"));
     }
 
     /** {@code icons_and_labels} becomes "Icons and labels". */
@@ -370,5 +379,95 @@ public final class Editors {
         }
         @Override public void onEdit(Runnable listener) { listeners.add(listener); }
         @Override public boolean removesAtDefault() { return true; }
+    }
+
+    static final class Profile implements ValueEditor<String> {
+        final JComboBox<String> box = new JComboBox<>();
+        final JButton detect;
+        private final List<String> ids = new ArrayList<>();
+        private final JComponent component;
+        private final ShellChoices shells;
+        private final SettingsDraft draft;
+        private final Subscription listening;
+        private String shown = "";
+        /** The id the box displays for {@link #shown} or the last edit; picking it again is no edit. */
+        private String current = "";
+        /** How many entries are choices; any after them is the one "(not detected)" entry. */
+        private int detected;
+        private boolean showing;
+        private final List<Runnable> edits = new ArrayList<>();
+
+        Profile(ShellChoices shells, SettingsDraft draft) {
+            this.shells = shells;
+            this.draft = draft;
+            box.setPrototypeDisplayValue("Ubuntu-22.04 (WSL 2 \u00B7 default)");
+            detect = Items.button("\u21BB", "Detect shells again", shells.refresh());
+            component = line(box, detect);
+            fill();
+            listening = shells.onChanged().apply(this::fill);
+            box.addActionListener(event -> {
+                if (showing || value().equals(current)) return;
+                current = value();
+                for (Runnable listener : List.copyOf(edits)) listener.run();
+            });
+        }
+
+        /** Rebuilds the entries from the current choices, keeping the selection. */
+        void fill() {
+            String keep = box.getSelectedIndex() < 0 ? shown : ids.get(box.getSelectedIndex());
+            showing = true;
+            try {
+                box.removeAllItems();
+                ids.clear();
+                for (ShellChoices.Choice choice : shells.choices().get()) add(choice.id(), choice.label());
+                if (!ids.contains(ShellChoices.CUSTOM)) add(ShellChoices.CUSTOM, "Custom");
+                detected = ids.size();
+                select(keep);
+            } finally { showing = false; }
+        }
+
+        private void add(String id, String label) { ids.add(id); box.addItem(label); }
+
+        private void select(String value) {
+            // At most one undetected entry: the one for the value shown now.
+            while (ids.size() > detected) {
+                ids.removeLast();
+                box.removeItemAt(box.getItemCount() - 1);
+            }
+            String wanted = effective(value);
+            // WSL distribution names ignore case, as the launcher's resolution does: select the detected spelling.
+            String id = ids.stream().filter(known -> known.equals(wanted)
+                || known.startsWith(WSL_PREFIX) && wanted.startsWith(WSL_PREFIX) && known.equalsIgnoreCase(wanted))
+                .findFirst().orElse(wanted);
+            if (!ids.contains(id)) add(id, id + " (not detected)");
+            box.setSelectedIndex(ids.indexOf(id));
+            current = id;
+        }
+
+        private static final String WSL_PREFIX = "wsl:";
+
+        /** Empty means Custom while the old program or args settings are in use, else the platform default (the first choice). */
+        private String effective(String value) {
+            if (!value.isEmpty()) return value;
+            if (TerminalConfig.Shell.custom(draft.value(CoreSettings.TERMINAL_SHELL_PROGRAM), draft.value(CoreSettings.TERMINAL_SHELL_ARGS), ""))
+                return ShellChoices.CUSTOM;
+            return ids.stream().filter(id -> !id.equals(ShellChoices.CUSTOM)).findFirst().orElse(ShellChoices.CUSTOM);
+        }
+
+        @Override public JComponent component() { return component; }
+        @Override public String value() {
+            int index = box.getSelectedIndex();
+            return index < 0 ? "" : ids.get(index);
+        }
+        @Override public void show(String value) {
+            showing = true;
+            try { shown = value; select(value); } finally { showing = false; }
+        }
+        /**
+         * A pick that differs from what the box displayed. Swing reports picking the selected entry again too, which
+         * would turn an empty setting shown as its effective profile into an explicit one.
+         */
+        @Override public void onEdit(Runnable listener) { edits.add(listener); }
+        @Override public void dispose() { listening.close(); }
     }
 }

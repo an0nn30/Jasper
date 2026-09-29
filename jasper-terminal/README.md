@@ -47,7 +47,8 @@ Launch command, environment and working directory must be explicit. Supply an
 actual executable instead of the illustrative `example-shell`; environment is
 not inherited implicitly. The process factory forces `TERM=xterm-256color` and
 `COLORTERM=truecolor` in its copied environment. Pass `localHostNames` so a directory
-reported under another host is not taken for a local path.
+reported under another host is not taken for a local path, and `localPathMapper` when a
+local report's path means a different directory on this machine (a WSL distribution's paths).
 
 <!-- example:configuration -->
 ```java

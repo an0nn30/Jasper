@@ -2,10 +2,12 @@ package dev.jasper.sdk.testing;
 
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.MissingCapabilityException;
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.Direction;
 import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.PaneInfo;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.terminal.WindowHandle;
@@ -154,9 +156,10 @@ final class FakeTerminals implements Terminals {
         Objects.requireNonNull(window, "window");
         requireFor(request);
         context.requireOpen();
+        if (!knownProfile(request)) return Optional.empty();
         return workspace.window(window.id()).map(target -> switch (request) {
             case OpenRequest.Local local -> {
-                workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-"));
+                workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-") + profile(local));
                 FakeWorkspace.Tab tab = workspace.addTab(target, "opened");
                 FakeWorkspace.Pane pane = workspace.addPane(tab, openedInfo(local));
                 yield new Pane(pane.id, tab.id);
@@ -176,10 +179,12 @@ final class FakeTerminals implements Terminals {
         Objects.requireNonNull(direction, "direction");
         requireFor(request);
         context.requireOpen();
+        if (!knownProfile(request)) return Optional.empty();
         return workspace.pane(target.id()).map(model -> {
             FakeWorkspace.Pane pane = switch (request) {
                 case OpenRequest.Local local -> {
-                    workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-"));
+                    workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-")
+                        + profile(local));
                     yield workspace.addPane(model.tab, openedInfo(local));
                 }
                 case OpenRequest.Session session -> {
@@ -193,6 +198,34 @@ final class FakeTerminals implements Terminals {
             return new Pane(pane.id, model.tab.id);
         });
     }
+
+    @Override public List<ShellProfileInfo> profiles() {
+        require(Capabilities.TERMINAL_OPEN);
+        context.requireOpen();
+        return workspace.profiles;
+    }
+
+    @Override public Subscription onProfilesChanged(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        require(Capabilities.TERMINAL_OPEN);
+        context.requireOpen();
+        Runnable entry = listener::run;
+        workspace.profileListeners.add(entry);
+        Subscription subscription = () -> workspace.profileListeners.remove(entry);
+        context.own(subscription);
+        return subscription;
+    }
+
+    /** The default shell, or a profile the test listed; anything else opens nothing, as in the application. */
+    private boolean knownProfile(OpenRequest request) {
+        if (!(request instanceof OpenRequest.Local local) || local.spec().profile().isEmpty()) return true;
+        String id = local.spec().profile().get();
+        if (workspace.profiles.stream().anyMatch(profile -> profile.id().equals(id))) return true;
+        context.log().log(System.Logger.Level.WARNING, "Unknown shell profile " + id + "; nothing opened");
+        return false;
+    }
+
+    private static String profile(OpenRequest.Local local) { return local.spec().profile().map(id -> "|" + id).orElse(""); }
 
     private static PaneInfo openedInfo(OpenRequest.Local local) {
         PaneInfo blank = PaneInfo.unknown();

@@ -8,12 +8,8 @@ import dev.jasper.terminal.session.TerminalSession;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
-import org.junit.jupiter.api.condition.OS;
 import static org.assertj.core.api.Assertions.*;
 
-// ControlledSessionChild signals readiness with an OSC 2 title, which pty4j's Windows backend (winpty) does not pass through.
-@DisabledOnOs(OS.WINDOWS)
 class SessionLaunchCoordinatorTest {
     @Test void lateSessionAfterPaneAndApplicationCloseIsNeverAttached() throws Exception {
         var executor = Executors.newSingleThreadExecutor();

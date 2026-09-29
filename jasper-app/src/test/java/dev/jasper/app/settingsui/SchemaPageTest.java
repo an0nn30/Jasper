@@ -119,4 +119,19 @@ class SchemaPageTest {
         var tools = new GroupPage("tools", "Tools", Optional.empty(), true, List::of, context);
         assertThat(tools.hiddenWhenChildless()).isTrue();
     }
+
+    @Test void aConditionEnablesARowOnlyWhileItHolds() {
+        var page = SchemaPage.page("bars", "Bars")
+            .row(CoreSettings.WINDOW_STATUS_BAR)
+            .row(CoreSettings.WINDOW_STATUS_BAR_HEIGHT, Editors.integer("px")).enabledWhen(d -> d.value(CoreSettings.WINDOW_STATUS_BAR))
+            .build(context);
+        page.component();
+        var height = page.rows().get(1).editor().component();
+        assertThat(height.isEnabled()).isTrue();
+        ((JCheckBox) page.rows().get(0).editor().component()).doClick();
+        assertThat(height.isEnabled()).isFalse();
+        assertThat(((java.awt.Container) height).getComponent(0).isEnabled()).as("its children too").isFalse();
+        page.reset();
+        assertThat(height.isEnabled()).isTrue();
+    }
 }

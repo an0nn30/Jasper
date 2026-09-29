@@ -68,10 +68,18 @@ class AppContractTest extends PluginContractTest {
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics) {
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, PluginRuntime.ShellProfiles.NONE);
+    }
+
+    /** As above, with the shell profiles plugins list and open. */
+    static PluginHost host(Path data, Duration drainGrace,
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
+                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles) {
         var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
-            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)))));
+            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -81,6 +89,17 @@ class AppContractTest extends PluginContractTest {
     static AuxiliaryWindows headlessWindows(UiState state) {
         return new AuxiliaryWindows(state, surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
             () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
+    }
+
+    /** The application's value for an SDK profile; the command is never run by the contract fixture. */
+    static dev.jasper.app.launch.ShellProfile appProfile(dev.jasper.sdk.terminal.ShellProfileInfo info) {
+        var kind = switch (info.kind()) {
+            case LOGIN_SHELL -> dev.jasper.app.launch.ShellProfile.Kind.LOGIN_SHELL;
+            case LOCAL_SHELL -> dev.jasper.app.launch.ShellProfile.Kind.LOCAL_SHELL;
+            case WSL -> dev.jasper.app.launch.ShellProfile.Kind.WSL;
+            case CUSTOM -> dev.jasper.app.launch.ShellProfile.Kind.CUSTOM;
+        };
+        return new dev.jasper.app.launch.ShellProfile(info.id(), info.name(), kind, info.detail(), List.of("sh"));
     }
 
     @Override protected ContractHarness newHarness() {
@@ -101,9 +120,10 @@ class AppContractTest extends PluginContractTest {
         }));
         List<String> notices = new CopyOnWriteArrayList<>();
         List<Path> edited = new CopyOnWriteArrayList<>();
+        TestShellProfiles shells = new TestShellProfiles();
         List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
         PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
-            diagnostics);
+            diagnostics, shells.source());
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
@@ -246,6 +266,9 @@ class AppContractTest extends PluginContractTest {
             @Override public String sessionOutput(UUID paneId) { return onEdtValue(() -> terminalFixture.sessionOutput(paneId)); }
             @Override public List<String> openRequests() {
                 return onEdtValue(() -> terminalFixture.opened().stream().filter(line -> !line.startsWith("front|")).toList());
+            }
+            @Override public void setShellProfiles(List<dev.jasper.sdk.terminal.ShellProfileInfo> profiles) {
+                onEdt(() -> shells.set(profiles.stream().map(AppContractTest::appProfile).toList()));
             }
             @Override public void finishCommand(UUID paneId, String command, int exitStatus) { onEdt(() -> terminalFixture.finishCommand(paneId, command, exitStatus)); }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) {

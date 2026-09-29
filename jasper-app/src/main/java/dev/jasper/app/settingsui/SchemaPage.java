@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -30,7 +31,7 @@ public final class SchemaPage implements SettingsPage {
     public record Button(String label, Runnable action, BooleanSupplier enabled) { }
 
     private sealed interface Item permits RowItem, SectionItem, ActionItem { }
-    private record RowItem(Setting<?> setting, Editors.Factory<?> editor, String note) implements Item { }
+    private record RowItem(Setting<?> setting, Editors.Factory<?> editor, String note, Predicate<SettingsDraft> enabled) implements Item { }
     private record SectionItem(String title) implements Item { }
     private record ActionItem(Supplier<String> text, List<Button> buttons) implements Item { }
 
@@ -52,13 +53,21 @@ public final class SchemaPage implements SettingsPage {
         public Spec anchor(String value) { anchor = value; return this; }
         public Spec section(String value) { items.add(new SectionItem(value)); return this; }
         public <T> Spec row(Setting<T> setting) { return row(setting, Editors.byKind(setting)); }
-        public <T> Spec row(Setting<T> setting, Editors.Factory<T> editor) { items.add(new RowItem(setting, editor, "")); return this; }
+        public <T> Spec row(Setting<T> setting, Editors.Factory<T> editor) { items.add(new RowItem(setting, editor, "", draft -> true)); return this; }
 
         /** Adds a note to the previous row's comment. */
         public Spec note(String text) {
             if (items.isEmpty() || !(items.getLast() instanceof RowItem)) throw new IllegalStateException("A note follows a row");
             RowItem row = (RowItem) items.removeLast();
-            items.add(new RowItem(row.setting(), row.editor(), text));
+            items.add(new RowItem(row.setting(), row.editor(), text, row.enabled()));
+            return this;
+        }
+
+        /** Enables the previous row's control only while {@code condition} holds for the dialog's draft. */
+        public Spec enabledWhen(Predicate<SettingsDraft> condition) {
+            if (items.isEmpty() || !(items.getLast() instanceof RowItem)) throw new IllegalStateException("A condition follows a row");
+            RowItem row = (RowItem) items.removeLast();
+            items.add(new RowItem(row.setting(), row.editor(), row.note(), java.util.Objects.requireNonNull(condition, "condition")));
             return this;
         }
 
@@ -76,16 +85,19 @@ public final class SchemaPage implements SettingsPage {
     static final class Row<T> {
         private final Setting<T> setting;
         private final ValueEditor<T> editor;
+        private final Predicate<SettingsDraft> enabled;
         private final HighlightBox box;
         private final JLabel comment = new JLabel();
         private final JLabel error = new JLabel();
         private final JButton reset = new JButton();
         private final String searchText;
         private boolean invalid;
+        private boolean shownEnabled = true;
 
-        Row(Setting<T> setting, ValueEditor<T> editor, String note, List<String> terms) {
+        Row(Setting<T> setting, ValueEditor<T> editor, String note, List<String> terms, Predicate<SettingsDraft> enabled) {
             this.setting = setting;
             this.editor = editor;
+            this.enabled = enabled;
             JComponent labelled = editor.labelled() ? editor.component() : label(setting.label() + ":");
             box = new HighlightBox(labelled);
             String applies = switch (setting.applies()) {
@@ -189,7 +201,7 @@ public final class SchemaPage implements SettingsPage {
         var setting = (Setting<T>) item.setting();
         var factory = (Editors.Factory<T>) item.editor();
         ValueEditor<T> editor = factory.build().apply(setting, context);
-        var row = new Row<>(setting, editor, item.note(), factory.terms());
+        var row = new Row<>(setting, editor, item.note(), factory.terms(), item.enabled());
         rows.add(row);
         if (editor.labelled()) {
             var c = constraints(0, y, 2);
@@ -316,6 +328,18 @@ public final class SchemaPage implements SettingsPage {
             if (!Objects.equals(current, value)) row.editor.show(value);
         }
         row.reset.setVisible(!Objects.equals(value, row.setting.defaultValue()));
+        // Only on a change: an editor that disables a part of itself (the optional size's spinner) keeps it disabled.
+        boolean enabled = row.enabled.test(context.draft());
+        if (enabled != row.shownEnabled) {
+            row.shownEnabled = enabled;
+            enable(row.editor.component(), enabled);
+        }
+    }
+
+    /** Swing does not disable a container's children with it. */
+    private static void enable(java.awt.Component component, boolean enabled) {
+        component.setEnabled(enabled);
+        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) enable(child, enabled);
     }
 
     @Override public boolean modified() {
@@ -347,5 +371,8 @@ public final class SchemaPage implements SettingsPage {
         if (panel != null) showValues();
     }
 
-    @Override public void dispose() { if (listening != null) listening.close(); }
+    @Override public void dispose() {
+        if (listening != null) listening.close();
+        for (Row<?> row : rows) row.editor.dispose();
+    }
 }

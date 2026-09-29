@@ -2,6 +2,7 @@ package dev.jasper.remote.ui;
 
 import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +39,137 @@ class HostsPanelTest {
         (h, favorite) -> events.add("favorite " + h.name() + " " + favorite), () -> events.add("import"));
     final RemoteHost prod = RemoteHost.create("prod", "api.example", 22, "deploy", new Auth.Vault(UUID.randomUUID()), "Production", Optional.empty());
     final RemoteHost nas = RemoteHost.create("nas", "nas.local", 2222, "me", Auth.AGENT, "", Optional.of(prod.id()));
+
+    final ShellProfileInfo ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 1"));
+    final ShellProfileInfo debian = new ShellProfileInfo("wsl:Debian", "Debian", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));
+    final ShellProfileInfo pwsh = new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty());
+
+    HostsPanel withDistros(java.util.function.Function<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon> icons) {
+        var panel = new HostsPanel(actions, icons);
+        panel.onDistros(profile -> events.add("open " + profile.name()), profile -> events.add("split " + profile.name()));
+        panel.setDistros(List.of(ubuntu, pwsh, debian), profile -> profile.equals(debian) ? 2 : 0);
+        panel.setHosts(List.of(prod), Optional.empty());
+        return panel;
+    }
+
+    static List<HostRows.Row> rows(HostsPanel panel) {
+        var out = new ArrayList<HostRows.Row>();
+        for (int i = 0; i < panel.list.getModel().getSize(); i++) out.add(panel.list.getModel().getElementAt(i));
+        return out;
+    }
+
+    static java.awt.Component render(HostsPanel panel, int index) {
+        return panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(index), index, false, false);
+    }
+
+    @Test void theHeadingReadsSessionsAndThereIsNoWslGroupWithoutDistributions() {
+        var panel = new HostsPanel(actions);
+        assertThat(panel.title.getText()).isEqualTo("Sessions");
+        panel.setDistros(List.of(pwsh), profile -> 0);
+        assertThat(rows(panel)).isEmpty();
+        assertThat(panel.empty.isVisible()).isTrue();
+        assertThat(panel.empty.getText()).as("without WSL the panel holds only hosts")
+            .isEqualTo("No hosts yet \u2014 Add or Import from ~/.ssh/config");
+        assertThat(panel.search.getClientProperty("JTextField.placeholderText")).isEqualTo("Search sessions\u2026");
+        panel.setHosts(List.of(prod), Optional.empty());
+        assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+    }
+
+    @Test void theEmptyHintSpeaksOfSshHostsWhenTheWslGroupIsShown() {
+        var panel = new HostsPanel(actions);
+        panel.setDistros(List.of(ubuntu), profile -> 0);
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
+        assertThat(panel.empty.isVisible()).isTrue();
+        assertThat(panel.empty.getText()).isEqualTo("No SSH hosts yet \u2014 Add or Import from ~/.ssh/config");
+        panel.setHosts(List.of(prod), Optional.empty());
+        panel.search.setText("zzz");
+        assertThat(rows(panel)).isEmpty();
+        assertThat(panel.empty.getText()).isEqualTo("No sessions match");
+        panel.setDistros(List.of(), profile -> 0);
+        assertThat(panel.empty.getText()).isEqualTo("No hosts match");
+    }
+
+    @Test void wslDistributionsComeFirstWithBadgesSessionsAndTheirOwnCard() {
+        var panel = withDistros(name -> null);
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 2, false, true),
+            new HostRows.Distro(ubuntu, 0), new HostRows.Distro(debian, 2), new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+        var header = (javax.swing.JLabel) render(panel, 0);
+        assertThat(header.getText()).isEqualTo("WSL   2");
+        assertThat(header.getToolTipText()).as("only the default host group can be renamed").isNull();
+        var busy = render(panel, 2);
+        assertThat(labels(busy)).contains("Debian", "WSL 2", "\u25CF", "2");
+        assertThat(busy.getAccessibleContext().getAccessibleName()).isEqualTo("Debian, WSL 2, 2 sessions");
+        assertThat(labels(render(panel, 1))).contains("Ubuntu", "WSL 1").doesNotContain("\u25CF");
+        assertThat(panel.selectedDistro()).as("the first selectable row").contains(ubuntu);
+        assertThat(panel.card.isVisible()).isTrue();
+        assertThat(panel.cardName.getText()).isEqualTo("Ubuntu");
+        assertThat(panel.cardAddress.getText()).isEqualTo("WSL 1");
+        assertThat(panel.cardInfo.getText()).isEqualTo("wsl.exe -d Ubuntu");
+        assertThat(panel.cardCredential.isVisible()).isFalse();
+        assertThat(panel.edit.isVisible()).isFalse();
+        assertThat(panel.connect.getText()).isEqualTo("Open");
+        panel.connect.doClick();
+        panel.activate(2);
+        assertThat(events).containsExactly("open Ubuntu", "open Debian");
+        panel.selectDistro("wsl:Debian");
+        panel.setDistros(List.of(ubuntu, debian), profile -> 1);
+        assertThat(panel.selectedDistro()).as("a refresh keeps the selection").contains(debian);
+        panel.select(prod.id());
+        assertThat(panel.selectedDistro()).isEmpty();
+        assertThat(panel.connect.getText()).isEqualTo("Connect");
+        assertThat(panel.edit.isVisible()).isTrue();
+        assertThat(panel.cardCredential.isVisible()).isTrue();
+    }
+
+    @Test void aHostGroupNamedWslCollapsesApartFromTheWslGroup() {
+        var box = RemoteHost.create("box", "box.example", 22, "me", Auth.AGENT, "wsl", Optional.empty());
+        var panel = new HostsPanel(actions);
+        panel.setDistros(List.of(ubuntu), profile -> 0);
+        panel.setHosts(List.of(box), Optional.empty());
+        panel.setCollapsed(Set.of("wsl"));
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0),
+            new HostRows.Group("wsl", 1, true));
+        panel.toggle(0);
+        assertThat(panel.wslCollapsed()).isTrue();
+        assertThat(panel.collapsed()).containsExactly("wsl");
+        panel.toggle(1);
+        assertThat(panel.collapsed()).isEmpty();
+        assertThat(panel.wslCollapsed()).isTrue();
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, true, true), new HostRows.Group("wsl", 1, false), new HostRows.Host(box));
+        panel.setWslCollapsed(false);
+        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(ubuntu, 0));
+    }
+
+    @Test void distroMenusOfferOnlyOpeningAndTheWslGroupCollapsesOnItsOwn() {
+        var icons = new java.util.EnumMap<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon>(dev.jasper.sdk.ui.BundledIcon.class);
+        for (var name : List.of(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER, dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN,
+                dev.jasper.sdk.ui.BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL))
+            icons.put(name, new dev.jasper.sdk.testing.FakeBundledIcon(name));
+        var panel = withDistros(icons::get);
+        var row = (java.awt.Container) render(panel, 1);
+        assertThat(((javax.swing.JLabel) row.getComponent(0)).getIcon()).isSameAs(icons.get(dev.jasper.sdk.ui.BundledIcon.TERMINAL_TOOLWINDOW_TERMINAL));
+        javax.swing.JPopupMenu menu = panel.menuFor(1);
+        assertThat(menu.getComponentCount()).isEqualTo(2);
+        assertThat(((javax.swing.JMenuItem) menu.getComponent(0)).getText()).isEqualTo("Open in new tab");
+        assertThat(((javax.swing.JMenuItem) menu.getComponent(1)).getText()).isEqualTo("Open in split");
+        ((javax.swing.JMenuItem) menu.getComponent(0)).doClick();
+        ((javax.swing.JMenuItem) menu.getComponent(1)).doClick();
+        assertThat(events).containsExactly("open Ubuntu", "split Ubuntu");
+        assertThat(panel.menuFor(0)).as("the WSL header offers no rename").isNull();
+        int[] changes = {0};
+        panel.onCollapsedChanged(() -> changes[0]++);
+        panel.toggle(0);
+        assertThat(changes[0]).isEqualTo(1);
+        assertThat(panel.wslCollapsed()).isTrue();
+        assertThat(panel.collapsed()).as("the WSL group is not in the host groups' collapsed set").isEmpty();
+        assertThat(rows(panel)).startsWith(new HostRows.Group(HostRows.WSL, 2, true, true), new HostRows.Group("Production", 1, false));
+        assertThat(((javax.swing.JLabel) render(panel, 0)).getIcon()).isSameAs(icons.get(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
+        panel.search.setText("deb");
+        assertThat(rows(panel)).containsExactly(new HostRows.Group(HostRows.WSL, 1, false, true), new HostRows.Distro(debian, 2));
+        panel.search.setText("");
+        panel.setDistros(List.of(), profile -> 0);
+        assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
+    }
 
     @Test void showingSelectsFirstHostAndArrowKeysNavigateImmediately() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
@@ -186,17 +318,17 @@ class HostsPanelTest {
 
     @Test void rowsKeepSessionCountsAndSearchableDetails() {
         var panel = new HostsPanel(actions);
-        panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu · 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
+        panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu \u00B7 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
         panel.setHosts(List.of(nas, prod), Optional.empty());
         panel.search.setText("ubuntu");
         assertThat(panel.list.getModel().getSize()).isEqualTo(2);
         var component = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(1), 1, false, false);
         assertThat(labels(component)).contains("nas");
         assertThat(component.getAccessibleContext().getAccessibleName()).contains("2 sessions");
-        assertThat(((javax.swing.JComponent) component).getToolTipText()).contains("me@nas.local:2222", "Ubuntu · 10.0.0.2");
+        assertThat(((javax.swing.JComponent) component).getToolTipText()).contains("me@nas.local:2222", "Ubuntu \u00B7 10.0.0.2");
         panel.select(nas.id());
         assertThat(panel.cardAddress.getText()).isEqualTo("me@nas.local:2222");
-        assertThat(panel.cardInfo.getText()).isEqualTo("Ubuntu · 10.0.0.2");
+        assertThat(panel.cardInfo.getText()).isEqualTo("Ubuntu \u00B7 10.0.0.2");
     }
     private static List<String> labels(java.awt.Component component) {
         var out = new ArrayList<String>();

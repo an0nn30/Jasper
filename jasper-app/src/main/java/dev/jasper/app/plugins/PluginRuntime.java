@@ -1,6 +1,7 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.settingsui.PageContext;
 import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.windows.AuxiliaryWindows;
@@ -28,6 +29,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import dev.jasper.app.terminals.TerminalRegistry;
 
 /**
@@ -152,6 +155,24 @@ public final class PluginRuntime {
         public static final SettingsReports IGNORED = new SettingsReports(diagnostic -> { }, file -> { });
     }
 
+    /**
+     * The shell profiles the application detected, as plugins see them through {@code Terminals.profiles()}. Both
+     * functions are called on the UI thread.
+     *
+     * @param current the profiles now, in display order
+     * @param onChanged registers a listener the catalog calls on the UI thread after a refresh; closing the result removes it
+     */
+    public record ShellProfiles(Supplier<List<ShellProfile>> current, Function<Runnable, dev.jasper.app.lifecycle.Subscription> onChanged) {
+        /** No profiles and no changes, for a runtime built without the catalog. */
+        public static final ShellProfiles NONE = new ShellProfiles(List::of, listener -> new dev.jasper.app.lifecycle.Subscription(() -> { }));
+
+        /** Rejects nulls. */
+        public ShellProfiles {
+            Objects.requireNonNull(current, "current");
+            Objects.requireNonNull(onChanged, "onChanged");
+        }
+    }
+
     private static final System.Logger LOG = System.getLogger(PluginRuntime.class.getName());
     private static final Duration DRAIN_GRACE = Duration.ofMillis(1500);
     private static final Duration LOCK_WAIT = Duration.ofSeconds(2);
@@ -164,6 +185,7 @@ public final class PluginRuntime {
     private final TerminalRegistry terminals;
     private final Consumer<String> notice;
     private final Consumer<Path> editor;
+    private final ShellProfiles profiles;
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
@@ -207,8 +229,28 @@ public final class PluginRuntime {
     public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals,
                          Consumer<String> notice, Consumer<Path> editor) {
+        this(options, notifier, reports, contributions, windows, terminals, notice, editor, ShellProfiles.NONE);
+    }
+
+    /**
+     * As the eight-argument constructor, plus the shell profiles plugins may list and open.
+     *
+     * @param options locations and mode
+     * @param notifier receives plugin activities for Buddy
+     * @param reports receives plugin complaints about their settings, and clears them per file
+     * @param contributions the application-wide model that plugin chrome contributions are written to
+     * @param windows builds plugin windows and dialogs
+     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param notice shows a plugin's error notice to the user, on the UI thread
+     * @param editor opens a file in the user's editor, off the UI thread; may throw
+     * @param profiles the detected shell profiles
+     */
+    public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
+                         Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals,
+                         Consumer<String> notice, Consumer<Path> editor, ShellProfiles profiles) {
         this.notice = Objects.requireNonNull(notice);
         this.editor = Objects.requireNonNull(editor);
+        this.profiles = Objects.requireNonNull(profiles);
         this.options = Objects.requireNonNull(options);
         this.notifier = Objects.requireNonNull(notifier);
         this.reports = Objects.requireNonNull(reports);
@@ -290,7 +332,7 @@ public final class PluginRuntime {
         statuses.addAll(resolution.rejected());
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
-            reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor, settingsFiles, reports.clear()));
+            reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor, settingsFiles, reports.clear(), profiles));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
                 settingsPoller = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(

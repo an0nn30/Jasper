@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import dev.jasper.terminal.internal.transport.AttachedTransport;
 import dev.jasper.terminal.internal.shell.DirectoryProvenance;
@@ -33,7 +34,13 @@ public final class TerminalAccess implements AutoCloseable {
     }
     /** A local process; {@code localHostNames} are the names under which a reported directory is local. Unsupported module collaboration API. */
     public TerminalAccess(PtyChild child, int columns, int rows, int scrollback, Set<String> localHostNames, JediTermEngine.Events events) {
-        this(new JediTermEngine(child, columns, rows, scrollback, events), events, System::nanoTime, new DirectoryProvenance(true, localHostNames));
+        this(child, columns, rows, scrollback, localHostNames, DirectoryProvenance::fileUriPath, events);
+    }
+    /** As above; {@code localPaths} maps a local report's path to a directory, empty to ignore it. Unsupported module collaboration API. */
+    public TerminalAccess(PtyChild child, int columns, int rows, int scrollback, Set<String> localHostNames,
+                          Function<String, Optional<Path>> localPaths, JediTermEngine.Events events) {
+        this(new JediTermEngine(child, columns, rows, scrollback, events), events, System::nanoTime,
+            new DirectoryProvenance(true, localHostNames, localPaths));
     }
     /** Unsupported module collaboration API; used only by terminal owners. */
     public TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock) {

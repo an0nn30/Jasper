@@ -1,12 +1,15 @@
 package dev.jasper.terminal.session;
 
 import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.internal.shell.DirectoryProvenance;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Immutable process inputs. Builders validate but perform no I/O.
@@ -17,9 +20,20 @@ import java.util.Set;
  * @param grid initial terminal size in cells
  * @param scrollback history capacity from 0 through 1,000,000 lines
  * @param localHostNames names this machine is known by, for classifying reported working directories; resolve them off the EDT, empty when unknown
+ * @param localPathMapper turns the path of a working-directory report classified as local into a directory on this machine;
+ *        empty ignores the report. It runs on the session's reader thread and must not block. Record equality compares
+ *        the mapper with its own {@code equals}, which for a lambda is identity: options that differ only in two
+ *        separately created mappers are not equal
  */
 public record SessionLaunchOptions(List<String> command, Map<String, String> environment,
-        Path workingDirectory, GridSize grid, int scrollback, Set<String> localHostNames) {
+        Path workingDirectory, GridSize grid, int scrollback, Set<String> localHostNames,
+        Function<String, Optional<Path>> localPathMapper) {
+    /**
+     * The default local path mapping: the reported path read as a {@code file} URI path on this machine, so
+     * {@code /home/me} becomes {@code \home\me} on Windows. Empty for a path that is not one.
+     */
+    public static final Function<String, Optional<Path>> DEFAULT_LOCAL_PATHS = DirectoryProvenance::fileUriPath;
+
     /** Copies collections and rejects invalid arguments before process creation. */
     public SessionLaunchOptions {
         command = List.copyOf(command);
@@ -42,13 +56,27 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
             throw new IllegalArgumentException("scrollback must be within 0–1000000");
         localHostNames = Set.copyOf(localHostNames);
         if (localHostNames.stream().anyMatch(String::isBlank)) throw new IllegalArgumentException("a local host name must not be blank");
+        Objects.requireNonNull(localPathMapper, "localPathMapper");
+    }
+    /**
+     * A launch description that reads local reports with {@link #DEFAULT_LOCAL_PATHS}.
+     * @param command executable followed by literal arguments
+     * @param environment complete child environment
+     * @param workingDirectory child directory
+     * @param grid initial terminal size in cells
+     * @param scrollback history capacity
+     * @param localHostNames names this machine is known by
+     */
+    public SessionLaunchOptions(List<String> command, Map<String, String> environment, Path workingDirectory,
+            GridSize grid, int scrollback, Set<String> localHostNames) {
+        this(command, environment, workingDirectory, grid, scrollback, localHostNames, DEFAULT_LOCAL_PATHS);
     }
     /** Starts a builder requiring an explicit command, environment, and working directory. */
     public static Builder builder() { return new Builder(); }
     /** Copies this launch description into an independent builder. */
     public Builder toBuilder() {
-        return new Builder().command(command).environment(environment)
-            .workingDirectory(workingDirectory).grid(grid).scrollback(scrollback).localHostNames(localHostNames);
+        return new Builder().command(command).environment(environment).workingDirectory(workingDirectory).grid(grid)
+            .scrollback(scrollback).localHostNames(localHostNames).localPathMapper(localPathMapper);
     }
     /** Thread-confined builder with an 80 by 24 grid and 10,000 history lines. */
     public static final class Builder {
@@ -58,6 +86,7 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
         private GridSize grid = new GridSize(80, 24);
         private int scrollback = 10_000;
         private Set<String> localHostNames = Set.of();
+        private Function<String, Optional<Path>> localPathMapper = DEFAULT_LOCAL_PATHS;
         private Builder() { }
         /** Copies the executable and arguments; no shell parsing is performed. */
         public Builder command(List<String> v) { command = List.copyOf(v); return this; }
@@ -71,9 +100,11 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
         public Builder scrollback(int v) { scrollback = v; return this; }
         /** Names this machine is known by; a working directory reported under any other host is not local. */
         public Builder localHostNames(Set<String> v) { localHostNames = Set.copyOf(v); return this; }
+        /** How a local working-directory report's path becomes a directory; empty ignores the report. */
+        public Builder localPathMapper(Function<String, Optional<Path>> v) { localPathMapper = v; return this; }
         /** Validates and creates an immutable launch description without process I/O. */
         public SessionLaunchOptions build() {
-            return new SessionLaunchOptions(command, environment, workingDirectory, grid, scrollback, localHostNames);
+            return new SessionLaunchOptions(command, environment, workingDirectory, grid, scrollback, localHostNames, localPathMapper);
         }
     }
 }

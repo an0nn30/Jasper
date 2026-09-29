@@ -131,7 +131,7 @@ class JasperApplicationResidencyTest {
         java.util.concurrent.atomic.AtomicInteger terminations = new java.util.concurrent.atomic.AtomicInteger();
         JasperApplication application = application(terminations::incrementAndGet);
         edt(() -> application.residency(true));
-        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/old.jar"), 1L, DesktopTestSupport.HOME);
+        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/old.jar"), 1L);
         assertThat(handler.apply(new LaunchRequest("t", Path.of("/new.jar"), 2L)))
             .isEqualTo(LaunchRequest.Response.STALE);
         edt(() -> { });
@@ -145,7 +145,7 @@ class JasperApplicationResidencyTest {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
         edt(application::quit);   // So the queued openOrRaise is inert and no window is created.
-        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/same.jar"), 7L, DesktopTestSupport.HOME);
+        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/same.jar"), 7L);
         assertThat(handler.apply(new LaunchRequest("t", Path.of("/same.jar"), 7L)))
             .isEqualTo(LaunchRequest.Response.OK);
         edt(() -> { });
@@ -158,7 +158,7 @@ class JasperApplicationResidencyTest {
         var terminated = new CountDownLatch(1);
         JasperApplication application = application(terminated::countDown);
         edt(() -> application.residency(true));
-        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/resident.jar"), 1L, DesktopTestSupport.HOME);
+        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/resident.jar"), 1L);
         var retire = new LaunchRequest("token", Path.of("/another-build.jar"), 2L, LaunchRequest.Kind.RETIRE);
         assertThat(handler.apply(retire)).isEqualTo(LaunchRequest.Response.OK);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("a resident process with no windows quits").isTrue();

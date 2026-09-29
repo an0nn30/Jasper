@@ -33,10 +33,16 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
 
     TerminalTab(Path directory, ShellLauncher launcher) { this(directory, launcher, null); }
 
-    TerminalTab(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) {
+    TerminalTab(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) { this(directory, launcher, requestOrNull, Optional.empty()); }
+
+    /**
+     * {@code profile} names the first pane's shell profile when it is a local shell; empty means the user's default.
+     * A null {@code directory} means nobody asked for one: the pane starts where a new shell starts.
+     */
+    TerminalTab(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile) {
         super(new BorderLayout());
         this.launcher = launcher;
-        TerminalPane pane = createPane(directory, requestOrNull);
+        TerminalPane pane = createPane(directory, requestOrNull, profile);
         tree = new SplitTree(pane.id());
         render();
     }
@@ -44,8 +50,8 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     void start() { focusedPane().start(); }
 
     /** {@code requestOrNull} makes the pane one whose session somebody else provides. */
-    private TerminalPane createPane(Path directory, SessionRequest requestOrNull) {
-        TerminalPane pane = new TerminalPane(directory, launcher, requestOrNull);
+    private TerminalPane createPane(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
+        TerminalPane pane = new TerminalPane(directory, launcher, requestOrNull, profile);
         panes.put(pane.id(), pane);
         pane.onChanged = () -> onChanged.run();
         pane.onFocused = () -> focus(pane);
@@ -83,11 +89,20 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     /** Splits a given pane, starting the new one in {@code directoryOrNull} or where the target is. Null when it cannot. */
     TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull) { return split(target, axis, directoryOrNull, null); }
 
-    /** As above; a request makes the new pane a provided session. The user's own split never passes one: it opens a local shell. */
+    /**
+     * As above; a request makes the new pane a provided session. The user's own split never passes one: it opens a
+     * local shell, which starts the target's profile.
+     */
     TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull, SessionRequest requestOrNull) {
+        return split(target, axis, directoryOrNull, requestOrNull,
+            target == null || requestOrNull != null ? Optional.empty() : target.profile());
+    }
+
+    /** As above with an explicit profile for a local pane; empty means the user's default. */
+    TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull, SessionRequest requestOrNull, Optional<String> profile) {
         if (closed || target == null || panes.get(target.id()) != target || !target.running()) return null;
         if (focusedPane() != target) focus(target);
-        TerminalPane pane = createPane(directoryOrNull == null ? target.directory() : directoryOrNull, requestOrNull);
+        TerminalPane pane = createPane(directoryOrNull == null ? target.inheritableDirectory() : directoryOrNull, requestOrNull, profile);
         tree.split(pane.id(), axis); render(); onChanged.run(); pane.start();
         return pane;
     }

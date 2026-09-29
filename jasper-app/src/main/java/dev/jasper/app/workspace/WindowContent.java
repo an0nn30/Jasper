@@ -148,8 +148,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
+        this(launcher, directory, directory == null, newWindow, quit, onEmpty, themes, bindings, history, macOs);
+    }
+
+    /**
+     * A {@code detached} window starts with no tab and holds detached content; any other starts one tab in
+     * {@code directory}, where null means where a new shell starts. {@code newWindow} receives null the same way.
+     */
+    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
         super(new BorderLayout());
-        detached = directory == null;
+        this.detached = detached;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
             @Override public Component getDefaultComponent(Container root) {
@@ -201,7 +210,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             }
         });
         themeRegistration = themes.subscribe(this::applyTheme);
-        if (directory != null) newTab(directory);
+        if (!detached) newTab(directory);
         else setPreferredSize(new Dimension(900, 650));
     }
 
@@ -544,16 +553,24 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     public TerminalTab currentTab() { return tabs.getSelectedComponent() instanceof TerminalTab tab ? tab : null; }
     public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
-    Path directory() { return currentPane() == null ? Path.of(System.getProperty("user.home")) : currentPane().directory(); }
+    /**
+     * Where a tab or window opened from here starts: the current pane's {@link TerminalPane#inheritableDirectory};
+     * null, meaning where a new shell starts, when there is no pane or it has no directory of its own.
+     */
+    Path directory() { return currentPane() == null ? null : currentPane().inheritableDirectory(); }
 
+    /** A tab whose shell starts in {@code directory}; null means where a new shell starts (the user's home). */
     public void newTab(Path directory) { openTab(directory); }
 
     TerminalTab openTab(Path directory) { return openTab(directory, null); }
 
     /** {@code requestOrNull} makes the tab's first pane a provided session instead of a local shell. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull) {
+    TerminalTab openTab(Path directory, SessionRequest requestOrNull) { return openTab(directory, requestOrNull, Optional.empty()); }
+
+    /** As above; {@code profile} names a local first pane's shell profile, empty for the user's default. */
+    TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
         if (closed) return null;
-        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull);
+        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull, profile);
         if (terminals != null) terminals.tabOpened(tab);
         tab.onChanged = () -> {
             for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current().palette());

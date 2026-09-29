@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.MissingCapabilityException;
@@ -9,6 +10,7 @@ import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionState;
+import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,55 @@ class HostedTerminalsTest {
     private HostedTerminals terminals(String... capabilities) {
         return new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of(capabilities)), fixture.registry, posted::add,
             onUi::get, open::get, new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
+    }
+
+    private final TestShellProfiles shells = new TestShellProfiles();
+
+    private HostedTerminals profiled(String... capabilities) {
+        return new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of(capabilities)), fixture.registry, posted::add,
+            onUi::get, open::get, new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null),
+            shells.source(), new Containment(() -> true));
+    }
+
+    static final ShellProfile LOGIN = new ShellProfile("login", "Login shell", ShellProfile.Kind.LOGIN_SHELL, Optional.empty(),
+        List.of("/bin/zsh", "-l"));
+    static final ShellProfile UBUNTU = new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.of("WSL 2"),
+        List.of("wsl.exe", "-d", "Ubuntu"));
+
+    @Test void profilesMirrorTheCatalogAndTheirListenersCloseWithThePlugin() {
+        shells.set(List.of(LOGIN, UBUNTU));
+        HostedTerminals terminals = profiled(Capabilities.TERMINAL_OPEN);
+        assertThat(terminals.profiles()).containsExactly(
+            new ShellProfileInfo("login", "Login shell", ShellProfileInfo.Kind.LOGIN_SHELL, Optional.empty()),
+            new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2")));
+        assertThatThrownBy(() -> profiled().profiles()).isInstanceOf(MissingCapabilityException.class);
+        assertThatThrownBy(() -> profiled().onProfilesChanged(() -> { })).isInstanceOf(MissingCapabilityException.class);
+        List<String> heard = new ArrayList<>();
+        dev.jasper.sdk.Subscription first = terminals.onProfilesChanged(() -> heard.add("first"));
+        terminals.onProfilesChanged(() -> { throw new IllegalStateException("a plugin bug"); });
+        terminals.onProfilesChanged(() -> heard.add("second"));
+        shells.set(List.of(UBUNTU));
+        assertThat(heard).as("a throwing listener is contained").containsExactly("first", "second");
+        first.close();
+        first.close();
+        shells.set(List.of(LOGIN));
+        assertThat(heard).containsExactly("first", "second", "second");
+        assertThat(shells.listeners()).isEqualTo(2);
+        terminals.closeAll();
+        assertThat(shells.listeners()).as("closed with the plugin").isZero();
+        shells.set(List.of());
+        assertThat(heard).hasSize(3);
+    }
+
+    @Test void aNamedProfileOpensOnlyWhenTheCatalogListsIt() {
+        shells.set(List.of(UBUNTU));
+        HostedTerminals terminals = profiled(Capabilities.TERMINAL_OPEN);
+        UUID window = fixture.addWindow(), tab = fixture.addTab(window, "build"), only = fixture.addPane(tab, "make", Path.of("/src"));
+        assertThat(terminals.openTab(terminals.windowHandle(window), OpenRequest.localProfile("wsl:Ubuntu"))).isPresent();
+        assertThat(terminals.openTab(terminals.windowHandle(window), OpenRequest.localProfile("wsl:Debian"))).isEmpty();
+        assertThat(terminals.split(terminals.paneHandle(only), Direction.RIGHT, OpenRequest.localProfile("pwsh"))).isEmpty();
+        assertThat(terminals.split(terminals.paneHandle(only), Direction.DOWN, OpenRequest.local())).as("the default needs no profile").isPresent();
+        assertThat(fixture.opened()).containsExactly("tab|" + window + "|-|wsl:Ubuntu", "split|" + only + "|DOWN|-");
     }
 
     @Test void queriesMirrorTheRegistryAndHandlesAreEqualById() {

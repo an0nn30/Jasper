@@ -20,4 +20,7 @@ public interface ValueEditor<T> {
 
     /** Whether choosing the default value means "remove the key" rather than "save the default". */
     default boolean removesAtDefault() { return false; }
+
+    /** Releases whatever the control listens to; its page calls this when it is disposed. */
+    default void dispose() { }
 }

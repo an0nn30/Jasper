@@ -31,6 +31,8 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
 Desk Buddy, System Settings), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins; the search field
 filters the tree and highlights matching settings on the page.
+Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
+("Ubuntu (WSL 1)"); ↻ detects them again. Program and Arguments apply only to Custom.
 
 Changes wait until **Apply** or **OK**; **Cancel** (or Escape) discards them, asking first. A page with unsaved
 changes shows its name in blue, and a setting that differs from its default has a Reset button, which removes
@@ -95,6 +97,7 @@ ligatures = true
 line_height = 1.0
 
 [terminal.shell]
+profile = ""
 program = ""
 args = []
 
@@ -139,7 +142,8 @@ name = "Jasper Dark"
 | `terminal.font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
 | `terminal.font.ligatures` | `true` | Boolean | Live |
 | `terminal.font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
-| `terminal.shell.program` | `""` | Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
+| `terminal.shell.profile` | `""` | `"login"` (macOS, Linux); `"powershell"`, `"pwsh"`, `"cmd"`, `"wsl:<name>"` (Windows); `"custom"`; empty picks `"custom"` when program or args are set, else the platform default | New pane requests |
+| `terminal.shell.program` | `""` | For `"custom"`. Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
 | `terminal.shell.args` | `[]` | Array of exact argument strings without NUL; empty strings allowed | New pane requests |
 | `terminal.env` | `{}` | Table of string values without NUL; names match `[A-Za-z_][A-Za-z0-9_]*` | New pane requests |
 | `terminal.scrollback` | `10000` | Integer 0–1000000 retained history lines | New pane requests |
@@ -387,7 +391,38 @@ A visual bell flashes a short foreground overlay for 150ms. Sound uses the syste
 
 Each new tab or split requests a new pane. Jasper captures its shell command, arguments, environment, scrollback capacity, shell-integration mode and shell label before dispatching the background launch. A reload cannot change an already queued request. Existing sessions retain those settings. Pending views still receive the latest live font and behavior settings when ready.
 
-With an empty program, macOS/Linux use the inherited `SHELL` followed by `-l`; when `SHELL` is unavailable or blank, the fallback is `/bin/zsh` on macOS and `/bin/bash` on Linux. Windows uses `powershell.exe -NoLogo`. Configured arguments append to that default command. An explicit program gets only the configured arguments, with no implicit login flag. Jasper does not split strings, expand shell expressions or parse a shell command line.
+`terminal.shell.profile` picks the shell new tabs start. Jasper detects the profiles at startup and again when you
+click ↻ next to Settings › Terminal › Shell › Profile. On Windows they are PowerShell (`powershell`, the default),
+PowerShell 7 (`pwsh`, when `pwsh.exe` is on `PATH`, under `%ProgramFiles%\PowerShell\7` or `7-preview`, or is the
+Microsoft Store alias in `%LOCALAPPDATA%\Microsoft\WindowsApps`), Command Prompt (`cmd`, which runs `%ComSpec%`) and
+each installed WSL distribution (`wsl:<name>`, matched without regard to case). Distributions are read from the
+registry, with `wsl.exe -l -v` as the fallback when the registry gives no answer; Docker Desktop's are hidden. On
+macOS and Linux the default is your login shell (`login`): the inherited `SHELL` followed by `-l`, or `/bin/zsh` on
+macOS and `/bin/bash` on Linux when `SHELL` is unavailable or blank. `custom` runs `program` and `args`: an empty
+program means the platform default with the configured arguments appended, and an explicit program gets only the
+configured arguments, with no implicit login flag. When `profile` is empty, a non-empty `program` or `args` means
+`custom`, so settings written before profiles existed keep working. A profile that is not installed starts the
+platform default and shows a warning with the configuration problems in the status bar. Until the startup detection
+finishes, a WSL or PowerShell 7 profile cannot be checked yet: a pane that starts one then waits for detection (at
+most 12 seconds, showing "Starting terminal…") and starts the platform default with that warning if the profile is
+missing; the warning also appears as soon as detection finds the configured profile missing. A split starts the profile of
+the pane it splits; New Tab starts the configured one. Jasper does not split strings, expand shell expressions or
+parse a shell command line.
+
+A WSL tab runs `wsl.exe -d <name> --cd <directory>` and is named after the distribution. The terminal process starts
+in your home folder; the directory goes to `--cd`: the Linux path when it is on that distribution's
+`\\wsl.localhost` share, any other existing Windows folder as it is, and `~` (the Linux home) otherwise. A new
+window, and a new tab from a pane that has reported no directory, asks for no directory and gets `~`; a split or
+new tab from a pane that reported your Windows home (a WSL shell in `/mnt/c/Users/me`) passes that folder on, so it
+stays there. Jasper adds `TERM`, `COLORTERM`,
+`TERM_PROGRAM`, `JASPER_TERMINAL` and, when it is set, `JASPER_SHELL_INTEGRATION/p` to `WSLENV` (after any entries
+already there, however `WSLENV` is spelled), because only variables listed in `WSLENV` reach Linux; `/p` turns the
+script folder into its `/mnt/c/...` path. A working directory the WSL shell reports becomes a Windows path:
+`/mnt/c/Users/me` is `C:\Users\me`, anything else `\\wsl.localhost\<name>\...`, so the status bar, breadcrumbs and
+"new tab here" all get a real path. A PowerShell or Command Prompt tab asked to start on a `\\wsl.localhost` share
+starts in your home folder instead, because those shells misbehave in UNC folders and touching the share can start
+the WSL 2 VM. Limits: a distribution whose hostname is not the Windows computer name reports its directory as
+remote, and an automount root other than `/mnt` is not recognised.
 
 For example, this starts zsh with exactly the two arguments `-l` and `-i`:
 
@@ -431,6 +466,11 @@ The working directory Jasper uses for "new tab in the same directory", command h
 - `"auto"` (the default) loads the script automatically, after your own shell startup files, with no dotfile edits.
 - `"manual"` only exports `JASPER_SHELL_INTEGRATION=<dir>` so you can `source` the script yourself: zsh `source "$JASPER_SHELL_INTEGRATION/jasper.zsh"`, bash `source "$JASPER_SHELL_INTEGRATION/jasper.bash"`, fish `source "$JASPER_SHELL_INTEGRATION/jasper.fish"`.
 - `"off"` exports nothing and injects nothing.
+
+**WSL.** Automatic loading does not reach a WSL shell: Jasper cannot know which shell the distribution starts. With
+`shell_integration` set to `"auto"` or `"manual"`, `JASPER_SHELL_INTEGRATION` arrives in Linux as a `/mnt/c/...`
+path, so add `[ -n "$JASPER_SHELL_INTEGRATION" ] && source "$JASPER_SHELL_INTEGRATION/jasper.bash"` to `~/.bashrc`
+(or the same line with `jasper.zsh` to `~/.zshrc`) inside the distribution.
 
 Injection only applies to a resolved program whose basename is exactly `zsh`, `bash` or `fish`; any other program (`sh`, nushell, PowerShell, a custom binary) only sees the exported variables. Each shell loads the script through a mechanism that leaves your own startup files in charge:
 

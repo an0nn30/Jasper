@@ -750,6 +750,18 @@ class ConfigurationControllerTest {
         edt(() -> assertThat(controller.state().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(50));
     }
 
+    @Test void applicationProblemsAreShownOnceUntilTheNextReload() throws Exception {
+        start("");
+        edt(() -> {
+            controller.report("terminal.shell.profile", "The shell profile \"wsl:Gone\" is not available.");
+            controller.report("terminal.shell.profile", "The shell profile \"wsl:Gone\" is not available.");
+            assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("terminal.shell.profile"))
+                .extracting(d -> d.message()).containsExactly("The shell profile \"wsl:Gone\" is not available.");
+        });
+        reload("[window]\ntab_height = 40\n");
+        edt(() -> assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().equals("terminal.shell.profile")));
+    }
+
     private static JButton find(java.awt.Component root, String name) {
         if (root instanceof JButton button && name.equals(button.getName())) return button;
         if (root instanceof java.awt.Container container)

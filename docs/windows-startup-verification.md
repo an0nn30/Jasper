@@ -48,48 +48,96 @@ These additional issues are outside the startup validator fix; they have not all
 been individually diagnosed. The log and Remote thread dump were retained locally
 as `%TEMP%/jasper-windows-check.log` and `%TEMP%/jasper-remote-test-threads.json`.
 
-## Observed failed test cases
+## Known failed test cases — re-verified 2026-09-28
 
-- `IntellijThemesTest > manifestPinsTheClassicLightChainAndTheDefaultSchemesToTheirUpstreamFiles()`
-- `SessionLaunchCoordinatorTest > shutdownWaitIncludesAcceptedLaunchAndLateChildExit()`
-- `SessionLaunchCoordinatorTest > admittedSessionExitsRemainTrackedUntilPaneOwnerClosesThem()`
-- `SessionLaunchCoordinatorTest > lateSessionAfterPaneAndApplicationCloseIsNeverAttached()`
-- `CommandHistoryTest > saveFailureIsLoggedAndDoesNotPreventMemoryRecency()`
-- `LaunchSettingsTest > userEnvOverlayCanStillOverrideTheIntegrationDirectory()`
+The 2026-09-27 run listed 43 failed test cases across app, Remote, Snippets, Vault, SDK testkit and terminal
+(see this file's history).
+The full `.\gradlew.bat check --continue` on 2026-09-28 (branch `worktree-wsl-hosts`, sessions on ConPTY, see the
+next section) completed every module, Remote included, and only the cases below failed or are known to fail on this
+machine. Everything else from the earlier list passed, including the three `SessionLaunchCoordinatorTest` cases
+(now enabled on Windows), `ShellIntegrationSessionTest > aDirectoryReportedUnderAnotherHostIsRemoteUntilALocalOneFollows()`,
+`ShellCommandTrackerTest > aRemoteReportClearsTheLocalDirectoryAndALocalOneClearsTheRemote()` and every Snippets,
+Vault and SDK testkit case.
+
+Failed in that run (symlink privilege, Unix path fixtures):
+
 - `ShellIntegrationScriptsTest > installReplacesASymlinkRatherThanWritingThroughIt()`
-- `ShellIntegrationScriptsTest > installWritesEveryFileOnceAndRewritesOnlyChangedContent()`
-- `AppDirsTest > daemonFilesShareOwnTheirOwnSubdirectoryOfTheRoot()`
-- `AppDirsTest > buddyStateLivesBesideCommandHistory()`
-- `IntellijIconsTest > manifestPinsEveryBundledSvgToItsUpstreamPathAndHash()`
-- `NamedIconsTest > manifestAndNoticeCoverAllStandardArtwork()`
-- `AppContractTest > openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane()`
-- `BundledSamplePluginTest > remoteLoadsWithoutVaultAndUsesHostIconsForEveryPlacement()`
-- `HostedChooserTest > terminalOwnerSelectsMultipleFilesOrOneDirectory()`
-- `HostedTerminalsTest > openingATabOrASplitReturnsTheNewPane()`
-- `HandoffSocketTest > aLivenessProbeLogsQuietlyRatherThanAlarmingly()`
-- `LaunchRequestTest > aRequestSurvivesEncodingIncludingPathsWithSeparatorsInThem()`
-- `TerminalTitleTest > idleTitleUsesDirectoryAndLoginShellLikeITerm()`
-- `WindowContributionsTest > aContributedScopeIsInThisWindowsPaletteItsShortcutSwitchesWhileOpenAndRequestsAreRouted()`
-- `WindowTabsTest > tooltipsAndTheTabListStayLiteralAndBounded()`
-- `WindowTabsTest > tooltipsCarryTheTitleAndTheLiveSelectShortcut()`
-- `ConnectionsTest > failuresHaveTheSpecsMessages(Path)`
-- `ConnectionsTest > cancellingSecondKeyRequestClosesFirstCopy(Path)`
-- `ConfigImportTest > resolvesTokensOnceAndRejectsUnsupportedSyntax()`
-- `ConfigImportTest > reimportPreservesIdentityAndOrganization()`
-- `SshConfigTest > readsFromDiskWithGlobbedIncludes(Path)`
+- `EditorsTest > listsTablesAndExecutablesEditTheirValues()`: the Unix `"/bin/zsh"` fixture becomes `"\bin\zsh"`
+  (pre-existing, not caused by the WSL branch).
 - `FileEndpointTest > localContract()`
 - `FileEndpointTest > rejectsIntermediateLinksWithoutTouchingTheirReferents()`
 - `SftpEndpointTest > sftpV3ContractAndSubsystemCloseKeepsSharedSessionAlive()`
-- `TransferCoordinatorTest > blockedPayloadDoesNotBlockPauseAndResumeUsesOwnedPartial()`
 - `TransferCoordinatorTest > folderTransferPreservesEmptyDirectoriesLinksAndUsesBoundedQueue()`
-- `TransferCoordinatorTest > retryFailedCopiesFixedItemsAndLeavesSkippedItemsSkipped()`
-- `TransferRecoveryTest > pauseCommitsShortSegmentResumeTruncatesOnlyOwnedTailAndRejectsEditedPrefix()`
 - `KnownHostsTest > ownDanglingSymlinkIsNotAnEmptyTrustFile(Path)`
 - `FileOperationTest > recursiveDeleteNeverFollowsLinksAndTransferReservationsBlockIt(Path)`
-- `SftpControllerTest > explicitDirectoryLinkNavigationShowsResolvedPathAndDoesNotChangeNoFollowOperations()`
-- `SnippetFileTest > parseIsLenientPerEntryAndStrictPerFile()`
-- `ManagedSshKeyTest > readsIndependentLegacyFixture()`
-- `FakeChooserTest > scriptsMultipleFilesAndDirectoryAndDiscardsClosedOwnerResults()`
-- `FakeContractTest > openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane()`
-- `ShellIntegrationSessionTest > aDirectoryReportedUnderAnotherHostIsRemoteUntilALocalOneFollows()`
-- `ShellCommandTrackerTest > aRemoteReportClearsTheLocalDirectoryAndALocalOneClearsTheRemote()`
+
+Timing-sensitive under full-check load (passed in that run and alone; failed once in an earlier full run):
+
+- `TerminalAppIntegrationTest > rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation(String) [3] "reflow"`:
+  uses `FakeConnector`, no PTY; tripped its 5 s wait while the whole build was running.
+
+Arrived with the merge of `main` (plugin settings C1-C3, Vim V1c-V3a) on 2026-09-28; each also fails on `main`
+itself (c974ec4d) on this machine:
+
+- `EditorsTest > aPathEditorBrowsesForAFile()`: the Unix `"/bin/zsh"` fixture becomes `"\bin\zsh"`.
+- Editor `CompletionTest > bufferNamesThatHoldTheText()`: a Windows temp path in the buffer names.
+- Editor `ExFilesTest > editOpensAFileOrReadsTheTabsFileAgain()`: `sub\other.txt` where `sub/other.txt` is expected.
+- Editor `ViewportSyncTest > wrappedScreenLinesAreTheSameInTheViewAndOnTheScreen()`: `g$` lands on the wrong
+  screen line (font metrics).
+- `TerminalAppIntegrationTest` `"reflow"` above failed again in the merged tree's full check.
+
+## ConPTY and WSL shell profiles — 2026-09-28
+
+Branch: `worktree-wsl-hosts` (plan `docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`).
+
+Sessions on Windows now run on ConPTY (`PtyChild.builder` sets `setUseWinConPty(true)`). Headless results on this
+machine:
+
+- `PtyConnectorTest > conPtyPassesTitlesAndWorkingDirectoryReportsThrough()`: PASS. OSC 2 titles and OSC 7
+  reports reach Jasper through ConPTY.
+- `PtyConnectorTest > powershellStartsWithInheritedWindowsDriveEnvironment()`: PASS; the `=C:` handling is
+  unchanged.
+- `ShellIntegrationSessionTest > aDirectoryReportedUnderAnotherHostIsRemoteUntilALocalOneFollows()` and
+  `ShellCommandTrackerTest > aRemoteReportClearsTheLocalDirectoryAndALocalOneClearsTheRemote()`: PASS. They do not
+  use a PTY, so ConPTY did not change them; they are off the known-failure list.
+- `SessionLaunchCoordinatorTest`: its child signals readiness with an OSC 2 title, which winpty dropped, so it was
+  disabled on Windows. Under ConPTY all three cases pass (three consecutive runs); the Windows disable is removed.
+- `ShellProfilesTest > anExecutionAliasCountsAsExistingThoughItCannotBeFollowed()` is skipped here: creating its
+  symlink needs a privilege this account lacks. It runs on macOS and Linux.
+- Full `check --continue`: 3458 tests, 237 skipped, 8 failed (app 1176/144 skipped/2 failed, terminal 391/19/0,
+  Editor 1172/13/0, Remote 271/54/6, Vault 139/7/0, Buddy 163/0/0, History 40/0/0, SDK 26/0/0, SDK testkit
+  58/0/0, Sample 11/0/0, Snippets 11/0/0) — every failure is on the list above.
+
+Native acceptance for the user (no GUI was launched):
+
+- [ ] A PowerShell tab: prompt, typing, resize (`$Host.UI.RawUI.WindowSize` follows), the title, no stray
+      cursor-visibility or title sequences on screen, colours intact.
+- [ ] Command Prompt and, if installed, PowerShell 7 from Settings › Terminal › Shell › Profile.
+- [ ] A WSL 1 tab and a WSL 2 tab: named after the distribution; `echo $TERM $COLORTERM $TERM_PROGRAM` prints
+      `xterm-256color truecolor Jasper` (if `TERM` differs, record it: `WSLENV` already forwards it).
+- [ ] A new WSL tab from a window in your Windows home starts in the Linux home (`pwd` prints `/home/...`, not
+      `/mnt/c/Users/...`).
+- [ ] With the manual `source` line from configuration.md in `~/.bashrc`: the status bar shows the Linux directory
+      as a `\\wsl.localhost\...` path; `cd /mnt/c/Users` shows `C:\Users`.
+- [ ] A split of a WSL tab starts in the same Linux directory; New Tab starts the default profile.
+- [ ] A split of a WSL tab after `cd /mnt/c/Users/<you>` starts in `/mnt/c/Users/<you>`, not the Linux home.
+- [ ] A configured but uninstalled WSL/pwsh profile at startup (for example `profile = 'wsl:Gone'` in
+      `config.toml`, then start Jasper) starts PowerShell in the first window with a warning in the status bar, not a
+      failed pane.
+- [ ] Choosing a WSL distribution as the Profile and applying: the next New Tab starts it; an uninstalled profile id in
+      `config.toml` starts PowerShell and shows a warning in the status bar.
+- [ ] ↻ next to the Profile dropdown detects the profiles again without freezing the dialog.
+
+Remote's WSL group (plan `docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`; the same checks are items 11
+to 15 under "Native acceptance" in `docs/remote.md`). The full `check --continue` after plan B: 3479 tests, 234
+skipped, 8 failed (app 1187/141/2, Remote 278/54/6, the rest 0 failed), exactly the "Failed in that run" list above.
+
+- [ ] The rail panel is titled **Sessions** and starts with a WSL group: each distribution with its WSL 1 or WSL 2
+      badge, `docker-desktop` absent.
+- [ ] Double-click (or Enter, or **Open**) on a distribution opens a tab running it; **Open in split** in the context
+      menu splits the current pane.
+- [ ] The row shows a dot for one open pane and a count for two; exiting or closing them clears it.
+- [ ] The toolbar's **Sessions** dropdown lists the distributions first ("Ubuntu (WSL 2)"); choosing one opens a tab.
+- [ ] `>ssh` in the palette lists distributions as `WSL` rows; Enter opens a tab, Ctrl+Enter splits.
+- [ ] ↻ after installing or removing a distribution updates the group, the dropdown and `>ssh` without a restart;
+      a collapsed WSL group stays collapsed after a restart.

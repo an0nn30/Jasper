@@ -82,7 +82,7 @@ class ResidentIndicatorTest {
         var terminations = new AtomicInteger();
         JasperApplication application = application(terminations::incrementAndGet, indicator);
         edt(() -> application.residency(true));
-        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/old.jar"), 1L, DesktopTestSupport.HOME);
+        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/old.jar"), 1L);
         assertThat(handler.apply(new LaunchRequest("t", Path.of("/new.jar"), 2L))).isEqualTo(LaunchRequest.Response.STALE);
         edt(() -> { });
         assertThat(indicator.removed()).as("not resident any more").hasValue(1);

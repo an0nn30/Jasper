@@ -383,3 +383,23 @@ and the page's unsaved values. The application's `PluginRuntime.settingsPages` r
 contained) for each running plugin with settings, and a `PluginStubPage` for each plugin that is enabled but not
 running, at most one page per plugin id (a copy superseded by another copy of the same plugin gets none);
 `CorePages` places them under Tools. Apply writes the plugin's file through `DeclaredSettings.save`.
+
+### Shell profiles (SDK 0.9.1)
+
+`Terminals.profiles()` lists the shells the application detected (`launch.ShellProfileCatalog`:
+PowerShell, PowerShell 7, Command Prompt and each WSL distribution on Windows, the login shell
+elsewhere, and Custom when `terminal.shell.program` is set) as `ShellProfileInfo(id, name, kind,
+detail)`, and `onProfilesChanged` fires after a detection completes (the first one, then each later
+one whose result differs: WSL distributions or PowerShell 7 appearing or disappearing; the catalog's
+`onChanged`); edits to the Custom shell settings may not be reported. Both are binary-compatible default methods (an
+empty list, an inert subscription) and need `terminal.open`. Kinds mirror the application's one to one;
+the SDK does not say which profile the user chose as default, and a plugin cannot
+change that choice.
+
+`LocalSpec.profile` names a profile. `HostedTerminals` checks the id against the catalog: an id it
+does not list logs a warning and makes `openTab` and `split` return empty, rather than starting the
+default shell. An empty profile means what Jasper's own New Tab or Split would start. The catalog
+reaches `dev.jasper.app.plugins` as `PluginRuntime.ShellProfiles`, a supplier and a listener
+registration, so the plugin runtime depends only on the `launch.ShellProfile` value; listener
+registrations close with the plugin. Plugins open only shells the application detected: explicit
+commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL group.
