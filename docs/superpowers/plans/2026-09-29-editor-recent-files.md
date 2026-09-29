@@ -1,5 +1,7 @@
 # Recent Files Implementation Plan
 
+> **Status:** executed inline on `claude/editor-recent-files`, 2026-09-29; not merged. Deviations from the plan text: the Editor's `plugin.toml` declares `palette.contribute` and `EditorPluginTest`'s `INFO` grants it (registering a scope needs the capability); a few JavaDoc `@param`/`@return` tags added for doclint.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The Editor remembers the local and remote files it opened and offers them in a "Recent files" palette scope that reopens them; Remote makes SFTP documents reopenable.
