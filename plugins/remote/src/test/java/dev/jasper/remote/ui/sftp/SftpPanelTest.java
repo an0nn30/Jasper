@@ -120,5 +120,9 @@ class SftpPanelTest {
             }
         } }.walk(panel);
         assertThat(names).contains("Up", "Refresh").doesNotContain("Download selected", "Upload files", "New folder", "Delete selected", "Copy paths", "Follow terminal folder");
+        assertThat(panel.table().getFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS))
+            .as("Tab leaves the list instead of moving between its cells").contains(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_TAB, 0));
+        assertThat(panel.table().getFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS))
+            .contains(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_TAB, java.awt.event.InputEvent.SHIFT_DOWN_MASK));
     }
 }
