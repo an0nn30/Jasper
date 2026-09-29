@@ -1,6 +1,5 @@
 package dev.jasper.app.palette;
 
-import dev.jasper.app.config.PaletteSettings;
 import dev.jasper.app.lifecycle.Subscription;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +13,7 @@ import javax.swing.SwingUtilities;
 /**
  * EDT-owned palette state: the chip (none, or one scope), the query, a step and queued completions. With
  * no chip an empty query lists the scopes (the mode list) and any other query searches every scope that
- * takes part in All, a section each, capped at the result limit. Host callbacks contain all workspace
+ * takes part in All, a section each; the list scrolls through every row. Host callbacks contain all workspace
  * integration.
  */
 public final class PaletteController implements AutoCloseable {
@@ -41,7 +40,6 @@ public final class PaletteController implements AutoCloseable {
     private BooleanSupplier originValid = () -> false;
     private boolean open, closed, completing, dirty = true, rosterChanged;
     private long generation;
-    private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
 
     public PaletteController(ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
                       Runnable layout, Runnable dismissed,
@@ -79,7 +77,7 @@ public final class PaletteController implements AutoCloseable {
         } else {
             generation++;
             originValid = valid;
-            context = new PaletteContext(macOs, target, maxResults);
+            context = new PaletteContext(macOs, target);
             palette.queryField().setText("");
             open = true;
             palette.setVisible(true);
@@ -125,15 +123,14 @@ public final class PaletteController implements AutoCloseable {
         palette.setPlaceholder(active == null ? "Search everything" : active.placeholder());
     }
 
-    /** The hard cap every scope returns; a live change re-runs the open query under the new cap. */
-    public void setMaxResults(int value) {
-        if (value == maxResults) return;
-        maxResults = value;
-        context = new PaletteContext(macOs, context.target(), maxResults);
-        if (open) rebuild(true);
+    /** How many result rows the list shows before it scrolls; a live change resizes an open palette. */
+    public void setVisibleRows(int value) {
+        if (value == palette.visibleRows()) return;
+        palette.setVisibleRows(value);
+        if (open) layout.run();
     }
 
-    public int maxResults() { return maxResults; }
+    public int visibleRows() { return palette.visibleRows(); }
     public void dismiss() { if (open) restoreAndHide(); }
     public boolean isOpen() { return open; }
     /** The chip: {@link PaletteScope#ALL_ID} for none, or a scope id; null while closed. */
@@ -358,15 +355,14 @@ public final class PaletteController implements AutoCloseable {
         } else if (query.isBlank()) {
             suggestions(entries);
         } else {
-            // One row more than shown tells whether a scope has more matches than All has room for.
-            var probe = new PaletteContext(macOs, context.target(), maxResults + 1);
-            // The list is a hard-capped 200 rows overall (PaletteResults.MAX_ROWS): with enough
-            // participating scopes, each at the settings' own cap, sections could ask for far more.
-            // Budget rows across sections in tab order; a scope cut short by the budget still gets its
-            // own "More in..." row, and a scope reached after the budget is spent gets no section at all.
+            // Every match goes into the list, which scrolls, but the list holds at most 200 rows overall
+            // (PaletteResults.MAX_ROWS). Budget rows across sections in tab order; a scope cut short by the
+            // budget gets a "More in..." row, and a scope reached after the budget is spent gets no section.
             int remaining = PaletteResults.MAX_ROWS;
             for (PaletteScope scope : tabScopes()) {
                 if (remaining <= 0) break;
+                // One row more than the budget left tells whether the budget cut this scope short.
+                var probe = new PaletteContext(macOs, context.target(), Math.min(remaining + 1, PaletteResults.MAX_ROWS));
                 PaletteResults results;
                 try { results = scope.search(query, probe); }
                 catch (RuntimeException failure) {
@@ -374,8 +370,7 @@ public final class PaletteController implements AutoCloseable {
                     continue;
                 }
                 if (results.rows().isEmpty()) continue;
-                int cap = Math.min(maxResults, remaining);
-                List<PaletteRow> shown = results.rows().subList(0, Math.min(cap, results.rows().size()));
+                List<PaletteRow> shown = results.rows().subList(0, Math.min(remaining, results.rows().size()));
                 entries.add(new PaletteEntry.Header(scope.label()));
                 for (PaletteRow row : shown) entries.add(new PaletteEntry.Item(scope, row));
                 if (results.rows().size() > shown.size()) entries.add(new PaletteEntry.More(scope));
@@ -422,7 +417,7 @@ public final class PaletteController implements AutoCloseable {
         tabListeners.clear();
         tab = null;
         active = null;
-        context = new PaletteContext(macOs, PaletteTarget.none(), maxResults);
+        context = new PaletteContext(macOs, PaletteTarget.none());
         originValid = () -> false;
         dismissed.run();
     }

@@ -168,29 +168,27 @@ class PaletteScopesTest {
         });
     }
 
-    @Test void allCapsEachSectionAndOffersTheRestInTheScopesTab() throws Exception {
+    @Test void allListsEveryMatchHoweverFewRowsAreVisible() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
                 var fake = new FakeScope();
-                fake.rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("alpine", "Alpine"), PaletteRow.of("alps", "Alps"));
+                var rows = new ArrayList<PaletteRow>();
+                for (int r = 0; r < 12; r++) rows.add(PaletteRow.of("alp" + r, "Alp " + r));
+                fake.rows = rows;
                 owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
-                palette.setMaxResults(2);
+                palette.setVisibleRows(2);
+                assertThat(palette.visibleRows()).isEqualTo(2);
                 palette.toggle();
                 card.queryField().setText("alp");
                 var entries = PaletteTestSupport.entries(card);
                 int section = entries.indexOf("# Fake");
-                assertThat(entries.subList(section, section + 4)).containsExactly("# Fake", "test.fake/alpha", "test.fake/alpine", "more:test.fake");
-                PaletteTestSupport.selectRow(card, "alpine");
-                palette.moveSelection(1);
-                assertThat(PaletteTestSupport.selectedRow(card)).as("the More row is selected").isNull();
-                palette.enterPressed(0);
-                assertThat(palette.isOpen()).isTrue();
-                assertThat(palette.activeScopeId()).isEqualTo("test.fake");
-                assertThat(card.queryField().getText()).as("the query is kept").isEqualTo("alp");
-                assertThat(PaletteTestSupport.rowCount(card)).isEqualTo(2);
-                assertThat(fake.executed).isEmpty();
+                assertThat(entries.subList(section + 1, section + 13)).as("every match, in order")
+                    .allMatch(entry -> entry.startsWith("test.fake/alp"));
+                assertThat(entries).as("nothing is held back").noneMatch(entry -> entry.startsWith("more:"));
+                palette.open("test.fake");
+                assertThat(PaletteTestSupport.rowCount(card)).isEqualTo(12);
             }
         });
     }
@@ -418,8 +416,8 @@ class PaletteScopesTest {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
-                // Eleven scopes at the settings' own max_results cap (20) would ask for 220 item rows,
-                // over PaletteResults.MAX_ROWS (200); All must budget instead of handing setEntries too many.
+                // Eleven scopes of 30 rows are 330 item rows, over PaletteResults.MAX_ROWS (200);
+                // All must budget instead of handing setEntries too many.
                 for (int n = 0; n < 11; n++) {
                     int index = n;
                     var scope = new FakeScope() {
@@ -427,20 +425,29 @@ class PaletteScopesTest {
                         @Override public String label() { return "Fake" + index; }
                     };
                     var rows = new ArrayList<PaletteRow>();
-                    for (int r = 0; r < 25; r++) rows.add(PaletteRow.of("row" + r, "Row " + r));
+                    for (int r = 0; r < 30; r++) rows.add(PaletteRow.of("row" + r, "Row " + r));
                     scope.rows = rows;
                     owner.scopes().register(scope);
                 }
                 var palette = owner.commandPalette(); var card = palette.component();
-                palette.setMaxResults(20);
                 palette.toggle();
                 card.queryField().setText("row");
                 assertThat(palette.isOpen()).as("All opens without throwing").isTrue();
                 assertThat(PaletteTestSupport.rowCount(card)).as("at most PaletteResults.MAX_ROWS (200) item rows").isEqualTo(200);
-                var headers = PaletteTestSupport.entries(card).stream().filter(entry -> entry.startsWith("# Fake")).toList();
+                var entries = PaletteTestSupport.entries(card);
+                var headers = entries.stream().filter(entry -> entry.startsWith("# Fake")).toList();
                 var expected = new ArrayList<String>();
-                for (int n = 0; n < 10; n++) expected.add("# Fake" + n);
+                for (int n = 0; n < 7; n++) expected.add("# Fake" + n);
                 assertThat(headers).as("sections in tab order, stopping once the budget is spent").containsExactlyElementsOf(expected);
+                assertThat(entries.stream().filter(entry -> entry.startsWith("more:")).toList())
+                    .as("only the scope the budget cut short offers the rest").containsExactly("more:test.fake6");
+                PaletteTestSupport.selectRelative(card, 1000);
+                palette.moveSelection(1);
+                assertThat(PaletteTestSupport.selectedRow(card)).as("the More row is selected").isNull();
+                palette.enterPressed(0);
+                assertThat(palette.activeScopeId()).isEqualTo("test.fake6");
+                assertThat(card.queryField().getText()).as("the query is kept").isEqualTo("row");
+                assertThat(PaletteTestSupport.rowCount(card)).isEqualTo(30);
             }
         });
     }

@@ -21,7 +21,7 @@ class LaunchSettingsTest {
         var terminal = new TerminalConfig(new TerminalConfig.Shell(program, args), t.env(), t.scrollback(), t.optionAsMeta(),
             t.cursorShape(), t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), mode);
         return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), Map.of(), d.columns(),
-            d.lines(), terminal, d.buddyEnabled(), d.maxResults());
+            d.lines(), terminal, d.buddyEnabled(), d.visibleRows());
     }
 
     private static ShellProfile wsl() {
@@ -233,7 +233,7 @@ class LaunchSettingsTest {
             Map.of("JASPER_SHELL_INTEGRATION", "/my/own"), t.scrollback(), t.optionAsMeta(), t.cursorShape(),
             t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), ShellIntegrationMode.AUTO);
         var snapshot = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), Map.of(),
-            d.columns(), d.lines(), terminal, d.buddyEnabled(), d.maxResults());
+            d.columns(), d.lines(), terminal, d.buddyEnabled(), d.visibleRows());
         var settings = LaunchSettings.resolve(snapshot, "Mac OS X", Map.of(), 150, 45, Path.of("/opt/jasper/si"));
         assertThat(settings.environment()).containsEntry("JASPER_SHELL_INTEGRATION", "/my/own")
             .containsEntry("ZDOTDIR", Path.of("/my/own").resolve("zsh").toString());
@@ -244,7 +244,7 @@ class LaunchSettingsTest {
         var terminal = new TerminalConfig(t.shell(), Map.of("TERM_PROGRAM", "Other"), t.scrollback(), t.optionAsMeta(), t.cursorShape(),
             t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), ShellIntegrationMode.AUTO);
         var snapshot = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), Map.of(), d.columns(),
-            d.lines(), terminal, d.buddyEnabled(), d.maxResults());
+            d.lines(), terminal, d.buddyEnabled(), d.visibleRows());
         assertThat(LaunchSettings.resolve(snapshot, "Linux", Map.of(), 150, 45, Path.of("/tmp/si")).environment())
             .containsEntry("TERM_PROGRAM", "Other");
     }

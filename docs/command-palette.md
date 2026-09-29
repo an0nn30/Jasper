@@ -16,8 +16,8 @@ prefix (`> commands`, `history >`, `snippets >`, `ssh >`, `vault >`); each pill 
 key that selects that scope from the keyboard: `>` for Commands, and each scope's own shortcut
 (Cmd+J Snippets, Cmd+R History, F8 Vault, Shift+Cmd+H SSH on macOS), which switches scope while the
 palette is open. Clicking a pill does the same. Typing anything else searches every scope at once and groups the matches
-under each scope's name, at most `palette.max_results` per scope; when a scope has more, a "More in
-<Scope>…" row sets that scope's chip with the query kept. Vault's secrets stay out of that search;
+under each scope's name. The list shows `palette.visible_rows` rows (five by default) and scrolls
+to the rest; if a very large result set runs past 200 rows, a "More in <Scope>…" row sets that scope's chip with the query kept. Vault's secrets stay out of that search;
 its chip searches them.
 
 Chips: `>` at the start of the query is Commands; `<scope> >` (for example `history > ls`, or any
@@ -42,8 +42,8 @@ digits are search text. Every colour comes from the installed theme.
 
 ## Commands
 
-Type to search available commands. At most `palette.max_results` results appear
-(five by default; see [configuration](configuration.md#palette)). An empty search
+Type to search available commands. The list shows `palette.visible_rows` rows (five by default;
+see [configuration](configuration.md#palette)) and scrolls to the rest. An empty search
 shows your last three distinct palette commands, newest first.
 Recents are shared across windows and saved in `command-history.toml` under
 Jasper's application directory. Running Settings from the palette counts as a
@@ -176,7 +176,7 @@ that already exists (case-insensitive) is refused with "A snippet named … exis
 the field, keeping focus so you can pick a different name; a write failure shows its message
 the same way. Escape returns to the History list.
 
-Snippets rows are capped at `palette.max_results` like every other scope (see
+Snippets rows scroll like every other scope's (see
 [configuration](configuration.md#palette)); each row's tag shows its
 placeholder count ("1 field", "2 fields") when nonzero, and the command itself shows in
 grey after the name, on the same line. If `snippets.toml` fails to parse, the last good snapshot

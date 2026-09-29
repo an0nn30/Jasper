@@ -31,7 +31,7 @@ class EditorsTest {
         assertThat(build(Editors.byKind(CoreSettings.WINDOW_STATUS_BAR), CoreSettings.WINDOW_STATUS_BAR, context).component()).isInstanceOf(JCheckBox.class);
         assertThat(build(Editors.byKind(CoreSettings.WINDOW_TOOLBAR), CoreSettings.WINDOW_TOOLBAR, context).component()).isInstanceOf(JComboBox.class);
         assertThat(build(Editors.byKind(CoreSettings.UI_THEME_NAME), CoreSettings.UI_THEME_NAME, context).component()).isInstanceOf(JTextField.class);
-        assertThat(build(Editors.byKind(CoreSettings.PALETTE_MAX_RESULTS), CoreSettings.PALETTE_MAX_RESULTS, context).component()).isInstanceOf(JSpinner.class);
+        assertThat(build(Editors.byKind(CoreSettings.PALETTE_VISIBLE_ROWS), CoreSettings.PALETTE_VISIBLE_ROWS, context).component()).isInstanceOf(JSpinner.class);
     }
 
     @Test void checkboxesCarryTheirLabelAndShowingDoesNotCountAsAnEdit() {

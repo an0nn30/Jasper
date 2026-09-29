@@ -79,7 +79,7 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().toolbar()).isEqualTo(ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().buddyEnabled()).isFalse();
-            assertThat(all.snapshot().maxResults()).isEqualTo(5);
+            assertThat(all.snapshot().visibleRows()).isEqualTo(5);
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
             assertThat(all.snapshot().columns()).isEqualTo(100);
             assertThat(all.snapshot().lines()).isEqualTo(35);
