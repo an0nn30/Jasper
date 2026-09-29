@@ -48,6 +48,7 @@ public final class EditorWindow {
     private final EditorEnvironment environment;
     private final PluginContext context;
     private final Runnable onClosed;
+    private final java.util.function.Consumer<EditorDocument> opened;
     private final EditorModel model = new EditorModel();
     private final EditorTheme theme = new EditorTheme();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
@@ -83,15 +84,25 @@ public final class EditorWindow {
     private boolean vimrcRead;
 
     /**
-     * Creates the window, not yet shown.
+     * Creates the window, not yet shown, reporting opened documents to nobody.
      *
      * @param environment what the window needs from the plugin
      * @param onClosed runs once the window has closed
      */
-    public EditorWindow(EditorEnvironment environment, Runnable onClosed) {
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed) { this(environment, onClosed, document -> { }); }
+
+    /**
+     * Creates the window, not yet shown.
+     *
+     * @param environment what the window needs from the plugin
+     * @param onClosed runs once the window has closed
+     * @param opened told a document once its new tab's first read succeeds, and each time its loaded tab is opened again
+     */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened) {
         this.environment = environment;
         this.context = environment.context();
         this.onClosed = onClosed;
+        this.opened = java.util.Objects.requireNonNull(opened);
         fileIcon = context.appearance().icon(IconName.FILE);
         serverIcon = context.appearance().icon(IconName.SERVER);
         ask = question -> environment.askers().apply(owner()).apply(question);
@@ -138,12 +149,22 @@ public final class EditorWindow {
     /** Opens a file in the originating workspace; null chooses the last main workspace. */
     public void open(EditorDocument document, WindowOwner owner) {
         origin = owner;
-        DocumentSession session = model.find(document.key()).orElseGet(() -> {
+        Optional<DocumentSession> existing = model.find(document.key());
+        DocumentSession session = existing.orElseGet(() -> {
             var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
             var created = new DocumentSession(document, sessionEnvironment(ref));
-            add(created, ref); created.load(); return created;
+            add(created, ref); reportWhenLoaded(created); created.load(); return created;
         });
+        if (existing.isPresent() && session.state() == DocumentSession.State.READY) session.document().ifPresent(opened);
         select(session);
+    }
+
+    /** Reports a new tab's document the first time it becomes ready: a failed read reports nothing, a successful retry does. */
+    private void reportWhenLoaded(DocumentSession session) {
+        var reported = new AtomicBoolean();
+        session.addListener(() -> {
+            if (session.state() == DocumentSession.State.READY && reported.compareAndSet(false, true)) session.document().ifPresent(opened);
+        });
     }
     private SessionEnvironment sessionEnvironment(java.util.concurrent.atomic.AtomicReference<WindowOwner> owner) {
         return new SessionEnvironment(context.background(), environment.ui(),
