@@ -82,6 +82,8 @@ public final class VimEditor {
     };
     /** The text exchange's first {@code cx} marked (the plugin's b:exchange), or null. */
     private Exchange.Region exchange;
+    /** The highlightedyank extension's highlight of the last yank. */
+    private final HighlightedYank highlightedYank = new HighlightedYank(this);
     /** A new language gives the tab its line comment as 'commentstring'. */
     private final java.beans.PropertyChangeListener languageListener = event -> languageChanged();
     private final DocumentListener highlightListener = new DocumentListener() {
@@ -145,6 +147,7 @@ public final class VimEditor {
         area.setCaretStyle(RTextArea.INSERT_MODE, originalCaret);
         area.enableInputMethods(true);
         marks.close();
+        highlightedYank.close();
         area.getDocument().removeDocumentListener(highlightListener);
         area.removeFocusListener(leaveListener);
         area.setWrapStyleWord(originalWrapStyleWord);
@@ -903,13 +906,21 @@ public final class VimEditor {
     /** @return the text exchange's first {@code cx} marked, or null */
     Exchange.Region exchange() { return exchange; }
 
+    HighlightedYank highlightedYank() { return highlightedYank; }
+
+    /** @return a number that changes with every change to the text (Vim's b:changedtick) */
+    int textVersion() { return textVersion; }
+
     /** @param region the text an exchange has marked, highlighted until the second {@code cx}; null forgets it */
     void exchange(Exchange.Region region) {
         exchange = region;
         refreshHighlights();
     }
 
-    /** Draws the Visual area, the 'hlsearch' matches, the incremental-search match and the text exchange marked. */
+    /**
+     * Draws the Visual area, the 'hlsearch' matches, the incremental-search match, the text exchange marked and the
+     * last yank's highlight.
+     */
     void refreshHighlights() {
         List<int[]> ranges = new ArrayList<>();
         Search search = vim.search();
@@ -929,10 +940,11 @@ public final class VimEditor {
             ranges.addAll(searchMatches);
         }
         ranges.addAll(Exchange.highlight(this, exchange));
+        ranges.addAll(highlightedYank.ranges());
         ranges.addAll(Highlights.visual(this));
         if (incsearch != null) ranges.add(new int[] { 0, incsearch[0], incsearch[1] });
         if (confirmMatch != null) ranges.add(new int[] { 0, confirmMatch[0], confirmMatch[1] });
-        highlights.show(ranges);
+        highlights.show(ranges, highlightedYank.color());
     }
 
     /** Shows the match {@code :s} asks about ({start, end} offsets), or none. */

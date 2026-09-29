@@ -143,8 +143,10 @@ final class Operators {
 
     /** op_yank, with its message when more than 'report' lines were yanked. */
     static void yank(Context c, Span span) {
-        c.registers.yank(c.register, content(c, span), c.options.string("clipboard"));
+        Registers.Content yanked = content(c, span);
+        c.registers.yank(c.register, yanked, c.options.string("clipboard"));
         if (c.register == '_') return;
+        HighlightedYank.yanked(c, span.visual(), yanked);
         int lines = span.lineCount();
         if (!span.linewise() && !span.blockwise() && lines == 1) lines = 0;
         if (lines <= c.options.number("report")) return;

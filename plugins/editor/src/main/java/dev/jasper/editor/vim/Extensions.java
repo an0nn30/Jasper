@@ -65,7 +65,8 @@ final class Extensions {
             map("xmap", "aI", "<Plug>textobj-indent-aI"), map("xmap", "iI", "<Plug>textobj-indent-iI"))),
         new Extension("argtextobj", "vim-scripts/argtextobj.vim", null, Check.NONE, List.of(
             map("xmap", "ia", "<Plug>InnerArgument"), map("xmap", "aa", "<Plug>OuterArgument"),
-            map("omap", "ia", "<Plug>InnerArgument"), map("omap", "aa", "<Plug>OuterArgument"))));
+            map("omap", "ia", "<Plug>InnerArgument"), map("omap", "aa", "<Plug>OuterArgument"))),
+        new Extension("highlightedyank", "machakann/vim-highlightedyank", null, Check.NONE, List.of()));
 
     private final Vim vim;
     /** The default mappings each switched-on extension added. */

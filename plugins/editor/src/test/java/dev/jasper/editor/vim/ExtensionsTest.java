@@ -140,4 +140,41 @@ class ExtensionsTest {
             assertThat(editor.buffer().line(0)).as("no tag: nothing around it").isEqualTo("one two");
         });
     }
+
+    @Test void theTextObjectsAndParagraphMotionSwitchAsIdeaVimNamesThem() throws Exception {
+        onEdt(() -> {
+            var editor = editor("x\n");
+            type(editor, ":set textobj-entire textobj-indent argtextobj vim-paragraph-motion highlightedyank<CR>");
+            for (String option : new String[] { "textobj-entire", "textobj-indent", "argtextobj", "vim-paragraph-motion", "highlightedyank" })
+                assertThat(editor.options().flag(option)).as(option).isTrue();
+            assertThat(mapped(editor, Mappings.OP_PENDING, "ae")).isTrue();
+            assertThat(mapped(editor, Mappings.VISUAL, "ii")).isTrue();
+            assertThat(mapped(editor, Mappings.OP_PENDING, "aa")).isTrue();
+            type(editor, ":set notextobj-entire<CR>");
+            assertThat(mapped(editor, Mappings.OP_PENDING, "ae")).isFalse();
+            type(editor, ":set sw-=2<CR>");
+            assertThat(editor.options().number("shiftwidth")).as("a hyphen before = is still -=").isEqualTo(6);
+            var plugged = editor("x\n");
+            for (String repository : new String[] { "kana/vim-textobj-entire", "michaeljsmith/vim-indent-object", "vim-scripts/argtextobj.vim",
+                "dbakker/vim-paragraph-motion", "machakann/vim-highlightedyank" })
+                type(plugged, ":Plug '" + repository + "'<CR>");
+            for (String option : new String[] { "textobj-entire", "textobj-indent", "argtextobj", "vim-paragraph-motion", "highlightedyank" })
+                assertThat(plugged.options().flag(option)).as("Plug switches on " + option).isTrue();
+        });
+    }
+
+    @Test void uniqueMappingsLeaveTheUsersKeysAlone() throws Exception {
+        onEdt(() -> {
+            var editor = editor("a\n\nb\n");
+            type(editor, ":nnoremap } j<CR>:omap ae iw<CR>:set vim-paragraph-motion textobj-entire<CR>");
+            assertThat(editor.vim().mappings().starting(Mappings.NORMAL, KeyInput.parse("}").getFirst()).getFirst().rhs)
+                .as("<unique>: the user's } stays").isEqualTo(KeyInput.parse("j"));
+            assertThat(mapped(editor, Mappings.OP_PENDING, "}")).as("in other modes the extension maps }").isTrue();
+            assertThat(editor.vim().mappings().starting(Mappings.OP_PENDING, KeyInput.parse("a").getFirst()).stream()
+                .filter(m -> m.lhs.equals(KeyInput.parse("ae"))).map(m -> m.rhs).toList()).containsExactly(KeyInput.parse("iw"));
+            type(editor, ":set novim-paragraph-motion<CR>");
+            assertThat(editor.vim().mappings().starting(Mappings.NORMAL, KeyInput.parse("}").getFirst()))
+                .as("switching off keeps the user's own").hasSize(1);
+        });
+    }
 }

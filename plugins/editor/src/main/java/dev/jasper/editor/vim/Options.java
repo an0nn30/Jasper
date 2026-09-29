@@ -43,6 +43,7 @@ public final class Options {
         new Def("foldopen", "fdo", Type.STRING, "block,hor,mark,percent,quickfix,search,tag,undo", false),
         new Def("formatoptions", "fo", Type.STRING, "tcq", true),
         new Def("gdefault", "gd", Type.BOOLEAN, false, false),
+        new Def("highlightedyank", "highlightedyank", Type.BOOLEAN, false, false),
         new Def("hlsearch", "hls", Type.BOOLEAN, true, false),
         new Def("ignorecase", "ic", Type.BOOLEAN, false, false),
         new Def("incsearch", "is", Type.BOOLEAN, true, false),
