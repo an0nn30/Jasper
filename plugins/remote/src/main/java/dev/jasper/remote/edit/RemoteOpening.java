@@ -38,7 +38,7 @@ public final class RemoteOpening {
     /**
      * @param editor the Editor's service
      * @param editing rebuilds connections from remote keys
-     * @param panes the connection and folder of a connected SSH pane
+     * @param panes the connection and folder of a connected SSH pane, given the Editor's handle (use only its id)
      * @param show shows the picker for a window
      */
     public RemoteOpening(Editor editor, RemoteEditing editing, Function<PaneHandle, Optional<Target>> panes, BiConsumer<WindowHandle, Target> show) {

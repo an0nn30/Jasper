@@ -182,7 +182,8 @@ public class RemotePlugin implements Plugin {
                 context.menus().standard(dev.jasper.sdk.ui.StandardMenu.FILE).add(OPEN_FILE);
                 openFile=true;
                 var opening=new dev.jasper.remote.edit.RemoteOpening(editor.orElseThrow(),editing,
-                    pane->sftpPane(pane).map(target->new dev.jasper.remote.edit.RemoteOpening.Target(target.identity(),target.directory())),
+                    // The Editor's handle is gated by the Editor's capabilities: look the pane up as Remote by its id.
+                    pane->context.terminals().pane(pane.id()).flatMap(this::sftpPane).map(target->new dev.jasper.remote.edit.RemoteOpening.Target(target.identity(),target.directory())),
                     (window,target)->sftpUi.openRemoteFile(window,Optional.of(target.identity()),target.directory()));
                 try { opener=opening.register(); } catch(NoSuchMethodError older) { /* an Editor before 0.5 opens only local files */ }
             }

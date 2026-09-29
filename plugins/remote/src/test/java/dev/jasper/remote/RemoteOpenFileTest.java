@@ -132,4 +132,22 @@ class RemoteOpenFileTest {
             assertThat(host.failures()).isEmpty();
         }
     }
+
+    /** The Editor hands over its own pane handle, gated by its own capabilities; the Editor has no terminal.observe. */
+    @Test void aPaneHandleFromAPluginWithoutTerminalObserveStillOpensThePicker(@TempDir Path dir) throws Exception {
+        Path files = Files.createDirectories(dir.resolve("files"));
+        Files.writeString(files.resolve("notes.toml"), "a = 1\n");
+        var editor = new FakeEditor();
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var set = setUp(host, server, files, dir, Optional.of(editor), 1, new SftpSubsystemFactory());
+            var stranger = new java.util.concurrent.atomic.AtomicReference<dev.jasper.sdk.plugin.PluginContext>();
+            host.start(new dev.jasper.sdk.PluginInfo("test.stranger", "Stranger", "1.0.0", java.util.Set.of()), java.util.Set.of(), java.util.Set.of(), stranger::set);
+            WindowHandle window = stranger.get().terminals().window(set.window()).orElseThrow();
+            var pane = stranger.get().terminals().pane(set.pane()).orElseThrow();
+            assertThat(editor.openers.getFirst().test(new OpenRequest(window, Optional.of(pane), Optional.empty()))).isTrue();
+            assertThat(((RemoteHost) picker(host).hosts().getSelectedItem()).name()).isEqualTo("prod");
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
 }
