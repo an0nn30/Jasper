@@ -7,7 +7,10 @@
   `Z`, `;`, `,`, vertical scope, the one-character `<Plug>Sneak_f` forms; no label mode), on motions that read their
   keys first (`VimCommands.motionWithKeys`). Every file in the plan was compiled and run against Vim 9.1 with the
   pinned sneak before the plan was written: 2211 corpus cases (47 new), with and without a final line break.
-  - Not done: executing the plan; GUI checks 110–114 of the [checklist](editor-verification.md) (user-run); push.
+  - Executed subagent-driven on 2026-09-29 (c18ceb96, 8f030022; final-review fixes f731d93e: the sneak highlight ends
+    when the text changes, scripted `F`/`T` leave sneak's `;` alone, `g:sneak#f_reset` and `t_reset`); `./gradlew check`
+    7,157 tests green.
+  - Not done: GUI checks 110–114 of the [checklist](editor-verification.md) (user-run); push.
 - **Editor Vim mode, plan V4c** (branch `claude/vim-v4c`, plan
   `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4c.md`, written 2026-09-29): matchit, ported from Vim 9.1's matchit.vim (`%`, `g%`,
   `[%`, `]%`, Visual `a%`; `set matchit`, `packadd matchit`), with the languages' `b:match_*` from Vim's filetype
