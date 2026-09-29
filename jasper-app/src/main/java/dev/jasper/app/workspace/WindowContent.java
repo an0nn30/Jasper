@@ -239,6 +239,30 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return bar;
     }
 
+    /**
+     * Windows and Linux custom title bar: the header joins the menus in FlatLaf's title pane, which embeds the menu bar.
+     * The title pane shows no title text (the field shows the context) and follows the toolbar height and chrome colours.
+     * Returns false, changing nothing, when {@code root} has no look-and-feel decorations.
+     */
+    static boolean installCustomTitleBar(JRootPane root, WindowContent content) {
+        if (root.getWindowDecorationStyle() == JRootPane.NONE) return false;
+        WindowHeader header = content.chrome.header();
+        content.remove(header);
+        content.chrome.menuBar().setHeader(header);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_SHOW_TITLE, false);
+        root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, content.toolbarHeight());
+        header.addPropertyChangeListener("barHeight",
+            event -> root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_HEIGHT, event.getNewValue()));
+        Runnable colors = () -> {
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, UIManager.getColor("Jasper.titleBackground"));
+            root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, UIManager.getColor("Jasper.titleForeground"));
+        };
+        colors.run();
+        content.onThemeChanged = theme -> colors.run();
+        content.revalidate();
+        return true;
+    }
+
     void installRootBindings(JRootPane root) {
         removeRootBindings();
         bindingRoot = root;

@@ -113,7 +113,7 @@ class WindowChromeContributionsTest {
             List<String> viewItems = items(menu(owner, "View"));
             assertThat(viewItems).hasSize(viewBefore + 4);
             assertThat(viewItems.subList(viewBefore, viewItems.size())).containsExactly("---", "Run Tool", "---", "submenu:More");
-            assertThat(owner.menuBar().getMenu(owner.menuBar().getMenuCount() - 1).getText()).isEqualTo("Tool");
+            assertThat(owner.chrome().menuBar().menus().getLast().getText()).isEqualTo("Tool");
             assertThat(items(menu(owner, "Tool"))).containsExactly("Run Tool");
             ((JMenuItem) menu(owner, "Tool").getMenuComponent(0)).doClick();
             assertThat(seen).hasSize(1);
@@ -163,8 +163,7 @@ class WindowChromeContributionsTest {
 
                 owner.chrome().renderContributedMenus();
 
-                assertThat(java.util.Arrays.stream(owner.menuBar().getComponents())
-                    .map(component -> ((JMenu) component).getText()).toList())
+                assertThat(owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList())
                     .containsExactly("File", "Edit", "View", "Pane", "Tab", "SSH", "Help");
                 assertThat(menu(owner, "SSH").getItem(0).isEnabled()).isFalse();
                 assertThat(items(menu(owner, "SSH"))).containsExactly("Connect", "Shortcuts");
