@@ -13,6 +13,7 @@
   plan was written: 1880 corpus cases (138 new).
   - Executed inline on 2026-09-28 (bf4dab73..ee1ab3fa): every step's expected result matched; `./gradlew check`
     4,505 tests green.
+  - Merged into local main (fast-forward) on 2026-09-28; not pushed.
   - Not done: GUI checks 89–96 of the [checklist](editor-verification.md) (user-run); plan V4b
     (argtextobj, textobj-entire, textobj-indent, matchit, paragraph-motion, highlightedyank, sneak); push.
 - **Editor Vim mode, plan V3b** (branch `claude/vim-v3b`, plan
