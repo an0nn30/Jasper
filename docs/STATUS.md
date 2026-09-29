@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-29
 
+- **IntelliJ parent themes and schemes** (branch `claude/intellij-parent-themes`, bounded change approved in chat
+  2026-09-29, no spec): every theme and editor scheme IntelliJ bundles at the pinned intellij-community commit is
+  vendored under `themes/intellij/` (New UI `expUI/`, `islands/`, `Light.xml`), so plugin themes built on
+  `ExperimentalDark`, `Islands Dark`, `Islands Light` etc. and schemes naming `Dark`, `Light`, `Islands Dark` etc.
+  resolve without falling back to Darcula/IntelliJ or Jasper's palette. Parents only: the picker still offers only
+  Jasper Dark and IntelliJ Light. Licensing: the files are Apache 2.0; the repo's root LICENSE.txt became JetBrains'
+  "Open-Source Build Terms" in June 2026, which cover their distributed builds (recorded in `SOURCE.md`).
+  `./gradlew check` green: app 1294/0/1, others unchanged. Not merged. GUI check pending with the user: install an
+  Islands-based theme plugin and a Dracula plugin and compare their chrome and terminal with IntelliJ.
 - **Recent files in the command palette** (branch `claude/editor-recent-files`, spec
   `docs/superpowers/specs/2026-09-29-editor-recent-files-design.md`, plan
   `docs/superpowers/plans/2026-09-29-editor-recent-files.md`, executed inline 2026-09-29): the Editor keeps the local

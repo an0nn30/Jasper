@@ -105,7 +105,7 @@ final class ThemeLoader {
         if (!(parent instanceof String parentName)) throw new ThemeException(file + ": \"parentTheme\" must be a string");
         String parentFile = filesByName.get(parentName);
         if (parentFile == null) {
-            // A parent Jasper does not ship (a New UI or another plugin's theme) becomes the classic base.
+            // A parent Jasper does not ship (another plugin's theme) becomes the classic base.
             String base = own.dark ? "Darcula" : "IntelliJ";
             parentFile = filesByName.get(base);
             if (parentFile == null) throw new ThemeException(file + ": unknown parentTheme \"" + parentName + "\"");

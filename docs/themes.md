@@ -35,9 +35,12 @@ runs. A theme you install takes precedence over a built-in theme of the same nam
 
 - Classic-UI theme plugins: the `.theme.json` files a plugin declares with `themeProvider`,
   including several themes in one plugin.
-- A theme's `parentTheme` when it is `Darcula` or `IntelliJ`. Any other parent, such as a New UI
-  theme's `ExperimentalDark`, is replaced by Darcula or IntelliJ by the theme's darkness, with a
-  warning.
+- A theme's `parentTheme` when it is one of the themes IntelliJ bundles: the classic `Darcula`,
+  `IntelliJ` and `JetBrainsLightTheme`, the New UI `ExperimentalDark`, `ExperimentalLight` and
+  `ExperimentalLightWithLightHeader`, and `Islands Dark`, `Islands Light`, `Islands Darcula` and
+  `JetBrainsHighContrastTheme`. They are vendored as parents only, not offered as themes. Any other
+  parent, such as another plugin's theme, is replaced by Darcula or IntelliJ by the theme's darkness,
+  with a warning.
 - The theme's editor colour scheme, for the terminal (below).
 
 Not supported:
@@ -52,7 +55,7 @@ Not supported:
 With `terminal.colors = "match"` (the default), a theme that has an editor colour scheme
 colours the terminal with the scheme's console colours: background, text, cursor, selection and
 the 16 ANSI colours.
-- **Missing colours:** colours the scheme leaves out come from its parent scheme (IntelliJ's own Default or Darcula), as in IntelliJ's console.
+- **Missing colours:** colours the scheme leaves out come from its parent schemes, as in IntelliJ's console. A theme's `editorScheme` or a scheme's `parent_scheme` may name any scheme IntelliJ bundles: `Default`, `Darcula`, `IntelliJ Light`, `Light`, `Dark`, `Darcula Contrast`, `High contrast` and `Islands Dark`.
 - **No scheme:** a theme without one, and the built-in themes, use Jasper Dark or Jasper Light by the theme's darkness.
 - **Forcing Jasper's palettes:** `"light"` and `"dark"` always use Jasper's palettes.
 

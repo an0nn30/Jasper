@@ -218,8 +218,9 @@ Installed themes come from `ThemeCatalog`, which lists the plugins in the `theme
   caps. Its `META-INF/plugin.xml` names each theme through `themeProvider`, and a theme names its
   editor scheme.
 - **Terminal palette:** `EditorScheme` turns the scheme's console colours into the theme's terminal palette,
-  with IntelliJ's own Default and Darcula schemes
-  (`themes/intellij/DefaultColorSchemesManager.xml`) as parents.
+  with the schemes IntelliJ bundles (`themes/intellij/`: Default and Darcula, the New UI and Islands schemes)
+  as parents. The themes IntelliJ bundles, classic, New UI and Islands, are vendored there too as the
+  `parentTheme`s a plugin theme may name (by IntelliJ's theme id); only IntelliJ Light is offered as a theme.
 - **Untrusted XML:** `SafeXml` parses plugin XML with DOCTYPE and external entities disabled.
 - **Installing:** a `Theme` records its source, a bundled resource or an archive, so `ThemeManager` installs
   an installed theme the same way as a built-in one.
