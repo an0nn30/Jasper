@@ -99,8 +99,8 @@ recorded corpus.
   Jasper never beeps.
 - `/` and `?` type their pattern in the strip, with Vim's command-line keys (`<C-r>` for a register, `<C-r><C-w>` for
   the word under the cursor, `<Up>` and `<Down>` for history). While you type, the match it would find is highlighted
-  ('incsearch'); `<Esc>` puts everything back. Patterns are Vim's (`\v`, `\<`, `\zs`, `\{-}` and the rest); the few
-  items Jasper does not translate say so (`E869`).
+  ('incsearch'); `<Esc>` puts everything back. Patterns are Vim's (`\v`, `\<`, `\zs`, `\{-}`, look-arounds such as
+  `\(foo\)\@<=bar`, columns such as `\%>8c`, and the rest); the few items Jasper does not translate say so (`E869`).
 - Visual mode (`v`, `V`, `<C-v>`) draws the area in the theme's selection colour. Dragging the mouse in Normal mode
   starts it.
 - The caret is a block in Normal and Visual mode, a bar in Insert mode, and an underline after an operator and in
@@ -166,7 +166,11 @@ recorded corpus.
   block), `ai` (with the line above) and `aI` (with the lines above and below); `set argtextobj` gives `ia` (a
   function argument) and `aa` (with its comma); `set highlightedyank` draws the text a yank took for a second
   (`let g:highlightedyank_highlight_duration = 300` for less).
-- Not yet: matchit and sneak. They follow in a later release. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
+- `set matchit` (or `packadd matchit`) makes `%` go between the words of a group as the tab's language defines them:
+  `if`, `else` and `fi` in shell scripts, a tag and its end tag in HTML and XML, `\begin` and `\end` in TeX, `#if`
+  and `#endif` and `/*` and `*/` everywhere; `g%` goes the other way, `[%` and `]%` to the start and end of the group
+  around the cursor, and Visual `a%` takes it. Matches in comments and strings are passed over.
+- Not yet: sneak. It follows in a later release. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 

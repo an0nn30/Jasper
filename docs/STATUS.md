@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V4c** (branch `claude/vim-v4c`, plan
+  `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4c.md`, written 2026-09-29): matchit, ported from Vim 9.1's matchit.vim (`%`, `g%`,
+  `[%`, `]%`, Visual `a%`; `set matchit`, `packadd matchit`), with the languages' `b:match_*` from Vim's filetype
+  plugins (`matchit-languages.tsv`); look-arounds and columns in Vim patterns (`\@<=`, `\%23c`), Vim script's string
+  functions (`VimStrings`) and searchpair(). The corpus gains `filetype:` (Vim loads the filetype plugin and syntax).
+  Every file in the plan was compiled and run against Vim 9.1 before the plan was written: 2164 corpus cases
+  (98 new), with and without a final line break.
+  - Not done: executing the plan; GUI checks 104–109 of the [checklist](editor-verification.md) (user-run); plan V4d
+    (sneak); push.
 - **Editor Vim mode, plan V4b** (branch `claude/vim-v4b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v4b.md`, written 2026-09-28): the extensions paragraph-motion, textobj-entire,
   textobj-indent, argtextobj and highlightedyank, switched on by IdeaVim's names (`:set` takes hyphens) or `Plug`
