@@ -1,5 +1,7 @@
 # Remote Open File Implementation Plan
 
+> **Status:** executed inline on `claude/remote-open-file`, 2026-09-29; not merged. Deviations from the plan text: JavaDoc added to `RemoteFilePicker`'s public accessors for doclint; otherwise none.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Cmd/Ctrl+O ("Open in Editor…") opens a remote file picker when an SSH pane or a remote Editor tab is focused, and File › Open Remote File… opens the same picker with a host dropdown.
