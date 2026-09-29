@@ -109,6 +109,19 @@ class ExtensionsTest {
         });
     }
 
+    @Test void theTextToExchangeIsHighlightedUntilTheSecond() throws Exception {
+        onEdt(() -> {
+            var editor = editor("one two\n");
+            type(editor, ":set exchange<CR>cxiw");
+            assertThat(editor.highlights()).anySatisfy(range -> assertThat(range).containsExactly(1, 0, 3));
+            type(editor, "cxc");
+            assertThat(editor.highlights()).isEmpty();
+            type(editor, "cxiwwcxiw");
+            assertThat(editor.buffer().line(0)).isEqualTo("two one");
+            assertThat(editor.highlights()).isEmpty();
+        });
+    }
+
     @Test void surroundAsksForATagOnTheCommandLine() throws Exception {
         onEdt(() -> {
             var editor = editor("one two\n");

@@ -80,6 +80,8 @@ public final class VimEditor {
     private final java.awt.event.FocusListener leaveListener = new java.awt.event.FocusAdapter() {
         @Override public void focusLost(java.awt.event.FocusEvent event) { marks.set('"', cursor()); }
     };
+    /** The text exchange's first {@code cx} marked (the plugin's b:exchange), or null. */
+    private Exchange.Region exchange;
     /** A new language gives the tab its line comment as 'commentstring'. */
     private final java.beans.PropertyChangeListener languageListener = event -> languageChanged();
     private final DocumentListener highlightListener = new DocumentListener() {
@@ -893,7 +895,16 @@ public final class VimEditor {
         });
     }
 
-    /** Draws the Visual area, the 'hlsearch' matches and the incremental-search match. */
+    /** @return the text exchange's first {@code cx} marked, or null */
+    Exchange.Region exchange() { return exchange; }
+
+    /** @param region the text an exchange has marked, highlighted until the second {@code cx}; null forgets it */
+    void exchange(Exchange.Region region) {
+        exchange = region;
+        refreshHighlights();
+    }
+
+    /** Draws the Visual area, the 'hlsearch' matches, the incremental-search match and the text exchange marked. */
     void refreshHighlights() {
         List<int[]> ranges = new ArrayList<>();
         Search search = vim.search();
@@ -912,6 +923,7 @@ public final class VimEditor {
             }
             ranges.addAll(searchMatches);
         }
+        ranges.addAll(Exchange.highlight(this, exchange));
         ranges.addAll(Highlights.visual(this));
         if (incsearch != null) ranges.add(new int[] { 0, incsearch[0], incsearch[1] });
         if (confirmMatch != null) ranges.add(new int[] { 0, confirmMatch[0], confirmMatch[1] });

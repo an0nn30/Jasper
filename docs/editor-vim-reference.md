@@ -346,10 +346,14 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>YSurround` (operator) | surround {motion} with {char}, on lines of its own (`yS`) |
 | `<Plug>Yssurround` (Normal) | surround [count] lines' text with {char} (`yss`) |
 | `<Plug>YSsurround` (Normal) | surround [count] lines with {char}, on lines of their own (`ySS`) |
+| `<Plug>(Exchange)` (operator) | mark {motion}'s text for an exchange, or swap it with the text marked (`cx`, with `set exchange`) |
+| `<Plug>(ExchangeLine)` (Normal) | exchange [count] lines (`cxx`) |
+| `<Plug>(ExchangeClear)` (Normal) | forget the text marked for an exchange (`cxc`) |
 | `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
 | `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
 | `<Plug>VSurround` (Visual) | surround the Visual area with {char} (`S`) |
 | `<Plug>VgSurround` (Visual) | surround the Visual area with {char}, the other way about lines (`gS`) |
+| `<Plug>(Exchange)` (Visual) | mark the Visual area for an exchange, or swap it (`X`) |
 
 ## Ex commands
 

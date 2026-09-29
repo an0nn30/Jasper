@@ -1,0 +1,239 @@
+# exchange (tommcdo/vim-exchange): cx{motion}, cxx, Visual X and cxc.
+
+=== cx swaps two words
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: cxiwwwcxiw
+--- vim 9.1
+expect-text:
+  three two one four
+expect-cursor: 1,11
+expect-mode: normal
+
+=== cx swaps a later word first
+text:
+  one two three four
+cursor: 1,15
+ext: exchange
+keys: cxiw0cxiw
+--- vim 9.1
+expect-text:
+  four two three one
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cx swaps words of different lengths
+text:
+  a longer b
+cursor: 1,1
+ext: exchange
+keys: cxiw$cxiw
+--- vim 9.1
+expect-text:
+  b longer a
+expect-cursor: 1,10
+expect-mode: normal
+
+=== cxx swaps two lines
+text:
+  one
+  two
+  three
+cursor: 1,1
+ext: exchange
+keys: cxxjjcxx
+--- vim 9.1
+expect-text:
+  three
+  two
+  one
+expect-cursor: 3,1
+expect-mode: normal
+
+=== cxx with a count
+text:
+  a
+  b
+  c
+  d
+cursor: 1,1
+ext: exchange
+keys: 2cxxjjcxx
+--- vim 9.1
+expect-text:
+  c
+  a
+  b
+  d
+expect-cursor: 2,1
+expect-mode: normal
+
+=== cx swaps lines keeping each one's indent
+text:
+    one
+      two
+cursor: 1,1
+ext: exchange
+keys: cxxjcxx
+--- vim 9.1
+expect-text:
+    two
+      one
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Visual X swaps
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: viwXwwviwX
+--- vim 9.1
+expect-text:
+  three two one four
+expect-cursor: 1,11
+expect-mode: normal
+
+=== Visual X then cx
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: viwXwwcxiw
+--- vim 9.1
+expect-text:
+  three two one four
+expect-cursor: 1,11
+expect-mode: normal
+
+=== cx over a motion
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: cxewcxe
+--- vim 9.1
+expect-text:
+  two one three four
+expect-cursor: 1,5
+expect-mode: normal
+
+=== cx with text inside the first swaps the inner
+text:
+  (a b) c
+cursor: 1,1
+ext: exchange
+keys: cxa(lcxiw
+--- vim 9.1
+expect-text:
+  a c
+expect-cursor: 1,2
+expect-mode: normal
+
+=== cx with text around the first
+text:
+  (a b) c
+cursor: 1,2
+ext: exchange
+keys: cxiw0cxa(
+--- vim 9.1
+expect-text:
+  a c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== overlapping text is not exchanged
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: cx2wwcxiw
+--- vim 9.1
+expect-text:
+  twothree four
+expect-cursor: 1,5
+expect-mode: normal
+
+=== cxc forgets the first text
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: cxiwcxcwwcxiw
+--- vim 9.1
+expect-text:
+  one two three four
+expect-cursor: 1,9
+expect-mode: normal
+
+=== cx between lines
+text:
+  one two
+  three four
+cursor: 1,1
+ext: exchange
+keys: cxiwjcxiw
+--- vim 9.1
+expect-text:
+  three two
+  one four
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dot repeats cx
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: cxiwww.
+--- vim 9.1
+expect-text:
+  three two one four
+expect-cursor: 1,11
+expect-mode: normal
+
+=== u undoes the exchange
+text:
+  one two three four
+cursor: 1,1
+ext: exchange
+keys: cxiwwwcxiwu
+--- vim 9.1
+expect-text:
+  one two three four
+expect-cursor: 1,9
+expect-mode: normal
+
+=== cx over a block
+text:
+  ab cd
+  ef gh
+cursor: 1,1
+ext: exchange
+keys: cx<C-v>jl$hcx<C-v>jl
+--- vim 9.1
+expect-text:
+  cb ad
+  gf eh
+expect-cursor: 1,5
+expect-mode: normal
+
+=== the default mappings
+text:
+  x
+cursor: 1,1
+ext: exchange
+keys: :nmap cx<CR>:xmap X<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  x
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  cxx           <Plug>(ExchangeLine)
+  n  cxc           <Plug>(ExchangeClear)
+  n  cx            <Plug>(Exchange)
+  x  X             <Plug>(Exchange)

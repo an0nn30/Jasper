@@ -69,6 +69,7 @@ public final class VimCommands {
         ReplaceWithRegister.register(commands);
         Commentary.register(commands);
         Surround.register(commands);
+        Exchange.register(commands);
         return commands;
     }
 
