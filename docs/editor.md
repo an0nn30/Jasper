@@ -115,7 +115,8 @@ recorded corpus.
   mode, `<C-w>` deletes a word in Insert mode, and Tab (`<C-i>`) goes forward in the jumplist.
 - `"+` is the clipboard and `"*` the selection (the clipboard where there is none).
 - 'tabstop' and 'shiftwidth' start at `tab_size`, 'expandtab' follows the tab's Spaces or Tab setting, and
-  'autoindent' is on. 'incsearch' and 'hlsearch' are on; `:noh` hides the highlight until the next search.
+  'autoindent' is on. 'incsearch' and 'hlsearch' are on; `:noh`, or `<Esc>` in Normal mode,
+  hides the highlight until the next search.
 - `:` opens the command line in the strip, with the same keys as `/` and its own history. It runs Vim's Ex commands
   for editing, with Vim's ranges (`:3,5`, `:%`, `:'<,'>` after Visual mode, `:/pat/`, `:.,+3`): `:s` with every flag,
   including `c`, which asks in the strip; `:g` and `:v`; `:d`, `:y`, `:m`, `:t`, `:j`, `:>`, `:pu`, `:norm`, `:sort`,
