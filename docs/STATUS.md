@@ -2937,6 +2937,15 @@ skipped, zero failures/errors. Still user-run: Cmd+J on a real macOS desktop,
 editing `snippets.toml` in the real OS editor, and the fill-in step with an input
 method active. No GUI, merge or push.
 
+**Palette visible rows (2026-09-29):** supersedes the result cap below. The five rows were meant as
+the list's height, not a cap on matches: `palette.visible_rows` (1–20, default 5, live; the old
+`palette.max_results` key is an alias that Migrate Config renames) sets how many result rows the
+list shows before it scrolls, with headers above them adding their own height. Scopes now get
+`PaletteResults.MAX_ROWS` (200) as their limit, so a scope's tab and the All tab list every match;
+All still shares 200 rows across its sections and offers "More in <Scope>…" only for a scope that
+budget cuts short. SDK unchanged apart from javadoc (`PaletteQuery.maxResults` stays "at most this
+many").
+
 **Palette result cap (2026-09-15):** `palette.max_results` (1–20, default 5, live) is now the
 hard cap every scope returns: `PaletteContext` carries it to `CommandsScope` (through a
 `CommandSearch.find` limit) and `ShellHistoryScope` (which no longer holds fifty rows and

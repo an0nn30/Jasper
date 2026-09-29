@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * What a scope answers a query with.
  *
- * @param rows               at most 200 rows, in display order; the palette shows the first {@code maxResults}
+ * @param rows               at most 200 rows, in display order; the palette lists them all, scrolling as needed
  * @param sectionLabel       a heading for the list, used for the empty query ("Recent", "Most recent")
  * @param initialSelectionId the row selected first; defaults to the first row
  */

@@ -79,10 +79,10 @@ public final class CoreSettings {
             + "work, and start it in the background at login. Quit still exits completely.\n"
             + "Residency applies from the next start; the login item updates as soon as you save.\n"
             + "Autostart needs an installed Jasper, not a development run.").build();
-    public static final Setting<Integer> PALETTE_MAX_RESULTS = Setting.of("palette.max_results",
-            SettingKind.integer(PaletteSettings.MIN_MAX_RESULTS, PaletteSettings.MAX_MAX_RESULTS, DEFAULT), PaletteSettings.DEFAULT_MAX_RESULTS)
-        .label("Results per scope").keywords("palette", "search", "results")
-        .description("Rows each palette scope shows, and the All tab shows per scope, 1-20; updates live.").build();
+    public static final Setting<Integer> PALETTE_VISIBLE_ROWS = Setting.of("palette.visible_rows",
+            SettingKind.integer(PaletteSettings.MIN_VISIBLE_ROWS, PaletteSettings.MAX_VISIBLE_ROWS, DEFAULT), PaletteSettings.DEFAULT_VISIBLE_ROWS)
+        .alias("palette.max_results").label("Visible rows").keywords("palette", "search", "results", "rows", "height")
+        .description("Result rows the palette list shows before it scrolls, 1-20; updates live.").build();
     public static final Setting<Integer> TERMINAL_SCROLLBACK = Setting.of("terminal.scrollback", SettingKind.integer(0, 1_000_000, DEFAULT), 10_000)
         .label("Scrollback lines").keywords("history", "buffer", "scrollback").applies(Applies.NEW_PANES)
         .description("Scrollback lines, 0-1000000; new panes only. Existing sessions keep their capacity.").build();
@@ -200,7 +200,7 @@ public final class CoreSettings {
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
-            PALETTE_MAX_RESULTS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
+            PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_COLORS, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
             TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME),

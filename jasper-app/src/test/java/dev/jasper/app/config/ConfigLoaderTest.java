@@ -353,22 +353,22 @@ class ConfigLoaderTest {
         assertDiagnostic(unknown, "system.start_at_login", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
-    @Test void paletteMaxResultsParsesWithinRangeAndRejectsOthers() {
-        var three = parse("[palette]\nmax_results = 3\n");
+    @Test void paletteVisibleRowsParsesWithinRangeAndRejectsOthers() {
+        var three = parse("[palette]\nvisible_rows = 3\n");
         assertThat(three.rejected()).isFalse();
         assertThat(three.diagnostics()).isEmpty();
-        assertThat(three.snapshot().maxResults()).isEqualTo(3);
-        assertThat(ConfigSnapshot.defaults().maxResults()).isEqualTo(5);
-        var tooMany = parse("[palette]\nmax_results = 21\n");
+        assertThat(three.snapshot().visibleRows()).isEqualTo(3);
+        assertThat(ConfigSnapshot.defaults().visibleRows()).isEqualTo(5);
+        var tooMany = parse("[palette]\nvisible_rows = 21\n");
         assertThat(tooMany.rejected()).isFalse();
-        assertThat(tooMany.snapshot().maxResults()).isEqualTo(5);
-        assertDiagnostic(tooMany, "palette.max_results", 2, 1, ConfigDiagnostic.Severity.ERROR);
-        var zero = parse("[palette]\nmax_results = 0\n");
-        assertThat(zero.snapshot().maxResults()).isEqualTo(5);
-        assertDiagnostic(zero, "palette.max_results", 2, 1, ConfigDiagnostic.Severity.ERROR);
-        var text = parse("[palette]\nmax_results = \"5\"\n");
+        assertThat(tooMany.snapshot().visibleRows()).isEqualTo(5);
+        assertDiagnostic(tooMany, "palette.visible_rows", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var zero = parse("[palette]\nvisible_rows = 0\n");
+        assertThat(zero.snapshot().visibleRows()).isEqualTo(5);
+        assertDiagnostic(zero, "palette.visible_rows", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var text = parse("[palette]\nvisible_rows = \"5\"\n");
         assertThat(text.rejected()).isTrue();
-        assertDiagnostic(text, "palette.max_results", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        assertDiagnostic(text, "palette.visible_rows", 2, 1, ConfigDiagnostic.Severity.ERROR);
         var unknown = parse("[palette]\nrows = 5\n");
         assertDiagnostic(unknown, "palette.rows", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
