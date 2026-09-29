@@ -2,8 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-09-28 on `claude/titlebar-command-center`. Not started.
+**Status:** Implemented inline 2026-09-28 (21664347..8474e9cf); `./gradlew check` 6,520 tests green (6 skipped).
 Record every deviation from this text here and in `docs/STATUS.md`.
+
+Deviations (all in test code; production code as written):
+- Task 2: `aRowFromAllRunsItsOwnScopesVerbs` and `aStepOpenedFromAllClosesInsteadOfRunningWhenItsScopeIsRemoved` also
+  relied on All with an empty query; each now types `beta` before selecting the row. `aStepReplacesTheListAndHidesTheHintBar`
+  still counted the removed 38 px tab strip in two height expectations; removed. The mode-row test writes ⌘ as a Java escape.
+  The remaining `PaletteScope` Javadoc that mentioned tabs now says chips.
+- Task 4: `Character::isSurrogate` does not take an `int`; the test uses `c -> Character.isSurrogate((char) c)`. The theme
+  setup in `TitleSearchFieldTest` (and Task 6's `WindowHeaderTest`) runs in `@BeforeAll` through `invokeAndWait`, because
+  `ThemeManager` requires the EDT and `@BeforeEach` does not run there.
+- Task 5: `dropdownsStayGroupedAndRemovedContributionsLeaveNoOverflowEntries` forced its overflow through the removed
+  title-bar drag space; it now sizes the bar at 70 px instead of 100.
+- Task 7: `MockUiTest.toolbarCompactsWithoutLosingActionsAndModeChangesKeepTheContentHeight` expected the pane to grow to
+  432 px when the toolbar is hidden; the header row now stays (spec §1), so it stays 408 px.
 
 **Goal:** Put a VS Code-style search field in the middle of every window's header, pack the toolbar
 right with a ⋮ overflow, drop the palette from the field, and replace the palette's tabs with

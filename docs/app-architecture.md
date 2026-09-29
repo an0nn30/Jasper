@@ -177,14 +177,19 @@ Javadoc and copied guide examples are normal check dependencies. See the
 
 ## Window chrome
 
-Windows stack three rows: `MacTitleBar` (macOS only) is a title-only row,
-`MacTitleBar.TITLE_HEIGHT` (28 px) high, with the native controls and a centred bold title;
-`WindowChrome`'s IntelliJ-style toolbar (tab/window, pane, plugin and right-pinned
-Find/Settings groups; tooltips carry live shortcuts); and `WindowTabs`, IntelliJ editor tabs
-sized to content with a 3 px selection underline, wheel scrolling and a ▾ list of all tabs.
-Each pane's `FindBar` is IntelliJ's single-line find row. App icons resolve from bundled
-assets. Since SDK 0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured
-to the chrome foreground (see [SDK architecture](sdk-architecture.md)).
+Every window has a header row and `WindowTabs` below it. `WindowHeader` (workspace) centres
+`TitleSearchField` on the window and packs `WindowChrome`'s IntelliJ-style toolbar (tab/window,
+pane, plugin, then Find/Settings groups; tooltips carry live shortcuts) against the trailing edge.
+As space runs out, toolbar controls move whole into the ⋮ overflow menu, then the field shrinks to
+240 px, then it collapses to its magnifier. `toolbar = "hidden"` hides only the buttons. On macOS,
+`MacTitleBar` (platform) hosts the header in the native title row and gives it insets that keep
+clear of the traffic lights; elsewhere the header is the top row of `WindowContent` under the
+native decorations. The field shows `WindowHeaderContext` and opens the palette, which
+`WindowCommandPalette` anchors to the field's bounds. `WindowTabs` are IntelliJ editor tabs sized
+to content with a 3 px selection underline, wheel scrolling and a ▾ list of all tabs. Each pane's
+`FindBar` is IntelliJ's single-line find row. App icons resolve from bundled assets. Since SDK
+0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured to the chrome
+foreground (see [SDK architecture](sdk-architecture.md)).
 
 ## Themes
 

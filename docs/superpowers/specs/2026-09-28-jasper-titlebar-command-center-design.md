@@ -1,6 +1,6 @@
 # Title-bar command centre, scope chips and custom title bars
 
-**Status:** Design approved in chat by the user on 2026-09-28. Written specification awaiting user review. No plans yet.
+**Status:** Design approved in chat by the user on 2026-09-28; written specification approved the same day. Plan A implemented on `claude/titlebar-command-center`; plan B not written.
 
 It amends:
 - [the unified header](2026-09-27-jasper-unified-header-design.md), where the header layout changes;
@@ -48,7 +48,7 @@ A new `workspace/WindowHeader` panel has three regions and a custom layout manag
 **Trailing: the existing `WindowToolbar`, right-aligned**
 - The glue that pinned Find and Settings to the right is removed. The whole group packs against the right edge, before the window controls on Windows and Linux.
 - The overflow button uses `general/moreVertical` (⋮). It stays the rightmost toolbar control, and its tooltip and accessible name remain "More actions".
-- Hiding is still by priority and unchanged (lowest first, later controls first within a priority). What changes is the width it measures against: the toolbar's available width is what is left after the leading slot and the field's **minimum** width.
+- Hiding is still by priority and unchanged (lowest first, later controls first within a priority). The toolbar gets its full width, capped by what is left after the leading slot and the field's **preferred** width, and never less than its own minimum (padding plus ⋮). That is what makes buttons overflow before the field shrinks. (Corrected by plan A; the first version said the field's minimum width, which contradicted the squeeze order.)
 
 **Squeeze order as the window narrows**
 1. Toolbar buttons overflow into ⋮.
