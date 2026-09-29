@@ -60,9 +60,15 @@ final class Sneak {
 
     private static Sneak state(Context c) { return c.vim.extensions().script(Sneak.class, Sneak::new); }
 
-    /** f, F, t and T in Normal or Visual mode give {@code ;} and {@code ,} back to them (the plugin's sneak#reset). */
-    static void findTyped(Context c) {
-        if (c.operator != null || !c.vim.extensions().on(OPTION)) return;
+    /**
+     * f, F, t and T in Normal or Visual mode give {@code ;} and {@code ,} back to them (the plugin's sneak#reset), as
+     * {@code g:sneak#f_reset} and {@code g:sneak#t_reset} (legacy {@code g:sneak#nextprev_f} and {@code _t}) allow.
+     * Keys a plugin runs with {@code :normal!} do not, as the plugin's reset is a mapping, which they bypass.
+     */
+    static void findTyped(Context c, boolean till) {
+        if (c.operator != null || c.editor.machine().replaying() || !c.vim.extensions().on(OPTION)) return;
+        String suffix = till ? "t" : "f";
+        if (number(c.vim, "sneak#nextprev_" + suffix, number(c.vim, "sneak#" + suffix + "_reset", 1)) == 0) return;
         Sneak st = state(c);
         if (!st.hooked) return;
         st.rst = true;
@@ -75,7 +81,7 @@ final class Sneak {
         Sneak st = state(c);
         StringBuilder s = new StringBuilder();
         for (KeyInput key : c.keys) {
-            if (cancels(key)) return cancelled(c);
+            if (cancels(key)) return cancelled();
             if (key.is("<CR>")) {
                 if (s.isEmpty()) s.append(st.input);
                 break;
@@ -87,7 +93,7 @@ final class Sneak {
     }
 
     /** An empty input: nothing moves. */
-    private static Target cancelled(Context c) { throw VimFailure.quiet(); }
+    private static Target cancelled() { throw VimFailure.quiet(); }
 
     /** sneak#rpt: {@code ;} and {@code ,}. */
     private static Target repeat(Context c, boolean reverse) {
@@ -114,7 +120,7 @@ final class Sneak {
     private Target to(Context c, String in, int len, int count, boolean repeatmotion, boolean rev, int incl) {
         VimEditor editor = c.editor;
         Buffer b = editor.buffer();
-        if (in.isEmpty()) return cancelled(c);
+        if (in.isEmpty()) return cancelled();
         boolean isOp = c.operator != null;
         Pos cur = editor.cursor();
         int ts = c.tabstop();

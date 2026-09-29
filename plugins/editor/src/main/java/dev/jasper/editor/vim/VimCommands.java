@@ -98,8 +98,8 @@ public final class VimCommands {
 
     /**
      * A motion that reads keys first (a ported plugin's getchar()), one at a time until {@code enough} says the keys
-     * read so far are enough (asked before the first one too); they are in {@link Context#keys}. {@code <Esc>} as the
-     * first key cancels it.
+     * read so far are enough (asked before the first one too); they are in {@link Context#keys}. {@code <Esc>} at any key
+     * read cancels it.
      */
     void motionWithKeys(String keys, String description, java.util.function.BiPredicate<VimEditor, java.util.List<KeyInput>> enough, Motion motion) {
         motion(keys, description, motion);

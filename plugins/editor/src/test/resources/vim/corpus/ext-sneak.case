@@ -845,3 +845,79 @@ expect-text:
   ab ab
 expect-cursor: 1,1
 expect-mode: normal
+
+=== f with f_reset off keeps ; for sneak
+text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+cursor: 1,1
+ext: sneak
+let: g:sneak#f_reset = 0
+keys: stw0fe;
+--- vim 9.1
+expect-text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+expect-cursor: 1,5
+expect-mode: normal
+
+=== t with t_reset off keeps ; for sneak
+text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+cursor: 1,1
+ext: sneak
+let: g:sneak#t_reset = 0
+keys: stw0to;
+--- vim 9.1
+expect-text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+expect-cursor: 1,15
+expect-mode: normal
+
+=== f with the legacy nextprev_f off keeps ; for sneak
+text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+cursor: 1,1
+ext: sneak
+let: g:sneak#nextprev_f = 0
+keys: stw0fe;
+--- vim 9.1
+expect-text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+expect-cursor: 1,5
+expect-mode: normal
+
+=== t with f_reset off still resets ;
+text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+cursor: 1,1
+ext: sneak
+let: g:sneak#f_reset = 0
+keys: stw0to;
+--- vim 9.1
+expect-text:
+  one two three two
+  four twofold two
+  five
+  two and tw
+expect-cursor: 1,16
+expect-mode: normal

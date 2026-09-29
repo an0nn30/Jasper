@@ -704,6 +704,7 @@ final class Machine {
         char reg = register, forc = forced, rr = recordRegister;
         String op = operator, k = keys, ln = line;
         List<KeyInput> sh = List.copyOf(shown), rec = List.copyOf(record);
+        List<KeyInput> rk = readKeys;
         Consumer<KeyInput> arg = argument;
         Visual.Redo rv = recordVisual, vr = visualRedo;
         boolean ri = recordingInsert, rep = replaying, sus = suspended, susc = suspendedChange;
@@ -728,6 +729,7 @@ final class Machine {
             shown.addAll(sh);
             record.clear();
             record.addAll(rec);
+            readKeys = rk;
             argument = arg;
             recordVisual = rv;
             visualRedo = vr;

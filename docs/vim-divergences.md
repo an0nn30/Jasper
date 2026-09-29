@@ -165,3 +165,8 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   `.` repeats the keys rather than vim-repeat's `<Plug>SneakRepeat`, with the same result. A letter finds the letters
   whose Unicode decomposition starts with it (`e` finds `é`), where Vim has its own table. Its default mappings check
   each mode on its own, and `,` does not move to `\` when you have mapped `,`.
+  A count's vertical scope has no highlight of its own (the plugin's SneakScope), and its columns are measured from
+  the start of a tab or wide character under the cursor, where Vim measures from its end. The matches drawn in a tab
+  stay until the cursor moves there, rather than clearing when you leave the tab. Your own mapping of `f` or `t` does
+  not stop them resetting `;` and `,`. The cancel keys (`<BS>`, `<C-c>`, `<C-g>`, `<Del>`) end a macro or mapping
+  they are in.

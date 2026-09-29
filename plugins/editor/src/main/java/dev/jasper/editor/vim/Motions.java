@@ -223,7 +223,7 @@ final class Motions {
 
     /** f, F, t and T typed: with sneak on, they take {@code ;} and {@code ,} back from it. */
     private static Target typedFind(Context c, boolean forward, boolean till) {
-        Sneak.findTyped(c);
+        Sneak.findTyped(c, till);
         return find(c, forward, till, false, false);
     }
 

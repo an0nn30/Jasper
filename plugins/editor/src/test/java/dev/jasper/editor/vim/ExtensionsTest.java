@@ -227,6 +227,28 @@ class ExtensionsTest {
         });
     }
 
+    @Test void sneakHighlightEndsWhenTheTextChangesUnderTheCursor() throws Exception {
+        onEdt(() -> {
+            var editor = editor("one two three two\n");
+            type(editor, ":set sneak<CR>stw");
+            assertThat(editor.highlights().stream().filter(r -> r[0] == 3).toList()).isNotEmpty();
+            type(editor, "x");
+            assertThat(editor.highlights().stream().filter(r -> r[0] == 3).toList()).as("x changed the text").isEmpty();
+        });
+    }
+
+    @Test void scriptedFindsInSurroundDoNotTakeSemicolonFromSneak() throws Exception {
+        onEdt(() -> {
+            var editor = editor("*b* one two three two\n");
+            type(editor, ":set surround<CR>:set sneak<CR>stw");
+            assertThat(editor.cursor()).isEqualTo(new Pos(0, 8));
+            type(editor, "0ds*");
+            assertThat(editor.area().getText()).isEqualTo("b one two three two\n");
+            type(editor, ";");
+            assertThat(editor.cursor()).as("; still sneaks, it was not given back to F").isEqualTo(new Pos(0, 6));
+        });
+    }
+
     @Test void sneakLeavesTheUsersKeysAlone() throws Exception {
         onEdt(() -> {
             var editor = editor("x\n");
