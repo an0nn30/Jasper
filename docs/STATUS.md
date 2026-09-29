@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-29
 
+- **Opening remote files from Cmd/Ctrl+O and File › Open Remote File…** (branch `claude/remote-open-file`, spec
+  `docs/superpowers/specs/2026-09-29-remote-open-file-design.md`, plan
+  `docs/superpowers/plans/2026-09-29-remote-open-file.md`, executed inline 2026-09-29): Open in Editor… asks openers
+  before the local chooser (Editor 0.5.0: `OpenRequest`, `Editor.opener`); the Editor tab's hardcoded Cmd/Ctrl+O is
+  gone, so the Keymap's binding for Open in Editor… applies in terminal panes and Editor tabs. Remote 0.7.0 answers
+  for connected SSH panes and remote Editor tabs with a modal Open Remote File picker (host dropdown, navigation,
+  multi-select, up to 20 files, links followed), also on File and SSH › Open Remote File… (no default shortcut); the
+  SFTP panel's open-in-Editor logic moved to `EditorOpening`, shared with the picker. `./gradlew check` green: app
+  1294/0/1, terminal 391/0/4, Editor 4776/0/0, Remote 299/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
+  Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0, testkit 69/0/0 (tests/failures/skipped). Not merged. GUI checks pending
+  with the user: Cmd/Ctrl+O in an SSH pane, a remote Editor tab and a local pane; rebinding Open in Editor… in the
+  Keymap moves all three; File › Open Remote File… with and without an SSH pane focused; on Linux/Windows, the
+  Keymap's cmd+o is Ctrl+Shift+O, which now applies in Editor tabs too (their old in-tab key was Ctrl+O).
 - **IntelliJ parent themes and schemes** (branch `claude/intellij-parent-themes`, bounded change approved in chat
   2026-09-29, no spec): every theme and editor scheme IntelliJ bundles at the pinned intellij-community commit is
   vendored under `themes/intellij/` (New UI `expUI/`, `islands/`, `Light.xml`), so plugin themes built on

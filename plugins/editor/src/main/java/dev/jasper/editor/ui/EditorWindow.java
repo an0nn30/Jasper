@@ -1,6 +1,7 @@
 package dev.jasper.editor.ui;
 
 import dev.jasper.editor.api.EditorDocument;
+import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.local.LocalWatcher;
 import dev.jasper.editor.session.DocumentSession;
@@ -18,6 +19,8 @@ import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.ContentSpec;
 import dev.jasper.sdk.ui.ContentPresentation;
+import dev.jasper.sdk.terminal.PaneHandle;
+import dev.jasper.sdk.terminal.WindowHandle;
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
@@ -32,6 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import javax.swing.Action;
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -49,6 +53,7 @@ public final class EditorWindow {
     private final PluginContext context;
     private final Runnable onClosed;
     private final java.util.function.Consumer<EditorDocument> opened;
+    private final Predicate<OpenRequest> openers;
     private final EditorModel model = new EditorModel();
     private final EditorTheme theme = new EditorTheme();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
@@ -99,10 +104,24 @@ public final class EditorWindow {
      * @param opened told a document once its new tab's first read succeeds, and each time its loaded tab is opened again
      */
     public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened) {
+        this(environment, onClosed, opened, request -> false);
+    }
+
+    /**
+     * Creates the window, not yet shown.
+     *
+     * @param environment what the window needs from the plugin
+     * @param onClosed runs once the window has closed
+     * @param opened told a document once its new tab's first read succeeds, and each time its loaded tab is opened again
+     * @param openers asked before the local chooser by Open in Editor…; true when one handled the request
+     */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                        Predicate<OpenRequest> openers) {
         this.environment = environment;
         this.context = environment.context();
         this.onClosed = onClosed;
         this.opened = java.util.Objects.requireNonNull(opened);
+        this.openers = java.util.Objects.requireNonNull(openers);
         fileIcon = context.appearance().icon(IconName.FILE);
         serverIcon = context.appearance().icon(IconName.SERVER);
         ask = question -> environment.askers().apply(owner()).apply(question);
@@ -113,7 +132,7 @@ public final class EditorWindow {
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
             command("save-as", "Save As…", KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK, this::saveAs),
             command("save-all", "Save All", KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK, () -> saveAll()),
-            command("open", "Open…", KeyEvent.VK_O, 0, this::openChooser),
+            new Command("open", "Open…", Optional.empty(), false, this::openChooser),
             command("new", "New File", KeyEvent.VK_N, 0, this::newUntitled),
             new Command("close-tab", "Close Tab", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, this::closeCurrent),
             command("find", "Find…", KeyEvent.VK_F, 0, () -> findBar.open(false)),
@@ -288,9 +307,28 @@ public final class EditorWindow {
         return saveSessions(model.sessions().stream().filter(DocumentSession::dirty).toList(), new AtomicBoolean());
     }
 
-    public void openChooser() {
-        Optional<Path> near = selected().flatMap(tab -> localFile(tab.session())).map(Path::getParent);
-        openLocalFiles(context.windows().chooseFiles(owner(), "Open", near));
+    /** The Editor's own "open" command (Vim's {@code :action open}): Open in Editor… for the window the Editor was last used from. */
+    public void openChooser() { openFrom(lastWindow(), Optional.empty()); }
+
+    /**
+     * Open in Editor…: the openers first, then the local chooser, which starts in the active local document's folder.
+     *
+     * @param window the workspace window it was invoked in; null skips the openers
+     * @param pane the focused terminal pane
+     */
+    public void openFrom(WindowHandle window, Optional<PaneHandle> pane) {
+        Optional<EditorTab> active = hosted.entrySet().stream().filter(entry -> entry.getValue().isActive()).map(java.util.Map.Entry::getKey).findFirst();
+        Optional<String> key = pane.isPresent() ? Optional.empty() : active.flatMap(tab -> tab.session().document()).map(EditorDocument::key);
+        if (window != null && openers.test(new OpenRequest(window, pane, key))) return;
+        Optional<Path> near = active.or(this::selected).flatMap(tab -> localFile(tab.session())).map(Path::getParent);
+        WindowOwner owner = window != null ? window : owner();
+        openLocalFiles(context.windows().chooseFiles(owner, "Open in Editor", near), owner);
+    }
+
+    /** @return the terminal window the Editor was last opened from, else the active one; null when there is none */
+    private WindowHandle lastWindow() {
+        if (origin instanceof WindowHandle window && window.isOpen()) return window;
+        return context.terminals().activeWindow().orElse(null);
     }
 
     public void closeCurrent() { selected().ifPresent(this::closeTab); }

@@ -44,11 +44,16 @@ class RemoteEditingPluginTest {
     /** A stand-in Editor that records what Remote asks it to open. */
     static final class FakeEditor implements Plugin {
         final List<EditorDocument> documents = new CopyOnWriteArrayList<>();
+        final List<java.util.function.Predicate<dev.jasper.editor.api.OpenRequest>> openers = new CopyOnWriteArrayList<>();
         volatile RuntimeException failure;
         @Override public void start(PluginContext context) {
             context.services().publish(Editor.class, new Editor() {
                 @Override public void open(Path file) { throw new AssertionError("Remote opens documents, not local paths"); }
                 @Override public void open(EditorDocument document) { if (failure != null) throw failure; documents.add(document); }
+                @Override public dev.jasper.sdk.Subscription opener(java.util.function.Predicate<dev.jasper.editor.api.OpenRequest> handler) {
+                    openers.add(handler);
+                    return () -> openers.remove(handler);
+                }
             });
         }
         @Override public void stop() { }
@@ -60,6 +65,14 @@ class RemoteEditingPluginTest {
     }
     /** As above, serving through {@code factory} instead of a plain {@link SftpSubsystemFactory}. */
     static SftpPanel browse(FakePluginHost host, LoopbackServer server, Path files, Path dir, Optional<FakeEditor> editor, int rows, SftpSubsystemFactory factory) throws Exception {
+        return setUp(host, server, files, dir, editor, rows, factory).panel();
+    }
+
+    /** What {@link #setUp} leaves open: the SFTP panel, the terminal window and SSH pane, and Remote's context. */
+    record Browsed(SftpPanel panel, UUID window, UUID pane, PluginContext context) { }
+
+    /** As {@link #browse}, returning the window, the SSH pane and Remote's context too. */
+    static Browsed setUp(FakePluginHost host, LoopbackServer server, Path files, Path dir, Optional<FakeEditor> editor, int rows, SftpSubsystemFactory factory) throws Exception {
         server.server.setFileSystemFactory(new VirtualFileSystemFactory(files.toRealPath()));
         server.server.setSubsystemFactories(List.of(factory));
         var vault = new FakeVault();
@@ -76,9 +89,10 @@ class RemoteEditingPluginTest {
         host.activateTerminalWindow(window);
         var panel = (SftpPanel) host.openPanel(SftpUi.PANEL, window);
         plugin.openHost(context.terminals().window(window).orElseThrow(), prod); RemotePluginTest.settle(host);
-        host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush();
+        UUID pane = host.terminalPanes().getFirst();
+        host.focusTerminalPane(pane); host.flush();
         RemotePluginTest.awaitRowCount(host, panel, rows);
-        return panel;
+        return new Browsed(panel, window, pane, context);
     }
 
     static void select(SftpPanel panel, String name) {

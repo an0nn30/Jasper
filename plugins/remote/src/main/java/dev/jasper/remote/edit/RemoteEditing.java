@@ -72,16 +72,24 @@ public final class RemoteEditing {
      */
     Optional<Function<WindowOwner, EditorDocument>> reopen(String key) {
         Optional<RemoteDocument.ParsedKey> parsed = RemoteDocument.parseKey(key);
-        if (parsed.isEmpty()) return Optional.empty();
+        Optional<ConnectionIdentity> identity = parsed.flatMap(this::identity);
+        if (identity.isEmpty()) return Optional.empty();
+        String path = parsed.get().path();
+        return Optional.of(owner -> new RemoteDocument(identity.get(), path, channels, owner instanceof WindowHandle window ? owner(window) : activeWindow));
+    }
+
+    /**
+     * @param parsed a parsed key
+     * @return its route with the saved hosts as they are now and the recorded logins; empty when a host is no longer saved
+     */
+    Optional<ConnectionIdentity> identity(RemoteDocument.ParsedKey parsed) {
         var route = new ArrayList<ConnectionIdentity.Hop>();
-        for (RemoteDocument.KeyHop hop : parsed.get().hops()) {
+        for (RemoteDocument.KeyHop hop : parsed.hops()) {
             Optional<RemoteHost> host = hosts.apply(hop.hostId());
             if (host.isEmpty()) return Optional.empty();
             route.add(new ConnectionIdentity.Hop(host.get(), hop.login()));
         }
-        var identity = new ConnectionIdentity(route);
-        String path = parsed.get().path();
-        return Optional.of(owner -> new RemoteDocument(identity, path, channels, owner instanceof WindowHandle window ? owner(window) : activeWindow));
+        return Optional.of(new ConnectionIdentity(route));
     }
 
     /**

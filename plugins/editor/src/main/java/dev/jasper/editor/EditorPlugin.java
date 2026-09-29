@@ -2,6 +2,8 @@ package dev.jasper.editor;
 
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.EditorDocument;
+import dev.jasper.editor.api.OpenRequest;
+import dev.jasper.editor.open.Openers;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.recent.RecentFiles;
 import dev.jasper.editor.recent.RecentFilesScope;
@@ -28,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import javax.swing.SwingUtilities;
 
 /** Edits local and remote text files in app-owned workspace tabs; publishes {@link Editor} for other plugins. */
@@ -39,6 +42,7 @@ public final class EditorPlugin implements Plugin {
     private EditorEnvironment environment;
     private EditorWindow window;
     private RecentFiles recent;
+    private final Openers openers = new Openers();
 
     /** The production plugin: Swing's event queue, modal dialogs and running timers. */
     public EditorPlugin() {
@@ -71,13 +75,11 @@ public final class EditorPlugin implements Plugin {
             @Override public Subscription reopener(String keyPrefix, Function<String, Optional<Function<WindowOwner, EditorDocument>>> resolve) {
                 return reopeners.register(keyPrefix, resolve);
             }
+            @Override public Subscription opener(Predicate<OpenRequest> handler) { return openers.register(handler); }
         });
         context.actions().register(ActionSpec.of(OPEN, "Open in Editor…").withIcon(context.appearance().icon(IconName.FILE))
                 .withKeywords(List.of("editor", "open", "file", "edit")).withDefaultBinding("cmd+o"),
-            invoked -> {
-                List<Path> files = context.windows().chooseFiles(invoked.window(), "Open in Editor", Optional.empty());
-                if (!files.isEmpty()) window().openLocalFiles(files, invoked.window());
-            });
+            invoked -> window().openFrom(invoked.window(), invoked.pane()));
         context.actions().register(ActionSpec.of(NEW, "New Editor File").withKeywords(List.of("editor", "new", "file", "untitled")),
             invoked -> window().newUntitled(invoked.window()));
         context.actions().register(ActionSpec.of(SHOW, "Show Editor").withKeywords(List.of("editor", "tabs")), invoked -> window().show());
@@ -94,7 +96,7 @@ public final class EditorPlugin implements Plugin {
     }
 
     private EditorWindow window() {
-        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()));
+        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle);
         return window;
     }
 }
