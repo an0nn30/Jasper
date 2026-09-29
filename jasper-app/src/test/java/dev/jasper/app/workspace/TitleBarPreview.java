@@ -36,10 +36,10 @@ public final class TitleBarPreview {
                         owner.currentTab().rename("Reviewing the notification implementation");
                         owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
                         owner.currentTab().rename("tmux");
-                        bar.setContext("Claude Code — Reviewing the notification implementation", "Claude Code — Reviewing the notification implementation", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
+                        owner.chrome().search().setContext("Claude Code — Reviewing the notification implementation", "Claude Code — Reviewing the notification implementation", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
                         render(bar, output, theme, "tmux-tabs", 830);
                         render(bar, output, theme, "narrow", 450);
-                        bar.setContext("staging-01:/srv/app : make test", "staging-01:/srv/app : make test",
+                        owner.chrome().search().setContext("staging-01:/srv/app : make test", "staging-01:/srv/app : make test",
                             dev.jasper.app.platform.AppIcons.named("SERVER"));
                         render(bar, output, theme, "remote", 830);
                         render(bar, output, theme, "remote-narrow", 450);

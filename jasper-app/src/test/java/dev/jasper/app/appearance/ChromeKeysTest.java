@@ -103,4 +103,25 @@ class ChromeKeysTest {
         assertThatIllegalStateException().isThrownBy(() -> ChromeKeys.derive(defaults, TERMINAL))
             .withMessageContaining("TitlePane.background");
     }
+
+    @Test void titleSearchKeysDeriveFromTheTitleBarUnlessTheThemeNamesThem() {
+        var defaults = flatLafOnly();
+        ChromeKeys.derive(defaults, TERMINAL);
+        Color title = defaults.getColor("Jasper.titleBackground");
+        Color background = defaults.getColor("Jasper.titleSearch.background");
+        assertThat(background).isEqualTo(ChromeKeys.mix(Color.BLACK, title, .07));
+        assertThat(defaults.getColor("Jasper.titleSearch.hoverBackground")).isEqualTo(ChromeKeys.mix(Color.BLACK, background, .06));
+        assertThat(defaults.getColor("Jasper.titleSearch.border")).isEqualTo(ChromeKeys.mix(Color.BLACK, title, .16));
+        assertThat(defaults.getColor("Jasper.titleSearch.foreground")).isEqualTo(defaults.getColor("Jasper.titleForeground"));
+        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.titleSearch.hintForeground"), background)).isGreaterThanOrEqualTo(3);
+
+        var themed = flatLafOnly();
+        put(themed, "SearchEverywhere.SearchField.background", 0x101010);
+        put(themed, "SearchEverywhere.SearchField.borderColor", 0x202020);
+        put(themed, "MainToolbar.searchField.hoverBackground", 0x303030);
+        ChromeKeys.derive(themed, TERMINAL);
+        assertThat(themed.getColor("Jasper.titleSearch.background")).isEqualTo(new Color(0x101010));
+        assertThat(themed.getColor("Jasper.titleSearch.border")).isEqualTo(new Color(0x202020));
+        assertThat(themed.getColor("Jasper.titleSearch.hoverBackground")).isEqualTo(new Color(0x303030));
+    }
 }

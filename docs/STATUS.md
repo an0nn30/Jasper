@@ -13,6 +13,18 @@
     6,809 tests green.
   - Not done: GUI checks 97–103 of the [checklist](editor-verification.md) (user-run); plan V4c
     (matchit, sneak); push.
+- **Title-bar command centre, plan A** (branch `claude/titlebar-command-center`, spec
+  `docs/superpowers/specs/2026-09-28-jasper-titlebar-command-center-design.md`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-titlebar-command-center-a.md`):
+  - **Header:** every window's header centres a VS Code-style search field showing the working
+    context and packs the toolbar right behind a ⋮ overflow; a hidden toolbar keeps the header row.
+  - **Palette:** drops from the field; its tabs are replaced by scope chips (`>`, `history >`, …) and
+    a mode list (Commands first); Tab no longer switches scopes; Backspace in an empty query removes the chip.
+  - Executed inline 2026-09-28 (21664347..8474e9cf); `./gradlew check` 6,520 tests green (6 skipped).
+  - Deviations: test-only, listed in the plan's banner.
+  - Not done: GUI checks (field and palette look in light and dark, the drop, native dragging
+    around the field and not over the open card), plan B (Windows/Linux custom title bar), merge
+    and push.
 - **Editor Vim mode: files without a final line break** (branch `fix/vim-final-break`, merged into local main
   2026-09-28, not pushed): the corpus runs every case a second time on its text without a final line break, which
   found empty last lines lost by `x`, `s`, `D`, `cc`, `S`, `o` and `==` (the case 093245f7 fixed for `<CR>`/`o`),

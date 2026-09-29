@@ -1,18 +1,24 @@
 # Command palette
 
-The palette works like IntelliJ's Search Everywhere. A row of tabs sits above the search field:
-**All** first, then one tab per **scope** (Commands, History, Snippets, SSH and any a plugin adds).
-Cmd+K on macOS or Ctrl+K on Windows and Linux (or View → Command Palette) opens **All**, which
-searches every scope at once and groups the matches under each scope's name, at most
-`palette.max_results` per scope; when a scope has more, a "More in <Scope>…" row opens that scope's
-tab with the query kept. Vault's secrets stay out of All; its tab searches them. Each scope's own
-shortcut opens its tab: Cmd+R (Ctrl+Shift+R elsewhere) History, Cmd+J (Ctrl+Shift+J) Snippets.
-Pressing the shortcut of the tab already showing closes the palette. Tab and Shift+Tab move between
-tabs, keeping the query; clicking a tab does the same.
+Every window's header has a search field in the middle showing the focused pane's context, with the
+palette shortcut on the right. Clicking it, Cmd+K on macOS or Ctrl+K on Windows and Linux, or View →
+Command Palette drops the palette from the field: the card covers the field, centred on it and at
+least 560 px wide. When the window is too narrow for the field, the palette opens centred near the
+top fifth of the window instead.
 
-The palette centers horizontally across the full window, including tool panels and the rail.
-Its top stays anchored near the upper fifth of the workspace as results change; tall cards
-are clamped inside the window. Opening or resizing a tool panel does not move or narrow it.
+The palette opens with no **scope chip**. An empty query lists the scopes (Commands, History,
+Snippets, SSH, Vault and any a plugin adds) with the prefix that selects each and its shortcut;
+choosing one sets its chip. Typing anything else searches every scope at once and groups the matches
+under each scope's name, at most `palette.max_results` per scope; when a scope has more, a "More in
+<Scope>…" row sets that scope's chip with the query kept. Vault's secrets stay out of that search;
+its chip searches them.
+
+Chips: `>` at the start of the query is Commands; `<scope> >` (for example `history > ls`, or any
+unique start such as `hist >`) is that scope, and the prefix leaves the field. With a chip set, `>`
+is ordinary text. Backspace in an empty query removes the chip. Each scope's own shortcut opens the
+palette with its chip: Cmd+R (Ctrl+Shift+R elsewhere) History, Cmd+J (Ctrl+Shift+J) Snippets.
+Pressing the shortcut of the chip already showing, or Cmd/Ctrl+K with no chip, closes the palette.
+Tab does nothing outside a form.
 
 Rows are one line: an icon, the title, a grey detail and a right-aligned tag. Up and Down move
 between rows, skipping the section headers. Enter runs a row's first verb, Cmd+Enter (Ctrl+Enter
@@ -217,7 +223,7 @@ contract makes no compatibility promise for a future plugin API. No plugin loadi
 or discovery exists; Jasper ships Commands, History and Snippets.
 
 `WindowCommandPalette` captures the origin tab/pane and restores focus; changing
-tabs retains that target. `PaletteController` owns the open tab, query and step state.
+chips retains that target. `PaletteController` owns the chip, query and step state.
 Completion callbacks are marshalled to EDT and recheck generation, step identity,
 registered scope and origin validity before publishing. Dismissal, scope changes,
 step cancellation, pane/tab changes and window closure invalidate stale results.
@@ -273,7 +279,7 @@ locking.
 
 The [actual Swing renders, pure-search and shell-history-search measurements, and
 reproduction commands](design/command-palette/README.md) cover the headless
-verification, including the All tab, scope tabs, History rows, the Snippets list and
+verification, including the mode list, chips, History rows, the Snippets list and
 its fill-in and name steps. Native focus, input methods, accessibility, tab
 rendering on the real title-bar theme, physical-display placement and editing
 `snippets.toml` in the real OS editor remain in the [manual acceptance

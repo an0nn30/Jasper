@@ -79,6 +79,11 @@ public final class PaletteKeyRouter implements AutoCloseable {
             | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK);
         int primary = macOs ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
         if (palette.composing() && modifiers == 0 && code != KeyEvent.VK_ESCAPE) return false;
+        if (modifiers == 0 && code == KeyEvent.VK_BACK_SPACE) {
+            if (!palette.backspacePressed()) return false;
+            claim.accept(code);
+            return true;
+        }
         boolean secondVerb = modifiers == primary && code == KeyEvent.VK_ENTER;
         boolean thirdVerb = modifiers == InputEvent.SHIFT_DOWN_MASK && code == KeyEvent.VK_ENTER;
         boolean backTab = modifiers == InputEvent.SHIFT_DOWN_MASK && code == KeyEvent.VK_TAB;

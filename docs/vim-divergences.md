@@ -74,7 +74,9 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   completes (`:s/a/b`) it types a tab, as Vim does, and in a search (`/`, `?`) it always types a tab, where Vim 9.1
   completes words from the text.
 - **Line numbers.** 'number' starts on, as the Editor shows line numbers. With 'number' and 'relativenumber' the
-  cursor line's number is right-aligned like the others; Vim puts it on the left.
+  cursor line's number is right-aligned like the others; Vim puts it on the left. The text area draws an empty row
+  after a file's final line break; it is not a line (Vim shows none), so it has no number and the cursor cannot reach
+  it.
 - **Uppercase marks across tabs.** `'A` and `` `A `` select the tab the mark is in and go there; after an operator or
   in Visual mode they fail, where Vim also cannot operate across files.
 - **Folds are the Editor's code folds.** There are no manual folds (`zf`, `zd`, `zE`); `zo`, `zc` and the other fold

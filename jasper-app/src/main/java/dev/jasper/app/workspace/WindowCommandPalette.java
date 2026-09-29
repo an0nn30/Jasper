@@ -112,6 +112,7 @@ final class WindowCommandPalette implements AutoCloseable {
     boolean stepOpen() { return controller.stepOpen(); }
     void escape() { controller.escape(); }
     boolean tabPressed(boolean backwards) { return controller.tabPressed(backwards); }
+    boolean backspacePressed() { return controller.backspacePressed(); }
     void refresh() { controller.refresh(); }
     void refreshIfChanged() { controller.refreshIfChanged(); }
     boolean tabPressed() { return tabPressed(false); }
@@ -122,6 +123,18 @@ final class WindowCommandPalette implements AutoCloseable {
         // Include Swing title/menu chrome, but never the native window controls.
         overlay.setBounds(0, 0, root.getLayeredPane().getWidth(), root.getLayeredPane().getHeight());
         overlay.doLayout(); overlay.repaint();
+    }
+
+    static final int ANCHORED_MINIMUM_WIDTH = 560;
+
+    /** The card dropped from the title field: over it, centred on it, at least the minimum wide, inside the window. */
+    static Rectangle anchored(Rectangle field, Rectangle window, Dimension preferred, int minimumWidth, int margin) {
+        int insetX = Math.min(margin, Math.max(0, window.width / 2));
+        int width = Math.min(Math.max(field.width, minimumWidth), Math.max(0, window.width - 2 * insetX));
+        int x = field.x + (field.width - width) / 2;
+        x = Math.max(window.x + insetX, Math.min(x, window.x + window.width - insetX - width));
+        int height = Math.min(preferred.height, Math.max(0, window.y + window.height - margin - field.y));
+        return new Rectangle(x, field.y, width, height);
     }
 
     static Rectangle positioned(Rectangle available, Dimension preferred, int margin) {
@@ -171,8 +184,14 @@ final class WindowCommandPalette implements AutoCloseable {
         }
         @Override public void doLayout() {
             if (root == null || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
-            // The workspace spans the window, including its rail and tool panels. Only native
-            // title controls are outside it; panel dividers must not move or narrow the palette.
+            Rectangle field = owner.paletteAnchor(this);
+            if (field != null) {
+                palette.setBounds(anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), palette.getPreferredSize(),
+                    UIScale.scale(ANCHORED_MINIMUM_WIDTH), UIScale.scale(16)));
+                return;
+            }
+            // No usable field: centre across the workspace, which spans the window including its rail and
+            // tool panels. Panel dividers must not move or narrow the palette.
             Rectangle window = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this);
             palette.setBounds(positioned(window, palette.getPreferredSize(), UIScale.scale(16)));
         }

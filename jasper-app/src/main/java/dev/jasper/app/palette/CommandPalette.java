@@ -49,17 +49,15 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 /**
- * Jasper's Search Everywhere: a tab row (All, then each scope), a full-width search field, a one-line
- * result list with section headers, and a hint bar with the selected row's detail and its scope's other
- * verbs. Every colour comes from the installed theme ({@code SearchEverywhere.*}, {@code List.*},
+ * Jasper's palette: a query row with an optional scope chip, a one-line result list with section headers
+ * or the mode list, and a hint bar with the selected row's detail and its scope's other verbs. Every colour comes from the installed theme ({@code SearchEverywhere.*}, {@code List.*},
  * {@code Popup.borderColor}); a key a theme lacks falls back to one FlatLaf always defines. The host owns
- * placement, focus, tab switching and key routing.
+ * placement, focus, chips and key routing.
  */
 public final class CommandPalette extends JPanel {
     static final int WIDTH = 680;
-    private static final int CORNER_ARC = 16;
-    private static final int TAB_PADDING = 4;
-    static final int TAB_HEIGHT = 30 + 2 * TAB_PADDING;
+    private static final int CORNER_ARC = 12;
+    static final int CHIP_HEIGHT = 22;
     static final int FIELD_HEIGHT = 44;
     static final int ROW_HEIGHT = 24;
     static final int HEADER_HEIGHT = 22;
@@ -67,16 +65,11 @@ public final class CommandPalette extends JPanel {
     static final int STEP_ROW_HEIGHT = 40;
     static final int MAX_VISIBLE_LINES = 15;
 
-    /** A tab above the search field: All, or one scope. */
-    public record Tab(String id, String label, Icon icon, String tooltip) {
-        public Tab { Objects.requireNonNull(id); Objects.requireNonNull(label); }
-    }
-
     private final boolean macOs;
     private final ObjIntConsumer<PaletteEntry> execute;
-    private final Consumer<String> tabSelected;
-    private final JPanel tabStrip = new FixedHeightPanel(TAB_HEIGHT);
-    private final List<TabLabel> tabLabels = new ArrayList<>();
+    private final java.util.function.Function<String, java.util.Optional<ScopePrefix>> prefixes;
+    private final Consumer<PaletteScope> chipTyped;
+    private final ChipLabel chip = new ChipLabel();
     private final JPanel fieldRow = new FixedHeightPanel(FIELD_HEIGHT);
     private final JTextField query = new JTextField();
     private final DefaultListModel<PaletteEntry> model = new DefaultListModel<>();
@@ -102,27 +95,29 @@ public final class CommandPalette extends JPanel {
     private int stepFocus = -1;
     private int hover = -1;
     private boolean composing;
-    private Color tabSelectedBackground, tabSelectedForeground, tabForeground, foreground, infoForeground, separatorColor,
+    private Color chipBackground, foreground, infoForeground, separatorColor,
         separatorForeground, selectionBackground, selectionForeground, hoverBackground, advertiserForeground, linkColor;
     private Font font, smallFont, monoFont;
 
     CommandPalette(boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
-                   Consumer<String> tabSelected) {
+                   java.util.function.Function<String, java.util.Optional<ScopePrefix>> prefixes,
+                   Consumer<PaletteScope> chipTyped) {
         super(new BorderLayout());
         this.macOs = macOs;
         this.execute = Objects.requireNonNull(execute);
-        this.tabSelected = Objects.requireNonNull(tabSelected);
+        this.prefixes = Objects.requireNonNull(prefixes);
+        this.chipTyped = Objects.requireNonNull(chipTyped);
         Objects.requireNonNull(queryChanged);
         setOpaque(false);
         // AWT retargets a press to the nearest ancestor that has mouse listeners. Without one here, a
-        // press in the tab-strip gap, the hint bar's detail text or the field row's padding would bubble
-        // past the palette to the overlay behind it, which dismisses on any press it receives.
+        // press on the chip, the hint bar's detail text or the field row's padding would bubble past
+        // the palette to the overlay behind it, which dismisses on any press it receives.
         var swallowClicks = new MouseAdapter() { };
         addMouseListener(swallowClicks);
         addMouseMotionListener(swallowClicks);
 
-        tabStrip.setLayout(new FlowLayout(FlowLayout.LEADING, 0, 0));
-        query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search everywhere");
+        query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search everything");
+        ((javax.swing.text.AbstractDocument) query.getDocument()).setDocumentFilter(new ChipFilter());
         query.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { changed(); }
             @Override public void removeUpdate(DocumentEvent event) { changed(); }
@@ -133,14 +128,10 @@ public final class CommandPalette extends JPanel {
             @Override public void inputMethodTextChanged(InputMethodEvent event) { composing = uncommittedCharacters(event) > 0; }
             @Override public void caretPositionChanged(InputMethodEvent event) {}
         });
-        fieldRow.setLayout(new BorderLayout());
+        fieldRow.setLayout(new BorderLayout(UIScale.scale(6), 0));
+        fieldRow.add(chip, BorderLayout.WEST);
         fieldRow.add(query, BorderLayout.CENTER);
-        var top = new JPanel();
-        top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-        top.setOpaque(false);
-        top.add(tabStrip);
-        top.add(fieldRow);
-        add(top, BorderLayout.NORTH);
+        add(fieldRow, BorderLayout.NORTH);
 
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setFocusable(false);
@@ -175,7 +166,7 @@ public final class CommandPalette extends JPanel {
         hintBar.add(hint, BorderLayout.CENTER);
         hintBar.add(hintActions, BorderLayout.EAST);
         add(hintBar, BorderLayout.SOUTH);
-        setTabs(List.of(new Tab(PaletteScope.ALL_ID, "All", null, null)), PaletteScope.ALL_ID);
+        setChip(null, null);
         refreshTheme();
     }
 
@@ -200,32 +191,25 @@ public final class CommandPalette extends JPanel {
 
     public JTextField queryField() { return query; }
     JList<PaletteEntry> entryList() { return list; }
-    JPanel tabStrip() { return tabStrip; }
     JPanel hintBar() { return hintBar; }
     JLabel stepTitle() { return stepTitle; }
 
-    /** Shows {@code tabs} in order and marks {@code selectedId}; the field and list are named after it. */
-    void setTabs(List<Tab> tabs, String selectedId) {
-        tabStrip.removeAll();
-        tabLabels.clear();
-        String name = "All";
-        for (Tab tab : tabs) {
-            var label = new TabLabel(tab, tab.id().equals(selectedId));
-            if (label.selected()) name = tab.label();
-            tabLabels.add(label);
-            tabStrip.add(label);
-        }
+    /** Shows {@code label}'s chip, or none for null; the field and list are named after it. */
+    void setChip(String label, Icon icon) {
+        chip.setText(label);
+        chip.setIcon(icon);
+        chip.setVisible(label != null);
+        chip.getAccessibleContext().setAccessibleName(label == null ? null : "Scope: " + label);
+        String name = label == null ? "All" : label;
         query.getAccessibleContext().setAccessibleName("Search " + name.toLowerCase(Locale.ROOT));
         list.getAccessibleContext().setAccessibleName(name);
-        applyTabColors();
-        tabStrip.revalidate();
-        tabStrip.repaint();
+        fieldRow.revalidate();
+        fieldRow.repaint();
     }
 
-    List<String> tabIds() { return tabLabels.stream().map(TabLabel::id).toList(); }
-    String selectedTabId() { return tabLabels.stream().filter(TabLabel::selected).map(TabLabel::id).findFirst().orElse(null); }
-    /** As a left click on that tab; an unknown id does nothing. */
-    void clickTab(String id) { if (tabIds().contains(id)) tabSelected.accept(id); }
+    /** The chip's label; null while no chip is set. */
+    String chipText() { return chip.isVisible() ? chip.getText() : null; }
+    JLabel chip() { return chip; }
     void setPlaceholder(String text) { query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, text); }
 
     /** Replaces the list, selecting {@code selectionKey} when present and otherwise the first selectable entry. */
@@ -305,7 +289,7 @@ public final class CommandPalette extends JPanel {
     /** As a click on the {@code index}th hint action. */
     void clickHintAction(int index) { executeSelected(hintVerbs.get(index)); }
 
-    /** Shows a form instead of the list; the tabs and query stay and the hint bar hides. The first field takes focus. */
+    /** Shows a form instead of the list; the chip and query stay and the hint bar hides. The first field takes focus. */
     void showStep(String title, List<PaletteStep.Field> fields) {
         stepPanel.removeAll(); stepFields.clear(); stepNames.clear(); stepLabels.clear();
         stepTitle.setText(title);
@@ -376,10 +360,6 @@ public final class CommandPalette extends JPanel {
     }
 
     void refreshTheme() {
-        Color headerBackground = color("SearchEverywhere.Header.background", "Panel.background");
-        tabSelectedBackground = color("SearchEverywhere.Tab.selectedBackground", "List.selectionInactiveBackground");
-        tabSelectedForeground = color("SearchEverywhere.Tab.selectedForeground", "Label.foreground");
-        tabForeground = color("Label.foreground", "List.foreground");
         foreground = color("List.foreground", "Label.foreground");
         infoForeground = color("SearchEverywhere.SearchField.infoForeground", "Label.disabledForeground");
         separatorColor = color("SearchEverywhere.List.separatorColor", "Separator.foreground");
@@ -391,6 +371,8 @@ public final class CommandPalette extends JPanel {
         Color advertiserBackground = color("SearchEverywhere.Advertiser.background", "Panel.background");
         advertiserForeground = color("SearchEverywhere.Advertiser.foreground", "Label.disabledForeground");
         linkColor = UIManager.getColor("Component.linkColor");
+        chipBackground = color("SearchEverywhere.Tab.selectedBackground", "List.selectionInactiveBackground");
+        chip.setForeground(linkColor);
         Color border = color("Popup.borderColor", "PopupMenu.borderColor");
         Color fieldBackground = color("SearchEverywhere.SearchField.background", "TextField.background");
         Color fieldBorder = color("SearchEverywhere.SearchField.borderColor", "Component.borderColor");
@@ -400,15 +382,13 @@ public final class CommandPalette extends JPanel {
 
         setBackground(listBackground);
         setBorder(new FlatLineBorder(new Insets(1, 1, 1, 1), border, 1f, CORNER_ARC));
-        tabStrip.setBackground(headerBackground);
-        int tabPadding = UIScale.scale(TAB_PADDING);
-        tabStrip.setBorder(BorderFactory.createEmptyBorder(tabPadding, tabPadding, tabPadding, tabPadding));
         fieldRow.setBackground(fieldBackground);
         fieldRow.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(8), UIScale.scale(6), UIScale.scale(8)));
         query.putClientProperty(FlatClientProperties.STYLE, "background: " + hex(fieldBackground)
             + "; borderColor: " + hex(fieldBorder) + "; placeholderForeground: " + hex(infoForeground));
         query.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_ICON, AppIcons.icon("search"));
         query.setFont(font);
+        chip.setFont(font);
         list.setBackground(listBackground);
         list.setForeground(foreground);
         list.setSelectionBackground(selectionBackground);
@@ -425,7 +405,6 @@ public final class CommandPalette extends JPanel {
             BorderFactory.createEmptyBorder(0, UIScale.scale(12), 0, UIScale.scale(12))));
         hint.setForeground(advertiserForeground);
         hint.setFont(smallFont);
-        applyTabColors();
         applyHintColors();
         applyStepColors();
         revalidate(); repaint();
@@ -433,7 +412,7 @@ public final class CommandPalette extends JPanel {
 
     @Override public Dimension getPreferredSize() {
         Insets insets = getInsets();
-        int height = TAB_HEIGHT + FIELD_HEIGHT + (stepShowing()
+        int height = FIELD_HEIGHT + (stepShowing()
             ? HEADER_HEIGHT + stepFields.size() * STEP_ROW_HEIGHT + (stepError.isVisible() ? HEADER_HEIGHT : 0)
             : listHeight() + HINT_HEIGHT);
         return new Dimension(UIScale.scale(WIDTH), UIScale.scale(height) + insets.top + insets.bottom);
@@ -490,7 +469,7 @@ public final class CommandPalette extends JPanel {
         } else if (entry instanceof PaletteEntry.More more) {
             text = "Show every match in " + more.scope().label();
             verbsDescription = keys(0) + " " + text;
-        }
+        } else if (entry instanceof PaletteEntry.Mode mode) text = mode.scope().description();
         hint.setText(text);
         list.getAccessibleContext().setAccessibleDescription(
             resultCount + " results" + (verbsDescription.isEmpty() ? "" : "; " + verbsDescription));
@@ -512,13 +491,6 @@ public final class CommandPalette extends JPanel {
 
     private String keys(int verb) {
         return (macOs ? new String[]{"⏎", "⌘⏎", "⇧⏎"} : new String[]{"Enter", "Ctrl+Enter", "Shift+Enter"})[verb];
-    }
-
-    private void applyTabColors() {
-        for (TabLabel label : tabLabels) {
-            label.setForeground(label.selected() ? tabSelectedForeground : tabForeground);
-            if (font != null) label.setFont(font);
-        }
     }
 
     private void applyHintColors() {
@@ -583,35 +555,6 @@ public final class CommandPalette extends JPanel {
         @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(logicalHeight)); }
     }
 
-    private final class TabLabel extends SizedLabel {
-        private final String id;
-        private final boolean selected;
-
-        TabLabel(Tab tab, boolean selected) {
-            super(tab.label(), TAB_HEIGHT - 2 * TAB_PADDING);
-            this.id = tab.id();
-            this.selected = selected;
-            setIcon(tab.icon());
-            setIconTextGap(UIScale.scale(4));
-            setToolTipText(tab.tooltip());
-            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(10), 0, UIScale.scale(10)));
-            getAccessibleContext().setAccessibleName(tab.label() + " tab");
-            addMouseListener(new MouseAdapter() {
-                @Override public void mousePressed(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) tabSelected.accept(id); }
-            });
-        }
-
-        String id() { return id; }
-        boolean selected() { return selected; }
-
-        @Override protected void paintComponent(Graphics graphics) {
-            if (selected && tabSelectedBackground != null) {
-                paintHighlight(graphics, tabSelectedBackground, getWidth(), getHeight());
-            }
-            super.paintComponent(graphics);
-        }
-    }
-
     private static void paintHighlight(Graphics graphics, Color color, int width, int height) {
         var g = (Graphics2D) graphics.create();
         try {
@@ -669,6 +612,18 @@ public final class CommandPalette extends JPanel {
                     tag.setFont(smallFont);
                     tag.setForeground(selected ? selectionForeground : infoForeground);
                 }
+                case PaletteEntry.Mode mode -> {
+                    icon.setIcon(mode.scope().icon());
+                    title.setText(mode.scope().label());
+                    title.setFont(font);
+                    title.setForeground(selected ? selectionForeground : foreground);
+                    detail.setText(mode.prefix());
+                    detail.setFont(font);
+                    detail.setForeground(selected ? selectionForeground : infoForeground);
+                    tag.setText(mode.shortcut());
+                    tag.setFont(smallFont);
+                    tag.setForeground(selected ? selectionForeground : infoForeground);
+                }
                 case PaletteEntry.More more -> {
                     title.setText("More in " + more.scope().label() + "…");
                     title.setFont(font);
@@ -717,6 +672,50 @@ public final class CommandPalette extends JPanel {
             if (entry instanceof PaletteEntry.Header && !first) {
                 graphics.setColor(separatorColor);
                 graphics.fillRect(0, 0, getWidth(), UIScale.scale(1));
+            }
+            super.paintComponent(graphics);
+        }
+    }
+
+    /** Turns a typed scope prefix into a chip: the prefix leaves the field and {@code chipTyped} runs. */
+    private final class ChipFilter extends javax.swing.text.DocumentFilter {
+        @Override public void insertString(FilterBypass bypass, int offset, String text,
+                                           javax.swing.text.AttributeSet attributes) throws javax.swing.text.BadLocationException {
+            replace(bypass, offset, 0, text, attributes);
+        }
+
+        @Override public void replace(FilterBypass bypass, int offset, int length, String text,
+                                      javax.swing.text.AttributeSet attributes) throws javax.swing.text.BadLocationException {
+            var document = bypass.getDocument();
+            String current = document.getText(0, document.getLength());
+            String inserted = text == null ? "" : text;
+            String next = current.substring(0, offset) + inserted + current.substring(offset + length);
+            var prefix = inserted.isEmpty() ? java.util.Optional.<ScopePrefix>empty() : prefixes.apply(next);
+            if (prefix.isEmpty()) { bypass.replace(offset, length, text, attributes); return; }
+            bypass.replace(0, document.getLength(), prefix.get().rest(), attributes);
+            chipTyped.accept(prefix.get().scope());
+        }
+    }
+
+    /** The active scope: its icon and label on a pill in the accent colour. */
+    private final class ChipLabel extends JLabel {
+        ChipLabel() {
+            setName("scopeChip");
+            putClientProperty("html.disable", Boolean.TRUE);
+            setIconTextGap(UIScale.scale(4));
+            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(8), 0, UIScale.scale(8)));
+            setVisible(false);
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            if (chipBackground != null) {
+                var g = (Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                    int height = Math.min(getHeight(), UIScale.scale(CHIP_HEIGHT));
+                    g.setColor(chipBackground);
+                    g.fillRoundRect(0, (getHeight() - height) / 2, getWidth(), height, height, height);
+                } finally { g.dispose(); }
             }
             super.paintComponent(graphics);
         }

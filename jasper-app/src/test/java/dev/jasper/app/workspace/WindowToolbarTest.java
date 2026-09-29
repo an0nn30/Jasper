@@ -56,7 +56,7 @@ class WindowToolbarTest {
             menu.add(WindowToolbar.menuItem(action("SSH", calls)));
             return menu;
         });
-        bar.finish(); bar.setTitleBar(true); bar.setSize(100, 42); bar.doLayout();
+        bar.finish(); bar.setSize(70, 42); bar.doLayout();
         var menu = (JMenu) bar.overflowMenu().getComponent(0);
         assertThat(menu.getText()).isEqualTo("Sessions");
         menu.getItem(0).doClick(); assertThat(calls).hasValue(1);
@@ -64,25 +64,30 @@ class WindowToolbarTest {
         assertThat(bar.overflowMenu().getComponentCount()).isZero();
     }
 
-    @Test void resizingNeverOverlapsOrShrinksVisibleButtonsAndKeepsDraggingSpace() {
+    @Test void controlsPackAgainstTheRightEdgeAndTheOverflowIsTheRightmost() {
         var bar = new WindowToolbar(() -> {});
         var calls = new AtomicInteger();
         for (int i = 0; i < 12; i++) button(bar, action("Plugin " + i, calls), i);
-        bar.add(Box.createHorizontalGlue());
         button(bar, action("Settings", calls), 100);
-        bar.finish(); bar.setTitleBar(true);
+        bar.finish();
+        assertThat(bar.fullWidth()).isEqualTo(16 + 13 * 64 - 4);
+        assertThat(bar.minimumWidth()).as("padding and the overflow button").isEqualTo(16 + 24);
         for (int width : new int[] {1000, 450, 200, 120, 450, 1000}) {
-            bar.setSize(width, 42); bar.doLayout();
-            int end = 0;
+            bar.setSize(width, 30); bar.doLayout();
+            int end = 0, right = 0;
             for (var child : bar.getComponents()) {
                 if (!(child instanceof JButton) || !child.isVisible()) continue;
                 assertThat(child.getX()).isGreaterThanOrEqualTo(end);
                 assertThat(child.getWidth()).isGreaterThanOrEqualTo(24);
                 end = child.getX() + child.getWidth();
-                assertThat(end).isLessThanOrEqualTo(width);
+                right = Math.max(right, end);
             }
-            var gap = java.util.Arrays.stream(bar.getComponents()).filter(Box.Filler.class::isInstance).findFirst().orElseThrow();
-            assertThat(gap.getWidth()).isGreaterThanOrEqualTo(64);
+            assertThat(right).as("packed right at %d", width).isEqualTo(width - 8);
+            if (bar.overflowButton().isVisible())
+                assertThat(bar.overflowButton().getX() + bar.overflowButton().getWidth()).isEqualTo(width - 8);
         }
+        bar.setSize(bar.fullWidth(), 30); bar.doLayout();
+        assertThat(bar.overflowButton().isVisible()).as("the full width shows everything").isFalse();
+        assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.bundled("general/moreVertical"));
     }
 }

@@ -24,9 +24,9 @@ class MacTitleBarTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             try (var bar = WindowContent.installTitleBar(new JRootPane(), owner, true, title -> {})) {
-                bar.setContext("<html>literal title", "<html>literal title", null);
-                var tooltip = label(bar).createToolTip();
-                tooltip.setTipText(label(bar).getToolTipText());
+                field(owner).setContext("<html>literal title", "<html>literal title", null);
+                var tooltip = field(owner).createToolTip();
+                tooltip.setTipText(field(owner).getToolTipText());
                 assertThat(tooltip.getClientProperty("html.disable")).isEqualTo(true);
                 assertThat(tooltip.getClientProperty("html")).isNull();
             }
@@ -42,15 +42,15 @@ class MacTitleBarTest {
                 assertThat(SwingUtilities.isDescendingFrom(owner.toolbar(), bar)).isTrue();
                 assertThat(bar.getPreferredSize().height).isEqualTo(30);
                 assertThat(SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root).y).isZero();
-                assertThat(label(bar).getText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
-                assertThat(label(bar).getToolTipText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+                assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+                assertThat(field(owner).getToolTipText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
                 owner.currentTab().rename("arbitrary program title"); owner.update();
-                assertThat(label(bar).getText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+                assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
                 var first = owner.currentTab();
                 owner.newTab(HOME.resolve("projects/moray")); owner.update();
-                assertThat(label(bar).getText()).isEqualTo(System.getProperty("user.name") + "@~/projects/moray : sh");
+                assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~/projects/moray : sh");
                 owner.selectTab(first); owner.update();
-                assertThat(label(bar).getText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+                assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
             }
         });
     }
@@ -73,8 +73,9 @@ class MacTitleBarTest {
                 owner.setToolbarHeight(28); layoutTree(root);
                 assertThat(bar.getHeight()).isEqualTo(28);
                 assertThat(bar.getMinimumSize().height).isEqualTo(28);
-                assertThat(label(bar).getText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
-                assertThat(label(bar).getWidth()).isGreaterThan(300);
+                assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+                assertThat(field(owner).getWidth()).as("a hidden toolbar leaves the field").isGreaterThan(300);
+                assertThat(field(owner).getHeight()).isEqualTo(28 - 8);
             }
         });
     }
@@ -97,7 +98,7 @@ class MacTitleBarTest {
                         assertThat(surfaceTop).as("no extra gutter below the header").isEqualTo(bar.getHeight());
                         for (var panel : java.util.List.of(left, right))
                             assertThat(SwingUtilities.convertPoint(panel, 0, 0, root).y).isEqualTo(surfaceTop);
-                        assertThat(label(bar).getY() * 2 + label(bar).getHeight()).isEqualTo(surfaceTop);
+                        assertThat(field(owner).getY() * 2 + field(owner).getHeight()).isEqualTo(surfaceTop);
                         for (var child : owner.toolbar().getComponents()) {
                             if (!(child instanceof JButton) || !child.isVisible()) continue;
                             int top = SwingUtilities.convertPoint(child, 0, 0, root).y;
@@ -127,10 +128,10 @@ class MacTitleBarTest {
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
                 owner.currentTab().rename("build logs"); owner.update();
                 assertThat(metadata.get()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
-                assertThat(label(bar).getText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+                assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
                 assertThat(bar.getMouseListeners()).isEmpty();
-                assertThat(label(bar).getMouseListeners()).isNotEmpty();
-                assertThat(label(bar).getToolTipText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+                assertThat(owner.chrome().header().getMouseListeners()).as("empty header space drags").isNotEmpty();
+                assertThat(field(owner).getToolTipText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
             }
         });
     }
@@ -149,10 +150,11 @@ class MacTitleBarTest {
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isNull();
             owner.currentTab().rename("plain window"); owner.update();
             assertThat(metadata.get()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
+            assertThat(field(owner).contextText()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
         });
     }
 
-    @Test void modernHeaderContainsToolbarAboveTheTabStrip() throws Exception {
+    @Test void modernHeaderPlacesTheFieldBetweenTheNativeControlsAndTheToolbar() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
@@ -160,29 +162,28 @@ class MacTitleBarTest {
             owner.onMinimumSizeChanged = minimumChanges::incrementAndGet;
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 assertThat(bar.getPreferredSize().height).isEqualTo(30);
-                assertThat(bar.getComponentCount()).as("context and toolbar").isEqualTo(2);
+                assertThat(bar.getComponentCount()).as("hidden title and the header").isEqualTo(2);
+                assertThat(label(bar).isVisible()).isFalse();
                 JComponent tabs = WindowTabsTest.named(owner, "windowTabs");
-                assertThat(tabs).as("tabs live in the window content").isNotNull();
                 root.setSize(959, 600); layoutTree(root);
                 Point toolbar = SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root);
                 Point strip = SwingUtilities.convertPoint(tabs, 0, 0, root);
                 assertThat(toolbar.y).isZero();
-                assertThat(strip.y).isEqualTo(toolbar.y + owner.toolbar().getHeight());
-                assertThat(label(bar).isVisible()).isTrue();
-                assertThat(owner.toolbar().getX() - label(bar).getX() - label(bar).getWidth()).isGreaterThanOrEqualTo(24);
-                assertThat(label(bar).getWidth()).isGreaterThanOrEqualTo(280);
-                owner.newTab(HOME); layoutTree(root);
-                assertThat(label(bar).isVisible()).as("the title stays with many tabs").isTrue();
+                assertThat(strip.y).isEqualTo(owner.chrome().header().getHeight());
+                var field = field(owner);
+                assertThat(field.isVisible()).isTrue();
+                assertThat(field.getX() + field.getWidth() + 12).isLessThanOrEqualTo(owner.toolbar().getX());
+                assertThat(field.getWidth()).isGreaterThanOrEqualTo(240);
                 root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(12, 6, 110, 34));
                 assertThat(minimumChanges.get()).isPositive();
-                bar.doLayout();
-                assertThat(label(bar).getX()).isGreaterThanOrEqualTo(130);
+                bar.doLayout(); owner.chrome().header().doLayout();
+                assertThat(field.getX()).isGreaterThanOrEqualTo(130);
                 var before = bar.getMinimumSize();
                 owner.currentTab().rename("extremely long shell title ".repeat(100)); owner.update();
                 assertThat(bar.getMinimumSize()).isEqualTo(before);
-                assertThat(bar.getPreferredSize().width).isLessThan(1000);
-                bar.setSize(80, 28); bar.doLayout();
-                assertThat(label(bar).getWidth()).isZero();
+                assertThat(bar.getPreferredSize().width).isLessThan(1400);
+                bar.setSize(80, 28); bar.doLayout(); owner.chrome().header().doLayout();
+                assertThat(field.collapsed()).isTrue();
             }
         });
     }
@@ -257,6 +258,7 @@ class MacTitleBarTest {
     }
 
     private static JLabel label(MacTitleBar bar) { return (JLabel) bar.getComponent(0); }
+    private static TitleSearchField field(WindowContent owner) { return owner.chrome().search(); }
     private static Color pixel(MacTitleBar bar) {
         var image = new BufferedImage(bar.getWidth(), bar.getHeight(), BufferedImage.TYPE_INT_RGB);
         var graphics = image.createGraphics();
