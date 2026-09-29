@@ -1,9 +1,10 @@
 id = "dev.jasper.editor"
 name = "Editor"
-version = "0.3.0"
+version = "0.3.1"
 entry = "dev.jasper.editor.EditorPlugin"
-sdk = ">=0.9.0, <0.10"
+sdk = ">=0.9.2, <0.10"
 description = "Edit local and remote text files in tabs, with syntax highlighting."
 vendor = "Jasper"
+icon = "icons/editor.svg"
 capabilities = []
 exports = ["dev.jasper.editor.api"]

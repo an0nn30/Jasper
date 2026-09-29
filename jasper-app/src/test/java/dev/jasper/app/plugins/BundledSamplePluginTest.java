@@ -53,7 +53,7 @@ class BundledSamplePluginTest {
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
         assertThat(runtime.get().statusLines()).as("the sample and the five bundled feature plugins").hasSize(6)
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.0", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.1", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))
@@ -75,6 +75,31 @@ class BundledSamplePluginTest {
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
+    @Test void everyBundledPluginShipsAnIconAndRemoteNamesItsHomepage() throws Exception {
+        Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
+        var runtime = new AtomicReference<PluginRuntime>();
+        onEdt(() -> {
+            runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
+                root.resolve("plugins.toml"), root.resolve("plugins.lock")),
+                new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }), PluginRuntime.SettingsReports.IGNORED,
+                new dev.jasper.app.contributions.Contributions(), AppContractTest.headlessWindows(),
+                new dev.jasper.app.terminals.TerminalRegistry()));
+            runtime.get().start(Map.of(), true);
+        });
+        try {
+            var outcome = new CompletableFuture<PluginRuntime.Outcome>();
+            onEdt(() -> runtime.get().snapshot(outcome::complete));
+            var rows = outcome.get(10, TimeUnit.SECONDS).snapshot().rows();
+            assertThat(rows).hasSize(6).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
+            assertThat(rows).filteredOn(row -> row.id().equals("dev.jasper.remote")).singleElement()
+                .satisfies(row -> assertThat(row.homepage()).isEqualTo("https://github.com/an0nn30/Jasper"));
+        } finally {
+            var pending = new AtomicReference<List<CompletableFuture<?>>>();
+            onEdt(() -> pending.set(runtime.get().stop()));
+            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        }
+    }
+
     @Test void remoteLoadsWithoutVaultAndUsesHostIconsForEveryPlacement() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
         // Not under @TempDir: sqlite-jdbc reads its version through a cached jar: URL it never closes, so this
