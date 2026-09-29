@@ -54,7 +54,7 @@ class SettingsDialogTest {
             (parent, count) -> { asked[0] = count; return discard[0]; });
         return new SettingsDialog(windows, context -> {
             contexts.add(context);
-            return CorePages.pages(() -> List.of("Jasper Dark"), new CorePages.SystemActions(() -> FILE,
+            return CorePages.pages(() -> List.of("Jasper Dark", "IntelliJ Light"), new CorePages.SystemActions(() -> FILE,
                     () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
         }, hooks);
@@ -71,6 +71,24 @@ class SettingsDialogTest {
             assertThat(dialog.view().breadcrumb.getText()).isEqualTo("Appearance & Behavior › Appearance");
             assertThat(dialog.view().apply.isEnabled()).isFalse();
         });
+    }
+
+    @Test void pickingAThemeFromTheListEnablesApply() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "appearance");
+            // The dialog's window replays the current theme when it opens, which updates every component's UI.
+            javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
+            @SuppressWarnings("unchecked") var box = (javax.swing.JComboBox<String>) find(dialog.view(), javax.swing.JComboBox.class);
+            box.setSelectedIndex(1);
+            assertThat(dialog.view().apply.isEnabled()).isTrue();
+        });
+    }
+
+    static java.awt.Component find(java.awt.Component c, Class<?> type) {
+        if (type.isInstance(c)) return c;
+        if (c instanceof java.awt.Container k) for (var x : k.getComponents()) { var f = find(x, type); if (f != null) return f; }
+        return null;
     }
 
     @Test void backAndForwardWalkThePagesVisited() throws Exception {

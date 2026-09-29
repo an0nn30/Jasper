@@ -60,7 +60,8 @@ final class SettingsView extends JPanel {
         banner.setVisible(false);
 
         body.setBorder(BorderFactory.createEmptyBorder());
-        body.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        // A generated page scrolls sideways only when the dialog is narrower than its editors need.
+        body.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         body.setOpaque(false);
         body.getViewport().setOpaque(false);
         body.getVerticalScrollBar().setUnitIncrement(16);

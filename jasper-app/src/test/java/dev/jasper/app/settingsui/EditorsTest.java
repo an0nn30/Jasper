@@ -69,6 +69,18 @@ class EditorsTest {
         assertThat(Editors.<ToolbarMode>choice(Map.of("icons", "Icons only")).terms()).contains("Icons only");
     }
 
+    @Test void anEditableComboStillReportsPicksAfterItsLookAndFeelIsUpdated() {
+        // Each dialog replays the current theme when it opens, and updateUI gives an editable combo a new editor field.
+        var editor = build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, context);
+        var edits = new int[1];
+        editor.show("Jasper Dark");
+        editor.onEdit(() -> edits[0]++);
+        javax.swing.SwingUtilities.updateComponentTreeUI(editor.component());
+        ((JComboBox<?>) editor.component()).setSelectedIndex(1);
+        assertThat(edits[0]).isPositive();
+        assertThat(editor.value()).isEqualTo("IntelliJ Light");
+    }
+
     @Test void listsTablesAndExecutablesEditTheirValues() {
         var args = (Editors.Items) build(Editors.textList(), CoreSettings.TERMINAL_SHELL_ARGS, context);
         args.show(List.of("-l"));

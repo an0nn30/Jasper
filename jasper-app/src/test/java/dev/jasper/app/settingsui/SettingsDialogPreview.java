@@ -91,6 +91,9 @@ public final class SettingsDialogPreview {
                     render(holder[0], output.resolve("window-" + suffix));
                     dialog.select("terminal.font");
                     render(holder[0], output.resolve("font-" + suffix));
+                    dialog.select("terminal.shell");
+                    render(holder[0], output.resolve("shell-" + suffix));
+                    render(holder[0], output.resolve("shell-narrow-" + suffix), 760);
                     dialog.select("system");
                     render(holder[0], output.resolve("system-" + suffix));
                     dialog.view().search.setText("font");
@@ -147,11 +150,13 @@ public final class SettingsDialogPreview {
             if (child.isVisible() && child instanceof Container nested) layoutVisible(nested);
     }
 
-    private static void render(JComponent component, Path file) {
-        component.setSize(1000, 700);
+    private static void render(JComponent component, Path file) { render(component, file, 1000); }
+
+    private static void render(JComponent component, Path file, int width) {
+        component.setSize(width, 700);
         layoutVisible(component);
         layoutVisible(component);
-        var image = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
+        var image = new BufferedImage(width, 700, BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
         try { component.printAll(g); } finally { g.dispose(); }
         try { ImageIO.write(image, "png", file.toFile()); }
