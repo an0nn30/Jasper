@@ -168,6 +168,23 @@ class ShortcutEditingTest {
         });
     }
 
+    /** In a narrow Settings window the four edit buttons take two rows, and the card grows to show both. */
+    @Test void theEditButtonsWrapInsteadOfBeingCutOff() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var panel = new ShortcutPanel(true, changes -> new CompletableFuture<>());
+            panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
+            panel.setSize(440, 560);
+            layoutAll(panel);
+            panel.search.setText("Copy"); clickShortcut(panel);
+            layoutAll(panel);
+            var restore = panel.editor.restore;
+            var row = restore.getParent();
+            assertThat(restore.getY()).as("Restore default wrapped to a second row").isGreaterThan(0);
+            assertThat(restore.getY() + restore.getHeight()).as("and that row is inside the card").isLessThanOrEqualTo(row.getHeight());
+            panel.close();
+        });
+    }
+
     /** Lays out every container, hidden ones included, as Container.validateTree does. */
     private static void layoutAll(java.awt.Container container) {
         container.doLayout();

@@ -67,7 +67,7 @@ final class ShortcutEditPanel extends JPanel {
         center.add(message, BorderLayout.SOUTH); add(center, BorderLayout.CENTER);
         var bottom = new JPanel(new BorderLayout()); bottom.setOpaque(false);
         bottom.add(reassign, BorderLayout.NORTH);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0)); buttons.setOpaque(false);
+        var buttons = new JPanel(new WrapLayout(FlowLayout.LEADING, 6, 0)); buttons.setOpaque(false);
         buttons.add(set); buttons.add(cancel); buttons.add(remove); buttons.add(restore);
         bottom.add(buttons, BorderLayout.SOUTH); add(bottom, BorderLayout.SOUTH);
         record.addActionListener(e -> { recording = !recording; if (recording) recordingStarted.run(); update(); value.requestFocusInWindow(); });
