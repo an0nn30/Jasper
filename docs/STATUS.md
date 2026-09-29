@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V4b** (branch `claude/vim-v4b`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v4b.md`, written 2026-09-28): the extensions paragraph-motion, textobj-entire,
+  textobj-indent, argtextobj and highlightedyank, switched on by IdeaVim's names (`:set` takes hyphens) or `Plug`
+  lines. Their text objects select in Visual mode as the plugins do and the pending operator acts on that area
+  (`Script.select`); highlightedyank draws a third kind of highlight after a yank. The corpus gains `let:`, pins that
+  need pins (textobj-user) and `plugin/**`. Every file in the plan was compiled and run against Vim 9.1 with the pinned
+  plugins before the plan was written: 2066 corpus cases (160 new), with and without a final line break.
+  - Not done: executing the plan; GUI checks 97–103 of the [checklist](editor-verification.md) (user-run); plan V4c
+    (matchit, sneak); push.
 - **Editor Vim mode: files without a final line break** (branch `fix/vim-final-break`, merged into local main
   2026-09-28, not pushed): the corpus runs every case a second time on its text without a final line break, which
   found empty last lines lost by `x`, `s`, `D`, `cc`, `S`, `o` and `==` (the case 093245f7 fixed for `<CR>`/`o`),

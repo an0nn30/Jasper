@@ -129,3 +129,13 @@ unverified.
 - [ ] 94. With `set ReplaceWithRegister`, `yiw` on one word, then `griw` on another replaces it and `p` still puts the first word.
 - [ ] 95. `:nmap <Leader>s <Plug>Ysurround` then `\siw"` quotes a word.
 - [ ] 96. `u` after each of these undoes it in one step.
+
+## Vim mode (plan V4b)
+
+- [ ] 97. With `set vim-paragraph-motion`, `}` stops at a line holding only spaces; without it, `}` passes it.
+- [ ] 98. With `set textobj-entire`, `yae` then `p` in a new tab copies the whole text; `die` keeps empty lines at either end.
+- [ ] 99. With `set textobj-indent` in a Python file, `dii` inside a function's body deletes the body; `vii` then `ii` again widens to the enclosing block.
+- [ ] 100. With `set argtextobj`, `cia` on the middle argument of `f(a, b, c)` changes only `b`; `daa` deletes `b, `.
+- [ ] 101. With `set highlightedyank`, `yiw` flashes the word for about a second; `let g:highlightedyank_highlight_duration = 300` makes it shorter, and `x` right after a yank clears it at once.
+- [ ] 102. `Plug 'kana/vim-textobj-entire'` (and the other plugins' `Plug` lines) in the vimrc switches the extension on.
+- [ ] 103. `u` after `dii`, `dae` and `dia` undoes each in one step, and `.` repeats them at the new cursor.

@@ -113,9 +113,12 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **Vim script is literals only.** `:let` sets a global variable (`mapleader`, `g:name`), a register (`@a`, `@/`) or
   an option (`&tw`, `&l:sw`) to one string or number; expressions, `s:` variables, functions and `:echo` fail with
   E319. In a vimrc `if` is true only for `has('ide')`, `has('jasper')` and a number other than 0.
-- **Extensions are ports.** surround, commentary, exchange and ReplaceWithRegister follow their plugins' scripts on
-  Jasper's own commands, and the corpus's `ext:` cases are recorded against the plugins, with tpope/vim-repeat, at the
-  commits `plugins/editor/vim-oracle.properties` pins. A `Plug` line switches on an extension Jasper has and is
+- **Extensions are ports.** surround, commentary, exchange, ReplaceWithRegister, paragraph-motion, textobj-entire,
+  textobj-indent, argtextobj and highlightedyank follow their plugins' scripts on Jasper's own commands, and the
+  corpus's `ext:` cases are recorded against the plugins, with tpope/vim-repeat, at the commits
+  `plugins/editor/vim-oracle.properties` pins. They are switched on by IdeaVim's names (`set textobj-entire`,
+  `set vim-paragraph-motion`), and a plugin that has no `<Plug>` names gets IdeaVim's (`<Plug>textobj-indent-ii`,
+  `<Plug>(ParagraphNextMotion)`, `<Plug>InnerArgument`), which `:map` shows where Vim shows the plugin's `:call`. A `Plug` line switches on an extension Jasper has and is
   otherwise ignored; `packadd` fails with E319 until matchit comes. `let g:…` settings are kept for the extensions.
 - **`:messages` keeps errors.** Jasper's history holds the errors given and the vimrc's report of skipped lines;
   Vim's holds every message.
@@ -137,3 +140,12 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **exchange** highlights the first text in the 'hlsearch' colour; `:XchangeHighlightToggle`,
   `:XchangeClear` and `g:exchange_indent = '=='` are not there.
 - **ReplaceWithRegister** cannot use the expression register (`"=`): Jasper has no expressions.
+- **argtextobj** knows parentheses only, as the plugin does; IdeaVim's `g:argtextobj_pairs` is not there, and the
+  plugin's `g:argumentobject_force_toplevel` is. A count is ignored (the plugin's mapping calls it once for each line
+  of a range). The plugin finds quoted strings by filling them in the text and putting the line back, so in Vim even
+  `yia` leaves a change to undo; Jasper looks at a copy of the line. Where the plugin loops for ever (parentheses that
+  do not pair on one line) Jasper stops.
+- **highlightedyank** draws for `g:highlightedyank_highlight_duration` milliseconds, 1000 unless set (IdeaVim's is
+  300), in IdeaVim's `g:highlightedyank_highlight_color` (`rgba(r, g, b, a)`) or else the colour of the incremental
+  search's match; there are no `:HighlightedyankOn`, `Off` or `Toggle` commands and no buffer variables.
+- **textobj-entire** stays linewise after `dv` (`dvae`), as the plugin does in Vim 9.1, which has no v:motion_force.

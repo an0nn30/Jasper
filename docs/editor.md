@@ -160,8 +160,13 @@ recorded corpus.
   language's comments. exchange: `cx{motion}` twice swaps two texts; `cxx` lines, Visual `X`, `cxc` to forget.
   ReplaceWithRegister (`set ReplaceWithRegister`): `gr{motion}`, `grr` and Visual `gr` put a register over text. Each
   extension's `<Plug>` names can be mapped as in Vim (`:nmap <Leader>s <Plug>Ysurround`).
-- Not yet: argtextobj, textobj-entire, textobj-indent, matchit, paragraph-motion, highlightedyank and sneak. They
-  follow in a later release. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
+- More extensions, by IdeaVim's names: `set vim-paragraph-motion` makes `{` and `}` stop at lines of white space too;
+  `set textobj-entire` gives `ae` (the whole text) and `ie` (without the empty lines at either end); `set
+  textobj-indent` gives `ii` (the lines at the cursor's indent and deeper; again in Visual mode, the enclosing
+  block), `ai` (with the line above) and `aI` (with the lines above and below); `set argtextobj` gives `ia` (a
+  function argument) and `aa` (with its comma); `set highlightedyank` draws the text a yank took for a second
+  (`let g:highlightedyank_highlight_duration = 300` for less).
+- Not yet: matchit and sneak. They follow in a later release. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 
