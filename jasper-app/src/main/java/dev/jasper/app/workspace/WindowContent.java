@@ -823,6 +823,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             rail.refreshTheme();
             regions.refreshTheme();
             regions.setTerminalBackground(theme.palette().background());
+            windowTabs.setPalette(theme.palette());
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 tab.setBackground(theme.palette().background());

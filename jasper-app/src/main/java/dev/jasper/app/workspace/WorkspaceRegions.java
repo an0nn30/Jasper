@@ -20,7 +20,8 @@ import javax.swing.UIManager;
  * The terminal column (the tab strip over the deck) with up to three panel regions around it. BOTTOM
  * wraps the center, RIGHT wraps that, LEFT wraps that, so the bottom region spans only the terminal
  * and the side regions run the full height beside the tabs. With no region shown the
- * center retains its rounded frame and exterior gutter. EDT only.
+ * center retains its rounded frame and exterior gutter. The center frame is painted in the terminal
+ * palette's background, never a theme's tool window colour. EDT only.
  */
 final class WorkspaceRegions extends JPanel {
     static final int DEFAULT_SIDE = 260, DEFAULT_BOTTOM = 200, MINIMUM = 120;
@@ -60,13 +61,9 @@ final class WorkspaceRegions extends JPanel {
                 g.setColor(UIManager.getColor("Jasper.titleBackground"));
                 g.fillRect(0, 0, getWidth(), getHeight());
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(toolWindow ? getBackground() : UIManager.getColor("ToolWindow.background")); g.fill(surface());
-                if (!toolWindow) {
-                    // The lower arc lives below the cell grid and continues its terminal palette.
-                    int radius = UIScale.scale(ARC / 2);
-                    g.clipRect(0, getHeight() - getInsets().bottom - radius, getWidth(), radius);
-                    g.setColor(getBackground()); g.fill(surface());
-                }
+                // The terminal column (tab strip included) is one surface in the terminal palette, so every
+                // theme shows all four rounded corners against the window chrome.
+                g.setColor(getBackground()); g.fill(surface());
             } finally { g.dispose(); }
         }
 
@@ -131,7 +128,7 @@ final class WorkspaceRegions extends JPanel {
         rebuild();
     }
 
-    /** Continues the resolved terminal surface below its unclipped rectangular cell grid. */
+    /** The terminal palette background of the whole rounded center, tab strip and lower arc included. */
     void setTerminalBackground(java.awt.Color background) { center.setBackground(background); }
 
     void show(PanelRegion region, JComponent content, int size) {
