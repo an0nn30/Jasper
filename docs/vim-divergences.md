@@ -52,7 +52,7 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **Options.** `:set` knows only the options in the [spec](superpowers/specs/2026-09-27-jasper-editor-vim-design.md)'s
   section 3.8 that Jasper has; an option Vim has and Jasper lacks fails with `E518: Unknown option`, and `:set` and
   `:set all` list only Jasper's. 'hlsearch' starts on (Vim's default is off); `:noh` hides the highlight until the next
-  search.
+  search, and so does an `<Esc>` in Normal mode with no count, register or operator pending (in Vim it only beeps).
 - **Tabs are the buffers.** Each Editor tab is a buffer and a tab page. `:e file` opens the file in a tab, or selects
   its tab, where Vim edits it in the window; `:w file` saves the tab as the file, which it then edits, where Vim
   writes a copy; `:q` closes the tab, and closing the last one leaves Jasper running. A tab never has to be written

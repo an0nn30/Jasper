@@ -35,6 +35,22 @@ class VimEditorTest {
 
     private static void type(VimEditor editor, String keys) { for (KeyInput key : KeyInput.parse(keys)) editor.feed(key); }
 
+    @Test void enterAndOOnALastLineWithoutAFinalBreakOpenANewLine() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "");
+            type(editor, "iabc<CR>");
+            assertThat(editor.cursor()).as("a new, empty file").isEqualTo(new Pos(1, 0));
+            type(editor, "d<CR>");
+            assertThat(area.getText()).isEqualTo("abc\nd\n\n");
+            assertThat(editor.cursor()).isEqualTo(new Pos(2, 0));
+            editor = editor(area, "abc");
+            type(editor, "ox");
+            assertThat(area.getText()).isEqualTo("abc\nx\n");
+            assertThat(editor.cursor()).isEqualTo(new Pos(1, 1));
+        });
+    }
+
     private static CaretStyle caret(VimTextArea area) { return ((ConfigurableCaret) area.getCaret()).getStyle(); }
 
     /** Remembers whether input methods are on, which a component does not report. */

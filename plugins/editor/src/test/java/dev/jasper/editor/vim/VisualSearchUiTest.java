@@ -54,6 +54,27 @@ class VisualSearchUiTest {
         });
     }
 
+    @Test void escapeInNormalModeHidesTheHlsearchMatchesUntilTheNextSearch() throws Exception {
+        onEdt(() -> {
+            var editor = editor(new Vim(VimHost.detached()), "ab ab\nab\n");
+            type(editor, "/ab<CR>");
+            assertThat(ranges(editor)).containsExactly("1:0-2", "1:3-5", "1:6-8");
+            type(editor, "<Esc>");
+            assertThat(ranges(editor)).as("<Esc> acts as :nohlsearch").isEmpty();
+            assertThat(editor.cursor()).isEqualTo(new Pos(0, 3));
+            type(editor, "n");
+            assertThat(ranges(editor)).as("the next search shows them again").containsExactly("1:0-2", "1:3-5", "1:6-8");
+            type(editor, "vl<Esc>");
+            assertThat(ranges(editor)).as("leaving Visual mode keeps them").containsExactly("1:0-2", "1:3-5", "1:6-8");
+            type(editor, "d<Esc>");
+            assertThat(ranges(editor)).as("cancelling an operator keeps them").containsExactly("1:0-2", "1:3-5", "1:6-8");
+            type(editor, "0ix<Esc>");
+            assertThat(ranges(editor)).as("leaving Insert mode keeps them").hasSize(3);
+            type(editor, "<Esc>");
+            assertThat(ranges(editor)).isEmpty();
+        });
+    }
+
     @Test void incsearchShowsTheMatchWithoutMovingTheCursor() throws Exception {
         onEdt(() -> {
             var editor = editor(new Vim(VimHost.detached()), "one two\nthree two\n");

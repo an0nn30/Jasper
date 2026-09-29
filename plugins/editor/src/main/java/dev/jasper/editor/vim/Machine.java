@@ -92,6 +92,8 @@ final class Machine {
             return;
         }
         if (key.is("<Esc>") || key.is("<C-c>")) {
+            // Jasper: an <Esc> with nothing to cancel in Normal mode is :nohlsearch, as 'hlsearch' starts on.
+            if (key.is("<Esc>") && editor.mode() == Mode.NORMAL && !pending()) vim.search().hideHighlight();
             reset();
             if (editor.mode().visual()) Visual.end(editor);
             resumeIfInsertNormal();

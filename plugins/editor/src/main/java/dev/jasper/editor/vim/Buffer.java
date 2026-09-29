@@ -126,6 +126,7 @@ final class Buffer {
      * where Vim's does (for the {@code '.} mark) and the undo holds only the change.
      */
     void setLine(int line, String text) {
+        if (text.endsWith("\n") && line == count() - 1 && !finalBreak()) text += "\n";
         String old = line(line);
         if (text.equals(old)) return;
         int prefix = 0, max = Math.min(old.length(), text.length());
@@ -145,9 +146,17 @@ final class Buffer {
             insert(start(line), block + "\n");
             return;
         }
+        if (finalBreak()) insert(length(), block + "\n");
+        else insert(length(), "\n" + block + (!text.isEmpty() && text.getLast().isEmpty() ? "\n" : ""));
+    }
+
+    /**
+     * @return whether the text ends with a line break; without one an empty last line added by an edit needs one,
+     *     or it would only end the line before it
+     */
+    private boolean finalBreak() {
         int length = length();
-        boolean newline = length > 0 && charAt(length - 1) == '\n';
-        insert(length, newline ? block + "\n" : "\n" + block);
+        return length > 0 && charAt(length - 1) == '\n';
     }
 
     /** Deletes lines {@code first} to {@code last}, keeping a final newline; deleting every line empties the text. */
