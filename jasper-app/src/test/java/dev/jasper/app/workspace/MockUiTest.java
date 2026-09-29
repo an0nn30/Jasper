@@ -35,7 +35,7 @@ class MockUiTest {
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
                 assertThat(new Color(image.getRGB(650, toolbar - 1))).as("continuous header surface").isEqualTo(UIManager.getColor("Jasper.titleBackground"));
-                assertThat(image.getRGB(650, toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x25292e);
+                assertThat(image.getRGB(20, toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x25292e);
                 assertThat(new Color(image.getRGB(650, toolbar + tabs - 1))).as("quiet tab strip baseline").isEqualTo(UIManager.getColor("ToolWindow.background"));
                 assertThat(new Color(image.getRGB(500, 940))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             }
@@ -128,7 +128,7 @@ class MockUiTest {
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).as("30px tabs, 24px status bar, 6px top gutter and 8px lower inset").isEqualTo(432);
+            assertThat(owner.currentPane().getHeight()).as("the header row, with its search field, stays when the toolbar is hidden").isEqualTo(408);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
             assertThat(owner.currentPane().getHeight()).isEqualTo(408);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();

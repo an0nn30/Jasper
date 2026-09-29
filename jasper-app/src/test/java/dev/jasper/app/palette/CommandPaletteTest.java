@@ -24,7 +24,6 @@ import javax.swing.JLabel;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
-import javax.swing.plaf.ColorUIResource;
 import javax.swing.text.DefaultEditorKit;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -60,7 +59,8 @@ class CommandPaletteTest {
 
     private static CommandPalette palette(List<String> events) {
         return new CommandPalette(true, query -> { },
-            (entry, verb) -> events.add(PaletteTestSupport.describe(entry) + ":" + verb), id -> events.add("tab:" + id));
+            (entry, verb) -> events.add(PaletteTestSupport.describe(entry) + ":" + verb),
+            text -> java.util.Optional.empty(), scope -> events.add("chip:" + scope.id()));
     }
 
     private static PaletteEntry item(PaletteScope scope, String id) { return new PaletteEntry.Item(scope, PaletteRow.of(id, "Row " + id)); }
@@ -68,7 +68,7 @@ class CommandPaletteTest {
     @Test void queryNotifiesWhenClearedAndKeepsNativeEditingActions() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new ArrayList<String>();
-            var palette = new CommandPalette(false, changes::add, (entry, verb) -> { }, id -> { });
+            var palette = new CommandPalette(false, changes::add, (entry, verb) -> { }, text -> java.util.Optional.empty(), scope -> { });
             palette.queryField().setText("split 2");
             palette.queryField().setText("");
             assertThat(changes).containsExactly("split 2", "");
@@ -76,34 +76,57 @@ class CommandPaletteTest {
             assertThat(palette.queryField().getActionMap().get(DefaultEditorKit.pasteAction)).isNotNull();
             assertThat(hasInputBinding(palette.queryField(), DefaultEditorKit.copyAction)).isTrue();
             assertThat(hasInputBinding(palette.queryField(), DefaultEditorKit.pasteAction)).isTrue();
-            assertThat(palette.tabIds()).containsExactly(PaletteScope.ALL_ID);
+            assertThat(palette.chipText()).isNull();
             assertThat(palette.queryField().getAccessibleContext().getAccessibleName()).isEqualTo("Search all");
             assertThat(palette.entryList().getAccessibleContext().getAccessibleName()).isEqualTo("All");
-            assertThat(palette.queryField().getClientProperty("JTextField.placeholderText")).isEqualTo("Search everywhere");
+            assertThat(palette.queryField().getClientProperty("JTextField.placeholderText")).isEqualTo("Search everything");
         });
     }
 
-    @Test void tabsShowInOrderMarkTheSelectedOneAndReportClicks() throws Exception {
+    @Test void theChipNamesTheScopeAndATypedPrefixBecomesAChip() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var chips = new ArrayList<String>();
+            var palette = new CommandPalette(true, query -> { }, (entry, verb) -> { },
+                text -> ScopePrefix.parse(text, List.of(COMMANDS, HISTORY)), scope -> chips.add(scope.id()));
+            palette.setChip("History", null);
+            assertThat(palette.chipText()).isEqualTo("History");
+            assertThat(palette.chip().getAccessibleContext().getAccessibleName()).isEqualTo("Scope: History");
+            assertThat(palette.queryField().getAccessibleContext().getAccessibleName()).isEqualTo("Search history");
+            assertThat(palette.entryList().getAccessibleContext().getAccessibleName()).isEqualTo("History");
+            palette.setChip(null, null);
+            assertThat(palette.chipText()).isNull();
+            assertThat(palette.queryField().getAccessibleContext().getAccessibleName()).isEqualTo("Search all");
+            palette.queryField().setText("hist > ls");
+            assertThat(chips).containsExactly("test.history");
+            assertThat(palette.queryField().getText()).as("the prefix is consumed").isEqualTo("ls");
+            palette.queryField().setText("");
+            palette.queryField().replaceSelection(">");
+            assertThat(chips).containsExactly("test.history", "jasper.commands");
+            assertThat(palette.queryField().getText()).isEmpty();
+            palette.queryField().setText("cat foo > bar");
+            assertThat(palette.queryField().getText()).as("not a scope name").isEqualTo("cat foo > bar");
+            assertThat(chips).hasSize(2);
+            palette.setPlaceholder("Search shell history");
+            assertThat(palette.queryField().getClientProperty("JTextField.placeholderText")).isEqualTo("Search shell history");
+        });
+    }
+
+    @Test void modeRowsShowTheScopeItsPrefixAndItsShortcutAndChoosingOneReportsIt() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var events = new ArrayList<String>();
             var palette = palette(events);
-            palette.setTabs(List.of(new CommandPalette.Tab(PaletteScope.ALL_ID, "All", null, "Search everywhere (⌘K)"),
-                new CommandPalette.Tab("jasper.commands", "Commands", null, null),
-                new CommandPalette.Tab("test.history", "History", null, "Search shell history")), "test.history");
-            assertThat(palette.tabIds()).containsExactly(PaletteScope.ALL_ID, "jasper.commands", "test.history");
-            assertThat(palette.selectedTabId()).isEqualTo("test.history");
-            assertThat(palette.queryField().getAccessibleContext().getAccessibleName()).isEqualTo("Search history");
-            assertThat(palette.entryList().getAccessibleContext().getAccessibleName()).isEqualTo("History");
-            var labels = labels(palette.tabStrip());
-            assertThat(labels).extracting(JLabel::getText).containsExactly("All", "Commands", "History");
-            assertThat(labels.getFirst().getToolTipText()).isEqualTo("Search everywhere (⌘K)");
-            labels.get(1).dispatchEvent(mousePress(labels.get(1), 3, 3));
-            assertThat(events).containsExactly("tab:jasper.commands");
-            palette.clickTab("test.history");
-            palette.clickTab("missing");
-            assertThat(events).containsExactly("tab:jasper.commands", "tab:test.history");
-            palette.setPlaceholder("Search shell history");
-            assertThat(palette.queryField().getClientProperty("JTextField.placeholderText")).isEqualTo("Search shell history");
+            palette.setEntries(List.of(new PaletteEntry.Mode(COMMANDS, ">", ""),
+                new PaletteEntry.Mode(HISTORY, "history >", "\u2318R")), null, "Nothing found");
+            assertThat(PaletteTestSupport.describe(palette.selectedEntry())).isEqualTo("mode:jasper.commands");
+            var list = palette.entryList();
+            var rendered = (Container) list.getCellRenderer()
+                .getListCellRendererComponent(list, list.getModel().getElementAt(1), 1, false, false);
+            assertThat(label(rendered, "History")).isNotNull();
+            assertThat(label(rendered, "history >").getForeground()).isEqualTo(UIManager.getColor("SearchEverywhere.SearchField.infoForeground"));
+            assertThat(label(rendered, "\u2318R")).isNotNull();
+            palette.selectRelative(1);
+            palette.executeSelected();
+            assertThat(events).containsExactly("mode:test.history:0");
         });
     }
 
@@ -216,14 +239,13 @@ class CommandPaletteTest {
             layoutTree(palette);
             Insets insets = palette.getInsets();
             assertThat(palette.getPreferredSize().width).isEqualTo(UIScale.scale(680));
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 22 + 2 * 24 + 26) + insets.top + insets.bottom);
-            assertThat(palette.tabStrip().getHeight()).isEqualTo(UIScale.scale(38));
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 24 + 26) + insets.top + insets.bottom);
             assertThat(palette.queryField().getParent().getHeight()).isEqualTo(UIScale.scale(44));
             assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(26));
             assertThat(palette.itemHeight()).isEqualTo(UIScale.scale(24));
             assertThat(palette.isOpaque()).as("rounded corners expose the underlying workspace").isFalse();
             palette.setEntries(List.of(), null, "Nothing found");
-            assertThat(palette.getPreferredSize().height).as("the empty line").isEqualTo(UIScale.scale(38 + 44 + 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).as("the empty line").isEqualTo(UIScale.scale(44 + 24 + 26) + insets.top + insets.bottom);
         });
     }
 
@@ -234,7 +256,7 @@ class CommandPaletteTest {
             for (int i = 0; i < 30; i++) rows.add(item(HISTORY, "r" + i));
             palette.setEntries(rows, null, null);
             Insets insets = palette.getInsets();
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 15 * 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 15 * 24 + 26) + insets.top + insets.bottom);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             palette.selectRelative(29);
@@ -251,8 +273,6 @@ class CommandPaletteTest {
                 for (Theme theme : List.of(Theme.LIGHT, Theme.DARK)) {
                     ThemeTestSupport.install(theme);
                     var palette = palette(new ArrayList<>());
-                    palette.setTabs(List.of(new CommandPalette.Tab(PaletteScope.ALL_ID, "All", null, null),
-                        new CommandPalette.Tab("jasper.commands", "Commands", null, null)), PaletteScope.ALL_ID);
                     var historyRow = new PaletteRow("c", "Row c", "a detail", null, null, true, null);
                     palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "a"), item(COMMANDS, "b"),
                         new PaletteEntry.Header("History"), new PaletteEntry.Item(HISTORY, historyRow)), null, null);
@@ -260,7 +280,6 @@ class CommandPaletteTest {
                     layoutTree(palette);
                     var image = paint(palette);
                     var list = palette.entryList();
-                    var allTab = labels(palette.tabStrip()).getFirst();
                     String name = theme.name();
                     assertPixel(image, new Point(palette.getWidth() / 2, 0), "Popup.borderColor", name);
                     for (Point corner : List.of(new Point(0, 0), new Point(palette.getWidth() - 1, 0),
@@ -269,14 +288,6 @@ class CommandPaletteTest {
                         assertThat(palette.contains(corner)).isFalse();
                     }
                     assertThat(palette.contains(palette.getWidth() / 2, 1)).isTrue();
-                    assertThat(allTab.getY()).as("scope has top padding").isEqualTo(UIScale.scale(4));
-                    assertThat(palette.tabStrip().getHeight() - allTab.getY() - allTab.getHeight())
-                        .as("scope has matching bottom padding").isEqualTo(UIScale.scale(4));
-                    assertThat(allTab.getX()).as("scope has left padding").isEqualTo(UIScale.scale(4));
-                    assertPixel(image, at(palette.tabStrip(), allTab.getX() + 12, 2, palette),
-                        "SearchEverywhere.Header.background", name);
-                    assertPixel(image, at(allTab, 12, 3, palette), "SearchEverywhere.Tab.selectedBackground", name);
-                    assertPixel(image, at(palette.tabStrip(), palette.tabStrip().getWidth() - 12, 3, palette), "SearchEverywhere.Header.background", name);
                     assertPixel(image, at(palette.queryField().getParent(), palette.queryField().getParent().getWidth() - 3, 2, palette),
                         "SearchEverywhere.SearchField.background", name);
                     Rectangle selected = list.getCellBounds(1, 1), plain = list.getCellBounds(2, 2), rule = list.getCellBounds(3, 3);
@@ -285,25 +296,6 @@ class CommandPaletteTest {
                     assertPixel(image, at(list, rule.width - 3, rule.y, palette), "SearchEverywhere.List.separatorColor", name);
                     assertPixel(image, at(palette.hintBar(), palette.hintBar().getWidth() - 3, palette.hintBar().getHeight() / 2, palette),
                         "SearchEverywhere.Advertiser.background", name);
-                    assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(UIManager.getColor("Label.foreground"));
-                    assertThat(allTab.getForeground()).as(name).isEqualTo(UIManager.getColor("SearchEverywhere.Tab.selectedForeground"));
-
-                    // List.foreground and Label.foreground happen to coincide in both bundled themes, so
-                    // the assertion above alone can't tell which key the unselected tab actually reads.
-                    // Give Label.foreground a distinctive value List.foreground doesn't share, and prove
-                    // the tab follows it.
-                    try {
-                        var distinctiveForeground = new ColorUIResource(0x123456);
-                        UIManager.put("Label.foreground", distinctiveForeground);
-                        palette.refreshTheme();
-                        assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(distinctiveForeground);
-                    } finally {
-                        // Putting the saved value back would pin it in the developer defaults, ahead of
-                        // whatever look and feel installs next; clearing the override is the real restore.
-                        UIManager.put("Label.foreground", null);
-                        palette.refreshTheme();
-                    }
-
                     // Select History's row (three verbs, a detail) to populate the hint bar with link-coloured
                     // secondary verbs and its detail text, without disturbing the pixel assertions taken above.
                     list.setSelectedIndex(4);
@@ -424,7 +416,7 @@ class CommandPaletteTest {
             assertThat(palette.hintActionTexts()).isEmpty();
             palette.selectRelative(1);
             assertThat(palette.hintText()).isEqualTo("Show every match in History");
-            var elsewhere = new CommandPalette(false, query -> { }, (entry, verb) -> { }, id -> { });
+            var elsewhere = new CommandPalette(false, query -> { }, (entry, verb) -> { }, text -> java.util.Optional.empty(), scope -> { });
             elsewhere.setEntries(List.of(item(HISTORY, "ls")), null, null);
             assertThat(elsewhere.hintActionTexts()).containsExactly("Paste and run Ctrl+Enter", "Save as snippet… Shift+Enter");
         });
@@ -450,7 +442,7 @@ class CommandPaletteTest {
             assertThat(palette.entryList().getAccessibleContext().getAccessibleDescription())
                 .as("switching back to a three-verb scope restores its verbs")
                 .isEqualTo("2 results; ⏎ Paste  ⌘⏎ Paste and run  ⇧⏎ Save as snippet…");
-            var elsewhere = new CommandPalette(false, query -> { }, (entry, verb) -> { }, id -> { });
+            var elsewhere = new CommandPalette(false, query -> { }, (entry, verb) -> { }, text -> java.util.Optional.empty(), scope -> { });
             elsewhere.setEntries(List.of(item(HISTORY, "ls")), null, null);
             assertThat(elsewhere.entryList().getAccessibleContext().getAccessibleDescription())
                 .as("the other platform's key symbols")
@@ -477,7 +469,7 @@ class CommandPaletteTest {
                 assertThat(palette.stepTitle().getText()).isEqualTo("Rebase");
                 assertThat(palette.hintBar().isVisible()).isFalse();
                 Insets insets = palette.getInsets();
-                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 22 + 2 * 40) + insets.top + insets.bottom);
+                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 40) + insets.top + insets.bottom);
                 palette.focusStepField(1);
                 assertThat(palette.stepFocusIndex()).isEqualTo(1);
                 palette.focusStepField(1);
@@ -488,7 +480,7 @@ class CommandPaletteTest {
                 assertThat(palette.stepValues()).hasSize(2).containsEntry("branch", "main").containsEntry("remote", "origin");
                 palette.setStepError("Nope");
                 assertThat(palette.stepError().isVisible()).isTrue();
-                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 22 + 2 * 40 + 22) + insets.top + insets.bottom);
+                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 22 + 2 * 40 + 22) + insets.top + insets.bottom);
                 palette.setStepError(null);
                 assertThat(palette.stepError().isVisible()).isFalse();
                 palette.hideStep();
@@ -546,8 +538,6 @@ class CommandPaletteTest {
                 for (var choice : List.of(Theme.DARK, Theme.LIGHT)) {
                     new ThemeController(choice);
                     var card = palette(new ArrayList<>());
-                    card.setTabs(List.of(new CommandPalette.Tab(PaletteScope.ALL_ID, "All", null, null),
-                        new CommandPalette.Tab("jasper.commands", "Commands", null, null)), PaletteScope.ALL_ID);
                     card.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "new_tab"), item(COMMANDS, "settings")), null, null);
                     var host = new javax.swing.JPanel(new java.awt.GridBagLayout()); host.add(card);
                     for (int scale : new int[]{1, 2}) saveRender(host, choice.name() + "-palette-" + scale, scale);

@@ -49,7 +49,7 @@ class BarHeightTest {
         });
     }
 
-    @Test void ordinaryToolbarSuppliesTopSpacingOnlyWhileVisible() throws Exception {
+    @Test void theHeaderRowStaysWhenTheToolbarIsHidden() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setSize(900, 600);
@@ -59,7 +59,8 @@ class BarHeightTest {
             for (var mode : new ToolbarMode[] {ToolbarMode.ICONS, ToolbarMode.HIDDEN, ToolbarMode.ICONS_AND_LABELS}) {
                 owner.setToolbarMode(mode);
                 dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
-                int expected = mode == ToolbarMode.HIDDEN ? UIScale.scale(6) : owner.toolbar().getHeight();
+                int expected = owner.chrome().header().getHeight();
+                assertThat(expected).isEqualTo(UIScale.scale(30));
                 assertThat(SwingUtilities.convertPoint(panel, 0, 0, owner).y).isEqualTo(expected);
                 assertThat(panel.getParent()).isSameAs(parent);
             }

@@ -31,6 +31,7 @@ public final class PaletteTestSupport {
             case PaletteEntry.Header header -> "# " + header.label();
             case PaletteEntry.Item item -> item.scope().id() + "/" + item.row().id();
             case PaletteEntry.More more -> "more:" + more.scope().id();
+            case PaletteEntry.Mode mode -> "mode:" + mode.scope().id();
         };
     }
 
@@ -70,12 +71,12 @@ public final class PaletteTestSupport {
         throw new IndexOutOfBoundsException(index);
     }
 
-    public static List<String> tabIds(CommandPalette palette) { return palette.tabIds(); }
-    public static String selectedTabId(CommandPalette palette) { return palette.selectedTabId(); }
-    public static void clickTab(CommandPalette palette, String id) { palette.clickTab(id); }
+    /** The chip's label, or null while no chip is set. */
+    public static String chipText(CommandPalette palette) { return palette.chipText(); }
+    public static JLabel chip(CommandPalette palette) { return palette.chip(); }
+    public static boolean backspace(PaletteController controller) { return controller.backspacePressed(); }
     public static String placeholder(CommandPalette palette) { return (String) palette.queryField().getClientProperty("JTextField.placeholderText"); }
     public static JPanel hintBar(CommandPalette palette) { return palette.hintBar(); }
-    public static JPanel tabStrip(CommandPalette palette) { return palette.tabStrip(); }
     public static JPanel fieldRow(CommandPalette palette) { return (JPanel) palette.queryField().getParent(); }
     public static String hint(CommandPalette palette) { return palette.hintText(); }
     public static List<String> hintActions(CommandPalette palette) { return palette.hintActionTexts(); }

@@ -19,7 +19,9 @@ final class ChromeKeys {
         "Jasper.tabSelectedBackground", "Jasper.tabSelectedForeground", "Jasper.tabHoverBackground", "Jasper.tabUnderline",
         "Jasper.tabUnderlineInactive", "Jasper.tabSelectedBorder", "Jasper.tabSelectedBorderInactive", "Jasper.splitDivider", "Jasper.findErrorBackground", "Jasper.runningForeground",
         "Jasper.editorBackground", "Jasper.editorForeground", "Jasper.editorCaret", "Jasper.editorSelection",
-        "Jasper.editorCurrentLine", "Jasper.editorGutter", "Jasper.editorLineNumbers", "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground");
+        "Jasper.editorCurrentLine", "Jasper.editorGutter", "Jasper.editorLineNumbers", "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground",
+        "Jasper.titleSearch.background", "Jasper.titleSearch.hoverBackground", "Jasper.titleSearch.border",
+        "Jasper.titleSearch.foreground", "Jasper.titleSearch.hintForeground");
 
     private ChromeKeys() {}
 
@@ -34,6 +36,16 @@ final class ChromeKeys {
         put(defaults, added, "Jasper.titleInactiveForeground",
             readable(first(defaults, "TitlePane.inactiveForeground"), title, 3, foreground));
         put(defaults, added, "Jasper.titleSeparator", first(defaults, "MainToolbar.borderColor", "Borders.color", "Separator.foreground"));
+        Color searchBackground = optional(defaults, "MainToolbar.searchField.background", "SearchEverywhere.SearchField.background");
+        put(defaults, added, "Jasper.titleSearch.background", searchBackground != null ? searchBackground : mix(foreground, title, .07));
+        Color search = defaults.getColor("Jasper.titleSearch.background");
+        Color searchHover = optional(defaults, "MainToolbar.searchField.hoverBackground");
+        put(defaults, added, "Jasper.titleSearch.hoverBackground", searchHover != null ? searchHover : mix(foreground, search, .06));
+        Color searchBorder = optional(defaults, "MainToolbar.searchField.borderColor", "SearchEverywhere.SearchField.borderColor");
+        put(defaults, added, "Jasper.titleSearch.border", searchBorder != null ? searchBorder : mix(foreground, title, .16));
+        put(defaults, added, "Jasper.titleSearch.foreground", defaults.getColor("Jasper.titleForeground"));
+        put(defaults, added, "Jasper.titleSearch.hintForeground",
+            readable(first(defaults, "SearchEverywhere.SearchField.infoForeground", "Label.disabledForeground"), search, 3, foreground));
         put(defaults, added, "Jasper.chromeForeground", first(defaults, "MainToolbar.foreground", "Label.foreground"));
         put(defaults, added, "Jasper.mutedForeground",
             readable(first(defaults, "Label.infoForeground", "Label.disabledForeground"), title, 3, foreground));
@@ -81,6 +93,15 @@ final class ChromeKeys {
             if (color != null) return color;
         }
         throw new IllegalStateException("None of " + List.of(keys) + " is defined by the theme");
+    }
+
+    /** The first key present, or null; for optional IntelliJ keys with a derived fallback. */
+    private static Color optional(UIDefaults defaults, String... keys) {
+        for (String key : keys) {
+            Color color = defaults.getColor(key);
+            if (color != null) return color;
+        }
+        return null;
     }
 
     /** {@code color}, moved toward {@code toward} in 5% steps until its contrast with {@code background} reaches {@code minimum}. */

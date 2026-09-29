@@ -77,21 +77,51 @@ class WindowCommandPaletteTest {
             }
         });
     }
-    @Test void overlayDoesNotResizeTerminalAndAnchorsTheCardTopInTheWholeWindow() throws Exception {
+    @Test void anAnchoredCardCoversTheFieldIsAtLeast560WideAndStaysInTheWindow() {
+        var window = new Rectangle(0, 0, 1400, 900);
+        var field = new Rectangle(420, 4, 560, 22);
+        assertThat(WindowCommandPalette.anchored(field, window, new Dimension(680, 300), 560, 16))
+            .isEqualTo(new Rectangle(420, 4, 560, 300));
+        var narrow = new Rectangle(500, 4, 300, 22);
+        assertThat(WindowCommandPalette.anchored(narrow, window, new Dimension(680, 300), 560, 16))
+            .as("centred on the field, widened to the minimum").isEqualTo(new Rectangle(370, 4, 560, 300));
+        var edge = new Rectangle(20, 4, 300, 22);
+        assertThat(WindowCommandPalette.anchored(edge, window, new Dimension(680, 300), 560, 16).x).isEqualTo(16);
+        var small = new Rectangle(0, 0, 350, 210);
+        assertThat(WindowCommandPalette.anchored(new Rectangle(20, 4, 286, 22), small, new Dimension(680, 400), 560, 16))
+            .isEqualTo(new Rectangle(16, 4, 318, 210 - 16 - 4));
+    }
+    @Test void overlayDoesNotResizeTerminalAndTheCardDropsFromTheTitleField() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner); var before = owner.tabStrip().getBounds();
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 assertThat(owner.tabStrip().getBounds()).isEqualTo(before);
                 var palette = owner.commandPalette().component();
-                var deck = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), palette.getParent());
-                assertThat(Math.abs(palette.getBounds().getCenterX() - deck.getCenterX())).isLessThanOrEqualTo(1);
-                assertThat(palette.getBounds().y).isEqualTo(deck.y + deck.height / 5);
+                var search = owner.chrome().search();
+                var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());
+                assertThat(palette.getY()).as("the card covers the field").isEqualTo(field.y);
+                assertThat(Math.abs(palette.getBounds().getCenterX() - field.getCenterX())).isLessThanOrEqualTo(1);
+                assertThat(palette.getWidth()).isEqualTo(Math.max(field.width, 560));
                 owner.setActive(false); assertThat(owner.commandPalette().isOpen()).isFalse();
             }
         });
     }
-    @Test void toolPanelsDoNotShiftOrConstrainTheWindowCenteredPalette() throws Exception {
+    @Test void aCollapsedFieldFallsBackToTheCentredCard() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var root = install(owner);
+                owner.chrome().search().setCollapsed(true);
+                owner.commandPalette().toggle();
+                owner.chrome().search().setCollapsed(true);
+                ((JComponent) owner.commandPalette().component().getParent()).doLayout();
+                var palette = owner.commandPalette().component();
+                var deck = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), palette.getParent());
+                assertThat(palette.getBounds().y).isEqualTo(deck.y + deck.height / 5);
+            }
+        });
+    }
+    @Test void toolPanelsDoNotShiftOrConstrainTheDroppedPalette() throws Exception {
         DesktopTestSupport.edt(() -> {
             for (boolean nativeHeader : new boolean[]{false, true}) {
                 try (var owner = owner(new CommandHistory())) {
@@ -101,25 +131,24 @@ class WindowCommandPaletteTest {
                         LayoutTestSupport.layoutTree(root);
                         owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                         var palette = owner.commandPalette().component();
-                        int top = palette.getY();
+                        var placed = palette.getBounds();
                         for (int sideWidth : new int[]{260, 400}) {
                             owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, new JPanel(), sideWidth);
                             owner.regions().show(dev.jasper.app.contributions.PanelRegion.RIGHT, new JPanel(), 220);
                             owner.regions().show(dev.jasper.app.contributions.PanelRegion.BOTTOM, new JPanel(), 180);
                             LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root);
-                            assertThat(Math.abs(palette.getBounds().getCenterX() - root.getLayeredPane().getWidth() / 2.0))
-                                .as("centered across the window with tool panels").isLessThanOrEqualTo(1);
-                            assertThat(palette.getWidth()).isEqualTo(palette.getPreferredSize().width);
-                            assertThat(palette.getY()).isEqualTo(top);
+                            assertThat(palette.getBounds()).as("panels leave the card where it is").isEqualTo(placed);
                         }
                         root.setSize(900, 700); LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root);
-                        assertThat(Math.abs(palette.getBounds().getCenterX() - 450)).isLessThanOrEqualTo(1);
+                        var search = owner.chrome().search();
+                        var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());
+                        assertThat(Math.abs(palette.getBounds().getCenterX() - field.getCenterX())).isLessThanOrEqualTo(1);
+                        assertThat(palette.getY()).isEqualTo(field.y);
                     }
                 }
             }
         });
     }
-
     @Test void overlayShadowTintsTowardThePopupDropShadowColour() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
@@ -159,7 +188,7 @@ class WindowCommandPaletteTest {
                 first.commandPalette().toggle(); first.commandPalette().component().queryField().setText("custom");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(first.commandPalette().component());
                 assertThat(a.get()).isEqualTo(1); assertThat(b.get()).isZero();
-                second.commandPalette().toggle();
+                second.commandPalette().open(dev.jasper.app.palette.PaletteScope.COMMANDS_ID);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(second.commandPalette().component()).id()).isEqualTo("custom");
                 first.close(); dev.jasper.app.palette.PaletteTestSupport.executeSelected(second.commandPalette().component());
                 assertThat(b.get()).isEqualTo(1); assertThat(history.recent()).containsExactly("custom");
@@ -246,18 +275,18 @@ class WindowCommandPaletteTest {
                 var palette = owner.commandPalette().component();
                 var overlay = (JComponent) palette.getParent();
 
-                var tabStrip = dev.jasper.app.palette.PaletteTestSupport.tabStrip(palette);
-                var tabStripBounds = SwingUtilities.convertRectangle(tabStrip.getParent(), tabStrip.getBounds(), palette);
+                var chip = dev.jasper.app.palette.PaletteTestSupport.chip(palette);
+                var chipBounds = SwingUtilities.convertRectangle(chip.getParent(), chip.getBounds(), palette);
                 var fieldRow = dev.jasper.app.palette.PaletteTestSupport.fieldRow(palette);
                 var fieldRowBounds = SwingUtilities.convertRectangle(fieldRow.getParent(), fieldRow.getBounds(), palette);
                 var hintBar = dev.jasper.app.palette.PaletteTestSupport.hintBar(palette);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.hint(palette)).as("a detail is showing to click on").isEqualTo("a detail");
 
-                // The tab-strip gap right of the last tab, the hint bar's detail text and the field
+                // The scope chip, the hint bar's detail text and the field
                 // row's padding: three places AWT could otherwise retarget a press straight to the
                 // overlay behind the palette, dismissing it and losing the query.
                 var points = List.of(
-                    new Point(tabStripBounds.x + tabStripBounds.width - 4, tabStripBounds.y + tabStripBounds.height / 2),
+                    new Point(chipBounds.x + chipBounds.width / 2, chipBounds.y + chipBounds.height / 2),
                     new Point(hintBar.getX() + 10, hintBar.getY() + hintBar.getHeight() / 2),
                     new Point(fieldRowBounds.x + 2, fieldRowBounds.y + 2));
 

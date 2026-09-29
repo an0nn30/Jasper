@@ -64,7 +64,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private KeyboardFocusManager paletteFocusManager;
     private javax.swing.Timer paletteTailCleanup;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
-    private boolean unifiedHeader;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
@@ -195,12 +194,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         regions = new WorkspaceRegions(terminalColumn);
         regions.setStatusVisible(chrome.status().isVisible());
-        regions.setHeaderVisible(chrome.toolbar().isVisible());
+        regions.setHeaderVisible(true);
         rail = new WindowRail();
         rail.setVisible(false);
         var body = new JPanel(new BorderLayout());
         body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
-        add(chrome.toolbar(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
+        add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (terminals != null) terminals.tabSelected();
@@ -219,11 +218,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                                       Consumer<String> nativeTitle) {
         var bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
         if (bar != null) {
-            content.unifiedHeader = true;
-            content.regions.setHeaderVisible(true);
-            content.remove(content.toolbar());
-            ((WindowToolbar) content.toolbar()).setTitleBar(true);
-            bar.setToolbar(content.toolbar());
+            content.remove(content.chrome.header());
+            bar.setHeader(content.chrome.header(), java.util.List.of(content.chrome.header(), content.toolbar()));
         }
         content.onTitle = value -> {
             TerminalPane pane = content.currentPane();
@@ -233,9 +229,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
             nativeTitle.accept(context.label());
-            if (bar != null) {
-                bar.setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
-            }
+            content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
             content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
@@ -439,13 +433,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void dispatchCommand(Command command) {
         command.action().actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, command.id()));
     }
-    /** The application shortcut that opens a scope directly, shown in its tab's tooltip; null when none. */
+    /** The shortcut that opens a scope's chip (or the palette, for {@code ALL_ID}), for the mode list; null when none. */
     String scopeShortcut(String scopeId) {
-        ActionId id = switch (scopeId) {
-            case PaletteScope.ALL_ID -> ActionId.COMMAND_PALETTE;
-            default -> null;
-        };
-        return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
+        if (PaletteScope.ALL_ID.equals(scopeId))
+            return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
+        return scopes.find(scopeId).flatMap(PaletteScope::shortcutActionId).flatMap(bindings::strokeFor)
+            .map(stroke -> CommandsScope.shortcutText(stroke, macOs)).orElse(null);
     }
     String tabShortcut(int index) {
         if (index < 0 || index >= 9) return "";
@@ -453,6 +446,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
     }
     WindowCommandPalette commandPalette() { return commandPalette; }
+    /** The title field's bounds in {@code target}'s coordinates while the palette can drop from it; null otherwise. */
+    java.awt.Rectangle paletteAnchor(Component target) {
+        TitleSearchField field = chrome.search();
+        if (!field.isVisible() || field.collapsed() || field.getWidth() <= 0 || field.getParent() == null) return null;
+        if (SwingUtilities.getRootPane(field) != SwingUtilities.getRootPane(target)) return null;
+        return SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), target);
+    }
     WindowChrome chrome() { return chrome; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
@@ -877,7 +877,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = mode; chrome.setToolbarMode(mode);
-        regions.setHeaderVisible(unifiedHeader || mode != ToolbarMode.HIDDEN);
         updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
     void setStatusVisible(boolean visible) {
