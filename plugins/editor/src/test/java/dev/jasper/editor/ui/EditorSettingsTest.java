@@ -25,7 +25,7 @@ class EditorSettingsTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             assertThat(start(host, Set.of("Menlo", "JetBrains Mono")).current())
                 .isEqualTo(new EditorSettings("JetBrains Mono", 13, 4, false, 10, false));
-            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "tab_size", "soft_wrap", "vim", "max_file_mib");
+            assertThat(host.declared(ID)).containsExactly("font_family", "font_size", "tab_size", "soft_wrap", "vim", "max_file_mib", "recent_files_days");
             assertThat(host.settingsReports(ID)).isEmpty();
         }
         try (var host = new FakePluginHost(home.resolve("other"))) {
@@ -47,6 +47,20 @@ class EditorSettingsTest {
             assertThat(settings.font()).isEqualTo(new Font("Menlo", Font.PLAIN, 13));
             assertThat(host.settingsReports(ID)).extracting(line -> line.substring(0, line.indexOf(':')))
                 .containsExactly("font_family", "font_size", "tab_size", "vim");
+        }
+    }
+
+    @Test void recentFilesAreKeptThirtyDaysByDefaultAndZeroTo365Days() {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            var declared = start(host, Set.of());
+            assertThat(declared.recentFilesDays()).isEqualTo(30);
+            host.setSetting(ID, "recent_files_days", 0L);
+            assertThat(declared.recentFilesDays()).isZero();
+            host.setSetting(ID, "recent_files_days", 365L);
+            assertThat(declared.recentFilesDays()).isEqualTo(365);
+            host.setSetting(ID, "recent_files_days", 400L);
+            assertThat(declared.recentFilesDays()).isEqualTo(30);
+            assertThat(host.settingsReports(ID)).isNotEmpty();
         }
     }
 
