@@ -5,6 +5,10 @@
 **Status:** Written 2026-09-29 on `claude/settings-polish`; not executed.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
+Deviations so far:
+- Task 4: `PluginManagerPanel`'s private accessor is `cardList()`, not `list()`: `java.awt.Component` already has a
+  `list()` method.
+
 Scope notes (decided while writing this plan):
 - The ▾ menu keeps today's labels: "Open Settings", "Open Plugin Folder" and "Open Data Folder", then Remove…,
   Keep (for a plugin marked for removal) or Discard Install. The spec's shorter "Open Folder" and "Open Data" were

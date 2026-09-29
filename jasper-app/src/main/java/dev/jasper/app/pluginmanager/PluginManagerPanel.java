@@ -1,252 +1,155 @@
 package dev.jasper.app.pluginmanager;
 
+import com.formdev.flatlaf.FlatClientProperties;
+import com.formdev.flatlaf.extras.FlatSVGIcon;
 import dev.jasper.app.plugins.PluginRuntime;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JList;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
-import javax.swing.ListSelectionModel;
+import javax.swing.JTabbedPane;
+import javax.swing.JTextField;
 import javax.swing.UIManager;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
-/** The manager's passive view: it renders a snapshot and reports clicks. It decides nothing. */
+/**
+ * The Plugins page's passive view: a search bar and gear menu, the restart banner, the plugin cards and the selected
+ * plugin's details. It renders a snapshot and reports clicks; it decides nothing. EDT only.
+ */
 final class PluginManagerPanel extends JPanel {
-    @Override public void updateUI() {
-        super.updateUI();
-        var base = UIManager.getFont("Label.font");
-        if (bannerLabel != null) bannerLabel.setFont(base.deriveFont(Font.BOLD));
-        if (title != null) title.setFont(base.deriveFont(Font.BOLD, base.getSize2D() + 3f));
-    }
-
     /** What the user can ask for. */
     record Handlers(Consumer<PluginRuntime.Row> toggle, Consumer<PluginRuntime.Row> review, Consumer<PluginRuntime.Row> remove,
                     Consumer<PluginRuntime.Row> discard, Runnable install, Consumer<PluginRuntime.Row> openSettings,
-                    Consumer<PluginRuntime.Row> openFolder, Consumer<PluginRuntime.Row> openData) { }
+                    Consumer<PluginRuntime.Row> openFolder, Consumer<PluginRuntime.Row> openData, Consumer<URI> browse) { }
 
     /** One button of the banner. */
     record BannerAction(String label, Runnable run) { }
 
-    final JButton toggle = new JButton("Disable");
-    final JButton review = new JButton("Review…");
-    final JButton remove = new JButton("Remove\u2026");
-    final JButton discard = new JButton("Discard Install");
-    final JButton install = new JButton("Install from Zip…");
-    private final DefaultListModel<PluginRuntime.Row> model = new DefaultListModel<>();
-    private final JList<PluginRuntime.Row> list = new JList<>(model);
-    private final JLabel title = plain(new JLabel(" "));
-    private final JTextArea body = new JTextArea();
+    final JTextField search = new JTextField(18);
+    final JButton gear = new JButton();
+    private final Handlers handlers;
+    private final PluginDetails details;
+    private final PluginCardList list;
     private final JPanel banner = new JPanel(new BorderLayout(12, 0));
     private final JLabel bannerLabel = plain(new JLabel());
     private final JPanel bannerActions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 8, 0));
     private final JLabel notice = plain(new JLabel());
     private final JLabel message = plain(new JLabel(" "));
     private boolean busy;
-    private boolean refreshing;
-    private final Handlers handlers;
 
     /** Swing renders label text that starts with an html tag; plugin-supplied text must never be markup. */
-    static <T extends javax.swing.JComponent> T plain(T component) {
+    static <T extends JComponent> T plain(T component) {
         component.putClientProperty("html.disable", Boolean.TRUE);
         return component;
     }
 
-    static String stateLabel(String state) {
-        return switch (state) {
-            case "ACTIVE" -> "Active"; case "DISABLED" -> "Disabled"; case "NEEDS_CONSENT" -> "Needs review";
-            case "SKIPPED" -> "Skipped"; case "FAILED" -> "Failed"; case "NOT_LOADED" -> "Not loaded yet";
-            default -> state;
-        };
-    }
-
-    static String label(PluginRuntime.Row row) {
-        return row.name() + "  " + row.version() + " — " + stateLabel(row.state()) + (row.pending().isEmpty() ? "" : " (restart to apply)");
-    }
-
     PluginManagerPanel(Handlers handlers) {
         super(new BorderLayout(0, 8));
+        this.handlers = handlers;
         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        details = new PluginDetails(handlers);
+        // The list reports its first selection while it is being built, before this field is set.
+        list = new PluginCardList(row -> (row.needsConsent() ? handlers.review() : handlers.toggle()).accept(row),
+            () -> { PluginCardList built = cardList(); if (built != null) details.show(built.selectedRow(), busy); },
+            (at, point) -> { if (!busy) details.menu().show(at, point.x, point.y); });
 
-        bannerLabel.setFont(bannerLabel.getFont().deriveFont(Font.BOLD));
+        search.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search plugins");
+        search.getAccessibleContext().setAccessibleName("Search plugins");
+        search.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent event) { list.search(search.getText()); }
+            @Override public void removeUpdate(DocumentEvent event) { list.search(search.getText()); }
+            @Override public void changedUpdate(DocumentEvent event) { list.search(search.getText()); }
+        });
+        gear.setIcon(new FlatSVGIcon("dev/jasper/app/icons/intellij/general/settings.svg", 16, 16, PluginManagerPanel.class.getClassLoader()));
+        gear.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+        gear.setToolTipText("Plugin options");
+        gear.getAccessibleContext().setAccessibleName("Plugin options");
+        gear.addActionListener(event -> gearMenu().show(gear, 0, gear.getHeight()));
+        var bar = new JPanel(new BorderLayout(8, 0));
+        bar.add(search, BorderLayout.CENTER);
+        bar.add(gear, BorderLayout.EAST);
+
         banner.add(bannerLabel, BorderLayout.CENTER);
         banner.add(bannerActions, BorderLayout.EAST);
-        banner.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        banner.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
         banner.setVisible(false);
         notice.setVisible(false);
         var top = new JPanel(new BorderLayout());
-        top.add(banner, BorderLayout.NORTH);
+        top.add(bar, BorderLayout.NORTH);
+        top.add(banner, BorderLayout.CENTER);
         top.add(notice, BorderLayout.SOUTH);
         add(top, BorderLayout.NORTH);
 
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer(new DefaultListCellRenderer() {
-            @Override public Component getListCellRendererComponent(JList<?> owner, Object value, int index, boolean selected, boolean focused) {
-                var cell = (JLabel) super.getListCellRendererComponent(owner, value, index, selected, focused);
-                plain(cell).setText(label((PluginRuntime.Row) value));
-                cell.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-                return cell;
-            }
-        });
-        list.addListSelectionListener(event -> { if (!refreshing && !event.getValueIsAdjusting()) render(); });
-
-        title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 3f));
-        body.setEditable(false); body.setLineWrap(true); body.setWrapStyleWord(true); body.setOpaque(false);
-        body.setFont(UIManager.getFont("Label.font"));
-        var actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 8, 0));
-        for (JButton button : List.of(toggle, review, remove, discard)) actions.add(button);
-        var details = new JPanel(new BorderLayout(0, 8));
-        details.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 4));
-        details.add(title, BorderLayout.NORTH);
-        details.add(new JScrollPane(body, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER), BorderLayout.CENTER);
-        details.add(actions, BorderLayout.SOUTH);
-
-        var listScroll = new JScrollPane(list);
-        listScroll.setMinimumSize(new Dimension(200, 100));
+        var listScroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        listScroll.setMinimumSize(new Dimension(240, 100));
         var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listScroll, details);
-        split.setDividerLocation(280);
+        split.setDividerLocation(340);
+        split.setResizeWeight(0.4);
         split.setBorder(null);
         add(split, BorderLayout.CENTER);
+        add(message, BorderLayout.SOUTH);
+        restyle();
+        details.show(list.selectedRow(), false);
+    }
 
-        var bottom = new JPanel(new BorderLayout(12, 0));
-        bottom.add(install, BorderLayout.WEST);
-        bottom.add(message, BorderLayout.CENTER);
-        add(bottom, BorderLayout.SOUTH);
+    private PluginCardList cardList() { return list; }
 
-        toggle.addActionListener(event -> { if (current() != null) handlers.toggle().accept(current()); });
-        review.addActionListener(event -> { if (current() != null) handlers.review().accept(current()); });
-        remove.addActionListener(event -> { if (current() != null) handlers.remove().accept(current()); });
-        discard.addActionListener(event -> { if (current() != null) handlers.discard().accept(current()); });
+    @Override public void updateUI() {
+        super.updateUI();
+        // Called by JPanel's constructor, before the labels exist.
+        if (message != null) restyle();
+    }
+
+    private void restyle() {
+        Font base = UIManager.getFont("Label.font");
+        if (base != null) bannerLabel.setFont(base.deriveFont(Font.BOLD));
+    }
+
+    private JPopupMenu gearMenu() {
+        var menu = new JPopupMenu();
+        var install = new JMenuItem("Install from Zip…");
+        install.setEnabled(!busy);
         install.addActionListener(event -> handlers.install().run());
-        this.handlers = handlers;
-        list.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mousePressed(java.awt.event.MouseEvent event) { maybeShowMenu(event); }
-            @Override public void mouseReleased(java.awt.event.MouseEvent event) { maybeShowMenu(event); }
-        });
-        list.getInputMap(javax.swing.JComponent.WHEN_FOCUSED).put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_CONTEXT_MENU, 0), "jasper.menu");
-        list.getInputMap(javax.swing.JComponent.WHEN_FOCUSED).put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F10, java.awt.event.InputEvent.SHIFT_DOWN_MASK), "jasper.menu");
-        list.getActionMap().put("jasper.menu", new javax.swing.AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
-                int index = list.getSelectedIndex();
-                if (index < 0) return;
-                var cell = list.getCellBounds(index, index);
-                showMenu(list, cell.x + 8, cell.y + cell.height / 2);
-            }
-        });
-        render();
-    }
-
-    private void maybeShowMenu(java.awt.event.MouseEvent event) {
-        if (!event.isPopupTrigger() || busy) return;
-        int index = list.locationToIndex(event.getPoint());
-        if (index >= 0 && list.getCellBounds(index, index).contains(event.getPoint())) list.setSelectedIndex(index);
-        if (current() != null) showMenu(event.getComponent(), event.getX(), event.getY());
-    }
-
-    /** The selected row's actions, as the buttons offer them, then the three openers. */
-    private javax.swing.JPopupMenu menu() {
-        var menu = new javax.swing.JPopupMenu();
-        PluginRuntime.Row row = current();
-        if (row == null) return menu;
-        for (JButton button : List.of(toggle, review, remove, discard)) {
-            if (!button.isVisible()) continue;
-            var item = new javax.swing.JMenuItem(button.getText());
-            item.addActionListener(event -> button.doClick());
-            menu.add(item);
-        }
-        if (menu.getComponentCount() > 0) menu.addSeparator();
-        var settings = new javax.swing.JMenuItem("Open Settings"); settings.addActionListener(event -> handlers.openSettings().accept(row)); menu.add(settings);
-        var folder = new javax.swing.JMenuItem("Open Plugin Folder"); folder.addActionListener(event -> handlers.openFolder().accept(row)); menu.add(folder);
-        var data = new javax.swing.JMenuItem("Open Data Folder"); data.addActionListener(event -> handlers.openData().accept(row)); menu.add(data);
+        menu.add(install);
         return menu;
     }
 
-    private void showMenu(Component at, int x, int y) { menu().show(at, x, y); }
-
-    /** Test seam: the menu's item texts for the selected row, {@code -} for a separator. */
-    List<String> menuLabels() {
+    List<String> gearLabels() {
         List<String> labels = new ArrayList<>();
-        for (Component component : menu().getComponents())
-            labels.add(component instanceof javax.swing.JMenuItem item ? item.getText() : "-");
+        for (Component component : gearMenu().getComponents()) if (component instanceof JMenuItem item) labels.add(item.getText());
         return labels;
     }
 
-    /** Test seam: clicks the menu item with that text. */
-    void clickMenu(String label) {
-        for (Component component : menu().getComponents())
-            if (component instanceof javax.swing.JMenuItem item && item.getText().equals(label)) { item.doClick(); return; }
-        throw new IllegalArgumentException("No menu item " + label);
+    /** Test seam: clicks the gear menu's item; a disabled item does nothing. */
+    void clickGear(String label) {
+        for (Component component : gearMenu().getComponents())
+            if (component instanceof JMenuItem item && item.getText().equals(label)) { item.doClick(); return; }
+        throw new IllegalArgumentException("No gear menu item " + label);
     }
 
-    private PluginRuntime.Row current() { return list.getSelectedValue(); }
+    /** Replaces the plugins, keeping the selection and the search. */
+    void show(PluginRuntime.Snapshot snapshot) { list.show(snapshot.rows()); }
 
-    /** Replaces the rows, keeping the selection by id; the first row is selected when the old one is gone. */
-    void show(PluginRuntime.Snapshot snapshot) {
-        String keep = selected();
-        refreshing = true;
-        try {
-            model.clear();
-            snapshot.rows().forEach(model::addElement);
-            int index = -1;
-            for (int i = 0; i < model.size(); i++) if (model.get(i).id().equals(keep)) index = i;
-            if (index < 0 && !model.isEmpty()) index = 0;
-            if (index >= 0) list.setSelectedIndex(index); else list.clearSelection();
-        } finally { refreshing = false; }
-        render();
-    }
-
-    private void render() {
-        PluginRuntime.Row row = current();
-        toggle.setVisible(row != null && row.canToggle());
-        review.setVisible(row != null && row.needsConsent());
-        discard.setVisible(row != null && row.pendingInstall());
-        remove.setVisible(row != null && row.canRemove() && !row.pendingInstall());
-        if (row != null) {
-            toggle.setText(row.enabled() ? "Disable" : "Enable");
-            remove.setText(row.pendingRemoval() ? "Keep" : "Remove\u2026");
-        }
-        title.setText(row == null ? " " : row.name() + " " + row.version());
-        body.setText(row == null ? "No plugins are installed." : describe(row));
-        body.setCaretPosition(0);
-        applyBusy();
-    }
-
-    private static String describe(PluginRuntime.Row row) {
-        var text = new StringBuilder(row.id());
-        text.append('\n').append(row.vendor().isBlank() ? row.origin() : row.vendor() + " · " + row.origin());
-        text.append("\n\n").append(stateLabel(row.state()));
-        if (!row.reason().isEmpty()) text.append(": ").append(row.reason());
-        if (!row.pending().isEmpty()) text.append('\n').append(row.pending());
-        if (row.errors() > 0) text.append('\n').append(row.errors()).append(row.errors() == 1 ? " error" : " errors").append(" since Jasper started; see the log");
-        if (!row.description().isBlank()) text.append("\n\n").append(row.description());
-        if (row.origin().equals("Bundled")) text.append("\n\nBundled with Jasper; disable it here, or remove it from the application image.");
-        if (row.origin().equals("Development")) text.append("\n\nLoaded from --plugin-dir; its settings and data are in ").append(row.directory()).append('.');
-        text.append("\n\nCapabilities");
-        if (row.capabilities().isEmpty()) text.append("\n  None");
-        for (String capability : row.capabilities())
-            text.append("\n  • ").append(Capabilities.describe(capability)).append(row.unconsented().contains(capability) ? " — not reviewed" : "");
-        if (!row.requires().isEmpty()) {
-            text.append("\n\nRequires");
-            for (String requirement : row.requires()) text.append("\n  • ").append(requirement);
-        }
-        return text.toString();
-    }
-
-    void busy(boolean value) { busy = value; applyBusy(); }
-
-    private void applyBusy() {
-        for (JButton button : List.of(toggle, review, remove, discard, install)) button.setEnabled(!busy);
+    void busy(boolean value) {
+        busy = value;
+        list.busy(value);
+        gear.setEnabled(!value);
+        details.show(list.selectedRow(), value);
     }
 
     /** An empty text hides the banner. */
@@ -259,7 +162,8 @@ final class PluginManagerPanel extends JPanel {
             bannerActions.add(button);
         }
         banner.setVisible(!text.isEmpty());
-        banner.revalidate(); banner.repaint();
+        banner.revalidate();
+        banner.repaint();
     }
 
     void notice(String text) { notice.setText(text); notice.setVisible(!text.isEmpty()); }
@@ -269,19 +173,22 @@ final class PluginManagerPanel extends JPanel {
         message.setForeground(UIManager.getColor(error ? "Actions.Red" : "Label.foreground"));
     }
 
-    List<String> listed() {
-        List<String> labels = new ArrayList<>();
-        for (int i = 0; i < model.size(); i++) labels.add(label(model.get(i)));
-        return labels;
-    }
+    List<String> listed() { return list.listed(); }
+    List<String> groupTitles() { return list.groupTitles(); }
+    String selected() { return list.selected(); }
+    void select(String id) { list.select(id); }
+    PluginCard card(String id) { return list.card(id); }
+    void search(String text) { search.setText(text); }
+    JButton primary() { return details.primary; }
+    JTabbedPane tabs() { return details.tabs; }
+    List<String> menuLabels() { return details.menuLabels(); }
+    void clickMenu(String label) { details.clickMenu(label); }
+    boolean homepageShown() { return details.homepage.isVisible(); }
+    void clickHomepage() { details.homepage.doClick(); }
 
-    String selected() { return current() == null ? null : current().id(); }
+    /** The selected plugin's details as text, or the list's empty text when nothing is selected. */
+    String details() { return list.selectedRow() == null ? list.emptyText() : details.text(); }
 
-    void select(String id) {
-        for (int i = 0; i < model.size(); i++) if (model.get(i).id().equals(id)) list.setSelectedIndex(i);
-    }
-
-    String details() { return title.getText() + "\n" + body.getText(); }
     String bannerText() { return banner.isVisible() ? bannerLabel.getText() : ""; }
     String noticeText() { return notice.isVisible() ? notice.getText() : ""; }
     String messageText() { return message.getText().strip(); }

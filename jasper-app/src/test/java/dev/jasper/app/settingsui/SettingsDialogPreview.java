@@ -70,7 +70,7 @@ public final class SettingsDialogPreview {
             var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run,
                 Duration.ofMillis(20), Duration.ofMillis(1));
             manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
-                ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }));
+                ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
             previewPlugins[0] = new dev.jasper.app.plugins.PluginPreviewSupport(home.resolve("preview-plugins"));
         });
         var keymapHooks = new KeymapPage.Hooks(new Contributions(), Map::of, Map::of, true, edits -> CompletableFuture.completedFuture(null));
