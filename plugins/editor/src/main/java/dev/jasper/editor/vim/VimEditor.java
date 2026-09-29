@@ -84,6 +84,9 @@ public final class VimEditor {
     private Exchange.Region exchange;
     /** Whether the tab's 'matchpairs' has pairs its language added. */
     private boolean languagePairs;
+    /** The sneak extension's matches, drawn while the cursor stays where the sneak left it. */
+    private List<int[]> sneakRanges = List.of();
+    private Pos sneakAt;
     /** The highlightedyank extension's highlight of the last yank. */
     private final HighlightedYank highlightedYank = new HighlightedYank(this);
     /** A new language gives the tab its line comment as 'commentstring'. */
@@ -918,6 +921,12 @@ public final class VimEditor {
 
     HighlightedYank highlightedYank() { return highlightedYank; }
 
+    /** @param ranges the sneak's matches as {kind 3, start, end}, drawn until the cursor leaves {@code at} */
+    void sneakHighlight(List<int[]> ranges, Pos at) {
+        sneakRanges = ranges;
+        sneakAt = at.copy();
+    }
+
     /** @return a number that changes with every change to the text (Vim's b:changedtick) */
     int textVersion() { return textVersion; }
 
@@ -951,6 +960,8 @@ public final class VimEditor {
         }
         ranges.addAll(Exchange.highlight(this, exchange));
         ranges.addAll(highlightedYank.ranges());
+        if (!sneakRanges.isEmpty() && (!cursor().equals(sneakAt) || mode.inserting())) sneakRanges = List.of();
+        ranges.addAll(sneakRanges);
         ranges.addAll(Highlights.visual(this));
         if (incsearch != null) ranges.add(new int[] { 0, incsearch[0], incsearch[1] });
         if (confirmMatch != null) ranges.add(new int[] { 0, confirmMatch[0], confirmMatch[1] });

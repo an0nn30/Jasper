@@ -75,6 +75,7 @@ public final class VimCommands {
         TextobjIndent.register(commands);
         Argtextobj.register(commands);
         Matchit.register(commands);
+        Sneak.register(commands);
         return commands;
     }
 
@@ -94,6 +95,23 @@ public final class VimCommands {
         motion(keys, description, motion);
         lineCommands.add(keys);
     }
+
+    /**
+     * A motion that reads keys first (a ported plugin's getchar()), one at a time until {@code enough} says the keys
+     * read so far are enough (asked before the first one too); they are in {@link Context#keys}. {@code <Esc>} as the
+     * first key cancels it.
+     */
+    void motionWithKeys(String keys, String description, java.util.function.BiPredicate<VimEditor, java.util.List<KeyInput>> enough, Motion motion) {
+        motion(keys, description, motion);
+        keyReaders.put(keys, enough);
+    }
+
+    /** @return what decides when an entry has read enough keys, or null for an entry that reads none */
+    java.util.function.BiPredicate<VimEditor, java.util.List<KeyInput>> keyReader(Entry entry) {
+        return entry.kind() == Kind.MOTION ? keyReaders.get(entry.keys()) : null;
+    }
+
+    private final java.util.Map<String, java.util.function.BiPredicate<VimEditor, java.util.List<KeyInput>>> keyReaders = new java.util.HashMap<>();
 
     /** @return whether the entry reads a command line before it runs */
     boolean needsLine(Entry entry) { return entry.kind() == Kind.MOTION && lineCommands.contains(entry.keys()); }

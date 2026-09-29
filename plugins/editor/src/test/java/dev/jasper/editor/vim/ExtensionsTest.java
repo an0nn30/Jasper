@@ -208,4 +208,33 @@ class ExtensionsTest {
             assertThat(MatchitLanguages.of(SyntaxConstants.SYNTAX_STYLE_HTML).words()).contains("<\\@<=/\\1>");
         });
     }
+
+    @Test void sneakRepeatsWithDotAndDrawsTheMatchesAhead() throws Exception {
+        onEdt(() -> {
+            var editor = editor("one two three two four two\n");
+            type(editor, ":Plug 'justinmk/vim-sneak'<CR>");
+            assertThat(editor.options().flag("sneak")).isTrue();
+            type(editor, "dztw");
+            assertThat(editor.area().getText()).isEqualTo("two three two four two\n");
+            type(editor, "w.");
+            assertThat(editor.area().getText()).as(". deletes to the next tw again").isEqualTo("two two four two\n");
+            type(editor, "0stw");
+            assertThat(editor.cursor()).isEqualTo(new Pos(0, 4));
+            assertThat(editor.highlights().stream().filter(r -> r[0] == 3).map(r -> r[1] + "-" + r[2]).toList())
+                .as("the matches ahead and the one reached").containsExactly("13-15", "4-6");
+            type(editor, "l");
+            assertThat(editor.highlights().stream().filter(r -> r[0] == 3).toList()).as("moving on ends it").isEmpty();
+        });
+    }
+
+    @Test void sneakLeavesTheUsersKeysAlone() throws Exception {
+        onEdt(() -> {
+            var editor = editor("x\n");
+            type(editor, ":nnoremap sa x<CR>:set sneak<CR>");
+            assertThat(mapped(editor, Mappings.NORMAL, "s")).as("mapcheck(): sa starts with s").isFalse();
+            assertThat(mapped(editor, Mappings.NORMAL, "S")).isTrue();
+            assertThat(mapped(editor, Mappings.OP_PENDING, "z")).isTrue();
+            assertThat(mapped(editor, Mappings.NORMAL, "<Plug>SneakForward")).as("the old names, always").isTrue();
+        });
+    }
 }

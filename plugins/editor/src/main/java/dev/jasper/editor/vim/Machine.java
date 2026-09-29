@@ -33,6 +33,8 @@ final class Machine {
     private Visual.Redo recordVisual, visualRedo;
     /** Whether the Visual area an operator is about to act on is one an extension's object selected. */
     private boolean objectArea;
+    /** The keys the running motion read ({@link VimCommands#motionWithKeys}). */
+    private List<KeyInput> readKeys = List.of();
     /** Where the undo step's cursor is, when an extension's script changed the text before the operator did. */
     private Pos undoCursor;
     /** The command line typed for the motion being run ({@code /pattern}), or null. */
@@ -166,6 +168,10 @@ final class Machine {
 
     /** A Normal-mode command or a motion after an operator, whose keys are complete: it reads what it needs, then runs. */
     private void start(VimCommands.Entry entry) {
+        if (vim.commands().keyReader(entry) != null) {
+            readKeys(entry, new ArrayList<>(), false);
+            return;
+        }
         if (needsChar(entry)) {
             VimCommands.Entry waiting = entry;
             argument = arg -> {
@@ -245,6 +251,10 @@ final class Machine {
         if (entry == null) {
             if (vim.commands().visualPrefix(keys)) return;
             throw Context.fail();
+        }
+        if (vim.commands().keyReader(entry) != null) {
+            readKeys(entry, new ArrayList<>(), true);
+            return;
         }
         if (needsChar(entry)) {
             argument = arg -> {
@@ -333,6 +343,21 @@ final class Machine {
         visualRedo = redo;
     }
 
+    /** A motion reads its keys one at a time until it has enough ({@link VimCommands#motionWithKeys}), then runs. */
+    private void readKeys(VimCommands.Entry entry, List<KeyInput> got, boolean visual) {
+        if (vim.commands().keyReader(entry).test(editor, got)) {
+            readKeys = List.copyOf(got);
+            if (visual) runVisual(entry, null);
+            else run(entry, null);
+            return;
+        }
+        argument = key -> {
+            record.add(key);
+            got.add(key);
+            readKeys(entry, got, visual);
+        };
+    }
+
     /** Whether the command reads a key as its argument; {@code q} does not while recording or while a register runs. */
     private boolean needsChar(VimCommands.Entry entry) {
         return entry.needsChar() && !(entry.keys().equals("q") && vim.macros().qTakesNoRegister());
@@ -356,6 +381,7 @@ final class Machine {
         context.operator = operator;
         context.forced = forced;
         context.line = line;
+        context.keys = readKeys;
         return context;
     }
 
@@ -726,6 +752,7 @@ final class Machine {
         suspended = false;
         suspendedChange = false;
         undoCursor = null;
+        readKeys = List.of();
         shown.clear();
         if (!recordingInsert) record.clear();
     }

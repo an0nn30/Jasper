@@ -363,6 +363,14 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>(MatchitOperationBackward)` (Normal) | to the previous word of the group at the cursor (`g%`) |
 | `<Plug>(MatchitOperationMultiBackward)` (Normal) | back to the start of the group around the cursor (`[%`) |
 | `<Plug>(MatchitOperationMultiForward)` (Normal) | on to the end of the group around the cursor (`]%`) |
+| `<Plug>Sneak_s` (Normal) | to the next place {char}{char} stand together (`s`, `z` after an operator, with `set sneak`) |
+| `<Plug>Sneak_S` (Normal) | back to the place {char}{char} stand together (`S`, `Z` after an operator) |
+| `<Plug>Sneak_f` (Normal) | to the next {char}, as sneak repeats it |
+| `<Plug>Sneak_F` (Normal) | back to the {char}, as sneak repeats it |
+| `<Plug>Sneak_t` (Normal) | till the next {char}, as sneak repeats it |
+| `<Plug>Sneak_T` (Normal) | back till the {char}, as sneak repeats it |
+| `<Plug>Sneak_;` (Normal) | repeat the last sneak (`;`); after `f` or `t`, their `;` |
+| `<Plug>Sneak_,` (Normal) | repeat the last sneak the other way (`,`) |
 | `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
 | `<Plug>(textobj-entire-a)` (text object) | the whole text (`ae`, with `set textobj-entire`) |
 | `<Plug>(textobj-entire-i)` (text object) | the whole text but the empty lines at either end (`ie`) |

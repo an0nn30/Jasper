@@ -29,11 +29,15 @@ final class Extensions {
 
     /**
      * How a plugin checks before it maps: not at all, hasmapto() once for all its mappings or for each, or with
-     * {@code <unique>}, which leaves out a key the user mapped already in that mode.
+     * {@code <unique>}, which leaves out a key the user mapped already in that mode, or with hasmapto() and
+     * mapcheck(), which also leaves out a key that starts a mapping in that mode or that a mapping starts with (a
+     * mapping marked {@code always} is made anyway).
      */
-    enum Check { NONE, ALL, EACH, UNIQUE }
+    enum Check { NONE, ALL, EACH, UNIQUE, MAPCHECK }
 
     private static String[] map(String command, String lhs, String rhs) { return new String[] { command, lhs, rhs }; }
+
+    private static String[] always(String command, String lhs, String rhs) { return new String[] { command, lhs, rhs, "always" }; }
 
     /** Every extension Jasper has. */
     static final List<Extension> ALL = List.of(
@@ -74,7 +78,16 @@ final class Extensions {
             map("nmap", "[%", "<Plug>(MatchitNormalMultiBackward)"), map("nmap", "]%", "<Plug>(MatchitNormalMultiForward)"),
             map("xmap", "[%", "<Plug>(MatchitVisualMultiBackward)"), map("xmap", "]%", "<Plug>(MatchitVisualMultiForward)"),
             map("omap", "[%", "<Plug>(MatchitOperationMultiBackward)"), map("omap", "]%", "<Plug>(MatchitOperationMultiForward)"),
-            map("xmap", "a%", "<Plug>(MatchitVisualTextObject)"))));
+            map("xmap", "a%", "<Plug>(MatchitVisualTextObject)"))),
+        new Extension("sneak", "justinmk/vim-sneak", null, Check.MAPCHECK, List.of(
+            map("nmap", "s", "<Plug>Sneak_s"), map("nmap", "S", "<Plug>Sneak_S"), map("omap", "z", "<Plug>Sneak_s"),
+            map("omap", "Z", "<Plug>Sneak_S"), map("nmap", ";", "<Plug>Sneak_;"), map("omap", ";", "<Plug>Sneak_;"),
+            map("xmap", ";", "<Plug>Sneak_;"), map("nmap", ",", "<Plug>Sneak_,"), map("omap", ",", "<Plug>Sneak_,"),
+            map("xmap", ",", "<Plug>Sneak_,"), map("xmap", "s", "<Plug>Sneak_s"), map("xmap", "Z", "<Plug>Sneak_S"),
+            always("nmap", "<Plug>SneakForward", "<Plug>Sneak_s"), always("nmap", "<Plug>SneakBackward", "<Plug>Sneak_S"),
+            always("xmap", "<Plug>VSneakForward", "<Plug>Sneak_s"), always("xmap", "<Plug>VSneakBackward", "<Plug>Sneak_S"),
+            always("xmap", "<Plug>VSneakNext", "<Plug>Sneak_;"), always("xmap", "<Plug>VSneakPrevious", "<Plug>Sneak_,"),
+            always("map", "<Plug>SneakNext", "<Plug>Sneak_;"), always("map", "<Plug>SneakPrevious", "<Plug>Sneak_,"))));
 
     private final Vim vim;
     /** The default mappings each switched-on extension added. */
@@ -138,9 +151,16 @@ final class Extensions {
             // <unique>: the key is mapped already in the mode (E227 in Vim, which the plugin's loading shows).
             if (extension.check() == Check.UNIQUE && mappings.all().stream().anyMatch(existing -> (existing.modes & modes) != 0 && existing.lhs.equals(lhs)))
                 continue;
+            if (extension.check() == Check.MAPCHECK && !(m.length > 3 && m[3].equals("always")) && mappings.all().stream().anyMatch(existing ->
+                (existing.modes & modes) != 0 && (contains(existing.rhs, rhs) || startsWith(existing.lhs, lhs) || startsWith(lhs, existing.lhs))))
+                continue;
             made.add(ExMaps.define(mappings, modes, lhs, rhs, false, false));
         }
         return made;
+    }
+
+    private static boolean startsWith(List<KeyInput> keys, List<KeyInput> prefix) {
+        return keys.size() >= prefix.size() && keys.subList(0, prefix.size()).equals(prefix);
     }
 
     private static boolean contains(List<KeyInput> keys, List<KeyInput> part) {

@@ -16,12 +16,14 @@ final class Highlights {
     private final List<Object> tags = new ArrayList<>();
     private List<int[]> shown = List.of();
     private java.awt.Color yankColor;
+    /** The sneak plugin's Sneak highlight: magenta, light enough to read the text through. */
+    private static final java.awt.Color SNEAK = new java.awt.Color(255, 0, 255, 110);
 
     Highlights(VimTextArea area) { this.area = area; }
 
     /**
      * Draws the ranges ({@code [kind, start, end)} with kind 0 for Visual and incsearch, 1 for 'hlsearch' and 2 for
-     * a yank's highlight, in {@code yank} or else the selection colour).
+     * a yank's highlight, in {@code yank} or else the selection colour, 3 for sneak's matches).
      */
     void show(List<int[]> ranges, java.awt.Color yank) {
         if (same(ranges) && java.util.Objects.equals(yank, yankColor)) return;
@@ -32,11 +34,12 @@ final class Highlights {
         var selection = new SmartHighlightPainter(area.getSelectionColor());
         var search = new SmartHighlightPainter(area.getMarkAllHighlightColor());
         var yanked = yank == null ? selection : new SmartHighlightPainter(yank);
+        var sneak = new SmartHighlightPainter(SNEAK);
         int length = area.getDocument().getLength();
         for (int[] range : ranges) {
             int start = Math.min(range[1], length), end = Math.min(range[2], length);
             if (end <= start) continue;
-            try { tags.add(highlighter.addHighlight(start, end, range[0] == 0 ? selection : range[0] == 1 ? search : yanked)); }
+            try { tags.add(highlighter.addHighlight(start, end, range[0] == 0 ? selection : range[0] == 1 ? search : range[0] == 2 ? yanked : sneak)); }
             catch (BadLocationException ignored) { }
         }
         shown = ranges;

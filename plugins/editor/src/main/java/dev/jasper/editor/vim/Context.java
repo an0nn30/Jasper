@@ -14,6 +14,8 @@ final class Context {
     char register;
     /** The key read as the command's argument ({@code f}'s character), or null. */
     KeyInput argument;
+    /** The keys a motion read before it ran ({@link VimCommands#motionWithKeys}); empty otherwise. */
+    java.util.List<KeyInput> keys = java.util.List.of();
     /** The pending operator's keys ({@code d}, {@code gU}), or null in Normal mode. */
     String operator;
     /** The forced motion type after the operator: {@code v}, {@code V}, or 0. */

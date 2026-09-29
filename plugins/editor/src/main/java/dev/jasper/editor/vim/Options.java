@@ -69,6 +69,7 @@ public final class Options {
         new Def("sidescroll", "ss", Type.NUMBER, 0, false),
         new Def("sidescrolloff", "siso", Type.NUMBER, 0, false),
         new Def("smartcase", "scs", Type.BOOLEAN, false, false),
+        new Def("sneak", "sneak", Type.BOOLEAN, false, false),
         new Def("softtabstop", "sts", Type.NUMBER, 0, true),
         new Def("startofline", "sol", Type.BOOLEAN, true, false),
         new Def("surround", "surround", Type.BOOLEAN, false, false),

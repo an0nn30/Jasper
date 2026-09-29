@@ -48,10 +48,10 @@ final class Motions {
         commands.motion("B", "back to the start of the WORD", c -> backWord(c, true));
         commands.motion("ge", "back to the end of the previous word", c -> backEnd(c, false));
         commands.motion("gE", "back to the end of the previous WORD", c -> backEnd(c, true));
-        commands.motionWithChar("f", "to the {count}-th {char} to the right", c -> find(c, true, false, false, false));
-        commands.motionWithChar("F", "to the {count}-th {char} to the left", c -> find(c, false, false, false, false));
-        commands.motionWithChar("t", "till before the {count}-th {char} to the right", c -> find(c, true, true, false, false));
-        commands.motionWithChar("T", "till after the {count}-th {char} to the left", c -> find(c, false, true, false, false));
+        commands.motionWithChar("f", "to the {count}-th {char} to the right", c -> typedFind(c, true, false));
+        commands.motionWithChar("F", "to the {count}-th {char} to the left", c -> typedFind(c, false, false));
+        commands.motionWithChar("t", "till before the {count}-th {char} to the right", c -> typedFind(c, true, true));
+        commands.motionWithChar("T", "till after the {count}-th {char} to the left", c -> typedFind(c, false, true));
         commands.motion(";", "repeat the last f, F, t or T", c -> find(c, true, false, true, false));
         commands.motion(",", "repeat the last f, F, t or T the other way", c -> find(c, true, false, true, true));
         commands.motion("(", "back {count} sentences", c -> sentence(c, false));
@@ -219,6 +219,12 @@ final class Motions {
     static Target backEnd(Context c, boolean bigword) {
         Pos p = c.cursor();
         return c.walk(bigword).bckendWord(p, c.count, false) ? Target.inclusive(p) : null;
+    }
+
+    /** f, F, t and T typed: with sneak on, they take {@code ;} and {@code ,} back from it. */
+    private static Target typedFind(Context c, boolean forward, boolean till) {
+        Sneak.findTyped(c);
+        return find(c, forward, till, false, false);
     }
 
     /** searchc: f, F, t, T, ; and ,. */
