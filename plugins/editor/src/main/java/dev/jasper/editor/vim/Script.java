@@ -79,6 +79,23 @@ final class Script {
         return span.blockwise() ? "block" : span.linewise() ? "line" : "char";
     }
 
+    /**
+     * A text object's selection, as a plugin makes it from an omap's or xmap's {@code :call}: Visual mode from
+     * {@code head} to {@code tail} ({@code normal! V}, {@code cursor(head)}, {@code o}, {@code cursor(tail)}). After an
+     * operator, Vim then applies the operator to that Visual area, and so does the Machine.
+     *
+     * @param wise {@code v}, {@code V} or CTRL-V
+     * @return {@link TextObjects#VISUAL_DONE}
+     */
+    static Span select(Context c, String wise, Pos head, Pos tail) {
+        VimEditor editor = c.editor;
+        Mode mode = wise.equals("V") ? Mode.VISUAL_LINE : wise.equals("\u0016") ? Mode.VISUAL_BLOCK : Mode.VISUAL;
+        editor.visualAnchor(head.copy());
+        editor.mode(mode);
+        editor.setCursor(tail.copy(), true);
+        return TextObjects.VISUAL_DONE;
+    }
+
     /** @return v:register: the register typed, or {@code "} (the clipboard's with 'clipboard' holding unnamed) */
     static char register(Context c) {
         if (c.register != 0) return c.register;

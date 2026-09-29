@@ -352,6 +352,8 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>(ParagraphNextMotion)` (Normal) | forward [count] paragraphs, lines of white space ending them too (`}`, with `set vim-paragraph-motion`) |
 | `<Plug>(ParagraphPrevMotion)` (Normal) | back [count] paragraphs, lines of white space ending them too (`{`) |
 | `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
+| `<Plug>(textobj-entire-a)` (text object) | the whole text (`ae`, with `set textobj-entire`) |
+| `<Plug>(textobj-entire-i)` (text object) | the whole text but the empty lines at either end (`ie`) |
 | `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
 | `<Plug>VSurround` (Visual) | surround the Visual area with {char} (`S`) |
 | `<Plug>VgSurround` (Visual) | surround the Visual area with {char}, the other way about lines (`gS`) |

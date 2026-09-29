@@ -31,6 +31,8 @@ final class Machine {
     private String shorterKeys;
     /** For a Visual-mode change being recorded, the size of its area. */
     private Visual.Redo recordVisual, visualRedo;
+    /** Whether the Visual area an operator is about to act on is one an extension's object selected. */
+    private boolean objectArea;
     /** The command line typed for the motion being run ({@code /pattern}), or null. */
     private String line;
     private boolean recordingInsert, replaying, resumeReplace;
@@ -289,7 +291,8 @@ final class Machine {
         editor.visualAnchor(null);
         editor.mode(Mode.NORMAL);
         operator = operatorKeys;
-        visualRedo = range.redo();
+        visualRedo = objectArea ? null : range.redo();
+        objectArea = false;
         Span span = range.span();
         switch (operatorKeys) {
             case "J", "gJ", "r", "I", "A", "<C-a>", "<C-x>", "g<C-a>", "g<C-x>" -> {
@@ -373,7 +376,15 @@ final class Machine {
             case OBJECT -> {
                 Span span = ((VimCommands.TextObject) entry.handler()).select(context);
                 if (span == null) throw Context.fail();
-                applyOperator(context, span);
+                // An extension's object selects as its plugin's omap does, in Visual mode; the operator then acts
+                // on the Visual area, as do_pending_operator does when a mapping leaves Visual mode active: a forced
+                // CTRL-V makes the area a block (v and V are not applied to a Visual area), and as the operator
+                // ended with the mapping's : command, . runs the keys again rather than acting on as much text.
+                if (span == TextObjects.VISUAL_DONE && editor.mode().visual()) {
+                    if (forced == CTRL_V) editor.mode(Mode.VISUAL_BLOCK);
+                    objectArea = true;
+                    Visual.operate(context, operator, false);
+                } else applyOperator(context, span);
             }
             case ACTION -> {
                 if (entry.keys().equals(".")) {

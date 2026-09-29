@@ -71,6 +71,7 @@ public final class VimCommands {
         Surround.register(commands);
         Exchange.register(commands);
         ParagraphMotion.register(commands);
+        TextobjEntire.register(commands);
         return commands;
     }
 

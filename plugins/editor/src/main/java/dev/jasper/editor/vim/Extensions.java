@@ -54,7 +54,10 @@ final class Extensions {
         new Extension("vim-paragraph-motion", "dbakker/vim-paragraph-motion", null, Check.UNIQUE, List.of(
             map("nmap", "}", "<Plug>(ParagraphNextMotion)"), map("omap", "}", "<Plug>(ParagraphNextMotion)"),
             map("xmap", "}", "<Plug>(ParagraphNextMotion)"), map("nmap", "{", "<Plug>(ParagraphPrevMotion)"),
-            map("omap", "{", "<Plug>(ParagraphPrevMotion)"), map("xmap", "{", "<Plug>(ParagraphPrevMotion)"))));
+            map("omap", "{", "<Plug>(ParagraphPrevMotion)"), map("xmap", "{", "<Plug>(ParagraphPrevMotion)"))),
+        new Extension("textobj-entire", "kana/vim-textobj-entire", "textobj_entire_no_default_key_mappings", Check.UNIQUE, List.of(
+            map("xmap", "ae", "<Plug>(textobj-entire-a)"), map("omap", "ae", "<Plug>(textobj-entire-a)"),
+            map("xmap", "ie", "<Plug>(textobj-entire-i)"), map("omap", "ie", "<Plug>(textobj-entire-i)"))));
 
     private final Vim vim;
     /** The default mappings each switched-on extension added. */
