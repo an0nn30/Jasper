@@ -2,6 +2,12 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode: files without a final line break** (branch `fix/vim-final-break`, merged into local main
+  2026-09-28, not pushed): the corpus runs every case a second time on its text without a final line break, which
+  found empty last lines lost by `x`, `s`, `D`, `cc`, `S`, `o` and `==` (the case 093245f7 fixed for `<CR>`/`o`),
+  the empty text swallowing a put or opened line, and the cursor after undo there. `Buffer` keeps an empty last line
+  in every edit; Visual put over every line removes Vim's dummy line (ML_EMPTY); `empty-lines.case` (26 cases) was
+  recorded from Vim. `./gradlew check` 6,503 tests green.
 - **Merged `origin/main` (WSL shell profiles, ConPTY, SDK 0.9.1, Remote WSL group) into local main** (2026-09-28)
   after the Vim V3b/V4a work and two Vim fixes (branch `fix/vim-search-highlight`): `<Esc>` in Normal mode with
   nothing pending hides the 'hlsearch' matches like `:noh` (a divergence, in `docs/vim-divergences.md`), and `<CR>` or
