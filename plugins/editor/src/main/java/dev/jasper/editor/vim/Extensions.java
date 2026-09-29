@@ -57,11 +57,18 @@ final class Extensions {
             map("omap", "{", "<Plug>(ParagraphPrevMotion)"), map("xmap", "{", "<Plug>(ParagraphPrevMotion)"))),
         new Extension("textobj-entire", "kana/vim-textobj-entire", "textobj_entire_no_default_key_mappings", Check.UNIQUE, List.of(
             map("xmap", "ae", "<Plug>(textobj-entire-a)"), map("omap", "ae", "<Plug>(textobj-entire-a)"),
-            map("xmap", "ie", "<Plug>(textobj-entire-i)"), map("omap", "ie", "<Plug>(textobj-entire-i)"))));
+            map("xmap", "ie", "<Plug>(textobj-entire-i)"), map("omap", "ie", "<Plug>(textobj-entire-i)"))),
+        new Extension("textobj-indent", "michaeljsmith/vim-indent-object", null, Check.NONE, List.of(
+            map("omap", "ai", "<Plug>textobj-indent-ai"), map("omap", "ii", "<Plug>textobj-indent-ii"),
+            map("xmap", "ai", "<Plug>textobj-indent-ai"), map("xmap", "ii", "<Plug>textobj-indent-ii"),
+            map("omap", "aI", "<Plug>textobj-indent-aI"), map("omap", "iI", "<Plug>textobj-indent-iI"),
+            map("xmap", "aI", "<Plug>textobj-indent-aI"), map("xmap", "iI", "<Plug>textobj-indent-iI"))));
 
     private final Vim vim;
     /** The default mappings each switched-on extension added. */
     private final Map<String, List<Mapping>> added = new HashMap<>();
+    /** The extensions' script variables ({@code s:}), which last as long as Vim does. */
+    private final Map<Class<?>, Object> scripts = new HashMap<>();
 
     Extensions(Vim vim) { this.vim = vim; }
 
@@ -78,6 +85,9 @@ final class Extensions {
         String key = (parts[parts.length - 2] + "/" + parts[parts.length - 1]).toLowerCase(Locale.ROOT);
         return ALL.stream().filter(e -> e.repository().toLowerCase(Locale.ROOT).equals(key)).findFirst();
     }
+
+    /** @return an extension's script variables, made the first time */
+    <T> T script(Class<T> type, java.util.function.Supplier<T> make) { return type.cast(scripts.computeIfAbsent(type, key -> make.get())); }
 
     /** @return whether the extension whose switch this is is on */
     boolean on(String option) { return vim.options().flag(option); }

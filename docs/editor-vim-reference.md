@@ -354,6 +354,10 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
 | `<Plug>(textobj-entire-a)` (text object) | the whole text (`ae`, with `set textobj-entire`) |
 | `<Plug>(textobj-entire-i)` (text object) | the whole text but the empty lines at either end (`ie`) |
+| `<Plug>textobj-indent-ai` (text object) | the lines at the cursor's indent and deeper, and the line above (`ai`, with `set textobj-indent`) |
+| `<Plug>textobj-indent-aI` (text object) | the lines at the cursor's indent and deeper, and the lines above and below (`aI`) |
+| `<Plug>textobj-indent-ii` (text object) | the lines at the cursor's indent and deeper (`ii`) |
+| `<Plug>textobj-indent-iI` (text object) | the lines at the cursor's indent and deeper (`iI`) |
 | `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
 | `<Plug>VSurround` (Visual) | surround the Visual area with {char} (`S`) |
 | `<Plug>VgSurround` (Visual) | surround the Visual area with {char}, the other way about lines (`gS`) |

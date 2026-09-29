@@ -1,0 +1,1099 @@
+# textobj-indent (plan V4b): ii, ai, aI and iI, blocks of lines by indent.
+
+=== dii deletes the block
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,5
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== dai takes the line above
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 2,5
+expect-mode: normal
+expect-register ": l "    if x:\n        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "    if x:\n        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== daI takes the lines above and below
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: daI
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+  $
+  def g():
+      pass
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "    if x:\n        a = 1\n\n        b = 2\n    return a\n"
+expect-register 0: none
+expect-register 1: l "    if x:\n        a = 1\n\n        b = 2\n    return a\n"
+expect-register -: none
+
+=== diI is dii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: diI
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,5
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== dii over a blank line inside
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 5,9
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,5
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== dii on the outer block
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 2,5
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+  $
+  def g():
+      pass
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "    if x:\n        a = 1\n\n        b = 2\n    return a\n"
+expect-register 0: none
+expect-register 1: l "    if x:\n        a = 1\n\n        b = 2\n    return a\n"
+expect-register -: none
+
+=== dai on the outer block
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 6,5
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def g():
+      pass
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\n"
+expect-register 0: none
+expect-register 1: l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\n"
+expect-register -: none
+
+=== daI on the outer block
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 6,5
+ext: textobj-indent
+keys: daI
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+      pass
+expect-cursor: 1,5
+expect-mode: normal
+expect-register ": l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\ndef g():\n"
+expect-register 0: none
+expect-register 1: l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\ndef g():\n"
+expect-register -: none
+
+=== dii on a blank line in a block
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 4,1
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,5
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== dai on a blank line between blocks
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 7,1
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def g():
+      pass
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\n"
+expect-register 0: none
+expect-register 1: l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\n"
+expect-register -: none
+
+=== dii at the top level
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 1,1
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "def f():\n    if x:\n        a = 1\n"
+expect-register 0: none
+expect-register 1: l "def f():\n    if x:\n        a = 1\n"
+expect-register -: none
+
+=== dai at the top level
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 8,1
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+expect-cursor: 6,5
+expect-mode: normal
+expect-register ": l "\ndef g():\n    pass\n"
+expect-register 0: none
+expect-register 1: l "\ndef g():\n    pass\n"
+expect-register -: none
+
+=== dii at the top level with every level
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 1,1
+ext: textobj-indent
+let: g:indent_object_except_first_level = 0
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\ndef g():\n    pass\n"
+expect-register 0: none
+expect-register 1: l "def f():\n    if x:\n        a = 1\n\n        b = 2\n    return a\n\ndef g():\n    pass\n"
+expect-register -: none
+
+=== dai on the last line
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 9,5
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+expect-cursor: 7,1
+expect-mode: normal
+expect-register ": l "def g():\n    pass\n"
+expect-register 0: none
+expect-register 1: l "def g():\n    pass\n"
+expect-register -: none
+
+=== yii keeps the cursor at the start
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 5,9
+ext: textobj-indent
+keys: yii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: l "        a = 1\n\n        b = 2\n"
+expect-register 1: none
+expect-register -: none
+
+=== cii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: ciix<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+  x
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== >ii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: >ii
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+  		a = 1
+  $
+  		b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,3
+expect-mode: normal
+
+=== 2dii takes the enclosing block
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: 2dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,5
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== vii selects the block
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: vii
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 5,1
+expect-mode: visual-line
+expect-visual: 3,1
+
+=== vii then ii grows it
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: viiii
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 6,1
+expect-mode: visual-line
+expect-visual: 2,1
+
+=== vii then ii then ii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: viiiiii
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 6,1
+expect-mode: visual-line
+expect-visual: 1,1
+
+=== vai
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: vai
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 5,1
+expect-mode: visual-line
+expect-visual: 2,1
+
+=== vaI
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: vaI
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 6,1
+expect-mode: visual-line
+expect-visual: 2,1
+
+=== Vii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: Vii
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 5,1
+expect-mode: visual-line
+expect-visual: 3,1
+
+=== vii then d
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: viid
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,5
+expect-mode: normal
+expect-register ": l "        a = 1\n\n        b = 2\n"
+expect-register 0: none
+expect-register 1: l "        a = 1\n\n        b = 2\n"
+expect-register -: none
+
+=== v over two lines then ii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 2,5
+ext: textobj-indent
+keys: vjii
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 6,1
+expect-mode: visual-line
+expect-visual: 2,1
+
+=== v2ii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: v2ii
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 5,1
+expect-mode: visual-line
+expect-visual: 3,1
+
+=== dii with tabs
+text:
+  if a {
+  	if b {
+  		x
+  	}
+  }
+cursor: 3,3
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  if a {
+  	if b {
+  	}
+  }
+expect-cursor: 3,2
+expect-mode: normal
+expect-register ": l "\t\tx\n"
+expect-register 0: none
+expect-register 1: l "\t\tx\n"
+expect-register -: none
+
+=== dai with tabs
+text:
+  if a {
+  	if b {
+  		x
+  	}
+  }
+cursor: 3,3
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  if a {
+  	}
+  }
+expect-cursor: 2,2
+expect-mode: normal
+expect-register ": l "\tif b {\n\t\tx\n"
+expect-register 0: none
+expect-register 1: l "\tif b {\n\t\tx\n"
+expect-register -: none
+
+=== daI with tabs
+text:
+  if a {
+  	if b {
+  		x
+  	}
+  }
+cursor: 3,3
+ext: textobj-indent
+keys: daI
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  if a {
+  }
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "\tif b {\n\t\tx\n\t}\n"
+expect-register 0: none
+expect-register 1: l "\tif b {\n\t\tx\n\t}\n"
+expect-register -: none
+
+=== dii then dot
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: diij.
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  def f():
+  $
+  def g():
+      pass
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "    if x:\n    return a\n"
+expect-register 0: none
+expect-register 1: l "    if x:\n    return a\n"
+expect-register -: none
+
+=== dii then u
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: diiu
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 3,1
+expect-mode: normal
+
+=== dii on the one empty line
+text:
+  $
+cursor: 1,1
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "\n"
+expect-register 0: none
+expect-register 1: l "\n"
+expect-register -: none
+
+=== dai on the one empty line
+text:
+  $
+cursor: 1,1
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "\n"
+expect-register 0: none
+expect-register 1: l "\n"
+expect-register -: none
+
+=== vii on the one empty line
+text:
+  $
+cursor: 1,1
+ext: textobj-indent
+keys: vii
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: visual-line
+expect-visual: 1,1
+
+=== dii on one line
+text:
+  only
+cursor: 1,2
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "only\n"
+expect-register 0: none
+expect-register 1: l "only\n"
+expect-register -: none
+
+=== dii on the last line of a block at the end
+text:
+  a
+    b
+    c
+cursor: 3,3
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "  b\n  c\n"
+expect-register 0: none
+expect-register 1: l "  b\n  c\n"
+expect-register -: none
+
+=== dai on the last line of a block at the end
+text:
+  a
+    b
+    c
+cursor: 3,3
+ext: textobj-indent
+keys: dai
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "a\n  b\n  c\n"
+expect-register 0: none
+expect-register 1: l "a\n  b\n  c\n"
+expect-register -: none
+
+=== daI on the last line of a block at the end
+text:
+  a
+    b
+    c
+cursor: 3,3
+ext: textobj-indent
+keys: daI
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "a\n  b\n  c\n"
+expect-register 0: none
+expect-register 1: l "a\n  b\n  c\n"
+expect-register -: none
+
+=== dii on blank lines only
+text:
+  $
+    $
+  $
+cursor: 2,1
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "  \n"
+expect-register 0: none
+expect-register 1: l "  \n"
+expect-register -: none
+
+=== dii with a blank last line
+text:
+  a
+    b
+  $
+cursor: 2,3
+ext: textobj-indent
+keys: dii
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  a
+  $
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "  b\n"
+expect-register 0: none
+expect-register 1: l "  b\n"
+expect-register -: none
+
+=== gv after dii
+text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+cursor: 3,9
+ext: textobj-indent
+keys: yiigv
+--- vim 9.1
+expect-text:
+  def f():
+      if x:
+          a = 1
+  $
+          b = 2
+      return a
+  $
+  def g():
+      pass
+expect-cursor: 5,1
+expect-mode: visual-line
+expect-visual: 3,1

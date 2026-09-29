@@ -72,6 +72,7 @@ public final class VimCommands {
         Exchange.register(commands);
         ParagraphMotion.register(commands);
         TextobjEntire.register(commands);
+        TextobjIndent.register(commands);
         return commands;
     }
 

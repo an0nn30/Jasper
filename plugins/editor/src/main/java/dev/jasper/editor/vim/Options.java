@@ -72,6 +72,7 @@ public final class Options {
         new Def("syntax", "syn", Type.STRING, "", true),
         new Def("tabstop", "ts", Type.NUMBER, 8, true),
         new Def("textobj-entire", "textobj-entire", Type.BOOLEAN, false, false),
+        new Def("textobj-indent", "textobj-indent", Type.BOOLEAN, false, false),
         new Def("textwidth", "tw", Type.NUMBER, 0, true),
         new Def("tildeop", "top", Type.BOOLEAN, false, false),
         new Def("timeout", "to", Type.BOOLEAN, true, false),
