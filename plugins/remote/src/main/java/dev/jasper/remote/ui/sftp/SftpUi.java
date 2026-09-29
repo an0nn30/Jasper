@@ -172,44 +172,18 @@ public final class SftpUi implements AutoCloseable {
     private boolean stillShowing(View view,WindowHandle owner,SftpController.Capture capture) {
         return views.get(owner.id())==view && view.controller().capture().filter(now->now.identity().equals(capture.identity()) && now.directory().equals(capture.directory())).isPresent();
     }
-    /** Double-click or Enter on one file or link: a file opens in the Editor; a link opens when it leads to a file and navigates when it leads to a folder. */
-    private void activate(View view,FileEntry entry) {
-        var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;var capture=captured.orElseThrow();WindowHandle owner=view.host().window();
-        String path;try { path=FilePaths.child(capture.directory(),entry.name()); } catch(IOException invalid) { view.panel().error(invalid.getMessage());return; }
-        if(entry.kind()==FileEntry.Kind.FILE) { editing.open(capture.identity(),path,owner);return; }
-        editing.kinds(capture.identity(),List.of(path),owner).whenComplete((kinds,failure)->ui.execute(()-> {
-            if(closed || !owner.isOpen()) return;
-            if(failure!=null) { if(stillShowing(view,owner,capture)) view.panel().error(message(failure));return; }
-            var kind=kinds.getFirst();
-            if(kind.isEmpty()) { if(stillShowing(view,owner,capture)) view.panel().error(entry.name()+": its target does not exist"); }
-            else if(kind.orElseThrow()==FileEntry.Kind.FILE) editing.open(capture.identity(),path,owner);
-            else if(kind.orElseThrow()==FileEntry.Kind.DIRECTORY) { if(stillShowing(view,owner,capture)) view.controller().manual(path); }
-            else if(stillShowing(view,owner,capture)) view.panel().error(entry.name()+" is not a regular file");
-        }));
+    private EditorOpening.Browser browser(View view,WindowHandle owner) {
+        return new EditorOpening.Browser(ui,()->!closed && owner.isOpen(),capture->stillShowing(view,owner,capture),view.panel()::error,view.controller()::manual,()->{});
     }
-    /** Open in Editor: the selected files and links to files, at most {@link RemoteEditing#MAX_OPEN}. A failed link resolution still opens the selection's regular files. */
+    /** Double-click or Enter on one file or link; see {@link EditorOpening#activate}. */
+    private void activate(View view,FileEntry entry) {
+        var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;WindowHandle owner=view.host().window();
+        EditorOpening.activate(editing,browser(view,owner),captured.orElseThrow(),entry,owner);
+    }
+    /** Open in Editor on the selection; see {@link EditorOpening#openSelected}. */
     private void openSelected(View view) {
-        var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;var capture=captured.orElseThrow();WindowHandle owner=view.host().window();
-        var candidates=capture.selection().stream().filter(entry->entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK).toList();if(candidates.isEmpty()) return;
-        var paths=new ArrayList<String>();var links=new ArrayList<String>();
-        try { for(var entry:candidates) { String path=FilePaths.child(capture.directory(),entry.name());paths.add(path);if(entry.kind()==FileEntry.Kind.LINK) links.add(path); } }
-        catch(IOException invalid) { view.panel().error(invalid.getMessage());return; }
-        CompletableFuture<List<Optional<FileEntry.Kind>>> resolved=links.isEmpty()?CompletableFuture.completedFuture(List.of()):editing.kinds(capture.identity(),links,owner);
-        resolved.whenComplete((kinds,failure)->ui.execute(()-> {
-            if(closed || !owner.isOpen()) return;
-            var files=new ArrayList<String>();
-            if(failure==null) {
-                int link=0;
-                for(int i=0;i<candidates.size();i++) {
-                    if(candidates.get(i).kind()==FileEntry.Kind.FILE) files.add(paths.get(i));
-                    else if(kinds.get(link++).filter(kind->kind==FileEntry.Kind.FILE).isPresent()) files.add(paths.get(i));
-                }
-            } else for(int i=0;i<candidates.size();i++) if(candidates.get(i).kind()==FileEntry.Kind.FILE) files.add(paths.get(i));
-            for(String path:files.subList(0,Math.min(files.size(),RemoteEditing.MAX_OPEN))) editing.open(capture.identity(),path,owner);
-            if(!stillShowing(view,owner,capture)) return;
-            if(failure!=null) view.panel().error(message(failure));
-            else if(files.size()>RemoteEditing.MAX_OPEN) view.panel().error("Opened "+RemoteEditing.MAX_OPEN+" of "+files.size()+" files.");
-        }));
+        var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;WindowHandle owner=view.host().window();
+        EditorOpening.openSelected(editing,browser(view,owner),captured.orElseThrow(),owner);
     }
     private static String message(Throwable failure) { while((failure instanceof CompletionException || failure instanceof ExecutionException) && failure.getCause()!=null) failure=failure.getCause();return failure.getMessage()==null?"SFTP operation failed":failure.getMessage(); }
     @Override public void close() { if(closed) return;closed=true;for(var request:List.copyOf(browsing.values())) request.cancel(true);browsing.clear();for(var dialog:List.copyOf(dialogs)) dialog.close();for(var view:List.copyOf(views.values())) { view.controller().close();view.operations().close(); }views.clear(); }
