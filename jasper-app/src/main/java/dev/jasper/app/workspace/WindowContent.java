@@ -178,7 +178,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         chrome = new WindowChrome(this);
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
-        commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.ALL_ID, macOs);
+        commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs);
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
                 && SwingUtilities.isDescendingFrom(this, bindingRoot)
@@ -823,6 +823,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             rail.refreshTheme();
             regions.refreshTheme();
             regions.setTerminalBackground(theme.palette().background());
+            windowTabs.setPalette(theme.palette());
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 tab.setBackground(theme.palette().background());

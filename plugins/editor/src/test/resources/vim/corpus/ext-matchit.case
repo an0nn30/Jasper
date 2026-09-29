@@ -1,0 +1,1651 @@
+# matchit (plan V4c): %, g%, [%, ]% and a% over the words of a group.
+
+=== % on a parenthesis
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,6
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,13
+expect-mode: normal
+
+=== % on the closing parenthesis
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,13
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,6
+expect-mode: normal
+
+=== % on an inner parenthesis
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,10
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,12
+expect-mode: normal
+
+=== % before a parenthesis on the line
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,1
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,13
+expect-mode: normal
+
+=== % on a brace
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,15
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,15
+expect-mode: normal
+
+=== % on a comment start
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 3,3
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 3,8
+expect-mode: normal
+
+=== % on a comment end
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 3,8
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 3,3
+expect-mode: normal
+
+=== % on if goes to else
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 1,2
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 4,1
+expect-mode: normal
+
+=== % on else goes to endif
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 4,3
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 6,1
+expect-mode: normal
+
+=== % on endif goes back to if
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 6,1
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g% on if goes to endif
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 1,1
+ext: matchit
+keys: g%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 6,1
+expect-mode: normal
+
+=== g% on endif goes to else
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 6,3
+ext: matchit
+keys: g%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 4,1
+expect-mode: normal
+
+=== % where the line has no word
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 5,1
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 5,5
+expect-mode: normal
+
+=== % with a count goes to a line
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 1,1
+ext: matchit
+keys: 50%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 3,3
+expect-mode: normal
+
+=== backtick backtick after %
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,6
+ext: matchit
+keys: %``
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,6
+expect-mode: normal
+
+=== d% on a parenthesis
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,6
+ext: matchit
+keys: d%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int f {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,6
+expect-mode: normal
+expect-register ": c "(a, (b))"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "(a, (b))"
+
+=== d% on if takes the whole else
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 1,1
+ext: matchit
+keys: d%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+    g();
+  #endif
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "#if A\nint f(a, (b)) {\n  /* x */\n#else"
+expect-register 0: none
+expect-register 1: c "#if A\nint f(a, (b)) {\n  /* x */\n#else"
+expect-register -: none
+
+=== d% on endif
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 6,3
+ext: matchit
+keys: d%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  dif
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "#if A\nint f(a, (b)) {\n  /* x */\n#else\n  g();\n#en"
+expect-register 0: none
+expect-register 1: c "#if A\nint f(a, (b)) {\n  /* x */\n#else\n  g();\n#en"
+expect-register -: none
+
+=== dg% on endif
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 6,1
+ext: matchit
+keys: dg%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  endif
+expect-cursor: 4,1
+expect-mode: normal
+expect-register ": c "#else\n  g();\n#"
+expect-register 0: none
+expect-register 1: c "#else\n  g();\n#"
+expect-register -: none
+
+=== d% where nothing matches takes a character
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 5,3
+ext: matchit
+keys: d%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    ;
+  #endif
+expect-cursor: 5,3
+expect-mode: normal
+expect-register ": c "g()"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "g()"
+
+=== dv% on a parenthesis
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,6
+ext: matchit
+keys: dv%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int f {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,6
+expect-mode: normal
+expect-register ": c "(a, (b))"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "(a, (b))"
+
+=== dV% on if
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 1,1
+ext: matchit
+keys: dV%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+    g();
+  #endif
+expect-cursor: 1,3
+expect-mode: normal
+expect-register ": l "#if A\nint f(a, (b)) {\n  /* x */\n#else\n"
+expect-register 0: none
+expect-register 1: l "#if A\nint f(a, (b)) {\n  /* x */\n#else\n"
+expect-register -: none
+
+=== d CTRL-V % on a parenthesis
+text:
+  (ab
+  cd)
+cursor: 1,1
+ext: matchit
+keys: d<C-v>%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": b3 "(ab\ncd)"
+expect-register 0: none
+expect-register 1: b3 "(ab\ncd)"
+expect-register -: none
+
+=== y% keeps the cursor
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,6
+ext: matchit
+keys: y%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,6
+expect-mode: normal
+expect-register ": c "(a, (b))"
+expect-register 0: c "(a, (b))"
+expect-register 1: none
+expect-register -: none
+
+=== c% on a parenthesis
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,6
+ext: matchit
+keys: c%X<Esc>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int fX {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,6
+expect-mode: normal
+expect-register ": c "(a, (b))"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "(a, (b))"
+
+=== d% then dot
+text:
+  (a) (b)
+cursor: 1,1
+ext: matchit
+keys: d%x.
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  b)
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "("
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "("
+
+=== v% extends the area
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,6
+ext: matchit
+keys: v%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,13
+expect-mode: visual
+expect-visual: 2,6
+
+=== V% on if
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 1,1
+ext: matchit
+keys: V%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 4,1
+expect-mode: visual-line
+expect-visual: 1,1
+
+=== vg% on endif
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 6,1
+ext: matchit
+keys: vg%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 4,1
+expect-mode: visual
+expect-visual: 6,1
+
+=== [% goes to the enclosing start
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,11
+ext: matchit
+keys: [%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,10
+expect-mode: normal
+
+=== ]% goes to the enclosing end
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,8
+ext: matchit
+keys: ]%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,13
+expect-mode: normal
+
+=== [% in an if block
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 5,3
+ext: matchit
+keys: [%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 4,1
+expect-mode: normal
+
+=== ]% in an if block
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,1
+ext: matchit
+keys: ]%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,1
+expect-mode: normal
+
+=== 2[% goes out two levels
+text:
+  ((a) (b))
+cursor: 1,4
+ext: matchit
+keys: 2[%
+--- vim 9.1
+expect-text:
+  ((a) (b))
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d]% deletes to the end
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,8
+ext: matchit
+keys: d]%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,8
+expect-mode: normal
+expect-register ": c ", (b))"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c ", (b))"
+
+=== d[% deletes back to the start
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 2,11
+ext: matchit
+keys: d[%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, )) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 2,10
+expect-mode: normal
+expect-register ": c "(b"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "(b"
+
+=== Visual a% takes the group
+text:
+  x (a (b) c) y
+cursor: 1,7
+ext: matchit
+keys: va%
+--- vim 9.1
+expect-text:
+  x (a (b) c) y
+expect-cursor: 1,8
+expect-mode: visual
+expect-visual: 1,6
+
+=== Visual a% then d
+text:
+  x (a (b) c) y
+cursor: 1,7
+ext: matchit
+keys: va%d
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  x (a  c) y
+expect-cursor: 1,6
+expect-mode: normal
+expect-register ": c "(b)"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "(b)"
+
+=== % on the one empty line
+text:
+  $
+cursor: 1,1
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d% on the one empty line
+text:
+  $
+cursor: 1,1
+ext: matchit
+keys: d%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": none
+expect-register 0: none
+expect-register 1: none
+expect-register -: none
+
+=== % on the last line
+text:
+  x
+  (a)
+cursor: 2,1
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  x
+  (a)
+expect-cursor: 2,3
+expect-mode: normal
+
+=== d% on the last line
+text:
+  x
+  (a)
+cursor: 2,3
+ext: matchit
+keys: d%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  x
+  $
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": c "(a)"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "(a)"
+
+=== % with a bracket in matchpairs set
+text:
+  <a>
+cursor: 1,1
+ext: matchit
+keys: :set mps+=<:><CR>%
+--- vim 9.1
+expect-text:
+  <a>
+expect-cursor: 1,3
+expect-mode: normal
+
+=== % across lines
+text:
+  f(
+    a,
+  )
+cursor: 1,2
+ext: matchit
+keys: %
+--- vim 9.1
+expect-text:
+  f(
+    a,
+  )
+expect-cursor: 3,1
+expect-mode: normal
+
+=== the default mappings
+text:
+  a
+cursor: 1,1
+ext: matchit
+keys: :nmap %<CR>:omap ]%<CR>:xmap a%<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  %             <Plug>(MatchitNormalForward)
+  o  ]%            <Plug>(MatchitOperationMultiForward)
+  x  a%            <Plug>(MatchitVisualTextObject)
+
+=== no plugin maps
+text:
+  (a)
+cursor: 1,1
+ext: matchit
+let: g:no_plugin_maps = 1
+keys: %
+--- vim 9.1
+expect-text:
+  (a)
+expect-cursor: 1,3
+expect-mode: normal
+
+=== packadd matchit switches it on
+text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+cursor: 1,1
+keys: :packadd matchit<CR>%
+--- vim 9.1
+expect-text:
+  #if A
+  int f(a, (b)) {
+    /* x */
+  #else
+    g();
+  #endif
+expect-cursor: 4,1
+expect-mode: normal
+
+=== packadd of another package
+text:
+  a
+cursor: 1,1
+keys: :packadd nothing<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E919: Directory not found in 'packpath': "pack/*/opt/nothing"
+
+=== html % on a tag goes to its end tag
+text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+cursor: 1,2
+ext: matchit
+filetype: html
+keys: %
+--- vim 9.1
+expect-text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+expect-cursor: 4,2
+expect-mode: normal
+
+=== html % on the end tag goes back
+text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+cursor: 4,3
+ext: matchit
+filetype: html
+keys: %
+--- vim 9.1
+expect-text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+expect-cursor: 1,2
+expect-mode: normal
+
+=== html % on an inner tag
+text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+cursor: 2,4
+ext: matchit
+filetype: html
+keys: %
+--- vim 9.1
+expect-text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+expect-cursor: 2,17
+expect-mode: normal
+
+=== html % on a nested tag
+text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+cursor: 2,9
+ext: matchit
+filetype: html
+keys: %
+--- vim 9.1
+expect-text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+expect-cursor: 2,13
+expect-mode: normal
+
+=== html % on angle brackets
+text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+cursor: 1,1
+ext: matchit
+filetype: html
+keys: %
+--- vim 9.1
+expect-text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+expect-cursor: 1,15
+expect-mode: normal
+
+=== html d% on a tag
+text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+cursor: 2,3
+ext: matchit
+filetype: html
+keys: d%
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  <div class="a">
+    x <b>y</b></p>
+    <br/>
+  </div>
+expect-cursor: 2,3
+expect-mode: normal
+expect-register ": c "<p>"
+expect-register 0: none
+expect-register 1: none
+expect-register -: c "<p>"
+
+=== html [% in a tag
+text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+cursor: 2,8
+ext: matchit
+filetype: html
+keys: [%
+--- vim 9.1
+expect-text:
+  <div class="a">
+    <p>x <b>y</b></p>
+    <br/>
+  </div>
+expect-cursor: 2,3
+expect-mode: normal
+
+=== html % ignores case
+text:
+  <DIV>
+  </div>
+cursor: 1,2
+ext: matchit
+filetype: html
+keys: %
+--- vim 9.1
+expect-text:
+  <DIV>
+  </div>
+expect-cursor: 2,2
+expect-mode: normal
+
+=== sh % on if goes to elif
+text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+cursor: 1,1
+ext: matchit
+filetype: sh
+keys: %
+--- vim 9.1
+expect-text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+expect-cursor: 3,1
+expect-mode: normal
+
+=== sh % on elif goes to else
+text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+cursor: 3,1
+ext: matchit
+filetype: sh
+keys: %
+--- vim 9.1
+expect-text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+expect-cursor: 5,1
+expect-mode: normal
+
+=== sh % on else goes to fi
+text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+cursor: 5,1
+ext: matchit
+filetype: sh
+keys: %
+--- vim 9.1
+expect-text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+expect-cursor: 9,1
+expect-mode: normal
+
+=== sh % on fi goes to if
+text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+cursor: 9,1
+ext: matchit
+filetype: sh
+keys: %
+--- vim 9.1
+expect-text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sh % on for goes to done
+text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+cursor: 6,3
+ext: matchit
+filetype: sh
+keys: %
+--- vim 9.1
+expect-text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+expect-cursor: 8,3
+expect-mode: normal
+
+=== sh ]% from inside
+text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+cursor: 4,3
+ext: matchit
+filetype: sh
+keys: ]%
+--- vim 9.1
+expect-text:
+  if [ a ]; then
+    echo "if"
+  elif b; then
+    :
+  else
+    for x in y; do
+      :
+    done
+  fi
+expect-cursor: 5,1
+expect-mode: normal
+
+=== lua % on function
+text:
+  function f()
+    if a then
+      return 1
+    else
+    end
+  end
+cursor: 1,1
+ext: matchit
+filetype: lua
+keys: %
+--- vim 9.1
+expect-text:
+  function f()
+    if a then
+      return 1
+    else
+    end
+  end
+expect-cursor: 6,1
+expect-mode: normal
+
+=== lua % on if goes to else
+text:
+  function f()
+    if a then
+      return 1
+    else
+    end
+  end
+cursor: 2,3
+ext: matchit
+filetype: lua
+keys: %
+--- vim 9.1
+expect-text:
+  function f()
+    if a then
+      return 1
+    else
+    end
+  end
+expect-cursor: 3,5
+expect-mode: normal
+
+=== lua g% on end
+text:
+  function f()
+    if a then
+      return 1
+    else
+    end
+  end
+cursor: 6,1
+ext: matchit
+filetype: lua
+keys: g%
+--- vim 9.1
+expect-text:
+  function f()
+    if a then
+      return 1
+    else
+    end
+  end
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ruby % on def goes to end
+text:
+  def f
+    if x
+      y
+    end
+  end
+cursor: 1,1
+ext: matchit
+filetype: ruby
+keys: %
+--- vim 9.1
+expect-text:
+  def f
+    if x
+      y
+    end
+  end
+expect-cursor: 5,1
+expect-mode: normal
+
+=== ruby % on if goes to end
+text:
+  def f
+    if x
+      y
+    end
+  end
+cursor: 2,3
+ext: matchit
+filetype: ruby
+keys: %
+--- vim 9.1
+expect-text:
+  def f
+    if x
+      y
+    end
+  end
+expect-cursor: 4,3
+expect-mode: normal
+
+=== make % on ifeq
+text:
+  ifeq ($(A),1)
+  X = 1
+  else
+  X = 2
+  endif
+cursor: 1,1
+ext: matchit
+filetype: make
+keys: %
+--- vim 9.1
+expect-text:
+  ifeq ($(A),1)
+  X = 1
+  else
+  X = 2
+  endif
+expect-cursor: 3,1
+expect-mode: normal
+
+=== make % on else
+text:
+  ifeq ($(A),1)
+  X = 1
+  else
+  X = 2
+  endif
+cursor: 3,1
+ext: matchit
+filetype: make
+keys: %
+--- vim 9.1
+expect-text:
+  ifeq ($(A),1)
+  X = 1
+  else
+  X = 2
+  endif
+expect-cursor: 5,1
+expect-mode: normal
+
+=== tex % on begin goes to end
+text:
+  \begin{itemize}
+    \item a
+  \end{itemize}
+cursor: 1,2
+ext: matchit
+filetype: tex
+keys: %
+--- vim 9.1
+expect-text:
+  \begin{itemize}
+    \item a
+  \end{itemize}
+expect-cursor: 3,1
+expect-mode: normal
+
+=== tex % on end goes to begin
+text:
+  \begin{itemize}
+    \item a
+  \end{itemize}
+cursor: 3,2
+ext: matchit
+filetype: tex
+keys: %
+--- vim 9.1
+expect-text:
+  \begin{itemize}
+    \item a
+  \end{itemize}
+expect-cursor: 1,1
+expect-mode: normal
+
+=== c % passes a parenthesis in a string
+text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+cursor: 1,2
+ext: matchit
+filetype: c
+keys: %
+--- vim 9.1
+expect-text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+expect-cursor: 1,9
+expect-mode: normal
+
+=== c % passes a parenthesis in a comment
+text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+cursor: 2,2
+ext: matchit
+filetype: c
+keys: %
+--- vim 9.1
+expect-text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+expect-cursor: 2,12
+expect-mode: normal
+
+=== c % on a parenthesis in a string
+text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+cursor: 1,4
+ext: matchit
+filetype: c
+keys: %
+--- vim 9.1
+expect-text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+expect-cursor: 1,9
+expect-mode: normal
+
+=== c % on #if
+text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+cursor: 3,1
+ext: matchit
+filetype: c
+keys: %
+--- vim 9.1
+expect-text:
+  f("(", a);
+  g(/* ) */ b);
+  #if X
+  #endif
+expect-cursor: 4,1
+expect-mode: normal
+
+=== xml % on a tag
+text:
+  <a>
+    <b/>
+    <c x="1">t</c>
+  </a>
+cursor: 1,2
+ext: matchit
+filetype: xml
+keys: %
+--- vim 9.1
+expect-text:
+  <a>
+    <b/>
+    <c x="1">t</c>
+  </a>
+expect-cursor: 4,2
+expect-mode: normal
+
+=== xml % on a tag with attributes
+text:
+  <a>
+    <b/>
+    <c x="1">t</c>
+  </a>
+cursor: 3,4
+ext: matchit
+filetype: xml
+keys: %
+--- vim 9.1
+expect-text:
+  <a>
+    <b/>
+    <c x="1">t</c>
+  </a>
+expect-cursor: 3,14
+expect-mode: normal
+
+=== xml % on a self-closing tag
+text:
+  <a>
+    <b/>
+    <c x="1">t</c>
+  </a>
+cursor: 2,4
+ext: matchit
+filetype: xml
+keys: %
+--- vim 9.1
+expect-text:
+  <a>
+    <b/>
+    <c x="1">t</c>
+  </a>
+expect-cursor: 2,4
+expect-mode: normal

@@ -230,6 +230,11 @@ public final class RecordCorpus {
             plugins.add(oracle("repeat"));
             for (String extension : c.extensions()) {
                 String name = extension.toLowerCase(java.util.Locale.ROOT);
+                // A plugin that comes with Vim (matchit) is pinned as packadd: Vim's own copy is loaded.
+                if (pin(name)[0].equals("packadd")) {
+                    lines.add("packadd " + name);
+                    continue;
+                }
                 for (String needed : needs(name)) if (!plugins.contains(oracle(needed))) plugins.add(oracle(needed));
                 plugins.add(oracle(name));
             }
@@ -242,9 +247,12 @@ public final class RecordCorpus {
             String text = register.type().equals("l") && register.text().endsWith("\n") ? register.text().substring(0, register.text().length() - 1) : register.text();
             lines.add("call setreg(" + Json.quote(String.valueOf(entry.getKey())) + ", " + vimList(List.of(text.split("\n", -1))) + ", " + Json.quote(register.type()) + ")");
         }
+        // A filetype: the filetype plugin and syntax load as they do with filetype plugin on and syntax on.
+        if (c.filetype() != null) lines.add("filetype plugin on | syntax on");
         // Editing a file, rather than setline(), leaves no undo history for u to reach.
         lines.add("call writefile(" + vimList(c.text()) + ", " + Json.quote(file.toString()) + ")");
         lines.add("silent execute 'edit!' fnameescape(" + Json.quote(file.toString()) + ")");
+        if (c.filetype() != null) lines.add("set filetype=" + c.filetype());
         if (c.folds() != null) lines.addAll(foldCommands(c));
         lines.add("call setcursorcharpos(" + c.line() + ", " + c.col() + ")");
         lines.add("let g:jasper = {}");

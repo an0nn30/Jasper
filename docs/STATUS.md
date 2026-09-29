@@ -24,6 +24,25 @@
     - the homepage link;
     - icons in dark and light.
   - Deviations: see the plan's status banner. Not pushed; not merged.
+- **Editor Vim mode, plan V4c** (branch `claude/vim-v4c`, plan
+  `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4c.md`, written 2026-09-29): matchit, ported from Vim 9.1's matchit.vim (`%`, `g%`,
+  `[%`, `]%`, Visual `a%`; `set matchit`, `packadd matchit`), with the languages' `b:match_*` from Vim's filetype
+  plugins (`matchit-languages.tsv`); look-arounds and columns in Vim patterns (`\@<=`, `\%23c`), Vim script's string
+  functions (`VimStrings`) and searchpair(). The corpus gains `filetype:` (Vim loads the filetype plugin and syntax).
+  Every file in the plan was compiled and run against Vim 9.1 before the plan was written: 2164 corpus cases
+  (98 new), with and without a final line break.
+  - Executed inline on 2026-09-29 (9f85bd53..4ce02518): every step's expected result matched; `./gradlew check`
+    7,031 tests green.
+  - Merged into local main (fast-forward, after merging main twice: 7,050 tests green) on 2026-09-29; not pushed.
+  - Not done: GUI checks 104–109 of the [checklist](editor-verification.md) (user-run); plan V4d
+    (sneak); push.
+- **Palette recents and scope hints** (branch `claude/palette-recents`, bounded change agreed in chat 2026-09-29):
+  the empty palette shows the last two rows run (Recently used), then rows ranked by frecency (Most used), topped up
+  with scopes' own suggestions to ten; the scope prefixes are pills along the bottom edge (the mode list is gone).
+  Uses (scope, row, title, count, last) are saved in `command-history.toml` (version 2; version 1 still reads), at
+  most 50. SDK 0.9.2 adds `ScopeSpec.withInRecents`; History opts out (`sdk = ">=0.9.2, <0.10"`) and scopes out of
+  All are out too. Each hint pill shows the key that selects its scope (`>` for Commands, else the scope's own
+  shortcut). Merged into local main 2026-09-29; not pushed. Not done: GUI check of the pills and lists, push.
 - **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
   `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
   - **Centring:** the search field is always centred on the window, and the sides give way first.

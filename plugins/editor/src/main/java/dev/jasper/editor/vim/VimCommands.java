@@ -74,6 +74,7 @@ public final class VimCommands {
         TextobjEntire.register(commands);
         TextobjIndent.register(commands);
         Argtextobj.register(commands);
+        Matchit.register(commands);
         return commands;
     }
 

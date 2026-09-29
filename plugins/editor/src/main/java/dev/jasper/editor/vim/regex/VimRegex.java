@@ -331,7 +331,7 @@ public final class VimRegex {
                 case '*' -> result = group(atom) + "*";
                 case '+' -> result = group(atom) + "+";
                 case '=', '?' -> result = group(atom) + "?";
-                case '@' -> throw unsupported("\\@");
+                case '@' -> result = lookaround(atom);
                 default -> result = group(atom) + brace();
             }
             if (isMulti(peek())) throw error("E61: Nested " + (noMagic(peek()) == '*' ? "*" : "\\" + (char) noMagic(peek())));
@@ -343,6 +343,67 @@ public final class VimRegex {
         }
 
         private static String group(String atom) { return "(?:" + atom + ")"; }
+
+        /**
+         * The {@code \@} multis, after the {@code @}: {@code \@=} and {@code \@!} look ahead, {@code \@<=} and
+         * {@code \@<!} (with a byte limit, {@code \@12<=}, which Java does not need) look behind, {@code \@>} matches
+         * the atom as a whole.
+         */
+        String lookaround(String atom) {
+            while (Character.isDigit(at(pos))) pos++;
+            char kind = at(pos);
+            String java;
+            if (kind == '=' || kind == '!' || kind == '>') {
+                pos++;
+                java = kind == '=' ? "(?=" : kind == '!' ? "(?!" : "(?>";
+            } else if (kind == '<' && (at(pos + 1) == '=' || at(pos + 1) == '!')) {
+                java = at(pos + 1) == '=' ? "(?<=" : "(?<!";
+                pos += 2;
+                // Java looks behind only as far as it can count: repeats inside get a bound.
+                atom = bounded(atom);
+            } else throw error("E59: Invalid character after \\@");
+            resync();
+            return java + atom + ")";
+        }
+
+        /** How far a repeat inside a look-behind may reach. */
+        private static final int BEHIND = 1000;
+
+        /** A Java pattern whose unbounded repeats ({@code *}, {@code +}, {@code {n,}}) outside classes reach {@link #BEHIND}. */
+        static String bounded(String java) {
+            StringBuilder out = new StringBuilder();
+            int classes = 0;
+            for (int i = 0; i < java.length(); i++) {
+                char c = java.charAt(i);
+                if (c == '\\' && i + 1 < java.length()) {
+                    if (java.charAt(i + 1) == 'Q') {
+                        int end = java.indexOf("\\E", i + 2);
+                        end = end < 0 ? java.length() : end + 2;
+                        out.append(java, i, end);
+                        i = end - 1;
+                    } else {
+                        out.append(c).append(java.charAt(i + 1));
+                        i++;
+                    }
+                } else if (c == '[') {
+                    classes++;
+                    out.append(c);
+                } else if (c == ']' && classes > 0) {
+                    classes--;
+                    out.append(c);
+                } else if (classes == 0 && (c == '*' || c == '+') && i > 0 && java.charAt(i - 1) != '(') {
+                    out.append(c == '*' ? "{0," : "{1,").append(BEHIND).append('}');
+                } else if (classes == 0 && c == '{') {
+                    int close = java.indexOf('}', i);
+                    String inside = close < 0 ? "" : java.substring(i + 1, close);
+                    if (inside.matches("\\d+,")) {
+                        out.append('{').append(inside).append(BEHIND).append('}');
+                        i = close;
+                    } else out.append(c);
+                } else out.append(c);
+            }
+            return out.toString();
+        }
 
         /** read_limits: {@code \{n,m}}, {@code \{-n,m}} and the rest, after the brace. */
         String brace() {
@@ -507,11 +568,34 @@ public final class VimRegex {
                     return literal(Integer.parseInt(src.substring(start, pos), radix));
                 }
                 default -> {
+                    String column = column();
+                    if (column != null) return column;
                     int end = pos + 1;
                     while (end < src.length() && (Character.isDigit(src.charAt(end)) || "<>'.".indexOf(src.charAt(end)) >= 0)) end++;
                     throw unsupported("\\%" + src.substring(pos, Math.min(src.length(), Math.max(end, pos + 1) + (end > pos + 1 ? 1 : 0))));
                 }
             }
+        }
+
+        /**
+         * {@code \%23c}, {@code \%<23c} and {@code \%>23c}: the column, counted from 1, is 23, before it or after it.
+         * Jasper counts characters where Vim counts bytes, which differs only in lines with characters beyond ASCII.
+         *
+         * @return the Java pattern, or null when this is not a column item
+         */
+        String column() {
+            int p = pos;
+            char cmp = at(p);
+            if (cmp == '<' || cmp == '>') p++;
+            int start = p;
+            while (Character.isDigit(at(p))) p++;
+            if (p == start || at(p) != 'c') return null;
+            long n = Long.parseLong(src.substring(start, p));
+            pos = p + 1;
+            resync();
+            if (cmp == '<') return n <= 1 ? "(?!)" : "(?<=^.{0," + (n - 2) + "})";
+            if (cmp == '>') return n <= 0 ? "" : "(?<!^.{0," + (n - 1) + "})";
+            return n <= 0 ? "(?!)" : "(?<=^.{" + (n - 1) + "})";
         }
 
         /** \%[abc]: each of the atoms matches in turn, as far as they go. */

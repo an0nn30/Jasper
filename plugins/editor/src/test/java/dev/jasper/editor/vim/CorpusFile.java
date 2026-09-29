@@ -33,7 +33,7 @@ final class CorpusFile {
             }
             if (!line.startsWith("=== ")) throw error(file, i, "expected \"=== name\"");
             String name = line.substring(4).trim();
-            String divergent = null, set = "", ext = "", keys = null, window = null, folds = null;
+            String divergent = null, set = "", ext = "", keys = null, window = null, folds = null, filetype = null;
             boolean output = false;
             List<String> let = new ArrayList<>();
             Map<Character, CorpusCase.Register> given = new LinkedHashMap<>();
@@ -69,6 +69,7 @@ final class CorpusFile {
                     case "set" -> set = value;
                     case "ext" -> ext = value;
                     case "let" -> let.add(value);
+                    case "filetype" -> filetype = value;
                     case "window" -> window = value;
                     case "folds" -> folds = value;
                     case "output" -> output = value.equals("yes");
@@ -89,7 +90,7 @@ final class CorpusFile {
                 i++;
             }
             if (text == null || keys == null) throw error(file, i, "case \"" + name + "\" needs text: and keys:");
-            cases.add(new CorpusCase(file, name, divergent, set, ext, List.copyOf(let), given, text, cursorLine, cursorCol, keys, registers, window, folds, output, expected));
+            cases.add(new CorpusCase(file, name, divergent, set, ext, List.copyOf(let), filetype, given, text, cursorLine, cursorCol, keys, registers, window, folds, output, expected));
         }
         return cases;
     }

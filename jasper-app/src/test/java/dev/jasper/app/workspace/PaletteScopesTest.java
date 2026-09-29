@@ -27,6 +27,7 @@ class PaletteScopesTest {
         final List<Runnable> listeners = new ArrayList<>();
         int activations;
         boolean inAll = true;
+        boolean inRecents = true;
         List<PaletteRow> rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("beta", "Beta"));
         PaletteStep.Result stepResult = PaletteStep.Result.done();
         final List<Map<String, String>> completed = new ArrayList<>();
@@ -39,6 +40,7 @@ class PaletteScopesTest {
         @Override public String description() { return "Fixture scope"; }
         @Override public String placeholder() { return "Search fake"; }
         @Override public boolean inAll() { return inAll; }
+        @Override public boolean inRecents() { return inAll && inRecents; }
         @Override public List<PaletteVerb> verbs() {
             return List.of(new PaletteVerb("one", "One"), new PaletteVerb("two", "Two"), new PaletteVerb("three", "Three"));
         }
@@ -69,7 +71,7 @@ class PaletteScopesTest {
         }
     }
 
-    @Test void theCommandPaletteShortcutOpensTheModeListWithNoChip() throws Exception {
+    @Test void theCommandPaletteShortcutOpensSuggestionsWithScopeHintsAlongTheBottom() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
@@ -80,16 +82,49 @@ class PaletteScopesTest {
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
                 assertThat(PaletteTestSupport.chipText(card)).isNull();
                 assertThat(PaletteTestSupport.placeholder(card)).isEqualTo("Search everything");
-                assertThat(PaletteTestSupport.entries(card)).containsExactly("mode:" + PaletteScope.COMMANDS_ID, "mode:test.fake");
-                var mode = (dev.jasper.app.palette.PaletteEntry.Mode) PaletteTestSupport.entryList(card).getModel().getElementAt(1);
-                assertThat(mode.prefix()).isEqualTo("fake >");
-                var commands = (dev.jasper.app.palette.PaletteEntry.Mode) PaletteTestSupport.entryList(card).getModel().getElementAt(0);
-                assertThat(commands.prefix()).isEqualTo(">");
+                var entries = PaletteTestSupport.entries(card);
+                assertThat(entries.getFirst()).as("nothing used yet").isEqualTo("# Suggested");
+                assertThat(entries).contains("test.fake/alpha", "test.fake/beta").noneMatch(entry -> entry.startsWith("mode:"));
+                assertThat(PaletteTestSupport.scopeHints(card)).containsExactly("> commands", "fake >");
                 assertThat(fake.activations).isEqualTo(1);
                 card.queryField().setText("al");
                 assertThat(PaletteTestSupport.entries(card)).containsSubsequence("# Fake", "test.fake/alpha");
                 palette.toggle();
                 assertThat(palette.isOpen()).as("the shortcut closes it again").isFalse();
+            }
+        });
+    }
+
+    @Test void runRowsComeBackAsRecentlyAndMostUsedButOptedOutScopesNever() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                fake.rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("beta", "Beta"), PaletteRow.of("gamma", "Gamma"));
+                var quiet = new FakeScope() {
+                    @Override public String id() { return "test.quiet"; }
+                    @Override public String label() { return "Quiet"; }
+                };
+                quiet.inRecents = false;
+                owner.scopes().register(fake);
+                owner.scopes().register(quiet);
+                var palette = owner.commandPalette(); var card = palette.component();
+                for (String row : new String[] {"gamma", "gamma", "gamma", "beta", "alpha"}) {
+                    palette.open("test.fake"); card.queryField().setText("");
+                    PaletteTestSupport.selectRow(card, row); palette.enterPressed(0);
+                }
+                palette.open("test.quiet"); PaletteTestSupport.selectRow(card, "alpha"); palette.enterPressed(0);
+                assertThat(quiet.executed).containsExactly("alpha:one");
+                assertThat(palette.history().uses()).extracting(dev.jasper.app.commands.PaletteUse::scopeId).doesNotContain("test.quiet");
+                palette.toggle();
+                var entries = PaletteTestSupport.entries(card);
+                assertThat(entries.subList(0, 3)).containsExactly("# Recently used", "test.fake/alpha", "test.fake/beta");
+                assertThat(entries.subList(3, 5)).as("ranked by use, without repeating the recents").containsExactly("# Most used", "test.fake/gamma");
+                assertThat(entries).noneMatch(entry -> entry.startsWith("test.quiet/"));
+                fake.rows = List.of(PaletteRow.of("beta", "Beta"), PaletteRow.of("gamma", "Gamma"));
+                List.copyOf(fake.listeners).forEach(Runnable::run);
+                assertThat(PaletteTestSupport.entries(card)).as("a row that is gone drops out").doesNotContain("test.fake/alpha")
+                    .containsSubsequence("# Recently used", "test.fake/beta", "test.fake/gamma");
             }
         });
     }
@@ -116,16 +151,17 @@ class PaletteScopesTest {
                 assertThat(palette.backspacePressed()).isTrue();
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
                 assertThat(PaletteTestSupport.chipText(card)).isNull();
-                assertThat(PaletteTestSupport.entries(card)).first().isEqualTo("mode:" + PaletteScope.COMMANDS_ID);
+                assertThat(PaletteTestSupport.scopeHints(card)).as("hints return without a chip").isNotEmpty();
                 assertThat(palette.backspacePressed()).as("no chip to remove").isFalse();
                 card.queryField().setText(">");
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
                 assertThat(PaletteTestSupport.placeholder(card)).isEqualTo("Type a command");
                 card.queryField().setText("");
                 palette.backspacePressed();
-                PaletteTestSupport.selectRelative(card, 1);
-                palette.enterPressed(0);
-                assertThat(palette.activeScopeId()).as("a mode row sets its chip").isEqualTo("test.fake");
+                assertThat(PaletteTestSupport.scopeHints(card)).containsExactly("> commands", "fake >");
+                PaletteTestSupport.clickScopeHint(card, "fake >");
+                assertThat(palette.activeScopeId()).as("a hint sets its chip").isEqualTo("test.fake");
+                assertThat(PaletteTestSupport.scopeHints(card)).as("no hints under a chip").isEmpty();
                 assertThat(palette.isOpen()).isTrue();
                 assertThat(PaletteTestSupport.entries(card)).contains("test.fake/alpha");
             }
@@ -167,7 +203,8 @@ class PaletteScopesTest {
                 owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                assertThat(PaletteTestSupport.entries(card)).contains("mode:test.fake");
+                assertThat(PaletteTestSupport.scopeHints(card)).contains("fake >");
+                assertThat(PaletteTestSupport.entries(card)).as("no unprompted rows").noneMatch(entry -> entry.startsWith("test.fake/"));
                 card.queryField().setText("al");
                 assertThat(PaletteTestSupport.entries(card)).doesNotContain("# Fake").noneMatch(entry -> entry.startsWith("test.fake/"));
                 assertThat(fake.activations).as("All does not activate it").isZero();
@@ -362,7 +399,7 @@ class PaletteScopesTest {
                 palette.toggle();
                 var fake = new FakeScope();
                 var registration = owner.scopes().register(fake);
-                assertThat(PaletteTestSupport.entries(card)).contains("mode:test.fake");
+                assertThat(PaletteTestSupport.scopeHints(card)).contains("fake >");
                 card.queryField().setText("gam");
                 fake.rows = List.of(PaletteRow.of("gamma", "Gamma"));
                 List.copyOf(fake.listeners).forEach(Runnable::run);
@@ -371,7 +408,7 @@ class PaletteScopesTest {
                 assertThat(palette.isOpen()).as("All stays open").isTrue();
                 assertThat(PaletteTestSupport.entries(card)).doesNotContain("# Fake");
                 card.queryField().setText("");
-                assertThat(PaletteTestSupport.entries(card)).doesNotContain("mode:test.fake");
+                assertThat(PaletteTestSupport.scopeHints(card)).doesNotContain("fake >");
                 assertThat(fake.listeners).isEmpty();
             }
         });

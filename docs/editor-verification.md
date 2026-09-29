@@ -139,3 +139,12 @@ unverified.
 - [ ] 101. With `set highlightedyank`, `yiw` flashes the word for about a second; `let g:highlightedyank_highlight_duration = 300` makes it shorter, and `x` right after a yank clears it at once.
 - [ ] 102. `Plug 'kana/vim-textobj-entire'` (and the other plugins' `Plug` lines) in the vimrc switches the extension on.
 - [ ] 103. `u` after `dii`, `dae` and `dia` undoes each in one step, and `.` repeats them at the new cursor.
+
+## Vim mode (plan V4c)
+
+- [ ] 104. With `packadd matchit` in the vimrc, `%` on `<div>` in an HTML file goes to its `</div>`, and back.
+- [ ] 105. In a shell script, `%` goes from `if` to `elif`, `else` and `fi` in turn; `]%` inside the block goes to `fi`.
+- [ ] 106. In a C file, `%` on `(` passes a `)` inside a string or a comment.
+- [ ] 107. `d%` on `#if` deletes up to and including `#else`; `u` undoes it in one step.
+- [ ] 108. Visual `a%` on a word inside parentheses selects the parentheses and what is between them.
+- [ ] 109. `/\(foo\)\@<=bar` finds the `bar` of `foobar` and not a `bar` alone.

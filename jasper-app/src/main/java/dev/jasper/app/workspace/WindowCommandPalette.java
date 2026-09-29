@@ -27,9 +27,13 @@ final class WindowCommandPalette implements AutoCloseable {
         @Override public void componentMoved(ComponentEvent event) { layoutOverlay(); }
     };
 
-    WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, String defaultScopeId, boolean macOs) {
+    private final dev.jasper.app.commands.CommandHistory history;
+
+    WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history,
+                         String defaultScopeId, boolean macOs) {
+        this.history = history;
         this.owner = owner; this.defaultScopeId = defaultScopeId;
-        controller = new PaletteController(scopes, macOs, this::layoutOverlay, this::restoreAndHide,
+        controller = new PaletteController(scopes, history, macOs, this::layoutOverlay, this::restoreAndHide,
             owner::scopeShortcut, owner::updatingActions, owner::updateActions,
             message -> owner.onError.accept(message), this::open);
         palette = controller.component();
@@ -54,6 +58,7 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     PaletteController controller() { return controller; }
+    dev.jasper.app.commands.CommandHistory history() { return history; }
     void toggle() { open(defaultScopeId); }
     boolean hasScope(String id) { return controller.hasScope(id); }
         void open(String id) { open(id, null, null); }

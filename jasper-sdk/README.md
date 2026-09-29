@@ -57,6 +57,11 @@ updates display and `PaneInfo.remoteDirectory()` only; shell OSC 7 reports take 
 Reports before attachment, after exit/close, or from an old reconnect attempt are ignored.
 The hint never becomes a local `Path`, changes command history, or emits `CWD_CHANGED`.
 
+SDK 0.9.2 adds `ScopeSpec.withInRecents(false)`: a scope whose rows should appear only when the user
+searches, such as shell history, stays out of the recently and most used rows the empty palette offers
+(a scope out of All is out of these too). `FakePluginHost.scopesInRecents()` lists the scopes that take
+part.
+
 SDK 0.9.1 adds shell profiles: `Terminals.profiles()` lists the shells Jasper detected as
 `ShellProfileInfo` (PowerShell, Command Prompt and WSL distributions on Windows, the login shell
 elsewhere), `onProfilesChanged` fires after a shell detection completes with a changed list (Custom

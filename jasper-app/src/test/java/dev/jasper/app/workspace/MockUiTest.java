@@ -36,7 +36,7 @@ class MockUiTest {
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
                 assertThat(new Color(image.getRGB(650, toolbar - 1))).as("continuous header surface").isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 assertThat(image.getRGB(20, toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x25292e);
-                assertThat(new Color(image.getRGB(650, toolbar + tabs - 1))).as("quiet tab strip baseline").isEqualTo(UIManager.getColor("ToolWindow.background"));
+                assertThat(new Color(image.getRGB(650, toolbar + tabs - 1))).as("quiet tab strip baseline").isEqualTo(owner.theme().palette().background());
                 assertThat(new Color(image.getRGB(500, 940))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             }
         });

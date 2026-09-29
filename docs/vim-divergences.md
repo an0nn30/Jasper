@@ -24,7 +24,8 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 
 - **`=` re-indents simply.** Each line gets the previous non-blank line's indent, one 'shiftwidth' more for each
   bracket that line leaves open, and one less when the line starts with a closing bracket. Vim uses C-indenting.
-- **`%` matches brackets only.** Vim also jumps between `/*` and `*/` and between `#if`, `#else` and `#endif`.
+- **`%` matches brackets only.** Vim also jumps between `/*` and `*/` and between `#if`, `#else` and `#endif`;
+  with matchit switched on (`set matchit`, `packadd matchit`) Jasper does too.
 - **Typing goes through the Editor.** In Insert mode a typed character runs RSyntaxTextArea's typing, so when the Editor
   closes brackets and quotes as you type, typing `(` also types `)`. The corpus runs with that off.
 - **Tabs start from the Editor.** 'tabstop' and 'shiftwidth' start at the Editor's `tab_size`, 'expandtab' follows the
@@ -87,8 +88,10 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   font whose characters differ in width, a screen line can hold a different number of characters than Vim's would.
 - **`ga` shows no digraph.** Vim ends the line with the character's digraph; Jasper has no digraph table.
 - **Search patterns are translated.** `VimRegex` turns a Vim pattern into a Java one, and the corpus's `regex.case`
-  checks the result against Vim. `\%V`, `\%#`, the `\%23l`-style position atoms, `\@` look-around, `\z(` and
-  equivalence classes (`[[=a=]]`) report `E869`. Character classes such as `\w` and `[:alpha:]` are ASCII, as in Vim;
+  checks the result against Vim. `\%V`, `\%#`, the `\%23l` and `\%23v` position atoms, `\z(` and equivalence
+  classes (`[[=a=]]`) report `E869`. Columns (`\%23c`) count characters where Vim counts bytes, which differs only
+  in lines with characters beyond ASCII, and a repeat inside a look-behind (`\(a*\)\@<=`) reaches back at most 1000
+  characters. Character classes such as `\w` and `[:alpha:]` are ASCII, as in Vim;
   `\k` and `\<` follow 'iskeyword', treating every letter above U+00FF as a word character.
 - **The `'.` mark and the change list follow each typed character**, as when typing in Vim. Keys fed to Vim all at
   once (a mapping, `feedkeys()`) are inserted as one string, so there the mark stays at the insert's start.
@@ -151,3 +154,10 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   300), in IdeaVim's `g:highlightedyank_highlight_color` (`rgba(r, g, b, a)`) or else the colour of the incremental
   search's match; there are no `:HighlightedyankOn`, `Off` or `Toggle` commands and no buffer variables.
 - **textobj-entire** stays linewise after `dv` (`dvae`), as the plugin does in Vim 9.1, which has no v:motion_force.
+- **matchit** takes each language's `b:match_words`, `b:match_ignorecase`, `b:match_skip` and 'matchpairs'
+  additions from a table Vim 9.1's filetype plugins made (`matchit-languages.tsv`), by the tab's language; there are no
+  buffer variables to change them. A skip naming syntax groups reads the tab's tokens as `Comment`, `String`,
+  `Character` and `Regex`; a skip that is another Vim expression (the shell's, Ruby's, PHP's) skips comments and
+  strings. `:MatchEnable`, `:MatchDisable` and `:MatchDebug` are not there, and `g:no_plugin_maps` counts only when it
+  is not 0. 'matchpairs' gains the pairs the language's filetype plugin adds (`<:>` for HTML) whether matchit is on
+  or not.

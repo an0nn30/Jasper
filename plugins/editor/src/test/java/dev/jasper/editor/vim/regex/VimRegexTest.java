@@ -70,9 +70,23 @@ class VimRegexTest {
         assertThat(find("\\Cabc", "ABC abc", ic)).isEqualTo("abc");
     }
 
+    @Test void lookaroundsAndColumns() {
+        assertThat(find("foo\\(bar\\)\\@=", "foobaz foobar")).as("\\@= looks ahead").isEqualTo("foo");
+        assertThat(find("foo\\(bar\\)\\@!", "foobar foobaz")).isEqualTo("foo");
+        assertThat(find("\\(foo\\)\\@<=bar", "xbar foobar")).as("\\@<= looks behind").isEqualTo("bar");
+        assertThat(find("\\(foo\\)\\@1<!bar", "foobar xbar")).isEqualTo("bar");
+        assertThat(find("\\(a*\\)\\@>a", "aaa")).as("\\@> keeps what the atom matched").isNull();
+        assertThat(find("\\%3cx", "xxx")).as("the third column").isEqualTo("x");
+        assertThat(find("\\%<3cx.*", "xxxx")).isEqualTo("xxxx");
+        assertThat(find("\\%>2cx.*", "xxxx")).isEqualTo("xx");
+        assertThat(find("^.*\\%3c\\%(ab\\)", "xxab")).as("matchit's column anchors").isEqualTo("xxab");
+        assertThat(find("\\%(;\\s*\\|^\\s*\\)\\@<=if", "x; if")).as("repeats in a look-behind").isEqualTo("if");
+        assertThat(find("\\%(\\\\\\@1<!\\%(\\\\\\\\\\)*\\)\\@<=\\\\(", "a\\(b")).as("matchit's s:notslash behind").isEqualTo("\\(");
+    }
+
     @Test void errorsNameTheProblem() {
         assertThatThrownBy(() -> VimRegex.compile("a\\%Vb", PLAIN)).hasMessage("E869: Unsupported in Jasper's Vim regex: \\%V");
-        assertThatThrownBy(() -> VimRegex.compile("a\\@<=b", PLAIN)).hasMessage("E869: Unsupported in Jasper's Vim regex: \\@");
+        assertThatThrownBy(() -> VimRegex.compile("a\\@xb", PLAIN)).hasMessage("E59: Invalid character after \\@");
         assertThatThrownBy(() -> VimRegex.compile("a\\%23lb", PLAIN)).hasMessageStartingWith("E869: Unsupported in Jasper's Vim regex: \\%23l");
         assertThatThrownBy(() -> VimRegex.compile("\\(a", PLAIN)).hasMessage("E54: Unmatched \\(");
         assertThatThrownBy(() -> VimRegex.compile("a**", PLAIN)).hasMessage("E61: Nested *");

@@ -1,0 +1,334 @@
+# Lookarounds and column items in patterns (plan V4c).
+
+=== search with a lookahead
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /foo\(baz\)\@=<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 1,8
+expect-mode: normal
+
+=== search with a negative lookahead
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /foo\(bar\)\@!<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 1,8
+expect-mode: normal
+
+=== search with a lookbehind
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /\(foo\)\@<=bar<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 1,4
+expect-mode: normal
+
+=== search with a negative lookbehind
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /\(foo\)\@<!bar<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 2,2
+expect-mode: normal
+
+=== search with a lookbehind and a byte limit
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /\(foo\)\@3<=bar<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 1,4
+expect-mode: normal
+
+=== search backward with a lookbehind
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 4,1
+keys: ?\(foo\)\@<=ba.<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 2,9
+expect-mode: normal
+
+=== search with an atom as a whole
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /\(o*\)\@>b<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 1,2
+expect-mode: normal
+
+=== search in a column
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /\%5cabc<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 4,5
+expect-mode: normal
+
+=== search before a column
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 4,5
+keys: /\%<3cif<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 4,5
+expect-mode: normal
+
+=== search after a column
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /\%>4cabc<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 4,5
+expect-mode: normal
+
+=== search with a column and zs
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /^.*\%9c\zsabc<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 4,9
+expect-mode: normal
+
+=== lookbehind across a line break
+text:
+  a
+  b
+  ab
+cursor: 1,1
+keys: /\(a\n\)\@<=b<CR>
+--- vim 9.1
+expect-text:
+  a
+  b
+  ab
+expect-cursor: 2,1
+expect-mode: normal
+
+=== lookbehind at the start of a line
+text:
+  ab
+  b
+cursor: 1,1
+keys: /\(a\)\@<!b<CR>
+--- vim 9.1
+expect-text:
+  ab
+  b
+expect-cursor: 2,1
+expect-mode: normal
+
+=== substitute with a lookbehind
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: :%s/\(foo\)\@<=ba/BA/g<CR>
+--- vim 9.1
+expect-text:
+  fooBAr fooBAz
+  xbar fooBAr
+    if x then
+  abc abc abc
+expect-cursor: 2,1
+expect-mode: normal
+
+=== substitute after a column
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 4,1
+keys: :s/\%>4cabc/X/g<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc X X
+expect-cursor: 4,1
+expect-mode: normal
+
+=== substitute before a column
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 4,1
+keys: :s/\%<6cabc/X/g<CR>
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  X X abc
+expect-cursor: 4,1
+expect-mode: normal
+
+=== a column on the one empty line
+text:
+  $
+cursor: 1,1
+keys: /\%1c<CR>
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a lookahead on the last line
+text:
+  x
+  ab
+cursor: 1,1
+keys: /a\(b\)\@=<CR>
+--- vim 9.1
+expect-text:
+  x
+  ab
+expect-cursor: 2,1
+expect-mode: normal
+
+=== an invalid item after at
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: /a\@x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  /a\@x $
+  E59: Invalid character after \@
+
+=== d with a lookahead search
+text:
+  foobar foobaz
+  xbar foobar
+    if x then
+  abc abc abc
+cursor: 1,1
+keys: d/\(baz\)\@=<CR>
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  baz
+  xbar foobar
+    if x then
+  abc abc abc
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "foobar foo"
+expect-register 0: none
+expect-register 1: c "foobar foo"
+expect-register -: c "foobar foo"

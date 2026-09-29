@@ -209,6 +209,9 @@ final class Machine {
             "e", "E", "0", "^", "<S-Right>", "<C-Right>", "<S-Left>", "<C-Left>")) table.put(k, "hor");
         for (String k : List.of("(", ")", "{", "}", "[[", "]]", "[]", "][", "[(", "[{", "])", "]}")) table.put(k, "block");
         table.put("%", "percent");
+        // matchit's % and g% (its s:CleanUp opens folds with 'foldopen' holding percent).
+        for (String mode : List.of("Normal", "Visual"))
+            for (String way : List.of("Forward", "Backward")) table.put("<Plug>(Matchit" + mode + way + ")", "percent");
         for (String k : List.of("'", "`")) table.put(k, "mark");
         for (String k : List.of("/", "?", "n", "N", "*", "#", "g*", "g#")) table.put(k, "search");
         for (String k : List.of("G", "gg")) table.put(k, "jump");
@@ -500,7 +503,7 @@ final class Machine {
                 }
             }
         }
-        return new Span(start, end, kind, target.regOne(), null, false, adjusted);
+        return new Span(start, end, kind, target.regOne(), null, target.area(), adjusted);
     }
 
     /**

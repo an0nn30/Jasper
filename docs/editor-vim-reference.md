@@ -351,6 +351,18 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>(ExchangeClear)` (Normal) | forget the text marked for an exchange (`cxc`) |
 | `<Plug>(ParagraphNextMotion)` (Normal) | forward [count] paragraphs, lines of white space ending them too (`}`, with `set vim-paragraph-motion`) |
 | `<Plug>(ParagraphPrevMotion)` (Normal) | back [count] paragraphs, lines of white space ending them too (`{`) |
+| `<Plug>(MatchitNormalForward)` (Normal) | to the next word of the group at the cursor (`%`, with `set matchit` or `packadd matchit`) |
+| `<Plug>(MatchitNormalBackward)` (Normal) | to the previous word of the group at the cursor (`g%`) |
+| `<Plug>(MatchitNormalMultiBackward)` (Normal) | back to the start of the group around the cursor (`[%`) |
+| `<Plug>(MatchitNormalMultiForward)` (Normal) | on to the end of the group around the cursor (`]%`) |
+| `<Plug>(MatchitVisualForward)` (Normal) | to the next word of the group at the cursor (`%`, with `set matchit` or `packadd matchit`) |
+| `<Plug>(MatchitVisualBackward)` (Normal) | to the previous word of the group at the cursor (`g%`) |
+| `<Plug>(MatchitVisualMultiBackward)` (Normal) | back to the start of the group around the cursor (`[%`) |
+| `<Plug>(MatchitVisualMultiForward)` (Normal) | on to the end of the group around the cursor (`]%`) |
+| `<Plug>(MatchitOperationForward)` (Normal) | to the next word of the group at the cursor (`%`, with `set matchit` or `packadd matchit`) |
+| `<Plug>(MatchitOperationBackward)` (Normal) | to the previous word of the group at the cursor (`g%`) |
+| `<Plug>(MatchitOperationMultiBackward)` (Normal) | back to the start of the group around the cursor (`[%`) |
+| `<Plug>(MatchitOperationMultiForward)` (Normal) | on to the end of the group around the cursor (`]%`) |
 | `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
 | `<Plug>(textobj-entire-a)` (text object) | the whole text (`ae`, with `set textobj-entire`) |
 | `<Plug>(textobj-entire-i)` (text object) | the whole text but the empty lines at either end (`ie`) |
@@ -364,6 +376,7 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 | `<Plug>VSurround` (Visual) | surround the Visual area with {char} (`S`) |
 | `<Plug>VgSurround` (Visual) | surround the Visual area with {char}, the other way about lines (`gS`) |
 | `<Plug>(Exchange)` (Visual) | mark the Visual area for an exchange, or swap it (`X`) |
+| `<Plug>(MatchitVisualTextObject)` (Visual) | the group around the Visual area, from its start to its end (`a%`) |
 
 ## Ex commands
 
@@ -472,6 +485,7 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:mes[sages]` | the message history: errors, and the vimrc's skipped lines; `:messages clear` |
 | `:seth[andler]` | `:sethandler {key} {modes}:{vim\|ide} …`: who gets a key in each mode |
 | `:ac[tion]` | run the Editor command {id}, as `<Action>(id)` does in a mapping |
+| `:pa[ckadd]` | `packadd matchit`: switch on matchit (another package is not there) |
 | `:Pl[ug]` | `Plug 'tpope/vim-surround'`: switch on the extension Jasper emulates for the plugin; others are ignored |
 | `:actionl[ist]` | list the Editor's command ids, or those holding [text] |
 | `:sy[ntax]` | accepted and ignored: the Editor highlights by language |

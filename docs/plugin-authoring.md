@@ -111,7 +111,7 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
   `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.9.0, <0.10"`
-  (Remote `>=0.9.1, <0.10` for shell profiles; before 0.9, Vault needed `>=0.8.2` for icon meanings,
+  (Remote `>=0.9.1, <0.10` for shell profiles; History `>=0.9.2, <0.10` for `withInRecents`; before 0.9, Vault needed `>=0.8.2` for icon meanings,
   Remote `>=0.8.3` for remote directory hints and Editor `>=0.8.4` for `onCloseCommand`, quit guards
   and `chooseSaveFile`).
   Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
@@ -361,7 +361,8 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
 A scope is one kind of searchable thing in the command palette, beside Commands. Declare
 `palette.contribute`, register a `PaletteScope` through `context.palette()`, and the scope gets a tab
 in every window's palette and a section in its All tab (`withInAll(false)` keeps a scope, such as
-Vault's secrets, out of All). The spec is read once; its id must start
+Vault's secrets, out of All; `withInRecents(false)`, SDK 0.9.2, keeps its rows out of the recently and
+most used rows the empty palette offers, as History does, while they stay searchable). The spec is read once; its id must start
 with your plugin id. Search, `available`, `step` and `execute` run on the UI thread and must do no
 I/O: keep an index, refresh it in the background and tell the palette through the `onChanged`
 listener. Return at most `maxResults` rows. A verb may return a

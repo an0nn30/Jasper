@@ -6,9 +6,16 @@ Command Palette drops the palette from the field: the card covers the field, cen
 least 560 px wide. When the window is too narrow for the field, the palette opens centred near the
 top fifth of the window instead.
 
-The palette opens with no **scope chip**. An empty query lists the scopes (Commands, History,
-Snippets, SSH, Vault and any a plugin adds) with the prefix that selects each and its shortcut;
-choosing one sets its chip. Typing anything else searches every scope at once and groups the matches
+The palette opens with no **scope chip**. An empty query shows **Recently used**, the last two rows
+you ran from the palette, then **Most used**, rows ranked by how often and how recently you ran them,
+topped up with each scope's own suggestions (Commands' starters, …) until there are ten. History's
+shell commands and Vault's entries never appear here unprompted; they show once you type. A row
+that no longer exists (a deleted host or snippet) drops out. Uses are saved with the command
+history (`command-history.toml`, at most 50). Along the bottom edge, pills name each scope's
+prefix (`> commands`, `history >`, `snippets >`, `ssh >`, `vault >`); each pill also shows, as a key cap, the
+key that selects that scope from the keyboard: `>` for Commands, and each scope's own shortcut
+(Cmd+J Snippets, Cmd+R History, F8 Vault, Shift+Cmd+H SSH on macOS), which switches scope while the
+palette is open. Clicking a pill does the same. Typing anything else searches every scope at once and groups the matches
 under each scope's name, at most `palette.max_results` per scope; when a scope has more, a "More in
 <Scope>…" row sets that scope's chip with the query kept. Vault's secrets stay out of that search;
 its chip searches them.

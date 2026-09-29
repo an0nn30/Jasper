@@ -92,7 +92,7 @@ class WindowTabsTest {
                 assertThat(pixel(selected, middle, 6)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
                 for (var point : java.util.List.of(new Point(2, 4), new Point(middle, 0), new Point(middle, 37)))
                     assertThat(pixel(selected, point.x, point.y)).as("outside the rounded selection")
-                        .isEqualTo(UIManager.getColor("ToolWindow.background"));
+                        .isEqualTo(owner.theme().palette().background());
                 owner.setActive(false);
                 assertThat(pixel(selected, middle, 4)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBorderInactive"));
                 owner.setActive(true);
@@ -122,6 +122,39 @@ class WindowTabsTest {
                 }
             }
         });
+    }
+
+    @Test void stripSitsOnTheTerminalSurfaceWithReadableTitlesWhateverTheUiTheme() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
+            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+                owner.selectTheme(chrome);
+                for (var colors : dev.jasper.app.config.TerminalColors.values()) {
+                    owner.selectTerminalColors(colors);
+                    var palette = owner.theme().palette();
+                    var strip = owner.windowTabs(); layout(strip, 800, 38);
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo(palette.background());
+                    for (boolean active : new boolean[]{true, false}) {
+                        owner.setActive(active);
+                        Color text = named(strip, "select:other").getForeground();
+                        assertThat(contrast(text, palette.background())).as("%s UI, %s terminal, active %s", chrome, colors, active)
+                            .isGreaterThanOrEqualTo(3);
+                    }
+                }
+            }
+        });
+    }
+
+    private static double contrast(Color a, Color b) {
+        double first = luminance(a), second = luminance(b);
+        return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
+    }
+
+    private static double luminance(Color color) {
+        double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
+        for (int i = 0; i < rgb.length; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
+        return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
     }
 
     @Test void controlsRetainIdentityAcrossMetadataSelectionReorderAndTheme() throws Exception {
@@ -273,7 +306,7 @@ class WindowTabsTest {
         });
     }
 
-    @Test void overflowFadesOnlyClippedEdgesUsingTheActiveThemeSurface() throws Exception {
+    @Test void overflowFadesOnlyClippedEdgesIntoTheTerminalSurface() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             for (int i = 0; i < 5; i++) {
@@ -287,8 +320,8 @@ class WindowTabsTest {
                 var first = named(strip, "select:wide selected tab 0");
                 wheel(first, 0.5); layout(strip, 380, 38);
                 var viewport = first.getParent().getParent();
-                Color surface = UIManager.getColor("ToolWindow.background");
-                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the active surface").isEqualTo(surface);
+                Color surface = owner.theme().palette().background();
+                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the terminal surface").isEqualTo(surface);
                 assertThat(pixel(viewport, 24, 6)).as("selection beyond the fade is unchanged")
                     .isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
                 var output = java.nio.file.Path.of("build/render-preview");
@@ -391,7 +424,9 @@ class WindowTabsTest {
     private static BufferedImage render(Container entry) {
         var image = new BufferedImage(entry.getWidth(), entry.getHeight(), BufferedImage.TYPE_INT_RGB);
         var g = image.createGraphics();
-        g.setColor(UIManager.getColor("ToolWindow.background")); g.fillRect(0, 0, image.getWidth(), image.getHeight());
+        // The strip's parent paints the terminal surface behind its non-opaque tabs.
+        var strip = SwingUtilities.getAncestorOfClass(WindowTabs.class, entry);
+        g.setColor((strip != null ? strip : entry).getBackground()); g.fillRect(0, 0, image.getWidth(), image.getHeight());
         try { entry.paint(g); } finally { g.dispose(); }
         return image;
     }
