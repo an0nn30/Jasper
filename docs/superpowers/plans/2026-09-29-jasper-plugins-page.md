@@ -2,12 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-09-29 on `claude/settings-polish`; not executed.
+**Status:** Implemented on claude/settings-polish; ./gradlew check green, 6,860 tests, 0 failures (6 skipped).
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far:
 - Task 4: `PluginManagerPanel`'s private accessor is `cardList()`, not `list()`: `java.awt.Component` already has a
   `list()` method.
+- Task 6: the preview showed two problems, both fixed with tests updated first. A plugin waiting for review showed a
+  ticked checkbox and counted as enabled although it cannot run until reviewed; its checkbox is now unticked
+  (`PluginCard.checked`), and the group counts use the same rule. The homepage link shared a flowing line with the
+  vendor and was clipped when that line wrapped at 18 pt; it now has a line of its own.
 
 Scope notes (decided while writing this plan):
 - The ▾ menu keeps today's labels: "Open Settings", "Open Plugin Folder" and "Open Data Folder", then Remove…,

@@ -174,7 +174,7 @@ final class PluginCardList extends JPanel implements Scrollable {
             List<PluginRuntime.Row> members = rows.stream().filter(row -> row.origin().equals(origin))
                 .sorted(Comparator.comparing(PluginRuntime.Row::name, String.CASE_INSENSITIVE_ORDER)).toList();
             if (members.isEmpty()) continue;
-            long on = members.stream().filter(PluginRuntime.Row::enabled).count();
+            long on = members.stream().filter(PluginCard::checked).count();
             String title = switch (origin) {
                 case "Development" -> "Development";
                 case "Installed" -> "User-installed (" + on + " of " + members.size() + " enabled)";

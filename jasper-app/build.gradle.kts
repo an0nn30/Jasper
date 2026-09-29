@@ -101,6 +101,8 @@ tasks.register<JavaExec>("settingsPreview") {
     group = "verification"
     description = "Renders the Settings dialog headlessly into build/settings-preview."
     dependsOn(tasks.testClasses)
+    dependsOn(stagePlugins)
+    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
     classpath = sourceSets["test"].runtimeClasspath
     mainClass = "dev.jasper.app.settingsui.SettingsDialogPreview"
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")

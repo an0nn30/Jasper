@@ -49,10 +49,8 @@ final class PluginDetails extends JPanel {
         homepage.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
         more.setToolTipText("More actions");
         more.getAccessibleContext().setAccessibleName("More actions");
-        var line = new JPanel(new FlowLayout(FlowLayout.LEADING, 8, 0));
-        line.setOpaque(false);
-        line.add(vendor);
-        line.add(homepage);
+        homepage.setMargin(new java.awt.Insets(0, 0, 0, 0));
+        homepage.setHorizontalAlignment(javax.swing.SwingConstants.LEADING);
         var actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
         actions.setOpaque(false);
         actions.add(primary);
@@ -62,7 +60,8 @@ final class PluginDetails extends JPanel {
         var text = new JPanel();
         text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
         text.setOpaque(false);
-        for (JComponent part : List.of(name, line, actions)) {
+        // The homepage has a line of its own: beside a long vendor name it would wrap out of sight.
+        for (JComponent part : List.of(name, vendor, homepage, actions)) {
             part.setAlignmentX(0f);
             text.add(part);
             text.add(Box.createVerticalStrut(6));

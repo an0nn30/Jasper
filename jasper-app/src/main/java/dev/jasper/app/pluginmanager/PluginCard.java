@@ -43,12 +43,12 @@ final class PluginCard extends JPanel {
         enabled.setOpaque(false);
         // The list is one focus stop: Space toggles the selected card, so the checkbox takes no focus of its own.
         enabled.setFocusable(false);
-        enabled.setSelected(row.enabled());
+        enabled.setSelected(checked(row));
         enabled.getAccessibleContext().setAccessibleName("Enable " + row.name());
         if (!toggleable(row)) enabled.setToolTipText(!row.pending().isEmpty() ? row.pending()
             : !row.reason().isEmpty() ? row.reason() : "This plugin cannot be enabled or disabled here.");
         // The checkbox shows the snapshot's state; the next snapshot says whether anything changed.
-        enabled.addActionListener(event -> { enabled.setSelected(row.enabled()); toggle.run(); });
+        enabled.addActionListener(event -> { enabled.setSelected(checked(row)); toggle.run(); });
         add(enabled, BorderLayout.EAST);
         var mouse = new MouseAdapter() {
             @Override public void mousePressed(MouseEvent event) { select.run(); if (event.isPopupTrigger()) popup.accept(event); }
@@ -112,6 +112,9 @@ final class PluginCard extends JPanel {
     static boolean greyed(PluginRuntime.Row row) {
         return !row.enabled() || row.needsConsent() || row.state().equals("FAILED") || row.state().equals("SKIPPED");
     }
+
+    /** Whether the checkbox is ticked: enabled, and not waiting for a review before it can run. */
+    static boolean checked(PluginRuntime.Row row) { return row.enabled() && !row.needsConsent(); }
 
     /** Whether the checkbox can act: toggle it, or review it first. */
     static boolean toggleable(PluginRuntime.Row row) { return row.canToggle() || row.needsConsent(); }

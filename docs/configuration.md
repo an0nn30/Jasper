@@ -512,9 +512,11 @@ Reload Config; a file that fails to parse keeps its last good values and is repo
 Configuration status under `plugins.<id>`. Settings writes the file when you change a plugin's settings there,
 keeping its comments. Each plugin declares its settings: a value its declaration
 does not allow is reported with its line and the default is used, and a key the plugin does not declare is reported
-as unknown and ignored. Right-click a plugin in Settings › Plugins
-(File → Manage Plugins…) and choose Open Settings to go to its page in Settings (or to its file, when the plugin is
-not running). The sample plugin's example, for instance:
+as unknown and ignored.
+Settings › Plugins (File → Manage Plugins…) lists each plugin as a card, grouped as Development, User-installed and
+Bundled; tick or untick a card to enable or disable it (after a restart). Select a card for its details, and use the
+▾ menu beside Enable/Disable (or right-click the card) and choose Open Settings to go to its page in Settings (or to
+its file, when the plugin is not running). The sample plugin's example, for instance:
 
 ```toml
 # Settings for the sample plugin. Change them in Settings > Tools > Sample or here; each applies after Jasper restarts. Every demo is off until you set it.

@@ -62,8 +62,10 @@ class PluginCardListTest {
         list.card("a.on").enabled.doClick();
         assertThat(events).containsExactly("toggle:a.on");
         assertThat(list.card("a.on").enabled.isSelected()).as("what the snapshot says until the next one").isTrue();
+        assertThat(list.card("a.review").enabled.isSelected()).as("not running until reviewed").isFalse();
         list.card("a.review").enabled.doClick();
         assertThat(events).containsExactly("toggle:a.on", "toggle:a.review");
+        assertThat(list.card("a.review").enabled.isSelected()).isFalse();
         list.show(rows);
         assertThat(list.card("a.on").enabled.isSelected()).isTrue();
         assertThat(list.card("a.fixed").enabled.isEnabled()).isFalse();

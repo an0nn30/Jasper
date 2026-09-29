@@ -2,6 +2,28 @@
 
 ## Current state — 2026-09-28
 
+- **Settings fixes and the Plugins page** (`claude/settings-polish`, 2026-09-29; spec
+  `docs/superpowers/specs/2026-09-29-jasper-plugins-page-design.md`, plan
+  `docs/superpowers/plans/2026-09-29-jasper-plugins-page.md`):
+  - Settings fixes: the theme picker enables Apply again, since every dialog replays the theme when it opens, which
+    gave the editable combo a new editor field. Narrow pages no longer squash lists, tables and fields: descriptions
+    wrap, editors keep their size, and a page too narrow for its editors scrolls sideways.
+  - Settings › Plugins is IntelliJ-style: cards grouped Development, User-installed and Bundled, with icons, badges and
+    enable checkboxes, a search field and a gear menu (Install from Zip…), and a details pane with the icon, vendor,
+    homepage link, Enable/Disable or Review… with a ▾ menu, and Overview and Details tabs.
+  - `plugin.toml` gains optional `icon` and `homepage` (SDK 0.9.2); every bundled plugin ships an icon and requires
+    `>=0.9.2, <0.10`.
+  - `./gradlew check`: 6,860 tests, 0 failures, 6 skipped.
+  - GUI checks pending with the user:
+    - the theme picker enabling Apply;
+    - Terminal › Shell and Tools › Shell History at a narrow width;
+    - cards and groups;
+    - toggling from a card, and review from a checkbox;
+    - the ▾ and right-click menus;
+    - search;
+    - the homepage link;
+    - icons in dark and light.
+  - Deviations: see the plan's status banner. Not pushed; not merged.
 - **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
   `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
   - **Centring:** the search field is always centred on the window, and the sides give way first.
