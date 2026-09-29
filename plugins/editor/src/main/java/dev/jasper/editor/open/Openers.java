@@ -5,11 +5,16 @@ import dev.jasper.sdk.Subscription;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-/** The handlers {@code Editor.opener} registers, asked in registration order; one that throws counts as false. */
+/** The handlers {@code Editor.opener} registers, asked in registration order; one that throws is reported and counts as false. */
 public final class Openers {
     private final List<Predicate<OpenRequest>> handlers = new CopyOnWriteArrayList<>();
+    private final Consumer<RuntimeException> failed;
+
+    /** @param failed told each failure of a handler that threw */
+    public Openers(Consumer<RuntimeException> failed) { this.failed = Objects.requireNonNull(failed); }
 
     /**
      * @param handler answers a request; true when it handled it
@@ -27,7 +32,7 @@ public final class Openers {
     public boolean handle(OpenRequest request) {
         for (Predicate<OpenRequest> handler : handlers) {
             try { if (handler.test(request)) return true; }
-            catch (RuntimeException failure) { /* counts as false: the next handler, or the local chooser, answers */ }
+            catch (RuntimeException failure) { failed.accept(failure); /* the next handler, or the local chooser, answers */ }
         }
         return false;
     }
