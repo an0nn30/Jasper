@@ -5,6 +5,7 @@ import dev.jasper.sdk.WindowOwner;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /** Published by the Editor plugin with {@code Services.publish}. UI thread only. */
 public interface Editor {
@@ -45,6 +46,18 @@ public interface Editor {
      * @return removes the reopener
      */
     default Subscription reopener(String keyPrefix, Function<String, Optional<Function<WindowOwner, EditorDocument>>> resolve) {
+        return () -> { };
+    }
+
+    /**
+     * Lets a plugin answer Open in Editor… in its own way, for example by browsing a remote host. Handlers run on the
+     * UI thread in registration order before the local file chooser; the first to return true has handled the
+     * request. A handler that throws counts as false. Since Editor 0.5.0.
+     *
+     * @param handler answers a request; true when it handled it
+     * @return removes the handler
+     */
+    default Subscription opener(Predicate<OpenRequest> handler) {
         return () -> { };
     }
 }
