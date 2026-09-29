@@ -27,6 +27,11 @@ public interface PaletteScope {
     default boolean monospaceRows() { return false; }
     /** Whether a query with no chip (All) searches this scope too; true unless the scope opts out. */
     default boolean inAll() { return true; }
+    /**
+     * Whether the palette may offer this scope's rows before anything is typed, among the recently and most used
+     * items; a scope that stays out of All stays out of these too.
+     */
+    default boolean inRecents() { return inAll(); }
 
     /**
      * A contributed action whose shortcut, while the palette is open, switches to or dismisses this

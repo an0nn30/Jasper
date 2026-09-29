@@ -91,6 +91,7 @@ public final class CommandPalette extends JPanel {
     private final JPanel hintBar = new FixedHeightPanel(HINT_HEIGHT);
     private final JLabel hint = new JLabel();
     private final JPanel hintActions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 0, 0));
+    private final JPanel scopeHints = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, UIScale.scale((HINT_HEIGHT - 1 - 18) / 2)));
     private final List<Integer> hintVerbs = new ArrayList<>();
     private String listCard = "empty";
     private long resultCount;
@@ -165,6 +166,9 @@ public final class CommandPalette extends JPanel {
 
         hintActions.setOpaque(false);
         hintBar.setLayout(new BorderLayout());
+        scopeHints.setOpaque(false);
+        scopeHints.setVisible(false);
+        hintBar.add(scopeHints, BorderLayout.WEST);
         hintBar.add(hint, BorderLayout.CENTER);
         hintBar.add(hintActions, BorderLayout.EAST);
         add(hintBar, BorderLayout.SOUTH);
@@ -207,6 +211,46 @@ public final class CommandPalette extends JPanel {
         list.getAccessibleContext().setAccessibleName(name);
         fieldRow.revalidate();
         fieldRow.repaint();
+    }
+
+    /**
+     * The scopes shown as hints along the bottom edge, each its prefix on a pill that sets its chip; none hides them and
+     * shows the selected row's detail again.
+     */
+    void setScopeHints(List<PaletteScope> scopes) { setScopeHints(scopes, id -> null); }
+
+    /** As above; {@code shortcut} gives the key that opens a scope, shown in its hint's tooltip, or null. */
+    void setScopeHints(List<PaletteScope> scopes, java.util.function.Function<String, String> shortcut) {
+        scopeHints.removeAll();
+        for (PaletteScope scope : scopes) scopeHints.add(new HintPill(scope, shortcut.apply(scope.id())));
+        scopeHints.setVisible(!scopes.isEmpty());
+        hint.setVisible(scopes.isEmpty());
+        applyHintColors();
+        scopeHints.revalidate(); scopeHints.repaint();
+    }
+
+    List<String> scopeHintTexts() {
+        var texts = new ArrayList<String>();
+        for (Component pill : scopeHints.getComponents()) texts.add(((JLabel) pill).getText());
+        return texts;
+    }
+
+    /** The key each hint shows, in order: {@code >} for Commands, a scope's shortcut, or empty when it has none. */
+    List<String> scopeHintKeys() {
+        var keys = new ArrayList<String>();
+        for (Component pill : scopeHints.getComponents()) keys.add(((HintPill) pill).key);
+        return keys;
+    }
+
+    /** As a click on the hint reading {@code text}. */
+    void clickScopeHint(String text) {
+        for (Component pill : scopeHints.getComponents())
+            if (pill instanceof HintPill hint && hint.getText().equals(text)) chipTyped.accept(hint.scope);
+    }
+
+    /** A hint's text: the prefix that selects the scope, which for Commands also names it. */
+    static String hintText(PaletteScope scope) {
+        return PaletteScope.COMMANDS_ID.equals(scope.id()) ? "> commands" : scope.label().toLowerCase(Locale.ROOT) + " >";
     }
 
     /** The chip's label; null while no chip is set. */
@@ -472,7 +516,7 @@ public final class CommandPalette extends JPanel {
         } else if (entry instanceof PaletteEntry.More more) {
             text = "Show every match in " + more.scope().label();
             verbsDescription = keys(0) + " " + text;
-        } else if (entry instanceof PaletteEntry.Mode mode) text = mode.scope().description();
+        }
         hint.setText(text);
         list.getAccessibleContext().setAccessibleDescription(
             resultCount + " results" + (verbsDescription.isEmpty() ? "" : "; " + verbsDescription));
@@ -497,6 +541,10 @@ public final class CommandPalette extends JPanel {
     }
 
     private void applyHintColors() {
+        for (Component pill : scopeHints.getComponents()) {
+            pill.setForeground(advertiserForeground);
+            if (smallFont != null) pill.setFont(smallFont);
+        }
         for (Component action : hintActions.getComponents()) {
             action.setForeground(linkColor);
             if (smallFont != null) action.setFont(smallFont);
@@ -615,18 +663,6 @@ public final class CommandPalette extends JPanel {
                     tag.setFont(smallFont);
                     tag.setForeground(selected ? selectionForeground : infoForeground);
                 }
-                case PaletteEntry.Mode mode -> {
-                    icon.setIcon(mode.scope().icon());
-                    title.setText(mode.scope().label());
-                    title.setFont(font);
-                    title.setForeground(selected ? selectionForeground : foreground);
-                    detail.setText(mode.prefix());
-                    detail.setFont(font);
-                    detail.setForeground(selected ? selectionForeground : infoForeground);
-                    tag.setText(mode.shortcut());
-                    tag.setFont(smallFont);
-                    tag.setForeground(selected ? selectionForeground : infoForeground);
-                }
                 case PaletteEntry.More more -> {
                     title.setText("More in " + more.scope().label() + "…");
                     title.setFont(font);
@@ -720,6 +756,71 @@ public final class CommandPalette extends JPanel {
                     g.fillRoundRect(0, (getHeight() - height) / 2, getWidth(), height, height, height);
                 } finally { g.dispose(); }
             }
+            super.paintComponent(graphics);
+        }
+    }
+
+    /**
+     * One scope hint: its prefix and the key that selects it (a key cap: {@code >} for Commands, else the scope's own
+     * shortcut, which switches scope while the palette is open) on a rounded pill; a click sets the scope's chip.
+     */
+    private final class HintPill extends SizedLabel {
+        private static final int GAP = 6, CAP_PADDING = 4;
+        private final PaletteScope scope;
+        private final String key;
+
+        HintPill(PaletteScope scope, String shortcut) {
+            super(hintText(scope), 18);
+            this.scope = scope;
+            this.key = PaletteScope.COMMANDS_ID.equals(scope.id()) ? ">" : shortcut == null ? "" : shortcut;
+            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(7), 0, UIScale.scale(7) + capWidth()));
+            String tip = scope.description().isBlank() ? scope.label() : scope.description();
+            setToolTipText(key.isEmpty() ? tip : tip + " (" + key + ")");
+            getAccessibleContext().setAccessibleName("Search " + scope.label() + (key.isEmpty() ? "" : ", " + key));
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            addMouseListener(new MouseAdapter() {
+                @Override public void mousePressed(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) chipTyped.accept(scope); }
+            });
+        }
+
+        /** The key cap's width plus its gap from the text; zero without a key. */
+        private int capWidth() {
+            if (key.isEmpty()) return 0;
+            return UIScale.scale(GAP) + getFontMetrics(smallFont != null ? smallFont : getFont()).stringWidth(key) + 2 * UIScale.scale(CAP_PADDING);
+        }
+
+        @Override public void setFont(Font font) {
+            super.setFont(font);
+            // The key cap's room follows the font; the constructor's border predates the theme's font.
+            if (key != null) setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(7), 0, UIScale.scale(7) + capWidth()));
+        }
+
+        @Override public Dimension getPreferredSize() {
+            Dimension size = super.getPreferredSize();
+            return new Dimension(size.width + UIScale.scale(6), size.height);
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                int width = getWidth() - UIScale.scale(6), height = getHeight();
+                if (chipBackground != null) {
+                    g.setColor(chipBackground);
+                    g.fillRoundRect(0, 0, width, height, height, height);
+                }
+                if (!key.isEmpty()) {
+                    var metrics = g.getFontMetrics(getFont());
+                    int capWidth = metrics.stringWidth(key) + 2 * UIScale.scale(CAP_PADDING), capHeight = height - UIScale.scale(4);
+                    int x = width - UIScale.scale(7) - capWidth, y = (height - capHeight) / 2, arc = UIScale.scale(6);
+                    g.setColor(separatorColor != null ? separatorColor : getForeground());
+                    g.drawRoundRect(x, y, capWidth - 1, capHeight - 1, arc, arc);
+                    g.setFont(getFont());
+                    g.setColor(getForeground());
+                    g.drawString(key, x + UIScale.scale(CAP_PADDING), y + (capHeight - metrics.getHeight()) / 2 + metrics.getAscent());
+                }
+            } finally { g.dispose(); }
             super.paintComponent(graphics);
         }
     }

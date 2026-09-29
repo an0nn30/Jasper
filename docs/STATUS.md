@@ -2,6 +2,13 @@
 
 ## Current state — 2026-09-28
 
+- **Palette recents and scope hints** (branch `claude/palette-recents`, bounded change agreed in chat 2026-09-29):
+  the empty palette shows the last two rows run (Recently used), then rows ranked by frecency (Most used), topped up
+  with scopes' own suggestions to ten; the scope prefixes are pills along the bottom edge (the mode list is gone).
+  Uses (scope, row, title, count, last) are saved in `command-history.toml` (version 2; version 1 still reads), at
+  most 50. SDK 0.9.2 adds `ScopeSpec.withInRecents`; History opts out (`sdk = ">=0.9.2, <0.10"`) and scopes out of
+  All are out too. Each hint pill shows the key that selects its scope (`>` for Commands, else the scope's own
+  shortcut). Merged into local main 2026-09-29; not pushed. Not done: GUI check of the pills and lists, push.
 - **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
   `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
   - **Centring:** the search field is always centred on the window, and the sides give way first.

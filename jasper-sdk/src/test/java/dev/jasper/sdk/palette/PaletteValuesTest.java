@@ -16,6 +16,11 @@ class PaletteValuesTest {
         assertThat(spec.inAll()).isTrue();
         assertThat(spec.withInAll(false).inAll()).isFalse();
         assertThat(spec.withInAll(false).withDescription("x").inAll()).as("derivations keep the flag").isFalse();
+        assertThat(spec.inRecents()).as("offered unprompted unless it opts out").isTrue();
+        assertThat(spec.withInRecents(false).inRecents()).isFalse();
+        assertThat(spec.withInRecents(false).withIcon(null).withInAll(false).inRecents()).as("derivations keep the flag").isFalse();
+        assertThat(new ScopeSpec("dev.x.old", "Old", "", "Search", List.of(PASTE), false, Optional.empty(), Optional.empty(), true).inRecents())
+            .as("the 0.9.1 constructor still works").isTrue();
         assertThat(spec.description()).isEqualTo("All the things");
         assertThat(spec.shortcutActionId()).contains("dev.x.open");
         assertThat(spec.icon()).isEmpty();
@@ -62,6 +67,6 @@ class PaletteValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new PaletteQuery(null, Optional.empty(), 5, true));
         assertThat(Capabilities.PALETTE_CONTRIBUTE).isEqualTo("palette.contribute");
         assertThat(Capabilities.ALL).contains("palette.contribute");
-        assertThat(JasperSdk.VERSION).isEqualTo("0.9.1");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.9.2");
     }
 }
