@@ -64,7 +64,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private KeyboardFocusManager paletteFocusManager;
     private javax.swing.Timer paletteTailCleanup;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
-    private boolean unifiedHeader;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
@@ -195,12 +194,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         regions = new WorkspaceRegions(terminalColumn);
         regions.setStatusVisible(chrome.status().isVisible());
-        regions.setHeaderVisible(chrome.toolbar().isVisible());
+        regions.setHeaderVisible(true);
         rail = new WindowRail();
         rail.setVisible(false);
         var body = new JPanel(new BorderLayout());
         body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
-        add(chrome.toolbar(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
+        add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (terminals != null) terminals.tabSelected();
@@ -219,10 +218,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                                       Consumer<String> nativeTitle) {
         var bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
         if (bar != null) {
-            content.unifiedHeader = true;
-            content.regions.setHeaderVisible(true);
-            content.remove(content.toolbar());
-            bar.setToolbar(content.toolbar());
+            content.remove(content.chrome.header());
+            bar.setHeader(content.chrome.header(), java.util.List.of(content.chrome.header(), content.toolbar()));
         }
         content.onTitle = value -> {
             TerminalPane pane = content.currentPane();
@@ -232,9 +229,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
             nativeTitle.accept(context.label());
-            if (bar != null) {
-                bar.setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
-            }
+            content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
             content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
@@ -875,7 +870,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = mode; chrome.setToolbarMode(mode);
-        regions.setHeaderVisible(unifiedHeader || mode != ToolbarMode.HIDDEN);
         updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
     void setStatusVisible(boolean visible) {

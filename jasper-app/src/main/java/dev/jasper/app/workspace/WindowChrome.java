@@ -26,6 +26,8 @@ import javax.swing.event.MenuListener;
 final class WindowChrome {
     private final WindowContent owner;
     private final WindowToolbar toolbar;
+    private final TitleSearchField search;
+    private final WindowHeader header;
     private final WindowStatusBar status = new WindowStatusBar();
     private final JMenuBar menuBar = new JMenuBar();
     private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
@@ -47,6 +49,11 @@ final class WindowChrome {
         toolbar = new WindowToolbar(owner::updateActions);
         toolbar.setFloatable(false);
         toolbar.setBorder(BorderFactory.createEmptyBorder());
+        search = new TitleSearchField(() -> owner.action(ActionId.COMMAND_PALETTE).actionPerformed(
+            new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
+            () -> owner.scopeShortcut(dev.jasper.app.palette.PaletteScope.ALL_ID));
+        header = new WindowHeader(search, toolbar);
+        header.setOpaque(true);
         JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
@@ -89,6 +96,9 @@ final class WindowChrome {
         view.add(new JMenuItem(owner.windowCommands().view("view.window_settings")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
+        owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
+            if (Action.ACCELERATOR_KEY.equals(event.getPropertyName())) search.repaint();
+        });
     }
 
     /** IntelliJ grouping: tab and window, pane, plugin items, then Find and Settings, all packed right. */
@@ -420,6 +430,8 @@ final class WindowChrome {
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
+        header.setBackground(UIManager.getColor("Jasper.titleBackground"));
+        search.repaint();
         toolbar.setBackground(UIManager.getColor("Jasper.titleBackground"));
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
@@ -428,6 +440,8 @@ final class WindowChrome {
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }
+    WindowHeader header() { return header; }
+    TitleSearchField search() { return search; }
     void setToolbarHeight(int height) { toolbar.setBarHeight(height); }
     WindowStatusBar status() { return status; }
     JMenuBar menuBar() { return menuBar; }
