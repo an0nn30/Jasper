@@ -65,7 +65,7 @@ public final class CommandPalette extends JPanel {
     static final int HEADER_HEIGHT = 22;
     static final int HINT_HEIGHT = 26;
     static final int STEP_ROW_HEIGHT = 40;
-    static final int MAX_VISIBLE_LINES = 15;
+    private int visibleRows = dev.jasper.app.config.PaletteSettings.DEFAULT_VISIBLE_ROWS;
 
     private final boolean macOs;
     private final ObjIntConsumer<PaletteEntry> execute;
@@ -465,11 +465,19 @@ public final class CommandPalette extends JPanel {
         return new Dimension(UIScale.scale(WIDTH), UIScale.scale(height) + insets.top + insets.bottom);
     }
 
+    /** How many result rows the list shows before it scrolls; section headers among them add their own height. */
+    void setVisibleRows(int rows) { visibleRows = rows; revalidate(); }
+    int visibleRows() { return visibleRows; }
+
+    /** Tall enough for the first {@link #visibleRows} rows and the headers above them; the rest scroll. */
     private int listHeight() {
         if ("empty".equals(listCard)) return ROW_HEIGHT;
         int height = 0;
-        for (int i = 0; i < Math.min(model.size(), MAX_VISIBLE_LINES); i++)
-            height += model.get(i) instanceof PaletteEntry.Header ? HEADER_HEIGHT : ROW_HEIGHT;
+        for (int i = 0, rows = 0; i < model.size() && rows < visibleRows; i++) {
+            boolean header = model.get(i) instanceof PaletteEntry.Header;
+            height += header ? HEADER_HEIGHT : ROW_HEIGHT;
+            if (!header) rows++;
+        }
         return height;
     }
 

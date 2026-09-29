@@ -742,7 +742,7 @@ public final class JasperApplication {
             var editor = new dev.jasper.app.platform.ConfigEditor();
             pluginManager = new PluginManager(plugins, auxiliary, new PluginManager.Hooks(
                 surface -> shells.chooseFile(surface, "Install Plugin", ".zip"), flow, this::quit, residentControl, standaloneNotice, worker,
-                editor::open, editor::reveal));
+                editor::open, editor::reveal, this::browse));
         }
         return pluginManager;
     }

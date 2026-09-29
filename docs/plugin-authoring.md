@@ -19,12 +19,18 @@ entry = "dev.example.tool.ToolPlugin"
 sdk = ">=0.9, <0.10"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute
 exports = []                       # packages other plugins may use
+icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
+homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
 
 [[requires]]
 id = "dev.example.other"
 version = ">=1.0"
 optional = false
 ```
+
+`icon` and `homepage` need Jasper 0.9.3 or later (declare `sdk = ">=0.9.3, <0.10"`); an older Jasper rejects a
+manifest with keys it does not know. An icon that is missing, too large or not an SVG or PNG, and a homepage that is
+not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
@@ -104,8 +110,8 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
-  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.9.0, <0.10"`
-  (Remote `>=0.9.1, <0.10` for shell profiles; History `>=0.9.2, <0.10` for `withInRecents`; before 0.9, Vault needed `>=0.8.2` for icon meanings,
+  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.9.3, <0.10"` for their manifest
+  `icon` (Remote also needs 0.9.1 for shell profiles and History 0.9.2 for `withInRecents`; before 0.9, Vault needed `>=0.8.2` for icon meanings,
   Remote `>=0.8.3` for remote directory hints and Editor `>=0.8.4` for `onCloseCommand`, quit guards
   and `chooseSaveFile`).
   Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.

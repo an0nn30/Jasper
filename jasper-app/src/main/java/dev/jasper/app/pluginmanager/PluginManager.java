@@ -31,15 +31,17 @@ public final class PluginManager {
      * @param resident the resident process, probed for the standalone notice
      * @param standaloneNotice whether this process is a {@code --standalone} replacement that should say when a resident still runs
      * @param worker runs the blocking resident probe
+     * @param browse opens a plugin's homepage in the browser
      */
     public record Hooks(Function<AuxiliarySurface, Optional<Path>> chooseZip, RestartFlow restarts, Runnable quit,
                         ResidentControl resident, boolean standaloneNotice, Executor worker,
-                        java.util.function.Consumer<Path> openInEditor, java.util.function.Consumer<Path> reveal) {
+                        java.util.function.Consumer<Path> openInEditor, java.util.function.Consumer<Path> reveal,
+                        java.util.function.Consumer<java.net.URI> browse) {
         /** Rejects nulls. */
         public Hooks {
             Objects.requireNonNull(chooseZip); Objects.requireNonNull(restarts); Objects.requireNonNull(quit);
             Objects.requireNonNull(resident); Objects.requireNonNull(worker);
-            Objects.requireNonNull(openInEditor); Objects.requireNonNull(reveal);
+            Objects.requireNonNull(openInEditor); Objects.requireNonNull(reveal); Objects.requireNonNull(browse);
         }
     }
 
@@ -80,7 +82,7 @@ public final class PluginManager {
         this.host = Objects.requireNonNull(host);
         this.navigate = Objects.requireNonNull(navigate);
         panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall,
-            this::install, this::openSettings, this::openFolder, this::openData));
+            this::install, this::openSettings, this::openFolder, this::openData, hooks.browse()));
         panel.show(snapshot);
         renderBanner();
         return panel;

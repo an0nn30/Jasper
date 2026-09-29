@@ -1,12 +1,12 @@
 package dev.jasper.app.config;
 
-/** Validated palette result bound; immutable and safe to share across threads. */
-public record PaletteSettings(int maxResults) {
-    public static final int DEFAULT_MAX_RESULTS = 5;
-    public static final int MIN_MAX_RESULTS = 1;
-    public static final int MAX_MAX_RESULTS = 20;
+/** Validated palette list height in rows; immutable and safe to share across threads. */
+public record PaletteSettings(int visibleRows) {
+    public static final int DEFAULT_VISIBLE_ROWS = 5;
+    public static final int MIN_VISIBLE_ROWS = 1;
+    public static final int MAX_VISIBLE_ROWS = 20;
     public PaletteSettings {
-        if (maxResults < MIN_MAX_RESULTS || maxResults > MAX_MAX_RESULTS)
-            throw new IllegalArgumentException("Max results must be 1–20.");
+        if (visibleRows < MIN_VISIBLE_ROWS || visibleRows > MAX_VISIBLE_ROWS)
+            throw new IllegalArgumentException("Visible rows must be 1–20.");
     }
 }

@@ -145,4 +145,53 @@ class SchemaPageTest {
         assertThat(page.rows()).hasSize(1);
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.WINDOW_NATIVE_DECORATIONS.label());
     }
+
+    private static void layOut(java.awt.Component component) {
+        component.doLayout();
+        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) layOut(child);
+    }
+
+    private static List<javax.swing.JScrollPane> scrolls(java.awt.Component component) {
+        var found = new ArrayList<javax.swing.JScrollPane>();
+        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) {
+            if (child instanceof javax.swing.JScrollPane scroll) found.add(scroll); else found.addAll(scrolls(child));
+        }
+        return found;
+    }
+
+    @Test void aNarrowPageScrollsSidewaysRatherThanSquashingItsLists() {
+        var page = SchemaPage.page("shell", "Shell")
+            .row(CoreSettings.TERMINAL_SHELL_ARGS, Editors.textList())
+            .row(CoreSettings.TERMINAL_ENV, Editors.table())
+            .build(context);
+        var viewport = new javax.swing.JScrollPane(page.component());
+        for (int width : new int[]{300, 1400}) {
+            viewport.setSize(width, 900);
+            layOut(viewport);
+            assertThat(scrolls(page.component())).as("at " + width + " px").hasSize(2)
+                .allSatisfy(scroll -> assertThat(scroll.getSize()).isEqualTo(scroll.getPreferredSize()));
+        }
+        viewport.setSize(300, 900);
+        layOut(viewport);
+        assertThat(((javax.swing.Scrollable) page.component()).getScrollableTracksViewportWidth()).as("scrolls sideways").isFalse();
+        viewport.setSize(1400, 900);
+        layOut(viewport);
+        assertThat(((javax.swing.Scrollable) page.component()).getScrollableTracksViewportWidth()).isTrue();
+    }
+
+    @Test void aLongDescriptionWrapsInsteadOfWideningThePage() {
+        int plain = SchemaPage.page("a", "A").row(CoreSettings.TERMINAL_FONT_FAMILY, Editors.text()).note("Short.")
+            .build(context).component().getPreferredSize().width;
+        var page = SchemaPage.page("b", "B").row(CoreSettings.TERMINAL_FONT_FAMILY, Editors.text())
+            .note("A long description that goes on and on, ".repeat(12)).build(context);
+        assertThat(page.component().getPreferredSize().width).isEqualTo(plain);
+        var viewport = new javax.swing.JScrollPane(page.component());
+        viewport.setSize(500, 900);
+        layOut(viewport);
+        layOut(viewport);
+        var comment = page.rows().get(0).comment();
+        assertThat(comment.getWidth()).isLessThanOrEqualTo(500);
+        assertThat(comment.getHeight()).as("several lines").isGreaterThan(3 * comment.getFontMetrics(comment.getFont()).getHeight());
+    }
+
 }

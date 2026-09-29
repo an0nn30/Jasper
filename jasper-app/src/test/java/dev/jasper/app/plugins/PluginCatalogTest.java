@@ -14,7 +14,7 @@ class PluginCatalogTest {
     private static PluginCandidate plugin(String id, String version, PluginCandidate.Origin origin, String... capabilities) {
         var descriptor = new PluginDescriptor(id, id.substring(id.lastIndexOf('.') + 1), Version.parse(version), "fix.Main",
             VersionRange.parse(">=0.1"), "Does " + id, "Example", Set.of(capabilities), Set.of(),
-            List.of(new PluginDescriptor.Requirement("dev.example.base", VersionRange.parse(">=1.0"), true)));
+            List.of(new PluginDescriptor.Requirement("dev.example.base", VersionRange.parse(">=1.0"), true)), "", "");
         return new PluginCandidate(descriptor, Path.of("/plugins").resolve(id), List.of(), origin);
     }
 

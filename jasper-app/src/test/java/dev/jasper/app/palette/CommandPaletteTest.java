@@ -255,14 +255,23 @@ class CommandPaletteTest {
         });
     }
 
-    @Test void theListScrollsPastFifteenLines() throws Exception {
+    @Test void theListShowsTheVisibleRowsAndScrollsToTheRest() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var palette = palette(new ArrayList<>());
             var rows = new ArrayList<PaletteEntry>();
             for (int i = 0; i < 30; i++) rows.add(item(HISTORY, "r" + i));
             palette.setEntries(rows, null, null);
             Insets insets = palette.getInsets();
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 15 * 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.visibleRows()).as("five by default").isEqualTo(5);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 5 * 24 + 26) + insets.top + insets.bottom);
+            palette.setEntries(List.of(new PaletteEntry.Header("History"), item(HISTORY, "a"), item(HISTORY, "b"),
+                new PaletteEntry.Header("Commands"), item(COMMANDS, "c"), item(COMMANDS, "d"), item(COMMANDS, "e"),
+                item(COMMANDS, "f")), null, null);
+            assertThat(palette.getPreferredSize().height).as("headers above the fifth row add their own height")
+                .isEqualTo(UIScale.scale(44 + 2 * 22 + 5 * 24 + 26) + insets.top + insets.bottom);
+            palette.setVisibleRows(8);
+            palette.setEntries(rows, null, null);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(44 + 8 * 24 + 26) + insets.top + insets.bottom);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             palette.selectRelative(29);

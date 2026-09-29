@@ -1,9 +1,10 @@
 id = "dev.jasper.snippets"
 name = "Snippets"
-version = "0.2.0"
+version = "0.2.1"
 entry = "dev.jasper.snippets.SnippetsPlugin"
-sdk = ">=0.9.0, <0.10"
+sdk = ">=0.9.3, <0.10"
 description = "Saved commands in the command palette: paste, paste and run, fill in placeholders, edit snippets.toml."
 vendor = "Jasper"
+icon = "icons/snippets.svg"
 capabilities = ["palette.contribute", "terminal.inject"]
 exports = ["dev.jasper.snippets.api"]

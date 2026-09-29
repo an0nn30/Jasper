@@ -64,7 +64,7 @@ class PluginManagerTest {
             var flow = new RestartFlow(control, mode -> { restarts.add(mode); return true; }, Runnable::run, Runnable::run,
                 Duration.ofMillis(20), Duration.ofMillis(1));
             manager = new PluginManager(runtime, windows, new PluginManager.Hooks(surface -> Optional.ofNullable(chosenZip), flow,
-                () -> quits.add("quit"), control, standaloneNotice, Runnable::run, edited::add, revealed::add));
+                () -> quits.add("quit"), control, standaloneNotice, Runnable::run, edited::add, revealed::add, uri -> { }));
         });
     }
 
@@ -110,7 +110,7 @@ class PluginManagerTest {
             assertThat(page.id()).isEqualTo("plugins");
             assertThat(page.modified()).isFalse();
             assertThat(manager.panel().bannerText()).isEmpty();
-            manager.panel().install.doClick();
+            manager.panel().clickGear("Install from Zip\u2026");
         });
         until(() -> manager.consent() != null);
         edt(() -> {
@@ -122,7 +122,7 @@ class PluginManagerTest {
         edt(() -> {
             assertThat(windows.open()).hasSize(1);
             assertThat(manager.consent()).isNull();
-            assertThat(manager.panel().listed()).containsExactly("dev.example.zipped  1.0.0 — Not loaded yet (restart to apply)");
+            assertThat(manager.panel().listed()).containsExactly("dev.example.zipped  1.0.0 \u2014 Install at restart");
             assertThat(manager.panel().messageText()).isEqualTo("dev.example.zipped 1.0.0 will be installed when Jasper restarts.");
             assertThat(manager.panel().bannerText()).isEqualTo("Restart Jasper to apply your changes.");
             assertThat(bannerButtons()).containsExactly("Restart Now");
@@ -137,7 +137,7 @@ class PluginManagerTest {
         chosenZip = zipOf("dev.example.zipped", "1.0.0", "");
         open();
         until(() -> manager.panel().details().contains("No plugins"));
-        edt(() -> manager.panel().install.doClick());
+        edt(() -> manager.panel().clickGear("Install from Zip\u2026"));
         until(() -> manager.consent() != null);
         edt(() -> manager.consent().cancel.doClick());
         until(() -> {
@@ -148,12 +148,12 @@ class PluginManagerTest {
 
         Files.writeString(root.resolve("bad.zip"), "not a zip");
         chosenZip = root.resolve("bad.zip");
-        edt(() -> manager.panel().install.doClick());
+        edt(() -> manager.panel().clickGear("Install from Zip\u2026"));
         until(() -> !manager.panel().messageText().isEmpty());
         edt(() -> assertThat(manager.panel().messageText()).contains("could not be read"));
 
         chosenZip = null;
-        edt(() -> manager.panel().install.doClick());
+        edt(() -> manager.panel().clickGear("Install from Zip\u2026"));
         edt(() -> assertThat(manager.consent()).as("cancelling the file dialog does nothing").isNull());
     }
 
@@ -164,8 +164,8 @@ class PluginManagerTest {
         open();
         until(() -> manager.panel().listed().size() == 1);
         edt(() -> {
-            assertThat(manager.panel().listed()).containsExactly("dev.example.found  1.0.0 — Needs review");
-            manager.panel().review.doClick();
+            assertThat(manager.panel().listed()).containsExactly("dev.example.found  1.0.0 \u2014 Needs review");
+            manager.panel().primary().doClick();
             assertThat(manager.consent().allow.getText()).isEqualTo("Allow and Enable");
             manager.consent().allow.doClick();
         });
@@ -216,15 +216,15 @@ class PluginManagerTest {
             open();
             until(() -> manager.panel().listed().stream().anyMatch(line -> line.contains("dev.example.gone")));
             edt(() -> manager.panel().select("dev.example.gone"));
-            edt(() -> manager.panel().remove.doClick());
+            edt(() -> manager.panel().clickMenu("Remove\u2026"));
             until(() -> manager.confirm() != null);
             edt(() -> assertThat(manager.confirm().text()).contains("dev.example.gone", "jars, settings and data"));
             edt(() -> manager.confirm().cancel.doClick());
-            edt(() -> assertThat(manager.panel().remove.getText()).isEqualTo("Remove\u2026"));
-            edt(() -> manager.panel().remove.doClick());
+            edt(() -> assertThat(manager.panel().menuLabels()).contains("Remove\u2026"));
+            edt(() -> manager.panel().clickMenu("Remove\u2026"));
             until(() -> manager.confirm() != null);
             edt(() -> manager.confirm().ok.doClick());
-            until(() -> manager.panel().remove.getText().equals("Keep"));
+            until(() -> manager.panel().menuLabels().contains("Keep"));
             edt(() -> { manager.panel().clickMenu("Open Settings"); manager.panel().clickMenu("Open Plugin Folder"); manager.panel().clickMenu("Open Data Folder"); });
             until(() -> edited.size() == 1 && revealed.size() == 2);
             assertThat(edited).containsExactly(user().resolve("dev.example.gone/dev.example.gone.toml"));

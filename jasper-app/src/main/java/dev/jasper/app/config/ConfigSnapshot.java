@@ -15,7 +15,7 @@ import java.util.Objects;
 public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, String theme, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                      int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
                       Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
                       int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations) {
     /** The theme a configuration without {@code ui.theme.name} uses. */
@@ -30,8 +30,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
             throw new IllegalArgumentException("Long-command seconds must be 0\u20133600.");
-        if (maxResults < PaletteSettings.MIN_MAX_RESULTS || maxResults > PaletteSettings.MAX_MAX_RESULTS)
-            throw new IllegalArgumentException("Max results must be 1\u201320.");
+        if (visibleRows < PaletteSettings.MIN_VISIBLE_ROWS || visibleRows > PaletteSettings.MAX_VISIBLE_ROWS)
+            throw new IllegalArgumentException("Visible rows must be 1\u201320.");
         if (tabHeight < 20 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 20–72.");
         if (railWidth < MIN_RAIL_WIDTH || railWidth > MAX_RAIL_WIDTH) throw new IllegalArgumentException("Rail width must be 28–64.");
         if (toolbarHeight < MIN_TOOLBAR_HEIGHT || toolbarHeight > MAX_TOOLBAR_HEIGHT)
@@ -66,20 +66,20 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                           FontConfig font, String theme, Map<String, String> keybindings,
                           int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                          int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                          int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
                           Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
-            maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, DEFAULT_RAIL_WIDTH,
+            visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, DEFAULT_RAIL_WIDTH,
             DEFAULT_TOOLBAR_HEIGHT, DEFAULT_STATUS_BAR_HEIGHT, false);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                           FontConfig font, String theme, Map<String, String> keybindings,
                           int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                          int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                          int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
                           Map<String, Map<String, Object>> plugins) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines,
-            terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
+            terminal, buddyEnabled, visibleRows, longCommandSeconds, backgroundEnabled,
             plugins, UiFontConfig.defaults(), TerminalColors.MATCH);
     }
 
@@ -88,10 +88,10 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                           FontConfig font, String theme, Map<String, String> keybindings,
                           int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                          int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                          int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
                           Map<String, Map<String, Object>> plugins, UiFontConfig uiFont) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines,
-            terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
+            terminal, buddyEnabled, visibleRows, longCommandSeconds, backgroundEnabled,
             plugins, uiFont, TerminalColors.MATCH);
     }
 
@@ -99,9 +99,9 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, String theme, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                   int maxResults, int longCommandSeconds, boolean backgroundEnabled) {
+                   int visibleRows, int longCommandSeconds, boolean backgroundEnabled) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
-            maxResults, longCommandSeconds, backgroundEnabled, Map.of());
+            visibleRows, longCommandSeconds, backgroundEnabled, Map.of());
     }
 
     /**
@@ -110,9 +110,9 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
      */
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, String theme, Map<String, String> keybindings,
-                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, int maxResults) {
+                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, int visibleRows) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal,
-            buddyEnabled, maxResults, 10, false);
+            buddyEnabled, visibleRows, 10, false);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -125,7 +125,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                    FontConfig font, String theme, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
-            PaletteSettings.DEFAULT_MAX_RESULTS);
+            PaletteSettings.DEFAULT_VISIBLE_ROWS);
     }
 
     public float fontSize() {
@@ -156,7 +156,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                 values.get(CoreSettings.TERMINAL_CURSOR_SHAPE), values.get(CoreSettings.TERMINAL_CURSOR_BLINK),
                 values.get(CoreSettings.TERMINAL_DIM_INACTIVE_PANES), values.get(CoreSettings.TERMINAL_COPY_ON_SELECT),
                 values.get(CoreSettings.TERMINAL_BELL), values.get(CoreSettings.TERMINAL_ON_EXIT), values.get(CoreSettings.TERMINAL_SHELL_INTEGRATION)),
-            values.get(CoreSettings.BUDDY_ENABLED), values.get(CoreSettings.PALETTE_MAX_RESULTS),
+            values.get(CoreSettings.BUDDY_ENABLED), values.get(CoreSettings.PALETTE_VISIBLE_ROWS),
             values.get(CoreSettings.NOTIFICATIONS_LONG_COMMAND_SECONDS), values.get(CoreSettings.SYSTEM_RUN_IN_BACKGROUND), plugins,
             new UiFontConfig(values.get(CoreSettings.UI_FONT_FAMILY), values.get(CoreSettings.UI_FONT_SIZE)),
             values.get(CoreSettings.TERMINAL_COLORS), values.get(CoreSettings.WINDOW_RAIL_WIDTH),
@@ -184,7 +184,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private int lines;
         private TerminalConfig terminal;
         private boolean buddyEnabled;
-        private int maxResults;
+        private int visibleRows;
         private int longCommandSeconds;
         private boolean backgroundEnabled;
         private Map<String, Map<String, Object>> plugins;
@@ -205,7 +205,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             lines = source.lines();
             terminal = source.terminal();
             buddyEnabled = source.buddyEnabled();
-            maxResults = source.maxResults();
+            visibleRows = source.visibleRows();
             longCommandSeconds = source.longCommandSeconds();
             backgroundEnabled = source.backgroundEnabled();
             plugins = source.plugins();
@@ -230,13 +230,13 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder lines(int value) { lines = value; return this; }
         public Builder terminal(TerminalConfig value) { terminal = value; return this; }
         public Builder buddyEnabled(boolean value) { buddyEnabled = value; return this; }
-        public Builder maxResults(int value) { maxResults = value; return this; }
+        public Builder visibleRows(int value) { visibleRows = value; return this; }
         public Builder longCommandSeconds(int value) { longCommandSeconds = value; return this; }
         public Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
         public Builder terminalColors(TerminalColors value) { terminalColors = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth, toolbarHeight, statusBarHeight, nativeDecorations);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth, toolbarHeight, statusBarHeight, nativeDecorations);
         }
     }
 }

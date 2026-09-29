@@ -46,7 +46,7 @@ final class WorkspaceConfiguration {
             }
         }
         if (previous == null || !previous.keybindings().equals(next.keybindings())) owner.setBindings(next.bindings(macOs));
-        if (previous == null || previous.maxResults() != next.maxResults()) owner.commandPalette().setMaxResults(next.maxResults());
+        if (previous == null || previous.visibleRows() != next.visibleRows()) owner.commandPalette().setVisibleRows(next.visibleRows());
     }
 
     private static boolean liveBehaviorChanged(TerminalConfig previous, TerminalConfig next) {

@@ -60,6 +60,14 @@ class ConnectionsTest {
     /** Runs on the fake UI thread and waits: the registry is UI-thread-only. */
     <T> T onUi(java.util.function.Supplier<T> work) { try { return ui.submit(work::get).get(10, TimeUnit.SECONDS); } catch (Exception failure) { throw new IllegalStateException(failure); } }
     void onUi(Runnable work) { onUi(() -> { work.run(); return null; }); }
+    /** Waits for state the registry reaches through a chain of {@code ui.execute} hops started on another thread. */
+    void awaitOnUi(java.util.function.BooleanSupplier condition, String description) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!onUi(condition::getAsBoolean)) {
+            if (System.nanoTime() > deadline) throw new AssertionError("timed out waiting for: " + description);
+            Thread.sleep(10);
+        }
+    }
 
     Connections connections(Path dir, Optional<AgentClient> agent) {
         trust = new KnownHosts(dir.resolve("known_hosts"), Optional.empty());
@@ -467,7 +475,7 @@ class ConnectionsTest {
             var shell = onUi(() -> connections.shell(inner.id(), 80, 24, status -> threads.add(Thread.currentThread().getName()))).get(15, TimeUnit.SECONDS);
             assertThat(threads).allMatch(name -> name.equals("ui"));
             shell.connection().close().run();
-            onUi(() -> {});
+            awaitOnUi(() -> !scheduled.isEmpty(), "inner host's linger scheduled after its shell closes");
             onUi(scheduled.getFirst());
             onUi(() -> {});
             assertThat(scheduled).as("jump also becomes idle after its dependent closes").isNotEmpty();

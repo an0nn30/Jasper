@@ -98,8 +98,8 @@ public final class SchemaPage implements SettingsPage {
         private final ValueEditor<T> editor;
         private final Predicate<SettingsDraft> enabled;
         private final HighlightBox box;
-        private final JLabel comment = new JLabel();
-        private final JLabel error = new JLabel();
+        private final WrappingText comment = new WrappingText("Label.disabledForeground", Color.GRAY, 1f);
+        private final WrappingText error = new WrappingText("Jasper.configErrorForeground", Color.RED, 0f);
         private final JButton reset = new JButton();
         private final String searchText;
         private boolean invalid;
@@ -120,12 +120,6 @@ public final class SchemaPage implements SettingsPage {
             String text = applies.isEmpty() ? note : note.isEmpty() ? applies : applies + ". " + note;
             comment.setText(text);
             comment.setVisible(!text.isEmpty());
-            comment.putClientProperty("html.disable", true);
-            comment.setForeground(UIManager.getColor("Label.disabledForeground"));
-            comment.setFont(comment.getFont().deriveFont(comment.getFont().getSize2D() - 1f));
-            error.putClientProperty("html.disable", true);
-            Color red = UIManager.getColor("Jasper.configErrorForeground");
-            error.setForeground(red != null ? red : Color.RED);
             error.setVisible(false);
             reset.setIcon(AppIcons.bundled("general/reset"));
             reset.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
@@ -137,8 +131,8 @@ public final class SchemaPage implements SettingsPage {
 
         ValueEditor<T> editor() { return editor; }
         JButton reset() { return reset; }
-        JLabel error() { return error; }
-        JLabel comment() { return comment; }
+        WrappingText error() { return error; }
+        WrappingText comment() { return comment; }
         HighlightBox box() { return box; }
     }
 
@@ -224,7 +218,7 @@ public final class SchemaPage implements SettingsPage {
             panel.add(row.box, label);
             var control = constraints(1, y, 1);
             control.insets = new Insets(4, 0, 2, 0);
-            panel.add(editor.component(), control);
+            panel.add(new Natural(editor.component()), control);
         }
         var reset = constraints(2, y, 1);
         reset.weightx = 1;
@@ -232,9 +226,11 @@ public final class SchemaPage implements SettingsPage {
         panel.add(row.reset, reset);
         int column = editor.labelled() ? 0 : 1;
         var comment = constraints(column, y + 1, 3 - column);
+        comment.fill = GridBagConstraints.HORIZONTAL;
         comment.insets = new Insets(0, editor.labelled() ? 24 : 0, 2, 0);
         panel.add(row.comment, comment);
         var error = constraints(column, y + 2, 3 - column);
+        error.fill = GridBagConstraints.HORIZONTAL;
         error.insets = new Insets(0, editor.labelled() ? 24 : 0, 4, 0);
         panel.add(row.error, error);
         editor.onEdit(() -> edited(row));
@@ -273,14 +269,32 @@ public final class SchemaPage implements SettingsPage {
         return y + 2;
     }
 
-    /** The page follows the dialog's width, so it never scrolls sideways. */
+    /**
+     * The page follows the dialog's width while it fits; narrower than its editors need, it scrolls sideways rather than
+     * squashing them.
+     */
     private static final class WidthTracking extends JPanel implements Scrollable {
         WidthTracking() { super(new GridBagLayout()); }
         @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
         @Override public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction) { return 16; }
         @Override public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction) { return visible.height; }
-        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportWidth() {
+            return !(getParent() instanceof javax.swing.JViewport viewport) || viewport.getWidth() >= getMinimumSize().width;
+        }
         @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
+    /**
+     * Holds an editor at its preferred size. GridBagLayout lays every child out at its minimum size once the page is
+     * narrower than it prefers, which squashed lists and tables to a single line.
+     */
+    private static final class Natural extends JPanel {
+        Natural(JComponent editor) {
+            super(new java.awt.BorderLayout());
+            setOpaque(false);
+            add(editor);
+        }
+        @Override public java.awt.Dimension getMinimumSize() { return getPreferredSize(); }
     }
 
     private static GridBagConstraints constraints(int x, int y, int width) {

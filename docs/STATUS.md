@@ -11,6 +11,30 @@
     when the text changes, scripted `F`/`T` leave sneak's `;` alone, `g:sneak#f_reset` and `t_reset`); `./gradlew check`
     7,157 tests green.
   - Not done: GUI checks 110–114 of the [checklist](editor-verification.md) (user-run); push.
+- **Settings fixes and the Plugins page** (`claude/settings-polish`, 2026-09-29; spec
+  `docs/superpowers/specs/2026-09-29-jasper-plugins-page-design.md`, plan
+  `docs/superpowers/plans/2026-09-29-jasper-plugins-page.md`):
+  - Settings fixes: the theme picker enables Apply again, since every dialog replays the theme when it opens, which
+    gave the editable combo a new editor field. Narrow pages no longer squash lists, tables and fields: descriptions
+    wrap, editors keep their size, and a page too narrow for its editors scrolls sideways.
+  - Settings › Plugins is IntelliJ-style: cards grouped Development, User-installed and Bundled, with icons, badges and
+    enable checkboxes, a search field and a gear menu (Install from Zip…), and a details pane with the icon, vendor,
+    homepage link, Enable/Disable or Review… with a ▾ menu, and Overview and Details tabs.
+  - `plugin.toml` gains optional `icon` and `homepage` (SDK 0.9.3); every bundled plugin ships an icon and requires
+    `>=0.9.3, <0.10`.
+  - `./gradlew check`: 6,860 tests, 0 failures, 6 skipped.
+  - GUI checks pending with the user:
+    - the theme picker enabling Apply;
+    - Terminal › Shell and Tools › Shell History at a narrow width;
+    - cards and groups;
+    - toggling from a card, and review from a checkbox;
+    - the ▾ and right-click menus;
+    - search;
+    - the homepage link;
+    - icons in dark and light.
+  - Deviations: see the plan's status banner. Merged into local `main` on 2026-09-29 after merging main (Vim V4c,
+    palette recents, terminal surface) into the branch; the manifest keys moved to SDK 0.9.3 there. `./gradlew check`
+    on the merged tree: 7,070 tests, 0 failures, 0 errors, 6 skipped. Not pushed.
 - **Editor Vim mode, plan V4c** (branch `claude/vim-v4c`, plan
   `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4c.md`, written 2026-09-29): matchit, ported from Vim 9.1's matchit.vim (`%`, `g%`,
   `[%`, `]%`, Visual `a%`; `set matchit`, `packadd matchit`), with the languages' `b:match_*` from Vim's filetype
@@ -2957,6 +2981,15 @@ tests, 302 passed and one existing font skip. Total 767 tests, 766 passed, one
 skipped, zero failures/errors. Still user-run: Cmd+J on a real macOS desktop,
 editing `snippets.toml` in the real OS editor, and the fill-in step with an input
 method active. No GUI, merge or push.
+
+**Palette visible rows (2026-09-29):** supersedes the result cap below. The five rows were meant as
+the list's height, not a cap on matches: `palette.visible_rows` (1–20, default 5, live; the old
+`palette.max_results` key is an alias that Migrate Config renames) sets how many result rows the
+list shows before it scrolls, with headers above them adding their own height. Scopes now get
+`PaletteResults.MAX_ROWS` (200) as their limit, so a scope's tab and the All tab list every match;
+All still shares 200 rows across its sections and offers "More in <Scope>…" only for a scope that
+budget cuts short. SDK unchanged apart from javadoc (`PaletteQuery.maxResults` stays "at most this
+many").
 
 **Palette result cap (2026-09-15):** `palette.max_results` (1–20, default 5, live) is now the
 hard cap every scope returns: `PaletteContext` carries it to `CommandsScope` (through a

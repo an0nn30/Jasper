@@ -31,7 +31,7 @@ class EditorsTest {
         assertThat(build(Editors.byKind(CoreSettings.WINDOW_STATUS_BAR), CoreSettings.WINDOW_STATUS_BAR, context).component()).isInstanceOf(JCheckBox.class);
         assertThat(build(Editors.byKind(CoreSettings.WINDOW_TOOLBAR), CoreSettings.WINDOW_TOOLBAR, context).component()).isInstanceOf(JComboBox.class);
         assertThat(build(Editors.byKind(CoreSettings.UI_THEME_NAME), CoreSettings.UI_THEME_NAME, context).component()).isInstanceOf(JTextField.class);
-        assertThat(build(Editors.byKind(CoreSettings.PALETTE_MAX_RESULTS), CoreSettings.PALETTE_MAX_RESULTS, context).component()).isInstanceOf(JSpinner.class);
+        assertThat(build(Editors.byKind(CoreSettings.PALETTE_VISIBLE_ROWS), CoreSettings.PALETTE_VISIBLE_ROWS, context).component()).isInstanceOf(JSpinner.class);
     }
 
     @Test void checkboxesCarryTheirLabelAndShowingDoesNotCountAsAnEdit() {
@@ -67,6 +67,18 @@ class EditorsTest {
         assertThat(editor.value()).isEqualTo(ToolbarMode.HIDDEN);
         assertThat(Editors.pretty("close_on_success")).isEqualTo("Close on success");
         assertThat(Editors.<ToolbarMode>choice(Map.of("icons", "Icons only")).terms()).contains("Icons only");
+    }
+
+    @Test void anEditableComboStillReportsPicksAfterItsLookAndFeelIsUpdated() {
+        // Each dialog replays the current theme when it opens, and updateUI gives an editable combo a new editor field.
+        var editor = build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, context);
+        var edits = new int[1];
+        editor.show("Jasper Dark");
+        editor.onEdit(() -> edits[0]++);
+        javax.swing.SwingUtilities.updateComponentTreeUI(editor.component());
+        ((JComboBox<?>) editor.component()).setSelectedIndex(1);
+        assertThat(edits[0]).isPositive();
+        assertThat(editor.value()).isEqualTo("IntelliJ Light");
     }
 
     @Test void listsTablesAndExecutablesEditTheirValues() {

@@ -78,4 +78,23 @@ class DescriptorParserTest {
         assertThat(DescriptorParser.CAPABILITIES).isEqualTo(Set.of("terminal.observe", "terminal.selection",
             "terminal.inject", "terminal.open", "session.provide", "palette.contribute"));
     }
+
+    @Test void anIconAndAHomepageAreOptionalAndABadOneIsDropped() throws Exception {
+        String base = "id = \"a.b\"\nname = \"AB\"\nversion = \"1.0.0\"\nentry = \"a.b.Main\"\nsdk = \">=0.1\"\n";
+        PluginDescriptor full = DescriptorParser.parse(base + "icon = \"icons/ab.svg\"\nhomepage = \"https://example.dev/ab\"\n");
+        assertThat(full.icon()).isEqualTo("icons/ab.svg");
+        assertThat(full.homepage()).isEqualTo("https://example.dev/ab");
+        assertThat(DescriptorParser.parse(base + "icon = \"icons/ab.PNG\"\nhomepage = \"http://example.dev\"\n"))
+            .satisfies(descriptor -> {
+                assertThat(descriptor.icon()).isEqualTo("icons/ab.PNG");
+                assertThat(descriptor.homepage()).isEqualTo("http://example.dev");
+            });
+        PluginDescriptor bad = DescriptorParser.parse(base + "icon = \"icons/ab.gif\"\nhomepage = \"javascript:alert(1)\"\n");
+        assertThat(bad.icon()).as("not an .svg or .png").isEmpty();
+        assertThat(bad.homepage()).as("not http or https").isEmpty();
+        assertThat(DescriptorParser.parse(base + "homepage = \"example.dev\"\n").homepage()).as("not absolute").isEmpty();
+        PluginDescriptor minimal = DescriptorParser.parse(base);
+        assertThat(minimal.icon()).isEmpty();
+        assertThat(minimal.homepage()).isEmpty();
+    }
 }

@@ -51,6 +51,19 @@ public final class SettingsDialogPreview {
         Path home = Files.createTempDirectory("jasper-settings-preview");
         PluginJars.build(home.resolve("plugins/dev.example.preview/jars"), "main.jar",
             PluginJars.descriptor("dev.example.preview", "1.0.0", "fix.Main"), Map.of(), List.of());
+        Path tidyJar = PluginJars.build(home.resolve("plugins/dev.example.tidy/jars"), "main.jar",
+            PluginJars.descriptor("dev.example.tidy", "1.2.0", "fix.tidy.Main").replace("name = \"dev.example.tidy\"", "name = \"Tidy Tabs\"")
+                + "description = \"Groups and tidies terminal tabs by project.\"\nvendor = \"Example Labs\"\n"
+                + "icon = \"icons/tidy.svg\"\nhomepage = \"https://example.dev/tidy\"\n",
+            Map.of("fix.tidy.Main", PluginJars.emptyPlugin("fix.tidy", "Main")), List.of());
+        PluginJars.addResource(tidyJar, "icons/tidy.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\""
+            + " viewBox=\"0 0 16 16\"><rect x=\"1\" y=\"1\" width=\"14\" height=\"14\" rx=\"3\" fill=\"#3574F0\"/>"
+            + "<rect x=\"4\" y=\"5\" width=\"8\" height=\"1.5\" fill=\"#FFFFFF\"/><rect x=\"4\" y=\"9\" width=\"5\" height=\"1.5\" fill=\"#FFFFFF\"/></svg>");
+        PluginJars.build(home.resolve("plugins/dev.example.broken/jars"), "main.jar",
+            PluginJars.descriptor("dev.example.broken", "0.3.0", "fix.broken.Missing").replace("name = \"dev.example.broken\"", "name = \"Broken Example\""),
+            Map.of(), List.of());
+        Files.writeString(home.resolve("plugins.toml"), "version = 1\n\n[plugins.\"dev.example.tidy\"]\nenabled = true\nconsented = []\n\n"
+            + "[plugins.\"dev.example.broken\"]\nenabled = true\nconsented = []\n");
         var holder = new JComponent[1];
         var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> {
             holder[0] = surface.holder();
@@ -63,14 +76,14 @@ public final class SettingsDialogPreview {
         var previewPlugins = new dev.jasper.app.plugins.PluginPreviewSupport[1];
         SwingUtilities.invokeAndWait(() -> {
             themes[0] = new ThemeController();
-            runtime[0] = new PluginRuntime(new PluginRuntime.Options(null, home.resolve("plugins"), null, false,
+            runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                 home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                 PluginRuntime.SettingsReports.IGNORED, new Contributions(), windows, new TerminalRegistry());
             runtime[0].start(Map.of(), true);
             var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run,
                 Duration.ofMillis(20), Duration.ofMillis(1));
             manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
-                ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }));
+                ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
             previewPlugins[0] = new dev.jasper.app.plugins.PluginPreviewSupport(home.resolve("preview-plugins"));
         });
         var keymapHooks = new KeymapPage.Hooks(new Contributions(), Map::of, Map::of, true, edits -> CompletableFuture.completedFuture(null));
@@ -91,6 +104,9 @@ public final class SettingsDialogPreview {
                     render(holder[0], output.resolve("window-" + suffix));
                     dialog.select("terminal.font");
                     render(holder[0], output.resolve("font-" + suffix));
+                    dialog.select("terminal.shell");
+                    render(holder[0], output.resolve("shell-" + suffix));
+                    render(holder[0], output.resolve("shell-narrow-" + suffix), 760);
                     dialog.select("system");
                     render(holder[0], output.resolve("system-" + suffix));
                     dialog.view().search.setText("font");
@@ -110,9 +126,12 @@ public final class SettingsDialogPreview {
                     dialog.select("plugins");
                 });
                 await(() -> dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow()
-                    .searchTerms().stream().anyMatch(term -> term.contains("dev.example.preview")));
+                    .searchTerms().stream().anyMatch(term -> term.contains("dev.example.tidy")));
                 SwingUtilities.invokeAndWait(() -> {
+                    dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow().highlight("Tidy Tabs");
                     render(holder[0], output.resolve("plugins-" + suffix));
+                    tabbed(holder[0]).setSelectedIndex(1);
+                    render(holder[0], output.resolve("plugins-details-" + suffix));
                     dialog.select("plugin.dev.example.editor");
                     render(holder[0], output.resolve("plugin-editor-" + suffix));
                     dialog.select("plugin.dev.example.sample");
@@ -147,11 +166,29 @@ public final class SettingsDialogPreview {
             if (child.isVisible() && child instanceof Container nested) layoutVisible(nested);
     }
 
-    private static void render(JComponent component, Path file) {
-        component.setSize(1000, 700);
+    private static void render(JComponent component, Path file) { render(component, file, 1000); }
+
+    private static javax.swing.JTabbedPane tabbed(java.awt.Component root) {
+        var found = findTabbed(root);
+        if (found == null) throw new IllegalStateException("No tabbed pane on the Plugins page");
+        return found;
+    }
+
+    private static javax.swing.JTabbedPane findTabbed(java.awt.Component component) {
+        if (component instanceof javax.swing.JTabbedPane tabs) return tabs;
+        if (component instanceof java.awt.Container container)
+            for (var child : container.getComponents()) {
+                var found = findTabbed(child);
+                if (found != null) return found;
+            }
+        return null;
+    }
+
+    private static void render(JComponent component, Path file, int width) {
+        component.setSize(width, 700);
         layoutVisible(component);
         layoutVisible(component);
-        var image = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
+        var image = new BufferedImage(width, 700, BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
         try { component.printAll(g); } finally { g.dispose(); }
         try { ImageIO.write(image, "png", file.toFile()); }

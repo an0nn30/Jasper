@@ -1,9 +1,10 @@
 id = "dev.jasper.history"
 name = "Shell History"
-version = "0.2.0"
+version = "0.2.1"
 entry = "dev.jasper.history.HistoryPlugin"
-sdk = ">=0.9.2, <0.10"
+sdk = ">=0.9.3, <0.10"
 description = "Search every shell's history from the command palette and paste or run a command; saves one as a snippet when the Snippets plugin is present."
 vendor = "Jasper"
+icon = "icons/history.svg"
 capabilities = ["palette.contribute", "terminal.observe", "terminal.inject"]
 requires = [{ id = "dev.jasper.snippets", version = ">=0.1", optional = true }]

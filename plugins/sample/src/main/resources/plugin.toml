@@ -1,8 +1,9 @@
 id = "dev.jasper.sample"
 name = "Sample"
-version = "0.2.0"
+version = "0.2.1"
 entry = "dev.jasper.sample.SamplePlugin"
-sdk = ">=0.9.0, <0.10"
+sdk = ">=0.9.3, <0.10"
 description = "Exercises the plugin runtime end to end; inert unless a demo_* setting such as demo_activity or demo_scope is set."
 vendor = "Jasper"
+icon = "dev/jasper/sample/flask.svg"
 capabilities = ["terminal.observe", "terminal.inject", "terminal.open", "session.provide", "palette.contribute"]

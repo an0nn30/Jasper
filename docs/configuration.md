@@ -77,7 +77,7 @@ long_command_seconds = 10
 run_in_background = false
 
 [palette]
-max_results = 5
+visible_rows = 5
 
 [terminal]
 scrollback = 10000
@@ -135,7 +135,7 @@ name = "Jasper Dark"
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `system.run_in_background` | `false` | Boolean | Next start (residency); live (login item) |
-| `palette.max_results` | `5` | Integer 1–20 | Live |
+| `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
 | `ui.font.size` | Platform default (omit key) | Finite number 8–32 points | Live, app and plugins |
 | `terminal.font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
@@ -222,9 +222,12 @@ acted on.
 
 ### Palette
 
-`palette.max_results` is the cap on rows each scope contributes: a scope's tab lists at most that
-many, and the All tab shows at most that many per scope, with a "More in <Scope>…" row when there
-are more. Changes apply live, including to an open palette.
+`palette.visible_rows` is how many result rows the palette list shows before it scrolls (section
+headings add their own height). Every match is listed: a scope's tab and the All tab scroll through
+all of them, up to 200 rows in total; only when that total cuts a scope short does the All tab add a
+"More in <Scope>…" row. The older `palette.max_results` key, which capped each scope's rows, is read
+as `palette.visible_rows` with a warning; Migrate Config renames it. Changes apply live, including to
+an open palette.
 
 ### Finished-command notifications
 
@@ -512,9 +515,11 @@ Reload Config; a file that fails to parse keeps its last good values and is repo
 Configuration status under `plugins.<id>`. Settings writes the file when you change a plugin's settings there,
 keeping its comments. Each plugin declares its settings: a value its declaration
 does not allow is reported with its line and the default is used, and a key the plugin does not declare is reported
-as unknown and ignored. Right-click a plugin in Settings › Plugins
-(File → Manage Plugins…) and choose Open Settings to go to its page in Settings (or to its file, when the plugin is
-not running). The sample plugin's example, for instance:
+as unknown and ignored.
+Settings › Plugins (File → Manage Plugins…) lists each plugin as a card, grouped as Development, User-installed and
+Bundled; tick or untick a card to enable or disable it (after a restart). Select a card for its details, and use the
+▾ menu beside Enable/Disable (or right-click the card) and choose Open Settings to go to its page in Settings (or to
+its file, when the plugin is not running). The sample plugin's example, for instance:
 
 ```toml
 # Settings for the sample plugin. Change them in Settings > Tools > Sample or here; each applies after Jasper restarts. Every demo is off until you set it.

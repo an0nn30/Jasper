@@ -67,6 +67,17 @@ class ConfigAliasTest {
         assertThat(parse("version = 'two'\n").rejected()).isTrue();
     }
 
+    @Test void theOldPaletteResultCapIsReadAsTheVisibleRows() {
+        var result = parse("[palette]\nmax_results = 8\n");
+        assertThat(result.snapshot().visibleRows()).isEqualTo(8);
+        assertThat(result.diagnostics()).singleElement().satisfies(d -> {
+            assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+            assertThat(d.message()).isEqualTo("Moved to palette.visible_rows. Use Migrate Config to update the file.");
+        });
+        assertThat(result.legacyKeys()).containsExactly(
+            new LegacyKey(List.of("palette", "max_results"), List.of("palette", "visible_rows")));
+    }
+
     @Test void deadTablesAndPresenceAreReported() {
         var dead = parse("[palette.scopes]\n[plugins.'dev.x']\na = 1\n");
         assertThat(dead.deadTables()).containsExactly(List.of("palette", "scopes"), List.of("plugins", "dev.x"));

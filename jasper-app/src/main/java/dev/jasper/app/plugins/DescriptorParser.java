@@ -18,7 +18,8 @@ final class DescriptorParser {
     static final List<String> FORBIDDEN_PACKAGES = List.of("dev.jasper.sdk", "dev.jasper.app",
         "dev.jasper.terminal", "dev.jasper.buddy", "java", "javax", "jdk");
     private static final Set<String> KEYS = Set.of("id", "name", "version", "entry", "sdk", "description",
-        "vendor", "capabilities", "exports", "requires");
+        "vendor", "capabilities", "exports", "requires", "icon", "homepage");
+    private static final System.Logger LOG = System.getLogger(DescriptorParser.class.getName());
     private static final String CLASS_NAME = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+";
     private static final String PACKAGE_NAME = "[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*";
 
@@ -50,13 +51,36 @@ final class DescriptorParser {
             if (forbidden(exported)) throw new InvalidDescriptor("exports names a reserved package: " + exported);
         }
         return new PluginDescriptor(id, name, version, entry, sdk, text(toml, "description", false),
-            text(toml, "vendor", false), capabilities, exports, requires(toml, id));
+            text(toml, "vendor", false), capabilities, exports, requires(toml, id),
+            icon(text(toml, "icon", false), id), homepage(text(toml, "homepage", false), id));
     }
 
     static boolean forbidden(String packageName) {
         for (String prefix : FORBIDDEN_PACKAGES)
             if (packageName.equals(prefix) || packageName.startsWith(prefix + ".")) return true;
         return false;
+    }
+
+    /** A path ending in .svg or .png; anything else is dropped, because an icon never stops a plugin loading. */
+    private static String icon(String path, String id) {
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        if (path.isEmpty() || lower.endsWith(".svg") || lower.endsWith(".png")) return path;
+        LOG.log(System.Logger.Level.WARNING, "Plugin " + id + ": icon must be an .svg or .png file; ignored: " + path);
+        return "";
+    }
+
+    /** An absolute http or https URI; anything else is dropped with a warning. */
+    private static String homepage(String text, String id) {
+        if (text.isEmpty()) return "";
+        try {
+            var uri = new java.net.URI(text);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+            if ((scheme.equals("http") || scheme.equals("https")) && uri.getHost() != null) return text;
+        } catch (java.net.URISyntaxException malformed) {
+            // Falls through to the warning.
+        }
+        LOG.log(System.Logger.Level.WARNING, "Plugin " + id + ": homepage must be an http or https address; ignored: " + text);
+        return "";
     }
 
     private static List<PluginDescriptor.Requirement> requires(TomlTable toml, String self) throws InvalidDescriptor {

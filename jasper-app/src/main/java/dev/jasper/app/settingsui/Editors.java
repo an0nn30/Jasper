@@ -224,20 +224,26 @@ public final class Editors {
 
     static final class Combo implements ValueEditor<String> {
         private final JComboBox<String> box;
+        private final List<Runnable> listeners = new ArrayList<>();
         private boolean showing;
         Combo(Supplier<List<String>> options) {
             box = new JComboBox<>(options.get().toArray(String[]::new));
             box.setEditable(true);
             box.setPrototypeDisplayValue("JetBrains Mono NL Extra");
+            // A look-and-feel update (every dialog replays the theme as it opens) gives the combo a new editor field,
+            // so follow each editor the combo gets rather than only the first.
+            onText(editor(), this::edited);
+            box.addPropertyChangeListener("editor", event -> { if (box.getEditor() != null) onText(editor(), this::edited); });
         }
         private JTextComponent editor() { return (JTextComponent) box.getEditor().getEditorComponent(); }
+        private void edited() { if (!showing) for (Runnable listener : List.copyOf(listeners)) listener.run(); }
         @Override public JComponent component() { return box; }
         @Override public String value() { return editor().getText(); }
         @Override public void show(String value) {
             showing = true;
             try { box.setSelectedItem(value); editor().setText(value); } finally { showing = false; }
         }
-        @Override public void onEdit(Runnable listener) { onText(editor(), () -> { if (!showing) listener.run(); }); }
+        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
     }
 
     static final class Browse implements ValueEditor<String> {

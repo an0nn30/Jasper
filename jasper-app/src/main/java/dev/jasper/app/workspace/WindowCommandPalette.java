@@ -105,8 +105,8 @@ final class WindowCommandPalette implements AutoCloseable {
         priorFocus = null; originTab = null; originPane = null;
     }
 
-    void setMaxResults(int value) { controller.setMaxResults(value); }
-    int maxResults() { return controller.maxResults(); }
+    void setVisibleRows(int value) { controller.setVisibleRows(value); }
+    int visibleRows() { return controller.visibleRows(); }
     void dismiss() { controller.dismiss(); }
     boolean isOpen() { return controller.isOpen(); }
     String activeScopeId() { return controller.activeScopeId(); }

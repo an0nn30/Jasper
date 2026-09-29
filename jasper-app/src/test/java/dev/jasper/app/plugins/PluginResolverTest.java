@@ -18,7 +18,7 @@ class PluginResolverTest {
     private static PluginCandidate plugin(String id, String version, PluginCandidate.Origin origin, Set<String> capabilities,
                                           String sdk, PluginDescriptor.Requirement... requires) {
         var descriptor = new PluginDescriptor(id, id, Version.parse(version), "x.Main", VersionRange.parse(sdk), "", "",
-            capabilities, Set.of(), List.of(requires));
+            capabilities, Set.of(), List.of(requires), "", "");
         return new PluginCandidate(descriptor, Path.of(id), List.of(), origin);
     }
 

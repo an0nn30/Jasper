@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.SwingUtilities;
@@ -90,19 +91,53 @@ public final class PluginRuntime {
      * @param directory the plugin's folder under {@code plugins/}
      * @param settingsFile its settings file
      * @param dataDirectory its data directory
+     * @param homepage the plugin's homepage, an http or https address; empty when it has none
+     * @param exports the packages the plugin exports, sorted
+     * @param icon the icon the plugin names in its manifest, as its jar holds it; empty when it names none or it cannot be read
      */
     public record Row(String id, String name, String version, String description, String vendor, String origin,
                       String state, String reason, List<String> capabilities, List<String> unconsented,
                       List<String> requires, int errors, boolean enabled, boolean needsConsent, boolean canToggle,
                       boolean canRemove, boolean pendingRemoval, boolean pendingInstall, String pending,
-                      Path directory, Path settingsFile, Path dataDirectory) {
+                      Path directory, Path settingsFile, Path dataDirectory, String homepage, List<String> exports,
+                      Optional<PluginIcon> icon) {
         /** Copies the lists. */
         public Row {
             capabilities = List.copyOf(capabilities);
             unconsented = List.copyOf(unconsented);
             requires = List.copyOf(requires);
+            exports = List.copyOf(exports);
             Objects.requireNonNull(directory, "directory"); Objects.requireNonNull(settingsFile, "settingsFile"); Objects.requireNonNull(dataDirectory, "dataDirectory");
+            Objects.requireNonNull(homepage, "homepage"); Objects.requireNonNull(icon, "icon");
         }
+    }
+
+    /**
+     * A plugin's icon as its jar holds it; the Plugins page decodes it.
+     *
+     * @param name the path in the jar, ending in {@code .svg} or {@code .png}
+     * @param data the file's bytes
+     */
+    public record PluginIcon(String name, byte[] data) {
+        /** Copies the bytes. */
+        public PluginIcon {
+            Objects.requireNonNull(name, "name");
+            data = data.clone();
+        }
+
+        /** @return a copy of the bytes */
+        @Override public byte[] data() { return data.clone(); }
+
+        /** @return whether the icon is an SVG rather than a PNG */
+        public boolean svg() { return name.toLowerCase(java.util.Locale.ROOT).endsWith(".svg"); }
+
+        @Override public boolean equals(Object other) {
+            return other instanceof PluginIcon icon && icon.name.equals(name) && java.util.Arrays.equals(icon.data, data);
+        }
+
+        @Override public int hashCode() { return 31 * name.hashCode() + java.util.Arrays.hashCode(data); }
+
+        @Override public String toString() { return "PluginIcon[" + name + ", " + data.length + " bytes]"; }
     }
 
     /**

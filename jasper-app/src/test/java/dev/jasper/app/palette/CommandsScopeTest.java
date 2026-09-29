@@ -61,7 +61,7 @@ class CommandsScopeTest {
                 for (int i = 0; i < 8; i++) registry.register(command("other_" + i, "Other " + i, null));
                 var capped = new PaletteContext(true, PaletteTarget.none(), 3);
                 assertThat(scope.search("other", capped).rows()).hasSize(3);
-                assertThat(scope.search("other", new PaletteContext(true, PaletteTarget.none())).rows()).hasSize(5);
+                assertThat(scope.search("other", new PaletteContext(true, PaletteTarget.none())).rows()).as("every match by default").hasSize(8);
                 for (int i = 0; i < 4; i++) history.record("other_" + i);
                 assertThat(scope.search("", capped).rows()).hasSize(3);
                 assertThat(scope.search("", new PaletteContext(true, PaletteTarget.none(), 2)).rows()).hasSize(2);
