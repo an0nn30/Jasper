@@ -422,11 +422,7 @@ final class WindowChrome {
 
     void setToolbarMode(ToolbarMode mode) {
         toolbar.setVisible(mode != ToolbarMode.HIDDEN);
-        for (var component : toolbar.getComponents()) if (component instanceof JButton button) {
-            boolean label = !Boolean.FALSE.equals(button.getClientProperty("keepLabel"))
-                && !"toolbarOverflow".equals(button.getName());
-            button.setText(mode == ToolbarMode.ICONS || !label ? null : (String) button.getClientProperty("label"));
-        }
+        toolbar.setLabelsWanted(mode == ToolbarMode.ICONS_AND_LABELS);
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
