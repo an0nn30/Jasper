@@ -9,7 +9,8 @@
   resolve without falling back to Darcula/IntelliJ or Jasper's palette. Parents only: the picker still offers only
   Jasper Dark and IntelliJ Light. Licensing: the files are Apache 2.0; the repo's root LICENSE.txt became JetBrains'
   "Open-Source Build Terms" in June 2026, which cover their distributed builds (recorded in `SOURCE.md`).
-  `./gradlew check` green: app 1294/0/1, others unchanged. Not merged. GUI check pending with the user: install an
+  `./gradlew check` green: app 1294/0/1, others unchanged. Merged into local main (380ef131) on 2026-09-29; not
+  pushed. GUI check pending with the user: install an
   Islands-based theme plugin and a Dracula plugin and compare their chrome and terminal with IntelliJ.
 - **Recent files in the command palette** (branch `claude/editor-recent-files`, spec
   `docs/superpowers/specs/2026-09-29-editor-recent-files-design.md`, plan
