@@ -1,7 +1,19 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-09-28
+## Current state — 2026-09-29
 
+- **Recent files in the command palette** (branch `claude/editor-recent-files`, spec
+  `docs/superpowers/specs/2026-09-29-editor-recent-files-design.md`, plan
+  `docs/superpowers/plans/2026-09-29-editor-recent-files.md`, executed inline 2026-09-29): the Editor keeps the local
+  and remote files it opened in `plugins/dev.jasper.editor/data/recent-files.toml` (newest first, at most 50,
+  forgotten after `recent_files_days`, default 30; 0 keeps none) and offers them in the "Recent files" palette scope
+  (Open, Remove from recent files; action Recent Files…). Editor 0.4.0 adds `Editor.reopener` and now declares
+  `palette.contribute` (a deviation: the plan missed that registering a scope needs it); Remote 0.6.2 registers
+  `remote:` and reopens on the saved hosts. `./gradlew check` green: app 1290/0/1, terminal 391/0/4, Editor 4770/0/0,
+  Remote 289/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0,
+  testkit 69/0/0 (tests/failures/skipped). Not merged. GUI checks pending with the user: open a local and an SFTP
+  file, restart, reopen both from Recent files (the SFTP one prompts for sign-in when needed); deleting the host dims
+  its row; `recent_files_days = 0` empties the scope.
 - **Editor Vim mode, plan V4d** (branch `claude/vim-v4d`, plan
   `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4d.md`, written 2026-09-29): sneak, the last of spec 8's extensions (`s`, `S`, `z`,
   `Z`, `;`, `,`, vertical scope, the one-character `<Plug>Sneak_f` forms; no label mode), on motions that read their

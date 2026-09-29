@@ -33,7 +33,7 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
     /** The Editor's declared settings; Settings checks their values and reports bad ones. */
     public static final class Declared {
         private final Setting<String> fontFamily;
-        private final Setting<Integer> fontSize, tabSize, maxFileMib;
+        private final Setting<Integer> fontSize, tabSize, maxFileMib, recentFilesDays;
         private final Setting<Boolean> softWrap, vim;
 
         /**
@@ -59,12 +59,18 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
                 .section("Editing").keywords("editor", "vim", "modal"));
             maxFileMib = settings.declare(SettingSpec.of("max_file_mib", SettingKind.integer(1, 256), 10)
                 .label("Largest file (MiB)").description("Larger files are refused.").section("Files").keywords("editor", "size"));
+            recentFilesDays = settings.declare(SettingSpec.of("recent_files_days", SettingKind.integer(0, 365), 30)
+                .label("Keep recent files for (days)").description("Recent files not opened for this many days are forgotten; 0 keeps no recent files.")
+                .section("Files").keywords("editor", "recent", "history"));
         }
 
         /** @return the current values */
         public EditorSettings current() {
             return new EditorSettings(fontFamily.get(), fontSize.get(), tabSize.get(), softWrap.get(), maxFileMib.get(), vim.get());
         }
+
+        /** @return how many days the Recent files list keeps a file it has not seen opened, 0 to 365; 0 keeps none */
+        public int recentFilesDays() { return recentFilesDays.get(); }
 
         /**
          * Saves Vim mode to the settings file.

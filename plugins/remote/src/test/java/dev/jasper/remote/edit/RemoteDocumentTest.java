@@ -3,6 +3,8 @@ package dev.jasper.remote.edit;
 import dev.jasper.editor.api.Revision;
 import dev.jasper.editor.api.TooLargeException;
 import dev.jasper.remote.client.ConnectionIdentity;
+import dev.jasper.remote.hosts.Auth;
+import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.EndpointFactory;
 import dev.jasper.remote.sftp.LocalEndpoint;
 import dev.jasper.remote.sftp.SftpFixture;
@@ -14,6 +16,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -65,6 +69,24 @@ class RemoteDocumentTest {
         assertThat(document.name()).isEqualTo("nginx.conf");
         assertThat(document.location()).isEqualTo("deploy@prod:/etc/nginx/nginx.conf");
         assertThat(document.host()).contains("prod");
+    }
+
+    @Test void aKeyParsesBackToItsRouteAndPath() {
+        var target = RemoteHost.create("prod", "10.0.0.5", 22, "deploy", Auth.AGENT, "", Optional.empty());
+        var jump = RemoteHost.create("bastion", "10.0.0.1", 22, "ops", Auth.AGENT, "", Optional.empty());
+        var identity = new ConnectionIdentity(List.of(new ConnectionIdentity.Hop(target, "deploy"), new ConnectionIdentity.Hop(jump, "ops")));
+        for (String path : List.of("/", "/etc/nginx/nginx.conf", "/srv/a:b,c d/r\u00e9sum\u00e9.txt")) {
+            assertThat(RemoteDocument.parseKey(RemoteDocument.key(identity, path))).contains(new RemoteDocument.ParsedKey(
+                List.of(new RemoteDocument.KeyHop(target.id(), "deploy"), new RemoteDocument.KeyHop(jump.id(), "ops")), path));
+        }
+    }
+
+    @Test void malformedKeysDoNotParse() {
+        UUID id = UUID.randomUUID();
+        assertThat(Stream.of("local:/etc/hosts", "remote:", "remote:" + id + "/deploy", "remote:" + id + "/deploy:relative",
+                "remote:not-a-uuid/deploy:/etc/hosts", "remote:" + id + ":/etc/hosts", "remote:" + id + "/deploy,:/etc/hosts",
+                "remote:" + id + "/a/b:/etc/hosts")
+            .map(RemoteDocument::parseKey)).allMatch(Optional::isEmpty);
     }
 
     @Test void itReadsTheFileAtTheRevisionItReports() throws Exception {

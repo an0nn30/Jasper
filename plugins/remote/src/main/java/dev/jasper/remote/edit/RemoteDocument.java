@@ -13,8 +13,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -25,6 +28,28 @@ public final class RemoteDocument implements EditorDocument {
     private final String path;
     private final EditChannels channels;
     private final Supplier<Optional<WindowHandle>> owner;
+
+    /** The start of every remote document's key. */
+    public static final String KEY_PREFIX = "remote:";
+
+    /**
+     * One hop of a parsed key.
+     *
+     * @param hostId the saved host's id
+     * @param login the login recorded for it; empty when it was never resolved
+     */
+    public record KeyHop(UUID hostId, String login) { }
+
+    /**
+     * A key parsed back.
+     *
+     * @param hops the route, target first
+     * @param path the absolute path
+     */
+    public record ParsedKey(List<KeyHop> hops, String path) {
+        /** Copies the hops. */
+        public ParsedKey { hops = List.copyOf(hops); }
+    }
 
     /**
      * @param identity the connection the file was browsed on
@@ -46,7 +71,33 @@ public final class RemoteDocument implements EditorDocument {
      * @return {@code remote:}, each hop's saved-host id and login, and the path; cosmetic host edits keep it
      */
     public static String key(ConnectionIdentity identity, String path) {
-        return "remote:" + identity.hops().stream().map(hop -> hop.host().id() + "/" + hop.username()).collect(Collectors.joining(",")) + ":" + path;
+        return KEY_PREFIX + identity.hops().stream().map(hop -> hop.host().id() + "/" + hop.username()).collect(Collectors.joining(",")) + ":" + path;
+    }
+
+    /**
+     * The inverse of {@link #key(ConnectionIdentity, String)}. The hop list ends at the first {@code :}; logins
+     * containing {@code ,}, {@code /} or {@code :} cannot be parsed back.
+     *
+     * @param key a recorded key
+     * @return the route and path, or empty when the key is not a well-formed remote key
+     */
+    public static Optional<ParsedKey> parseKey(String key) {
+        if (key == null || !key.startsWith(KEY_PREFIX)) return Optional.empty();
+        String rest = key.substring(KEY_PREFIX.length());
+        int colon = rest.indexOf(':');
+        if (colon < 0) return Optional.empty();
+        String path = rest.substring(colon + 1);
+        if (!path.startsWith("/")) return Optional.empty();
+        var hops = new ArrayList<KeyHop>();
+        for (String hop : rest.substring(0, colon).split(",", -1)) {
+            int slash = hop.indexOf('/');
+            if (slash < 0) return Optional.empty();
+            String login = hop.substring(slash + 1);
+            if (login.indexOf('/') >= 0) return Optional.empty();
+            try { hops.add(new KeyHop(UUID.fromString(hop.substring(0, slash)), login)); }
+            catch (IllegalArgumentException malformed) { return Optional.empty(); }
+        }
+        return Optional.of(new ParsedKey(hops, path));
     }
 
     @Override public String key() { return key(identity, path); }

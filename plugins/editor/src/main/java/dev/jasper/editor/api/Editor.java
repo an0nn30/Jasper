@@ -1,7 +1,10 @@
 package dev.jasper.editor.api;
 
-import java.nio.file.Path;
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.function.Function;
 
 /** Published by the Editor plugin with {@code Services.publish}. UI thread only. */
 public interface Editor {
@@ -29,4 +32,19 @@ public interface Editor {
      * @param owner originating workspace, or null
      */
     default void open(EditorDocument document, WindowOwner owner) { open(document); }
+
+    /**
+     * Makes recent files under a key prefix reopenable. The resolver runs on the UI thread and must do no I/O. It
+     * returns empty when the key cannot be reopened now, for example because its host was deleted, and otherwise a
+     * factory that builds the document for the window reopening it (null when there is none). A later registration
+     * of the same prefix replaces the earlier one; the longest matching prefix wins. Since Editor 0.4.0.
+     *
+     * @param keyPrefix the start of the keys this plugin's documents use, for example {@code "remote:"}; not blank and
+     *     not {@code "local:"}
+     * @param resolve resolves a recorded key
+     * @return removes the reopener
+     */
+    default Subscription reopener(String keyPrefix, Function<String, Optional<Function<WindowOwner, EditorDocument>>> resolve) {
+        return () -> { };
+    }
 }

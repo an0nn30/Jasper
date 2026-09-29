@@ -2,10 +2,13 @@ package dev.jasper.editor;
 
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.session.Question;
+import dev.jasper.editor.testsupport.StubDocument;
 import dev.jasper.editor.ui.EditorEnvironment;
 import dev.jasper.editor.ui.EditorWindow;
 import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
+import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.awt.Color;
@@ -13,6 +16,7 @@ import java.awt.Component;
 import java.awt.Container;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,11 +31,89 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class EditorPluginTest {
     @TempDir Path home;
-    private static final PluginInfo INFO = new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of());
+    private static final PluginInfo INFO = new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of("palette.contribute"));
 
     private static EditorPlugin plugin() {
         return new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,
             owner -> Question::dismissed, owner -> (message, saves) -> saves.getNow(false), settings::current, settings::saveVim, false));
+    }
+
+    private static final String RECENT = "dev.jasper.editor.recent";
+
+    private static List<String> titles(List<String> rows) { return rows.stream().map(row -> row.split("\\|")[1]).toList(); }
+    private static String rowId(List<String> rows) { return rows.getFirst().split("\\|")[0]; }
+    private static void drain(FakePluginHost host) { while (host.runBackground() > 0) { } }
+
+    @Test void recentFilesListOpenedFilesReopenThemAndForgetThem() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID terminal = host.addTerminalWindow();
+            assertThat(host.scopes()).contains(RECENT + "|Recent files|open,remove");
+            assertThat(host.scopesInAll()).contains(RECENT);
+            assertThat(host.scopesInRecents()).contains(RECENT);
+            assertThat(host.actions()).contains("dev.jasper.editor.recent-files|Recent Files\u2026|true");
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            editor.open(Files.writeString(home.resolve("alpha.txt"), "a\n"));
+            drain(host);
+            editor.open(Files.writeString(home.resolve("beta.md"), "b\n"));
+            drain(host);
+            assertThat(titles(host.searchScope(RECENT, "", terminal, null))).containsExactly("beta.md", "alpha.txt");
+            List<String> alpha = host.searchScope(RECENT, "ALPHA", terminal, null);
+            assertThat(titles(alpha)).containsExactly("alpha.txt");
+            host.executeInScope(RECENT, rowId(alpha), "open", terminal, null);
+            assertThat(titles(host.searchScope(RECENT, "", terminal, null))).containsExactly("alpha.txt", "beta.md");
+            host.executeInScope(RECENT, rowId(alpha), "remove", terminal, null);
+            assertThat(titles(host.searchScope(RECENT, "", terminal, null))).containsExactly("beta.md");
+            host.setSetting("dev.jasper.editor", "recent_files_days", 0L);
+            assertThat(host.searchScope(RECENT, "", terminal, null)).isEmpty();
+            drain(host);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void nameMatchesComeBeforeHostAndLocationMatches() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID terminal = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            editor.open(new StubDocument("stub:1", "prod.conf", "dustin@web:/etc/prod.conf", "web"));
+            drain(host);
+            editor.open(new StubDocument("stub:2", "nginx.conf", "dustin@prod:/etc/nginx.conf", "prod"));
+            drain(host);
+            assertThat(titles(host.searchScope(RECENT, "prod", terminal, null))).containsExactly("prod.conf", "nginx.conf");
+        }
+    }
+
+    @Test void otherPluginsMakeTheirKeysReopenableAndOtherKeysAreDimmed() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID terminal = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            editor.open(new StubDocument("stub:/srv/app.conf", "app.conf", "dustin@prod:/srv/app.conf", "prod"));
+            drain(host);
+            List<String> rows = host.searchScope(RECENT, "", terminal, null);
+            assertThat(rows).containsExactly(rowId(rows) + "|app.conf|false");
+            assertThat(host.availableInScope(RECENT, rowId(rows), "open", terminal, null)).isFalse();
+            assertThat(host.availableInScope(RECENT, rowId(rows), "remove", terminal, null)).isTrue();
+            var reopened = new ArrayList<WindowOwner>();
+            Subscription registration = editor.reopener("stub:", key -> Optional.of(owner -> {
+                reopened.add(owner);
+                return new StubDocument(key, "app.conf", "dustin@prod:/srv/app.conf", "prod");
+            }));
+            rows = host.searchScope(RECENT, "prod", terminal, null);
+            assertThat(rows).containsExactly(rowId(rows) + "|app.conf|true");
+            assertThat(host.availableInScope(RECENT, rowId(rows), "open", terminal, null)).isTrue();
+            host.executeInScope(RECENT, rowId(rows), "open", terminal, null);
+            assertThat(reopened).hasSize(1);
+            registration.close();
+            assertThat(host.searchScope(RECENT, "", terminal, null)).containsExactly(rowId(rows) + "|app.conf|false");
+        }
     }
 
     @Test void registersItsActionsAndPublishesTheEditorService() throws Exception {

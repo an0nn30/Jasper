@@ -78,6 +78,7 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
     private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
     private dev.jasper.remote.edit.EditChannels editChannels;
+    private dev.jasper.sdk.Subscription reopener;
     private final Map<UUID, PendingSession> attachedPanes = new java.util.HashMap<>();
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE;
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
@@ -168,7 +169,10 @@ public class RemotePlugin implements Plugin {
             var editor=context.services().find(dev.jasper.editor.api.Editor.class);
             if(editor.isPresent()) {
                 editChannels=new dev.jasper.remote.edit.EditChannels((identity,owner)->endpoints.open(Optional.of(identity),owner.orElse(null),status->{}),connections::authenticated,transferBackground,ui);
-                sftpUi.editing(new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notices()::error));
+                var editing=new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notices()::error,
+                    id->store.hosts().stream().filter(host->host.id().equals(id)).findFirst());
+                sftpUi.editing(editing);
+                try { reopener=editing.registerReopener(); } catch(NoSuchMethodError older) { /* an Editor before 0.4 keeps no recent files */ }
             }
         } catch(NoClassDefFoundError absent) { /* the Editor is not installed: files in the SFTP panel do not open */ }
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
@@ -237,7 +241,7 @@ public class RemotePlugin implements Plugin {
 
     @Override public void stop() {
         stopped = true;
-        if(follower!=null)follower.close();if(sftpUi!=null)sftpUi.close();if(editChannels!=null)editChannels.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
+        if(follower!=null)follower.close();if(sftpUi!=null)sftpUi.close();if(reopener!=null)reopener.close();if(editChannels!=null)editChannels.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
         if (configImport != null) configImport.close();
         for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);

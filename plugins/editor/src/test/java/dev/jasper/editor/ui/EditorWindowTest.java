@@ -1,12 +1,15 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.session.Question;
 import dev.jasper.editor.syntax.Languages;
+import dev.jasper.editor.testsupport.StubDocument;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -35,6 +38,7 @@ class EditorWindowTest {
     private Runnable duringAsk = () -> { };
     private boolean cancelWait;
     private final List<Boolean> savedVim = new ArrayList<>();
+    private final List<String> recorded = new ArrayList<>();
     private java.util.concurrent.CompletableFuture<Void> vimSave = java.util.concurrent.CompletableFuture.completedFuture(null);
 
     @BeforeEach void open() {
@@ -57,7 +61,7 @@ class EditorWindowTest {
                 return saves.getNow(false);
             },
             settings::get, on -> { savedVim.add(on); return vimSave; }, false);
-        window = new EditorWindow(environment, () -> windowClosed = true);
+        window = new EditorWindow(environment, () -> windowClosed = true, document -> recorded.add(document.key()));
     }
 
     @AfterEach void close() { host.close(); }
@@ -74,6 +78,29 @@ class EditorWindowTest {
         window.openLocal(file);
         drain();
         return window.selected().orElseThrow();
+    }
+
+    @Test void aDocumentIsReportedOnceItsFirstReadSucceeds() throws Exception {
+        Path file = file("recent.txt", "text\n");
+        window.openLocal(file);
+        assertThat(recorded).isEmpty();
+        drain();
+        assertThat(recorded).containsExactly(LocalDocument.key(file));
+    }
+
+    @Test void aFailedReadIsNotReported() {
+        window.open(new StubDocument("stub:gone", "gone.txt", "/srv/gone.txt", null).failing(new NoSuchFileException("/srv/gone.txt")));
+        drain();
+        assertThat(window.selected().orElseThrow().session().state()).isEqualTo(DocumentSession.State.FAILED);
+        assertThat(recorded).isEmpty();
+    }
+
+    @Test void openingAnOpenFileAgainReportsItAgain() throws Exception {
+        Path file = file("again.txt", "text\n");
+        opened(file);
+        window.openLocal(file);
+        drain();
+        assertThat(recorded).containsExactly(LocalDocument.key(file), LocalDocument.key(file));
     }
 
     @Test void filesUseHostedTabsAndMovingPreservesDirtyTextAndUndo() throws Exception {
