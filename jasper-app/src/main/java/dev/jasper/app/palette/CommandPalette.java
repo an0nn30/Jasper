@@ -50,8 +50,10 @@ import javax.swing.event.DocumentListener;
 
 /**
  * Jasper's palette: a query row with an optional scope chip, a one-line result list with section headers
- * or the mode list, and a hint bar with the selected row's detail and its scope's other verbs. Every colour comes from the installed theme ({@code SearchEverywhere.*}, {@code List.*},
- * {@code Popup.borderColor}); a key a theme lacks falls back to one FlatLaf always defines. The host owns
+ * or the mode list, and a hint bar with the selected row's detail and its scope's other verbs. The card is one
+ * surface, {@code List.background}, throughout; the field keeps its {@code SearchEverywhere.SearchField.borderColor}
+ * border and the hint bar its separator rule. Every colour comes from the installed theme ({@code SearchEverywhere.*},
+ * {@code List.*}, {@code Popup.borderColor}); a key a theme lacks falls back to one FlatLaf always defines. The host owns
  * placement, focus, chips and key routing.
  */
 public final class CommandPalette extends JPanel {
@@ -368,13 +370,13 @@ public final class CommandPalette extends JPanel {
         selectionBackground = UIManager.getColor("List.selectionBackground");
         selectionForeground = UIManager.getColor("List.selectionForeground");
         hoverBackground = UIManager.getColor("List.hoverBackground");
-        Color advertiserBackground = color("SearchEverywhere.Advertiser.background", "Panel.background");
         advertiserForeground = color("SearchEverywhere.Advertiser.foreground", "Label.disabledForeground");
         linkColor = UIManager.getColor("Component.linkColor");
         chipBackground = color("SearchEverywhere.Tab.selectedBackground", "List.selectionInactiveBackground");
         chip.setForeground(linkColor);
         Color border = color("Popup.borderColor", "PopupMenu.borderColor");
-        Color fieldBackground = color("SearchEverywhere.SearchField.background", "TextField.background");
+        // One surface throughout, like VS Code's quick input: the field keeps only its border.
+        Color fieldBackground = listBackground;
         Color fieldBorder = color("SearchEverywhere.SearchField.borderColor", "Component.borderColor");
         font = UIManager.getFont("Label.font");
         smallFont = font.deriveFont(Font.PLAIN, font.getSize2D() - UIScale.scale(1f));
@@ -386,6 +388,7 @@ public final class CommandPalette extends JPanel {
         fieldRow.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(8), UIScale.scale(6), UIScale.scale(8)));
         query.putClientProperty(FlatClientProperties.STYLE, "background: " + hex(fieldBackground)
             + "; borderColor: " + hex(fieldBorder) + "; placeholderForeground: " + hex(infoForeground));
+        query.setBackground(listBackground);
         query.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_ICON, AppIcons.icon("search"));
         query.setFont(font);
         chip.setFont(font);
@@ -399,7 +402,7 @@ public final class CommandPalette extends JPanel {
         stepPanel.setBackground(listBackground);
         empty.setForeground(infoForeground);
         empty.setFont(font);
-        hintBar.setBackground(advertiserBackground);
+        hintBar.setBackground(listBackground);
         hintBar.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(UIScale.scale(1), 0, 0, 0, separatorColor),
             BorderFactory.createEmptyBorder(0, UIScale.scale(12), 0, UIScale.scale(12))));

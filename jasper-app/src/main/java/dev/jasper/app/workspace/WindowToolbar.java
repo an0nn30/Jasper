@@ -46,6 +46,35 @@ final class WindowToolbar extends JToolBar {
     int buttonSide() { return buttonSide(barHeight); }
     JButton overflowButton() { return overflow; }
 
+    private boolean labelsWanted = true;
+
+    /** Whether labelled controls (Split, contributed buttons and dropdowns) show their labels when they fit. */
+    void setLabelsWanted(boolean value) {
+        labelsWanted = value;
+        applyLabels(value);
+        revalidate(); repaint();
+    }
+
+    private boolean labelled(JButton button) {
+        return button != overflow && !Boolean.FALSE.equals(button.getClientProperty("keepLabel"))
+            && button.getClientProperty("label") instanceof String;
+    }
+
+    private void applyLabels(boolean on) {
+        for (Component child : getComponents())
+            if (child instanceof JButton button && labelled(button)) {
+                String text = on ? (String) button.getClientProperty("label") : null;
+                if (!java.util.Objects.equals(button.getText(), text)) button.setText(text);
+            }
+    }
+
+    private int groupWidth(int gap) {
+        int width = 0, count = 0;
+        for (Component child : getComponents())
+            if (child instanceof JButton button && button != overflow) { width += button.getPreferredSize().width + gap; count++; }
+        return count == 0 ? 0 : width - gap;
+    }
+
     /** The width that shows every control; the header never gives the toolbar more. */
     int fullWidth() {
         int padding = UIScale.scale(8), gap = UIScale.scale(4), width = 0;
@@ -91,6 +120,9 @@ final class WindowToolbar extends JToolBar {
     @Override public void doLayout() {
         int padding = UIScale.scale(8), gap = UIScale.scale(4), side = buttonSide();
         int available = Math.max(0, getWidth() - 2 * padding);
+        // Labels give way before any control moves into the overflow menu.
+        applyLabels(labelsWanted);
+        if (labelsWanted && groupWidth(gap) > available) applyLabels(false);
         List<JButton> buttons = new ArrayList<>();
         for (Component child : getComponents()) {
             if (child instanceof JButton button && button != overflow) {

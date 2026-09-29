@@ -117,6 +117,7 @@ class ThemeManagerTest {
             assertColours(Map.of("MenuItem.selectionBackground", "#5e7293", "MenuItem.selectionForeground", "#ffffff"));
             assertColours(Map.of("ToolWindow.background", "#191c20", "Table.background", "#191c20", "StatusBar.background", "#25292e",
                 "SearchEverywhere.Tab.selectedBackground", "#3e4451", "List.hoverBackground", "#323942"));
+            assertThat(UIManager.getBoolean("TitlePane.centerTitle")).as("dialog titles are centred").isTrue();
         } finally { UIManager.setLookAndFeel(original); }
     }
 

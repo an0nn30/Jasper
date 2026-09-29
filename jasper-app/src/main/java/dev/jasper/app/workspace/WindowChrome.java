@@ -29,7 +29,7 @@ final class WindowChrome {
     private final TitleSearchField search;
     private final WindowHeader header;
     private final WindowStatusBar status = new WindowStatusBar();
-    private final JMenuBar menuBar = new JMenuBar();
+    private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
     private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
@@ -54,6 +54,9 @@ final class WindowChrome {
             () -> owner.scopeShortcut(dev.jasper.app.palette.PaletteScope.ALL_ID));
         header = new WindowHeader(search, toolbar);
         header.setOpaque(true);
+        // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
+        toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
+            (java.util.function.Function<Point, Boolean>) point -> null);
         JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
@@ -422,11 +425,7 @@ final class WindowChrome {
 
     void setToolbarMode(ToolbarMode mode) {
         toolbar.setVisible(mode != ToolbarMode.HIDDEN);
-        for (var component : toolbar.getComponents()) if (component instanceof JButton button) {
-            boolean label = !Boolean.FALSE.equals(button.getClientProperty("keepLabel"))
-                && !"toolbarOverflow".equals(button.getName());
-            button.setText(mode == ToolbarMode.ICONS || !label ? null : (String) button.getClientProperty("label"));
-        }
+        toolbar.setLabelsWanted(mode == ToolbarMode.ICONS_AND_LABELS);
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
@@ -444,5 +443,5 @@ final class WindowChrome {
     TitleSearchField search() { return search; }
     void setToolbarHeight(int height) { toolbar.setBarHeight(height); }
     WindowStatusBar status() { return status; }
-    JMenuBar menuBar() { return menuBar; }
+    CollapsingMenuBar menuBar() { return menuBar; }
 }

@@ -90,4 +90,28 @@ class WindowToolbarTest {
         assertThat(bar.overflowButton().isVisible()).as("the full width shows everything").isFalse();
         assertThat(bar.overflowButton().getIcon()).isSameAs(dev.jasper.app.platform.AppIcons.bundled("general/moreVertical"));
     }
+
+    @Test void labelsGiveWayBeforeAnyControlOverflowsAndComeBackWithRoom() {
+        var bar = new WindowToolbar(() -> {});
+        var calls = new AtomicInteger();
+        var labelled = new JButton(action("Sessions", calls)) {
+            @Override public Dimension getPreferredSize() { return new Dimension(getText() == null ? 24 : 90, 24); }
+        };
+        labelled.putClientProperty("label", "Sessions");
+        WindowToolbar.entry(labelled, 80, () -> WindowToolbar.menuItem(labelled.getAction()));
+        bar.add(labelled);
+        button(bar, action("Find", calls), 100);
+        bar.finish();
+        bar.setSize(16 + 90 + 4 + 60, 30); bar.doLayout();
+        assertThat(labelled.getText()).isEqualTo("Sessions");
+        bar.setSize(16 + 24 + 4 + 60, 30); bar.doLayout();
+        assertThat(labelled.getText()).as("icons before overflow").isNull();
+        assertThat(bar.overflowButton().isVisible()).isFalse();
+        bar.setSize(60, 30); bar.doLayout();
+        assertThat(bar.overflowButton().isVisible()).isTrue();
+        bar.setSize(1000, 30); bar.doLayout();
+        assertThat(labelled.getText()).as("labels return with room").isEqualTo("Sessions");
+        bar.setLabelsWanted(false); bar.doLayout();
+        assertThat(labelled.getText()).isNull();
+    }
 }

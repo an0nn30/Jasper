@@ -20,6 +20,9 @@ status_bar_height = 24
 # Initial grid for new windows only. Columns: 5-500; lines: 2-200.
 columns = 100
 lines = 35
+# Restart required. Windows and Linux only: true uses the operating system's title bar, with the menus and
+# the toolbar in rows of their own, instead of Jasper's title bar. macOS ignores it.
+native_decorations = false
 
 [buddy]
 # Live. Show the pixel-art Jasper floating above your windows while a terminal is open.
