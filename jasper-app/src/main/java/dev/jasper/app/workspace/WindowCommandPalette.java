@@ -112,6 +112,7 @@ final class WindowCommandPalette implements AutoCloseable {
     boolean stepOpen() { return controller.stepOpen(); }
     void escape() { controller.escape(); }
     boolean tabPressed(boolean backwards) { return controller.tabPressed(backwards); }
+    boolean backspacePressed() { return controller.backspacePressed(); }
     void refresh() { controller.refresh(); }
     void refreshIfChanged() { controller.refreshIfChanged(); }
     boolean tabPressed() { return tabPressed(false); }

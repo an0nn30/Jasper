@@ -12,9 +12,10 @@ import java.util.function.Function;
 import javax.swing.SwingUtilities;
 
 /**
- * EDT-owned palette state: the open tab (All or one scope), the query, a step and queued completions.
- * All searches every scope that takes part in it, a section each, capped at the result limit. Host
- * callbacks contain all workspace integration.
+ * EDT-owned palette state: the chip (none, or one scope), the query, a step and queued completions. With
+ * no chip an empty query lists the scopes (the mode list) and any other query searches every scope that
+ * takes part in All, a section each, capped at the result limit. Host callbacks contain all workspace
+ * integration.
  */
 public final class PaletteController implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(PaletteController.class.getName());
@@ -27,9 +28,9 @@ public final class PaletteController implements AutoCloseable {
     private final Consumer<String> reportError, reopen;
     private final Subscription scopesListener;
     private final List<Subscription> tabListeners = new ArrayList<>();
-    /** The open tab, {@link PaletteScope#ALL_ID} or a scope id; null while closed. */
+    /** The chip: {@link PaletteScope#ALL_ID} for none, or a scope id; null while closed. */
     private String tab;
-    /** The open tab's scope; null for All. */
+    /** The chip's scope; null for none. */
     private PaletteScope active;
     private PaletteStep step;
     private PaletteScope stepScope;
@@ -46,11 +47,11 @@ public final class PaletteController implements AutoCloseable {
         this.shortcut = shortcut; this.batching = batching; this.updateActions = updateActions;
         this.reportError = reportError; this.reopen = reopen;
         context = new PaletteContext(macOs, PaletteTarget.none());
-        palette = new CommandPalette(macOs, this::queryChanged, this::execute, this::selectTab);
+        palette = new CommandPalette(macOs, this::queryChanged, this::execute, this::prefix, scope -> selectTab(scope.id()));
         scopesListener = scopes.onChanged(this::rosterChanged);
     }
 
-    /** Whether {@code id} is a tab: All, or a registered scope. */
+    /** Whether {@code id} can be opened: no chip (All), or a registered scope. */
     public boolean hasScope(String id) { return PaletteScope.ALL_ID.equals(id) || scopes.find(id).isPresent(); }
 
     /** The registered scope whose shortcut action is {@code actionId}. */
@@ -58,12 +59,12 @@ public final class PaletteController implements AutoCloseable {
         return scopes.byShortcutAction(actionId).map(PaletteScope::id);
     }
 
-    /** Captures the origin only on first open; changing tabs retains that captured target. */
+    /** Captures the origin only on first open; changing chips retains that captured target. */
     public boolean open(String tabId, PaletteTarget target, BooleanSupplier valid) { return open(tabId, target, valid, null, null); }
 
     /**
      * As {@link #open(String, PaletteTarget, BooleanSupplier)}; afterwards {@code queryOrNull} replaces the
-     * query text and {@code rowIdOrNull} selects a row of the resulting list. Opening the tab that is
+     * query text and {@code rowIdOrNull} selects a row of the resulting list. Opening the chip that is
      * already showing dismisses instead, and then neither is applied.
      */
     public boolean open(String tabId, PaletteTarget target, BooleanSupplier valid, String queryOrNull, String rowIdOrNull) {
@@ -85,20 +86,10 @@ public final class PaletteController implements AutoCloseable {
         return true;
     }
 
-    /** Selects the tab {@code id}, keeping the query; the open tab again does nothing. */
+    /** Sets the chip {@code id}, keeping the query; the current chip again does nothing. */
     public void selectTab(String id) {
         if (!open || id.equals(tab) || !hasScope(id)) return;
         activate(id);
-    }
-
-    /** Selects the next ({@code delta} 1) or previous ({@code -1}) tab, wrapping, and keeps the query. */
-    public void cycleTab(int delta) {
-        if (!open) return;
-        var ids = new ArrayList<String>();
-        ids.add(PaletteScope.ALL_ID);
-        scopes.scopes().forEach(scope -> ids.add(scope.id()));
-        int index = Math.max(0, ids.indexOf(tab));
-        activate(ids.get(Math.floorMod(index + delta, ids.size())));
     }
 
     private void activate(String tabId) {
@@ -114,7 +105,7 @@ public final class PaletteController implements AutoCloseable {
             tabListeners.add(scope.onChanged(this::changed));
             scope.activated(context);
         }
-        showTabs();
+        showChip();
         rebuild(false);
     }
 
@@ -124,19 +115,9 @@ public final class PaletteController implements AutoCloseable {
         return scopes.scopes().stream().filter(PaletteScope::inAll).toList();
     }
 
-    private void showTabs() {
-        var tabs = new ArrayList<CommandPalette.Tab>();
-        tabs.add(new CommandPalette.Tab(PaletteScope.ALL_ID, "All", null, tooltip("Search everywhere", PaletteScope.ALL_ID)));
-        for (PaletteScope scope : scopes.scopes())
-            tabs.add(new CommandPalette.Tab(scope.id(), scope.label(), scope.icon(), tooltip(scope.description(), scope.id())));
-        palette.setTabs(tabs, tab);
-        palette.setPlaceholder(active == null ? "Search everywhere" : active.placeholder());
-    }
-
-    private String tooltip(String description, String id) {
-        String keys = shortcut.apply(id);
-        if (keys == null || keys.isBlank()) return description.isBlank() ? null : description;
-        return description.isBlank() ? keys : description + " (" + keys + ")";
+    private void showChip() {
+        palette.setChip(active == null ? null : active.label(), active == null ? null : active.icon());
+        palette.setPlaceholder(active == null ? "Search everything" : active.placeholder());
     }
 
     /** The hard cap every scope returns; a live change re-runs the open query under the new cap. */
@@ -150,7 +131,7 @@ public final class PaletteController implements AutoCloseable {
     public int maxResults() { return maxResults; }
     public void dismiss() { if (open) restoreAndHide(); }
     public boolean isOpen() { return open; }
-    /** The open tab: {@link PaletteScope#ALL_ID} or a scope id; null while closed. */
+    /** The chip: {@link PaletteScope#ALL_ID} for none, or a scope id; null while closed. */
     public String activeScopeId() { return tab; }
     public boolean composing() { return palette.composing(); }
     public CommandPalette component() { return palette; }
@@ -172,12 +153,36 @@ public final class PaletteController implements AutoCloseable {
 
     public boolean tabPressed() { return tabPressed(false); }
 
-    /** Tab moves between step fields, and otherwise to the next tab; Shift+Tab goes back. */
+    /** Tab moves between step fields; elsewhere the palette claims it and does nothing. */
     public boolean tabPressed(boolean backwards) {
         if (!open) return false;
-        if (step != null) { palette.focusStepField(backwards ? -1 : 1); return true; }
-        cycleTab(backwards ? -1 : 1);
+        if (step != null) palette.focusStepField(backwards ? -1 : 1);
         return true;
+    }
+
+    /** Backspace in an empty query removes the chip; false leaves the key to the field. */
+    public boolean backspacePressed() {
+        if (!open || step != null || active == null || !palette.queryField().getText().isEmpty()) return false;
+        activate(PaletteScope.ALL_ID);
+        return true;
+    }
+
+    /** A typed prefix becomes a chip only while no chip or step is showing. */
+    private Optional<ScopePrefix> prefix(String text) {
+        if (!open || active != null || step != null) return Optional.empty();
+        return ScopePrefix.parse(text, scopes.scopes());
+    }
+
+    /** Commands first, then every other scope in registry order. */
+    private List<PaletteScope> modeScopes() {
+        var ordered = new ArrayList<PaletteScope>();
+        scopes.find(PaletteScope.COMMANDS_ID).ifPresent(ordered::add);
+        for (PaletteScope scope : scopes.scopes()) if (!PaletteScope.COMMANDS_ID.equals(scope.id())) ordered.add(scope);
+        return ordered;
+    }
+
+    static String prefixText(PaletteScope scope) {
+        return PaletteScope.COMMANDS_ID.equals(scope.id()) ? ">" : scope.label().toLowerCase(Locale.ROOT) + " >";
     }
 
     private void showStep(PaletteStep pending, PaletteScope owner) {
@@ -268,7 +273,7 @@ public final class PaletteController implements AutoCloseable {
             && (stepScope == null || scopes.contains(stepScope));
     }
 
-    /** A scope came or went while open: show the new tabs and, on All, listen to the new roster. */
+    /** A scope came or went while open: show the chip and, with none, listen to the new roster. */
     private void applyRoster() {
         rosterChanged = false;
         if (active == null) {
@@ -276,7 +281,7 @@ public final class PaletteController implements AutoCloseable {
             tabListeners.clear();
             for (PaletteScope scope : tabScopes()) tabListeners.add(scope.onChanged(this::changed));
         }
-        showTabs();
+        showChip();
     }
 
     public void refreshTheme() { palette.refreshTheme(); if (open) layout.run(); }
@@ -294,6 +299,9 @@ public final class PaletteController implements AutoCloseable {
             if (results.sectionLabel() != null && !results.rows().isEmpty()) entries.add(new PaletteEntry.Header(results.sectionLabel()));
             for (PaletteRow row : results.rows()) entries.add(new PaletteEntry.Item(active, row));
             if (results.initialSelectionId() != null) initial = PaletteEntry.key(active, results.initialSelectionId());
+        } else if (query.isBlank()) {
+            for (PaletteScope scope : modeScopes())
+                entries.add(new PaletteEntry.Mode(scope, prefixText(scope), shortcut.apply(scope.id())));
         } else {
             // One row more than shown tells whether a scope has more matches than All has room for.
             var probe = new PaletteContext(macOs, context.target(), maxResults + 1);
@@ -330,6 +338,7 @@ public final class PaletteController implements AutoCloseable {
     private void execute(PaletteEntry entry, int verbIndex) {
         if (!open) return;
         if (entry instanceof PaletteEntry.More more) { selectTab(more.scope().id()); return; }
+        if (entry instanceof PaletteEntry.Mode mode) { selectTab(mode.scope().id()); return; }
         if (!(entry instanceof PaletteEntry.Item item)) return;
         PaletteScope scope = item.scope();
         PaletteRow row = item.row();

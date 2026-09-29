@@ -69,7 +69,7 @@ class PaletteScopesTest {
         }
     }
 
-    @Test void theCommandPaletteShortcutOpensAllWithATabPerScope() throws Exception {
+    @Test void theCommandPaletteShortcutOpensTheModeListWithNoChip() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
@@ -78,37 +78,56 @@ class PaletteScopesTest {
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
-                assertThat(PaletteTestSupport.tabIds(card)).containsExactly(PaletteScope.ALL_ID, PaletteScope.COMMANDS_ID, "test.fake");
-                assertThat(PaletteTestSupport.selectedTabId(card)).isEqualTo(PaletteScope.ALL_ID);
-                assertThat(PaletteTestSupport.placeholder(card)).isEqualTo("Search everywhere");
-                var entries = PaletteTestSupport.entries(card);
-                assertThat(entries.getFirst()).isEqualTo("# Commands");
-                assertThat(entries).containsSubsequence("# Fake", "test.fake/alpha", "test.fake/beta");
+                assertThat(PaletteTestSupport.chipText(card)).isNull();
+                assertThat(PaletteTestSupport.placeholder(card)).isEqualTo("Search everything");
+                assertThat(PaletteTestSupport.entries(card)).containsExactly("mode:" + PaletteScope.COMMANDS_ID, "mode:test.fake");
+                var mode = (dev.jasper.app.palette.PaletteEntry.Mode) PaletteTestSupport.entryList(card).getModel().getElementAt(1);
+                assertThat(mode.prefix()).isEqualTo("fake >");
+                var commands = (dev.jasper.app.palette.PaletteEntry.Mode) PaletteTestSupport.entryList(card).getModel().getElementAt(0);
+                assertThat(commands.prefix()).isEqualTo(">");
                 assertThat(fake.activations).isEqualTo(1);
-                assertThat(PaletteTestSupport.selectedRow(card)).isNotNull();
+                card.queryField().setText("al");
+                assertThat(PaletteTestSupport.entries(card)).containsSubsequence("# Fake", "test.fake/alpha");
                 palette.toggle();
-                assertThat(palette.isOpen()).as("the open tab's own shortcut closes").isFalse();
+                assertThat(palette.isOpen()).as("the shortcut closes it again").isFalse();
             }
         });
     }
 
-    @Test void greaterThanInAllIsAPlainQueryNotAPicker() throws Exception {
+    @Test void typedPrefixesAndModeRowsSetTheChipAndBackspaceRemovesIt() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
                 var fake = new FakeScope();
-                fake.rows = List.of(PaletteRow.of("gt", "closes > right"));
+                fake.rows = List.of(PaletteRow.of("gt", "closes > right"), PaletteRow.of("alpha", "Alpha"));
                 owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                var tabsBefore = PaletteTestSupport.tabIds(card);
-                var selectedBefore = PaletteTestSupport.selectedTabId(card);
+                card.queryField().setText("fake > al");
+                assertThat(palette.activeScopeId()).isEqualTo("test.fake");
+                assertThat(PaletteTestSupport.chipText(card)).isEqualTo("Fake");
+                assertThat(card.queryField().getText()).isEqualTo("al");
+                assertThat(PaletteTestSupport.entries(card)).containsExactly("test.fake/alpha");
+                card.queryField().setText("closes > right");
+                assertThat(palette.activeScopeId()).as("with a chip, '>' is text").isEqualTo("test.fake");
+                assertThat(PaletteTestSupport.entries(card)).containsExactly("test.fake/gt");
+                assertThat(palette.backspacePressed()).as("the query is not empty").isFalse();
+                card.queryField().setText("");
+                assertThat(palette.backspacePressed()).isTrue();
+                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
+                assertThat(PaletteTestSupport.chipText(card)).isNull();
+                assertThat(PaletteTestSupport.entries(card)).first().isEqualTo("mode:" + PaletteScope.COMMANDS_ID);
+                assertThat(palette.backspacePressed()).as("no chip to remove").isFalse();
                 card.queryField().setText(">");
-                assertThat(card.queryField().getText()).as("no picker rewrites the field").isEqualTo(">");
-                assertThat(PaletteTestSupport.tabIds(card)).as("the tabs are unchanged").isEqualTo(tabsBefore);
-                assertThat(PaletteTestSupport.selectedTabId(card)).as("the selected tab is unchanged").isEqualTo(selectedBefore);
-                assertThat(PaletteTestSupport.entries(card)).as("scopes are searched with the literal '>' text")
-                    .contains("test.fake/gt");
+                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
+                assertThat(PaletteTestSupport.placeholder(card)).isEqualTo("Type a command");
+                card.queryField().setText("");
+                palette.backspacePressed();
+                PaletteTestSupport.selectRelative(card, 1);
+                palette.enterPressed(0);
+                assertThat(palette.activeScopeId()).as("a mode row sets its chip").isEqualTo("test.fake");
+                assertThat(palette.isOpen()).isTrue();
+                assertThat(PaletteTestSupport.entries(card)).contains("test.fake/alpha");
             }
         });
     }
@@ -140,7 +159,7 @@ class PaletteScopesTest {
         });
     }
 
-    @Test void aScopeThatOptsOutKeepsItsTabButStaysOutOfAll() throws Exception {
+    @Test void aScopeThatOptsOutIsInTheModeListButStaysOutOfAll() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
@@ -148,7 +167,8 @@ class PaletteScopesTest {
                 owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                assertThat(PaletteTestSupport.tabIds(card)).contains("test.fake");
+                assertThat(PaletteTestSupport.entries(card)).contains("mode:test.fake");
+                card.queryField().setText("al");
                 assertThat(PaletteTestSupport.entries(card)).doesNotContain("# Fake").noneMatch(entry -> entry.startsWith("test.fake/"));
                 assertThat(fake.activations).as("All does not activate it").isZero();
                 palette.open("test.fake");
@@ -169,34 +189,25 @@ class PaletteScopesTest {
                 owner.scopes().register(new FakeScope());
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
+                card.queryField().setText("alph");
                 assertThat(palette.isOpen()).isTrue();
-                assertThat(PaletteTestSupport.entries(card)).contains("# Commands", "# Fake").doesNotContain("# Broken");
+                assertThat(PaletteTestSupport.entries(card)).contains("# Fake").doesNotContain("# Broken");
             }
         });
     }
 
-    @Test void tabAndShiftTabCycleTheTabsAndKeepTheQuery() throws Exception {
+    @Test void tabIsIgnoredOutsideAStepAndKeepsTheChipAndQuery() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
                 owner.scopes().register(new FakeScope());
                 var palette = owner.commandPalette(); var card = palette.component();
-                palette.toggle();
+                palette.open("test.fake");
                 card.queryField().setText("be");
                 assertThat(palette.tabPressed(false)).isTrue();
-                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
-                assertThat(PaletteTestSupport.placeholder(card)).isEqualTo("Type a command");
-                assertThat(palette.tabPressed(false)).isTrue();
+                assertThat(palette.tabPressed(true)).isTrue();
                 assertThat(palette.activeScopeId()).isEqualTo("test.fake");
                 assertThat(card.queryField().getText()).isEqualTo("be");
-                assertThat(PaletteTestSupport.entries(card)).containsExactly("test.fake/beta");
-                palette.tabPressed(false);
-                assertThat(palette.activeScopeId()).as("wraps to All").isEqualTo(PaletteScope.ALL_ID);
-                palette.tabPressed(true);
-                assertThat(palette.activeScopeId()).isEqualTo("test.fake");
-                PaletteTestSupport.clickTab(card, PaletteScope.COMMANDS_ID);
-                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
-                assertThat(PaletteTestSupport.selectedTabId(card)).isEqualTo(PaletteScope.COMMANDS_ID);
                 palette.dismiss();
                 assertThat(palette.tabPressed(false)).as("closed").isFalse();
             }
@@ -208,18 +219,21 @@ class PaletteScopesTest {
             try (var owner = owner(true)) {
                 install(owner);
                 owner.scopes().register(new FakeScope());
+                owner.scopes().register(new FakeScope() {
+                    @Override public String id() { return "test.other"; }
+                    @Override public String label() { return "Other"; }
+                });
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                int commands = PaletteTestSupport.entries(card).indexOf("# Fake") - 1;
-                assertThat(commands).isPositive();
-                palette.moveSelection(commands - 1);
-                assertThat(PaletteTestSupport.selectedRowIndex(card)).isEqualTo(commands - 1);
+                card.queryField().setText("alph");
+                assertThat(PaletteTestSupport.entries(card)).containsExactly("# Fake", "test.fake/alpha", "# Other", "test.other/alpha");
+                assertThat(PaletteTestSupport.selectedRowIndex(card)).isZero();
                 palette.moveSelection(1);
-                assertThat(PaletteTestSupport.selectedRow(card).id()).as("past the Fake header").isEqualTo("alpha");
+                assertThat(PaletteTestSupport.selectedRowIndex(card)).as("past the Other header").isEqualTo(1);
                 palette.moveSelection(-1);
-                assertThat(PaletteTestSupport.selectedRowIndex(card)).isEqualTo(commands - 1);
+                assertThat(PaletteTestSupport.selectedRowIndex(card)).isZero();
                 palette.moveSelection(50);
-                assertThat(PaletteTestSupport.selectedRow(card).id()).isEqualTo("beta");
+                assertThat(PaletteTestSupport.selectedRowIndex(card)).isEqualTo(1);
             }
         });
     }
@@ -283,10 +297,12 @@ class PaletteScopesTest {
                 var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
+                card.queryField().setText("beta");
                 PaletteTestSupport.selectRow(card, "beta");
                 PaletteTestSupport.executeSelected(card, 1);
                 assertThat(fake.executed).containsExactly("beta:two");
                 palette.toggle();
+                card.queryField().setText("beta");
                 PaletteTestSupport.selectRow(card, "beta");
                 palette.enterPressed(2);
                 assertThat(palette.stepOpen()).as("the scope's own step").isTrue();
@@ -306,6 +322,7 @@ class PaletteScopesTest {
                 var registration = owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
+                card.queryField().setText("beta");
                 PaletteTestSupport.selectRow(card, "beta");
                 palette.enterPressed(2);
                 assertThat(palette.stepOpen()).as("the step opened from All").isTrue();
@@ -337,7 +354,7 @@ class PaletteScopesTest {
         });
     }
 
-    @Test void scopesRegisteredOrRemovedWhileAllIsOpenUpdateItsTabsAndSections() throws Exception {
+    @Test void scopesRegisteredOrRemovedWhileOpenUpdateTheModeListAndSections() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 install(owner);
@@ -345,15 +362,16 @@ class PaletteScopesTest {
                 palette.toggle();
                 var fake = new FakeScope();
                 var registration = owner.scopes().register(fake);
-                assertThat(PaletteTestSupport.tabIds(card)).contains("test.fake");
-                assertThat(PaletteTestSupport.entries(card)).contains("# Fake");
+                assertThat(PaletteTestSupport.entries(card)).contains("mode:test.fake");
+                card.queryField().setText("gam");
                 fake.rows = List.of(PaletteRow.of("gamma", "Gamma"));
                 List.copyOf(fake.listeners).forEach(Runnable::run);
-                assertThat(PaletteTestSupport.entries(card)).contains("test.fake/gamma");
+                assertThat(PaletteTestSupport.entries(card)).contains("# Fake", "test.fake/gamma");
                 registration.close();
                 assertThat(palette.isOpen()).as("All stays open").isTrue();
-                assertThat(PaletteTestSupport.tabIds(card)).doesNotContain("test.fake");
                 assertThat(PaletteTestSupport.entries(card)).doesNotContain("# Fake");
+                card.queryField().setText("");
+                assertThat(PaletteTestSupport.entries(card)).doesNotContain("mode:test.fake");
                 assertThat(fake.listeners).isEmpty();
             }
         });
@@ -379,6 +397,7 @@ class PaletteScopesTest {
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.setMaxResults(20);
                 palette.toggle();
+                card.queryField().setText("row");
                 assertThat(palette.isOpen()).as("All opens without throwing").isTrue();
                 assertThat(PaletteTestSupport.rowCount(card)).as("at most PaletteResults.MAX_ROWS (200) item rows").isEqualTo(200);
                 var headers = PaletteTestSupport.entries(card).stream().filter(entry -> entry.startsWith("# Fake")).toList();
@@ -389,7 +408,7 @@ class PaletteScopesTest {
         });
     }
 
-    @Test void routerOpensAllCyclesWithTabAndRunsTheSecondVerbWithCmdEnter() throws Exception {
+    @Test void routerOpensTheModeListRemovesChipsWithBackspaceAndRunsTheSecondVerbWithCmdEnter() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
                 var root = install(owner);
@@ -399,14 +418,15 @@ class PaletteScopesTest {
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_K));
                 assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
-                for (int i = 0; i < 2; i++) {
-                    assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_TAB, 0))).isTrue();
-                    router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_TAB));
-                }
-                assertThat(owner.commandPalette().activeScopeId()).isEqualTo("test.fake");
-                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_TAB, InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_TAB, 0))).as("claimed, ignored").isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_TAB));
-                assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
+                assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_BACK_SPACE, 0)))
+                    .as("no chip: the field keeps Backspace").isFalse();
+                owner.commandPalette().open("test.fake");
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_BACK_SPACE, 0))).isTrue();
+                router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_BACK_SPACE));
+                assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
                 owner.commandPalette().open("test.fake");
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, mod))).isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_ENTER));
@@ -415,7 +435,7 @@ class PaletteScopesTest {
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_K));
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
-                assertThat(owner.commandPalette().isOpen()).as("Cmd+K on All closes").isFalse();
+                assertThat(owner.commandPalette().isOpen()).as("Cmd+K with no chip closes").isFalse();
             }
         });
     }

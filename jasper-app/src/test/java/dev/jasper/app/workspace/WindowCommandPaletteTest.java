@@ -159,7 +159,7 @@ class WindowCommandPaletteTest {
                 first.commandPalette().toggle(); first.commandPalette().component().queryField().setText("custom");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(first.commandPalette().component());
                 assertThat(a.get()).isEqualTo(1); assertThat(b.get()).isZero();
-                second.commandPalette().toggle();
+                second.commandPalette().open(dev.jasper.app.palette.PaletteScope.COMMANDS_ID);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(second.commandPalette().component()).id()).isEqualTo("custom");
                 first.close(); dev.jasper.app.palette.PaletteTestSupport.executeSelected(second.commandPalette().component());
                 assertThat(b.get()).isEqualTo(1); assertThat(history.recent()).containsExactly("custom");
@@ -246,18 +246,18 @@ class WindowCommandPaletteTest {
                 var palette = owner.commandPalette().component();
                 var overlay = (JComponent) palette.getParent();
 
-                var tabStrip = dev.jasper.app.palette.PaletteTestSupport.tabStrip(palette);
-                var tabStripBounds = SwingUtilities.convertRectangle(tabStrip.getParent(), tabStrip.getBounds(), palette);
+                var chip = dev.jasper.app.palette.PaletteTestSupport.chip(palette);
+                var chipBounds = SwingUtilities.convertRectangle(chip.getParent(), chip.getBounds(), palette);
                 var fieldRow = dev.jasper.app.palette.PaletteTestSupport.fieldRow(palette);
                 var fieldRowBounds = SwingUtilities.convertRectangle(fieldRow.getParent(), fieldRow.getBounds(), palette);
                 var hintBar = dev.jasper.app.palette.PaletteTestSupport.hintBar(palette);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.hint(palette)).as("a detail is showing to click on").isEqualTo("a detail");
 
-                // The tab-strip gap right of the last tab, the hint bar's detail text and the field
+                // The scope chip, the hint bar's detail text and the field
                 // row's padding: three places AWT could otherwise retarget a press straight to the
                 // overlay behind the palette, dismissing it and losing the query.
                 var points = List.of(
-                    new Point(tabStripBounds.x + tabStripBounds.width - 4, tabStripBounds.y + tabStripBounds.height / 2),
+                    new Point(chipBounds.x + chipBounds.width / 2, chipBounds.y + chipBounds.height / 2),
                     new Point(hintBar.getX() + 10, hintBar.getY() + hintBar.getHeight() / 2),
                     new Point(fieldRowBounds.x + 2, fieldRowBounds.y + 2));
 

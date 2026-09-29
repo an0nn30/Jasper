@@ -439,13 +439,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void dispatchCommand(Command command) {
         command.action().actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, command.id()));
     }
-    /** The application shortcut that opens a scope directly, shown in its tab's tooltip; null when none. */
+    /** The shortcut that opens a scope's chip (or the palette, for {@code ALL_ID}), for the mode list; null when none. */
     String scopeShortcut(String scopeId) {
-        ActionId id = switch (scopeId) {
-            case PaletteScope.ALL_ID -> ActionId.COMMAND_PALETTE;
-            default -> null;
-        };
-        return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
+        if (PaletteScope.ALL_ID.equals(scopeId))
+            return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
+        return scopes.find(scopeId).flatMap(PaletteScope::shortcutActionId).flatMap(bindings::strokeFor)
+            .map(stroke -> CommandsScope.shortcutText(stroke, macOs)).orElse(null);
     }
     String tabShortcut(int index) {
         if (index < 0 || index >= 9) return "";
