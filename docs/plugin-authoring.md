@@ -19,12 +19,18 @@ entry = "dev.example.tool.ToolPlugin"
 sdk = ">=0.9, <0.10"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute
 exports = []                       # packages other plugins may use
+icon = "icons/tool.svg"            # optional, SDK 0.9.2: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
+homepage = "https://example.dev/tool"  # optional, SDK 0.9.2: an http or https link on your plugin's page
 
 [[requires]]
 id = "dev.example.other"
 version = ">=1.0"
 optional = false
 ```
+
+`icon` and `homepage` need Jasper 0.9.2 or later (declare `sdk = ">=0.9.2, <0.10"`); an older Jasper rejects a
+manifest with keys it does not know. An icon that is missing, too large or not an SVG or PNG, and a homepage that is
+not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
