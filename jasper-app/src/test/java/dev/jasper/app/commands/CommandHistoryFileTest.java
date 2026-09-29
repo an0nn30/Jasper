@@ -30,9 +30,9 @@ class CommandHistoryFileTest {
 
     @Test void oversizedOrUnsupportedHistoryIsRejected() throws Exception {
         Path file = directory.resolve("command-history.toml");
-        Files.writeString(file, " ".repeat(16385));
+        Files.writeString(file, " ".repeat(131073));
         assertThatThrownBy(() -> CommandHistoryFile.read(file)).isInstanceOf(IOException.class);
-        Files.writeString(file, "version = 2\nrecent = []\n");
+        Files.writeString(file, "version = 3\nrecent = []\n");
         assertThatThrownBy(() -> CommandHistoryFile.read(file)).isInstanceOf(IOException.class);
     }
 
@@ -67,5 +67,32 @@ class CommandHistoryFileTest {
             List.of("query text"))).isInstanceOf(IOException.class);
         assertThatThrownBy(() -> CommandHistoryFile.write(directory.resolve("null.toml"),
             java.util.Arrays.asList((String) null))).isInstanceOf(IOException.class);
+    }
+
+    @Test void paletteUsesRoundTripInVersionTwoWithEscapedTitles() throws Exception {
+        Path file = directory.resolve("command-history.toml");
+        var uses = List.of(new PaletteUse("dev.jasper.remote.scope", "host/prod", "prod \"eu\" \\ west\tone", 3, 1000L),
+            new PaletteUse("jasper.commands", "new_tab", "New Tab", 1, 500L));
+        CommandHistoryFile.write(file, List.of("new_tab"), uses);
+        assertThat(Files.readString(file)).startsWith("version = 2\n");
+        var saved = CommandHistoryFile.readAll(file);
+        assertThat(saved.recent()).containsExactly("new_tab");
+        assertThat(saved.uses()).containsExactlyElementsOf(uses);
+        assertThat(CommandHistoryFile.read(file)).containsExactly("new_tab");
+        CommandHistoryFile.write(file, List.of("new_tab"));
+        assertThat(Files.readString(file)).as("no uses keeps version 1").startsWith("version = 1\n");
+        assertThat(CommandHistoryFile.readAll(file).uses()).isEmpty();
+    }
+
+    @Test void malformedPaletteUsesAreRejected() throws Exception {
+        Path file = directory.resolve("command-history.toml");
+        for (String text : List.of(
+                "version = 1\nrecent = []\n[[used]]\nscope = \"a.b\"\nrow = \"r\"\ntitle = \"t\"\ncount = 1\nlast = 1\n",
+                "version = 2\nrecent = []\n[[used]]\nscope = \"Bad\"\nrow = \"r\"\ntitle = \"t\"\ncount = 1\nlast = 1\n",
+                "version = 2\nrecent = []\n[[used]]\nscope = \"a.b\"\nrow = \"r\"\ntitle = \"t\"\ncount = 0\nlast = 1\n",
+                "version = 2\nrecent = []\n[[used]]\nscope = \"a.b\"\nrow = \"r\"\ntitle = \"t\"\ncount = 1\n")) {
+            Files.writeString(file, text);
+            assertThatThrownBy(() -> CommandHistoryFile.readAll(file)).as(text).isInstanceOf(IOException.class);
+        }
     }
 }
