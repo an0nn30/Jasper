@@ -11,7 +11,7 @@
   (98 new), with and without a final line break.
   - Executed inline on 2026-09-29 (9f85bd53..4ce02518): every step's expected result matched; `./gradlew check`
     7,031 tests green.
-  - Merged into local main (fast-forward, after merging main: 7,045 tests green) on 2026-09-29; not pushed.
+  - Merged into local main (fast-forward, after merging main twice: 7,050 tests green) on 2026-09-29; not pushed.
   - Not done: GUI checks 104–109 of the [checklist](editor-verification.md) (user-run); plan V4d
     (sneak); push.
 - **Palette recents and scope hints** (branch `claude/palette-recents`, bounded change agreed in chat 2026-09-29):
