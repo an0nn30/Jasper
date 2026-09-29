@@ -18,8 +18,13 @@ final class Search {
         static final Offset NONE = new Offset(false, false, 0);
     }
 
-    /** A match: its start, and the position after its end. */
-    record Match(Pos start, Pos end) { }
+    /**
+     * A match: its start, the position after its end, and the number of its first {@code \(\)} group that took part
+     * (searchit's submatch, for searchpair()), 0 for none.
+     */
+    record Match(Pos start, Pos end, int submatch) {
+        Match(Pos start, Pos end) { this(start, end, 0); }
+    }
 
     /** Vim's RE_SEARCH and RE_SUBST. */
     static final int SEARCH = 0, SUBSTITUTE = 1;
@@ -417,69 +422,128 @@ final class Search {
      */
     Pos searchit(Context c, Pos start, boolean forward, VimRegex re, int count, boolean atEnd, String shown) {
         Buffer b = c.buffer;
-        String text = b.text(0, b.length());
-        Matcher m = re.pattern().matcher(text);
+        Matcher m = re.pattern().matcher(b.text(0, b.length()));
         Pos pos = start.copy();
         boolean wrapscan = c.options.flag("wrapscan");
-        int lastLine = b.count() - 1;
-        boolean found = false;
-        int lnum = 0;
+        Match found;
         do {
-            int startCharLen;
-            if (pos.col == Integer.MAX_VALUE) startCharLen = 0;
-            else if (pos.line >= 0 && pos.line <= lastLine) {
-                String l = b.line(pos.line);
-                startCharLen = pos.col >= l.length() ? 1 : Character.charCount(l.codePointAt(pos.col));
-            } else startCharLen = 1;
-            int extraCol = forward ? startCharLen : 0;
-            Pos startPos = pos.copy();
-            found = false;
-            boolean atFirstLine = true;
-            if (pos.line < 0) {
-                pos = new Pos(0, 0);
-                atFirstLine = false;
-            }
-            if (!forward && startPos.col == 0) {
-                lnum = pos.line - 1;
-                atFirstLine = false;
-            } else lnum = pos.line;
-            if (pos.line > lastLine) atFirstLine = false;
-            for (int loop = 0; loop <= 1; loop++) {
-                for (; lnum >= 0 && lnum <= lastLine; lnum += forward ? 1 : -1, atFirstLine = false) {
-                    Match match = forward ? forwardIn(b, m, re, lnum, atFirstLine, startPos, extraCol, atEnd)
-                        : backwardIn(b, m, re, lnum, loop > 0, startPos, extraCol, atEnd);
-                    if (match != null) {
-                        if (atEnd && !match.start().equals(match.end())) {
-                            Pos e = match.end().copy();
-                            if (e.col == 0) {
-                                if (e.line > 0) {
-                                    e.line--;
-                                    e.col = b.line(e.line).length();
-                                }
-                            } else e.col = Text.previous(b.line(e.line), e.col);
-                            pos = e;
-                        } else pos = match.start().copy();
-                        found = true;
-                        break;
-                    }
-                    if (loop > 0 && lnum == startPos.line) break;
-                }
-                if (!wrapscan || found || loop > 0) break;
-                lnum = forward ? 0 : lastLine;
+            found = findOnce(b, m, re, pos, forward, atEnd, wrapscan, () -> {
                 lastWrapped = true;
                 c.editor.message(forward ? "search hit BOTTOM, continuing at TOP" : "search hit TOP, continuing at BOTTOM", true);
-            }
-        } while (--count > 0 && found);
-        if (!found) {
+            });
+            if (found != null) pos = found.start();
+        } while (--count > 0 && found != null);
+        if (found == null) {
             if (wrapscan) throw new VimFailure("E486: Pattern not found: " + shown);
-            if (lnum < 0) throw new VimFailure("E384: Search hit TOP without match for: " + shown);
+            if (!forward) throw new VimFailure("E384: Search hit TOP without match for: " + shown);
             throw new VimFailure("E385: Search hit BOTTOM without match for: " + shown);
         }
+        int lastLine = b.count() - 1;
         if (pos.line > lastLine) {
             String l = b.line(lastLine);
             pos = new Pos(lastLine, l.isEmpty() ? 0 : Text.last(l));
         }
         return pos;
+    }
+
+    /**
+     * One step of searchit: the next match from {@code pos}, forward or backward, wrapping once when {@code wrap}
+     * ({@code onWrap} runs then).
+     *
+     * @return the match, whose start is its last character with {@code atEnd}; null when there is none
+     */
+    static Match findOnce(Buffer b, Matcher m, VimRegex re, Pos pos, boolean forward, boolean atEnd, boolean wrap, Runnable onWrap) {
+        int lastLine = b.count() - 1;
+        int startCharLen;
+        if (pos.col == Integer.MAX_VALUE) startCharLen = 0;
+        else if (pos.line >= 0 && pos.line <= lastLine) {
+            String l = b.line(pos.line);
+            startCharLen = pos.col >= l.length() ? 1 : Character.charCount(l.codePointAt(pos.col));
+        } else startCharLen = 1;
+        int extraCol = forward ? startCharLen : 0;
+        Pos startPos = pos.copy();
+        boolean atFirstLine = true;
+        int lnum;
+        if (pos.line < 0) atFirstLine = false;
+        if (!forward && startPos.col == 0) {
+            lnum = Math.max(pos.line, 0) - 1;
+            atFirstLine = false;
+        } else lnum = Math.max(pos.line, 0);
+        if (pos.line > lastLine) atFirstLine = false;
+        for (int loop = 0; loop <= 1; loop++) {
+            for (; lnum >= 0 && lnum <= lastLine; lnum += forward ? 1 : -1, atFirstLine = false) {
+                Match match = forward ? forwardIn(b, m, re, lnum, atFirstLine, startPos, extraCol, atEnd)
+                    : backwardIn(b, m, re, lnum, loop > 0, startPos, extraCol, atEnd);
+                if (match != null) {
+                    if (atEnd && !match.start().equals(match.end())) {
+                        Pos e = match.end().copy();
+                        if (e.col == 0) {
+                            if (e.line > 0) {
+                                e.line--;
+                                e.col = b.line(e.line).length();
+                            }
+                        } else e.col = Text.previous(b.line(e.line), e.col);
+                        return new Match(e, match.end(), match.submatch());
+                    }
+                    return match;
+                }
+                if (loop > 0 && lnum == startPos.line) break;
+            }
+            if (!wrap || loop > 0) break;
+            lnum = forward ? 0 : lastLine;
+            onWrap.run();
+        }
+        return null;
+    }
+
+    /**
+     * searchpair() (do_searchpair): from the cursor, the {@code end} that pairs with the {@code start} before it, or
+     * going back, the start that pairs with the end after it; nested pairs are passed over, and a {@code middle}
+     * of the outer pair stops the search too. A match {@code skip} accepts is passed over. The cursor goes to the
+     * match; when there is none it stays.
+     *
+     * @param strings the patterns' settings, as the plugin's string functions have them
+     * @param wrap whether the search wraps around the text (no {@code W} flag)
+     * @return the match's line number, from 1; 0 when there is none
+     */
+    static int searchpair(VimEditor editor, VimStrings strings, String start, String middle, String end, boolean backward, boolean wrap,
+                          java.util.function.Predicate<Pos> skip) {
+        Buffer b = editor.buffer();
+        String text = b.text(0, b.length());
+        VimRegex pair = strings.regex("\\m\\(" + start + "\\m\\)\\|\\(" + end + "\\m\\)");
+        VimRegex outer = middle.isEmpty() ? pair
+            : strings.regex("\\m\\(" + start + "\\m\\)\\|\\(" + end + "\\m\\)\\|\\(" + middle + "\\m\\)");
+        Matcher pairMatcher = pair.pattern().matcher(text), outerMatcher = outer.pattern().matcher(text);
+        Pos pos = editor.cursor(), firstpos = null, foundpos = null;
+        boolean nested = false;
+        int nest = 1, retval = 0;
+        while (true) {
+            Match found = nested ? findOnce(b, pairMatcher, pair, pos, !backward, false, wrap, () -> { })
+                : findOnce(b, outerMatcher, outer, pos, !backward, false, wrap, () -> { });
+            if (found == null) break;
+            pos = found.start().copy();
+            if (firstpos != null && pos.equals(firstpos)) break;
+            if (firstpos == null) firstpos = pos.copy();
+            if (pos.equals(foundpos)) {
+                // The same position again (a pattern ending in \zs, going back): one character on.
+                if (backward) decl(b, pos);
+                else incl(b, pos);
+            }
+            foundpos = pos.copy();
+            if (skip.test(pos.copy())) continue;
+            // searchit's result is the submatch + 1: 2 for a start, 3 for an end, 4 for a middle.
+            int n = found.submatch() + 1;
+            if (backward && n == 3 || !backward && n == 2) {
+                nest++;
+                nested = true;
+            } else if (--nest == 1) nested = false;
+            if (nest == 0) {
+                retval = pos.line + 1;
+                editor.setCursor(pos);
+                break;
+            }
+        }
+        return retval;
     }
 
     /** The first match attempted at or after {@code col} of line {@code lnum}; null when no attempt there matches. */
@@ -494,7 +558,9 @@ final class Search {
 
     private static Match match(Buffer b, VimRegex re, Matcher m) {
         int s = Math.min(re.start(m), b.length()), e = Math.min(re.end(m), b.length());
-        return new Match(position(b, s), position(b, Math.max(s, e)));
+        int submatch = 0;
+        for (int n = 1; n <= 9 && submatch == 0; n++) if (re.groupStart(m, n) >= 0) submatch = n;
+        return new Match(position(b, s), position(b, Math.max(s, e)), submatch);
     }
 
     /** An offset as a position; the offset after the final line break is the end of the last line. */
