@@ -370,4 +370,46 @@ class CommandHistoryTest {
             logger.setLevel(priorLevel);
         }
     }
+
+    @Test void paletteUsesCountRepeatsKeepFiftyAndRankByFrecency() throws Exception {
+        edt(() -> {
+            var history = new CommandHistory();
+            history.recordUse("jasper.commands", "new_tab", "New Tab", 1_000L);
+            history.recordUse("dev.x.hosts", "prod", "prod", 2_000L);
+            history.recordUse("jasper.commands", "new_tab", "New Tab", 3_000L);
+            assertThat(history.uses()).extracting(PaletteUse::rowId).as("newest first").containsExactly("new_tab", "prod");
+            assertThat(history.uses().getFirst().count()).isEqualTo(2);
+            history.recordUse("Bad Scope", "x", "x", 4_000L);
+            history.recordUse("dev.x.hosts", "", "x", 4_000L);
+            assertThat(history.uses()).as("invalid uses are ignored").hasSize(2);
+            for (int i = 0; i < 60; i++) history.recordUse("dev.x.hosts", "h" + i, "h" + i, 10_000L + i);
+            assertThat(history.uses()).hasSize(50);
+            assertThat(history.uses().getFirst().rowId()).isEqualTo("h59");
+            long week = 604_800_000L;
+            var old = new PaletteUse("a.b", "old", "old", 10, 0L);
+            var fresh = new PaletteUse("a.b", "fresh", "fresh", 2, 10 * week);
+            assertThat(old.score(10 * week)).isLessThan(fresh.score(10 * week));
+            assertThat(fresh.score(10 * week)).isEqualTo(2.0);
+            history.close();
+        });
+    }
+
+    @Test void usesRecordedBeforeLoadMergeWithSavedCountsAndPersist() throws Exception {
+        Path file = directory.resolve("command-history.toml");
+        CommandHistoryFile.write(file, List.of(), List.of(new PaletteUse("dev.x.hosts", "prod", "prod", 4, 100L)));
+        ManualExecutor worker = new ManualExecutor();
+        DeliveryQueue deliveries = new DeliveryQueue();
+        CommandHistory history = create(file, worker, deliveries);
+        edt(() -> history.recordUse("dev.x.hosts", "prod", "prod", 200L));
+        worker.runNext();
+        deliveries.runNext();
+        edt(() -> assertThat(history.uses()).singleElement().satisfies(use -> {
+            assertThat(use.count()).isEqualTo(5);
+            assertThat(use.lastUsed()).isEqualTo(200L);
+        }));
+        worker.runNext();
+        deliveries.runNext();
+        close(history);
+        assertThat(CommandHistoryFile.readAll(file).uses()).singleElement().extracting(PaletteUse::count).isEqualTo(5);
+    }
 }

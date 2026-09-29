@@ -45,7 +45,9 @@ final class HistoryScope implements PaletteScope {
         return ScopeSpec.of(ID, "History", "Search shell history",
                 snippets.isPresent() ? List.of(PASTE, PASTE_RUN, SAVE) : List.of(PASTE, PASTE_RUN))
             .withDescription("Search shell history and paste or run a command")
-            .withMonospaceRows(true).withShortcutActionId(openActionId);
+            .withMonospaceRows(true).withShortcutActionId(openActionId)
+            // Searchable, but never offered before the user types: shell commands can hold anything.
+            .withInRecents(false);
     }
 
     @Override public void activated(PaletteQuery context) { index.refresh(); }
