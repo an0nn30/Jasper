@@ -26,6 +26,9 @@ final class Machine {
     private final List<KeyInput> record = new ArrayList<>();
     private char recordRegister;
     private int recordCount;
+    /** A {@code <Plug>} command whose name starts a longer one, and its keys, while the next key decides. */
+    private VimCommands.Entry shorter;
+    private String shorterKeys;
     /** For a Visual-mode change being recorded, the size of its area. */
     private Visual.Redo recordVisual, visualRedo;
     /** The command line typed for the motion being run ({@code /pattern}), or null. */
@@ -122,10 +125,35 @@ final class Machine {
         VimCommands.Entry entry;
         if (operator == null) entry = keys.equals("~") && editor.options().flag("tildeop") ? vim.commands().normal("g~") : vim.commands().normal(keys);
         else entry = vim.commands().pending(keys);
+        boolean longer = vim.commands().prefix(keys, operator != null);
+        if (entry != null && longer && keys.startsWith("<Plug>")) {
+            // A <Plug> name that starts a longer one (<Plug>Commentary, <Plug>CommentaryLine) waits for the next key,
+            // as the plugin's mappings resolve to the longest match.
+            shorter = entry;
+            shorterKeys = keys;
+            return;
+        }
         if (entry == null) {
-            if (vim.commands().prefix(keys, operator != null)) return;
+            if (longer) return;
+            if (shorter != null) {
+                // The longer name did not come: the shorter one runs, and this key goes again after it.
+                VimCommands.Entry run = shorter;
+                keys = shorterKeys;
+                shorter = null;
+                record.removeLast();
+                shown.removeLast();
+                start(run);
+                key(key);
+                return;
+            }
             throw Context.fail();
         }
+        shorter = null;
+        start(entry);
+    }
+
+    /** A Normal-mode command or a motion after an operator, whose keys are complete: it reads what it needs, then runs. */
+    private void start(VimCommands.Entry entry) {
         if (needsChar(entry)) {
             VimCommands.Entry waiting = entry;
             argument = arg -> {
@@ -290,6 +318,8 @@ final class Machine {
 
     /** {@code dd}, {@code gUU}, {@code gUgU}, and {@code ~~} with 'tildeop'. */
     private boolean doubled() {
+        // A ported plugin's operator is g@, whose second key there is a mapping of its own (commentary's gcu).
+        if (operator.startsWith("<Plug>")) return false;
         if (keys.equals(operator)) return true;
         if (operator.length() == 2 && operator.charAt(0) == 'g' && keys.equals(operator.substring(1))) return true;
         return operator.equals("g~") && keys.equals("~") && editor.options().flag("tildeop");
@@ -603,6 +633,7 @@ final class Machine {
         line = null;
         keys = "";
         argument = null;
+        shorter = null;
         shown.clear();
         if (!recordingInsert) record.clear();
     }

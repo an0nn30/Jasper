@@ -1,0 +1,486 @@
+# commentary (tpope/vim-commentary): gc{motion}, gcc, Visual gc, gcu and the gc text object.
+
+=== gcc comments a line
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,5
+set: cms=#\ %s
+ext: commentary
+keys: gcc
+--- vim 9.1
+expect-text:
+  def f():
+      # x = 1
+      y = 2
+  $
+      return x
+expect-cursor: 2,5
+expect-mode: normal
+
+=== gcc uncomments a commented line
+text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+cursor: 2,5
+set: cms=#\ %s
+ext: commentary
+keys: gcc
+--- vim 9.1
+expect-text:
+  def f():
+      x = 1
+      # y = 2
+  $
+      return x
+expect-cursor: 2,5
+expect-mode: normal
+
+=== gcc with a count
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: 2gcc
+--- vim 9.1
+expect-text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gc with a motion
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: gcj
+--- vim 9.1
+expect-text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gc with a text object
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: gcip
+--- vim 9.1
+expect-text:
+  # def f():
+  #     x = 1
+  #     y = 2
+  $
+      return x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gc over a paragraph leaves the blank line
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 1,1
+set: cms=#\ %s
+ext: commentary
+keys: gcap
+--- vim 9.1
+expect-text:
+  # def f():
+  #     x = 1
+  #     y = 2
+  $
+      return x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== Visual gc
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: Vjgc
+--- vim 9.1
+expect-text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== Visual gc charwise takes whole lines
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,7
+set: cms=#\ %s
+ext: commentary
+keys: vjgc
+--- vim 9.1
+expect-text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+expect-cursor: 2,7
+expect-mode: normal
+
+=== gc uncomments when every line is commented
+text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: gcj
+--- vim 9.1
+expect-text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== gc comments when one line is not
+text:
+      # x = 1
+      y = 2
+cursor: 1,1
+set: cms=#\ %s
+ext: commentary
+keys: gcj
+--- vim 9.1
+expect-text:
+      # # x = 1
+      # y = 2
+expect-cursor: 1,1
+expect-mode: normal
+
+=== comments go at the first line's indent
+text:
+    a
+      b
+  c
+cursor: 1,1
+set: cms=#\ %s
+ext: commentary
+keys: 2gcc
+--- vim 9.1
+expect-text:
+    # a
+    #   b
+  c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gcu uncomments the comment block
+text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: gcu
+--- vim 9.1
+expect-text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dot repeats gcc
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: gccj.
+--- vim 9.1
+expect-text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+expect-cursor: 3,1
+expect-mode: normal
+
+=== dot repeats gc with a motion
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+      z = 3
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: gcjjjj.
+--- vim 9.1
+expect-text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      # return x
+      # z = 3
+expect-cursor: 5,1
+expect-mode: normal
+
+=== dgc deletes the comment block
+text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+cursor: 3,1
+set: cms=#\ %s
+ext: commentary
+keys: dgc
+registers: "
+--- vim 9.1
+expect-text:
+  def f():
+      return x
+expect-cursor: 2,5
+expect-mode: normal
+expect-register ": l "    # x = 1\n    # y = 2\n\n"
+
+=== cgc changes the comment block
+text:
+  def f():
+      # x = 1
+      # y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: cgcpass<Esc>
+--- vim 9.1
+expect-text:
+  def f():
+  pass
+  $
+      return x
+expect-cursor: 2,4
+expect-mode: normal
+
+=== gcc on a blank line does nothing
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 4,1
+set: cms=#\ %s
+ext: commentary
+keys: gcc
+--- vim 9.1
+expect-text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+expect-cursor: 4,1
+expect-mode: normal
+
+=== u undoes gcc
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,1
+set: cms=#\ %s
+ext: commentary
+keys: gccu
+--- vim 9.1
+expect-text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== the default mappings
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 1,1
+set: cms=#\ %s
+ext: commentary
+keys: :nmap gc<CR>:omap gc<CR>:xmap gc<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  gcu           <Plug>Commentary<Plug>Commentary
+  n  gcc           <Plug>CommentaryLine
+  n  gc            <Plug>Commentary
+  o  gc            <Plug>Commentary
+  x  gc            <Plug>Commentary
+
+=== the default commentstring
+text:
+  def f():
+      x = 1
+      y = 2
+  $
+      return x
+cursor: 2,1
+ext: commentary
+keys: gcc
+--- vim 9.1
+expect-text:
+  def f():
+      /* x = 1 */
+      y = 2
+  $
+      return x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== nested block comments are numbered
+text:
+  a /* b */ c
+cursor: 1,1
+ext: commentary
+keys: gcc
+--- vim 9.1
+expect-text:
+  /* a /1* b *1/ c */
+expect-cursor: 1,1
+expect-mode: normal
+
+=== nested block comments are numbered back
+text:
+  /* a /1* b *1/ c */
+cursor: 1,1
+ext: commentary
+keys: gcc
+--- vim 9.1
+expect-text:
+  a /* b */ c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a commentstring without spaces
+text:
+  x
+  y
+cursor: 1,1
+set: cms=//%s
+ext: commentary
+keys: gcc
+--- vim 9.1
+expect-text:
+  // x
+  y
+expect-cursor: 1,1
+expect-mode: normal
+
+=== uncommenting a comment without its space
+text:
+  //x
+  //y
+cursor: 1,1
+set: cms=//%s
+ext: commentary
+keys: gcj
+--- vim 9.1
+expect-text:
+  x
+  y
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a commentstring with an end
+text:
+  <b>
+  text
+cursor: 1,1
+set: cms=<!--%s-->
+ext: commentary
+keys: gcj
+--- vim 9.1
+expect-text:
+  <!-- <b> -->
+  <!-- text -->
+expect-cursor: 1,1
+expect-mode: normal

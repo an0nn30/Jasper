@@ -32,6 +32,7 @@ public final class Options {
         new Def("belloff", "bo", Type.STRING, "", false),
         new Def("clipboard", "cb", Type.STRING, "", false),
         new Def("commentary", "commentary", Type.BOOLEAN, false, false),
+        new Def("commentstring", "cms", Type.STRING, "/* %s */", true),
         new Def("comments", "com", Type.STRING, "s1:/*,mb:*,ex:*/,://,b:#,:%,:XCOMM,n:>,fb:-", true),
         new Def("compatible", "cp", Type.BOOLEAN, false, false),
         new Def("encoding", "enc", Type.STRING, "utf-8", false),

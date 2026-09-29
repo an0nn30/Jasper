@@ -337,6 +337,9 @@ these `<Plug>` commands, which mappings of your own can use too (`:nmap <Leader>
 |---|---|
 | `<Plug>ReplaceWithRegisterOperator` (operator) | replace {motion}'s text with the register (`gr`, with `set ReplaceWithRegister`) |
 | `<Plug>ReplaceWithRegisterLine` (Normal) | replace [count] lines with the register (`grr`) |
+| `<Plug>Commentary` (operator) | comment or uncomment {motion}'s lines, or the Visual lines (`gc`, with `set commentary`) |
+| `<Plug>CommentaryLine` (Normal) | comment or uncomment [count] lines (`gcc`) |
+| `<Plug>Commentary` (text object) | the block of comment lines around the cursor (`gc` after an operator; `gcu` uncomments it) |
 | `<Plug>ReplaceWithRegisterVisual` (Visual) | replace the Visual area with the register (`gr`) |
 
 ## Ex commands

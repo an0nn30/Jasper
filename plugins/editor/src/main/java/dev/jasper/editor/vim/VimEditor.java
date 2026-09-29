@@ -80,6 +80,8 @@ public final class VimEditor {
     private final java.awt.event.FocusListener leaveListener = new java.awt.event.FocusAdapter() {
         @Override public void focusLost(java.awt.event.FocusEvent event) { marks.set('"', cursor()); }
     };
+    /** A new language gives the tab its line comment as 'commentstring'. */
+    private final java.beans.PropertyChangeListener languageListener = event -> languageChanged();
     private final DocumentListener highlightListener = new DocumentListener() {
         @Override public void insertUpdate(DocumentEvent event) { textChanged(); }
         @Override public void removeUpdate(DocumentEvent event) { textChanged(); }
@@ -113,6 +115,8 @@ public final class VimEditor {
         area.addFocusListener(leaveListener);
         originalCaret = area.getCaret() instanceof ConfigurableCaret caret ? caret.getStyle() : CaretStyle.VERTICAL_LINE_STYLE;
         editorDefaults(defaults);
+        languageChanged();
+        area.addPropertyChangeListener(org.fife.ui.rsyntaxtextarea.RSyntaxTextArea.SYNTAX_STYLE_PROPERTY, languageListener);
         options.onChanged(this::syncArea);
         syncArea();
         area.attach(this);
@@ -134,6 +138,7 @@ public final class VimEditor {
         insert.abort();
         machine.abort();
         area.removeCaretListener(caretListener);
+        area.removePropertyChangeListener(org.fife.ui.rsyntaxtextarea.RSyntaxTextArea.SYNTAX_STYLE_PROPERTY, languageListener);
         area.attach(null);
         area.setCaretStyle(RTextArea.INSERT_MODE, originalCaret);
         area.enableInputMethods(true);
@@ -147,6 +152,17 @@ public final class VimEditor {
         highlights.clear();
         vim.forget(this);
         buffer.close();
+    }
+
+    /**
+     * The tab's language changed: 'commentstring' becomes its line comment ({@code //%s}, {@code <!--%s-->}), as a
+     * filetype plugin sets it in Vim; a language with none keeps the value it had.
+     */
+    private void languageChanged() {
+        if (!(area.getDocument() instanceof org.fife.ui.rsyntaxtextarea.RSyntaxDocument document)) return;
+        String[] tokens = document.getLineCommentStartAndEnd(0);
+        if (tokens == null || tokens[0] == null) return;
+        options.setLocal("commentstring", tokens[0].strip() + "%s" + (tokens[1] == null ? "" : tokens[1].strip()));
     }
 
     /**

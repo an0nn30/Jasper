@@ -2,6 +2,7 @@ package dev.jasper.editor.vim;
 
 import java.util.Optional;
 import javax.swing.SwingUtilities;
+import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -76,6 +77,22 @@ class ExtensionsTest {
             assertThat(editor.vim().mappings().isEmpty()).isTrue();
             type(editor, ":set surround<CR>");
             assertThat(mapped(editor, Mappings.NORMAL, "ds")).as("and on again").isTrue();
+        });
+    }
+
+    @Test void commentstringFollowsTheTabsLanguage() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            area.setText("x\n");
+            area.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            assertThat(editor.options().string("commentstring")).isEqualTo("//%s");
+            area.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PYTHON);
+            assertThat(editor.options().string("commentstring")).isEqualTo("#%s");
+            type(editor, ":set commentary<CR>gcc");
+            assertThat(editor.buffer().line(0)).isEqualTo("# x");
+            area.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);
+            assertThat(editor.options().string("commentstring")).as("no line comment: kept").isEqualTo("#%s");
         });
     }
 }
