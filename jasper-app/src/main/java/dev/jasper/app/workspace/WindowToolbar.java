@@ -12,13 +12,13 @@ import java.util.List;
 import java.util.function.Supplier;
 import javax.swing.*;
 
-/** One row of stable-size controls; lower-priority controls move whole into a live overflow menu. */
+/** One row of stable-size controls packed against the trailing edge; lower-priority controls move whole
+ * into a live overflow menu behind a vertical ellipsis. */
 final class WindowToolbar extends JToolBar {
     private static final String MENU = "Jasper.overflowMenu", PRIORITY = "Jasper.toolbarPriority";
-    private final JButton overflow = new JButton(AppIcons.named("MORE"));
+    private final JButton overflow = new JButton(AppIcons.bundled("general/moreVertical"));
     private final Runnable refreshActions;
     private int barHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
-    private boolean titleBar;
 
     WindowToolbar(Runnable refreshActions) {
         this.refreshActions = refreshActions;
@@ -36,7 +36,6 @@ final class WindowToolbar extends JToolBar {
     }
 
     void finish() { add(overflow); }
-    void setTitleBar(boolean value) { titleBar = value; revalidate(); }
     void setBarHeight(int height) {
         int old = barHeight;
         barHeight = height;
@@ -45,6 +44,24 @@ final class WindowToolbar extends JToolBar {
     }
     static int buttonSide(int height) { return UIScale.scale(height - 6); }
     int buttonSide() { return buttonSide(barHeight); }
+    JButton overflowButton() { return overflow; }
+
+    /** The width that shows every control; the header never gives the toolbar more. */
+    int fullWidth() {
+        int padding = UIScale.scale(8), gap = UIScale.scale(4), width = 0;
+        for (Component child : getComponents())
+            if (child instanceof JButton button && button != overflow) width += button.getPreferredSize().width + gap;
+        return width == 0 ? 0 : 2 * padding + width - gap;
+    }
+
+    /** The width with every hideable control in the overflow menu. */
+    int minimumWidth() {
+        int padding = UIScale.scale(8), gap = UIScale.scale(4), width = buttonSide();
+        for (Component child : getComponents())
+            if (child instanceof JButton button && button != overflow && !(button.getClientProperty(MENU) instanceof Supplier<?>))
+                width += button.getPreferredSize().width + gap;
+        return 2 * padding + width;
+    }
 
     static void entry(JButton button, int priority, Supplier<JMenuItem> menu) {
         button.putClientProperty(PRIORITY, priority);
@@ -69,12 +86,11 @@ final class WindowToolbar extends JToolBar {
     }
 
     @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(barHeight)); }
-    @Override public Dimension getPreferredSize() { return getMinimumSize(); }
+    @Override public Dimension getPreferredSize() { return new Dimension(fullWidth(), UIScale.scale(barHeight)); }
 
     @Override public void doLayout() {
         int padding = UIScale.scale(8), gap = UIScale.scale(4), side = buttonSide();
         int available = Math.max(0, getWidth() - 2 * padding);
-        int dragSpace = titleBar ? Math.min(UIScale.scale(64), Math.max(0, available - side)) : 0;
         List<JButton> buttons = new ArrayList<>();
         for (Component child : getComponents()) {
             if (child instanceof JButton button && button != overflow) {
@@ -85,19 +101,20 @@ final class WindowToolbar extends JToolBar {
         var removable = new ArrayList<>(buttons);
         java.util.Collections.reverse(removable);
         removable.sort(Comparator.comparingInt(button -> button.getClientProperty(PRIORITY) instanceof Integer p ? p : 50));
-        int needed = buttons.stream().mapToInt(button -> button.getPreferredSize().width + gap).sum();
+        int group = buttons.stream().mapToInt(button -> button.getPreferredSize().width + gap).sum() - (buttons.isEmpty() ? 0 : gap);
         boolean hidden = false;
         for (JButton button : removable) {
-            if (needed + dragSpace + (hidden ? side + gap : 0) <= available) break;
+            if (group + (hidden ? gap + side : 0) <= available) break;
             if (!(button.getClientProperty(MENU) instanceof Supplier<?>)) continue;
             button.setVisible(false); button.setBounds(0, 0, 0, 0);
-            needed -= button.getPreferredSize().width + gap;
+            group -= button.getPreferredSize().width + gap;
             hidden = true;
         }
         overflow.setVisible(hidden);
+        int shown = Math.max(0, group);
+        int trailing = hidden ? side + (shown > 0 ? gap : 0) : 0;
         // Separators share the inter-control spacing; they never consume button target space.
-        int x = padding, y = (getHeight() - side) / 2;
-        int remaining = needed + (hidden ? side + gap : 0);
+        int x = Math.max(padding, getWidth() - padding - trailing - shown), y = (getHeight() - side) / 2;
         boolean previousVisible = false;
         for (Component child : getComponents()) {
             if (child == overflow) continue;
@@ -105,16 +122,15 @@ final class WindowToolbar extends JToolBar {
                 if (!button.isVisible()) continue;
                 int width = button.getPreferredSize().width;
                 button.setBounds(x, y, width, side);
-                x += width + gap; remaining -= width + gap; previousVisible = true;
-            } else if (child instanceof Box.Filler) {
-                int width = Math.max(0, getWidth() - padding - x - remaining);
-                child.setBounds(x, 0, width, getHeight()); x += width; previousVisible = false;
+                x += width + gap; previousVisible = true;
             } else if (child instanceof JSeparator) {
                 child.setBounds(Math.max(0, x - gap / 2), UIScale.scale(7), UIScale.scale(1),
                     Math.max(0, getHeight() - UIScale.scale(14)));
-                // Empty plugin separators are maintained by the owner; hidden groups paint no rule.
-                child.setVisible(previousVisible && hasFollowingVisibleButton(child));
-                previousVisible = false;
+                // Empty groups paint no rule; a hidden rule (the empty plugin group's) leaves the
+                // previous group open, so the rule before Find still shows.
+                boolean shownRule = previousVisible && hasFollowingVisibleButton(child);
+                child.setVisible(shownRule);
+                if (shownRule) previousVisible = false;
             }
         }
         if (hidden) overflow.setBounds(Math.max(0, getWidth() - padding - side), y, side, side);
@@ -124,10 +140,9 @@ final class WindowToolbar extends JToolBar {
     private boolean hasFollowingVisibleButton(Component separator) {
         for (int i = getComponentIndex(separator) + 1; i < getComponentCount(); i++) {
             Component next = getComponent(i);
-            if (next instanceof Box.Filler || next instanceof JSeparator) return false;
+            if (next instanceof JSeparator) return false;
             if (next instanceof JButton && next != overflow && next.isVisible()) return true;
         }
         return false;
     }
-
 }

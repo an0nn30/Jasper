@@ -33,7 +33,6 @@ final class WindowChrome {
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
     private final JCheckBoxMenuItem railVisible = new JCheckBoxMenuItem("Rail", true);
-    private final Component toolbarGlue = Box.createHorizontalGlue();
     private final java.util.EnumMap<MenuTarget.Slot, JMenu> standardMenus = new java.util.EnumMap<>(MenuTarget.Slot.class);
     private final List<Component> contributedToolbar = new ArrayList<>();
     private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
@@ -92,7 +91,7 @@ final class WindowChrome {
         buildToolbar();
     }
 
-    /** IntelliJ grouping: tab and window, pane, plugin items, then Find and Settings pinned right. */
+    /** IntelliJ grouping: tab and window, pane, plugin items, then Find and Settings, all packed right. */
     private void buildToolbar() {
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
@@ -100,7 +99,7 @@ final class WindowChrome {
         addButton(ActionId.ZOOM_PANE, "maximize");
         pluginSeparator.setVisible(false);
         toolbar.add(pluginSeparator);
-        toolbar.add(toolbarGlue);
+        toolbar.add(new ToolbarSeparator());
         addButton(ActionId.FIND, "search");
         addButton(ActionId.OPEN_SETTINGS, "settings");
         toolbar.finish();
@@ -183,7 +182,7 @@ final class WindowChrome {
                     }
                 }
             }
-            int index = toolbar.getComponentIndex(toolbarGlue);
+            int index = toolbar.getComponentIndex(pluginSeparator) + 1;
             for (Component control : contributedToolbar) toolbar.add(control, index++);
         }
         pluginSeparator.setVisible(!contributedToolbar.isEmpty());

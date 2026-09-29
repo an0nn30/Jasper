@@ -222,7 +222,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             content.unifiedHeader = true;
             content.regions.setHeaderVisible(true);
             content.remove(content.toolbar());
-            ((WindowToolbar) content.toolbar()).setTitleBar(true);
             bar.setToolbar(content.toolbar());
         }
         content.onTitle = value -> {
