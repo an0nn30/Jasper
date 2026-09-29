@@ -11,8 +11,8 @@
   - Settings › Plugins is IntelliJ-style: cards grouped Development, User-installed and Bundled, with icons, badges and
     enable checkboxes, a search field and a gear menu (Install from Zip…), and a details pane with the icon, vendor,
     homepage link, Enable/Disable or Review… with a ▾ menu, and Overview and Details tabs.
-  - `plugin.toml` gains optional `icon` and `homepage` (SDK 0.9.2); every bundled plugin ships an icon and requires
-    `>=0.9.2, <0.10`.
+  - `plugin.toml` gains optional `icon` and `homepage` (SDK 0.9.3); every bundled plugin ships an icon and requires
+    `>=0.9.3, <0.10`.
   - `./gradlew check`: 6,860 tests, 0 failures, 6 skipped.
   - GUI checks pending with the user:
     - the theme picker enabling Apply;
@@ -23,7 +23,9 @@
     - search;
     - the homepage link;
     - icons in dark and light.
-  - Deviations: see the plan's status banner. Not pushed; not merged.
+  - Deviations: see the plan's status banner. Merged into local `main` on 2026-09-29 after merging main (Vim V4c,
+    palette recents, terminal surface) into the branch; the manifest keys moved to SDK 0.9.3 there. `./gradlew check`
+    on the merged tree: 7,070 tests, 0 failures, 0 errors, 6 skipped. Not pushed.
 - **Editor Vim mode, plan V4c** (branch `claude/vim-v4c`, plan
   `docs/superpowers/plans/2026-09-29-jasper-editor-vim-v4c.md`, written 2026-09-29): matchit, ported from Vim 9.1's matchit.vim (`%`, `g%`,
   `[%`, `]%`, Visual `a%`; `set matchit`, `packadd matchit`), with the languages' `b:match_*` from Vim's filetype

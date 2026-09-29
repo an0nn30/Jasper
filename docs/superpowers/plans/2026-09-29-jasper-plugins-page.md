@@ -12,6 +12,9 @@ Deviations so far:
   ticked checkbox and counted as enabled although it cannot run until reviewed; its checkbox is now unticked
   (`PluginCard.checked`), and the group counts use the same rule. The homepage link shared a flowing line with the
   vendor and was clipped when that line wrapped at 18 pt; it now has a line of its own.
+- Merge: main had meanwhile made SDK 0.9.2 mean `ScopeSpec.withInRecents` (palette recents). So that 0.9.2 does not
+  name two different Jaspers, the manifest keys moved to SDK 0.9.3, and every bundled plugin requires
+  `>=0.9.3, <0.10`.
 
 Scope notes (decided while writing this plan):
 - The ▾ menu keeps today's labels: "Open Settings", "Open Plugin Folder" and "Open Data Folder", then Remove…,

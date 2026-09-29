@@ -62,6 +62,9 @@ searches, such as shell history, stays out of the recently and most used rows th
 (a scope out of All is out of these too). `FakePluginHost.scopesInRecents()` lists the scopes that take
 part.
 
+SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
+https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.
+
 SDK 0.9.1 adds shell profiles: `Terminals.profiles()` lists the shells Jasper detected as
 `ShellProfileInfo` (PowerShell, Command Prompt and WSL distributions on Windows, the login shell
 elsewhere), `onProfilesChanged` fires after a shell detection completes with a changed list (Custom
