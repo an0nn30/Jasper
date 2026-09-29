@@ -289,13 +289,15 @@ class CommandPaletteTest {
                     }
                     assertThat(palette.contains(palette.getWidth() / 2, 1)).isTrue();
                     assertPixel(image, at(palette.queryField().getParent(), palette.queryField().getParent().getWidth() - 3, 2, palette),
-                        "SearchEverywhere.SearchField.background", name);
+                        "List.background", name);
                     Rectangle selected = list.getCellBounds(1, 1), plain = list.getCellBounds(2, 2), rule = list.getCellBounds(3, 3);
                     assertPixel(image, at(list, selected.width - 12, selected.y + 3, palette), "List.selectionBackground", name);
                     assertPixel(image, at(list, plain.width - 3, plain.y + 3, palette), "List.background", name);
                     assertPixel(image, at(list, rule.width - 3, rule.y, palette), "SearchEverywhere.List.separatorColor", name);
                     assertPixel(image, at(palette.hintBar(), palette.hintBar().getWidth() - 3, palette.hintBar().getHeight() / 2, palette),
-                        "SearchEverywhere.Advertiser.background", name);
+                        "List.background", name);
+                    assertThat(palette.queryField().getBackground()).as("%s: the field is the card's colour", name)
+                        .isEqualTo(UIManager.getColor("List.background"));
                     // Select History's row (three verbs, a detail) to populate the hint bar with link-coloured
                     // secondary verbs and its detail text, without disturbing the pixel assertions taken above.
                     list.setSelectedIndex(4);
