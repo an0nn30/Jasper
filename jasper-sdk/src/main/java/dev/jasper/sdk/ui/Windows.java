@@ -1,6 +1,8 @@
 package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.files.FileChoice;
+import dev.jasper.sdk.files.FileLocation;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -105,5 +107,20 @@ public interface Windows {
      */
     default Optional<Path> chooseSaveFile(WindowOwner owner, String title, Optional<Path> initial) {
         throw new UnsupportedOperationException("Save selection is unavailable");
+    }
+
+    /**
+     * Shows Jasper's file chooser: local places plus the roots of the sources {@code choice} names. The synchronous
+     * call pumps UI events; closing the owner or stopping the plugin cancels it.
+     *
+     * @param choice what to choose
+     * @return the chosen locations, or an empty immutable list on cancel
+     * @throws IllegalArgumentException for a foreign, unshown or dead owner
+     * @throws IllegalStateException for a closed context or off-UI call
+     * @throws UnsupportedOperationException if the host lacks this chooser
+     * @since 0.10.0
+     */
+    default List<FileLocation> choose(FileChoice choice) {
+        throw new UnsupportedOperationException("The file chooser is unavailable");
     }
 }

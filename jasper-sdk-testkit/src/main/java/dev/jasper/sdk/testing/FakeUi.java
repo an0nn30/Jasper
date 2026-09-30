@@ -440,6 +440,14 @@ final class FakeUi {
             @Override public java.util.Optional<java.nio.file.Path> chooseSaveFile(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
                 return choosePaths(owner, title, initial).stream().findFirst();
             }
+            @Override public List<dev.jasper.sdk.files.FileLocation> choose(dev.jasper.sdk.files.FileChoice choice) {
+                context.requireOpen();
+                java.util.Objects.requireNonNull(choice, "choice");
+                WindowOwner owner = choice.owner();
+                if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+                var chosen = host.takeFileChoice(choice);
+                return context.state == FakePluginContext.State.CLOSED || !liveChooserOwner(owner) ? List.of() : chosen;
+            }
             @Override public PluginWindow create(WindowSpec spec) {
                 context.requireOpen();
                 requireNamespace(spec.id(), "A window");

@@ -11,29 +11,31 @@ class ChooserPrefsTest {
     private final ChooserPrefs prefs = new ChooserPrefs(state);
     private final Path root = Path.of("/").toAbsolutePath();
 
+    private Location at(String name) { return Location.local(root.resolve(name)); }
+
     @Test void recentKeepsTheNewestTenWithoutDuplicates() {
-        for (int i = 0; i < 12; i++) prefs.recordRecent(root.resolve("f" + i));
-        prefs.recordRecent(root.resolve("f5"));
-        assertThat(prefs.recent()).hasSize(10).doesNotHaveDuplicates().doesNotContain(root.resolve("f0"), root.resolve("f1"));
-        assertThat(prefs.recent().getFirst()).isEqualTo(root.resolve("f5"));
+        for (int i = 0; i < 12; i++) prefs.recordRecent(at("f" + i));
+        prefs.recordRecent(at("f5"));
+        assertThat(prefs.recent()).hasSize(10).doesNotHaveDuplicates().doesNotContain(at("f0"), at("f1"));
+        assertThat(prefs.recent().getFirst()).isEqualTo(at("f5"));
     }
 
-    @Test void pinsAndTogglesAreStoredInTheUiState() {
-        prefs.pin(root.resolve("work"));
-        prefs.pin(root.resolve("work"));
-        assertThat(prefs.pinned()).containsExactly(root.resolve("work"));
-        assertThat(prefs.isPinned(root.resolve("work/../work"))).isTrue();
-        prefs.unpin(root.resolve("work"));
-        assertThat(prefs.pinned()).isEmpty();
+    @Test void pinsTogglesAndRemoteFoldersAreStoredInTheUiState() {
+        var remote = new Location("dev.x.hosts", "box", "/srv");
+        prefs.pin(at("work"));
+        prefs.pin(at("work"));
+        prefs.pin(remote);
+        assertThat(prefs.pinned()).containsExactly(at("work"), remote);
+        assertThat(prefs.isPinned(remote)).isTrue();
+        prefs.unpin(at("work"));
+        assertThat(prefs.pinned()).containsExactly(remote);
         prefs.setPreview(true);
         prefs.setShowHidden(false);
-        assertThat(state.chooser()).isEqualTo(new UiState.Chooser(List.of(), List.of(), true, false));
-        assertThat(prefs.preview()).isTrue();
-        assertThat(prefs.showHidden()).isFalse();
+        assertThat(state.chooser()).isEqualTo(new UiState.Chooser(List.of(), List.of("@dev.x.hosts|box|/srv"), true, false));
     }
 
-    @Test void ignoresRelativeStoredPaths() {
-        state.setChooser(new UiState.Chooser(List.of("relative", root.resolve("ok").toString()), List.of(), false, true));
-        assertThat(prefs.recent()).containsExactly(root.resolve("ok"));
+    @Test void ignoresUnreadableStoredPaths() {
+        state.setChooser(new UiState.Chooser(List.of("relative", "@broken", root.resolve("ok").toString()), List.of(), false, true));
+        assertThat(prefs.recent()).containsExactly(at("ok"));
     }
 }

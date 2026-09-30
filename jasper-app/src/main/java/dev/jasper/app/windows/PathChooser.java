@@ -8,5 +8,5 @@ import java.util.function.Consumer;
 @FunctionalInterface
 public interface PathChooser {
     /** Registers disposal before showing the chooser. Empty means cancelled. EDT only. */
-    List<Path> choose(PathChoice choice, Consumer<Runnable> cancellation);
+    List<dev.jasper.app.files.Location> choose(PathChoice choice, Consumer<Runnable> cancellation);
 }

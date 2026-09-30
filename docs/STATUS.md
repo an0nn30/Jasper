@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-30
 
+- **File chooser plan B1: SDK file sources** (branch `claude/file-chooser-b1`, plan
+  `docs/superpowers/plans/2026-09-30-file-chooser-b1.md`): SDK 0.10.0 adds `dev.jasper.sdk.files` (`FileSources`,
+  `FileSource`, `FileBrowser`, `FileLocation`, `FileChoice`, `FileEntry`, `FileRoot`, `FileSourceSpec`), the
+  `files.source` capability and `Windows.choose(FileChoice)`; all bundled plugins declare `sdk = ">=0.10.0, <0.11"`.
+  The chooser browses `Location`s through app-internal `Browser`s and `ChooserSource`s; plugin sources appear as
+  navigation sections with a connected dot, connect on click (Cancel connection, Retry on failure) and list in
+  256-entry batches; `Windows.choose` starts where a named source locates the focused pane. No bundled plugin
+  registers a source yet (Remote does in plan B2), so the app looks as after plan A. `./gradlew check` green: app 1348/0/1, terminal 391/0/4, Editor 4778/0/0, Remote 306/0/0, Vault 139/0/1,
+  Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0.
+  Not merged. GUI checks: none new beyond plan A's (re-check the local chooser).
 - **Jasper file chooser, plan A: local** (branch `claude/file-chooser`, spec
   `docs/superpowers/specs/2026-09-30-file-chooser-design.md`, plan `docs/superpowers/plans/2026-09-30-file-chooser-a.md`,
   executed inline 2026-09-30): every native file picker (`FileDialog`, `JFileChooser`) is replaced by Jasper's

@@ -15,6 +15,7 @@ import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import dev.jasper.app.palette.PaletteScope;
+import dev.jasper.app.files.ChooserSource;
 
 /**
  * What extensions have contributed, in registration order. Windows subscribe and re-render the part
@@ -166,6 +167,8 @@ public final class Contributions {
         }
 
         private final List<PaletteScope> scopes = new ArrayList<>();
+
+        private final List<ChooserSource> fileSources = new ArrayList<>();
         private final List<Consumer<PaletteRequest>> paletteListeners = new ArrayList<>();
 
         /**
@@ -184,6 +187,18 @@ public final class Contributions {
         }
 
         public List<PaletteScope> scopes() { return List.copyOf(scopes); }
+
+        /** A place the file chooser offers besides the local disk; ids are unique. */
+        public Subscription addFileSource(ChooserSource source) {
+            requireEdt();
+            Objects.requireNonNull(source, "source");
+            for (ChooserSource existing : fileSources)
+                if (existing.id().equals(source.id())) throw new IllegalArgumentException("File source already contributed: " + source.id());
+            fileSources.add(source);
+            return new Subscription(() -> fileSources.remove(source));
+        }
+
+        public List<ChooserSource> fileSources() { return List.copyOf(fileSources); }
 
         public Subscription onPaletteRequest(Consumer<PaletteRequest> listener) {
             requireEdt();

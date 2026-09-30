@@ -19,8 +19,10 @@ public final class Capabilities {
     public static final String SESSION_PROVIDE = "session.provide";
     /** Contribute command-palette scopes and open the palette. */
     public static final String PALETTE_CONTRIBUTE = "palette.contribute";
+    /** Add places, such as saved hosts, to Jasper's file chooser. @since 0.10.0 */
+    public static final String FILES_SOURCE = "files.source";
     /** Every capability this SDK version knows. */
-    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE);
+    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE);
 
     private Capabilities() { }
 }

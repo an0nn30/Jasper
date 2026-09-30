@@ -53,6 +53,7 @@ public final class FakePluginContext implements PluginContext {
     final FakeTerminals terminals;
     final FakeUi ui;
     final FakePalette palette;
+    final FakeFileSources fileSources;
     final FakePluginSettings settings;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
@@ -60,6 +61,7 @@ public final class FakePluginContext implements PluginContext {
         this.terminals = new FakeTerminals(this, host.workspace);
         this.ui = new FakeUi(host, this);
         this.palette = new FakePalette(host, this);
+        this.fileSources = new FakeFileSources(host, this);
         this.settings = new FakePluginSettings(host, info.id(), host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
     }
 
@@ -99,6 +101,7 @@ public final class FakePluginContext implements PluginContext {
     /** The scripted windows, tabs and panes. */
     @Override public dev.jasper.sdk.terminal.Terminals terminals() { return terminals; }
         @Override public dev.jasper.sdk.palette.Palette palette() { return palette; }
+    @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
         @Override public dev.jasper.sdk.ui.Notices notices() { return message -> { requireOpen(); host.notices.add(info.id() + ": " + Objects.requireNonNull(message, "message")); }; }
         @Override public dev.jasper.sdk.ui.Platform platform() { return file -> { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }; }
 

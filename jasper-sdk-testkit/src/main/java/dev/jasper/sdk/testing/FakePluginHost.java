@@ -65,6 +65,9 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, FakePluginContext> contexts = new LinkedHashMap<>();
     final Map<String, FakeSettingsPanelHost> panelHosts = new java.util.concurrent.ConcurrentHashMap<>();
         final Map<String, FakePalette.Registered> scopes = new LinkedHashMap<>();
+    final Map<String, FakeFileSources.Registered> fileSources = new LinkedHashMap<>();
+    private final java.util.ArrayDeque<List<dev.jasper.sdk.files.FileLocation>> fileChoiceQueue = new java.util.ArrayDeque<>();
+    private final List<dev.jasper.sdk.files.FileChoice> fileChoices = new ArrayList<>();
         final List<String> paletteOpens = new ArrayList<>();
         final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
@@ -423,6 +426,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.settings.close();
         context.ui.closeAll();
         context.palette.closeAll();
+        context.fileSources.closeAll();
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
         for (ActivityEvent open : List.copyOf(running.values())) {
@@ -942,6 +946,84 @@ public final class FakePluginHost implements AutoCloseable {
                 pane.info.shellIntegration(), pane.info.kind(), pane.info.providerPluginId(), pane.info.state(), pane.info.exitStatus(), pane.info.shell());
             publishApp(TerminalEvents.CWD_CHANGED, new TerminalEvents.CwdChanged(paneId, Optional.empty(), remote));
         });
+    }
+
+    /**
+     * Registered file sources as {@code id|heading}, in registration order.
+     *
+     * @return the sources
+     * @since 0.10.0
+     */
+    public List<String> fileSources() {
+        return fileSources.values().stream().map(registered -> registered.spec().id() + "|" + registered.spec().heading()).toList();
+    }
+
+    /**
+     * A source's roots as {@code id|label|connected}.
+     *
+     * @param sourceId a registered source
+     * @return its roots now
+     * @since 0.10.0
+     */
+    public List<String> fileRoots(String sourceId) {
+        return registeredSource(sourceId).source().roots().stream().map(root -> root.id() + "|" + root.label() + "|" + root.connected()).toList();
+    }
+
+    /**
+     * Asks a source where a pane is, as a chooser opened from that pane would.
+     *
+     * @param sourceId a registered source
+     * @param paneId   a scripted pane
+     * @return the source's answer
+     * @since 0.10.0
+     */
+    public Optional<dev.jasper.sdk.files.FileLocation.Sourced> locateFile(String sourceId, UUID paneId) {
+        var registered = registeredSource(sourceId);
+        return registered.source().locate(registered.context().terminals.paneHandle(paneId));
+    }
+
+    /**
+     * Connects to a source's root as the chooser would, waiting for the result.
+     *
+     * @param sourceId a registered source
+     * @param rootId   one of its roots
+     * @param windowId the terminal window the chooser belongs to
+     * @return the browser; the caller closes it
+     * @since 0.10.0
+     */
+    public dev.jasper.sdk.files.FileBrowser connectFileSource(String sourceId, String rootId, UUID windowId) {
+        var registered = registeredSource(sourceId);
+        var owner = registered.context().terminals.windowHandle(windowId);
+        return registered.source().connect(rootId, owner).toCompletableFuture().join();
+    }
+
+    private FakeFileSources.Registered registeredSource(String sourceId) {
+        var registered = fileSources.get(sourceId);
+        if (registered == null) throw new IllegalArgumentException("No such file source: " + sourceId);
+        return registered;
+    }
+
+    /**
+     * Queues what the next {@code Windows.choose} returns; an empty list scripts cancellation.
+     *
+     * @param chosen the locations
+     * @since 0.10.0
+     */
+    public void queueFileChoice(List<dev.jasper.sdk.files.FileLocation> chosen) { fileChoiceQueue.addLast(List.copyOf(chosen)); }
+
+    /**
+     * Every choice plugins asked for, in order.
+     *
+     * @return the choices
+     * @since 0.10.0
+     */
+    public List<dev.jasper.sdk.files.FileChoice> fileChoices() { return List.copyOf(fileChoices); }
+
+    List<dev.jasper.sdk.files.FileLocation> takeFileChoice(dev.jasper.sdk.files.FileChoice choice) {
+        fileChoices.add(choice);
+        var chosen = fileChoiceQueue.isEmpty() ? List.<dev.jasper.sdk.files.FileLocation>of() : fileChoiceQueue.removeFirst();
+        var action = duringPathSelection; duringPathSelection = () -> {}; action.run();
+        return chosen;
     }
 
         /** Registered scopes as {@code id|label|verbIds}, in registration order. */

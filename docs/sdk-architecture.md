@@ -9,7 +9,7 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
 | `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
@@ -170,6 +170,15 @@ reaches the last active window's error handler; `platform().openInEditor` runs t
 `ConfigEditor` on the plugin's executor and reports failure as a notice. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
 contributors; `stagePlugins` copies each plugin's jar and runtime classpath into `lib/plugins/<id>/`.
+
+## File sources (SDK 0.10.0)
+
+`FileSources.register` (needs `files.source`) adds a plugin `FileSource` to `Contributions` through
+`HostedFileSources`, which adapts it onto the chooser's app-internal `ChooserSource` and each `FileBrowser` onto
+`Browser`. `roots`, `onChanged`, `locate` and `connect` run on the UI thread and are contained; browser calls run on
+the chooser dialog's worker, one at a time, and their failures show in the chooser with Retry. `Windows.choose` offers
+only the sources the caller names; with no `initial`, the chooser opens where a named source locates the owner's
+focused pane, else at the pane's local folder. A stopped plugin's source disappears from open choosers.
 
 ## Plugins manager, install and restart
 

@@ -17,7 +17,7 @@ name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
 sdk = ">=0.9, <0.10"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute
+capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
@@ -240,6 +240,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `terminal.inject` | `sendText`, `sendBytes`, `paste` |
 | `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` or `localProfile(id)`, and `Terminals.profiles()` and `onProfilesChanged` |
 | `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
+| `files.source` | `FileSources.register`: add places, such as saved hosts, to the file chooser |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
 without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
@@ -653,6 +654,15 @@ call `pending.reportRemoteDirectory(new RemoteDirectory(host, path))` from any t
 reports OSC 7. It does not emit `CWD_CHANGED`, affect command events, or create a local
 working directory. Calls made before attach, after exit/close, or by an old reconnect
 attempt have no effect. Declare a minimum SDK of 0.8.3 when using this method.
+
+### File sources and the chooser (SDK 0.10.0)
+
+Register a `FileSource` with `context.fileSources().register(source)` (needs `files.source`). Its `spec()` id starts
+with your plugin id; `roots()` lists what appears in the chooser's navigation pane; `connect(rootId, owner)` returns a
+stage completing with a `FileBrowser` the host owns and closes. Browser methods run on a host worker and may block;
+paths are absolute and use `/`. Implement `locate(pane)` to open choosers where a terminal pane is. Ask for a file with
+`context.windows().choose(new FileChoice(owner, "Open", FileChoice.Mode.OPEN, false, Optional.empty(), Optional.empty(), Set.of(sourceId)))`;
+the result lists `FileLocation.Local` and `FileLocation.Sourced` values.
 
 ### Documents in workspace tabs
 

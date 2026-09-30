@@ -1,27 +1,28 @@
 package dev.jasper.app.windows;
 
-import java.nio.file.Path;
+import dev.jasper.app.files.ChooserSource;
+import dev.jasper.app.files.Location;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Owner and mode for a local path picker; exactly one owner is present. {@code terminalFolder} is the owner's focused
- * terminal folder: listed as "Terminal folder", and where the picker opens when {@code initial} is empty.
+ * Owner and request for the file chooser; exactly one owner is present. {@code terminalFolder} is where the owner's
+ * focused terminal is (listed as "Terminal folder", and where the chooser opens when {@code initial} is empty);
+ * {@code sources} are the plugin sources offered besides the local disk.
  */
-public record PathChoice(UUID terminalOwner, AuxiliarySurface auxiliaryOwner, String title,
-                         Optional<Path> initial, Mode mode, Optional<Path> terminalFolder) {
-    /** Existing files, one existing directory, or one file to save to. */
-    public enum Mode { FILES, DIRECTORY, SAVE }
+public record PathChoice(UUID terminalOwner, AuxiliarySurface auxiliaryOwner, String title, Optional<Location> initial,
+                         Mode mode, boolean multiple, Optional<Location> terminalFolder, Optional<String> suggestedName,
+                         List<ChooserSource> sources) {
+    /** Existing files, one folder, or one file to save to. */
+    public enum Mode { OPEN, DIRECTORY, SAVE }
 
     public PathChoice {
         if ((terminalOwner == null) == (auxiliaryOwner == null)) throw new IllegalArgumentException("Exactly one owner is required");
-        Objects.requireNonNull(title); Objects.requireNonNull(initial); Objects.requireNonNull(mode); Objects.requireNonNull(terminalFolder);
-        initial = initial.map(path -> path.toAbsolutePath().normalize());
-        terminalFolder = terminalFolder.map(path -> path.toAbsolutePath().normalize());
-    }
-
-    public PathChoice(UUID terminalOwner, AuxiliarySurface auxiliaryOwner, String title, Optional<Path> initial, Mode mode) {
-        this(terminalOwner, auxiliaryOwner, title, initial, mode, Optional.empty());
+        Objects.requireNonNull(title); Objects.requireNonNull(initial); Objects.requireNonNull(mode);
+        Objects.requireNonNull(terminalFolder); Objects.requireNonNull(suggestedName);
+        if (multiple && mode != Mode.OPEN) throw new IllegalArgumentException("Only Open selects several files");
+        sources = List.copyOf(sources);
     }
 }

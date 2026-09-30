@@ -1,5 +1,9 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.files.ChooserSource;
+import dev.jasper.app.files.Location;
+import dev.jasper.sdk.files.FileChoice;
+import dev.jasper.sdk.files.FileLocation;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuTarget;
@@ -373,38 +377,71 @@ final class HostedUi {
         return owner;
     }
 
-    private java.util.List<Path> choosePaths(WindowOwner owner, String title, Optional<Path> initial, dev.jasper.app.windows.PathChoice.Mode mode) {
-        guard("choosePaths");
+    private java.util.List<Location> chooseLocations(WindowOwner owner, String title, Optional<Location> initial,
+                                                     dev.jasper.app.windows.PathChoice.Mode mode, boolean multiple,
+                                                     Optional<String> suggestedName, Set<String> sourceIds) {
+        guard("choose");
         OwnedContent document = owner instanceof OwnedContent content ? content : null;
         owner = resolveContentOwner(owner);
-        java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
+        java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial); java.util.Objects.requireNonNull(suggestedName);
+        List<ChooserSource> sources = model.fileSources().stream().filter(source -> sourceIds.contains(source.id())).toList();
         var cancelled = new AtomicBoolean();
         var cancelAction = new java.util.concurrent.atomic.AtomicReference<Runnable>(() -> {});
         Runnable cancel = () -> { if (cancelled.compareAndSet(false, true)) cancelAction.get().run(); };
         dev.jasper.app.windows.PathChoice choice;
         Subscription ownerClosed;
         if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window && window.surface.shown()) {
-            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, mode, terminals.workingDirectory(null));
+            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, mode, multiple,
+                terminalStart(null, sources), suggestedName, sources);
             ownerClosed = wrap(window.surface.onClosed(cancel));
         } else if (owner instanceof WindowHandle terminal && terminals.ownsOpenWindow(terminal)) {
-            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, mode, terminals.workingDirectory(terminal.id()));
+            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, mode, multiple,
+                terminalStart(terminal.id(), sources), suggestedName, sources);
             ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
         } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
         Subscription stopped = tracked(cancel);
         var pin = document == null ? null : document.entry.pin();
         var documentClosed = document == null ? null : document.entry.onClosed(cancel);
         try {
-            var paths = windows.choose(choice, action -> {
+            var chosen = windows.choose(choice, action -> {
                 cancelAction.set(action);
                 if (cancelled.get()) action.run();
             });
             if (cancelled.get() || !open.getAsBoolean()) return java.util.List.of();
-            return paths.stream().map(path -> path.toAbsolutePath().normalize()).toList();
+            return java.util.List.copyOf(chosen);
         } finally {
             stopped.close(); ownerClosed.close();
             if (documentClosed != null) documentClosed.close();
             if (pin != null) pin.close();
         }
+    }
+
+    /** Where the owner's focused terminal is: a source's location when one recognises the pane, else the pane's local folder. */
+    private Optional<Location> terminalStart(java.util.UUID window, List<ChooserSource> sources) {
+        Optional<java.util.UUID> pane = terminals.focusedPane(window);
+        for (ChooserSource source : sources) {
+            Optional<Location> found;
+            try { found = pane.flatMap(source::locate); }
+            catch (RuntimeException failed) { found = Optional.empty(); }
+            if (found.isPresent()) return found;
+        }
+        return terminals.workingDirectory(window).map(Location::local);
+    }
+
+    private static java.util.List<Path> localPaths(java.util.List<Location> chosen) {
+        return chosen.stream().filter(Location::isLocal).map(location -> location.localPath().toAbsolutePath().normalize()).toList();
+    }
+
+    static Location location(FileLocation location) {
+        return switch (location) {
+            case FileLocation.Local local -> Location.local(local.path());
+            case FileLocation.Sourced sourced -> new Location(sourced.sourceId(), sourced.rootId(), sourced.path());
+        };
+    }
+
+    static FileLocation fileLocation(Location location) {
+        return location.isLocal() ? new FileLocation.Local(location.localPath())
+            : new FileLocation.Sourced(location.source(), location.root(), location.path());
     }
 
     Windows windows() {
@@ -442,13 +479,23 @@ final class HostedUi {
             }
 
             @Override public java.util.List<Path> chooseFiles(WindowOwner owner, String title, Optional<Path> initial) {
-                return choosePaths(owner, title, initial, dev.jasper.app.windows.PathChoice.Mode.FILES);
+                return localPaths(chooseLocations(owner, title, initial.map(Location::local), dev.jasper.app.windows.PathChoice.Mode.OPEN, true, Optional.empty(), Set.of()));
             }
             @Override public Optional<Path> chooseDirectory(WindowOwner owner, String title, Optional<Path> initial) {
-                return choosePaths(owner, title, initial, dev.jasper.app.windows.PathChoice.Mode.DIRECTORY).stream().findFirst();
+                return localPaths(chooseLocations(owner, title, initial.map(Location::local), dev.jasper.app.windows.PathChoice.Mode.DIRECTORY, false, Optional.empty(), Set.of())).stream().findFirst();
             }
             @Override public Optional<Path> chooseSaveFile(WindowOwner owner, String title, Optional<Path> initial) {
-                return choosePaths(owner, title, initial, dev.jasper.app.windows.PathChoice.Mode.SAVE).stream().findFirst();
+                return localPaths(chooseLocations(owner, title, initial.map(Location::local), dev.jasper.app.windows.PathChoice.Mode.SAVE, false, Optional.empty(), Set.of())).stream().findFirst();
+            }
+            @Override public java.util.List<FileLocation> choose(FileChoice choice) {
+                java.util.Objects.requireNonNull(choice, "choice");
+                var mode = switch (choice.mode()) {
+                    case OPEN -> dev.jasper.app.windows.PathChoice.Mode.OPEN;
+                    case SAVE -> dev.jasper.app.windows.PathChoice.Mode.SAVE;
+                    case DIRECTORY -> dev.jasper.app.windows.PathChoice.Mode.DIRECTORY;
+                };
+                return chooseLocations(choice.owner(), choice.title(), choice.initial().map(HostedUi::location), mode, choice.multiple(),
+                    choice.suggestedName(), choice.sources()).stream().map(HostedUi::fileLocation).toList();
             }
             @Override public PluginWindow create(WindowSpec spec) {
                 guard("create");

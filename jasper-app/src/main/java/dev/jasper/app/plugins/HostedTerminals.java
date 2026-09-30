@@ -213,14 +213,19 @@ final class HostedTerminals implements Terminals {
     /** A handle for an id an action was given; it finds its tab if the pane is open. */
     PaneHandle paneHandle(UUID id) { return registry.pane(id).<PaneHandle>map(Pane::new).orElseGet(() -> new Pane(id, NOWHERE)); }
 
-    /**
-     * The local folder of the focused pane in {@code windowId}'s selected tab, else of the active pane. For the host's
-     * file chooser; no capability applies because nothing reaches the plugin unless the user picks it.
-     */
-    Optional<Path> workingDirectory(UUID windowId) {
+    /** The focused pane in {@code windowId}'s selected tab, else the active pane. */
+    Optional<UUID> focusedPane(UUID windowId) {
         Optional<PaneEntry> pane = windowId == null ? Optional.empty()
             : registry.window(windowId).flatMap(window -> window.selectedTab().get()).flatMap(tab -> tab.focusedPane().get());
-        return pane.or(registry::activePane).flatMap(entry -> entry.snapshot().get().workingDirectory());
+        return pane.or(registry::activePane).map(PaneEntry::id);
+    }
+
+    /**
+     * The local folder of {@link #focusedPane}. For the host's file chooser; no capability applies because nothing
+     * reaches the plugin unless the user picks it.
+     */
+    Optional<Path> workingDirectory(UUID windowId) {
+        return focusedPane(windowId).flatMap(registry::pane).flatMap(entry -> entry.snapshot().get().workingDirectory());
     }
 
     @Override public Optional<WindowHandle> activeWindow() { requireUi("activeWindow"); return registry.activeWindow().map(window -> new Window(window.id())); }

@@ -4,8 +4,11 @@ import com.formdev.flatlaf.util.SystemInfo;
 import dev.jasper.app.files.ChooserModel;
 import dev.jasper.app.files.ChooserPrefs;
 import dev.jasper.app.files.ChooserRequest;
+import dev.jasper.app.files.ChooserSource;
 import dev.jasper.app.files.FileChooserPanel;
-import dev.jasper.app.files.LocalFiles;
+import dev.jasper.app.files.LocalBrowser;
+import dev.jasper.app.files.LocalSource;
+import dev.jasper.app.files.Location;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -200,37 +203,44 @@ public final class NativeShells {
         return owner.closed() ? Optional.empty() : selected;
     }
 
-    /** Owner-based multiple-file, single-directory or save-target selection in Jasper's own chooser. */
-    public List<Path> choosePaths(PathChoice choice, Consumer<Runnable> cancellation) {
+    /** Owner-based file, folder or save-target selection in Jasper's own chooser. */
+    public List<Location> choosePaths(PathChoice choice, Consumer<Runnable> cancellation) {
         Window owner = choice.terminalOwner() != null ? terminalWindows.apply(choice.terminalOwner()) : natives.get(choice.auxiliaryOwner());
         if (owner == null || !owner.isShowing()) throw new IllegalArgumentException("Picker requires a shown owner");
         ChooserRequest.Mode mode = switch (choice.mode()) {
-            case FILES -> ChooserRequest.Mode.OPEN;
+            case OPEN -> ChooserRequest.Mode.OPEN;
             case DIRECTORY -> ChooserRequest.Mode.DIRECTORY;
             case SAVE -> ChooserRequest.Mode.SAVE;
         };
-        return showChooser(owner, ChooserRequest.of(choice.title(), mode, choice.mode() == PathChoice.Mode.FILES, choice.initial(),
-            choice.terminalFolder(), Optional.empty(), new LocalFiles().home()), cancellation);
+        var local = new LocalBrowser();
+        return showChooser(owner, ChooserRequest.of(choice.title(), mode, choice.multiple(), choice.initial(), choice.terminalFolder(),
+            choice.suggestedName(), Optional.empty(), Optional.ofNullable(choice.terminalOwner()), local.homePath()), local, choice.sources(), cancellation);
     }
 
     private Optional<Path> chooseFile(Window owner, String title, Optional<Path> initialPath, Optional<String> suffix) {
-        return showChooser(owner, ChooserRequest.of(title, ChooserRequest.Mode.OPEN, false, initialPath, Optional.empty(), suffix,
-            new LocalFiles().home()), action -> { }).stream().findFirst();
+        var local = new LocalBrowser();
+        return showChooser(owner, ChooserRequest.of(title, ChooserRequest.Mode.OPEN, false, initialPath.map(Location::local), Optional.empty(),
+                Optional.empty(), suffix, Optional.empty(), local.homePath()), local, List.of(), action -> { })
+            .stream().filter(Location::isLocal).map(Location::localPath).findFirst();
     }
 
     /** Shows the chooser document-modally over {@code owner}; returns when it closes. Empty means cancelled. */
-    private List<Path> showChooser(Window owner, ChooserRequest request, Consumer<Runnable> cancellation) {
+    private List<Location> showChooser(Window owner, ChooserRequest request, LocalBrowser local, List<ChooserSource> extra,
+                                       Consumer<Runnable> cancellation) {
         var dialog = new JDialog(owner, request.title(), Dialog.ModalityType.DOCUMENT_MODAL);
         ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
             var thread = new Thread(task, "jasper-file-chooser");
             thread.setDaemon(true);
             return thread;
         });
+        var sources = new java.util.ArrayList<ChooserSource>();
+        sources.add(new LocalSource(local));
+        sources.addAll(extra);
         var prefs = new ChooserPrefs(state);
-        var model = new ChooserModel(request, new LocalFiles(), worker, SwingUtilities::invokeLater, prefs.showHidden());
-        var result = new AtomicReference<List<Path>>(List.of());
-        var panel = new FileChooserPanel(model, prefs, paths -> { result.set(paths); dialog.dispose(); },
-            file -> JOptionPane.showConfirmDialog(dialog, file.getFileName() + " already exists. Do you want to replace it?",
+        var model = new ChooserModel(request, sources, worker, SwingUtilities::invokeLater, prefs.showHidden());
+        var result = new AtomicReference<List<Location>>(List.of());
+        var panel = new FileChooserPanel(model, prefs, local.homePath(), chosen -> { result.set(chosen); dialog.dispose(); },
+            file -> JOptionPane.showConfirmDialog(dialog, model.name(file) + " already exists. Do you want to replace it?",
                 "Confirm Save As", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION,
             () -> Optional.ofNullable(JOptionPane.showInputDialog(dialog, "Folder name:", "New Folder", JOptionPane.PLAIN_MESSAGE))
                 .map(String::strip).filter(name -> !name.isEmpty()));
@@ -268,8 +278,10 @@ public final class NativeShells {
             }
             theme.close();
             if (bar != null) bar.close();
+            panel.close();
+            model.close();
             dialog.dispose();
-            worker.shutdownNow();
+            worker.shutdown();
         }
     }
 

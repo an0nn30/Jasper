@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.concurrent.Executor;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.palette.Palette;
+import dev.jasper.sdk.files.FileSources;
 import dev.jasper.sdk.ui.Notices;
 import dev.jasper.sdk.ui.Platform;
 
@@ -149,6 +150,14 @@ public interface PluginContext {
 
         /** @return the command palette; registering needs {@code palette.contribute} */
         Palette palette();
+
+    /**
+     * Places this plugin adds to Jasper's file chooser.
+     *
+     * @return the file sources; registering needs {@code files.source}
+     * @since 0.10.0
+     */
+    FileSources fileSources();
 
         /** @return error notices shown to the user */
         Notices notices();

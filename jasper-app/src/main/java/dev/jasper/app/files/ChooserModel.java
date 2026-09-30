@@ -4,27 +4,34 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.NotDirectoryException;
-import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
- * The chooser without Swing: the folder shown, back and forward history, the listing, filter, sort order and
- * selection, previews, new folders and what the primary button does. Listing runs on {@code worker}; results are
- * applied through {@code ui} and dropped when a newer request has started. UI thread only.
+ * The chooser without Swing: the place shown (a folder in some source's root), back and forward history across
+ * sources, connecting to roots, the listing, filter, sort order, selection, previews and what the primary button does.
+ * Browsers come from the sources and are kept until {@link #close()}. Browser calls run on {@code worker}; results
+ * are applied through {@code ui} and dropped when a newer request has started. UI thread only.
  */
 public final class ChooserModel {
     /** Sort keys; folders always come first. */
@@ -32,26 +39,30 @@ public final class ChooserModel {
 
     /** What the primary button, Enter in the name field, or opening an entry leads to. */
     public sealed interface Outcome {
-        /** The name was a folder, which is now shown. */
-        record Navigated(Path folder) implements Outcome { }
+        /** A folder is now shown. */
+        record Navigated(Location folder) implements Outcome { }
         /** The choice is made. */
-        record Chosen(List<Path> paths) implements Outcome { }
+        record Chosen(List<Location> locations) implements Outcome { }
         /** Saving would replace an existing file: ask first, then treat it as chosen. */
-        record ConfirmReplace(Path file) implements Outcome { }
+        record ConfirmReplace(Location file) implements Outcome { }
         /** Nothing can be chosen; the message says why. */
         record Invalid(String message) implements Outcome { }
     }
 
     static final int PREVIEW_BYTES = 8 * 1024;
-
+    static final int BATCH = 256;
     private final ChooserRequest request;
-    private final LocalFiles files;
+    private final Map<String, ChooserSource> sources = new LinkedHashMap<>();
     private final Executor worker;
     private final Executor ui;
-    private final Deque<Path> back = new ArrayDeque<>();
-    private final Deque<Path> forward = new ArrayDeque<>();
+    private final Map<String, Browser> browsers = new HashMap<>();
+    private final Deque<Location> back = new ArrayDeque<>();
+    private final Deque<Location> forward = new ArrayDeque<>();
     private final List<Runnable> listeners = new ArrayList<>();
-    private Path folder;
+    private Location location;
+    private Browser browser;
+    private CompletableFuture<Browser> connecting;
+    private Optional<String> connectingTo = Optional.empty();
     private List<ChooserEntry> listing = List.of();
     private List<ChooserEntry> visible = List.of();
     private List<ChooserEntry> selection = List.of();
@@ -60,83 +71,139 @@ public final class ChooserModel {
     private Column sortColumn = Column.NAME;
     private boolean ascending = true;
     private boolean loading;
+    private boolean retryable;
     private Optional<String> error = Optional.empty();
-    private Optional<LocalFiles.PreviewInfo> preview = Optional.empty();
+    private Optional<PreviewInfo> preview = Optional.empty();
+    private Optional<String> pendingSelection = Optional.empty();
     private long generation;
     private long previewGeneration;
-    private Optional<Path> pendingSelection = Optional.empty();
+    private boolean closed;
 
     /**
-     * @param worker runs blocking file access
+     * @param sources where the chooser can browse; the local source must be among them
+     * @param worker runs browser calls, one at a time
      * @param ui applies results on the UI thread
      * @param showHidden whether dotfiles are listed at first
      */
-    public ChooserModel(ChooserRequest request, LocalFiles files, Executor worker, Executor ui, boolean showHidden) {
+    public ChooserModel(ChooserRequest request, List<ChooserSource> sources, Executor worker, Executor ui, boolean showHidden) {
         this.request = Objects.requireNonNull(request);
-        this.files = Objects.requireNonNull(files);
+        for (ChooserSource source : sources) this.sources.putIfAbsent(source.id(), source);
         this.worker = Objects.requireNonNull(worker);
         this.ui = Objects.requireNonNull(ui);
         this.showHidden = showHidden;
-        this.folder = request.start();
+        this.location = request.start();
         if (request.mode() == ChooserRequest.Mode.OPEN)
-            request.suggestedName().ifPresent(name -> {
-                try { pendingSelection = Optional.of(folder.resolve(name)); } catch (InvalidPathException ignored) { }
-            });
+            pendingSelection = request.suggestedName().filter(name -> !name.contains("/") && !name.contains(File.separator));
     }
 
-    /** Lists the start folder. */
-    public void start() { load(); }
+    /** Opens the start location. */
+    public void start() { show(location); }
 
     /** Runs {@code listener} after every change. */
     public void addListener(Runnable listener) { listeners.add(Objects.requireNonNull(listener)); }
 
     public ChooserRequest request() { return request; }
-    public Path folder() { return folder; }
+    public List<ChooserSource> sources() { return List.copyOf(sources.values()); }
+    public Location location() { return location; }
     /** The listing after the dotfile, mode, suffix and search filters, sorted. */
     public List<ChooserEntry> entries() { return visible; }
     public List<ChooserEntry> selection() { return selection; }
     public boolean loading() { return loading; }
+    /** The root being connected to, by label. */
+    public Optional<String> connectingTo() { return connectingTo; }
     public Optional<String> error() { return error; }
-    public Optional<LocalFiles.PreviewInfo> preview() { return preview; }
+    /** Whether {@link #retry()} may help with the error. */
+    public boolean retryable() { return retryable; }
+    public Optional<PreviewInfo> preview() { return preview; }
     public String filter() { return filter; }
     public boolean showHidden() { return showHidden; }
     public Column sortColumn() { return sortColumn; }
     public boolean ascending() { return ascending; }
     public boolean canGoBack() { return !back.isEmpty(); }
     public boolean canGoForward() { return !forward.isEmpty(); }
-    public boolean canGoUp() { return folder.getParent() != null; }
+    public boolean canGoUp() { return parent(location).isPresent(); }
 
-    /** Shows {@code target}, recording the current folder for Back; the folder already shown is listed again. */
-    public void navigate(Path target) {
-        Path next = target.toAbsolutePath().normalize();
-        if (!next.equals(folder)) {
-            back.push(folder);
-            forward.clear();
-            folder = next;
+    /** The folder containing {@code place}, when its root is open. */
+    public Optional<Location> parent(Location place) {
+        Browser open = browsers.get(key(place));
+        if (open == null || place.path().equals(Location.HOME)) return Optional.empty();
+        try { return open.parent(place.path()).map(place::at); }
+        catch (RuntimeException failed) { return Optional.empty(); }
+    }
+
+    /** A location's last path element; the root's label while it is not open. */
+    public String name(Location place) {
+        Browser open = browsers.get(key(place));
+        if (open == null || place.path().equals(Location.HOME)) return rootLabel(place);
+        try { return open.name(place.path()); }
+        catch (RuntimeException failed) { return place.path(); }
+    }
+
+    /** The label of a location's root, such as a host's name. */
+    public String rootLabel(Location place) {
+        ChooserSource source = sources.get(place.source());
+        if (source == null) return place.root();
+        try {
+            return source.roots().stream().filter(root -> root.id().equals(place.root())).map(ChooserSource.Root::label).findFirst().orElse(place.root());
+        } catch (RuntimeException failed) {
+            return place.root();
         }
+    }
+
+    /** The folders from the root down to the one shown, for the path bar. */
+    public List<Location> chain() {
+        var chain = new ArrayDeque<Location>();
+        Location at = location;
+        for (int depth = 0; at != null && depth < 256; depth++) {
+            chain.addFirst(at);
+            at = parent(at).orElse(null);
+        }
+        return List.copyOf(chain);
+    }
+
+    /** Shows {@code target}, recording the current place for Back; the place already shown is listed again. */
+    public void navigate(Location target) {
+        if (!target.equals(location)) {
+            back.push(location);
+            forward.clear();
+        }
+        pendingSelection = Optional.empty();
         filter = "";
-        load();
+        show(target);
     }
 
     public void goBack() {
         if (back.isEmpty()) return;
-        forward.push(folder);
-        folder = back.pop();
+        forward.push(location);
         filter = "";
-        load();
+        show(back.pop());
     }
 
     public void goForward() {
         if (forward.isEmpty()) return;
-        back.push(folder);
-        folder = forward.pop();
+        back.push(location);
         filter = "";
-        load();
+        show(forward.pop());
     }
 
-    public void goUp() { if (folder.getParent() != null) navigate(folder.getParent()); }
+    public void goUp() { parent(location).ifPresent(this::navigate); }
 
-    public void refresh() { load(); }
+    public void refresh() { show(location); }
+
+    /** Tries the place shown again, reconnecting when its root is not open. */
+    public void retry() { show(location); }
+
+    /** Abandons a connection in progress. */
+    public void cancelConnection() {
+        if (connecting == null) return;
+        generation++;
+        connecting.cancel(true);
+        connecting = null;
+        connectingTo = Optional.empty();
+        error = Optional.of("Connection cancelled.");
+        retryable = true;
+        fire();
+    }
 
     /** Shows only entries whose names contain {@code value}, ignoring case. */
     public void setFilter(String value) {
@@ -188,76 +255,141 @@ public final class ChooserModel {
     }
 
     /**
-     * Resolves name-field text: {@code ~}, {@code ~/…}, an absolute path, or a path relative to the folder shown.
-     *
-     * @throws InvalidPathException when the text is not a path on this platform
+     * The primary button, given the name field's text. The selection answers at once; a typed name is resolved and
+     * checked on the worker. {@code done} runs on the UI thread, after a typed folder has been shown; it does not run
+     * when the user moved elsewhere meanwhile.
      */
-    public Path resolve(String text) {
-        Path home = files.home();
-        if (text.equals("~")) return home;
-        if (text.startsWith("~/") || text.startsWith("~" + File.separator)) return home.resolve(text.substring(2)).normalize();
-        Path path = Path.of(text);
-        return (path.isAbsolute() ? path : folder.resolve(path)).toAbsolutePath().normalize();
-    }
-
-    /** The primary button, given the name field's text. A typed folder is shown, except in Directory mode, where it is chosen. */
-    public Outcome accept(String typed) {
+    public void accept(String typed, Consumer<Outcome> done) {
         String text = typed.strip();
         if (!text.isEmpty() && nameForSelection().filter(text::equals).isPresent()) {
-            if (request.mode() == ChooserRequest.Mode.OPEN)
-                return new Outcome.Chosen(selection.stream().filter(entry -> !entry.directory()).map(ChooserEntry::path).toList());
-            if (request.mode() == ChooserRequest.Mode.DIRECTORY) return new Outcome.Chosen(List.of(selection.getFirst().path()));
+            if (request.mode() == ChooserRequest.Mode.OPEN) {
+                done.accept(new Outcome.Chosen(selection.stream().filter(entry -> !entry.directory()).map(entry -> location.at(entry.path())).toList()));
+                return;
+            }
+            if (request.mode() == ChooserRequest.Mode.DIRECTORY) {
+                done.accept(new Outcome.Chosen(List.of(location.at(selection.getFirst().path()))));
+                return;
+            }
         }
         if (text.isEmpty()) {
-            if (request.mode() == ChooserRequest.Mode.DIRECTORY) return new Outcome.Chosen(List.of(folder));
-            if (selection.size() == 1 && selection.getFirst().directory()) return show(selection.getFirst().path());
-            return new Outcome.Invalid(request.mode() == ChooserRequest.Mode.SAVE ? "Enter a file name." : "Select a file.");
+            if (request.mode() == ChooserRequest.Mode.DIRECTORY && browser != null) done.accept(new Outcome.Chosen(List.of(location)));
+            else if (selection.size() == 1 && selection.getFirst().directory()) done.accept(activate(selection.getFirst()));
+            else done.accept(new Outcome.Invalid(request.mode() == ChooserRequest.Mode.SAVE ? "Enter a file name." : "Select a file."));
+            return;
         }
-        Path target;
-        try { target = resolve(text); }
-        catch (InvalidPathException invalid) { return new Outcome.Invalid("\"" + text + "\" is not a valid name."); }
-        if (Files.isDirectory(target))
-            return request.mode() == ChooserRequest.Mode.DIRECTORY ? new Outcome.Chosen(List.of(target)) : show(target);
+        Browser current = browser;
+        if (current == null) {
+            done.accept(new Outcome.Invalid("Not connected yet."));
+            return;
+        }
+        Location here = location;
+        long ticket = generation;
+        submit(() -> {
+            Outcome outcome;
+            try {
+                String path = current.resolve(here.path(), text);
+                outcome = decide(current, text, here.at(path), current.stat(path));
+            } catch (IllegalArgumentException invalid) {
+                outcome = new Outcome.Invalid("\"" + text + "\" is not a valid name.");
+            } catch (IOException | RuntimeException failed) {
+                outcome = new Outcome.Invalid(describe(failed));
+            }
+            Outcome result = outcome;
+            ui.execute(() -> {
+                if (ticket != generation || closed) return;
+                if (result instanceof Outcome.Navigated navigated) navigate(navigated.folder());
+                done.accept(result);
+            });
+        });
+    }
+
+    /** Runs on the worker. */
+    private Outcome decide(Browser current, String text, Location target, Optional<ChooserEntry> found) throws IOException {
+        if (found.filter(ChooserEntry::directory).isPresent())
+            return request.mode() == ChooserRequest.Mode.DIRECTORY ? new Outcome.Chosen(List.of(target)) : new Outcome.Navigated(target);
         return switch (request.mode()) {
             case DIRECTORY -> new Outcome.Invalid("There is no folder named \"" + text + "\".");
-            case OPEN -> Files.isRegularFile(target) ? new Outcome.Chosen(List.of(target))
-                : new Outcome.Invalid("There is no file named \"" + text + "\".");
+            case OPEN -> found.filter(entry -> entry.kind() == ChooserEntry.Kind.FILE).isPresent()
+                ? new Outcome.Chosen(List.of(target)) : new Outcome.Invalid("There is no file named \"" + text + "\".");
             case SAVE -> {
-                Path parent = target.getParent();
-                if (parent == null || !Files.isDirectory(parent)) yield new Outcome.Invalid("The folder for \"" + text + "\" doesn't exist.");
-                yield Files.exists(target) ? new Outcome.ConfirmReplace(target) : new Outcome.Chosen(List.of(target));
+                Optional<String> parent = current.parent(target.path());
+                boolean folderExists = parent.isPresent() && current.stat(parent.get()).filter(ChooserEntry::directory).isPresent();
+                if (!folderExists) yield new Outcome.Invalid("The folder for \"" + text + "\" doesn't exist.");
+                yield found.isPresent() ? new Outcome.ConfirmReplace(target) : new Outcome.Chosen(List.of(target));
             }
         };
     }
 
     /** Double-click or Enter on an entry: a folder is shown; a file is opened, or in Save, replaced after asking. */
     public Outcome activate(ChooserEntry entry) {
-        if (entry.directory()) return show(entry.path());
+        Location target = location.at(entry.path());
+        if (entry.directory()) {
+            navigate(target);
+            return new Outcome.Navigated(target);
+        }
         return switch (request.mode()) {
-            case OPEN -> new Outcome.Chosen(List.of(entry.path()));
-            case SAVE -> new Outcome.ConfirmReplace(entry.path());
+            case OPEN -> new Outcome.Chosen(List.of(target));
+            case SAVE -> new Outcome.ConfirmReplace(target);
             case DIRECTORY -> new Outcome.Invalid("Choose a folder.");
         };
     }
 
-    private Outcome show(Path target) {
-        navigate(target);
-        return new Outcome.Navigated(folder);
+    /** The path bar: shows the folder {@code text} names, or reports why not, on the UI thread. */
+    public void goTo(String text, Consumer<Optional<String>> problem) {
+        Browser current = browser;
+        if (current == null) {
+            problem.accept(Optional.of("Not connected yet."));
+            return;
+        }
+        Location here = location;
+        long ticket = generation;
+        String typed = text.strip();
+        submit(() -> {
+            Optional<String> result;
+            Location target = null;
+            try {
+                String path = current.resolve(here.path(), typed);
+                target = here.at(path);
+                result = current.stat(path).filter(ChooserEntry::directory).isPresent() ? Optional.empty()
+                    : Optional.of("There is no folder at " + path + ".");
+            } catch (IllegalArgumentException invalid) {
+                result = Optional.of("\"" + typed + "\" is not a valid path.");
+            } catch (IOException | RuntimeException failed) {
+                result = Optional.of(describe(failed));
+            }
+            Optional<String> outcome = result;
+            Location destination = target;
+            ui.execute(() -> {
+                if (ticket != generation || closed) return;
+                if (outcome.isEmpty()) navigate(destination);
+                problem.accept(outcome);
+            });
+        });
     }
 
     /** Loads the preview of the single selected entry; a result that arrives after the selection changed is dropped. */
     public void requestPreview() {
         long ticket = ++previewGeneration;
         preview = Optional.empty();
-        if (selection.size() != 1) return;
+        Browser current = browser;
+        if (selection.size() != 1 || current == null) return;
         ChooserEntry entry = selection.getFirst();
-        worker.execute(() -> {
-            Optional<LocalFiles.PreviewInfo> result;
-            try { result = Optional.of(files.preview(entry, PREVIEW_BYTES)); }
-            catch (IOException | RuntimeException unreadable) { result = Optional.empty(); }
-            Optional<LocalFiles.PreviewInfo> loaded = result;
+        submit(() -> {
+            Optional<PreviewInfo> result;
+            try {
+                if (entry.directory()) {
+                    int[] items = { 0 };
+                    current.list(entry.path(), ignored -> items[0]++);
+                    result = Optional.of(PreviewInfo.folder(items[0]));
+                } else {
+                    result = Optional.of(PreviewInfo.file(current.read(entry.path(), PREVIEW_BYTES)));
+                }
+            } catch (IOException | RuntimeException unreadable) {
+                result = Optional.empty();
+            }
+            Optional<PreviewInfo> loaded = result;
             ui.execute(() -> {
-                if (ticket != previewGeneration) return;
+                if (ticket != previewGeneration || closed) return;
                 preview = loaded;
                 fire();
             });
@@ -272,67 +404,170 @@ public final class ChooserModel {
     public void createFolder(String name, Consumer<Optional<String>> done) {
         String trimmed = name.strip();
         Optional<String> invalid = Optional.of("\"" + trimmed + "\" is not a valid folder name.");
-        if (trimmed.isEmpty() || trimmed.equals(".") || trimmed.equals("..") || trimmed.contains("/") || trimmed.contains(File.separator)) {
-            done.accept(invalid);
+        Browser current = browser;
+        if (current == null || trimmed.isEmpty() || trimmed.equals(".") || trimmed.equals("..") || trimmed.equals("~")
+                || trimmed.contains("/") || trimmed.contains(File.separator)) {
+            done.accept(current == null ? Optional.of("Not connected yet.") : invalid);
             return;
         }
-        Path target;
-        try { target = folder.resolve(trimmed); }
-        catch (InvalidPathException bad) { done.accept(invalid); return; }
-        Path shown = folder;
-        worker.execute(() -> {
+        Location shown = location;
+        submit(() -> {
             String failure = null;
-            try { files.mkdir(target); }
+            try { current.mkdir(current.resolve(shown.path(), trimmed)); }
             catch (FileAlreadyExistsException exists) { failure = "\"" + trimmed + "\" already exists."; }
-            catch (IOException | RuntimeException failed) {
-                failure = failed.getMessage() == null ? failed.getClass().getSimpleName() : failed.getMessage();
-            }
+            catch (IllegalArgumentException bad) { failure = invalid.get(); }
+            catch (IOException | RuntimeException failed) { failure = failed.getMessage() == null ? failed.getClass().getSimpleName() : failed.getMessage(); }
             String result = failure;
             ui.execute(() -> {
-                if (result == null && folder.equals(shown)) {
-                    pendingSelection = Optional.of(target);
-                    load();
+                if (closed) return;
+                if (result == null && location.equals(shown)) {
+                    pendingSelection = Optional.of(trimmed);
+                    show(location);
                 }
                 done.accept(Optional.ofNullable(result));
             });
         });
     }
 
-    private void load() {
+    /** Cancels a connection in progress and closes every browser this model opened. */
+    public void close() {
+        if (closed) return;
+        closed = true;
+        generation++;
+        if (connecting != null) connecting.cancel(true);
+        List<Browser> open = List.copyOf(browsers.values());
+        browsers.clear();
+        for (Browser each : open) {
+            try { each.abort(); } catch (RuntimeException ignored) { }
+        }
+        for (Browser each : open) closeLater(each);
+    }
+
+    private static String key(Location place) { return place.source() + "|" + place.root(); }
+
+    private void show(Location target) {
         long ticket = ++generation;
-        Path target = folder;
-        loading = true;
+        location = target;
+        browser = null;
+        loading = false;
+        retryable = false;
         error = Optional.empty();
+        connectingTo = Optional.empty();
         listing = List.of();
         selection = List.of();
         preview = Optional.empty();
         previewGeneration++;
+        if (connecting != null) {
+            connecting.cancel(true);
+            connecting = null;
+        }
+        if (closed) return;
+        Browser known = browsers.get(key(target));
+        if (known != null) {
+            load(ticket, known, target);
+            return;
+        }
+        ChooserSource source = sources.get(target.source());
+        if (source == null) {
+            error = Optional.of("This place is no longer available.");
+            recompute();
+            fire();
+            return;
+        }
+        String label = rootLabel(target);
+        connectingTo = Optional.of(label);
         recompute();
         fire();
-        worker.execute(() -> {
-            List<ChooserEntry> result = List.of();
-            String failure = null;
-            try { result = files.list(target); }
-            catch (IOException | RuntimeException unreadable) { failure = describe(unreadable); }
-            List<ChooserEntry> listed = result;
-            String failed = failure;
-            ui.execute(() -> {
-                if (ticket != generation) return;
-                loading = false;
-                listing = List.copyOf(listed);
-                error = Optional.ofNullable(failed);
-                recompute();
-                listed(ticket);
-                fire();
+        CompletableFuture<Browser> attempt;
+        try { attempt = Objects.requireNonNull(source.connect(target.root(), request.ownerWindow())); }
+        catch (RuntimeException failed) { attempt = CompletableFuture.failedFuture(failed); }
+        connecting = attempt;
+        attempt.whenComplete((opened, failure) -> ui.execute(() -> connected(ticket, target, label, opened, failure)));
+    }
+
+    private void connected(long ticket, Location target, String label, Browser opened, Throwable failure) {
+        if (opened != null && (closed || browsers.putIfAbsent(key(target), opened) != null)) closeLater(opened);
+        if (closed || ticket != generation) return;
+        connecting = null;
+        connectingTo = Optional.empty();
+        Browser ready = browsers.get(key(target));
+        if (ready == null) {
+            error = Optional.of("Couldn't connect to " + label + ": " + reason(failure));
+            retryable = true;
+            fire();
+            return;
+        }
+        load(ticket, ready, target);
+    }
+
+    private void load(long ticket, Browser current, Location target) {
+        browser = current;
+        loading = true;
+        recompute();
+        fire();
+        submit(() -> {
+            String folder;
+            try {
+                folder = target.path().equals(Location.HOME) ? current.home() : target.path();
+            } catch (IOException | RuntimeException failed) {
+                ui.execute(() -> finish(ticket, List.of(), describe(failed), true));
+                return;
+            }
+            if (!folder.equals(target.path())) ui.execute(() -> {
+                if (ticket == generation) {
+                    location = target.at(folder);
+                    fire();
+                }
             });
+            var batch = new ArrayList<ChooserEntry>(BATCH);
+            String failure = null;
+            try {
+                current.list(folder, entry -> {
+                    batch.add(entry);
+                    if (batch.size() == BATCH) {
+                        List<ChooserEntry> chunk = List.copyOf(batch);
+                        batch.clear();
+                        ui.execute(() -> append(ticket, chunk));
+                    }
+                });
+            } catch (IOException | RuntimeException failed) {
+                failure = describe(failed);
+            }
+            List<ChooserEntry> rest = List.copyOf(batch);
+            String failed = failure;
+            ui.execute(() -> finish(ticket, rest, failed, false));
         });
     }
 
-    /** Called once a listing is applied, before listeners run: selects the entry a new folder or the request named. */
-    private void listed(long ticket) {
-        pendingSelection.flatMap(path -> visible.stream().filter(entry -> entry.path().equals(path)).findFirst())
+    private void append(long ticket, List<ChooserEntry> chunk) {
+        if (ticket != generation) return;
+        listing = Stream.concat(listing.stream(), chunk.stream()).toList();
+        recompute();
+        fire();
+    }
+
+    private void finish(long ticket, List<ChooserEntry> rest, String failure, boolean retry) {
+        if (ticket != generation) return;
+        loading = false;
+        listing = Stream.concat(listing.stream(), rest.stream()).toList();
+        error = Optional.ofNullable(failure);
+        retryable = retry;
+        recompute();
+        pendingSelection.flatMap(name -> visible.stream().filter(entry -> entry.name().equals(name)).findFirst())
             .ifPresent(entry -> selection = List.of(entry));
         pendingSelection = Optional.empty();
+        fire();
+    }
+
+    private void submit(Runnable task) {
+        if (closed) return;
+        try { worker.execute(task); }
+        catch (RejectedExecutionException stopped) { /* the dialog is closing */ }
+    }
+
+    private void closeLater(Browser opened) {
+        try { worker.execute(opened::close); }
+        catch (RejectedExecutionException stopped) { opened.close(); }
     }
 
     private void recompute() {
@@ -358,13 +593,21 @@ public final class ChooserModel {
     }
 
     /** A short, user-facing reason a folder could not be listed. */
-    static String describe(Exception failure) {
+    static String describe(Throwable failure) {
         return switch (failure) {
             case AccessDeniedException denied -> "You don't have permission to open this folder.";
             case NoSuchFileException missing -> "This folder doesn't exist.";
             case NotDirectoryException notFolder -> "This is not a folder.";
             default -> failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
         };
+    }
+
+    static String reason(Throwable failure) {
+        Throwable cause = failure;
+        while ((cause instanceof CompletionException || cause instanceof ExecutionException) && cause.getCause() != null) cause = cause.getCause();
+        if (cause == null) return "no connection";
+        if (cause instanceof CancellationException) return "cancelled";
+        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 
     private void fire() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
