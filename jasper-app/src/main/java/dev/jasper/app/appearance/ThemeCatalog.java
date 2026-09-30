@@ -46,6 +46,12 @@ public final class ThemeCatalog {
         }
     }
 
+    /** What an archive would install: its themes' names, and the problems reading it met. */
+    public record Inspection(List<String> themes, List<String> problems) {
+        public Inspection { themes = List.copyOf(themes); problems = List.copyOf(problems); }
+    }
+
+    private record Loaded(List<Theme> themes, List<Problem> problems) {}
     private record Stamp(long size, FileTime modified) {}
     private record Read(Stamp stamp, List<Theme> themes, List<Problem> problems) {}
 
@@ -72,6 +78,20 @@ public final class ThemeCatalog {
 
     /** The last scan's result; the built-in themes before the first scan. */
     public Snapshot latest() { return latest; }
+
+    /** The folder this catalog scans; empty for the built-in catalog. */
+    public Optional<Path> directory() { return Optional.ofNullable(directory); }
+
+    /** Reads {@code archive} as a scan would, without installing it; may run on any thread. */
+    public static Inspection inspect(Path archive) {
+        Loaded loaded;
+        try { loaded = load(archive, ThemeArchive::read); }
+        catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
+            return new Inspection(List.of(), List.of(archive.getFileName() + " cannot be read: " + failure));
+        }
+        return new Inspection(loaded.themes().stream().map(Theme::name).toList(),
+            loaded.problems().stream().map(Problem::message).toList());
+    }
 
     /** Reads the themes folder, creating it when missing, and re-reads only files whose size or modified time changed. */
     public synchronized Snapshot scan() {
@@ -138,10 +158,16 @@ public final class ThemeCatalog {
         }
         Read previous = reads.get(file);
         if (previous != null && previous.stamp().equals(stamp)) return previous;
+        Loaded loaded = load(file, reader);
+        return new Read(stamp, loaded.themes(), loaded.problems());
+    }
+
+    /** The archive's themes, loaded and resolved, and every problem met; never throws for a bad archive. */
+    private static Loaded load(Path file, Function<Path, ThemeArchive.Contents> reader) {
         ThemeArchive.Contents contents;
         try { contents = reader.apply(file); }
         catch (RuntimeException failure) {
-            return new Read(stamp, List.of(), List.of(new Problem(file, file.getFileName() + " cannot be read: " + failure)));
+            return new Loaded(List.of(), List.of(new Problem(file, file.getFileName() + " cannot be read: " + failure)));
         }
         var problems = new ArrayList<Problem>();
         contents.problems().forEach(problem -> problems.add(new Problem(file, problem)));
@@ -157,7 +183,7 @@ public final class ThemeCatalog {
             scheme.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
             themes.add(new Theme("installed:" + found.label(), resolved.name(), resolved.dark(), scheme.palette(), source));
         }
-        return new Read(stamp, themes, problems);
+        return new Loaded(themes, problems);
     }
 
     private static EditorScheme.Result scheme(ThemeArchive.Found found, boolean dark) {

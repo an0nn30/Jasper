@@ -162,4 +162,17 @@ class ThemeCatalogTest {
         assertThat(snapshot.problems()).singleElement().satisfies(problem ->
             assertThat(problem.message()).contains("\"Same\"").contains("provided twice"));
     }
+
+    @Test void inspectingAnArchiveNamesItsThemesWithoutInstallingIt() {
+        Path file = plugin(home.resolve("elsewhere/fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        var inspection = ThemeCatalog.inspect(file);
+        assertThat(inspection.themes()).containsExactly("Fixture Dark");
+        assertThat(inspection.problems()).isEmpty();
+        Path empty = jar(home.resolve("elsewhere/empty.jar"), entries("META-INF/plugin.xml", pluginXml("Nothing")));
+        assertThat(ThemeCatalog.inspect(empty).themes()).isEmpty();
+        assertThat(ThemeCatalog.inspect(home.resolve("elsewhere/missing.jar")).problems()).isNotEmpty();
+        assertThat(catalog().directory()).contains(themes());
+        assertThat(ThemeCatalog.builtIn().directory()).isEmpty();
+        assertThat(themes()).doesNotExist();
+    }
 }
