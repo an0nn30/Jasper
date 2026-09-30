@@ -117,13 +117,13 @@ public final class Editors {
             List.of("Get More Themes", "Marketplace"));
     }
 
-    /** Terminal colours: Match the theme, Light, Dark, then every terminal theme, ending in More Terminal Themes\u2026. */
+    /**
+     * Terminal colours: a checkbox, ticked for {@code match}, that makes the terminal follow the UI theme, over a
+     * dropdown of the separate choices (Light, Dark, then every terminal theme, ending in More Terminal Themes\u2026).
+     */
     public static Factory<String> terminalColors(Supplier<List<String>> themes) {
-        return new Factory<>((setting, context) -> new ActionCombo(new Choices(
-            () -> { var all = new ArrayList<>(BUILT_IN_COLORS.values()); all.addAll(themes.get()); return all; },
-            Editors::storedColors, Editors::shownColors, index -> index == BUILT_IN_COLORS.size(),
-            () -> MORE_TERMINAL_THEMES, label -> context.navigate().accept(CorePages.ALACRITTY_THEMES))),
-            List.of("Match the theme", "Alacritty", "More Terminal Themes"));
+        return new Factory<>((setting, context) -> new TerminalColorsEditor(themes, context),
+            List.of(TerminalColorsEditor.FOLLOW, "follow couple match", "Alacritty", "More Terminal Themes"));
     }
 
     /**
@@ -293,6 +293,72 @@ public final class Editors {
             try { box.setSelectedItem(value); editor().setText(value); } finally { showing = false; }
         }
         @Override public void onEdit(Runnable listener) { listeners.add(listener); }
+    }
+
+    /**
+     * Terminal colours as a choice to follow the UI theme or not: the checkbox is the value {@code match}; while it is
+     * cleared, the dropdown of separate choices is the value. Clearing it returns to the last separate choice (this
+     * dialog's, else the saved one, else Dark).
+     */
+    static final class TerminalColorsEditor implements ValueEditor<String> {
+        static final String FOLLOW = "Terminal colors follow the UI theme";
+        final JCheckBox follow = new JCheckBox(FOLLOW);
+        final ActionCombo choice;
+        private final JPanel component = new JPanel();
+        private final List<Runnable> listeners = new ArrayList<>();
+        private String separate = "dark";
+        private boolean showing;
+
+        TerminalColorsEditor(Supplier<List<String>> themes, PageContext context) {
+            choice = new ActionCombo(new Choices(() -> {
+                    var all = new ArrayList<>(List.of(BUILT_IN_COLORS.get("light"), BUILT_IN_COLORS.get("dark")));
+                    all.addAll(themes.get());
+                    return all;
+                }, Editors::storedColors, Editors::shownColors, index -> index == 2,
+                () -> MORE_TERMINAL_THEMES, label -> context.navigate().accept(CorePages.ALACRITTY_THEMES)));
+            String saved = TerminalColors.normalize(context.draft().saved(CoreSettings.TERMINAL_COLORS).orElse(""));
+            if (separate(saved)) separate = saved;
+            follow.putClientProperty("html.disable", true);
+            follow.setOpaque(false);
+            component.setLayout(new BoxLayout(component, BoxLayout.Y_AXIS));
+            component.setOpaque(false);
+            for (JComponent part : List.of(follow, choice.component())) { part.setAlignmentX(0f); component.add(part); }
+            follow.addActionListener(event -> {
+                if (showing) return;
+                if (!follow.isSelected()) choice.show(separate);
+                sync();
+                edited();
+            });
+            choice.onEdit(() -> {
+                if (showing) return;
+                String value = choice.value();
+                if (separate(value)) separate = value;
+                edited();
+            });
+            sync();
+        }
+
+        /** Whether {@code value} is a separate choice rather than following the UI theme. */
+        private static boolean separate(String value) { return !value.isBlank() && !value.equals("match"); }
+
+        private void sync() { choice.component().setEnabled(!follow.isSelected()); }
+        private void edited() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
+
+        @Override public JComponent component() { return component; }
+        @Override public String value() { return follow.isSelected() ? "match" : choice.value(); }
+        @Override public void show(String value) {
+            showing = true;
+            try {
+                String normalized = TerminalColors.normalize(value);
+                boolean follows = !separate(normalized);
+                follow.setSelected(follows);
+                if (!follows) separate = normalized;
+                choice.show(separate);
+                sync();
+            } finally { showing = false; }
+        }
+        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
+        @Override public void dispose() { choice.dispose(); }
     }
 
     /**

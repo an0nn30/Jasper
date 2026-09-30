@@ -279,30 +279,57 @@ class EditorsTest {
         assertThat(navigated).as("Enter on a theme row does not navigate").containsExactly("themes.intellij#marketplace");
     }
 
-    @Test void terminalColorsOfferTheBuiltInsTheThemesAndMoreTerminalThemes() {
-        var navigated = new ArrayList<String>();
-        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+    private static Editors.TerminalColorsEditor terminalColors(String config, List<String> navigated) {
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values());
         var ctx = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
-        var combo = (Editors.ActionCombo) build(Editors.terminalColors(() -> List.of("Dracula", "Nord")), CoreSettings.TERMINAL_COLORS, ctx);
-        @SuppressWarnings("unchecked") var box = (JComboBox<String>) combo.component();
+        return (Editors.TerminalColorsEditor) build(Editors.terminalColors(() -> List.of("Dracula", "Nord")), CoreSettings.TERMINAL_COLORS, ctx);
+    }
+
+    @Test void followingTheUiThemeIsACheckboxOverTheSeparateChoices() {
+        var navigated = new ArrayList<String>();
+        var editor = terminalColors("", navigated);
+        @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.choice.component();
         assertThat(java.util.stream.IntStream.range(0, box.getItemCount()).mapToObj(box::getItemAt))
-            .containsExactly("Match the theme", "Light", "Dark", "Dracula", "Nord", "More Terminal Themes\u2026");
-        combo.show("match");
-        assertThat(combo.value()).isEqualTo("match");
-        assertThat(((JTextField) box.getEditor().getEditorComponent()).getText()).isEqualTo("Match the theme");
-        combo.show("DARK");
-        assertThat(combo.value()).isEqualTo("dark");
+            .as("Match is the checkbox, not a choice").containsExactly("Light", "Dark", "Dracula", "Nord", "More Terminal Themes\u2026");
+        assertThat(editor.follow.getText()).isEqualTo("Terminal colors follow the UI theme");
+
+        editor.show("match");
+        assertThat(editor.follow.isSelected()).isTrue();
+        assertThat(box.isEnabled()).isFalse();
+        assertThat(editor.value()).isEqualTo("match");
+
         var edits = new int[1];
-        combo.onEdit(() -> edits[0]++);
-        box.setSelectedIndex(3);
-        assertThat(combo.value()).isEqualTo("Dracula");
-        assertThat(edits[0]).isPositive();
-        box.setSelectedIndex(5);
+        editor.onEdit(() -> edits[0]++);
+        editor.follow.doClick();
+        assertThat(editor.follow.isSelected()).isFalse();
+        assertThat(box.isEnabled()).isTrue();
+        assertThat(editor.value()).as("nothing chosen before: Dark").isEqualTo("dark");
+        assertThat(edits[0]).isEqualTo(1);
+
+        box.setSelectedIndex(2);
+        assertThat(editor.value()).isEqualTo("Dracula");
+        editor.follow.doClick();
+        assertThat(editor.value()).isEqualTo("match");
+        assertThat(box.isEnabled()).isFalse();
+        editor.follow.doClick();
+        assertThat(editor.value()).as("unticking returns to the last separate choice").isEqualTo("Dracula");
+
+        editor.show("Nord");
+        assertThat(editor.follow.isSelected()).isFalse();
+        assertThat(editor.value()).isEqualTo("Nord");
+        editor.show("DARK");
+        assertThat(editor.value()).isEqualTo("dark");
+
+        box.setSelectedIndex(4);
         assertThat(navigated).containsExactly("themes.alacritty");
-        assertThat(combo.value()).as("the action is never the value").isEqualTo("Dracula");
-        combo.highlight(5);
-        combo.enter(new java.awt.event.ActionEvent(box, java.awt.event.ActionEvent.ACTION_PERFORMED, ""), true);
-        assertThat(navigated).containsExactly("themes.alacritty", "themes.alacritty");
+        assertThat(editor.value()).as("the action is never the value").isEqualTo("dark");
+    }
+
+    @Test void unTickingStartsFromTheSavedSeparateChoice() {
+        var editor = terminalColors("[terminal]\ncolors = 'Nord'\n", new ArrayList<>());
+        editor.show("match");
+        editor.follow.doClick();
+        assertThat(editor.value()).isEqualTo("Nord");
     }
 
     @Test void onlyTheShownBuiltInLabelsBecomeTheirTokens() {
