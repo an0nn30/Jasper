@@ -78,4 +78,18 @@ class HostedChooserTest {
         assertThatIllegalArgumentException().isThrownBy(() -> ui.windows().chooseFiles(terminals.windowHandle(UUID.randomUUID()), "Upload", Optional.empty()));
         assertThat(requests).isEmpty();
     }
+
+    @Test void choicesCarryTheFocusedPanesFolder() {
+        var id = fixture.addWindow();
+        var pane = fixture.addPane(fixture.addTab(id, "Shell"), "Shell", Path.of("/work/project"));
+        fixture.focusPane(pane);
+        ui.windows().chooseFiles(terminals.windowHandle(id), "Open", Optional.empty());
+        assertThat(requests.getLast().terminalFolder()).contains(Path.of("/work/project").toAbsolutePath());
+        assertThat(requests.getLast().initial()).isEmpty();
+        var owner = ui.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(500, 400), true));
+        owner.show();
+        fixture.activateWindow(id);
+        ui.windows().chooseFiles(owner, "Open", Optional.empty());
+        assertThat(requests.getLast().terminalFolder()).as("a plugin window uses the active pane").contains(Path.of("/work/project").toAbsolutePath());
+    }
 }

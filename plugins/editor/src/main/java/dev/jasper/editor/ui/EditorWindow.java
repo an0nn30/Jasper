@@ -311,7 +311,8 @@ public final class EditorWindow {
     public void openChooser() { openFrom(lastWindow(), Optional.empty()); }
 
     /**
-     * Open in Editor…: the openers first, then the local chooser, which starts in the active local document's folder.
+     * Open in Editor…: the openers first, then the chooser, which starts in the active local document's folder or,
+     * from a terminal pane, in that pane's folder.
      *
      * @param window the workspace window it was invoked in; null skips the openers
      * @param pane the focused terminal pane
@@ -320,9 +321,17 @@ public final class EditorWindow {
         Optional<EditorTab> active = hosted.entrySet().stream().filter(entry -> entry.getValue().isActive()).map(java.util.Map.Entry::getKey).findFirst();
         Optional<String> key = pane.isPresent() ? Optional.empty() : active.flatMap(tab -> tab.session().document()).map(EditorDocument::key);
         if (window != null && openers.test(new OpenRequest(window, pane, key))) return;
-        Optional<Path> near = active.or(this::selected).flatMap(tab -> localFile(tab.session())).map(Path::getParent);
+        Optional<Path> near = openStart(pane.isPresent(), active.or(this::selected).flatMap(tab -> localFile(tab.session())));
         WindowOwner owner = window != null ? window : owner();
         openLocalFiles(context.windows().chooseFiles(owner, "Open in Editor", near), owner);
+    }
+
+    /**
+     * Where Open in Editor… starts: the active local document's folder, except in a focused terminal pane, where the
+     * host's chooser starts at that pane's folder.
+     */
+    static Optional<Path> openStart(boolean paneFocused, Optional<Path> documentFile) {
+        return paneFocused ? Optional.empty() : documentFile.map(Path::getParent);
     }
 
     /** @return the terminal window the Editor was last opened from, else the active one; null when there is none */
