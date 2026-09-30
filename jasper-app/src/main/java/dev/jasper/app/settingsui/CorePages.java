@@ -99,7 +99,7 @@ public final class CorePages {
                 .row(TERMINAL_FONT_LIGATURES)
                 .row(TERMINAL_FONT_LINE_HEIGHT, Editors.number(0.05, "×"))
                 .section("Colors")
-                .row(TERMINAL_COLORS, Editors.choice(Map.of("match", "Match the theme", "light", "Light", "dark", "Dark"))),
+                .row(TERMINAL_COLORS),
             SchemaPage.page("terminal.cursor", "Cursor").parent("terminal")
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),

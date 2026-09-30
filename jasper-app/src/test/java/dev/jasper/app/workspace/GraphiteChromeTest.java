@@ -64,7 +64,7 @@ class GraphiteChromeTest {
                 owner.selectTheme(theme);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                    for (var colors : dev.jasper.app.config.TerminalColors.values()) {
+                    for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                         owner.selectTerminalColors(colors);
                         root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                         var grid = owner.tabStrip();

@@ -76,7 +76,7 @@ on_exit = "keep_open"
 # New panes only. "auto" loads Jasper's shell integration script (zsh, bash, fish) after your startup files;
 # "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
 shell_integration = "auto"
-# Terminal colors, live: "match" uses the theme's console colours; "light" or "dark" keeps Jasper's palette.
+# Terminal colors, live: "match" uses the theme's console colours; "light" or "dark" keeps Jasper's palette; any other value names a terminal theme.
 colors = "match"
 
 [terminal.shell]

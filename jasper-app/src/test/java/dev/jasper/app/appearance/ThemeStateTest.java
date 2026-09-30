@@ -36,4 +36,15 @@ class ThemeStateTest {
             .as("a theme change keeps the terminal choice").isEqualTo(TerminalColors.LIGHT);
         assertThat(configured.configureTerminal(TerminalColors.DARK).terminalChoice()).isEqualTo(TerminalColors.DARK);
     }
+
+    @Test void aNamedTerminalThemeUsesItsPaletteAndAnUnknownOneMatches() {
+        var named = new Palette(Color.BLACK, Color.WHITE, Color.BLUE, Color.GRAY, Collections.nCopies(16, Color.GREEN));
+        var state = ThemeState.defaults().configure(INSTALLED);
+        assertThat(state.configureTerminal(new TerminalColors("Dracula"), named).resolve()).isEqualTo(new ResolvedTheme(INSTALLED, named));
+        assertThat(state.configureTerminal(new TerminalColors("Nope"), null).resolve()).isEqualTo(new ResolvedTheme(INSTALLED, SCHEME));
+        assertThat(state.configureTerminal(TerminalColors.DARK, named).resolve().palette())
+            .as("a built-in choice ignores a palette").isEqualTo(Palette.jasperDark());
+        assertThat(state.configureTerminal(new TerminalColors("Dracula"), named).configure(Theme.LIGHT).resolve().palette())
+            .as("a UI theme change keeps the named palette").isEqualTo(named);
+    }
 }

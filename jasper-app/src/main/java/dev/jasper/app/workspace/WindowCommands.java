@@ -61,8 +61,8 @@ final class WindowCommands implements AutoCloseable {
         add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
-        for (var colors : TerminalColors.values()) {
-            String label = switch (colors) { case MATCH -> "Match UI"; case LIGHT -> "Light"; case DARK -> "Dark"; };
+        for (var colors : TerminalColors.builtIns()) {
+            String label = colors.equals(TerminalColors.MATCH) ? "Match UI" : colors.equals(TerminalColors.LIGHT) ? "Light" : "Dark";
             add(registry, "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
                 "Terminal Colors: " + label, () -> owner.selectTerminalColors(colors), List.of("terminal", "colors", "palette"));
         }
@@ -103,9 +103,9 @@ final class WindowCommands implements AutoCloseable {
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
         for (var mode : ToolbarMode.values())
             view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
-        for (var colors : TerminalColors.values()) {
+        for (var colors : TerminalColors.builtIns()) {
             var action = view("view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT));
-            action.putValue(Action.SELECTED_KEY, owner.terminalColors() == colors);
+            action.putValue(Action.SELECTED_KEY, owner.terminalColors().equals(colors));
             action.setEnabled(true);
         }
         view("view.window_settings").setEnabled(owner.settingsConnected());

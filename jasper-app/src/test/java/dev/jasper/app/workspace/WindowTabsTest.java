@@ -110,7 +110,7 @@ class WindowTabsTest {
             owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
             for (Theme chrome : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                 owner.selectTheme(chrome);
-                for (var colors : dev.jasper.app.config.TerminalColors.values()) {
+                for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
                     JComponent label = named(strip, "select:selected");
@@ -130,7 +130,7 @@ class WindowTabsTest {
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
             for (Theme chrome : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                 owner.selectTheme(chrome);
-                for (var colors : dev.jasper.app.config.TerminalColors.values()) {
+                for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
                     var palette = owner.theme().palette();
                     var strip = owner.windowTabs(); layout(strip, 800, 38);

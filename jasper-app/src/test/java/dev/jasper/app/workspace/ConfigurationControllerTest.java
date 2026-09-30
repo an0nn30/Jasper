@@ -707,7 +707,7 @@ class ConfigurationControllerTest {
         edt(() -> first.windowCommands().view("view.status_bar").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
         until(() -> Boolean.FALSE.equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR)));
         edt(() -> first.windowCommands().view("view.terminal_colors.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
-        until(() -> seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_COLORS) == dev.jasper.app.config.TerminalColors.DARK);
+        until(() -> "dark".equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_COLORS)));
         edt(() -> {
             for (var owner : List.of(first, second)) {
                 assertThat(owner.toolbar().isVisible()).isFalse();

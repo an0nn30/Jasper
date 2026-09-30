@@ -54,7 +54,7 @@ class CoreSettingsTest {
         var values = SettingValues.builder(CoreSettings.SCHEMA)
             .put(CoreSettings.TERMINAL_FONT_SIZE, 20f, CoreSettings.TERMINAL_FONT_SIZE.key())
             .put(CoreSettings.SYSTEM_RUN_IN_BACKGROUND, true, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.key())
-            .put(CoreSettings.TERMINAL_COLORS, TerminalColors.DARK, CoreSettings.TERMINAL_COLORS.key())
+            .put(CoreSettings.TERMINAL_COLORS, "dark", CoreSettings.TERMINAL_COLORS.key())
             .put(CoreSettings.TERMINAL_ENV, Map.of("A", "1"), CoreSettings.TERMINAL_ENV.key())
             .put(CoreSettings.WINDOW_STATUS_BAR_HEIGHT, 30, CoreSettings.WINDOW_STATUS_BAR_HEIGHT.key()).build();
         var snapshot = ConfigSnapshot.from(values, Map.of("copy", "none"), Map.of());

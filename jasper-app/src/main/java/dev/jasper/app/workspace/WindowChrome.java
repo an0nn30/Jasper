@@ -30,7 +30,7 @@ final class WindowChrome {
     private final WindowHeader header;
     private final WindowStatusBar status = new WindowStatusBar();
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
-    private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
+    private final java.util.Map<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.LinkedHashMap<>();
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
@@ -85,7 +85,7 @@ final class WindowChrome {
         railVisible.setAction(owner.windowCommands().view("view.rail"));
         JMenu terminalColors = new JMenu("Terminal Colors");
         ButtonGroup terminalGroup = new ButtonGroup();
-        for (TerminalColors colors : TerminalColors.values()) {
+        for (TerminalColors colors : TerminalColors.builtIns()) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view(
                 "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT)));
             terminalItems.put(colors, item); terminalGroup.add(item); terminalColors.add(item);
@@ -435,7 +435,7 @@ final class WindowChrome {
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
         status.refreshTheme();
-        terminalItems.forEach((colors, item) -> item.setSelected(owner.terminalColors() == colors));
+        terminalItems.forEach((colors, item) -> item.setSelected(owner.terminalColors().equals(colors)));
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }

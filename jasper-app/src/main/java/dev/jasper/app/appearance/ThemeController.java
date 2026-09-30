@@ -1,6 +1,7 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.TerminalColors;
+import dev.jasper.terminal.config.Palette;
 import dev.jasper.app.config.UiFontConfig;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
@@ -59,16 +60,18 @@ public final class ThemeController {
     }
     public void configure(Theme saved) { configure(saved, uiFont); }
     public void configure(Theme saved, UiFontConfig font) { configure(saved, state.terminalChoice(), font); }
-    public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) {
+    public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) { configure(saved, terminal, null, font); }
+    /** As above, with {@code named} the palette of a named terminal choice (null for a built-in or unknown one). */
+    public void configure(Theme saved, TerminalColors terminal, Palette named, UiFontConfig font) {
         requireEdt();
-        apply(state.configure(Objects.requireNonNull(saved)).configureTerminal(Objects.requireNonNull(terminal)),
+        apply(state.configure(Objects.requireNonNull(saved)).configureTerminal(Objects.requireNonNull(terminal), named),
             Objects.requireNonNull(font));
     }
     private void apply(ThemeState candidate) { apply(candidate, uiFont); }
     private void apply(ThemeState candidate, UiFontConfig font) {
         ResolvedTheme previous = state.resolve(), next = candidate.resolve();
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
-        boolean choiceChanged = state.choice() != candidate.choice() || state.terminalChoice() != candidate.terminalChoice();
+        boolean choiceChanged = state.choice() != candidate.choice() || !state.terminalChoice().equals(candidate.terminalChoice());
         if (chromeChanged) {
             installFontDefaults(font);
             try { installOrThrow(next.chrome()); }
