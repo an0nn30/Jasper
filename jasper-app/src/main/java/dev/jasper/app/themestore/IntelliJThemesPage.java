@@ -33,6 +33,7 @@ final class IntelliJThemesPage implements SettingsPage {
     private InstalledTab installed;
     private MarketplaceTab marketplace;
     private Subscription draftListening;
+    private boolean revealing;
 
     IntelliJThemesPage(ThemeStore store, PageContext context, SettingsPage header) {
         this.store = store;
@@ -55,12 +56,12 @@ final class IntelliJThemesPage implements SettingsPage {
         if (body != null) return body;
         banner = new Banner();
         installed = new InstalledTab(store, context, banner, this::use);
-        marketplace = new MarketplaceTab(store, banner, installed::installedVersions, this::use, installed::reload);
+        marketplace = new MarketplaceTab(store, banner, installed::installedVersions, this::use, installed::loadList);
         installed.onChanged(marketplace::installedChanged);
         tabs = new JTabbedPane();
         tabs.addTab("Marketplace", marketplace.component());
         tabs.addTab("Installed", installed.component());
-        tabs.addChangeListener(event -> activate());
+        tabs.addChangeListener(event -> { if (!revealing) activate(); });
         var top = new JPanel(new BorderLayout());
         top.setOpaque(false);
         top.add(header.component(), BorderLayout.NORTH);
@@ -88,7 +89,10 @@ final class IntelliJThemesPage implements SettingsPage {
             case INSTALLED -> installed.component();
             default -> null;
         };
-        if (target != null && tabs.getSelectedComponent() != target) tabs.setSelectedComponent(target);
+        if (target == null || tabs.getSelectedComponent() == target) return;
+        // The dialog calls selected() next, which loads the tab now shown; switching here must not load the other one.
+        revealing = true;
+        try { tabs.setSelectedComponent(target); } finally { revealing = false; }
     }
 
     @Override public boolean modified() { return header.modified(); }
@@ -111,10 +115,11 @@ final class IntelliJThemesPage implements SettingsPage {
     private void syncTabs() {
         if (tabs == null) return;
         boolean enabled = marketplaceEnabled();
+        // First, so a tab change below that loads the Installed tab already knows not to ask the Marketplace.
+        installed.marketplaceEnabled(enabled);
         int index = tabs.indexOfComponent(marketplace.component());
         if (enabled && index < 0) tabs.insertTab("Marketplace", null, marketplace.component(), null, 0);
         if (!enabled && index >= 0) tabs.removeTabAt(index);
-        installed.marketplaceEnabled(enabled);
     }
 
     /** Loads what the visible tab shows: the Marketplace's first search, or the installed themes and their updates. */

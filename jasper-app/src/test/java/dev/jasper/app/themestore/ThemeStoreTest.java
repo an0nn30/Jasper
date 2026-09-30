@@ -10,6 +10,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
@@ -75,6 +77,11 @@ class ThemeStoreTest {
         assertThat(rescans[0]).isZero();
     }
 
+    @Test void anUnexpectedFailureIsDescribedOnlyGenerally() {
+        assertThat(ThemeStore.message(new java.util.concurrent.CompletionException(new IllegalStateException("internal detail"))))
+            .isEqualTo("Something went wrong. See the log for details.");
+    }
+
     @Test void theInstalledListShowsDiskInstallsAndFilesWithOnlyProblems() throws Exception {
         plugin(home.resolve("themes/nord.jar"), "Nord", true, "#2e3440", "2e3440");
         Files.writeString(home.resolve("themes/broken.zip"), "not a zip");
@@ -92,7 +99,14 @@ class ThemeStoreTest {
 
     @Test void rescansAndCompletionsRunOnTheEdtWhileTheWorkRunsOffIt() throws Exception {
         ExecutorService worker = Executors.newSingleThreadExecutor(task -> new Thread(task, "test-worker"));
-        ExecutorService edt = Executors.newSingleThreadExecutor(task -> new Thread(task, "test-edt"));
+        ExecutorService edtThread = Executors.newSingleThreadExecutor(task -> new Thread(task, "test-edt"));
+        // Hold every EDT task until the test has registered its completion callback, so the callback always runs when
+        // the result completes (on the EDT) rather than at once on the test thread.
+        var registered = new CountDownLatch(1);
+        Executor edt = task -> edtThread.execute(() -> {
+            try { registered.await(); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            task.run();
+        });
         var rescanThreads = new ArrayList<String>();
         var real = new ThemeStore(catalog, market.client(), worker, edt, new ThemeStore.Hooks(
             () -> { rescanThreads.add(Thread.currentThread().getName()); catalog.scan(); return CompletableFuture.completedFuture(null); },
@@ -102,6 +116,7 @@ class ThemeStoreTest {
             var completedOn = new CompletableFuture<String>();
             var future = real.install(12275, "com.vermouthx.idea", "Dracula Theme");
             future.thenRun(() -> completedOn.complete(Thread.currentThread().getName()));
+            registered.countDown();
             future.get();
             assertThat(rescanThreads).containsExactly("test-edt");
             assertThat(completedOn.get()).isEqualTo("test-edt");
@@ -112,7 +127,7 @@ class ThemeStoreTest {
         } finally {
             real.close();
             worker.shutdownNow();
-            edt.shutdownNow();
+            edtThread.shutdownNow();
         }
     }
 

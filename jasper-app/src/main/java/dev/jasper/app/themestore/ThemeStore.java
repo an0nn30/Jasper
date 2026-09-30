@@ -33,6 +33,8 @@ import javax.swing.SwingUtilities;
  * Call it on the EDT; every future it returns completes on the EDT. The application owns one and closes it at shutdown.
  */
 public final class ThemeStore implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(ThemeStore.class.getName());
+
     /**
      * What the store needs from the application.
      *
@@ -167,11 +169,12 @@ public final class ThemeStore implements AutoCloseable {
         return at;
     }
 
-    /** A message for the user about {@code failure}. */
+    /** A message for the user about {@code failure}; an unexpected failure is logged and described only generally. */
     static String message(Throwable failure) {
         Throwable cause = cause(failure);
         if (cause instanceof MarketplaceClient.MarketplaceException || cause instanceof ThemeInstaller.InstallException) return cause.getMessage();
-        return "Something went wrong: " + cause;
+        LOG.log(System.Logger.Level.WARNING, "An IntelliJ theme operation failed unexpectedly", cause);
+        return "Something went wrong. See the log for details.";
     }
 
     @Override public void close() {

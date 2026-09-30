@@ -87,6 +87,7 @@ final class ThemeInstaller {
             entries.put(name, source);
             provenance.write(entries);
             for (String old : older) {
+                if (!removable(old)) continue;
                 try { Files.deleteIfExists(themes.resolve(old)); } catch (IOException ignored) { }
             }
             return new Installed(target, inspection.themes());
@@ -141,6 +142,13 @@ final class ThemeInstaller {
         } catch (IOException failure) {
             throw new InstallException("Cannot uninstall " + file.getFileName() + ": " + failure.getMessage(), failure);
         }
+    }
+
+    /** Whether a recorded name is an archive directly in the themes folder, so replacing its plugin may delete it. */
+    private boolean removable(String name) {
+        Path resolved = themes.resolve(name).normalize();
+        String lower = name.toLowerCase(Locale.ROOT);
+        return themes.equals(resolved.getParent()) && (lower.endsWith(".jar") || lower.endsWith(".zip"));
     }
 
     private static String detail(ThemeCatalog.Inspection inspection) {

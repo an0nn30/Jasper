@@ -14,8 +14,13 @@
   clears leftover downloads once per app run; the description pane uses an allowlist HTML sanitiser (basic formatting
   tags, only a[href]; links open in the browser, http/https only); the Marketplace tab loads the installed list when
   shown; details failures show an inline Retry and install/update failures offer Retry in the banner; the package-info
-  `{@link}` names ThemeStore and the ThemeCombo renderer calls `ThemeCombo.action(value)`. `./gradlew check` green:
-  app 1385/0/1, terminal 391/0/4, Editor 4781/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
+  `{@link}` names ThemeStore and the ThemeCombo renderer calls `ThemeCombo.isAction(value)`. Final-review fixes: arrow
+  and page keys no longer navigate from the dropdown's action entry; `#installed`/`#marketplace` reveal the tab before
+  the page is selected so only that tab loads; update checks run only on the Installed tab; the sanitiser caps input at
+  256 KiB and escapes href quotes once; old-version deletes stay inside the folder (.jar/.zip only); unexpected
+  failures show a generic message and are logged; the details header shows the icon; the threaded ThemeStore test is
+  deterministic. `./gradlew check` green:
+  app 1393/0/1, terminal 391/0/4, Editor 4781/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
   Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Not merged. GUI checks pending with the user:
   Get More Themes… from the dropdown; search "dracula", install, Use and Apply; an Islands-based theme; Material Theme
   UI refused cleanly; Install from Disk…; Uninstall of the active theme; the offline checkbox; the page in dark and

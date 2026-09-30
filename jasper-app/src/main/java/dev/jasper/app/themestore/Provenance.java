@@ -40,7 +40,9 @@ final class Provenance {
             String plugin = table.getString("name");
             String version = table.getString("version");
             if (id == null || xmlId == null || version == null) continue;
-            if (name.startsWith(".") || name.contains("/") || !Files.isRegularFile(file.resolveSibling(name))) continue;
+            // Only a plain file name in the themes folder: no separator of any platform and no parent step.
+            if (name.startsWith(".") || name.contains("/") || name.contains("\\") || name.contains("..")
+                || !Files.isRegularFile(file.resolveSibling(name))) continue;
             entries.put(name, new Entry(id.intValue(), xmlId, plugin == null ? xmlId : plugin, version));
         }
         return entries;

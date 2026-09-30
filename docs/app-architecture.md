@@ -230,6 +230,9 @@ Installed themes come from `ThemeCatalog`, which lists the plugins in the `theme
   after each read. `ConfigurationController` resolves `ui.theme.name` against the latest scan and
   shows the catalog's problems as configuration warnings.
 
-Installed theme plugins live in the `themes` folder that `ThemeCatalog` scans. `themestore.ThemeInstaller` writes that
-folder: it validates every archive with `ThemeCatalog.inspect` (the same loading a scan does) before moving or copying
-it in, then asks the configuration service to reload, which rescans the catalog.
+Installed theme plugins live in the `themes` folder that `ThemeCatalog` scans. `themestore.ThemeInstaller` writes
+that folder: it validates every archive with `ThemeCatalog.inspect` (the same loading a scan does) before moving or
+copying it in, then asks the configuration service to reload, which rescans the catalog. Downloads and disk copies
+are written under `themes/.downloads` and moved into place with one atomic replace, so a scan never sees half a
+file; the installer installs, replaces and deletes only `.jar` and `.zip` files directly in the folder, whatever
+`.sources.toml` records.

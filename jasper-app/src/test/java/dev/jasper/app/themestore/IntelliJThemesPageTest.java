@@ -82,6 +82,8 @@ class IntelliJThemesPageTest {
         assertThat(tab.listed()).containsExactly("Dracula Theme");
         tab.select("Dracula Theme");
         assertThat(tab.details()).contains("Dracula Theme", "Vendor 12275", "Version 2.3.1", "A dark theme");
+        assertThat(tab.detailsIcon()).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+        assertThat(tab.detailsIcon().getIconWidth()).isEqualTo(32);
         assertThat(tab.installButton().getText()).isEqualTo("Install");
         tab.installButton().doClick();
         assertThat(home.resolve("themes/com.vermouthx.idea-2.3.1.jar")).isRegularFile();
@@ -92,6 +94,7 @@ class IntelliJThemesPageTest {
         page.banner().click();
         assertThat(draft.value(CoreSettings.UI_THEME_NAME)).isEqualTo("Dracula");
         page.reveal("installed");
+        page.selected();
         assertThat(page.installed().listed()).containsExactly("Dracula Theme");
         assertThat(page.installed().details()).contains("2.3.1", "Marketplace");
         tab.viewButton().doClick();
@@ -107,6 +110,7 @@ class IntelliJThemesPageTest {
         catalog.scan();
         var page = page();
         page.reveal("installed");
+        page.selected();
         var tab = page.installed();
         tab.select("Dracula Theme");
         assertThat(tab.updateButton().isVisible()).isTrue();
@@ -121,6 +125,7 @@ class IntelliJThemesPageTest {
         chosen = Optional.of(plugin(home.resolve("Downloads/nord.jar"), "Nord", true, "#2e3440", "2e3440"));
         var page = page();
         page.reveal("installed");
+        page.selected();
         var tab = page.installed();
         tab.installFromDiskButton().doClick();
         assertThat(home.resolve("themes/nord.jar")).isRegularFile();
@@ -192,5 +197,41 @@ class IntelliJThemesPageTest {
         page.banner().click();
         assertThat(home.resolve("themes/com.vermouthx.idea-2.3.1.jar")).isRegularFile();
         assertThat(page.banner().text()).isEqualTo("Installed Dracula Theme.");
+    }
+
+    private void installDracula(String version) throws Exception {
+        var installer = new ThemeInstaller(home.resolve("themes"));
+        Path part = installer.downloadTarget(new MarketplaceClient.Release(1, version, "x.jar"));
+        plugin(part, "Dracula", true, "#282a36", "282a36");
+        installer.installDownload(part, ".jar", new Provenance.Entry(12275, "com.vermouthx.idea", "Dracula Theme", version));
+        catalog.scan();
+    }
+
+    private long searches() { return market.requests.stream().filter(request -> request.startsWith("/api/searchPlugins")).count(); }
+
+    @Test void revealingATabLoadsNothingUntilThePageIsSelected() throws Exception {
+        market.theme(home.resolve("served"), 12275, "com.vermouthx.idea", "Dracula Theme", "Dracula", "2.4.0");
+        installDracula("2.3.1");
+        var page = page();
+        page.reveal("installed");
+        assertThat(market.requests).isEmpty();
+        page.selected();
+        assertThat(page.installed().listed()).containsExactly("Dracula Theme");
+        assertThat(searches()).isZero();
+        page.reveal("marketplace");
+        assertThat(searches()).isZero();
+        page.selected();
+        assertThat(searches()).isOne();
+    }
+
+    @Test void withTheMarketplaceOffTheInstalledTabNeverAsksIt() throws Exception {
+        market.theme(home.resolve("served"), 12275, "com.vermouthx.idea", "Dracula Theme", "Dracula", "2.4.0");
+        installDracula("2.3.1");
+        draft.stage(CoreSettings.THEMES_MARKETPLACE_ENABLED, Optional.of(false));
+        var page = page();
+        page.reveal("installed");
+        page.selected();
+        assertThat(page.installed().listed()).containsExactly("Dracula Theme");
+        assertThat(market.requests).isEmpty();
     }
 }

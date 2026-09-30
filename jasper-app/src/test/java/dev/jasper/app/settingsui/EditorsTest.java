@@ -216,4 +216,35 @@ class EditorsTest {
         assertThat(editor.value()).isEqualTo("Dracula");
         assertThat(edits[0]).isPositive();
     }
+
+    @Test void onlyClicksEnterAndProgrammaticChoicesNavigateFromTheActionEntry() {
+        var source = new javax.swing.JPanel();
+        assertThat(Editors.ThemeCombo.navigates(null)).isTrue();
+        assertThat(Editors.ThemeCombo.navigates(new java.awt.event.MouseEvent(source, java.awt.event.MouseEvent.MOUSE_RELEASED,
+            0, 0, 1, 1, 1, false))).isTrue();
+        assertThat(Editors.ThemeCombo.navigates(new java.awt.event.ActionEvent(source, java.awt.event.ActionEvent.ACTION_PERFORMED, ""))).isTrue();
+        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_ENTER))).isTrue();
+        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_DOWN))).isFalse();
+        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_PAGE_DOWN))).isFalse();
+        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_END))).isFalse();
+    }
+
+    private static java.awt.event.KeyEvent key(java.awt.Component source, int code) {
+        return new java.awt.event.KeyEvent(source, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, code, java.awt.event.KeyEvent.CHAR_UNDEFINED);
+    }
+
+    @Test void enterOnTypedActionTextNavigatesAndKeepsTheChosenTheme() {
+        var navigated = new ArrayList<String>();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+        var themes = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
+        var editor = build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, themes);
+        editor.show("Jasper Dark");
+        @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.component();
+        var field = (JTextField) box.getEditor().getEditorComponent();
+        field.setText("Get More Themes\u2026");
+        field.postActionEvent();
+        assertThat(navigated).containsExactly("themes.intellij#marketplace");
+        assertThat(editor.value()).isEqualTo("Jasper Dark");
+        assertThat(box.getSelectedItem()).isEqualTo("Jasper Dark");
+    }
 }

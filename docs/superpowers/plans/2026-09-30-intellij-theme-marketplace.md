@@ -1,6 +1,6 @@
 # IntelliJ Theme Marketplace Implementation Plan
 
-> **Status:** written 2026-09-30 on `claude/theme-marketplace`; executed subagent-driven 2026-09-30; not merged. Choices this plan makes where the spec left
+> **Status:** written 2026-09-30 on `claude/theme-marketplace`; executed subagent-driven 2026-09-30; final-review fixes applied (keyboard-safe theme combo, reveal-before-select for `#fragment` navigation, Installed-only update checks, sanitiser cap and href escaping, confined old-version deletes, logged generic error message instead of "Something went wrong: " + cause, details icon, deterministic threaded test; app tests 1393/0/1); not merged. Choices this plan makes where the spec left
 > room (record further deviations here and in `docs/STATUS.md` as you go):
 > - Deviations made during execution: the Marketplace client refuses a first request to any host other than the base and
 >   uses shutdownNow on close; the installer replaces files atomically (disk installs via `.downloads`), writes provenance

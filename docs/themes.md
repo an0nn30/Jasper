@@ -13,9 +13,9 @@ Name the theme in `config.toml`:
 name = "Dracula"
 ```
 
-The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it
-applies the theme to every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and installed theme; **Get More Themes…** at the bottom opens
-Settings › Themes › IntelliJ Themes.
+The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
+every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and
+installed theme; **Get More Themes…** at the bottom opens Settings › Themes › IntelliJ Themes.
 
 ## Installing a theme
 

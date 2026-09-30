@@ -123,4 +123,21 @@ class ThemeInstallerTest {
         assertThat(themes().resolve(".downloads")).isEmptyDirectory();
         assertThat(themes().resolve("nord.jar")).isRegularFile();
     }
+
+    @Test void anUpdateDeletesOnlyArchivesInTheFolderWhateverTheRecordsSay() throws Exception {
+        var installer = new ThemeInstaller(themes());
+        Files.createDirectories(themes());
+        Path outside = Files.writeString(home.resolve("x.jar"), "outside");
+        Path backslashed = Files.writeString(themes().resolve("a\\..\\..\\x.jar"), "odd name");
+        Path notes = Files.writeString(themes().resolve("notes.txt"), "not an archive");
+        var record = "\nmarketplace_id = 12275\nxml_id = \"com.vermouthx.idea\"\nname = \"Dracula Theme\"\nversion = \"1.0\"\n";
+        Files.writeString(themes().resolve(Provenance.FILE), "['../x.jar']" + record + "['a\\..\\..\\x.jar']" + record
+            + "['notes.txt']" + record);
+        assertThat(installer.sources()).containsOnlyKeys("notes.txt");
+        installer.installDownload(download(installer, 1, "Dracula"), ".jar", dracula);
+        assertThat(outside).hasContent("outside");
+        assertThat(backslashed).hasContent("odd name");
+        assertThat(notes).hasContent("not an archive");
+        assertThat(installer.sources()).containsOnlyKeys("com.vermouthx.idea-2.3.1.jar");
+    }
 }

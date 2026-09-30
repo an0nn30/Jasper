@@ -144,16 +144,23 @@ public final class SettingsDialog {
         return pages.stream().filter(page -> page.id().equals(id)).findFirst();
     }
 
-    /** Selects a page, remembering the one it leaves for Back; {@code id#fragment} then reveals that part of the page. */
+    /**
+     * Selects a page, remembering the one it leaves for Back. For {@code id#fragment} the page first reveals that part,
+     * then is shown (or, already current, told it is selected again), so it loads only what the fragment names.
+     */
     void select(String id) {
         int hash = id.indexOf('#');
         String base = hash < 0 ? id : id.substring(0, hash);
         var target = page(base).or(() -> pages.stream().findFirst()).orElseThrow();
+        boolean revealing = hash >= 0 && target.id().equals(base);
+        if (revealing) target.reveal(id.substring(hash + 1));
         if (!target.id().equals(current)) {
             if (current != null) { backStack.push(current); forwardStack.clear(); }
             show(target);
+        } else if (revealing) {
+            target.selected();
+            refreshNow();
         }
-        if (hash >= 0 && target.id().equals(base)) target.reveal(id.substring(hash + 1));
     }
 
     void back() {

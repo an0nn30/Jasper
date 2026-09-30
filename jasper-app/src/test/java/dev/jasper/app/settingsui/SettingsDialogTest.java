@@ -63,7 +63,7 @@ class SettingsDialogTest {
         }, hooks());
     }
 
-    @Test void aFragmentSelectsThePageAndRevealsItsPartEvenWhenItIsAlreadyShown() throws Exception {
+    @Test void aFragmentRevealsItsPartBeforeThePageIsSelectedEvenWhenItIsAlreadyShown() throws Exception {
         var revealed = new ArrayList<String>();
         var dialog = new SettingsDialog(windows, context -> CorePages.pages(() -> List.of("Jasper Dark"),
                 new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
@@ -74,13 +74,13 @@ class SettingsDialogTest {
             dialog.select("themes.intellij#marketplace");
             assertThat(dialog.currentPage()).isEqualTo("themes.intellij");
             dialog.select("themes.intellij#installed");
-            assertThat(revealed).containsExactly("marketplace", "installed");
+            assertThat(revealed).containsExactly("reveal marketplace", "selected", "reveal installed", "selected");
             dialog.back();
             assertThat(dialog.currentPage()).isEqualTo("appearance");
         });
     }
 
-    /** Records what it is asked to reveal; everything else is the schema page it wraps. */
+    /** Records what it is asked to reveal and each selection; everything else is the schema page it wraps. */
     private record Revealing(SettingsPage header, List<String> revealed) implements SettingsPage {
         @Override public String id() { return header.id(); }
         @Override public String title() { return header.title(); }
@@ -92,7 +92,8 @@ class SettingsDialogTest {
         @Override public CompletableFuture<Void> apply() { return header.apply(); }
         @Override public void highlight(String query) { header.highlight(query); }
         @Override public void dispose() { header.dispose(); }
-        @Override public void reveal(String fragment) { revealed.add(fragment); }
+        @Override public void reveal(String fragment) { revealed.add("reveal " + fragment); }
+        @Override public void selected() { header.selected(); revealed.add("selected"); }
     }
 
     @Test void openingShowsTheTreeHidesEmptyToolsAndSelectsTheDefaultPage() throws Exception {

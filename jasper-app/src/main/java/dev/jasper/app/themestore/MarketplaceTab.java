@@ -217,10 +217,11 @@ final class MarketplaceTab {
         install.setVisible(shown);
         view.setVisible(shown && !listing.link().isEmpty());
         if (!shown) {
-            name.setText(""); vendor.setText(""); version.setText(""); description.setText("");
+            name.setText(""); name.setIcon(null); vendor.setText(""); version.setText(""); description.setText("");
             return;
         }
         name.setText(listing.name());
+        name.setIcon(listing.iconPath().isEmpty() ? null : icon(listing.iconPath()));
         vendor.setText(listing.vendor());
         version.setText("");
         description.setText("<html><body><p>" + escape(listing.preview()) + "</p></body></html>");
@@ -286,8 +287,10 @@ final class MarketplaceTab {
             try { icons.put(path, new FlatSVGIcon(new ByteArrayInputStream(bytes)).derive(32, 32)); }
             catch (IOException | RuntimeException unreadable) { return; }
             list.repaint();
+            MarketplaceClient.Listing selected = list.getSelectedValue();
+            if (selected != null && selected.iconPath().equals(path)) name.setIcon(icons.get(path));
         });
-        return BLANK;
+        return icons.get(path);
     }
 
     private void restyle() {
@@ -299,6 +302,8 @@ final class MarketplaceTab {
         detailStatus.setForeground(UIManager.getColor(detailError ? "Actions.Red" : "Label.disabledForeground"));
     }
 
+    /** The longest description read, in characters: 256 KiB. */
+    static final int MAX_DESCRIPTION = 256 * 1024;
     private static final java.util.Set<String> KEPT = java.util.Set.of("p", "br", "div", "span", "ul", "ol", "li", "b", "strong", "i", "em",
         "u", "code", "pre", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "a", "hr", "table", "tr", "td", "th", "thead", "tbody");
     private static final java.util.regex.Pattern TAG = java.util.regex.Pattern.compile("<(/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>");
@@ -308,8 +313,13 @@ final class MarketplaceTab {
     /**
      * The description reduced to an allowlist of formatting tags with no attributes, except {@code href} on links. Comments,
      * scripts and styles go entirely; any other tag goes and its text stays. Nothing can load an image, stylesheet or frame.
+     * Only the first {@link #MAX_DESCRIPTION} characters are read, which bounds the work and the page it builds.
      */
     static String safeHtml(String html) {
+        if (html.length() > MAX_DESCRIPTION) {
+            int end = Character.isHighSurrogate(html.charAt(MAX_DESCRIPTION - 1)) ? MAX_DESCRIPTION - 1 : MAX_DESCRIPTION;
+            html = html.substring(0, end);
+        }
         String text = html.replaceAll("(?s)<!--.*?(-->|$)", "")
             .replaceAll("(?is)<(script|style)\\b.*?(</\\1\\s*>|$)", "");
         var out = new StringBuilder("<html><body>");
@@ -326,7 +336,7 @@ final class MarketplaceTab {
                 var href = HREF.matcher(matcher.group(3));
                 if (href.find()) {
                     String value = href.group(1) != null ? href.group(1) : href.group(2) != null ? href.group(2) : href.group(3);
-                    out.append(" href=\"").append(escape(value.replace("&amp;", "&")).replace("\"", "&quot;")).append('"');
+                    out.append(" href=\"").append(escape(unescape(value)).replace("\"", "&quot;")).append('"');
                 }
             }
             out.append('>');
@@ -336,6 +346,11 @@ final class MarketplaceTab {
     }
 
     static String escape(String text) { return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"); }
+
+    /** Undoes the entities an attribute value commonly carries, {@code &amp;} last so it is not undone twice. */
+    private static String unescape(String text) {
+        return text.replace("&quot;", "\"").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
+    }
 
     /** Vendor, downloads, rating and badges, joined with middle dots. */
     static String meta(MarketplaceClient.Listing listing, boolean installed) {
@@ -355,6 +370,7 @@ final class MarketplaceTab {
     }
 
     // Test access.
+    Icon detailsIcon() { return name.getIcon(); }
     List<String> listed() { var names = new ArrayList<String>(); for (int i = 0; i < model.size(); i++) names.add(model.get(i).name()); return names; }
     void select(String listingName) { for (int i = 0; i < model.size(); i++) if (model.get(i).name().equals(listingName)) list.setSelectedIndex(i); }
     String details() {

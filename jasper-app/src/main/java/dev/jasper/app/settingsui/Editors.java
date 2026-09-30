@@ -287,14 +287,25 @@ public final class Editors {
                 String text = editor().getText();
                 model.removeAllElements();
                 for (String name : names.get()) model.addElement(name);
-                model.addElement(action());
+                model.addElement(actionLabel());
                 model.select(text);
                 editor().setText(text);
             } finally { showing = false; }
         }
 
-        private String action() { return context.draft().value(CoreSettings.THEMES_MARKETPLACE_ENABLED) ? MORE : MANAGE; }
-        private static boolean action(Object item) { return MORE.equals(item) || MANAGE.equals(item); }
+        private String actionLabel() { return context.draft().value(CoreSettings.THEMES_MARKETPLACE_ENABLED) ? MORE : MANAGE; }
+        private static boolean isAction(Object item) { return MORE.equals(item) || MANAGE.equals(item); }
+
+        /**
+         * Whether choosing the action entry during {@code current} should navigate. Basic and FlatLaf select as the
+         * arrow and page keys move through the open list, so only a click, Enter or a programmatic choice (no event)
+         * navigates; any other key leaves the entry unselected.
+         */
+        static boolean navigates(java.awt.AWTEvent current) {
+            if (current instanceof java.awt.event.KeyEvent key) return key.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
+                || key.getKeyChar() == '\n';
+            return true;
+        }
         private JTextComponent editor() { return (JTextComponent) box.getEditor().getEditorComponent(); }
         private void edited() { if (!showing) for (Runnable listener : List.copyOf(listeners)) listener.run(); }
 
@@ -314,7 +325,15 @@ public final class Editors {
         /** Refuses the action entry as a selection and navigates instead. */
         private final class Model extends DefaultComboBoxModel<String> {
             @Override public void setSelectedItem(Object item) {
-                if (action(item)) { if (!showing) open(MORE.equals(item)); return; }
+                if (isAction(item)) {
+                    if (showing || !navigates(java.awt.EventQueue.getCurrentEvent())) return;
+                    // Enter on typed action text: put the chosen theme back so the sentinel is never the value.
+                    Object chosen = getSelectedItem();
+                    String text = chosen == null ? "" : chosen.toString();
+                    if (!editor().getText().equals(text)) editor().setText(text);
+                    open(MORE.equals(item));
+                    return;
+                }
                 super.setSelectedItem(item);
             }
             void select(Object item) { super.setSelectedItem(item); }
@@ -325,7 +344,7 @@ public final class Editors {
             @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
                 var label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focused);
                 label.putClientProperty("html.disable", true);
-                if (ThemeCombo.action(value) && index >= 0) {
+                if (ThemeCombo.isAction(value) && index >= 0) {
                     Color link = UIManager.getColor("Component.linkColor");
                     if (link != null && !selected) label.setForeground(link);
                     Color rule = UIManager.getColor("Separator.foreground");
