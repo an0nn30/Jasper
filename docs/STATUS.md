@@ -1,7 +1,20 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-09-29
+## Current state — 2026-09-30
 
+- **Jasper file chooser, plan A: local** (branch `claude/file-chooser`, spec
+  `docs/superpowers/specs/2026-09-30-file-chooser-design.md`, plan `docs/superpowers/plans/2026-09-30-file-chooser-a.md`,
+  executed inline 2026-09-30): every native file picker (`FileDialog`, `JFileChooser`) is replaced by Jasper's
+  Explorer-style chooser (`dev.jasper.app.files`): navigation pane (Terminal folder, home, Desktop, Downloads, Pinned,
+  Recent), back/forward/up, breadcrumb path bar with typed paths (Cmd/Ctrl+L), search filter, sortable list, preview
+  pane toggle, dotfile toggle (Cmd/Ctrl+Shift+.), typed paths in the name field, Save with replace confirmation and
+  New folder. Choosers start at the owner's focused-pane folder when the caller gives none; Open in Editor… no longer
+  overrides that in a terminal pane. No SDK change (moved to plan B; deviations listed in the plan). `./gradlew check`
+  green: app 1338/0/1, terminal 391/0/4, Editor 4778/0/0, Remote 306/0/0, Vault 139/0/1, Buddy 163/0/0, History
+  41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0, testkit 69/0/0. Not merged. GUI checks pending with the user:
+  Cmd/Ctrl+O from a local pane opens at its folder quickly (target about 100 ms); Save As in the Editor; Settings file
+  pickers; Install Plugin (.zip only); SFTP upload/download folder pickers; dark and light themes; long paths in the
+  path bar. Cmd/Ctrl+O in an SSH pane still shows the old remote picker until plan B.
 - **Opening remote files from Cmd/Ctrl+O and File › Open Remote File…** (branch `claude/remote-open-file`, spec
   `docs/superpowers/specs/2026-09-29-remote-open-file-design.md`, plan
   `docs/superpowers/plans/2026-09-29-remote-open-file.md`, executed inline 2026-09-29): Open in Editor… asks openers

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** written 2026-09-30, not started.
+**Status:** executed inline 2026-09-30. Further deviations: `LocalFiles.Preview` is `PreviewInfo` (the packaged-jar check rejects classes named `*Preview`); the panel's size/date helpers are `sizeText`/`modifiedText` (a renderer's inherited `Component.size()` shadowed `size`); `EntryTable.getColumnName` returns plain names because JTable asks before the panel's model field is set.
 
 **Goal:** Replace every native file picker in Jasper with an app-owned, Explorer-style chooser for local files, and make
 Open in Editor… (Cmd/Ctrl+O) start in the focused terminal's folder.
