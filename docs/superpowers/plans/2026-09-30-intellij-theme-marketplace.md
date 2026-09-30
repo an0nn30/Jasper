@@ -1,7 +1,14 @@
 # IntelliJ Theme Marketplace Implementation Plan
 
-> **Status:** written 2026-09-30 on `claude/theme-marketplace`; not started. Choices this plan makes where the spec left
+> **Status:** written 2026-09-30 on `claude/theme-marketplace`; executed subagent-driven 2026-09-30; not merged. Choices this plan makes where the spec left
 > room (record further deviations here and in `docs/STATUS.md` as you go):
+> - Deviations made during execution: the Marketplace client refuses a first request to any host other than the base and
+>   uses shutdownNow on close; the installer replaces files atomically (disk installs via `.downloads`), writes provenance
+>   before deleting old versions, accepts only .jar/.zip and only uninstalls .jar/.zip; ThemeStore calls the rescan hook on
+>   the EDT, retries icon fetches and clears leftover downloads once per run; the description pane uses an allowlist HTML
+>   sanitiser (basic formatting tags, only a[href]); the Marketplace tab loads the installed list when shown; details
+>   failures show inline Retry and install/update failures offer Retry in the banner; package-info `{@link}` names
+>   ThemeStore; the ThemeCombo renderer calls `ThemeCombo.action(value)`.
 > - `MarketplaceClient` methods block; `ThemeStore` runs them on its worker and returns `CompletableFuture`s completed
 >   on the EDT (the spec had the client return futures).
 > - **Use** stages `ui.theme.name` in the dialog's draft; the theme switches on Apply or OK like every other setting.
