@@ -8,6 +8,7 @@ import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.settingsui.PageContext;
 import dev.jasper.app.settingsui.SettingsDraft;
 import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.terminal.config.Palette;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,7 +86,7 @@ class AlacrittyThemesPageTest {
         assertThat(page.listed()).doesNotContain("My Sunset");
     }
 
-        @Test void aUserFileShadowsTheBundledThemeOfTheSameNameUntilRemoved() throws Exception {
+    @Test void aUserFileShadowsTheBundledThemeOfTheSameNameUntilRemoved() throws Exception {
         Files.createDirectories(home.resolve("Downloads"));
         chosen = Optional.of(Files.writeString(home.resolve("Downloads/tokyo_night.toml"), TerminalThemeCatalogTest.theme("#1a1b26")));
         var page = page();
@@ -96,8 +97,7 @@ class AlacrittyThemesPageTest {
         assertThat(catalog.latest().find("Tokyo Night").orElseThrow().bundled()).isTrue();
         assertThat(page.listed()).containsOnlyOnce("Tokyo Night");
     }
-
-@Test void anUnusableFileIsReportedAndDisposeClosesTheSample() throws Exception {
+    @Test void anUnusableFileIsReportedAndDisposeClosesTheSample() throws Exception {
         Files.createDirectories(home.resolve("Downloads"));
         chosen = Optional.of(Files.writeString(home.resolve("Downloads/light.toml"), TerminalThemeCatalogTest.theme("#ffffff")));
         var page = page();
@@ -105,5 +105,26 @@ class AlacrittyThemesPageTest {
         assertThat(page.status()).contains("reserved");
         page.dispose();
         assertThat(page.sample().closed()).isTrue();
+    }
+
+    @Test void theSampleKeepsItsGridSizeWhenThePageIsLarge() {
+        var page = page();
+        var body = page.component();
+        body.setSize(1200, 900);
+        LayoutTestSupport.layoutTree(body);
+        var view = page.sample().component();
+        assertThat(view.getSize()).isEqualTo(view.getPreferredSize());
+        assertThat(view.getWidth()).isLessThan(900);
+    }
+
+    @Test void theSelectedThemesFileProblemsAreShown() throws Exception {
+        var folder = Files.createDirectories(home.resolve("terminal-themes"));
+        Files.writeString(folder.resolve("reddish.toml"), TerminalThemeCatalogTest.theme("#101010") + "[colors.normal]\nred = 'reddish'\n");
+        catalog.scan();
+        var page = page();
+        page.select("Dracula");
+        assertThat(page.problems()).isEmpty();
+        page.select("Reddish");
+        assertThat(page.problems()).contains("reddish");
     }
 }

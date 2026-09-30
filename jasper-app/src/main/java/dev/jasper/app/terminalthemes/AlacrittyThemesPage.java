@@ -12,7 +12,6 @@ import dev.jasper.terminal.config.TerminalOptions;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -43,6 +42,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.ListCellRenderer;
@@ -89,7 +89,12 @@ public final class AlacrittyThemesPage implements SettingsPage {
     private final JButton remove = new JButton("Remove…");
     private final JButton install = new JButton("Install from Disk…");
     private final JButton reveal = new JButton("Reveal Folder");
-    private final JPanel sampleHolder = new JPanel(new BorderLayout());
+    private final JTextArea problems = new JTextArea();
+    private final JPanel sampleHolder = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0)) {
+        @Override public java.awt.Dimension getMaximumSize() { return getPreferredSize(); }
+    };
+    private String inUse;
+    private boolean disposed;
     private List<TerminalTheme> all = List.of();
     private SampleTerminal sample;
     private FillingPage body;
@@ -156,7 +161,17 @@ public final class AlacrittyThemesPage implements SettingsPage {
         details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
         details.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
         sampleHolder.setOpaque(false);
-        for (JComponent part : List.of(title, source, swatches, sampleHolder, buttons)) { part.setAlignmentX(0f); details.add(part); }
+        problems.setEditable(false);
+        problems.setFocusable(false);
+        problems.setLineWrap(true);
+        problems.setWrapStyleWord(true);
+        problems.setOpaque(false);
+        problems.setBorder(null);
+        problems.setForeground(UIManager.getColor("Actions.Red"));
+        problems.getAccessibleContext().setAccessibleName("Theme file problems");
+        problems.setVisible(false);
+        list.setFixedCellHeight(44);
+        for (JComponent part : List.of(title, source, problems, swatches, sampleHolder, buttons)) { part.setAlignmentX(0f); details.add(part); }
         details.add(Box.createVerticalGlue());
         var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, new JScrollPane(details));
         split.setResizeWeight(0.35);
@@ -170,13 +185,13 @@ public final class AlacrittyThemesPage implements SettingsPage {
         source.setForeground(UIManager.getColor("Label.disabledForeground"));
         try {
             sample = new SampleTerminal(hooks.sampleOptions().get());
-            sampleHolder.add(sample.component(), BorderLayout.CENTER);
+            sampleHolder.add(sample.component());
         } catch (RuntimeException unavailable) {
             // Without a sample the colour strip alone previews the theme.
             sample = null;
         }
         body = new FillingPage(panel);
-        draftListening = context.draft().onChanged(list::repaint);
+        draftListening = context.draft().onChanged(() -> { updateInUse(); list.repaint(); });
         refresh(null);
         return body;
     }
@@ -188,6 +203,7 @@ public final class AlacrittyThemesPage implements SettingsPage {
     @Override public void highlight(String query) { }
 
     @Override public void dispose() {
+        disposed = true;
         if (draftListening != null) draftListening.close();
         if (sample != null) sample.close();
     }
@@ -195,6 +211,7 @@ public final class AlacrittyThemesPage implements SettingsPage {
     /** Re-reads the catalog, keeping the selection or selecting {@code prefer} when given. */
     private void refresh(String prefer) {
         all = hooks.catalog().latest().themes();
+        updateInUse();
         String keep = prefer != null ? prefer : selectedName();
         show(keep);
     }
@@ -227,11 +244,18 @@ public final class AlacrittyThemesPage implements SettingsPage {
         if (theme == null) {
             title.setText(model.isEmpty() ? "No terminal themes match" : "");
             source.setText("");
+            problems.setText("");
+            problems.setVisible(false);
             swatches.setIcon(null);
             return;
         }
         title.setText(theme.name());
         source.setText(theme.bundled() ? "Bundled with Jasper (alacritty-theme)" : "Your file: " + theme.file().orElseThrow().getFileName());
+        String found = theme.file().map(file -> hooks.catalog().latest().problems().stream()
+            .filter(problem -> file.equals(problem.file())).map(TerminalThemeCatalog.Problem::message)
+            .collect(java.util.stream.Collectors.joining("\n"))).orElse("");
+        problems.setText(found);
+        problems.setVisible(!found.isEmpty());
         swatches.setIcon(new Strip(theme.palette(), true));
         swatches.setText("Cursor and selection colours at the end");
         if (sample != null) sample.palette(theme.palette());
@@ -241,6 +265,7 @@ public final class AlacrittyThemesPage implements SettingsPage {
         TerminalTheme theme = list.getSelectedValue();
         if (theme == null) return;
         context.draft().stage(CoreSettings.TERMINAL_COLORS, Optional.of(theme.name()));
+        updateInUse();
         message("“" + theme.name() + "” is chosen. Apply or OK switches the terminals to it.", false);
         list.repaint();
     }
@@ -260,6 +285,7 @@ public final class AlacrittyThemesPage implements SettingsPage {
             return;
         }
         message("Installed " + name + ".", false);
+        search.setText("");
         rescanThen(name);
     }
 
@@ -279,7 +305,14 @@ public final class AlacrittyThemesPage implements SettingsPage {
         CompletableFuture<?> done;
         try { done = hooks.rescan().get(); }
         catch (RuntimeException failure) { done = CompletableFuture.failedFuture(failure); }
-        done.whenComplete((ignored, failure) -> hooks.edt().execute(() -> refresh(prefer)));
+        done.whenComplete((ignored, failure) -> hooks.edt().execute(() -> {
+            if (disposed) return;
+            if (failure != null) {
+                Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure;
+                message("Could not reload the terminal themes: " + cause.getMessage(), true);
+            }
+            refresh(prefer);
+        }));
     }
 
     private void message(String text, boolean error) {
@@ -294,10 +327,17 @@ public final class AlacrittyThemesPage implements SettingsPage {
     JButton removeButton() { return remove; }
     JButton installButton() { return install; }
     String status() { return status.getText(); }
+    String problems() { return problems.isVisible() ? problems.getText() : ""; }
     SampleTerminal sample() { return sample; }
 
     /** The theme the draft's terminal colours name, or null. */
-    String inUse() {
+    String inUse() { return inUse; }
+
+    private void updateInUse() {
+        inUse = computeInUse();
+    }
+
+    private String computeInUse() {
         TerminalColors colors = TerminalColors.parse(context.draft().value(CoreSettings.TERMINAL_COLORS));
         if (!colors.named()) return null;
         return all.stream().map(TerminalTheme::name).filter(name -> name.equalsIgnoreCase(colors.name())).findFirst().orElse(null);
@@ -323,7 +363,7 @@ public final class AlacrittyThemesPage implements SettingsPage {
 
         @Override public Component getListCellRendererComponent(JList<? extends TerminalTheme> owner, TerminalTheme value, int index,
                                                                 boolean selected, boolean focused) {
-            boolean current = value.name().equals(inUse());
+            boolean current = value.name().equals(inUse);
             name.setText(current ? value.name() + "  ✓" : value.name());
             name.setFont(owner.getFont().deriveFont(Font.BOLD));
             line.setText(value.bundled() ? "Bundled" : "Your file");

@@ -493,8 +493,12 @@ public final class JasperApplication {
         private dev.jasper.app.terminalthemes.AlacrittyThemesPage.Hooks alacrittyHooks() {
             var editor = new dev.jasper.app.platform.ConfigEditor();
             return new dev.jasper.app.terminalthemes.AlacrittyThemesPage.Hooks(terminalThemes, () -> configuration.reload(),
-                folder -> CompletableFuture.runAsync(() -> editor.reveal(folder)), dev.jasper.app.terminalthemes.AlacrittyThemesPage::ask,
-                () -> configuration.snapshot().viewOptions(configuration.snapshot().fontSize(), themes.current().palette()),
+                folder -> CompletableFuture.runAsync(() -> editor.reveal(folder))
+                    .whenComplete((ignored, failure) -> {
+                        if (failure != null) SwingUtilities.invokeLater(() -> notice("Could not reveal " + folder));
+                    }),
+                dev.jasper.app.terminalthemes.AlacrittyThemesPage::ask,
+                () -> { var snapshot = configuration.snapshot(); return snapshot.viewOptions(snapshot.fontSize(), themes.current().palette()); },
                 SwingUtilities::invokeLater);
         }
 
