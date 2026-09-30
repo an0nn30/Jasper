@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** written 2026-09-30, not started.
+**Status:** executed inline 2026-09-30. Further deviations: `RemoteBrowser`'s helper is `entryName` (a static `name` clashed with `FileBrowser.name`); `RemoteBrowser.read` resolves links first (Remote's `LocalEndpoint` refuses to open a link); `RemoteBrowserTest` qualifies `FileEntry.Kind.FILE` (AssertJ also exports a `FILE`).
 
 **Goal:** Remote's saved hosts appear in Jasper's file chooser; Cmd/Ctrl+O in an SSH pane opens the chooser on that
 host at the shell's folder; files picked on a host open in the Editor; the old remote picker and File › Open Remote

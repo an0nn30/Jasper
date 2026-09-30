@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-30
 
+- **File chooser plan B2: Remote hosts and remote Open in Editor** (branch `claude/file-chooser-b2`, plan
+  `docs/superpowers/plans/2026-09-30-file-chooser-b2.md`): Remote 0.8.0 registers its saved hosts as a file source
+  (`dev.jasper.remote.chooser.RemoteHosts`, `files.source`): each host is a root with a connected dot, clicking it
+  resolves the logins (Vault prompts as usual) and browses over SFTP with links followed, and an SSH pane is located on
+  its host at the shell's folder (or the login's home). Editor 0.6.0 adds `LocationResolver` /
+  `Editor.locationDocuments`; Open in Editor… (Cmd/Ctrl+O) now always shows Jasper's chooser, offering sources with a
+  resolver and opening their files through it, starting in the active document's folder (local or remote) or where the
+  focused pane is. Remote's resolver builds `RemoteDocument`s. Removed: `RemoteFilePicker`, `RemoteOpening`, File ›
+  Open Remote File… and `SftpPanel.pickMode`. SDK 0.10.1: `FileLocation.Sourced.HOME`. `./gradlew check` green:
+  app 1348/0/1, terminal 391/0/4, Editor 4781/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
+  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Not merged. GUI checks pending with the user: Cmd/Ctrl+O in an SSH pane opens on that host at the shell's
+  folder; clicking a disconnected host connects (Vault prompt, Cancel, Retry); opening a remote file; Cmd/Ctrl+O from a
+  remote Editor tab starts in its folder; pinning a remote folder.
 - **File chooser plan B1: SDK file sources** (branch `claude/file-chooser-b1`, plan
   `docs/superpowers/plans/2026-09-30-file-chooser-b1.md`): SDK 0.10.0 adds `dev.jasper.sdk.files` (`FileSources`,
   `FileSource`, `FileBrowser`, `FileLocation`, `FileChoice`, `FileEntry`, `FileRoot`, `FileSourceSpec`), the
@@ -37,7 +50,7 @@
   Snippets 11/0/0, Sample 12/0/0, SDK 31/0/0, testkit 69/0/0 (tests/failures/skipped). Not merged. GUI checks pending
   with the user: Cmd/Ctrl+O in an SSH pane, a remote Editor tab and a local pane; rebinding Open in Editor… in the
   Keymap moves all three; File › Open Remote File… with and without an SSH pane focused; on Linux/Windows, the
-  Keymap's cmd+o is Ctrl+Shift+O, which now applies in Editor tabs too (their old in-tab key was Ctrl+O).
+  Keymap's cmd+o is Ctrl+Shift+O, which now applies in Editor tabs too (their old in-tab key was Ctrl+O). Superseded by the file chooser (plan B2): the picker and Open Remote File… are gone.
 - **IntelliJ parent themes and schemes** (branch `claude/intellij-parent-themes`, bounded change approved in chat
   2026-09-29, no spec): every theme and editor scheme IntelliJ bundles at the pinned intellij-community commit is
   vendored under `themes/intellij/` (New UI `expUI/`, `islands/`, `Light.xml`), so plugin themes built on
