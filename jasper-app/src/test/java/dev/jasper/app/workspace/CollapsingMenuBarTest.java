@@ -120,15 +120,15 @@ class CollapsingMenuBarTest {
         assertThat(bar.isOptimizedDrawingEnabled()).as("menus overlap the header").isFalse();
         bar.setSize(1400, 30); bar.doLayout();
         assertThat(header.getBounds()).isEqualTo(new Rectangle(0, 0, 1400, 30));
-        assertThat(header.field().getX()).isEqualTo(420);
+        assertThat(header.field().getX()).isEqualTo(500);
         assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
         assertThat(bar.getComponentIndex(header)).as("under every menu").isGreaterThan(bar.getComponentIndex(bar.hamburgerMenu()));
-        bar.setSize(900, 30); bar.doLayout();
+        bar.setSize(740, 30); bar.doLayout();
         assertThat(header.field().getX()).isEqualTo(170);
         assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.MORE);
         assertThat(shown(bar)).containsExactly(true, true, false, false, false);
-        bar.setSize(600, 30); bar.doLayout();
+        bar.setSize(440, 30); bar.doLayout();
         assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.ALL);
-        assertThat(header.field().getX() + header.field().getWidth() / 2).as("still centred").isEqualTo(300);
+        assertThat(header.field().getX() + header.field().getWidth() / 2).as("still centred").isEqualTo(220);
     }
 }

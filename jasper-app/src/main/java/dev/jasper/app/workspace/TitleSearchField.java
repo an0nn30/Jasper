@@ -25,7 +25,7 @@ import javax.swing.UIManager;
  * focusable; the keyboard route is the shortcut. Collapsed, it is only the magnifier.
  */
 final class TitleSearchField extends JComponent {
-    static final int PREFERRED_WIDTH = 560, MINIMUM_WIDTH = 240, MAXIMUM_WIDTH = 640, ARC = 12;
+    static final int PREFERRED_WIDTH = 400, MINIMUM_WIDTH = 240, MAXIMUM_WIDTH = 480, ARC = 12;
     private final Runnable open;
     private final Supplier<String> shortcut;
     private String context = "Search";
