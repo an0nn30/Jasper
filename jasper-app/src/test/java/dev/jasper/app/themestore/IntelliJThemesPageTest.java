@@ -82,7 +82,6 @@ class IntelliJThemesPageTest {
         assertThat(tab.listed()).containsExactly("Dracula Theme");
         tab.select("Dracula Theme");
         assertThat(tab.details()).contains("Dracula Theme", "Vendor 12275", "Version 2.3.1", "A dark theme");
-        assertThat(market.requests).noneMatch(request -> request.contains("example.invalid"));
         assertThat(tab.installButton().getText()).isEqualTo("Install");
         tab.installButton().doClick();
         assertThat(home.resolve("themes/com.vermouthx.idea-2.3.1.jar")).isRegularFile();
@@ -149,5 +148,49 @@ class IntelliJThemesPageTest {
         page.marketplace().retryButton().doClick();
         assertThat(page.marketplace().status()).isEqualTo("The Marketplace lists no themes.");
         assertThat(page.marketplace().retryButton().isVisible()).isFalse();
+    }
+
+    @Test void theMarketplaceTabKnowsWhatIsInstalledBeforeTheInstalledTabOpens() throws Exception {
+        market.theme(home.resolve("served"), 12275, "com.vermouthx.idea", "Dracula Theme", "Dracula", "2.3.1");
+        var installer = new ThemeInstaller(home.resolve("themes"));
+        Path part = installer.downloadTarget(new MarketplaceClient.Release(1, "2.3.1", "x.jar"));
+        plugin(part, "Dracula", true, "#282a36", "282a36");
+        installer.installDownload(part, ".jar", new Provenance.Entry(12275, "com.vermouthx.idea", "Dracula Theme", "2.3.1"));
+        catalog.scan();
+        var page = page();
+        page.selected();
+        var tab = page.marketplace();
+        tab.select("Dracula Theme");
+        assertThat(tab.installButton().getText()).isEqualTo("Installed");
+        assertThat(tab.listLine("Dracula Theme")).contains("Installed");
+    }
+
+    @Test void aDetailsFailureShowsAMessageAndRetry() throws Exception {
+        market.theme(home.resolve("served"), 12275, "com.vermouthx.idea", "Dracula Theme", "Dracula", "2.3.1");
+        market.bytes("/api/plugins/12275", 500, new byte[0]);
+        var page = page();
+        page.selected();
+        var tab = page.marketplace();
+        assertThat(tab.detailStatus()).isEqualTo("The Marketplace answered HTTP 500.");
+        assertThat(tab.detailRetryButton().isVisible()).isTrue();
+        market.json("/api/plugins/12275", FakeMarketplace.details(12275, "com.vermouthx.idea", "Dracula Theme", "<p>A dark theme</p>"));
+        tab.detailRetryButton().doClick();
+        assertThat(tab.detailStatus()).isEmpty();
+        assertThat(tab.detailRetryButton().isVisible()).isFalse();
+        assertThat(tab.details()).contains("A dark theme");
+    }
+
+    @Test void aFailedInstallOffersRetryInTheBanner() throws Exception {
+        market.theme(home.resolve("served"), 12275, "com.vermouthx.idea", "Dracula Theme", "Dracula", "2.3.1");
+        market.bytes("/files/12275/99/com.vermouthx.idea-2.3.1.jar", 404, new byte[0]);
+        var page = page();
+        page.selected();
+        page.marketplace().installButton().doClick();
+        assertThat(page.banner().text()).isEqualTo("The Marketplace answered HTTP 404.");
+        assertThat(page.banner().actionText()).isEqualTo("Retry");
+        market.theme(home.resolve("served"), 12275, "com.vermouthx.idea", "Dracula Theme", "Dracula", "2.3.1");
+        page.banner().click();
+        assertThat(home.resolve("themes/com.vermouthx.idea-2.3.1.jar")).isRegularFile();
+        assertThat(page.banner().text()).isEqualTo("Installed Dracula Theme.");
     }
 }

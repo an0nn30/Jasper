@@ -55,6 +55,17 @@ class ThemeStoreTest {
         assertThat(store.updates(listed).get()).containsOnlyKeys(installed.file());
     }
 
+    @Test void downloadsAreClearedOnlyOnTheFirstCall() throws Exception {
+        Path downloads = home.resolve("themes/.downloads");
+        Files.createDirectories(downloads);
+        Files.writeString(downloads.resolve("old.part"), "x");
+        store.clearDownloads();
+        assertThat(downloads.resolve("old.part")).doesNotExist();
+        Files.writeString(downloads.resolve("running.part"), "x");
+        store.clearDownloads();
+        assertThat(downloads.resolve("running.part")).isRegularFile();
+    }
+
     @Test void aFailedDownloadLeavesNothingAndExplainsItself() {
         market.json("/api/plugins/7/updates", FakeMarketplace.release(1, "1.0", "7/1/gone.zip"));
         var failure = catchThrowable(() -> store.install(7, "x.gone", "Gone").get());

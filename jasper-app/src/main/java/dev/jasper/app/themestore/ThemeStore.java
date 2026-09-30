@@ -48,6 +48,7 @@ public final class ThemeStore implements AutoCloseable {
         }
     }
 
+    private final java.util.concurrent.atomic.AtomicBoolean downloadsCleared = new java.util.concurrent.atomic.AtomicBoolean();
     private final ThemeCatalog catalog;
     private final MarketplaceClient client;
     private final ThemeInstaller installer;
@@ -140,8 +141,9 @@ public final class ThemeStore implements AutoCloseable {
         return onEdt(onEdt(supply(() -> { installer.uninstall(file); return (Void) null; })).thenCompose(this::rescanned));
     }
 
-    /** Deletes leftover downloads in the background. */
+    /** Deletes leftover downloads in the background, once per store: a later call could delete a running install's part file. */
     void clearDownloads() {
+        if (!downloadsCleared.compareAndSet(false, true)) return;
         try { worker.execute(installer::clearDownloads); } catch (RejectedExecutionException closed) { }
     }
 

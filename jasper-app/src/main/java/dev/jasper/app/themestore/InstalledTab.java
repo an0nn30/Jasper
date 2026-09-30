@@ -38,7 +38,13 @@ final class InstalledTab {
     private final List<Runnable> changed = new ArrayList<>();
     private final DefaultListModel<InstalledTheme> model = new DefaultListModel<>();
     private final JList<InstalledTheme> list = new JList<>(model);
-    private final JPanel component = new JPanel(new BorderLayout());
+    private final JPanel component = new JPanel(new BorderLayout()) {
+        @Override public void updateUI() {
+            super.updateUI();
+            // JPanel's constructor calls this before the fields exist.
+            if (title != null) restyle();
+        }
+    };
     private final JPanel details = new JPanel();
     private final JLabel title = new JLabel();
     private final JLabel meta = new JLabel();
@@ -51,6 +57,7 @@ final class InstalledTab {
     private Map<Path, MarketplaceClient.Release> updates = Map.of();
     private boolean marketplaceEnabled = true;
     private int generation;
+    private boolean disposed;
 
     InstalledTab(ThemeStore store, PageContext context, Banner banner, Consumer<String> use) {
         this.store = store;
@@ -73,7 +80,7 @@ final class InstalledTab {
         problems.setWrapStyleWord(true);
         problems.setOpaque(false);
         uses.setOpaque(false);
-        update.addActionListener(event -> update());
+        update.addActionListener(event -> update(list.getSelectedValue()));
         uninstall.addActionListener(event -> uninstall());
         details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
         details.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
@@ -105,6 +112,18 @@ final class InstalledTab {
         var versions = new HashMap<String, String>();
         for (int i = 0; i < model.size(); i++) model.get(i).source().ifPresent(source -> versions.put(source.xmlId(), source.version()));
         return versions;
+    }
+
+    /** Stops reacting to late results; the dialog disposing its page calls this. */
+    void dispose() { disposed = true; generation++; }
+
+    /** Re-reads the folder and shows it, without asking the Marketplace for updates. */
+    void loadList() {
+        int asked = ++generation;
+        store.installed().whenComplete((themes, failure) -> {
+            if (asked != generation || failure != null) return;
+            show(themes);
+        });
     }
 
     /** Re-reads the folder, then asks the Marketplace for updates to the themes installed from it. */
@@ -165,15 +184,15 @@ final class InstalledTab {
         details.repaint();
     }
 
-    private void update() {
-        InstalledTheme theme = list.getSelectedValue();
+    private void update(InstalledTheme theme) {
         if (theme == null || theme.source().isEmpty()) return;
         var source = theme.source().get();
         busy(true);
         banner.info("Updating " + source.name() + "\u2026");
         store.install(source.marketplaceId(), source.xmlId(), source.name()).whenComplete((result, failure) -> {
+            if (disposed) return;
             busy(false);
-            if (failure != null) banner.error(ThemeStore.message(failure));
+            if (failure != null) banner.errorOffer(ThemeStore.message(failure), "Retry", () -> update(theme));
             else banner.info("Updated " + source.name() + ".");
             reload();
         });
@@ -187,6 +206,7 @@ final class InstalledTab {
         if (!store.confirm(component, question)) return;
         busy(true);
         store.uninstall(theme.file()).whenComplete((ignored, failure) -> {
+            if (disposed) return;
             busy(false);
             if (failure != null) banner.error(ThemeStore.message(failure));
             else banner.info("Uninstalled " + theme.title() + ".");
@@ -201,6 +221,7 @@ final class InstalledTab {
     private void installFromDisk(Path file, boolean replace) {
         busy(true);
         store.installFromDisk(file, replace).whenComplete((result, failure) -> {
+            if (disposed) return;
             busy(false);
             if (ThemeStore.cause(failure) instanceof ThemeInstaller.Conflict conflict) {
                 if (store.confirm(component, conflict.existing().getFileName() + " is already installed. Replace it?")) installFromDisk(file, true);

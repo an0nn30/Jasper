@@ -102,6 +102,7 @@ final class IntelliJThemesPage implements SettingsPage {
         header.dispose();
         if (draftListening != null) draftListening.close();
         if (marketplace != null) marketplace.dispose();
+        if (installed != null) installed.dispose();
     }
 
     private boolean marketplaceEnabled() { return context.draft().value(CoreSettings.THEMES_MARKETPLACE_ENABLED); }
@@ -118,8 +119,10 @@ final class IntelliJThemesPage implements SettingsPage {
 
     /** Loads what the visible tab shows: the Marketplace's first search, or the installed themes and their updates. */
     private void activate() {
-        if (tabs.getSelectedComponent() == marketplace.component()) marketplace.activate();
-        else installed.reload();
+        if (tabs.getSelectedComponent() == marketplace.component()) {
+            installed.loadList();
+            marketplace.activate();
+        } else installed.reload();
     }
 
     /** Chooses {@code theme} on the Appearance page's setting; it switches on Apply or OK. */

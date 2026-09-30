@@ -29,6 +29,7 @@ final class Banner extends JPanel {
     void info(String message) { show(message, false, null, null); }
     void error(String message) { show(message, true, null, null); }
     void offer(String message, String label, Runnable run) { show(message, false, label, run); }
+    void errorOffer(String message, String label, Runnable run) { show(message, true, label, run); }
     void clear() { show("", false, null, null); }
 
     private void show(String message, boolean isError, String label, Runnable run) {

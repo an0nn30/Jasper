@@ -48,12 +48,20 @@ final class MarketplaceTab {
     private final Supplier<Map<String, String>> installedVersions;
     private final Consumer<String> use;
     private final Runnable installedChanged;
-    private final JPanel component = new JPanel(new BorderLayout());
+    private final JPanel component = new JPanel(new BorderLayout()) {
+        @Override public void updateUI() {
+            super.updateUI();
+            // JPanel's constructor calls this before the fields exist.
+            if (name != null) restyle();
+        }
+    };
     private final JTextField search = new JTextField();
     private final DefaultListModel<MarketplaceClient.Listing> model = new DefaultListModel<>();
     private final JList<MarketplaceClient.Listing> list = new JList<>(model);
     private final JButton more = new JButton("Load more");
     private final JLabel status = new JLabel();
+    private final JLabel detailStatus = new JLabel();
+    private final JButton detailRetry = new JButton("Retry");
     private final JButton retry = new JButton("Retry");
     private final JLabel name = new JLabel();
     private final JLabel vendor = new JLabel();
@@ -67,6 +75,9 @@ final class MarketplaceTab {
     private int nextOffset;
     private boolean activated;
     private boolean busy;
+    private boolean disposed;
+    private boolean statusError;
+    private boolean detailError;
     private int generation;
     private int detailGeneration;
     private MarketplaceClient.Release release;
@@ -88,13 +99,14 @@ final class MarketplaceTab {
             @Override public void changedUpdate(DocumentEvent event) { debounce.restart(); }
         });
         search.addActionListener(event -> { debounce.stop(); search(search.getText()); });
-        for (JComponent label : List.of(status, name, vendor, version, install, view, more, retry)) label.putClientProperty("html.disable", true);
+        for (JComponent label : List.of(status, detailStatus, detailRetry, name, vendor, version, install, view, more, retry)) label.putClientProperty("html.disable", true);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setCellRenderer(new Renderer());
         list.getAccessibleContext().setAccessibleName("Marketplace themes");
         list.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) showDetails(); });
         more.addActionListener(event -> load());
         retry.addActionListener(event -> load());
+        detailRetry.addActionListener(event -> showDetails());
         install.addActionListener(event -> install());
         view.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
         view.addActionListener(event -> {
@@ -127,7 +139,11 @@ final class MarketplaceTab {
         buttons.setOpaque(false);
         buttons.add(install);
         buttons.add(view);
-        for (JComponent part : List.of(name, vendor, version, buttons)) { part.setAlignmentX(0f); header.add(part); }
+        var detailRow = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
+        detailRow.setOpaque(false);
+        detailRow.add(detailStatus);
+        detailRow.add(detailRetry);
+        for (JComponent part : List.of(name, vendor, version, buttons, detailRow)) { part.setAlignmentX(0f); header.add(part); }
         header.add(Box.createVerticalStrut(4));
         var right = new JPanel(new BorderLayout());
         right.add(header, BorderLayout.NORTH);
@@ -159,7 +175,7 @@ final class MarketplaceTab {
         if (listing != null) syncInstall(listing);
     }
 
-    void dispose() { debounce.stop(); generation++; detailGeneration++; }
+    void dispose() { disposed = true; debounce.stop(); generation++; detailGeneration++; }
 
     /** Starts a new search now. */
     void search(String text) {
@@ -185,6 +201,7 @@ final class MarketplaceTab {
     }
 
     private void status(String text, boolean error) {
+        statusError = error;
         status.setText(text);
         status.setForeground(UIManager.getColor(error ? "Actions.Red" : "Label.disabledForeground"));
         status.setVisible(!text.isEmpty());
@@ -195,6 +212,7 @@ final class MarketplaceTab {
         MarketplaceClient.Listing listing = list.getSelectedValue();
         int asked = ++detailGeneration;
         release = null;
+        detailStatus("", false);
         boolean shown = listing != null;
         install.setVisible(shown);
         view.setVisible(shown && !listing.link().isEmpty());
@@ -208,7 +226,8 @@ final class MarketplaceTab {
         description.setText("<html><body><p>" + escape(listing.preview()) + "</p></body></html>");
         syncInstall(listing);
         store.details(listing.id()).whenComplete((details, failure) -> {
-            if (asked != detailGeneration || failure != null) return;
+            if (asked != detailGeneration) return;
+            if (failure != null) { detailStatus(ThemeStore.message(failure), true); return; }
             description.setText(safeHtml(details.descriptionHtml()));
             description.setCaretPosition(0);
             if (!details.vendor().isEmpty()) vendor.setText(details.vendor());
@@ -221,6 +240,14 @@ final class MarketplaceTab {
         });
     }
 
+    private void detailStatus(String text, boolean error) {
+        detailError = error;
+        detailStatus.setText(text);
+        detailStatus.setForeground(UIManager.getColor(error ? "Actions.Red" : "Label.disabledForeground"));
+        detailStatus.setVisible(!text.isEmpty());
+        detailRetry.setVisible(error);
+    }
+
     private void syncInstall(MarketplaceClient.Listing listing) {
         String have = installedVersions.get().get(listing.xmlId());
         if (busy) { install.setText("Installing\u2026"); install.setEnabled(false); }
@@ -229,15 +256,17 @@ final class MarketplaceTab {
         else { install.setText("Installed"); install.setEnabled(false); }
     }
 
-    private void install() {
-        MarketplaceClient.Listing listing = list.getSelectedValue();
+    private void install() { install(list.getSelectedValue()); }
+
+    private void install(MarketplaceClient.Listing listing) {
         if (listing == null || busy) return;
         busy = true;
         syncInstall(listing);
         banner.info("Installing " + listing.name() + "\u2026");
         store.install(listing.id(), listing.xmlId(), listing.name()).whenComplete((result, failure) -> {
+            if (disposed) return;
             busy = false;
-            if (failure != null) banner.error(ThemeStore.message(failure));
+            if (failure != null) banner.errorOffer(ThemeStore.message(failure), "Retry", () -> install(listing));
             else {
                 installedChanged.run();
                 String first = result.themes().getFirst();
@@ -266,13 +295,44 @@ final class MarketplaceTab {
         if (base != null) name.setFont(base.deriveFont(Font.BOLD, base.getSize2D() + 2f));
         vendor.setForeground(UIManager.getColor("Label.disabledForeground"));
         version.setForeground(UIManager.getColor("Label.disabledForeground"));
+        status.setForeground(UIManager.getColor(statusError ? "Actions.Red" : "Label.disabledForeground"));
+        detailStatus.setForeground(UIManager.getColor(detailError ? "Actions.Red" : "Label.disabledForeground"));
     }
 
-    /** The description without anything that would load from the network or run: images, frames, objects, scripts and styles. */
+    private static final java.util.Set<String> KEPT = java.util.Set.of("p", "br", "div", "span", "ul", "ol", "li", "b", "strong", "i", "em",
+        "u", "code", "pre", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "a", "hr", "table", "tr", "td", "th", "thead", "tbody");
+    private static final java.util.regex.Pattern TAG = java.util.regex.Pattern.compile("<(/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>");
+    private static final java.util.regex.Pattern HREF =
+        java.util.regex.Pattern.compile("(?is)\\bhref\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))");
+
+    /**
+     * The description reduced to an allowlist of formatting tags with no attributes, except {@code href} on links. Comments,
+     * scripts and styles go entirely; any other tag goes and its text stays. Nothing can load an image, stylesheet or frame.
+     */
     static String safeHtml(String html) {
-        String body = html.replaceAll("(?is)<(script|style|iframe|object)\\b.*?</\\1\\s*>", "")
-            .replaceAll("(?is)<(img|link|embed|iframe|object|meta|base)\\b[^>]*>", "");
-        return "<html><body>" + body + "</body></html>";
+        String text = html.replaceAll("(?s)<!--.*?(-->|$)", "")
+            .replaceAll("(?is)<(script|style)\\b.*?(</\\1\\s*>|$)", "");
+        var out = new StringBuilder("<html><body>");
+        var matcher = TAG.matcher(text);
+        int last = 0;
+        while (matcher.find()) {
+            out.append(text.substring(last, matcher.start()).replace("<", "&lt;"));
+            last = matcher.end();
+            String tag = matcher.group(2).toLowerCase(Locale.ROOT);
+            if (!KEPT.contains(tag)) continue;
+            if (!matcher.group(1).isEmpty()) { out.append("</").append(tag).append('>'); continue; }
+            out.append('<').append(tag);
+            if (tag.equals("a")) {
+                var href = HREF.matcher(matcher.group(3));
+                if (href.find()) {
+                    String value = href.group(1) != null ? href.group(1) : href.group(2) != null ? href.group(2) : href.group(3);
+                    out.append(" href=\"").append(escape(value.replace("&amp;", "&")).replace("\"", "&quot;")).append('"');
+                }
+            }
+            out.append('>');
+        }
+        out.append(text.substring(last).replaceAll("(?s)<[a-zA-Z/!?].*$", "").replace("<", "&lt;"));
+        return out.append("</body></html>").toString();
     }
 
     static String escape(String text) { return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"); }
@@ -305,7 +365,15 @@ final class MarketplaceTab {
     JButton installButton() { return install; }
     JButton viewButton() { return view; }
     JButton retryButton() { return retry; }
+    String listLine(String listingName) {
+        for (int i = 0; i < model.size(); i++) {
+            if (model.get(i).name().equals(listingName)) return meta(model.get(i), installedVersions.get().containsKey(model.get(i).xmlId()));
+        }
+        return "";
+    }
     String status() { return status.getText(); }
+    String detailStatus() { return detailStatus.getText(); }
+    JButton detailRetryButton() { return detailRetry; }
 
     /** Icon, bold name, then vendor, downloads, rating and badges. */
     private final class Renderer extends JPanel implements ListCellRenderer<MarketplaceClient.Listing> {
