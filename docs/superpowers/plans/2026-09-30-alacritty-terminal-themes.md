@@ -261,7 +261,11 @@ and the selected state `owner.terminalColors().equals(colors)`.
 - [ ] **Step 7: Documentation**
 
 `config.example.toml` line 79: `# Terminal colors, live: "match" uses the theme's console colours; "light" or "dark" keeps Jasper's palette; any other value names a terminal theme.`
-`docs/configuration.md` line 167: `| \`terminal.colors\` | \`"match"\` | \`"match"\`, \`"light"\`, \`"dark"\`, or a terminal theme's name ([Themes](themes.md)); an unknown name is a warning and uses \`"match"\` | Live |`
+`docs/configuration.md` line 167 becomes:
+
+```markdown
+| `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"`, or a terminal theme's name ([Themes](themes.md)); an unknown name is a warning and uses `"match"` | Live |
+```
 
 - [ ] **Step 8: Run the tests**
 
@@ -2242,7 +2246,11 @@ matches the UI theme.
 
 - [ ] **Step 2: `docs/configuration.md` and `docs/app-architecture.md`**
 
-In the Settings dialog section, change "Themes (IntelliJ Themes)" to "Themes (IntelliJ Themes, Alacritty Themes)". In the "Terminal colors" section, add a sentence: "`terminal.colors` may also name a terminal theme; see [Themes](themes.md#terminal-themes)."
+In the Settings dialog section, change "Themes (IntelliJ Themes)" to "Themes (IntelliJ Themes, Alacritty Themes)". In the "Terminal colors" section, add this sentence:
+
+```markdown
+`terminal.colors` may also name a terminal theme; see [Themes](themes.md#terminal-themes).
+```
 
 In `docs/app-architecture.md`'s Package ownership table, after `themestore`:
 
