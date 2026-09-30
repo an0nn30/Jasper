@@ -102,4 +102,16 @@ class CorePagesTest {
         assertThat(program.isEnabled()).as("an old program setting is the Custom profile").isTrue();
         page.dispose();
     }
+
+    @Test void theAlacrittyThemesPageFollowsIntellijThemesUnderThemes() {
+        var alacritty = new GroupPage("themes.alacritty", "Alacritty Themes", Optional.of("themes"), false, List::of, context);
+        var pages = CorePages.pages(() -> List.of("Jasper Dark"), () -> List.of("Dracula"), system, ShellChoices.NONE,
+            new CorePages.Pages(CorePagesTest::keymap, CorePagesTest::plugins, page -> List.of(), (page, header) -> header,
+                page -> Optional.of(alacritty))).apply(context);
+        var ids = pages.stream().map(SettingsPage::id).toList();
+        assertThat(ids.indexOf("themes.alacritty")).isEqualTo(ids.indexOf("themes.intellij") + 1);
+        assertThat(CorePages.ALACRITTY_THEMES).isEqualTo("themes.alacritty");
+        var withoutIt = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
+        assertThat(withoutIt).extracting(SettingsPage::id).doesNotContain("themes.alacritty");
+    }
 }
