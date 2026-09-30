@@ -13,23 +13,35 @@ Name the theme in `config.toml`:
 name = "Dracula"
 ```
 
-The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it
-applies the theme to every window at once, keeping shells, scrollback and splits. There is no
-theme picker: the configuration file is the only place a theme is chosen.
+The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
+every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and
+installed theme; **Get More Themes…** at the bottom opens Settings › Themes › IntelliJ Themes.
 
-## Installing a Marketplace theme
+## Installing a theme
 
-1. Download the theme plugin from the Marketplace, using the version for a recent IntelliJ. It is a `.jar` or a
-   `.zip`.
-2. Put the file, unchanged, in the `themes` folder beside `config.toml`
-   (`~/.config/jasper/themes/` on macOS). Jasper creates the folder when it starts.
-3. Set `ui.theme.name` to the theme's name and save. If the name is already set, choose
-   **Reload config**.
+Settings › Themes › IntelliJ Themes has two tabs.
 
-Jasper reads the folder when it starts, when `config.toml` changes and on **Reload config**. It
-finds a plugin's themes through its `META-INF/plugin.xml`, and reads each theme's `.theme.json`
-and editor colour scheme straight from the file. Nothing is unpacked, and no code in the plugin
-runs. A theme you install takes precedence over a built-in theme of the same name.
+- **Marketplace** searches the JetBrains Marketplace's theme plugins (most downloaded first). Select one to read its
+  description, then **Install**. Jasper downloads the latest release, checks that it has a theme Jasper can use, and
+  puts it in the `themes` folder beside `config.toml` (`~/.config/jasper/themes/` on macOS); the banner then offers
+  **Use "…"**, which chooses it on the Appearance page (Apply or OK switches). Paid plugins are not listed; freemium
+  ones are marked. Clicking a link in a description opens it in your browser (http and https only).
+- **Installed** lists the theme plugins in the folder, with **Use** for each theme, **Update to …** when the
+  Marketplace has a newer release of one installed from it, and **Uninstall**. **Install from Disk…** copies a
+  downloaded `.jar` or `.zip` into the folder; **Reveal Folder** shows it.
+
+You can also put a plugin's `.jar` or `.zip`, unchanged, in the folder yourself and choose **Reload config**.
+
+Jasper contacts the Marketplace only while that page is open: searches, the selected plugin's details and icons, the
+download, and one update check per Marketplace install each time the Installed tab opens. Requests carry your search
+text and nothing else about you. Uncheck **Browse the JetBrains Marketplace** (`themes.marketplace.enabled = false`)
+to hide the Marketplace tab and stop update checks.
+
+Jasper finds a plugin's themes through its `META-INF/plugin.xml` and reads each theme's `.theme.json` and editor
+colour scheme straight from the file. Nothing is unpacked, and no code in the plugin runs. A plugin whose theme needs
+IntelliJ's code, such as Material Theme UI, is refused with a message. A theme you install takes precedence over a
+built-in theme of the same name. Marketplace installs are named `<plugin id>-<version>`, and `themes/.sources.toml`
+records where each came from.
 
 ## What is supported
 

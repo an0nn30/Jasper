@@ -45,19 +45,55 @@ class SettingsDialogTest {
     private final List<PageContext> contexts = new ArrayList<>();
     private final FakePage fake = new FakePage("keymap", "Keymap", List.of("shortcuts", "copy"));
 
-    private SettingsDialog dialog() {
-        var hooks = new SettingsDialog.Hooks(edit -> {
+    private SettingsDialog.Hooks hooks() {
+        return new SettingsDialog.Hooks(edit -> {
                 saved.add(edit);
                 return saveResult != null ? saveResult : CompletableFuture.completedFuture(state("[window]\ntab_height = 50\n"));
             }, () -> state, listener -> { listeners.add(listener); return new Subscription(() -> listeners.remove(listener)); },
             () -> opened.add("config"), () -> opened.add("migrate"), browsed::add,
             (parent, count) -> { asked[0] = count; return discard[0]; });
+    }
+
+    private SettingsDialog dialog() {
         return new SettingsDialog(windows, context -> {
             contexts.add(context);
             return CorePages.pages(() -> List.of("Jasper Dark", "IntelliJ Light"), new CorePages.SystemActions(() -> FILE,
                     () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
-        }, hooks);
+        }, hooks());
+    }
+
+    @Test void aFragmentRevealsItsPartBeforeThePageIsSelectedEvenWhenItIsAlreadyShown() throws Exception {
+        var revealed = new ArrayList<String>();
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(() -> List.of("Jasper Dark"),
+                new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
+                page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), page -> List.of(),
+                (page, header) -> new Revealing(header, revealed)).apply(context), hooks());
+        edt(() -> {
+            dialog.open(null, "appearance");
+            dialog.select("themes.intellij#marketplace");
+            assertThat(dialog.currentPage()).isEqualTo("themes.intellij");
+            dialog.select("themes.intellij#installed");
+            assertThat(revealed).containsExactly("reveal marketplace", "selected", "reveal installed", "selected");
+            dialog.back();
+            assertThat(dialog.currentPage()).isEqualTo("appearance");
+        });
+    }
+
+    /** Records what it is asked to reveal and each selection; everything else is the schema page it wraps. */
+    private record Revealing(SettingsPage header, List<String> revealed) implements SettingsPage {
+        @Override public String id() { return header.id(); }
+        @Override public String title() { return header.title(); }
+        @Override public Optional<String> parent() { return header.parent(); }
+        @Override public List<String> searchTerms() { return header.searchTerms(); }
+        @Override public javax.swing.JComponent component() { return header.component(); }
+        @Override public boolean modified() { return header.modified(); }
+        @Override public void reset() { header.reset(); }
+        @Override public CompletableFuture<Void> apply() { return header.apply(); }
+        @Override public void highlight(String query) { header.highlight(query); }
+        @Override public void dispose() { header.dispose(); }
+        @Override public void reveal(String fragment) { revealed.add("reveal " + fragment); }
+        @Override public void selected() { header.selected(); revealed.add("selected"); }
     }
 
     @Test void openingShowsTheTreeHidesEmptyToolsAndSelectsTheDefaultPage() throws Exception {

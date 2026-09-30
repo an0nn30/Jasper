@@ -103,6 +103,7 @@ public final class JasperApplication {
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
     private PluginManager pluginManager;
+    private dev.jasper.app.themestore.ThemeStore themeStore;
     private ResidentControl residentControl = ResidentControl.NONE;
     private boolean replacementHandsOff;
     private boolean standaloneNotice;
@@ -442,7 +443,7 @@ public final class JasperApplication {
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system, shells,
                     context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
-                    context -> plugins.settingsPages(context)),
+                    context -> plugins.settingsPages(context), (context, header) -> themeStore().page(context, header)),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
@@ -732,6 +733,17 @@ public final class JasperApplication {
 
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
 
+    /** The IntelliJ Themes page's store, created the first time Settings builds that page. */
+    private dev.jasper.app.themestore.ThemeStore themeStore() {
+        if (themeStore == null) {
+            var editor = new dev.jasper.app.platform.ConfigEditor();
+            themeStore = dev.jasper.app.themestore.ThemeStore.create(themeCatalog, new dev.jasper.app.themestore.ThemeStore.Hooks(
+                () -> configuration.reload(), this::browse,
+                folder -> CompletableFuture.runAsync(() -> editor.reveal(folder)), dev.jasper.app.themestore.ThemeStore::ask));
+        }
+        return themeStore;
+    }
+
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
         if (pluginManager == null) {
@@ -793,6 +805,7 @@ public final class JasperApplication {
         if (auxiliary != null) auxiliary.close();
         uiState.save();
         if (pluginTheme != null) pluginTheme.close();
+        if (themeStore != null) themeStore.close();
         notifications.close();
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();

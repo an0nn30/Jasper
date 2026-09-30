@@ -2,6 +2,29 @@
 
 ## Current state — 2026-09-30
 
+- **IntelliJ themes from disk and the Marketplace** (branch `claude/theme-marketplace`, spec
+  `docs/superpowers/specs/2026-09-30-intellij-theme-marketplace-design.md`, plan
+  `docs/superpowers/plans/2026-09-30-intellij-theme-marketplace.md`): Settings gains a Themes group whose IntelliJ Themes
+  page has Marketplace (search, details, Install) and Installed (Use, Update, Uninstall, Install from Disk…, Reveal
+  Folder) tabs; the Appearance dropdown ends in Get More Themes… (Manage Themes… when `themes.marketplace.enabled` is
+  false). New package `themestore` is Jasper's first network client. Deviations from the plan: the Marketplace client
+  refuses a first request to any host other than the base and uses shutdownNow on close; the installer replaces files
+  atomically (disk installs go through `.downloads`), writes provenance before deleting old versions, accepts only
+  .jar/.zip and only uninstalls .jar/.zip; ThemeStore calls the rescan hook on the EDT, retries failed icon fetches and
+  clears leftover downloads once per app run; the description pane uses an allowlist HTML sanitiser (basic formatting
+  tags, only a[href]; links open in the browser, http/https only); the Marketplace tab loads the installed list when
+  shown; details failures show an inline Retry and install/update failures offer Retry in the banner; the package-info
+  `{@link}` names ThemeStore and the ThemeCombo renderer calls `ThemeCombo.isAction(value)`. Final-review fixes: arrow
+  and page keys no longer navigate from the dropdown's action entry; `#installed`/`#marketplace` reveal the tab before
+  the page is selected so only that tab loads; update checks run only on the Installed tab; the sanitiser caps input at
+  256 KiB and escapes href quotes once; old-version deletes stay inside the folder (.jar/.zip only); unexpected
+  failures show a generic message and are logged; the details header shows the icon; the threaded ThemeStore test is
+  deterministic. `./gradlew check` green:
+  app 1393/0/1, terminal 391/0/4, Editor 4781/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
+  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Merged into local main 2026-09-30 (not pushed; merged-tree check green, app 1396/0/1, Editor 4782/0/0). Known follow-up: keyboard-only users cannot choose Get More Themes… by arrowing and Enter (the editable combo's Enter keeps the typed text); mouse, typing the label and the tree entry work. GUI checks pending with the user:
+  Get More Themes… from the dropdown; search "dracula", install, Use and Apply; an Islands-based theme; Material Theme
+  UI refused cleanly; Install from Disk…; Uninstall of the active theme; the offline checkbox; arrowing through the theme dropdown; the page in dark and
+  light themes.
 - **File chooser plan C: Save As anywhere** (branch `claude/file-chooser-c`, plan
   `docs/superpowers/plans/2026-09-30-file-chooser-c.md`): Editor 0.6.1's Save As uses Jasper's chooser in Save mode,
   starting in the document's folder (local or remote) with its name filled in, offering local places and every file

@@ -139,7 +139,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
-| `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated and group pages, editors and the core page tree; the application supplies the Keymap and Plugins pages. SettingsDialog owns each opening's pages and disposes them on close. |
+| `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated and group pages, editors and the core page tree; the application supplies the Keymap, Plugins and IntelliJ Themes pages. SettingsDialog owns each opening's pages and disposes them on close. |
 | `settings` | Pure declarative settings machinery: setting kinds, descriptors, the schema, loaded values and the comment-preserving TomlDocument editor. No Jasper dependencies; caller chooses thread. SchemaReader reads any settings file against its schema. |
 | `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
@@ -154,6 +154,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
+| `themestore` | Settings › Themes › IntelliJ Themes: the blocking Marketplace client (Jasper's only network client, https JetBrains hosts only, capped bodies), the synchronized installer that owns writes to the themes folder and `.sources.toml`, and the page. Application owns the ThemeStore (a virtual-thread worker and the HTTP client) and closes it at shutdown; SettingsDialog owns each page. Futures complete on the EDT. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
@@ -228,3 +229,10 @@ Installed themes come from `ThemeCatalog`, which lists the plugins in the `theme
 - **Scanning and resolving:** `ConfigService.watchWith` runs the catalog's scan on the configuration worker at start-up and
   after each read. `ConfigurationController` resolves `ui.theme.name` against the latest scan and
   shows the catalog's problems as configuration warnings.
+
+Installed theme plugins live in the `themes` folder that `ThemeCatalog` scans. `themestore.ThemeInstaller` writes
+that folder: it validates every archive with `ThemeCatalog.inspect` (the same loading a scan does) before moving or
+copying it in, then asks the configuration service to reload, which rescans the catalog. Downloads and disk copies
+are written under `themes/.downloads` and moved into place with one atomic replace, so a scan never sees half a
+file; the installer installs, replaces and deletes only `.jar` and `.zip` files directly in the folder, whatever
+`.sources.toml` records.

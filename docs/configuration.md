@@ -29,8 +29,8 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
 The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
-Desk Buddy, System Settings), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins; the search field
-filters the tree and highlights matching settings on the page.
+Desk Buddy, System Settings), Themes (IntelliJ Themes), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
+the search field filters the tree and highlights matching settings on the page.
 Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
 ("Ubuntu (WSL 1)"); ↻ detects them again. Program and Arguments apply only to Custom.
 
@@ -44,6 +44,8 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
+Themes › IntelliJ Themes installs, updates and uninstalls theme plugins at once (see [Themes](themes.md)); only its
+Browse the JetBrains Marketplace checkbox waits for Apply.
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
@@ -117,6 +119,10 @@ family = "system"
 # A built-in or installed theme's name; see Themes.
 name = "Jasper Dark"
 
+[themes.marketplace]
+# Search the JetBrains Marketplace from Settings > Themes; false keeps Jasper offline.
+enabled = true
+
 [keybindings]
 # Optional action overrides; see examples below.
 ```
@@ -157,6 +163,7 @@ name = "Jasper Dark"
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
+| `themes.marketplace.enabled` | `true` | Boolean; `false` hides Settings › Themes › IntelliJ Themes' Marketplace tab and stops its update checks | Live |
 | `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 

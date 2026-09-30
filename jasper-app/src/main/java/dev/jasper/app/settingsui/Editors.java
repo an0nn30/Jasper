@@ -7,6 +7,7 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settings.SettingKind;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -23,6 +24,8 @@ import java.util.function.Supplier;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.JTextComponent;
 
@@ -87,17 +90,17 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Combo(() -> Fonts.families(monospaced)), List.of());
     }
 
-    /** An editable combo of theme names. */
+    /** An editable combo of theme names ending in Get More Themes\u2026 (Manage Themes\u2026 while the Marketplace is off). */
     public static Factory<String> theme(Supplier<List<String>> names) {
-        return new Factory<>((setting, context) -> new Combo(names), List.of());
+        return new Factory<>((setting, context) -> new ThemeCombo(names, context), List.of("Get More Themes", "Marketplace"));
     }
 
-    /** A text field with Browse…, for a program path. */
+    /** A text field with Browse\u2026, for a program path. */
     public static Factory<String> executable() {
         return new Factory<>((setting, context) -> new Browse(context, "Choose a shell program"), List.of());
     }
 
-    /** A text field with Browse…, for a file path. */
+    /** A text field with Browse\u2026, for a file path. */
     public static Factory<String> path(String title) {
         return new Factory<>((setting, context) -> new Browse(context, title), List.of());
     }
@@ -246,6 +249,113 @@ public final class Editors {
         @Override public void onEdit(Runnable listener) { listeners.add(listener); }
     }
 
+    /**
+     * The theme combo: the installed theme names, re-read each time the list opens, then an entry that opens Settings >
+     * Themes > IntelliJ Themes. Choosing that entry navigates and leaves the value as it was.
+     */
+    static final class ThemeCombo implements ValueEditor<String> {
+        static final String MORE = "Get More Themes\u2026";
+        static final String MANAGE = "Manage Themes\u2026";
+        private final Supplier<List<String>> names;
+        private final PageContext context;
+        private final Model model = new Model();
+        private final JComboBox<String> box = new JComboBox<>(model);
+        private final List<Runnable> listeners = new ArrayList<>();
+        private boolean showing;
+
+        ThemeCombo(Supplier<List<String>> names, PageContext context) {
+            this.names = names;
+            this.context = context;
+            box.setEditable(true);
+            box.setPrototypeDisplayValue("JetBrains Mono NL Extra");
+            box.setRenderer(new Renderer());
+            reload();
+            // A look-and-feel update gives the combo a new editor field; follow each one (see Combo).
+            onText(editor(), this::edited);
+            box.addPropertyChangeListener("editor", event -> { if (box.getEditor() != null) onText(editor(), this::edited); });
+            box.addPopupMenuListener(new PopupMenuListener() {
+                @Override public void popupMenuWillBecomeVisible(PopupMenuEvent event) { reload(); }
+                @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent event) { }
+                @Override public void popupMenuCanceled(PopupMenuEvent event) { }
+            });
+        }
+
+        /** Re-reads the theme names, keeping the text shown, so themes installed since the page was built are offered. */
+        void reload() {
+            showing = true;
+            try {
+                String text = editor().getText();
+                model.removeAllElements();
+                for (String name : names.get()) model.addElement(name);
+                model.addElement(actionLabel());
+                model.select(text);
+                editor().setText(text);
+            } finally { showing = false; }
+        }
+
+        private String actionLabel() { return context.draft().value(CoreSettings.THEMES_MARKETPLACE_ENABLED) ? MORE : MANAGE; }
+        private static boolean isAction(Object item) { return MORE.equals(item) || MANAGE.equals(item); }
+
+        /**
+         * Whether choosing the action entry during {@code current} should navigate. Basic and FlatLaf select as the
+         * arrow and page keys move through the open list, so only a click, Enter or a programmatic choice (no event)
+         * navigates; any other key leaves the entry unselected.
+         */
+        static boolean navigates(java.awt.AWTEvent current) {
+            if (current instanceof java.awt.event.KeyEvent key) return key.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
+                || key.getKeyChar() == '\n';
+            return true;
+        }
+        private JTextComponent editor() { return (JTextComponent) box.getEditor().getEditorComponent(); }
+        private void edited() { if (!showing) for (Runnable listener : List.copyOf(listeners)) listener.run(); }
+
+        private void open(boolean marketplace) {
+            box.hidePopup();
+            context.navigate().accept(CorePages.INTELLIJ_THEMES + (marketplace ? "#marketplace" : "#installed"));
+        }
+
+        @Override public JComponent component() { return box; }
+        @Override public String value() { return editor().getText(); }
+        @Override public void show(String value) {
+            showing = true;
+            try { model.select(value); editor().setText(value); } finally { showing = false; }
+        }
+        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
+
+        /** Refuses the action entry as a selection and navigates instead. */
+        private final class Model extends DefaultComboBoxModel<String> {
+            @Override public void setSelectedItem(Object item) {
+                if (isAction(item)) {
+                    if (showing || !navigates(java.awt.EventQueue.getCurrentEvent())) return;
+                    // Enter on typed action text: put the chosen theme back so the sentinel is never the value.
+                    Object chosen = getSelectedItem();
+                    String text = chosen == null ? "" : chosen.toString();
+                    if (!editor().getText().equals(text)) editor().setText(text);
+                    open(MORE.equals(item));
+                    return;
+                }
+                super.setSelectedItem(item);
+            }
+            void select(Object item) { super.setSelectedItem(item); }
+        }
+
+        /** Draws the action entry as a link below a rule. */
+        private static final class Renderer extends DefaultListCellRenderer {
+            @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
+                var label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focused);
+                label.putClientProperty("html.disable", true);
+                if (ThemeCombo.isAction(value) && index >= 0) {
+                    Color link = UIManager.getColor("Component.linkColor");
+                    if (link != null && !selected) label.setForeground(link);
+                    Color rule = UIManager.getColor("Separator.foreground");
+                    label.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createMatteBorder(1, 0, 0, 0, rule != null ? rule : Color.GRAY), label.getBorder()));
+                }
+                return label;
+            }
+        }
+    }
+
     static final class Browse implements ValueEditor<String> {
         private final Line line = new Line();
         private final JComponent component;
@@ -254,7 +364,7 @@ public final class Editors {
         Browse(PageContext context, String title) {
             this.context = context;
             this.title = title;
-            var browse = new JButton("Browse…");
+            var browse = new JButton("Browse\u2026");
             browse.addActionListener(event -> browse());
             component = line(line.field, browse);
         }
