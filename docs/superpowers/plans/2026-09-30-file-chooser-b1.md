@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** written 2026-09-30, not started.
+**Status:** executed inline 2026-09-30. Further deviations: existing tests that pin the capability list (`TerminalValuesTest`, `DescriptorParserTest`) and the SDK range (`VersionRangeTest`, now "plugins built for 0.9 are incompatible with 0.10") were updated; `:jasper-sdk:check` could not run in Task 1 because it compiles the testkit, so Task 1 ran `:jasper-sdk:test` and `:jasper-sdk:javadoc`.
 
 **Goal:** Let plugins add places (such as saved hosts) to Jasper's file chooser through a new SDK package, and let
 plugins open the chooser with `Windows.choose(FileChoice)` to pick local or plugin-sourced files; the chooser lists

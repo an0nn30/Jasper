@@ -14,6 +14,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `Notices`, `Platform` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
+| `dev.jasper.sdk.files` | Places plugins add to Jasper's file chooser (`FileSources`, `FileSource`, `FileBrowser`) and what `Windows.choose` returns (`FileLocation`). |
 
 The SDK is **0.x: no compatibility promise** until the Vault and SSH plugins ship. Plugins
 implement only `Plugin` and functional callbacks; the application and `jasper-sdk-testkit`
@@ -61,6 +62,13 @@ SDK 0.9.2 adds `ScopeSpec.withInRecents(false)`: a scope whose rows should appea
 searches, such as shell history, stays out of the recently and most used rows the empty palette offers
 (a scope out of All is out of these too). `FakePluginHost.scopesInRecents()` lists the scopes that take
 part.
+
+SDK 0.10.0 adds `dev.jasper.sdk.files` and `Windows.choose(FileChoice)`. A plugin with the `files.source` capability
+registers a `FileSource` whose roots (for example saved hosts) appear in Jasper's file chooser; the chooser connects
+when the user opens one and browses it through the plugin's `FileBrowser` on a host worker. `Windows.choose` opens
+the chooser for local places plus the sources the caller names and returns `FileLocation`s. The testkit scripts it
+with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fileRoots`, `locateFile` and
+`connectFileSource`. Plugins declare `sdk = ">=0.10.0, <0.11"`.
 
 SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
 https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.
