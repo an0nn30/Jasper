@@ -2,6 +2,9 @@ package dev.jasper.editor.ui;
 
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
+import dev.jasper.editor.open.Locations;
+import dev.jasper.sdk.files.FileChoice;
+import dev.jasper.sdk.files.FileLocation;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.local.LocalWatcher;
 import dev.jasper.editor.session.DocumentSession;
@@ -54,6 +57,7 @@ public final class EditorWindow {
     private final Runnable onClosed;
     private final java.util.function.Consumer<EditorDocument> opened;
     private final Predicate<OpenRequest> openers;
+    private final Locations locations;
     private final EditorModel model = new EditorModel();
     private final EditorTheme theme = new EditorTheme();
     private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
@@ -113,10 +117,25 @@ public final class EditorWindow {
      * @param environment what the window needs from the plugin
      * @param onClosed runs once the window has closed
      * @param opened told a document once its new tab's first read succeeds, and each time its loaded tab is opened again
-     * @param openers asked before the local chooser by Open in Editor…; true when one handled the request
+     * @param openers asked before the chooser by Open in Editor…; true when one handled the request
      */
     public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
                         Predicate<OpenRequest> openers) {
+        this(environment, onClosed, opened, openers, new Locations());
+    }
+
+    /**
+     * Creates the window, not yet shown.
+     *
+     * @param environment what the window needs from the plugin
+     * @param onClosed runs once the window has closed
+     * @param opened told a document once its new tab's first read succeeds, and each time its loaded tab is opened again
+     * @param openers asked before the chooser by Open in Editor…; true when one handled the request
+     * @param locations the file sources whose files Open in Editor… opens, by source id
+     */
+    public EditorWindow(EditorEnvironment environment, Runnable onClosed, java.util.function.Consumer<EditorDocument> opened,
+                        Predicate<OpenRequest> openers, Locations locations) {
+        this.locations = java.util.Objects.requireNonNull(locations);
         this.environment = environment;
         this.context = environment.context();
         this.onClosed = onClosed;
@@ -311,8 +330,8 @@ public final class EditorWindow {
     public void openChooser() { openFrom(lastWindow(), Optional.empty()); }
 
     /**
-     * Open in Editor…: the openers first, then the chooser, which starts in the active local document's folder or,
-     * from a terminal pane, in that pane's folder.
+     * Open in Editor…: the openers first, then Jasper's chooser, which offers local places and the file sources that
+     * have a resolver, starting in the active document's folder or, from a terminal pane, where that pane is.
      *
      * @param window the workspace window it was invoked in; null skips the openers
      * @param pane the focused terminal pane
@@ -321,17 +340,46 @@ public final class EditorWindow {
         Optional<EditorTab> active = hosted.entrySet().stream().filter(entry -> entry.getValue().isActive()).map(java.util.Map.Entry::getKey).findFirst();
         Optional<String> key = pane.isPresent() ? Optional.empty() : active.flatMap(tab -> tab.session().document()).map(EditorDocument::key);
         if (window != null && openers.test(new OpenRequest(window, pane, key))) return;
-        Optional<Path> near = openStart(pane.isPresent(), active.or(this::selected).flatMap(tab -> localFile(tab.session())));
+        Optional<FileLocation> near = openStart(pane.isPresent(), active.or(this::selected).flatMap(tab -> folderOf(tab.session())));
         WindowOwner owner = window != null ? window : owner();
-        openLocalFiles(context.windows().chooseFiles(owner, "Open in Editor", near), owner);
+        var choice = new FileChoice(owner, "Open in Editor", FileChoice.Mode.OPEN, true, near, Optional.empty(), locations.sources());
+        openLocations(context.windows().choose(choice), owner);
     }
 
-    /**
-     * Where Open in Editor… starts: the active local document's folder, except in a focused terminal pane, where the
-     * host's chooser starts at that pane's folder.
-     */
-    static Optional<Path> openStart(boolean paneFocused, Optional<Path> documentFile) {
-        return paneFocused ? Optional.empty() : documentFile.map(Path::getParent);
+    /** Where Open in Editor… starts: the document's folder, except in a focused terminal pane, which the host locates. */
+    static Optional<FileLocation> openStart(boolean paneFocused, Optional<FileLocation> documentFolder) {
+        return paneFocused ? Optional.empty() : documentFolder;
+    }
+
+    /** The folder a document is in: a local file's folder, or its file source's folder. */
+    private Optional<FileLocation> folderOf(DocumentSession session) {
+        Optional<FileLocation> local = localFile(session).map(Path::getParent).map(FileLocation.Local::new);
+        if (local.isPresent()) return local;
+        return session.document().map(EditorDocument::key).flatMap(locations::location)
+            .map(found -> new FileLocation.Sourced(found.sourceId(), found.rootId(), parentOf(found.path())));
+    }
+
+    /** The folder containing a {@code /} path; {@code /} for a top-level file. */
+    static String parentOf(String path) {
+        int slash = path.lastIndexOf('/');
+        return slash <= 0 ? "/" : path.substring(0, slash);
+    }
+
+    /** Opens what the chooser returned: local files directly, a source's files through its resolver. */
+    public void openLocations(List<FileLocation> chosen, WindowOwner owner) {
+        for (FileLocation location : chosen) {
+            switch (location) {
+                case FileLocation.Local local -> openLocal(local.path(), owner);
+                case FileLocation.Sourced sourced -> locations.resolver(sourced.sourceId()).ifPresent(resolver -> {
+                    try {
+                        open(resolver.document(sourced, owner), owner);
+                    } catch (RuntimeException failure) {
+                        context.notices().error("Could not open " + sourced.path() + ": "
+                            + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+                    }
+                });
+            }
+        }
     }
 
     /** @return the terminal window the Editor was last opened from, else the active one; null when there is none */

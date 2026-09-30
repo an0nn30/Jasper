@@ -102,7 +102,7 @@ public final class EditorPlugin implements Plugin {
     }
 
     private EditorWindow window() {
-        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle);
+        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations);
         return window;
     }
 }
