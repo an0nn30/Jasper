@@ -60,4 +60,17 @@ public interface Editor {
     default Subscription opener(Predicate<OpenRequest> handler) {
         return () -> { };
     }
+
+    /**
+     * Lets Open in Editor… offer a file source's places and open what the user picks there. The chooser offers the
+     * source's roots only while a resolver is registered; a later registration for the same source replaces the earlier
+     * one. Since Editor 0.6.0.
+     *
+     * @param sourceId the id of a file source the plugin registered
+     * @param resolver builds documents for the source's files
+     * @return removes the resolver
+     */
+    default Subscription locationDocuments(String sourceId, LocationResolver resolver) {
+        return () -> { };
+    }
 }
