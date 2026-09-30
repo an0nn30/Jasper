@@ -48,4 +48,18 @@ class TerminalColorsThemeTest {
         } finally { new ThemeController(); }
     }
 
+
+    @Test void themeOnlyAndFontOnlyChangesKeepANamedPalette() {
+        var named = new Palette(java.awt.Color.BLACK, java.awt.Color.WHITE, java.awt.Color.BLUE, java.awt.Color.GRAY,
+            java.util.Collections.nCopies(16, java.awt.Color.GREEN));
+        var themes = new ThemeController(Theme.DARK, ThemeTestSupport::install);
+        try {
+            themes.configure(Theme.DARK, new TerminalColors("Dracula"), named, UiFontConfig.defaults());
+            assertThat(themes.current().palette()).isEqualTo(named);
+            themes.configure(Theme.LIGHT);
+            assertThat(themes.current().palette()).isEqualTo(named);
+            themes.configure(Theme.DARK, UiFontConfig.defaults());
+            assertThat(themes.current().palette()).isEqualTo(named);
+        } finally { new ThemeController(); }
+    }
 }

@@ -59,7 +59,7 @@ public final class ThemeController {
         requireEdt(); apply(state.configureTerminal(Objects.requireNonNull(terminal)));
     }
     public void configure(Theme saved) { configure(saved, uiFont); }
-    public void configure(Theme saved, UiFontConfig font) { configure(saved, state.terminalChoice(), font); }
+    public void configure(Theme saved, UiFontConfig font) { configure(saved, state.terminalChoice(), state.named(), font); }
     public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) { configure(saved, terminal, null, font); }
     /** As above, with {@code named} the palette of a named terminal choice (null for a built-in or unknown one). */
     public void configure(Theme saved, TerminalColors terminal, Palette named, UiFontConfig font) {
