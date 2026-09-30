@@ -309,18 +309,20 @@ public final class FileChooserPanel extends JPanel {
         return split;
     }
 
+    /**
+     * The name row and the buttons. Open has no name row: the selection is what opens, so a type filter, when the
+     * caller set one, sits beside the buttons instead. Save and Directory keep the field for a typed name or path.
+     */
     private JComponent bottom() {
         ChooserRequest request = model.request();
-        var name = new JPanel(new BorderLayout(8, 0));
-        name.add(plain(new JLabel(request.mode() == ChooserRequest.Mode.DIRECTORY ? "Folder" : "File name")), BorderLayout.WEST);
-        name.add(nameField, BorderLayout.CENTER);
+        boolean open = request.mode() == ChooserRequest.Mode.OPEN;
         var types = new JComboBox<>(new String[] { request.suffix().map(suffix -> "*" + suffix).orElse("All files") });
         types.setPrototypeDisplayValue("All files      ");
-        name.add(types, BorderLayout.EAST);
         nameField.addActionListener(event -> approve());
         cancelButton.addActionListener(event -> cancel());
         primaryButton.addActionListener(event -> approve());
         var buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        if (open && request.suffix().isPresent()) buttons.add(types);
         buttons.add(cancelButton);
         buttons.add(primaryButton);
         var actions = new JPanel(new BorderLayout());
@@ -328,7 +330,13 @@ public final class FileChooserPanel extends JPanel {
         actions.add(buttons, BorderLayout.EAST);
         var bottom = new JPanel(new BorderLayout(0, 8));
         bottom.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-        bottom.add(name, BorderLayout.NORTH);
+        if (!open) {
+            var name = new JPanel(new BorderLayout(8, 0));
+            name.add(plain(new JLabel(request.mode() == ChooserRequest.Mode.DIRECTORY ? "Folder" : "File name")), BorderLayout.WEST);
+            name.add(nameField, BorderLayout.CENTER);
+            name.add(types, BorderLayout.EAST);
+            bottom.add(name, BorderLayout.NORTH);
+        }
         bottom.add(actions, BorderLayout.SOUTH);
         return bottom;
     }

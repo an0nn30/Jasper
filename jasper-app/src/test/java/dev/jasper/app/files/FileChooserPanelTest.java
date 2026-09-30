@@ -105,14 +105,32 @@ class FileChooserPanelTest {
         assertThat(prefs.recent()).containsExactly(Location.local(dir));
     }
 
-    @Test void theNameFieldAcceptsPathsAndReportsProblems() {
+    @Test void openHasNoNameFieldAndOpensTheSelection() {
         var panel = panel(OPEN, Optional.empty());
+        assertThat(javax.swing.SwingUtilities.isDescendingFrom(panel.nameField(), panel)).as("Open picks rows; nothing is typed").isFalse();
+        panel.approve();
+        assertThat(panel.statusText()).isEqualTo("Select a file.");
+        panel.table().setRowSelectionInterval(2, 2);
+        panel.approve();
+        assertThat(finished).containsExactly(List.of(here("todo.md")));
+    }
+
+    @Test void saveAndDirectoryKeepTheNameField() {
+        var save = panel(SAVE, Optional.empty());
+        var directory = panel(DIRECTORY, Optional.empty());
+        assertThat(javax.swing.SwingUtilities.isDescendingFrom(save.nameField(), save)).isTrue();
+        assertThat(javax.swing.SwingUtilities.isDescendingFrom(directory.nameField(), directory)).isTrue();
+    }
+
+    @Test void theSaveNameFieldAcceptsPathsAndReportsProblems() {
+        var panel = panel(SAVE, Optional.empty());
         panel.nameField().setText("docs");
         panel.approve();
         assertThat(panel.pathText()).endsWith("docs");
-        panel.nameField().setText("../missing.txt");
+        panel.nameField().setText("../nowhere/x.txt");
         panel.approve();
-        assertThat(panel.statusText()).isEqualTo("There is no file named \"../missing.txt\".");
+        assertThat(panel.statusText()).isEqualTo("The folder for \"../nowhere/x.txt\" doesn't exist.");
+        replace = true;
         panel.nameField().setText("../todo.md");
         panel.approve();
         assertThat(finished).containsExactly(List.of(here("todo.md")));
