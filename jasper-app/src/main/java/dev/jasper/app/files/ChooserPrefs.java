@@ -1,8 +1,6 @@
 package dev.jasper.app.files;
 
 import dev.jasper.app.persistence.UiState;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -14,15 +12,15 @@ public final class ChooserPrefs {
 
     public ChooserPrefs(UiState state) { this.state = Objects.requireNonNull(state); }
 
-    public List<Path> recent() { return paths(state.chooser().recent()); }
-    public List<Path> pinned() { return paths(state.chooser().pinned()); }
+    public List<Location> recent() { return locations(state.chooser().recent()); }
+    public List<Location> pinned() { return locations(state.chooser().pinned()); }
     public boolean preview() { return state.chooser().preview(); }
     public boolean showHidden() { return state.chooser().showHidden(); }
-    public boolean isPinned(Path folder) { return pinned().contains(normal(folder)); }
+    public boolean isPinned(Location folder) { return pinned().contains(folder); }
 
     /** Moves {@code folder} to the front of Recent, which keeps ten. */
-    public void recordRecent(Path folder) {
-        String value = normal(folder).toString();
+    public void recordRecent(Location folder) {
+        String value = folder.stored();
         var recent = new ArrayList<String>();
         recent.add(value);
         state.chooser().recent().stream().filter(other -> !other.equals(value)).limit(RECENT_LIMIT - 1).forEach(recent::add);
@@ -30,16 +28,16 @@ public final class ChooserPrefs {
         update(new UiState.Chooser(recent, current.pinned(), current.preview(), current.showHidden()));
     }
 
-    public void pin(Path folder) {
+    public void pin(Location folder) {
         if (isPinned(folder)) return;
         UiState.Chooser current = state.chooser();
         var pinned = new ArrayList<>(current.pinned());
-        pinned.add(normal(folder).toString());
+        pinned.add(folder.stored());
         update(new UiState.Chooser(current.recent(), pinned, current.preview(), current.showHidden()));
     }
 
-    public void unpin(Path folder) {
-        String value = normal(folder).toString();
+    public void unpin(Location folder) {
+        String value = folder.stored();
         UiState.Chooser current = state.chooser();
         update(new UiState.Chooser(current.recent(), current.pinned().stream().filter(other -> !other.equals(value)).toList(),
             current.preview(), current.showHidden()));
@@ -60,18 +58,7 @@ public final class ChooserPrefs {
         state.save();
     }
 
-    private static Path normal(Path path) { return path.toAbsolutePath().normalize(); }
-
-    private static List<Path> paths(List<String> values) {
-        var result = new ArrayList<Path>();
-        for (String value : values) {
-            try {
-                Path path = Path.of(value);
-                if (path.isAbsolute()) result.add(path.normalize());
-            } catch (InvalidPathException ignored) {
-                // A path from another platform or a damaged file is skipped, not an error.
-            }
-        }
-        return List.copyOf(result);
+    private static List<Location> locations(List<String> values) {
+        return values.stream().map(Location::parse).flatMap(java.util.Optional::stream).toList();
     }
 }
