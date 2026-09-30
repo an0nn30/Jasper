@@ -70,19 +70,25 @@ final class ThemeInstaller {
      */
     synchronized Installed installDownload(Path download, String extension, Provenance.Entry source) throws InstallException {
         try {
+            String ext = extension.toLowerCase(Locale.ROOT);
+            if (!ext.equals(".jar") && !ext.equals(".zip")) throw new InstallException("Unsupported theme file type: " + extension);
             var inspection = ThemeCatalog.inspect(download);
             if (inspection.themes().isEmpty()) throw new InstallException(source.name() + " has no themes Jasper can use." + detail(inspection));
-            String name = safe(source.xmlId() + "-" + source.version()) + extension;
+            String name = safe(source.xmlId() + "-" + source.version()) + ext;
             Path target = themes.resolve(name);
             Files.move(download, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             var entries = new TreeMap<>(provenance.read());
+            var older = new java.util.ArrayList<String>();
             for (var entry : List.copyOf(entries.entrySet())) {
                 if (!entry.getValue().xmlId().equals(source.xmlId()) || entry.getKey().equals(name)) continue;
-                Files.deleteIfExists(themes.resolve(entry.getKey()));
+                older.add(entry.getKey());
                 entries.remove(entry.getKey());
             }
             entries.put(name, source);
             provenance.write(entries);
+            for (String old : older) {
+                try { Files.deleteIfExists(themes.resolve(old)); } catch (IOException ignored) { }
+            }
             return new Installed(target, inspection.themes());
         } catch (IOException failure) {
             throw new InstallException("Cannot install " + source.name() + ": " + failure.getMessage(), failure);
@@ -103,7 +109,15 @@ final class ThemeInstaller {
         if (Files.exists(target) && !replace) throw new Conflict(target);
         try {
             Files.createDirectories(themes);
-            if (!Files.exists(target) || !Files.isSameFile(source, target)) Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            if (!Files.exists(target) || !Files.isSameFile(source, target)) {
+                Path temp = Files.createDirectories(themes.resolve(DOWNLOADS)).resolve(name + ".part");
+                try {
+                    Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING);
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } finally {
+                    Files.deleteIfExists(temp);
+                }
+            }
             var entries = new TreeMap<>(provenance.read());
             if (entries.remove(name) != null) provenance.write(entries);
             return new Installed(target, inspection.themes());
@@ -116,6 +130,9 @@ final class ThemeInstaller {
     synchronized void uninstall(Path file) throws InstallException {
         Path absolute = file.toAbsolutePath().normalize();
         if (!themes.equals(absolute.getParent())) throw new InstallException(file.getFileName() + " is not in the themes folder.");
+        String leaf = absolute.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (leaf.startsWith(".") || !(leaf.endsWith(".jar") || leaf.endsWith(".zip")))
+            throw new InstallException(file.getFileName() + " is not an installed theme plugin.");
         try {
             Files.deleteIfExists(absolute);
             var entries = new TreeMap<>(provenance.read());

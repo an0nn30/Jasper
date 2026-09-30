@@ -99,4 +99,28 @@ class ThemeInstallerTest {
         Files.writeString(themes().resolve(".sources.toml"), "this is = not [ toml");
         assertThat(installer.sources()).isEmpty();
     }
+
+    @Test void anUnknownExtensionIsRefusedAndNothingLandsOutside() throws Exception {
+        var installer = new ThemeInstaller(themes());
+        Path part = download(installer, 1, "Dracula");
+        assertThatThrownBy(() -> installer.installDownload(part, "/../x", dracula)).isInstanceOf(ThemeInstaller.InstallException.class);
+        assertThat(home.resolve("x")).doesNotExist();
+        assertThat(installer.sources()).isEmpty();
+    }
+
+    @Test void uninstallRefusesDotFilesAndNonArchives() throws Exception {
+        var installer = new ThemeInstaller(themes());
+        installer.installDownload(download(installer, 1, "Dracula"), ".jar", dracula);
+        assertThatThrownBy(() -> installer.uninstall(themes().resolve(".sources.toml"))).isInstanceOf(ThemeInstaller.InstallException.class);
+        assertThat(themes().resolve(".sources.toml")).isRegularFile();
+    }
+
+    @Test void aReplacingDiskInstallLeavesNoTemporaryFile() throws Exception {
+        var installer = new ThemeInstaller(themes());
+        Path nord = plugin(home.resolve("Downloads/nord.jar"), "Nord", true, "#2e3440", "2e3440");
+        installer.installFromDisk(nord, false);
+        installer.installFromDisk(nord, true);
+        assertThat(themes().resolve(".downloads")).isEmptyDirectory();
+        assertThat(themes().resolve("nord.jar")).isRegularFile();
+    }
 }
