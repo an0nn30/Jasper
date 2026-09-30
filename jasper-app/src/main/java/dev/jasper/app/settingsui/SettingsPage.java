@@ -52,6 +52,9 @@ public interface SettingsPage {
     /** The dialog shows this page now; called each time it is shown. */
     default void selected() { }
 
+    /** Shows the part of the page {@code fragment} names, such as a tab; called after the page is shown. Unknown fragments are ignored. */
+    default void reveal(String fragment) { }
+
     /** The configuration guide section that documents this page. */
     default String helpAnchor() { return "supported-settings"; }
 }

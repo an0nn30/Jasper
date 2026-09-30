@@ -144,12 +144,16 @@ public final class SettingsDialog {
         return pages.stream().filter(page -> page.id().equals(id)).findFirst();
     }
 
-    /** Selects a page, remembering the one it leaves for Back. */
+    /** Selects a page, remembering the one it leaves for Back; {@code id#fragment} then reveals that part of the page. */
     void select(String id) {
-        var target = page(id).or(() -> pages.stream().findFirst()).orElseThrow();
-        if (target.id().equals(current)) return;
-        if (current != null) { backStack.push(current); forwardStack.clear(); }
-        show(target);
+        int hash = id.indexOf('#');
+        String base = hash < 0 ? id : id.substring(0, hash);
+        var target = page(base).or(() -> pages.stream().findFirst()).orElseThrow();
+        if (!target.id().equals(current)) {
+            if (current != null) { backStack.push(current); forwardStack.clear(); }
+            show(target);
+        }
+        if (hash >= 0 && target.id().equals(base)) target.reveal(id.substring(hash + 1));
     }
 
     void back() {

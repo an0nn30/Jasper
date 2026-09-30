@@ -185,4 +185,35 @@ class EditorsTest {
         editor.browse();
         assertThat(editor.value()).isEqualTo("/bin/zsh");
     }
+
+    @Test void theThemeComboEndsInGetMoreThemesWhichNavigatesWithoutEditing() {
+        var navigated = new ArrayList<String>();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+        var names = new ArrayList<>(List.of("Jasper Dark", "IntelliJ Light"));
+        var themes = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
+        var editor = build(Editors.theme(() -> List.copyOf(names)), CoreSettings.UI_THEME_NAME, themes);
+        var edits = new int[1];
+        editor.show("Jasper Dark");
+        editor.onEdit(() -> edits[0]++);
+        @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.component();
+        assertThat(box.getItemAt(box.getItemCount() - 1)).isEqualTo("Get More Themes\u2026");
+        box.setSelectedIndex(box.getItemCount() - 1);
+        assertThat(navigated).containsExactly("themes.intellij#marketplace");
+        assertThat(editor.value()).isEqualTo("Jasper Dark");
+        assertThat(edits[0]).isZero();
+
+        draft.stage(CoreSettings.THEMES_MARKETPLACE_ENABLED, Optional.of(false));
+        names.add("Dracula");
+        ((Editors.ThemeCombo) editor).reload();
+        assertThat(box.getItemCount()).isEqualTo(4);
+        assertThat(box.getItemAt(2)).isEqualTo("Dracula");
+        assertThat(box.getItemAt(3)).isEqualTo("Manage Themes\u2026");
+        assertThat(editor.value()).isEqualTo("Jasper Dark");
+        box.setSelectedIndex(3);
+        assertThat(navigated).containsExactly("themes.intellij#marketplace", "themes.intellij#installed");
+        assertThat(edits[0]).isZero();
+        box.setSelectedIndex(2);
+        assertThat(editor.value()).isEqualTo("Dracula");
+        assertThat(edits[0]).isPositive();
+    }
 }
