@@ -126,9 +126,12 @@ public final class Editors {
             List.of("Match the theme", "Alacritty", "More Terminal Themes"));
     }
 
-    /** A shown terminal colours entry as saved: Match the theme, Light and Dark become their tokens. */
+    /**
+     * A shown terminal colours entry as saved: the labels Match the theme, Light and Dark (exactly as shown) become their
+     * tokens, typed tokens are normalised, and anything else, such as a theme named "Match The Theme", is kept.
+     */
     static String storedColors(String shown) {
-        for (var entry : BUILT_IN_COLORS.entrySet()) if (entry.getValue().equalsIgnoreCase(shown.strip())) return entry.getKey();
+        for (var entry : BUILT_IN_COLORS.entrySet()) if (entry.getValue().equals(shown.strip())) return entry.getKey();
         return TerminalColors.normalize(shown);
     }
 

@@ -35,6 +35,15 @@ public final class AlacrittyTheme {
 
     /** Reads a theme's text; never throws for bad input. */
     public static Result read(String toml) {
+        try {
+            return parse(toml);
+        } catch (RuntimeException | StackOverflowError unreadable) {
+            // tomlj recurses per nesting level; a deeply nested file overflows the stack.
+            return new Result(Optional.empty(), List.of("It cannot be read as TOML."));
+        }
+    }
+
+    private static Result parse(String toml) {
         TomlParseResult parsed = Toml.parse(toml);
         if (parsed.hasErrors())
             return new Result(Optional.empty(), List.of("It is not valid TOML: " + parsed.errors().getFirst().getMessage()));

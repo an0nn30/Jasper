@@ -304,4 +304,14 @@ class EditorsTest {
         combo.enter(new java.awt.event.ActionEvent(box, java.awt.event.ActionEvent.ACTION_PERFORMED, ""), true);
         assertThat(navigated).containsExactly("themes.alacritty", "themes.alacritty");
     }
+
+    @Test void onlyTheShownBuiltInLabelsBecomeTheirTokens() {
+        assertThat(Editors.storedColors("Match the theme")).isEqualTo("match");
+        assertThat(Editors.storedColors("Light")).isEqualTo("light");
+        assertThat(Editors.storedColors(" Dark ")).isEqualTo("dark");
+        assertThat(Editors.storedColors("match")).isEqualTo("match");
+        assertThat(Editors.storedColors("LIGHT")).isEqualTo("light");
+        assertThat(Editors.storedColors("Match The Theme")).as("a user theme of that name").isEqualTo("Match The Theme");
+        assertThat(Editors.storedColors("match the theme")).isEqualTo("match the theme");
+    }
 }

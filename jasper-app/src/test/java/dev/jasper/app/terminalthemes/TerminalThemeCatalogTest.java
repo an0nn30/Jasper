@@ -1,6 +1,7 @@
 package dev.jasper.app.terminalthemes;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.awt.Color;
 import java.nio.file.Files;
@@ -74,5 +75,31 @@ class TerminalThemeCatalogTest {
         Files.delete(file);
         assertThat(catalog.scan().find("Mine")).isEmpty();
         assertThat(catalog.latest().find("Dracula")).isPresent();
+    }
+
+    @Test void aFileThatBreaksTheParserIsAProblemAndTheScanContinues() throws Exception {
+        Files.createDirectories(folder());
+        Files.writeString(folder().resolve("nested.toml"), AlacrittyThemeTest.NESTED);
+        Files.writeString(folder().resolve("mine.toml"), theme("#010101"));
+        var snapshot = catalog().scan();
+        assertThat(snapshot.problems()).extracting(problem -> problem.file().getFileName().toString()).containsExactly("nested.toml");
+        assertThat(snapshot.find("Mine")).isPresent();
+        assertThat(snapshot.find("Nested")).isEmpty();
+        assertThat(snapshot.find("Dracula")).isPresent();
+    }
+
+    @Test void aFileThatCouldNotBeReadIsRetriedOnTheNextScan() throws Exception {
+        Files.createDirectories(folder());
+        Path file = Files.writeString(folder().resolve("locked.toml"), theme("#010101"));
+        assumeTrue(file.toFile().setReadable(false) && !Files.isReadable(file), "the file system cannot make a file unreadable");
+        var catalog = catalog();
+        try {
+            assertThat(catalog.scan().problems()).extracting(problem -> problem.file().getFileName().toString()).containsExactly("locked.toml");
+        } finally {
+            file.toFile().setReadable(true);
+        }
+        var snapshot = catalog.scan();
+        assertThat(snapshot.problems()).isEmpty();
+        assertThat(snapshot.find("Locked")).isPresent();
     }
 }

@@ -229,7 +229,10 @@ Installed themes come from `ThemeCatalog`, which lists the plugins in the `theme
   an installed theme the same way as a built-in one.
 - **Scanning and resolving:** `ConfigService.watchWith` runs the catalog's scan on the configuration worker at start-up and
   after each read. `ConfigurationController` resolves `ui.theme.name` against the latest scan and
-  shows the catalog's problems as configuration warnings.
+  shows the catalog's problems as configuration warnings. It resolves a named `terminal.colors` choice against the
+  `TerminalThemeCatalog`'s latest scan the same way (an unknown name is a warning and the terminal uses `match`) and
+  shows that catalog's file problems too. Each catalog's scan is guarded on its own, so one failing does not skip the
+  other.
 
 Installed theme plugins live in the `themes` folder that `ThemeCatalog` scans. `themestore.ThemeInstaller` writes
 that folder: it validates every archive with `ThemeCatalog.inspect` (the same loading a scan does) before moving or

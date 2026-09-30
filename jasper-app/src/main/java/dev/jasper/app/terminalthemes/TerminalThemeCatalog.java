@@ -50,6 +50,7 @@ public final class TerminalThemeCatalog {
     static final int MAX_FILE = 64 * 1024;
 
     private record Stamp(long size, FileTime modified) {}
+    /** A file's read; a null stamp means it is not remembered and is read again next scan. */
     private record Read(Stamp stamp, TerminalTheme theme, List<String> problems) {}
 
     private final Path directory;
@@ -86,9 +87,13 @@ public final class TerminalThemeCatalog {
         var owners = new HashMap<String, Path>();
         var next = new HashMap<Path, Read>();
         for (Path file : files(problems)) {
-            Read read = read(file);
+            Read read;
+            try { read = read(file); }
+            catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
+                read = new Read(null, null, List.of(file.getFileName() + " cannot be read: " + failure));
+            }
             if (read == null) continue;
-            next.put(file, read);
+            if (read.stamp() != null) next.put(file, read);
             read.problems().forEach(message -> problems.add(new Problem(file, message)));
             if (read.theme() == null) continue;
             String name = read.theme().name();
@@ -143,7 +148,10 @@ public final class TerminalThemeCatalog {
         String text;
         try { text = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(Files.readAllBytes(file))).toString(); }
         catch (CharacterCodingException notUtf8) { return new Read(stamp, null, List.of(file.getFileName() + " is not UTF-8 text; skipped.")); }
-        catch (IOException | SecurityException failure) { return new Read(stamp, null, List.of(file.getFileName() + " cannot be read: " + failure.getMessage())); }
+        catch (IOException | SecurityException failure) {
+            // Not remembered (no stamp), so the next scan tries again.
+            return new Read(null, null, List.of(file.getFileName() + " cannot be read: " + failure.getMessage()));
+        }
         var result = AlacrittyTheme.read(text);
         String name = AlacrittyTheme.displayName(file.getFileName().toString());
         var problems = result.problems().stream().map(problem -> file.getFileName() + ": " + problem).toList();

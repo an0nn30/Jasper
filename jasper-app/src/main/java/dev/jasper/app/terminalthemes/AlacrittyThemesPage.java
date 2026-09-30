@@ -86,10 +86,15 @@ public final class AlacrittyThemesPage implements SettingsPage {
     private final JLabel swatches = new JLabel();
     private final JLabel status = new JLabel();
     private final JButton use = new JButton("Use");
-    private final JButton remove = new JButton("Remove…");
-    private final JButton install = new JButton("Install from Disk…");
+    private final JButton remove = new JButton("Remove\u2026");
+    private final JButton install = new JButton("Install from Disk\u2026");
     private final JButton reveal = new JButton("Reveal Folder");
-    private final JTextArea problems = new JTextArea();
+    /** Wraps; capped at its preferred height so BoxLayout does not hand it the spare height. */
+    private final JTextArea problems = new JTextArea() {
+        @Override public java.awt.Dimension getMaximumSize() {
+            return new java.awt.Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+        }
+    };
     private final JPanel sampleHolder = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0)) {
         @Override public java.awt.Dimension getMaximumSize() { return getPreferredSize(); }
     };
@@ -266,7 +271,7 @@ public final class AlacrittyThemesPage implements SettingsPage {
         if (theme == null) return;
         context.draft().stage(CoreSettings.TERMINAL_COLORS, Optional.of(theme.name()));
         updateInUse();
-        message("“" + theme.name() + "” is chosen. Apply or OK switches the terminals to it.", false);
+        message("\u201c" + theme.name() + "\u201d is chosen. Apply or OK switches the terminals to it.", false);
         list.repaint();
     }
 
@@ -328,6 +333,8 @@ public final class AlacrittyThemesPage implements SettingsPage {
     JButton installButton() { return install; }
     String status() { return status.getText(); }
     String problems() { return problems.isVisible() ? problems.getText() : ""; }
+    JTextArea problemsArea() { return problems; }
+    JLabel swatchesLabel() { return swatches; }
     SampleTerminal sample() { return sample; }
 
     /** The theme the draft's terminal colours name, or null. */
@@ -364,7 +371,7 @@ public final class AlacrittyThemesPage implements SettingsPage {
         @Override public Component getListCellRendererComponent(JList<? extends TerminalTheme> owner, TerminalTheme value, int index,
                                                                 boolean selected, boolean focused) {
             boolean current = value.name().equals(inUse);
-            name.setText(current ? value.name() + "  ✓" : value.name());
+            name.setText(current ? value.name() + "  \u2713" : value.name());
             name.setFont(owner.getFont().deriveFont(Font.BOLD));
             line.setText(value.bundled() ? "Bundled" : "Your file");
             line.setIcon(new Strip(value.palette(), false));

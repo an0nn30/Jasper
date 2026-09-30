@@ -4,6 +4,7 @@ import dev.jasper.app.config.TerminalColors;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
@@ -48,7 +49,11 @@ final class TerminalThemeFiles {
         } catch (IOException failure) {
             throw new ThemeFileException("Cannot read " + fileName + ": " + failure.getMessage(), failure);
         }
-        var result = AlacrittyTheme.read(text);
+        AlacrittyTheme.Result result;
+        try { result = AlacrittyTheme.read(text); }
+        catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
+            throw new ThemeFileException(name + " cannot be used: it cannot be read as TOML.", failure);
+        }
         if (result.palette().isEmpty()) throw new ThemeFileException(name + " cannot be used: " + result.problems().getFirst());
         Path target = folder.resolve(fileName);
         if (Files.exists(target) && !replace) throw new Conflict(target);
@@ -69,7 +74,8 @@ final class TerminalThemeFiles {
     synchronized void remove(Path file) throws ThemeFileException {
         Path absolute = file.toAbsolutePath().normalize();
         String name = absolute.getFileName().toString();
-        if (!folder.equals(absolute.getParent()) || name.startsWith(".") || !name.toLowerCase(Locale.ROOT).endsWith(".toml"))
+        if (!folder.equals(absolute.getParent()) || name.startsWith(".") || !name.toLowerCase(Locale.ROOT).endsWith(".toml")
+                || Files.exists(absolute, LinkOption.NOFOLLOW_LINKS) && !Files.isRegularFile(absolute))
             throw new ThemeFileException(name + " is not one of your terminal themes.");
         try { Files.deleteIfExists(absolute); }
         catch (IOException failure) { throw new ThemeFileException("Cannot remove " + name + ": " + failure.getMessage(), failure); }

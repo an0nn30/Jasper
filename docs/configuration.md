@@ -696,10 +696,19 @@ padding and the area behind the panes follow this choice; the title row, toolbar
 bar, status bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every
 window without reinstalling the look and feel, keeping shells, scrollback and splits.
 
-`terminal.colors` may also name a terminal theme; see [Themes](themes.md#terminal-themes).
+`terminal.colors` may also name a terminal theme; see [Alacritty themes](#alacritty-themes).
 
-View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. An
-unrecognized value produces an error diagnostic and keeps `"match"`; a non-string value rejects the configuration.
+View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. While a
+named terminal theme is in use, none of these choices is checked. Any other non-blank text names a terminal theme; an
+unknown name is a warning and the terminal uses `"match"`. A blank value is an error and keeps `"match"`; a non-string
+value rejects the configuration.
+
+### Alacritty themes
+
+Settings › Themes › Alacritty Themes lists the bundled and installed terminal themes, previews each in a sample
+terminal and installs `.toml` theme files into the `terminal-themes` folder beside `config.toml`. Choosing one sets
+`terminal.colors` to its name. The format, the folder and the problems Jasper reports are described in
+[Themes](themes.md#terminal-themes).
 
 ### Interface typography
 

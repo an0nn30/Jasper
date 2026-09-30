@@ -89,8 +89,13 @@ the themes too, ending in **More Terminal Themes…**.
 Jasper reads a theme's `colors.primary` foreground and background (required), `colors.normal` and `colors.bright` (the
 16 ANSI colours), `colors.cursor.cursor` and `colors.selection.background`. A missing bright colour uses the normal one;
 a missing cursor uses the foreground and a missing selection a blend of foreground and background. Other keys (dim
-colours, search, hints, indexed colours) are ignored. An unknown name in `terminal.colors` is a warning and the terminal
-matches the UI theme.
+colours, search, hints, indexed colours) are ignored. A missing normal colour comes from Jasper Dark, or Jasper Light
+when the theme's background is light. An unknown name in `terminal.colors` is a warning and the terminal matches the UI
+theme.
+
+In the `terminal-themes` folder Jasper reads only `.toml` files; hidden files (a name starting with `.`) and other files
+are ignored, and a file over 64 KiB is skipped. A file that cannot be used, or a colour Jasper ignores, is reported
+under the status bar's **Config warnings**, naming the file.
 
 ## When something is wrong
 
@@ -100,6 +105,9 @@ Problems appear under the status bar's **Config warnings**, naming the file:
 - A theme that fails to load, or names a parent theme Jasper doesn't have, is reported.
 - Two installed themes with the same name are reported, and the file that sorts first wins.
 - An unreadable editor scheme is reported, and the terminal then uses Jasper's palette.
+- A terminal theme file that is not valid TOML, lacks `colors.primary` foreground and background, is too large, is not
+  UTF-8, takes a reserved name or repeats another file's name is reported and skipped; a colour it cannot read is
+  reported and ignored.
 
 No problem stops Jasper from starting. Each plugin is capped at 64 MiB, each file read from it at
 4 MiB, and each jar inside a `.zip` at 32 MiB, with at most 16 such jars read.

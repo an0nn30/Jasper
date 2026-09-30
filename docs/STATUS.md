@@ -12,7 +12,11 @@
   reserved-names list before the constants; `ThemeController.configure(Theme)` and `configure(Theme, UiFontConfig)` keep
   a named terminal palette; the Alacritty page shows the selected file's problems in red; the sample terminal keeps its
   preferred (60x10) size; the page test uses a non-bundled theme and a separate test shows a user file shadowing bundled
-  "Tokyo Night" until removed; failed rescans and reveal failures are reported. `./gradlew check` green: jasper-app 1,422 tests (0 failures, 1 skipped), jasper-terminal 391 (0, 4 skipped), jasper-buddy 163 (0, 0), jasper-sdk 34 (0, 0), jasper-sdk-testkit 72 (0, 0), editor 4,782 (0, 0), history 41, remote 297, sample 12, snippets 11, vault 139 (0, 1 skipped). Not
+  "Tokyo Night" until removed; failed rescans and reveal failures are reported. Final-review fixes: deeply nested
+  theme files (a tomlj StackOverflowError) are reported instead of stopping start-up, unreadable files are retried,
+  the page's problems text no longer takes the spare height, View › Terminal Colors shows no check for a named theme,
+  the two start-up scans are guarded separately, and the configuration/themes/architecture docs were corrected.
+  `./gradlew check` green: jasper-app 1,428 tests (0 failures, 1 skipped), jasper-terminal 391 (0, 4 skipped), jasper-buddy 163 (0, 0), jasper-sdk 34 (0, 0), jasper-sdk-testkit 72 (0, 0), editor 4,782 (0, 0), history 41, remote 297, sample 12, snippets 11, vault 139 (0, 1 skipped). Not
   merged. GUI checks pending with the user: the dropdown and More Terminal Themes…; the sample in the configured font;
   Use then Apply recolours open terminals; install a downloaded theme and remove it; a theme without cursor or selection
   colours; switching back to Match the theme.

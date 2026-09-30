@@ -17,6 +17,11 @@
 >   page test uses a non-bundled theme and a separate test shows a user file shadowing bundled "Tokyo Night" until it is
 >   removed; failed rescans and reveal failures are reported.
 > - Each user file is re-read on every scan only when its size or modified time changed (as the UI theme catalog does).
+> - Final-review fixes: a theme file that overflows the TOML parser's stack (deep nesting) is reported, not fatal, in
+>   reading, scanning and installing; unreadable files are retried on the next scan; the problems text keeps its own
+>   height; View › Terminal Colors clears its group for a named theme; the two catalog scans are guarded separately;
+>   Remove refuses non-regular files; the combo maps only the exact built-in labels; docs gained an Alacritty themes
+>   heading and the missing format details. `./gradlew check` green: jasper-app 1,428 tests (0 failures, 1 skipped).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

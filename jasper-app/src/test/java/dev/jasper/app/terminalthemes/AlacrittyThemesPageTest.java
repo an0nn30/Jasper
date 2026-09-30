@@ -126,5 +126,14 @@ class AlacrittyThemesPageTest {
         assertThat(page.problems()).isEmpty();
         page.select("Reddish");
         assertThat(page.problems()).contains("reddish");
+        var body = page.component();
+        body.setSize(900, 600);
+        LayoutTestSupport.layoutTree(body);
+        var area = page.problemsArea();
+        assertThat(area.getHeight()).as("the problems keep their own height").isLessThanOrEqualTo(area.getPreferredSize().height + 2);
+        var sample = page.sample().component();
+        var swatches = page.swatchesLabel();
+        int sampleTop = javax.swing.SwingUtilities.convertPoint(sample.getParent(), sample.getLocation(), swatches.getParent()).y;
+        assertThat(sampleTop - (swatches.getY() + swatches.getHeight())).as("the sample sits just below the swatches").isBetween(0, 20);
     }
 }

@@ -227,11 +227,20 @@ public final class JasperApplication {
      * 10 s, so the first window shows the saved theme. Later scans run with each configuration read.
      */
     private void scanThemes(ConfigService service) {
-        try { service.watchWith(() -> { themeCatalog.scan(); terminalThemes.scan(); }).get(10, java.util.concurrent.TimeUnit.SECONDS); }
+        try { service.watchWith(() -> { scanQuietly("IntelliJ themes", themeCatalog::scan); scanQuietly("terminal themes", terminalThemes::scan); })
+            .get(10, java.util.concurrent.TimeUnit.SECONDS); }
         catch (ExecutionException | TimeoutException failure) {
             LOG.log(System.Logger.Level.WARNING, "The themes folder could not be read at start-up", failure);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Runs one catalog scan, logging a failure so the next catalog is still scanned. */
+    private static void scanQuietly(String what, Runnable scan) {
+        try { scan.run(); }
+        catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
+            LOG.log(System.Logger.Level.WARNING, "The " + what + " could not be scanned", failure);
         }
     }
 

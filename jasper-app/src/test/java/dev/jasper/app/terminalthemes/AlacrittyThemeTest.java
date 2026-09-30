@@ -41,6 +41,14 @@ class AlacrittyThemeTest {
         foreground = '#000000'
         """;
 
+    static final String NESTED = "x = " + "[".repeat(25_000) + "]".repeat(25_000) + "\n";
+
+    @Test void deeplyNestedArraysAreUnusableInsteadOfThrowing() {
+        var result = AlacrittyTheme.read(NESTED);
+        assertThat(result.palette()).isEmpty();
+        assertThat(result.problems()).containsExactly("It cannot be read as TOML.");
+    }
+
     @Test void aFullThemeMapsOntoThePalette() {
         var result = AlacrittyTheme.read(FULL);
         assertThat(result.problems()).isEmpty();

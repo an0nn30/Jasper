@@ -37,6 +37,8 @@ class TerminalThemeFilesTest {
             .isInstanceOf(TerminalThemeFiles.ThemeFileException.class).hasMessageContaining("reserved");
         assertThatThrownBy(() -> files.install(download("big.toml", "#" + "x".repeat(TerminalThemeCatalog.MAX_FILE)), false))
             .isInstanceOf(TerminalThemeFiles.ThemeFileException.class).hasMessageContaining("64 KiB");
+        assertThatThrownBy(() -> files.install(download("nested.toml", AlacrittyThemeTest.NESTED), false))
+            .isInstanceOf(TerminalThemeFiles.ThemeFileException.class).hasMessage("Nested cannot be used: It cannot be read as TOML.");
         assertThat(folder()).satisfiesAnyOf(path -> assertThat(path).doesNotExist(), path -> assertThat(path).isEmptyDirectory());
     }
 
@@ -50,5 +52,12 @@ class TerminalThemeFilesTest {
         assertThat(outside).exists();
         Files.writeString(folder().resolve(".hidden.toml"), "x");
         assertThatThrownBy(() -> files.remove(folder().resolve(".hidden.toml"))).isInstanceOf(TerminalThemeFiles.ThemeFileException.class);
+    }
+
+    @Test void removeRefusesADirectoryNamedLikeATheme() throws Exception {
+        var files = new TerminalThemeFiles(folder());
+        Path directory = Files.createDirectories(folder().resolve("odd.toml"));
+        assertThatThrownBy(() -> files.remove(directory)).isInstanceOf(TerminalThemeFiles.ThemeFileException.class);
+        assertThat(directory).isDirectory();
     }
 }

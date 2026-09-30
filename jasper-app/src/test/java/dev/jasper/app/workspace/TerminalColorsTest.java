@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.TerminalColors;
+import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.terminal.config.Palette;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -74,6 +75,25 @@ class TerminalColorsTest {
             open(menu);
             assertThat(items.get(2).isSelected()).isTrue();
             assertThat(items).allMatch(JMenuItem::isEnabled);
+        });
+    }
+
+    @Test void aNamedTerminalThemeLeavesNoMenuChoiceChecked() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController(Theme.DARK);
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            owner.updateActions();
+            JMenu menu = terminalColors(owner);
+            List<JRadioButtonMenuItem> items = terminalItems(menu);
+            owner.selectTerminalColors(TerminalColors.DARK);
+            open(menu);
+            assertThat(items.get(2).isSelected()).isTrue();
+            themes.configure(Theme.DARK, new TerminalColors("Dracula"), Palette.jasperLight(), UiFontConfig.defaults());
+            open(menu);
+            assertThat(items).as("no built-in choice is checked for a named theme").noneMatch(JMenuItem::isSelected);
+            owner.selectTerminalColors(TerminalColors.DARK);
+            open(menu);
+            assertThat(items).extracting(JMenuItem::isSelected).containsExactly(false, false, true);
         });
     }
 
