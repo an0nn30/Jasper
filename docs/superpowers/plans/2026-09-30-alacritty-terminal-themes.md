@@ -1,6 +1,6 @@
 # Alacritty Terminal Themes Implementation Plan
 
-> **Status:** written 2026-09-30 on `claude/alacritty-themes`; not started. Choices this plan makes where the spec left
+> **Status:** written 2026-09-30 on `claude/alacritty-themes`; executed subagent-driven 2026-09-30; not merged. Choices this plan makes where the spec left
 > room (record further deviations here and in `docs/STATUS.md`):
 > - `TerminalColors` becomes a record `TerminalColors(String name)` with constants `MATCH`/`LIGHT`/`DARK` and
 >   `builtIns()` (instead of a sealed type), so existing callers keep `name()` and the constants; `terminal.colors` is a
@@ -11,6 +11,11 @@
 >   shows the cursor and selection colours as swatches instead.
 > - `TerminalSession.attach` is documented as callable from any thread, so the sample session is created on the EDT.
 > - Until Task 5, Font & Colors edits `terminal.colors` in a plain text field.
+> - Deviations while executing: `TerminalColors` declares its reserved-names list before the constants (static init
+>   order); `ThemeController.configure(Theme)` and `configure(Theme, UiFontConfig)` keep a named terminal palette; the
+>   Alacritty page shows the selected file's problems in red; the sample terminal keeps its preferred (60x10) size; the
+>   page test uses a non-bundled theme and a separate test shows a user file shadowing bundled "Tokyo Night" until it is
+>   removed; failed rescans and reveal failures are reported.
 > - Each user file is re-read on every scan only when its size or modified time changed (as the UI theme catalog does).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -73,6 +73,25 @@ the 16 ANSI colours.
 
 Scheme colours are used exactly as the theme author chose them.
 
+## Terminal themes
+
+`terminal.colors` can also name a terminal theme in [Alacritty](https://alacritty.org)'s format. Jasper bundles the
+whole [alacritty-theme](https://github.com/alacritty/alacritty-theme) collection (177 themes, Apache 2.0), and reads
+`.toml` files you put in the `terminal-themes` folder beside `config.toml`; a file of yours wins over a bundled theme of
+the same name. A theme's name comes from its file name: `gruvbox_dark.toml` is "Gruvbox Dark". `match`, `light` and
+`dark` are Jasper's own choices and cannot be theme names.
+
+Settings › Themes › **Alacritty Themes** lists every theme with its colours and draws a sample terminal in the selected
+one; **Use** chooses it (Apply or OK switches the terminals), **Install from Disk…** checks and copies a theme file in,
+**Reveal Folder** shows the folder, and **Remove…** deletes one of your files. Settings › Terminal › Font & Colors lists
+the themes too, ending in **More Terminal Themes…**.
+
+Jasper reads a theme's `colors.primary` foreground and background (required), `colors.normal` and `colors.bright` (the
+16 ANSI colours), `colors.cursor.cursor` and `colors.selection.background`. A missing bright colour uses the normal one;
+a missing cursor uses the foreground and a missing selection a blend of foreground and background. Other keys (dim
+colours, search, hints, indexed colours) are ignored. An unknown name in `terminal.colors` is a warning and the terminal
+matches the UI theme.
+
 ## When something is wrong
 
 Problems appear under the status bar's **Config warnings**, naming the file:

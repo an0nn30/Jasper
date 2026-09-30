@@ -29,7 +29,7 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
 The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
-Desk Buddy, System Settings), Themes (IntelliJ Themes), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
+Desk Buddy, System Settings), Themes (IntelliJ Themes, Alacritty Themes), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
 the search field filters the tree and highlights matching settings on the page.
 Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
 ("Ubuntu (WSL 1)"); ↻ detects them again. Program and Arguments apply only to Custom.
@@ -695,6 +695,8 @@ Jasper Dark or Jasper Light by the theme's darkness when it has none ([Themes](t
 padding and the area behind the panes follow this choice; the title row, toolbar, tab strip, find
 bar, status bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every
 window without reinstalling the look and feel, keeping shells, scrollback and splits.
+
+`terminal.colors` may also name a terminal theme; see [Themes](themes.md#terminal-themes).
 
 View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. An
 unrecognized value produces an error diagnostic and keeps `"match"`; a non-string value rejects the configuration.
