@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.*;
 
 import java.net.ServerSocket;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,12 +85,16 @@ class MarketplaceClientTest {
         }
     }
 
+    @Test void iconsOnOtherHostsAreRefusedWithoutARequest() {
+        assertThatThrownBy(() -> client.icon("//127.0.0.2/x")).isInstanceOf(MarketplaceClient.MarketplaceException.class);
+        assertThat(market.requests).isEmpty();
+    }
+
     @Test void onlyHttpsJetbrainsHostsAreTrusted() {
         assertThat(MarketplaceClient.jetbrains(URI.create("https://downloads.marketplace.jetbrains.com/files/x.zip"))).isTrue();
         assertThat(MarketplaceClient.jetbrains(URI.create("https://plugins.jetbrains.com/x"))).isTrue();
         assertThat(MarketplaceClient.jetbrains(URI.create("http://plugins.jetbrains.com/x"))).isFalse();
         assertThat(MarketplaceClient.jetbrains(URI.create("https://jetbrains.com.evil.io/x"))).isFalse();
         assertThat(MarketplaceClient.jetbrains(URI.create("https://notjetbrains.com/x"))).isFalse();
-        assertThat(Files.exists(home.resolve("nothing"))).isFalse();
     }
 }

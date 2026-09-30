@@ -124,7 +124,7 @@ public final class MarketplaceClient implements AutoCloseable {
 
     /** An icon's bytes (usually SVG); {@code path} is a listing's {@code iconPath}. */
     public byte[] icon(String path) throws MarketplaceException {
-        if (!path.startsWith("/") || path.contains("..")) throw new MarketplaceException("Not a Marketplace icon: " + path);
+        if (!path.startsWith("/") || path.startsWith("//") || path.contains("..")) throw new MarketplaceException("Not a Marketplace icon: " + path);
         return get(path, MAX_ICON);
     }
 
@@ -148,7 +148,7 @@ public final class MarketplaceClient implements AutoCloseable {
         }
     }
 
-    @Override public void close() { http.close(); }
+    @Override public void close() { http.shutdownNow(); }
 
     /** Whether {@code uri} is https on jetbrains.com or one of its subdomains. */
     static boolean jetbrains(URI uri) {
@@ -172,6 +172,9 @@ public final class MarketplaceClient implements AutoCloseable {
     /** A 200 response for {@code path}, following at most five trusted redirects. */
     private HttpResponse<InputStream> open(String path) throws MarketplaceException {
         URI uri = base.resolve(path);
+        if (!Objects.equals(uri.getScheme(), base.getScheme()) || !Objects.equals(uri.getHost(), base.getHost())
+            || uri.getPort() != base.getPort())
+            throw new MarketplaceException("Not a Marketplace address: " + path);
         for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
             HttpResponse<InputStream> response;
             try {
