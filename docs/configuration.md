@@ -698,6 +698,10 @@ window without reinstalling the look and feel, keeping shells, scrollback and sp
 
 `terminal.colors` may also name a terminal theme; see [Alacritty themes](#alacritty-themes).
 
+In Settings › Terminal › Font & Colors, **Terminal colors follow the UI theme** is `"match"`: while it is ticked the
+terminal uses the UI theme's colours and the dropdown is off; clearing it enables the dropdown of separate choices
+(Light, Dark and every terminal theme) and returns to your last separate choice, or Dark.
+
 View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. While a
 named terminal theme is in use, none of these choices is checked. Any other non-blank text names a terminal theme; an
 unknown name is a warning and the terminal uses `"match"`. A blank value is an error and keeps `"match"`; a non-string

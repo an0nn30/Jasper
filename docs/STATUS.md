@@ -2,6 +2,12 @@
 
 ## Current state — 2026-09-30
 
+- **Terminal colors follow the UI theme** (branch `claude/terminal-follow-theme`, bounded change approved in chat
+  2026-09-30, no spec): Font & Colors' Terminal colors row is a checkbox, "Terminal colors follow the UI theme" (the
+  value `match`), over the dropdown of separate choices (Light, Dark, every terminal theme, More Terminal Themes…),
+  which is off while the box is ticked; clearing it returns to the last separate choice (this dialog's, else the saved
+  one, else Dark). No new setting. `./gradlew check` green: app 1429/0/1, other modules unchanged. Merged into local main
+  2026-09-30 (not pushed). GUI check pending: tick and clear the box, the dropdown greys out, Apply switches the terminals.
 - **Alacritty terminal themes** (branch `claude/alacritty-themes`, spec
   `docs/superpowers/specs/2026-09-30-alacritty-terminal-themes-design.md`, plan
   `docs/superpowers/plans/2026-09-30-alacritty-terminal-themes.md`): `terminal.colors` accepts a terminal theme's name;
