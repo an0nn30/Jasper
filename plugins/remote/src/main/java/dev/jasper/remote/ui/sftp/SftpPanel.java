@@ -87,14 +87,6 @@ public class SftpPanel extends JPanel {
     public boolean following() { return follow.isSelected(); }
     public void following(boolean value) { follow.setSelected(value); }
     public void destinationMode() { follow.setVisible(false);for(String name:List.of("Download selected","Upload files","Delete selected","Copy paths")) buttons.get(name).getParent().remove(buttons.get(name));table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);table.setComponentPopupMenu(null); }
-    /** Open Remote File: files and folders, several at once, with navigation only; no transfers, deletion, follow or menu. */
-    public void pickMode() {
-        follow.setVisible(false);for(String name:List.of("Download selected","Upload files","New folder","Delete selected","Copy paths")) buttons.get(name).getParent().remove(buttons.get(name));table.setComponentPopupMenu(null);
-        // Keyboard only: Tab leaves the list instead of moving between its cells, and Up and Refresh take focus.
-        table.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS,Set.of(KeyStroke.getKeyStroke(KeyEvent.VK_TAB,0)));
-        table.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS,Set.of(KeyStroke.getKeyStroke(KeyEvent.VK_TAB,InputEvent.SHIFT_DOWN_MASK)));
-        toolbar.putClientProperty("JToolBar.focusableButtons",true);for(String name:List.of("Up","Refresh")) buttons.get(name).setFocusable(true);
-    }
     public void showPage(String hostname,String directory,List<FileEntry> values,long offset,long total,boolean focus) {
         this.entries=List.copyOf(values);this.offset=offset;this.total=total;loaded=true;host.setText(hostname);path.setText(directory);model.fireTableDataChanged();
         pageLabel.setText(total==0?"Empty folder":(offset+1)+"–"+(offset+values.size())+" of "+total);previous.setEnabled(offset>0);next.setEnabled(offset+values.size()<total);

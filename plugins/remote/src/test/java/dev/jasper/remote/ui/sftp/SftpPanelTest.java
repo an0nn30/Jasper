@@ -105,24 +105,4 @@ class SftpPanelTest {
         return Arrays.stream(menu.getComponents()).filter(JMenuItem.class::isInstance).map(JMenuItem.class::cast).filter(item->text.equals(item.getText())).findFirst().orElseThrow();
     }
 
-    @Test void pickModeKeepsNavigationAndSeveralSelectionsButDropsTransfersAndTheMenu() {
-        var panel = new SftpPanel(name -> null);
-        panel.pickMode();
-        assertThat(panel.table().getSelectionModel().getSelectionMode()).isEqualTo(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-        assertThat(panel.table().getComponentPopupMenu()).isNull();
-        assertThat(panel.following()).isTrue();
-        List<String> names = new ArrayList<>();
-        new Object() { void walk(Container root) {
-            for (var child : root.getComponents()) {
-                if (child instanceof JButton button && button.getAccessibleContext().getAccessibleName() != null) names.add(button.getAccessibleContext().getAccessibleName());
-                if (child instanceof JCheckBox box && box.isVisible()) names.add(box.getText());
-                if (child instanceof Container container) walk(container);
-            }
-        } }.walk(panel);
-        assertThat(names).contains("Up", "Refresh").doesNotContain("Download selected", "Upload files", "New folder", "Delete selected", "Copy paths", "Follow terminal folder");
-        assertThat(panel.table().getFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS))
-            .as("Tab leaves the list instead of moving between its cells").contains(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_TAB, 0));
-        assertThat(panel.table().getFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS))
-            .contains(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_TAB, java.awt.event.InputEvent.SHIFT_DOWN_MASK));
-    }
 }

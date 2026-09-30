@@ -45,6 +45,7 @@ class RemoteEditingPluginTest {
     static final class FakeEditor implements Plugin {
         final List<EditorDocument> documents = new CopyOnWriteArrayList<>();
         final List<java.util.function.Predicate<dev.jasper.editor.api.OpenRequest>> openers = new CopyOnWriteArrayList<>();
+        final java.util.Map<String, dev.jasper.editor.api.LocationResolver> locations = new java.util.concurrent.ConcurrentHashMap<>();
         volatile RuntimeException failure;
         @Override public void start(PluginContext context) {
             context.services().publish(Editor.class, new Editor() {
@@ -53,6 +54,10 @@ class RemoteEditingPluginTest {
                 @Override public dev.jasper.sdk.Subscription opener(java.util.function.Predicate<dev.jasper.editor.api.OpenRequest> handler) {
                     openers.add(handler);
                     return () -> openers.remove(handler);
+                }
+                @Override public dev.jasper.sdk.Subscription locationDocuments(String sourceId, dev.jasper.editor.api.LocationResolver resolver) {
+                    locations.put(sourceId, resolver);
+                    return () -> locations.remove(sourceId, resolver);
                 }
             });
         }

@@ -2,6 +2,8 @@ package dev.jasper.remote.edit;
 
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.EditorDocument;
+import dev.jasper.editor.api.LocationResolver;
+import dev.jasper.sdk.files.FileLocation;
 import dev.jasper.remote.client.ConnectionIdentity;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.FileEntry;
@@ -64,6 +66,28 @@ public final class RemoteEditing {
      * @return removes the registration
      */
     public Subscription registerReopener() { return editor.reopener(RemoteDocument.KEY_PREFIX, this::reopen); }
+
+    /**
+     * Opens files picked in Jasper's file chooser from Remote's hosts, and tells the Editor where a remote document is.
+     * Throws {@link NoSuchMethodError} with an Editor older than 0.6.
+     *
+     * @param sourceId Remote's file-source id
+     * @param identities the route and logins to open a host's files on, by root id
+     * @return removes the registration
+     */
+    public Subscription registerLocations(String sourceId, Function<String, Optional<ConnectionIdentity>> identities) {
+        return editor.locationDocuments(sourceId, new LocationResolver() {
+            @Override public EditorDocument document(FileLocation.Sourced location, WindowOwner owner) {
+                ConnectionIdentity identity = identities.apply(location.rootId())
+                    .orElseThrow(() -> new IllegalStateException("That host is no longer saved"));
+                return new RemoteDocument(identity, location.path(), channels, owner instanceof WindowHandle window ? owner(window) : activeWindow);
+            }
+            @Override public Optional<FileLocation.Sourced> location(String documentKey) {
+                return RemoteDocument.parseKey(documentKey)
+                    .map(parsed -> new FileLocation.Sourced(sourceId, parsed.hops().getFirst().hostId().toString(), parsed.path()));
+            }
+        });
+    }
 
     /**
      * @param key a recorded {@link RemoteDocument#key}
