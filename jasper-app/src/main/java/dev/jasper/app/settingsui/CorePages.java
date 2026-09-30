@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -16,6 +17,10 @@ import java.util.function.Supplier;
 public final class CorePages {
     /** The page shown when Settings opens for the first time. */
     public static final String DEFAULT_PAGE = "appearance";
+    /** The Themes group's id. */
+    public static final String THEMES = "themes";
+    /** The IntelliJ Themes page's id; {@code #marketplace} and {@code #installed} select its tabs. */
+    public static final String INTELLIJ_THEMES = "themes.intellij";
 
     private CorePages() { }
 
@@ -75,6 +80,8 @@ public final class CorePages {
                     new SchemaPage.Button("Reload from Disk", system.reload(), () -> true))
                 .action(() -> "Rewrite old setting names to the current layout; the original is backed up first.",
                     new SchemaPage.Button("Migrate Config…", system.migrate(), system.migratable())),
+            SchemaPage.page(INTELLIJ_THEMES, "IntelliJ Themes").parent(THEMES).anchor("intellij-themes")
+                .row(THEMES_MARKETPLACE_ENABLED),
             SchemaPage.page("terminal", "Terminal")
                 .row(TERMINAL_SCROLLBACK, Editors.integer("lines"))
                 .row(TERMINAL_BELL)
@@ -140,6 +147,18 @@ public final class CorePages {
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools) {
+        return pages(themeNames, system, shells, keymap, plugins, tools, (context, header) -> header);
+    }
+
+    /**
+     * The whole tree: as above, with {@code intellijThemes} turning the IntelliJ Themes schema page (its settings) into
+     * the page the tree shows.
+     */
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
+                                                                   Function<PageContext, SettingsPage> keymap,
+                                                                   Function<PageContext, SettingsPage> plugins,
+                                                                   Function<PageContext, List<SettingsPage>> tools,
+                                                                   BiFunction<PageContext, SettingsPage, SettingsPage> intellijThemes) {
         return context -> {
             var specs = specs(themeNames, system, shells);
             var all = new ArrayList<SettingsPage>();
@@ -149,7 +168,9 @@ public final class CorePages {
                 childrenOf.apply("appearance-behavior"), context));
             for (var spec : specs.subList(0, 6)) all.add(spec.build(context));
             all.add(keymap.apply(context));
-            for (var spec : specs.subList(6, specs.size())) all.add(spec.build(context));
+            all.add(new GroupPage(THEMES, "Themes", Optional.empty(), false, childrenOf.apply(THEMES), context));
+            all.add(intellijThemes.apply(context, specs.get(6).build(context)));
+            for (var spec : specs.subList(7, specs.size())) all.add(spec.build(context));
             all.add(plugins.apply(context));
             all.add(new GroupPage("tools", "Tools", Optional.empty(), true, childrenOf.apply("tools"), context));
             all.addAll(tools.apply(context));

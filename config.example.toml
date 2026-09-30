@@ -119,6 +119,10 @@ family = "system"
 # Live across open windows: "Jasper Dark", "IntelliJ Light", or an installed theme plugin's name.
 name = "Jasper Dark"
 
+[themes.marketplace]
+# Search the JetBrains Marketplace from Settings > Themes; false keeps Jasper offline.
+enabled = true
+
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
 # On macOS, cmd is Command and alt/option is Option. Example:

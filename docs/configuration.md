@@ -117,6 +117,10 @@ family = "system"
 # A built-in or installed theme's name; see Themes.
 name = "Jasper Dark"
 
+[themes.marketplace]
+# Search the JetBrains Marketplace from Settings > Themes; false keeps Jasper offline.
+enabled = true
+
 [keybindings]
 # Optional action overrides; see examples below.
 ```
@@ -157,6 +161,7 @@ name = "Jasper Dark"
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
+| `themes.marketplace.enabled` | `true` | Boolean; `false` hides Settings › Themes › IntelliJ Themes' Marketplace tab and stops its update checks | Live |
 | `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
