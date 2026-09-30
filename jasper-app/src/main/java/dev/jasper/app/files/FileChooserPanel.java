@@ -16,6 +16,7 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.awt.RenderingHints;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -185,6 +186,7 @@ public final class FileChooserPanel extends JPanel {
     void pressCenterAction() { centerAction.run(); }
     String previewText() { return previewText.getText(); }
     String pathText() { return pathBar.text(); }
+    JComponent pathBox() { return pathBar.crumbs; }
     void editPath(String text) { pathBar.edit(); pathBar.field.setText(text); pathBar.submit(); }
 
     private JComponent toolbar() {
@@ -732,14 +734,12 @@ public final class FileChooserPanel extends JPanel {
     /** Clickable breadcrumbs; clicking the empty area or Cmd/Ctrl+L turns it into a text field for a typed path. */
     private final class PathBar extends JPanel {
         private final CardLayout cards = new CardLayout();
-        private final JPanel crumbs = new JPanel(new TailLayout());
+        private final JPanel crumbs = new FieldBox(new TailLayout());
         private final JTextField field = new JTextField();
         private final List<String> labels = new ArrayList<>();
 
         PathBar() {
             setLayout(cards);
-            crumbs.setBorder(UIManager.getBorder("TextField.border"));
-            crumbs.setBackground(UIManager.getColor("TextField.background"));
             crumbs.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) edit(); }
             });
@@ -799,6 +799,55 @@ public final class FileChooserPanel extends JPanel {
         }
 
         void finishEditing() { cards.show(this, "crumbs"); }
+    }
+
+    /**
+     * The path bar's breadcrumbs inside a box drawn like a text field, so it matches the search box: the theme's field
+     * background, border colour and corner radius, at least a text field's height. Crumbs that slide out on the left are
+     * clipped to the box's padding.
+     */
+    private static final class FieldBox extends JPanel {
+        FieldBox(LayoutManager layout) {
+            super(layout);
+            setOpaque(false);
+            setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+        }
+
+        @Override public Dimension getPreferredSize() {
+            Dimension size = super.getPreferredSize();
+            return new Dimension(size.width, Math.max(size.height, new JTextField().getPreferredSize().height));
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            Graphics2D copy = (Graphics2D) graphics.create();
+            try {
+                copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                float arc = com.formdev.flatlaf.util.UIScale.scale((float) UIManager.getInt("TextComponent.arc"));
+                var shape = new RoundRectangle2D.Float(0.5f, 0.5f, getWidth() - 1f, getHeight() - 1f, arc, arc);
+                copy.setColor(color("TextField.background", getBackground()));
+                copy.fill(shape);
+                copy.setColor(color("Component.borderColor", getForeground()));
+                copy.draw(shape);
+            } finally {
+                copy.dispose();
+            }
+        }
+
+        @Override protected void paintChildren(Graphics graphics) {
+            Insets insets = getInsets();
+            Graphics clipped = graphics.create();
+            try {
+                clipped.clipRect(insets.left, 0, getWidth() - insets.left - insets.right, getHeight());
+                super.paintChildren(clipped);
+            } finally {
+                clipped.dispose();
+            }
+        }
+
+        private static Color color(String key, Color fallback) {
+            Color value = UIManager.getColor(key);
+            return value == null ? fallback : value;
+        }
     }
 
     /** Lays crumbs out left to right; when they do not fit, the leftmost slide out of view so the current folder stays visible. */
