@@ -77,9 +77,11 @@ Modelled on `PaletteScope`: the host contains every failure (a throwing method c
 
 ### Registration and capability
 
-`context.files().register(FileSource)` → `Subscription`; requires a new `files.source` capability. The app's local
-source implements the same interface internally, so `FileSource` has two real implementations (app local, Remote), plus
-the testkit fake.
+`context.files().register(FileSource)` → `Subscription`; requires a new `files.source` capability. Like
+`PaletteScope`, `FileSource` is implemented by plugins (Remote) and the testkit fake. SDK types stay inside
+`dev.jasper.app.plugins` (AGENTS.md rule): an adapter there wraps each registered `FileSource`/`FileBrowser` in the
+dialog package's own app-internal place/browser types, so the dialog never imports the SDK. That internal source type
+has two real implementations: the app's local places and the plugin adapter.
 
 ### Choosing: `Windows.choose(FileChoice)`
 
@@ -101,8 +103,9 @@ and `FileBrowser`.
 
 ## App: the dialog (`dev.jasper.app.files`, new package)
 
-The only place that draws the chooser. Package-info names its dependencies (windows, appearance, plugins registry for
-sources) per the app conventions; `verifyApplicationArchitecture` rules are updated for the new package.
+The only place that draws the chooser; it knows no SDK types. `dev.jasper.app.plugins` implements `Windows.choose` by
+translating `FileChoice`/`FileLocation` to and from the package's internal types. Package-info names its dependencies
+(windows, appearance) per the app conventions; `verifyApplicationArchitecture` rules are updated for the new package.
 
 ### Layout
 
