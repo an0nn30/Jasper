@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** written 2026-09-30, not started.
+**Status:** executed inline 2026-09-30; no further deviations.
 
 **Goal:** The Editor's Save As uses Jasper's chooser in Save mode and can write a document to any offered place: a
 local document to a remote host, a remote document to the local disk, or remote to remote. Directory mode says which
