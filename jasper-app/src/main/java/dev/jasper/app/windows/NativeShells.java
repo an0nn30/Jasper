@@ -234,10 +234,23 @@ public final class NativeShells {
                 "Confirm Save As", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION,
             () -> Optional.ofNullable(JOptionPane.showInputDialog(dialog, "Folder name:", "New Folder", JOptionPane.PLAIN_MESSAGE))
                 .map(String::strip).filter(name -> !name.isEmpty()));
+        // Jasper's own title bar, as on the application's other dialogs, so the chooser matches the theme.
+        MacTitleBar bar = MacTitleBar.install(dialog.getRootPane(), panel, () -> { }, MacTitleBar.isSupported());
+        Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
+            if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
+            if (bar != null) bar.setLight(!resolved.chrome().dark());
+        });
         try {
             dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             dialog.setIconImages(ApplicationIcon.images());
-            dialog.setContentPane(panel);
+            if (bar != null) {
+                bar.setTitle(request.title());
+                dialog.addWindowListener(new WindowAdapter() {
+                    @Override public void windowActivated(WindowEvent event) { bar.setActive(true); }
+                    @Override public void windowDeactivated(WindowEvent event) { bar.setActive(false); }
+                });
+                bar.attach(dialog);
+            }
             dialog.getRootPane().setDefaultButton(panel.primaryButton());
             var size = state.window(CHOOSER_BOUNDS).map(saved -> new java.awt.Dimension(saved.width(), saved.height()))
                 .orElse(new java.awt.Dimension(820, 520));
@@ -253,6 +266,8 @@ public final class NativeShells {
                 state.putWindow(CHOOSER_BOUNDS, new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height));
                 state.save();
             }
+            theme.close();
+            if (bar != null) bar.close();
             dialog.dispose();
             worker.shutdownNow();
         }
