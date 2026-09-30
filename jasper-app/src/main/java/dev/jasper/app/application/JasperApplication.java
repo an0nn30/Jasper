@@ -444,9 +444,11 @@ public final class JasperApplication {
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system, shells,
-                    context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
-                    context -> plugins.settingsPages(context), (context, header) -> themeStore().page(context, header)),
+                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), () -> terminalThemes.latest().names(),
+                    system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
+                        context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
+                        context -> plugins.settingsPages(context), (context, header) -> themeStore().page(context, header),
+                        context -> Optional.of(new dev.jasper.app.terminalthemes.AlacrittyThemesPage(context, alacrittyHooks())))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
@@ -485,6 +487,15 @@ public final class JasperApplication {
             configuration.openConfigFile().whenComplete((file, failure) -> {
                 if (failure != null) SwingUtilities.invokeLater(() -> notice(failure.getMessage()));
             });
+        }
+
+        /** What the Alacritty Themes page needs: the catalog, the reload that rescans it, and the sample terminal's options. */
+        private dev.jasper.app.terminalthemes.AlacrittyThemesPage.Hooks alacrittyHooks() {
+            var editor = new dev.jasper.app.platform.ConfigEditor();
+            return new dev.jasper.app.terminalthemes.AlacrittyThemesPage.Hooks(terminalThemes, () -> configuration.reload(),
+                folder -> CompletableFuture.runAsync(() -> editor.reveal(folder)), dev.jasper.app.terminalthemes.AlacrittyThemesPage::ask,
+                () -> configuration.snapshot().viewOptions(configuration.snapshot().fontSize(), themes.current().palette()),
+                SwingUtilities::invokeLater);
         }
 
         private void revealConfigFile() {
