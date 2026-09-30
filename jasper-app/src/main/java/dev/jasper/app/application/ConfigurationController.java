@@ -10,6 +10,10 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.TerminalColors;
+import dev.jasper.app.terminalthemes.TerminalTheme;
+import dev.jasper.app.terminalthemes.TerminalThemeCatalog;
+import dev.jasper.terminal.config.Palette;
 import dev.jasper.app.config.SettingsEdit;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.platform.ConfigEditor;
@@ -30,6 +34,7 @@ final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
     private final ConfigService service;
     private final ThemeCatalog catalog;
+    private final TerminalThemeCatalog terminalThemes;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
     private ConfigService.State state;
@@ -82,12 +87,21 @@ final class ConfigurationController implements AutoCloseable {
     }
 
     ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog) {
-        this(themes, service, catalog, new ConfigEditor()::open);
+        this(themes, service, catalog, TerminalThemeCatalog.bundledOnly(), new ConfigEditor()::open);
     }
 
     ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, Consumer<Path> editor) {
+        this(themes, service, catalog, TerminalThemeCatalog.bundledOnly(), editor);
+    }
+
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, TerminalThemeCatalog terminalThemes) {
+        this(themes, service, catalog, terminalThemes, new ConfigEditor()::open);
+    }
+
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, TerminalThemeCatalog terminalThemes,
+                            Consumer<Path> editor) {
         requireEdt();
-        this.themes = themes; this.service = service; this.catalog = catalog; this.editor = editor;
+        this.themes = themes; this.service = service; this.catalog = catalog; this.terminalThemes = terminalThemes; this.editor = editor;
         state = service.initialState();
         try { configureThemes(state); }
         catch (ThemeController.InstallationFailure ignored) {
@@ -245,8 +259,20 @@ final class ConfigurationController implements AutoCloseable {
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
                 "Unknown theme \"" + name + "\"; keeping " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
         }
+        TerminalThemeCatalog.Snapshot terminal = terminalThemes.latest();
+        for (TerminalThemeCatalog.Problem problem : terminal.problems())
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), 0, 0, "", problem.message()));
+        TerminalColors colors = next.snapshot().terminalColors();
+        Palette named = null;
+        if (colors.named()) {
+            named = terminal.find(colors.name()).map(TerminalTheme::palette).orElse(null);
+            if (named == null)
+                problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "terminal.colors",
+                    "Unknown terminal colors \"" + colors.name() + "\"; using the theme's colours. Settings \u203a Themes \u203a "
+                        + "Alacritty Themes lists the terminal themes."));
+        }
         try {
-            themes.configure(theme, next.snapshot().terminalColors(), next.snapshot().uiFont());
+            themes.configure(theme, colors, named, next.snapshot().uiFont());
             themeProblems = List.copyOf(problems);
         } catch (ThemeController.InstallationFailure failure) {
             Throwable cause = failure.getCause();
