@@ -21,7 +21,7 @@
   failures show a generic message and are logged; the details header shows the icon; the threaded ThemeStore test is
   deterministic. `./gradlew check` green:
   app 1393/0/1, terminal 391/0/4, Editor 4781/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0,
-  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Merged into local main 2026-09-30 (not pushed; merged-tree check green, app 1396/0/1, Editor 4782/0/0). Known follow-up: keyboard-only users cannot choose Get More Themes… by arrowing and Enter (the editable combo's Enter keeps the typed text); mouse, typing the label and the tree entry work. GUI checks pending with the user:
+  Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Merged into local main 2026-09-30 (not pushed; merged-tree check green, app 1396/0/1, Editor 4782/0/0). Follow-up fixed on `claude/theme-combo-enter`: Enter on the highlighted Get More Themes…/Manage Themes… row of the open theme list now navigates (the editor field binds Enter; an editable combo's own Enter keeps the typed text). GUI checks pending with the user:
   Get More Themes… from the dropdown; search "dracula", install, Use and Apply; an Islands-based theme; Material Theme
   UI refused cleanly; Install from Disk…; Uninstall of the active theme; the offline checkbox; arrowing through the theme dropdown; the page in dark and
   light themes.

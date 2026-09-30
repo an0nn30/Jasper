@@ -247,4 +247,35 @@ class EditorsTest {
         assertThat(editor.value()).isEqualTo("Jasper Dark");
         assertThat(box.getSelectedItem()).isEqualTo("Jasper Dark");
     }
+
+    @Test void enterOnTheHighlightedActionEntryOfTheOpenListNavigates() {
+        var navigated = new ArrayList<String>();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+        var themes = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
+        var combo = (Editors.ThemeCombo) build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, themes);
+        combo.show("Jasper Dark");
+        var edits = new int[1];
+        combo.onEdit(() -> edits[0]++);
+        @SuppressWarnings("unchecked") var box = (JComboBox<String>) combo.component();
+        // A look-and-feel update gives the combo a new editor field; Enter must be bound on that one too.
+        javax.swing.SwingUtilities.updateComponentTreeUI(box);
+        var field = (JTextField) box.getEditor().getEditorComponent();
+        Object bound = field.getInputMap().get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0));
+        assertThat(field.getActionMap().get(bound)).as("Enter is bound on the current editor").isNotNull();
+        var enter = new java.awt.event.ActionEvent(field, java.awt.event.ActionEvent.ACTION_PERFORMED, "");
+
+        combo.highlight(box.getItemCount() - 1);
+        combo.enter(enter, false);
+        assertThat(navigated).as("with the list closed Enter accepts the text as usual").isEmpty();
+        assertThat(combo.value()).isEqualTo("Jasper Dark");
+        edits[0] = 0;
+        combo.enter(enter, true);
+        assertThat(navigated).containsExactly("themes.intellij#marketplace");
+        assertThat(combo.value()).isEqualTo("Jasper Dark");
+        assertThat(edits[0]).isZero();
+
+        combo.highlight(1);
+        combo.enter(enter, true);
+        assertThat(navigated).as("Enter on a theme row does not navigate").containsExactly("themes.intellij#marketplace");
+    }
 }
