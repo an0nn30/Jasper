@@ -298,6 +298,9 @@ class AppContractTest extends PluginContractTest {
                             return scope.verbs().stream().filter(verb -> verb.id().equals(verbId)).findFirst()
                                 .orElseThrow(() -> new IllegalArgumentException("No such verb: " + verbId));
                         }
+                        @Override public List<String> fileSources() {
+                            return onEdtValue(() -> contributions.fileSources().stream().map(source -> source.id() + "|" + source.heading()).toList());
+                        }
                         @Override public List<String> scopes() {
                             return onEdtValue(() -> contributions.scopes().stream().map(scope -> scope.id() + "|" + scope.label() + "|"
                                 + String.join(",", scope.verbs().stream().map(dev.jasper.app.palette.PaletteVerb::id).toList())).toList());

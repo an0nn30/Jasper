@@ -154,6 +154,8 @@ public interface ContractHarness extends AutoCloseable {
 
         /** Contributed scopes as {@code id|label|verbIds}, in registration order. */
         List<String> scopes();
+        /** Registered file sources as {@code id|heading}, in registration order. */
+        List<String> fileSources();
         /** Searches a scope from a window and optional pane, as {@code rowId|title|enabled}; later row lookups use this answer. */
         List<String> searchScope(String scopeId, String query, java.util.UUID windowId, java.util.UUID paneIdOrNull);
         boolean availableInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull);

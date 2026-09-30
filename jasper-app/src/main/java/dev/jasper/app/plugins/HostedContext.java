@@ -61,6 +61,7 @@ final class HostedContext implements PluginContext {
     final CapabilityGate gate;
     final HostedTerminals terminals;
     final HostedPalette palette;
+    final HostedFileSources fileSources;
     private boolean observing;
     Plugin plugin;
 
@@ -80,6 +81,7 @@ final class HostedContext implements PluginContext {
             handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
             host.environment.windows(), terminals);
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
+        this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
     }
 
     private void requireOpen() {
@@ -140,6 +142,7 @@ final class HostedContext implements PluginContext {
     @Override public Windows windows() { return ui.windows(); }
     @Override public Terminals terminals() { return terminals; }
         @Override public Palette palette() { return palette; }
+        @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
 
         @Override public Notices notices() {
             return message -> {

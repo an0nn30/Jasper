@@ -60,6 +60,12 @@ import java.io.ByteArrayOutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import dev.jasper.sdk.terminal.RemoteDirectory;
+import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.files.FileBrowser;
+import dev.jasper.sdk.files.FileRoot;
+import dev.jasper.sdk.files.FileSource;
+import dev.jasper.sdk.files.FileSourceSpec;
+import java.util.concurrent.CompletionStage;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteResults;
 import dev.jasper.sdk.palette.PaletteRow;
@@ -1016,6 +1022,40 @@ public abstract class PluginContractTest {
                 context.target().ifPresent(pane -> pane.paste(row.title()));
             }
             @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+        }
+
+        static final class Hosts implements FileSource {
+            private final String id;
+            Hosts(String id) { this.id = id; }
+            @Override public FileSourceSpec spec() { return new FileSourceSpec(id, "Hosts"); }
+            @Override public List<FileRoot> roots() { return List.of(new FileRoot("one", "One", "", false)); }
+            @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+            @Override public CompletionStage<FileBrowser> connect(String rootId, WindowOwner owner) {
+                return CompletableFuture.failedFuture(new java.io.IOException("offline"));
+            }
+        }
+
+        @Test void aFileSourceNeedsTheCapabilityAndTheNamespaceAndVanishesWithThePlugin() {
+            var failure = new AtomicReference<Throwable>();
+            h.start(info("test.bare"), Set.of(), Set.of(), context -> {
+                try { context.fileSources().register(new Hosts("test.bare.hosts")); } catch (RuntimeException caught) { failure.set(caught); }
+            });
+            assertThat(failure.get()).isInstanceOfSatisfying(MissingCapabilityException.class,
+                missing -> assertThat(missing.capability()).isEqualTo(Capabilities.FILES_SOURCE));
+            var a = new AtomicReference<PluginContext>();
+            h.start(info("test.a", Capabilities.FILES_SOURCE), Set.of(), Set.of(), a::set);
+            var first = new AtomicReference<Subscription>();
+            h.ui(() -> {
+                assertThatIllegalArgumentException().isThrownBy(() -> a.get().fileSources().register(new Hosts("test.b.hosts")));
+                first.set(a.get().fileSources().register(new Hosts("test.a.hosts")));
+                assertThatIllegalArgumentException().isThrownBy(() -> a.get().fileSources().register(new Hosts("test.a.hosts")));
+                a.get().fileSources().register(new Hosts("test.a.more"));
+            });
+            assertThat(h.fileSources()).containsExactly("test.a.hosts|Hosts", "test.a.more|Hosts");
+            h.ui(() -> { first.get().close(); first.get().close(); });
+            assertThat(h.fileSources()).containsExactly("test.a.more|Hosts");
+            h.stopAll();
+            assertThat(h.fileSources()).isEmpty();
         }
 
         @Test void aPaletteScopeNeedsTheCapabilityAndThePluginsNamespace() {

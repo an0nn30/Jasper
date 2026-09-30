@@ -12,6 +12,7 @@ final class Capabilities {
             case "terminal.open" -> "Open terminal tabs, splits and windows";
             case "session.provide" -> "Run its own terminal sessions, such as remote connections";
             case "palette.contribute" -> "Add scopes to the command palette and open it";
+            case "files.source" -> "Add places, such as saved hosts, to the file chooser";
             default -> null;
         };
         return meaning == null ? capability : meaning + " (" + capability + ")";
