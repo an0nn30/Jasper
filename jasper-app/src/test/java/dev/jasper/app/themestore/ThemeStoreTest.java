@@ -10,6 +10,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +77,32 @@ class ThemeStoreTest {
         assertThat(listed.get(1).version()).isEmpty();
         assertThat(store.updates(listed).get()).isEmpty();
         assertThat(market.requests).isEmpty();
+    }
+
+    @Test void rescansAndCompletionsRunOnTheEdtWhileTheWorkRunsOffIt() throws Exception {
+        ExecutorService worker = Executors.newSingleThreadExecutor(task -> new Thread(task, "test-worker"));
+        ExecutorService edt = Executors.newSingleThreadExecutor(task -> new Thread(task, "test-edt"));
+        var rescanThreads = new ArrayList<String>();
+        var real = new ThemeStore(catalog, market.client(), worker, edt, new ThemeStore.Hooks(
+            () -> { rescanThreads.add(Thread.currentThread().getName()); catalog.scan(); return CompletableFuture.completedFuture(null); },
+            browsed::add, folder -> { }, (parent, question) -> true), () -> { });
+        try {
+            market.theme(home.resolve("served"), 12275, "com.vermouthx.idea", "Dracula Theme", "Dracula", "2.3.1");
+            var completedOn = new CompletableFuture<String>();
+            var future = real.install(12275, "com.vermouthx.idea", "Dracula Theme");
+            future.thenRun(() -> completedOn.complete(Thread.currentThread().getName()));
+            future.get();
+            assertThat(rescanThreads).containsExactly("test-edt");
+            assertThat(completedOn.get()).isEqualTo("test-edt");
+
+            market.json("/api/plugins/7/updates", FakeMarketplace.release(1, "1.0", "7/1/gone.zip"));
+            var failure = catchThrowable(() -> real.install(7, "x.gone", "Gone").get());
+            assertThat(failure.getCause()).isInstanceOf(MarketplaceClient.MarketplaceException.class);
+        } finally {
+            real.close();
+            worker.shutdownNow();
+            edt.shutdownNow();
+        }
     }
 
     @Test void browsingOpensOnlyWebLinksResolvedAgainstTheMarketplace() {

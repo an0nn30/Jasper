@@ -85,7 +85,11 @@ public final class ThemeStore implements AutoCloseable {
     CompletableFuture<Optional<MarketplaceClient.Release>> latest(int id) { return onEdt(supply(() -> client.latest(id))); }
 
     /** An icon's bytes, fetched once per session. */
-    CompletableFuture<byte[]> icon(String path) { return onEdt(icons.computeIfAbsent(path, key -> supply(() -> client.icon(key)))); }
+    CompletableFuture<byte[]> icon(String path) {
+        var fetch = icons.computeIfAbsent(path, key -> supply(() -> client.icon(key)));
+        fetch.whenComplete((bytes, failure) -> { if (failure != null) icons.remove(path, fetch); });
+        return onEdt(fetch);
+    }
 
     /** The archives in the themes folder as the catalog last read them. */
     CompletableFuture<List<InstalledTheme>> installed() {
@@ -112,7 +116,7 @@ public final class ThemeStore implements AutoCloseable {
 
     /** Downloads the plugin's latest release, installs it (replacing an older one) and rescans. */
     CompletableFuture<ThemeInstaller.Installed> install(int id, String xmlId, String name) {
-        return onEdt(supply(() -> {
+        return onEdt(onEdt(supply(() -> {
             MarketplaceClient.Release release = client.latest(id)
                 .orElseThrow(() -> new ThemeInstaller.InstallException(name + " has no release to download."));
             Path part = installer.downloadTarget(release);
@@ -120,15 +124,15 @@ public final class ThemeStore implements AutoCloseable {
             catch (MarketplaceClient.MarketplaceException failure) { Files.deleteIfExists(part); throw failure; }
             String extension = release.file().toLowerCase(Locale.ROOT).endsWith(".jar") ? ".jar" : ".zip";
             return installer.installDownload(part, extension, new Provenance.Entry(id, xmlId, name, release.version()));
-        }).thenCompose(this::rescanned));
+        })).thenCompose(this::rescanned));
     }
 
     CompletableFuture<ThemeInstaller.Installed> installFromDisk(Path file, boolean replace) {
-        return onEdt(supply(() -> installer.installFromDisk(file, replace)).thenCompose(this::rescanned));
+        return onEdt(onEdt(supply(() -> installer.installFromDisk(file, replace))).thenCompose(this::rescanned));
     }
 
     CompletableFuture<Void> uninstall(Path file) {
-        return onEdt(supply(() -> { installer.uninstall(file); return (Void) null; }).thenCompose(this::rescanned));
+        return onEdt(onEdt(supply(() -> { installer.uninstall(file); return (Void) null; })).thenCompose(this::rescanned));
     }
 
     /** Deletes leftover downloads in the background. */
@@ -164,13 +168,14 @@ public final class ThemeStore implements AutoCloseable {
     }
 
     @Override public void close() {
-        stopWorker.run();
-        client.close();
+        try { stopWorker.run(); }
+        finally { client.close(); }
     }
 
     /** {@code value} once the catalog has been read again; a failed rescan does not undo the change. */
     private <T> CompletableFuture<T> rescanned(T value) {
-        return hooks.rescan().get().handle((ignored, failure) -> value);
+        try { return hooks.rescan().get().handle((ignored, failure) -> value); }
+        catch (RuntimeException failure) { return CompletableFuture.completedFuture(value); }
     }
 
     private <T> CompletableFuture<T> supply(Callable<T> work) {
