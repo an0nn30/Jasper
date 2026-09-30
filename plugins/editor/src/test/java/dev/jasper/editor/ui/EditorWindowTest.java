@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Optional;
+import dev.jasper.sdk.files.FileLocation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -485,7 +486,7 @@ class EditorWindowTest {
         assertThat(tab.area().getInputMap(javax.swing.JComponent.WHEN_FOCUSED).get(KeyNames.stroke(java.awt.event.KeyEvent.VK_O, 0)))
             .as("Cmd/Ctrl+O is left to the Keymap's Open in Editor\u2026").isNotEqualTo("open");
         Path other = file("other.txt", "two\n");
-        host.queuePathSelection(List.of(other));
+        host.queueFileChoice(List.of(new FileLocation.Local(other)));
         vimKeys(tab, ":action open<CR>");
         drain();
         assertThat(window.selected().orElseThrow().session().name()).isEqualTo("other.txt");
@@ -574,9 +575,11 @@ class EditorWindowTest {
     }
 
     @Test void openInEditorLeavesAFocusedPaneToTheHostsTerminalFolder() {
-        Path file = Path.of("/work/notes.txt").toAbsolutePath();
-        assertThat(EditorWindow.openStart(true, Optional.of(file))).isEmpty();
-        assertThat(EditorWindow.openStart(false, Optional.of(file))).contains(file.getParent());
+        FileLocation folder = new FileLocation.Local(Path.of("/work"));
+        assertThat(EditorWindow.openStart(true, Optional.of(folder))).isEmpty();
+        assertThat(EditorWindow.openStart(false, Optional.of(folder))).contains(folder);
         assertThat(EditorWindow.openStart(false, Optional.empty())).isEmpty();
+        assertThat(EditorWindow.parentOf("/srv/app.conf")).isEqualTo("/srv");
+        assertThat(EditorWindow.parentOf("/app.conf")).isEqualTo("/");
     }
 }

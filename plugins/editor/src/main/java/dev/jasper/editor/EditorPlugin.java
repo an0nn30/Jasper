@@ -1,5 +1,7 @@
 package dev.jasper.editor;
 
+import dev.jasper.editor.api.LocationResolver;
+import dev.jasper.editor.open.Locations;
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
@@ -43,6 +45,7 @@ public final class EditorPlugin implements Plugin {
     private EditorWindow window;
     private RecentFiles recent;
     private Openers openers;
+    private final Locations locations = new Locations();
 
     /** The production plugin: Swing's event queue, modal dialogs and running timers. */
     public EditorPlugin() {
@@ -78,6 +81,7 @@ public final class EditorPlugin implements Plugin {
                 return reopeners.register(keyPrefix, resolve);
             }
             @Override public Subscription opener(Predicate<OpenRequest> handler) { return openers.register(handler); }
+            @Override public Subscription locationDocuments(String sourceId, LocationResolver resolver) { return locations.register(sourceId, resolver); }
         });
         context.actions().register(ActionSpec.of(OPEN, "Open in Editor…").withIcon(context.appearance().icon(IconName.FILE))
                 .withKeywords(List.of("editor", "open", "file", "edit")).withDefaultBinding("cmd+o"),
@@ -98,7 +102,7 @@ public final class EditorPlugin implements Plugin {
     }
 
     private EditorWindow window() {
-        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle);
+        if (window == null) window = new EditorWindow(environment, () -> window = null, document -> recent.record(document, Instant.now()), openers::handle, locations);
         return window;
     }
 }

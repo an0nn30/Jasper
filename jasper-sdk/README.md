@@ -70,6 +70,9 @@ the chooser for local places plus the sources the caller names and returns `File
 with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fileRoots`, `locateFile` and
 `connectFileSource`. Plugins declare `sdk = ">=0.10.0, <0.11"`.
 
+SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
+whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
+
 SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
 https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.
 

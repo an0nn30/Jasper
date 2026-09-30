@@ -1,5 +1,9 @@
 package dev.jasper.editor;
 
+import dev.jasper.editor.api.LocationResolver;
+import dev.jasper.editor.api.EditorDocument;
+import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.files.FileLocation;
 import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.OpenRequest;
 import dev.jasper.editor.session.Question;
@@ -125,7 +129,7 @@ class EditorPluginTest {
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
             var asked = new ArrayList<OpenRequest>();
             consumer.get().services().require(Editor.class).opener(request -> { asked.add(request); return false; });
-            host.queuePathSelection(List.of(Files.writeString(home.resolve("local.txt"), "x\n")));
+            host.queueFileChoice(List.of(new FileLocation.Local(Files.writeString(home.resolve("local.txt"), "x\n"))));
             assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
             drain(host);
             assertThat(asked).singleElement().satisfies(request -> {
@@ -148,7 +152,7 @@ class EditorPluginTest {
             drain(host);
             var asked = new ArrayList<OpenRequest>();
             Subscription registration = editor.opener(request -> { asked.add(request); return true; });
-            host.queuePathSelection(List.of(Files.writeString(home.resolve("unused.txt"), "x\n")));
+            host.queueFileChoice(List.of(new FileLocation.Local(Files.writeString(home.resolve("unused.txt"), "x\n"))));
             assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
             drain(host);
             assertThat(asked).singleElement().satisfies(request -> assertThat(request.documentKey()).contains("stub:/srv/app.conf"));
@@ -178,7 +182,7 @@ class EditorPluginTest {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
-            host.queuePathSelection(List.of(Files.writeString(home.resolve("b.yaml"), "a: 1\n")));
+            host.queueFileChoice(List.of(new FileLocation.Local(Files.writeString(home.resolve("b.yaml"), "a: 1\n"))));
             assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
             assertThat(host.windows()).isEmpty();
             assertThat(host.contentTabs()).hasSize(1);
@@ -224,6 +228,39 @@ class EditorPluginTest {
             assertThat(host.settingsReports("dev.jasper.editor")).containsExactly("font_size: Use a whole number from 8\u201348.");
             host.setSetting("dev.jasper.editor", "tab_size", 0L);
             assertThat(host.settingsReports("dev.jasper.editor")).contains("tab_size: Use a whole number from 1\u201316.");
+        }
+    }
+
+    @Test void openInEditorOffersRegisteredSourcesAndOpensTheirFilesThroughTheResolver() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID terminal = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            Subscription registration = editor.locationDocuments("test.consumer.hosts", new LocationResolver() {
+                @Override public EditorDocument document(FileLocation.Sourced location, WindowOwner owner) {
+                    return new StubDocument("stub:" + location.path(), "app.conf", "me@box:" + location.path(), "box");
+                }
+                @Override public Optional<FileLocation.Sourced> location(String key) {
+                    return key.startsWith("stub:") ? Optional.of(new FileLocation.Sourced("test.consumer.hosts", "box", key.substring(5))) : Optional.empty();
+                }
+            });
+            host.queueFileChoice(List.of(new FileLocation.Sourced("test.consumer.hosts", "box", "/srv/app.conf")));
+            assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
+            drain(host);
+            assertThat(host.fileChoices().getLast().sources()).containsExactly("test.consumer.hosts");
+            assertThat(host.fileChoices().getLast().initial()).isEmpty();
+            assertThat(host.contentTabs()).hasSize(1);
+            host.queueFileChoice(List.of());
+            assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
+            drain(host);
+            assertThat(host.fileChoices().getLast().initial()).as("the active remote document's folder")
+                .contains(new FileLocation.Sourced("test.consumer.hosts", "box", "/srv"));
+            registration.close();
+            host.queueFileChoice(List.of());
+            assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
+            assertThat(host.fileChoices().getLast().sources()).isEmpty();
         }
     }
 }

@@ -983,7 +983,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Connects to a source's root as the chooser would, waiting for the result.
+     * Connects to a source's root as the chooser would, running scripted background work until it has connected (at most 30 seconds).
      *
      * @param sourceId a registered source
      * @param rootId   one of its roots
@@ -994,7 +994,14 @@ public final class FakePluginHost implements AutoCloseable {
     public dev.jasper.sdk.files.FileBrowser connectFileSource(String sourceId, String rootId, UUID windowId) {
         var registered = registeredSource(sourceId);
         var owner = registered.context().terminals.windowHandle(windowId);
-        return registered.source().connect(rootId, owner).toCompletableFuture().join();
+        var pending = registered.source().connect(rootId, owner).toCompletableFuture();
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
+        while (!pending.isDone()) {
+            if (runBackground() > 0) continue;
+            if (System.nanoTime() > deadline) throw new IllegalStateException("The file source did not connect within 30 seconds: " + sourceId);
+            java.util.concurrent.locks.LockSupport.parkNanos(1_000_000);
+        }
+        return pending.join();
     }
 
     private FakeFileSources.Registered registeredSource(String sourceId) {

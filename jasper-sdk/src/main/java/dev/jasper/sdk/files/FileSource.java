@@ -41,7 +41,7 @@ public interface FileSource {
      * Where a terminal pane is, when this source can reach it; a chooser opened from that pane starts there.
      *
      * @param pane the owner's focused pane
-     * @return a location in one of this source's roots, or empty
+     * @return a location in one of this source's roots ({@link FileLocation.Sourced#HOME} when only the root is known), or empty
      */
     default Optional<FileLocation.Sourced> locate(PaneHandle pane) { return Optional.empty(); }
 

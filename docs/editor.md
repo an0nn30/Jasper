@@ -181,3 +181,8 @@ recorded corpus.
 The Editor exports `dev.jasper.editor.api`. Require `dev.jasper.editor`, look up `Editor` with
 `services().find`, and call `open(Path)` for a local file or `open(EditorDocument)` for a file you
 read and write yourself; `EditorDocument.write` documents the save contract a provider follows.
+
+A plugin with a file source (SDK 0.10) calls `locationDocuments(sourceId, resolver)` (Editor 0.6): Open in Editor…
+then offers the source's places in Jasper's file chooser and opens what the user picks there through the
+`LocationResolver`, which also tells the Editor where one of its documents is so the chooser can start in its folder.
+Remote uses this for its saved hosts.
