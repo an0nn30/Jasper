@@ -266,4 +266,20 @@ class FileChooserPanelTest {
         java.awt.Color fill = javax.swing.UIManager.getColor("TextField.background");
         assertThat(new java.awt.Color(image.getRGB(296, height / 2), true)).as("the field's background inside").isEqualTo(fill);
     }
+
+    @Test void crumbsSitCloseToTheirSeparators() {
+        var panel = panel(OPEN, Optional.empty());
+        var separators = new java.util.ArrayList<String>();
+        for (var child : panel.pathBox().getComponents()) {
+            if (child instanceof javax.swing.JButton crumb) {
+                assertThat(crumb.getClientProperty(com.formdev.flatlaf.FlatClientProperties.MINIMUM_WIDTH)).as("no minimum width").isEqualTo(0);
+                assertThat(crumb.getMargin().left + crumb.getMargin().right).as("tight side margins").isLessThanOrEqualTo(8);
+            } else if (child instanceof JLabel separator) {
+                separators.add(separator.getText());
+                java.awt.Insets insets = separator.getInsets();
+                assertThat(insets.left + insets.right).isLessThanOrEqualTo(4);
+            }
+        }
+        assertThat(separators).isNotEmpty().allMatch("\u203A"::equals);
+    }
 }
