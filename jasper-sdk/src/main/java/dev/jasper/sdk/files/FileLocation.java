@@ -27,14 +27,18 @@ public sealed interface FileLocation {
      *
      * @param sourceId the source's {@link FileSourceSpec#id()}
      * @param rootId   the root's {@link FileRoot#id()}
-     * @param path     an absolute path in that root, using {@code /}
+     * @param path     an absolute path in that root, using {@code /}, or {@link #HOME}
      */
     record Sourced(String sourceId, String rootId, String path) implements FileLocation {
-        /** Rejects blank ids and a path that does not start with {@code /}. */
+        /** The root's home folder, for a source that cannot name it before connecting. @since 0.10.1 */
+        public static final String HOME = "~";
+
+        /** Rejects blank ids and a path that is neither absolute nor {@link #HOME}. */
         public Sourced {
             if (sourceId == null || sourceId.isBlank()) throw new IllegalArgumentException("A location needs a source id");
             if (rootId == null || rootId.isBlank()) throw new IllegalArgumentException("A location needs a root id");
-            if (path == null || !path.startsWith("/")) throw new IllegalArgumentException("A source path must start with /: " + path);
+            if (path == null || !(path.startsWith("/") || path.equals(HOME)))
+                throw new IllegalArgumentException("A source path must start with / or be ~: " + path);
         }
     }
 }

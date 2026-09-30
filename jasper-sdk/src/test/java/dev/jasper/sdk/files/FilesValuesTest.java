@@ -29,6 +29,8 @@ class FilesValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new FileSourceSpec("x|y", "Hosts"));
         assertThatIllegalArgumentException().isThrownBy(() -> new FileSourceSpec("x", " "));
         assertThatIllegalArgumentException().isThrownBy(() -> new FileLocation.Sourced("s", "r", "relative"));
+        assertThat(new FileLocation.Sourced("s", "r", FileLocation.Sourced.HOME).path()).as("a root's home").isEqualTo("~");
+        assertThatIllegalArgumentException().isThrownBy(() -> new FileLocation.Sourced("s", "r", "~/x"));
         WindowOwner owner = new WindowOwner() { };
         assertThatIllegalArgumentException().isThrownBy(() ->
             new FileChoice(owner, "Save", FileChoice.Mode.SAVE, true, Optional.empty(), Optional.empty(), Set.of()));
@@ -49,7 +51,7 @@ class FilesValuesTest {
     }
 
     @Test void theSdkIsVersionTenWithTheFileSourceCapability() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.10.0");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.10.1");
         assertThat(Capabilities.ALL).contains(Capabilities.FILES_SOURCE);
         assertThat(Capabilities.FILES_SOURCE).isEqualTo("files.source");
     }
