@@ -11,6 +11,7 @@ import dev.jasper.sdk.testing.FakePluginHost;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -570,5 +571,12 @@ class EditorWindowTest {
         vimKeys(second, ":b 1<CR>");
         vimKeys(first, "d'A");
         assertThat(first.area().getText()).as("an operator cannot reach another tab").isEqualTo("one\n");
+    }
+
+    @Test void openInEditorLeavesAFocusedPaneToTheHostsTerminalFolder() {
+        Path file = Path.of("/work/notes.txt").toAbsolutePath();
+        assertThat(EditorWindow.openStart(true, Optional.of(file))).isEmpty();
+        assertThat(EditorWindow.openStart(false, Optional.of(file))).contains(file.getParent());
+        assertThat(EditorWindow.openStart(false, Optional.empty())).isEmpty();
     }
 }
