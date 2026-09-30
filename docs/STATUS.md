@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-30
 
+- **Remote tunnels design (7b)** (branch `claude/tunnels-spec`, spec
+  `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md`, brainstormed and approved section by section
+  2026-09-30; written spec awaiting the user's review): tunnels with their own lifecycle (never tied to terminals)
+  through a saved host, local / remote / dynamic SOCKS5, Manually or When Jasper starts, quick unsaved forwards, a
+  Tunnels rail panel, an own forwarding engine over MINA channels (live counters; reconnect with per-host backoff
+  keeps the local port bound), unattended connections that never prompt (new `Connections` unattended lease, Vault
+  0.4.0 `credentialIfAllowed`), and Buddy connection cards for trouble only through SDK 0.10.2 connection activities
+  (plus `Platform.browse` and card activation). Replaces the tunnels outline in the Remote design's section 9. Three
+  plans: 7b-1 SDK, 7b-2 tunnels run by hand, 7b-3 tunnels that stay up. No code yet.
 - **Terminal colors follow the UI theme** (branch `claude/terminal-follow-theme`, bounded change approved in chat
   2026-09-30, no spec): Font & Colors' Terminal colors row is a checkbox, "Terminal colors follow the UI theme" (the
   value `match`), over the dropdown of separate choices (Light, Dark, every terminal theme, More Terminal Themes…),
