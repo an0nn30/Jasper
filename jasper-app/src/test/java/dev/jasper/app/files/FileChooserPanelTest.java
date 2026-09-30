@@ -249,4 +249,21 @@ class FileChooserPanelTest {
         panel.approve();
         assertThat(finished).containsExactly(List.of(here("docs")));
     }
+
+    @Test void thePathBarIsDrawnAsATextFieldLikeTheSearchBox() {
+        var panel = panel(OPEN, Optional.empty());
+        JComponent box = panel.pathBox();
+        assertThat(box.isOpaque()).as("it paints its own rounded field").isFalse();
+        int height = box.getPreferredSize().height;
+        assertThat(height).isGreaterThanOrEqualTo(new javax.swing.JTextField().getPreferredSize().height);
+        box.setSize(300, height);
+        box.doLayout();
+        var image = new java.awt.image.BufferedImage(300, height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        box.paint(graphics);
+        graphics.dispose();
+        assertThat(image.getRGB(299, height / 2) >>> 24).as("an outline at the right edge").isNotZero();
+        java.awt.Color fill = javax.swing.UIManager.getColor("TextField.background");
+        assertThat(new java.awt.Color(image.getRGB(296, height / 2), true)).as("the field's background inside").isEqualTo(fill);
+    }
 }
