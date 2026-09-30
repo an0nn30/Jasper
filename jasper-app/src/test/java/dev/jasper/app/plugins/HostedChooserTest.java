@@ -4,6 +4,8 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.windows.*;
+import dev.jasper.app.files.*;
+import dev.jasper.sdk.files.*;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.WindowSpec;
 import java.awt.Dimension;
@@ -26,12 +28,15 @@ class HostedChooserTest {
     private final AtomicReference<Runnable> during = new AtomicReference<>(() -> {});
     private final AtomicBoolean disposed = new AtomicBoolean();
     private final List<PathChoice> requests = new ArrayList<>();
+    private List<Location> chosenLocations;
+    private final Contributions contributions = new Contributions();
     private List<Path> selected = List.of(Path.of("/one").toAbsolutePath(), Path.of("/two").toAbsolutePath());
     private final AuxiliaryWindows windows = new AuxiliaryWindows(UiState.inMemory(),
         surface -> new AuxiliarySurface.Shell(() -> {}, () -> {}, () -> {}, title -> {},
             () -> new Rectangle(0,0,100,100), (title,initial) -> Optional.empty()),
-        (request, cancellation) -> { requests.add(request); cancellation.accept(() -> disposed.set(true)); during.get().run(); return selected; });
-    private final HostedUi ui = new HostedUi("dev.x.tool", new Contributions(), new Containment(() -> true),
+        (request, cancellation) -> { requests.add(request); cancellation.accept(() -> disposed.set(true)); during.get().run();
+            return chosenLocations != null ? chosenLocations : selected.stream().map(Location::local).toList(); });
+    private final HostedUi ui = new HostedUi("dev.x.tool", contributions, new Containment(() -> true),
         Runnable::run, () -> true, open::get, getClass().getClassLoader(), () -> Variant.DARK, h -> () -> {}, windows, terminals);
 
     @Test void terminalOwnerSelectsMultipleFilesOrOneDirectory() {
@@ -45,7 +50,7 @@ class HostedChooserTest {
         selected = List.of(Path.of("/notes/new.toml").toAbsolutePath());
         assertThat(ui.windows().chooseSaveFile(owner, "Save As", Optional.of(Path.of("/notes/old.toml").toAbsolutePath()))).contains(Path.of("/notes/new.toml").toAbsolutePath());
         assertThat(requests.getLast().mode()).isEqualTo(PathChoice.Mode.SAVE);
-        assertThat(requests.getLast().initial()).contains(Path.of("/notes/old.toml").toAbsolutePath());
+        assertThat(requests.getLast().initial()).contains(Location.local(Path.of("/notes/old.toml")));
         selected = List.of();
         assertThat(ui.windows().chooseFiles(owner, "Cancelled", Optional.empty())).isEmpty();
     }
@@ -84,12 +89,37 @@ class HostedChooserTest {
         var pane = fixture.addPane(fixture.addTab(id, "Shell"), "Shell", Path.of("/work/project"));
         fixture.focusPane(pane);
         ui.windows().chooseFiles(terminals.windowHandle(id), "Open", Optional.empty());
-        assertThat(requests.getLast().terminalFolder()).contains(Path.of("/work/project").toAbsolutePath());
+        assertThat(requests.getLast().terminalFolder()).contains(Location.local(Path.of("/work/project")));
         assertThat(requests.getLast().initial()).isEmpty();
         var owner = ui.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(500, 400), true));
         owner.show();
         fixture.activateWindow(id);
         ui.windows().chooseFiles(owner, "Open", Optional.empty());
-        assertThat(requests.getLast().terminalFolder()).as("a plugin window uses the active pane").contains(Path.of("/work/project").toAbsolutePath());
+        assertThat(requests.getLast().terminalFolder()).as("a plugin window uses the active pane").contains(Location.local(Path.of("/work/project")));
+    }
+
+    @Test void chooseOffersTheNamedSourcesStartsWhereASourceLocatesThePaneAndReturnsItsLocations() {
+        var id = fixture.addWindow();
+        var pane = fixture.addPane(fixture.addTab(id, "ssh"), "ssh", null);
+        fixture.focusPane(pane);
+        var remote = new Location("dev.x.tool.hosts", "box", "/srv");
+        ChooserSource hosts = new ChooserSource() {
+            @Override public String id() { return "dev.x.tool.hosts"; }
+            @Override public String heading() { return "Remote"; }
+            @Override public List<Root> roots() { return List.of(new Root("box", "Box", "", true)); }
+            @Override public Runnable onChanged(Runnable listener) { return () -> { }; }
+            @Override public java.util.concurrent.CompletableFuture<Browser> connect(String root, Optional<UUID> owner) { return new java.util.concurrent.CompletableFuture<>(); }
+            @Override public Optional<Location> locate(UUID paneId) { return paneId.equals(pane) ? Optional.of(remote) : Optional.empty(); }
+        };
+        contributions.addFileSource(hosts);
+        chosenLocations = List.of(remote.at("/srv/app.conf"));
+        var choice = new FileChoice(terminals.windowHandle(id), "Open", FileChoice.Mode.OPEN, false, Optional.empty(), Optional.empty(),
+            Set.of("dev.x.tool.hosts"));
+        assertThat(ui.windows().choose(choice)).containsExactly(new FileLocation.Sourced("dev.x.tool.hosts", "box", "/srv/app.conf"));
+        assertThat(requests.getLast().sources()).containsExactly(hosts);
+        assertThat(requests.getLast().terminalFolder()).contains(remote);
+        ui.windows().choose(new FileChoice(terminals.windowHandle(id), "Open", FileChoice.Mode.OPEN, false, Optional.empty(), Optional.empty(), Set.of()));
+        assertThat(requests.getLast().sources()).as("sources the caller did not name are not offered").isEmpty();
+        assertThat(ui.windows().chooseFiles(terminals.windowHandle(id), "Open", Optional.empty())).as("the Path API drops remote results").isEmpty();
     }
 }

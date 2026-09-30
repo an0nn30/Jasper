@@ -26,7 +26,7 @@ public final class AuxiliaryWindows implements AutoCloseable {
     }
 
     /** Synchronous chooser boundary; caller owns cancellation registration and validates the owner. */
-    public List<java.nio.file.Path> choose(PathChoice choice, java.util.function.Consumer<Runnable> cancellation) {
+    public List<dev.jasper.app.files.Location> choose(PathChoice choice, java.util.function.Consumer<Runnable> cancellation) {
         if (choice.auxiliaryOwner() != null && (!open.contains(choice.auxiliaryOwner()) || !choice.auxiliaryOwner().shown()))
             throw new IllegalArgumentException("Picker requires a shown, open owner");
         return List.copyOf(chooser.choose(choice, cancellation));
