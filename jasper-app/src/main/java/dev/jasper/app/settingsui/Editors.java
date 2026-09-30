@@ -272,7 +272,12 @@ public final class Editors {
             reload();
             // A look-and-feel update gives the combo a new editor field; follow each one (see Combo).
             onText(editor(), this::edited);
-            box.addPropertyChangeListener("editor", event -> { if (box.getEditor() != null) onText(editor(), this::edited); });
+            bindEnter(editor());
+            box.addPropertyChangeListener("editor", event -> {
+                if (box.getEditor() == null) return;
+                onText(editor(), this::edited);
+                bindEnter(editor());
+            });
             box.addPopupMenuListener(new PopupMenuListener() {
                 @Override public void popupMenuWillBecomeVisible(PopupMenuEvent event) { reload(); }
                 @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent event) { }
@@ -308,6 +313,33 @@ public final class Editors {
         }
         private JTextComponent editor() { return (JTextComponent) box.getEditor().getEditorComponent(); }
         private void edited() { if (!showing) for (Runnable listener : List.copyOf(listeners)) listener.run(); }
+
+        /**
+         * Binds Enter on the editor field. An editable combo's Enter takes the typed text, not the row highlighted in the
+         * open list, and the arrow keys never select the action entry, so Enter on it would do nothing without this.
+         */
+        private void bindEnter(JTextComponent field) {
+            field.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "jasper.themeComboEnter");
+            field.getActionMap().put("jasper.themeComboEnter", new AbstractAction() {
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) { enter(event, box.isPopupVisible()); }
+            });
+        }
+
+        /** Enter: the highlighted action entry of the open list navigates; anything else accepts the text as usual. */
+        void enter(java.awt.event.ActionEvent event, boolean listOpen) {
+            Object highlighted = popupList().map(JList::getSelectedValue).orElse(null);
+            if (listOpen && isAction(highlighted)) { open(MORE.equals(highlighted)); return; }
+            Action accept = editor().getActionMap().get(JTextField.notifyAction);
+            if (accept != null) accept.actionPerformed(event);
+        }
+
+        /** Highlights a row of the list, as the arrow keys do. */
+        void highlight(int index) { popupList().ifPresent(list -> list.setSelectedIndex(index)); }
+
+        private Optional<JList<?>> popupList() {
+            return box.getUI().getAccessibleChild(box, 0) instanceof javax.swing.plaf.basic.ComboPopup popup
+                ? Optional.of(popup.getList()) : Optional.empty();
+        }
 
         private void open(boolean marketplace) {
             box.hidePopup();
