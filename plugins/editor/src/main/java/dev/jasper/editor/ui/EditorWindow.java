@@ -2,6 +2,7 @@ package dev.jasper.editor.ui;
 
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.editor.api.OpenRequest;
+import dev.jasper.editor.api.LocationResolver;
 import dev.jasper.editor.open.Locations;
 import dev.jasper.sdk.files.FileChoice;
 import dev.jasper.sdk.files.FileLocation;
@@ -573,15 +574,39 @@ public final class EditorWindow {
         }
     }
 
+    /**
+     * Save As: Jasper's chooser in Save mode, offering local places and the file sources that have a resolver, starting
+     * in the document's folder with its name filled in. A file source's location is saved through its resolver's
+     * document; a file there that does not exist yet is created by the first write.
+     */
     private CompletableFuture<Boolean> saveAsSession(DocumentSession session) {
-        Optional<Path> initial = localFile(session).or(() -> Optional.of(Path.of(System.getProperty("user.home"), session.name())));
-        Optional<Path> chosen = context.windows().chooseSaveFile(owner(session), "Save As", initial);
+        WindowOwner owner = owner(session);
+        var choice = new FileChoice(owner, "Save As", FileChoice.Mode.SAVE, false, folderOf(session), Optional.of(session.name()), locations.sources());
+        Optional<FileLocation> chosen = context.windows().choose(choice).stream().findFirst();
         if (chosen.isEmpty()) return CompletableFuture.completedFuture(false);
-        if (model.find(LocalDocument.key(chosen.get())).filter(other -> other != session).isPresent()) {
-            ask.apply(new Question("Already open", chosen.get() + " is open in another tab.", List.of("OK")));
+        Optional<EditorDocument> target = switch (chosen.get()) {
+            case FileLocation.Local local -> Optional.<EditorDocument>of(new LocalDocument(local.path(), context.background()));
+            case FileLocation.Sourced sourced -> sourcedDocument(sourced, owner);
+        };
+        if (target.isEmpty()) return CompletableFuture.completedFuture(false);
+        if (model.find(target.get().key()).filter(other -> other != session).isPresent()) {
+            ask.apply(new Question("Already open", target.get().location() + " is open in another tab.", List.of("OK")));
             return CompletableFuture.completedFuture(false);
         }
-        return session.saveAs(new LocalDocument(chosen.get(), context.background()));
+        return session.saveAs(target.get());
+    }
+
+    /** The resolver's document for a file source's location; empty, with a notice, when it cannot make one. */
+    private Optional<EditorDocument> sourcedDocument(FileLocation.Sourced location, WindowOwner owner) {
+        Optional<LocationResolver> resolver = locations.resolver(location.sourceId());
+        if (resolver.isEmpty()) return Optional.empty();
+        try {
+            return Optional.of(resolver.get().document(location, owner));
+        } catch (RuntimeException failure) {
+            context.notices().error("Could not save to " + location.path() + ": "
+                + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            return Optional.empty();
+        }
     }
 
     /**

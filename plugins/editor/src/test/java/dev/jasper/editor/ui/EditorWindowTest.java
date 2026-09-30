@@ -1,5 +1,13 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.editor.api.Content;
+import dev.jasper.editor.api.EditorDocument;
+import dev.jasper.editor.api.LocationResolver;
+import dev.jasper.editor.api.Revision;
+import dev.jasper.editor.open.Locations;
+import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.files.FileChoice;
+import java.util.concurrent.CompletableFuture;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.session.Question;
@@ -41,6 +49,7 @@ class EditorWindowTest {
     private boolean cancelWait;
     private final List<Boolean> savedVim = new ArrayList<>();
     private final List<String> recorded = new ArrayList<>();
+    private final Locations locations = new Locations();
     private java.util.concurrent.CompletableFuture<Void> vimSave = java.util.concurrent.CompletableFuture.completedFuture(null);
 
     @BeforeEach void open() {
@@ -63,7 +72,7 @@ class EditorWindowTest {
                 return saves.getNow(false);
             },
             settings::get, on -> { savedVim.add(on); return vimSave; }, false);
-        window = new EditorWindow(environment, () -> windowClosed = true, document -> recorded.add(document.key()));
+        window = new EditorWindow(environment, () -> windowClosed = true, document -> recorded.add(document.key()), request -> false, locations);
     }
 
     @AfterEach void close() { host.close(); }
@@ -317,14 +326,14 @@ class EditorWindowTest {
         EditorTab tab = window.selected().orElseThrow();
         tab.area().setText("print(1)\n");
         Path target = home.resolve("app.py");
-        host.queuePathSelection(List.of(target));
+        host.queueFileChoice(List.of(new FileLocation.Local(target)));
         window.save();
         drain();
         assertThat(Files.readString(target)).isEqualTo("print(1)\n");
         assertThat(window.headerTitle(0)).isEqualTo("app.py");
         assertThat(tab.area().getSyntaxEditingStyle()).isEqualTo(SYNTAX_STYLE_PYTHON);
         window.newUntitled();
-        host.queuePathSelection(List.of(target));
+        host.queueFileChoice(List.of(new FileLocation.Local(target)));
         window.saveAs();
         assertThat(asked.getLast().message()).isEqualTo(target + " is open in another tab.");
     }
@@ -421,7 +430,7 @@ class EditorWindowTest {
     @Test void saveAsDoesNotAliasTheOriginalFileToTheRenamedTab() throws Exception {
         Path original = file("original.txt", "original");
         opened(original);
-        host.queuePathSelection(List.of(home.resolve("renamed.txt")));
+        host.queueFileChoice(List.of(new FileLocation.Local(home.resolve("renamed.txt"))));
         window.saveAs(); drain();
         opened(original);
         assertThat(host.contentTabs()).hasSize(2);
@@ -581,5 +590,50 @@ class EditorWindowTest {
         assertThat(EditorWindow.openStart(false, Optional.empty())).isEmpty();
         assertThat(EditorWindow.parentOf("/srv/app.conf")).isEqualTo("/srv");
         assertThat(EditorWindow.parentOf("/app.conf")).isEqualTo("/");
+    }
+
+    /** A remote file for Save As tests: it does not exist yet, and records what is written to it. */
+    private record RemoteStub(String path, List<String> written) implements EditorDocument {
+        @Override public String key() { return "stub:" + path; }
+        @Override public String name() { return path.substring(path.lastIndexOf('/') + 1); }
+        @Override public String location() { return "me@box:" + path; }
+        @Override public Optional<String> host() { return Optional.of("box"); }
+        @Override public CompletableFuture<Content> read(long limitBytes) { return CompletableFuture.failedFuture(new NoSuchFileException(path)); }
+        @Override public CompletableFuture<Optional<Revision>> revision() { return CompletableFuture.completedFuture(Optional.empty()); }
+        @Override public CompletableFuture<Revision> write(byte[] content) {
+            written.add(path + "=" + new String(content, java.nio.charset.StandardCharsets.UTF_8));
+            return CompletableFuture.completedFuture(new Revision(1, content.length));
+        }
+    }
+
+    @Test void saveAsWritesToAnyOfferedPlaceStartingInTheDocumentsFolder() throws Exception {
+        var written = new ArrayList<String>();
+        locations.register("test.hosts", new LocationResolver() {
+            @Override public EditorDocument document(FileLocation.Sourced location, WindowOwner owner) { return new RemoteStub(location.path(), written); }
+            @Override public Optional<FileLocation.Sourced> location(String key) {
+                return key.startsWith("stub:") ? Optional.of(new FileLocation.Sourced("test.hosts", "box", key.substring(5))) : Optional.empty();
+            }
+        });
+        opened(file("notes.txt", "hello\n"));
+        host.queueFileChoice(List.of(new FileLocation.Sourced("test.hosts", "box", "/srv/notes.txt")));
+        window.saveAs();
+        drain();
+        FileChoice asked = host.fileChoices().getLast();
+        assertThat(asked.mode()).isEqualTo(FileChoice.Mode.SAVE);
+        assertThat(asked.initial()).contains(new FileLocation.Local(home));
+        assertThat(asked.suggestedName()).contains("notes.txt");
+        assertThat(asked.sources()).containsExactly("test.hosts");
+        assertThat(written).containsExactly("/srv/notes.txt=hello\n");
+        assertThat(window.sessions().getFirst().document().orElseThrow().key()).isEqualTo("stub:/srv/notes.txt");
+        host.queueFileChoice(List.of());
+        window.saveAs();
+        drain();
+        assertThat(host.fileChoices().getLast().initial()).as("a remote document's folder")
+            .contains(new FileLocation.Sourced("test.hosts", "box", "/srv"));
+        Path copy = home.resolve("copy.txt");
+        host.queueFileChoice(List.of(new FileLocation.Local(copy)));
+        window.saveAs();
+        drain();
+        assertThat(Files.readString(copy)).as("back to the local disk").isEqualTo("hello\n");
     }
 }

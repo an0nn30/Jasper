@@ -186,3 +186,7 @@ A plugin with a file source (SDK 0.10) calls `locationDocuments(sourceId, resolv
 then offers the source's places in Jasper's file chooser and opens what the user picks there through the
 `LocationResolver`, which also tells the Editor where one of its documents is so the chooser can start in its folder.
 Remote uses this for its saved hosts.
+
+Save As uses the same chooser in Save mode: it starts in the document's folder with its name filled in and can save to
+any offered place, so a local file can be saved to a remote host and a remote file to this computer. A file that does
+not exist yet is created by the first write.

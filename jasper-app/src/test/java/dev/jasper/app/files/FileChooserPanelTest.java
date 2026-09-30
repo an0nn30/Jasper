@@ -220,4 +220,15 @@ class FileChooserPanelTest {
         assertThat(cell.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
         assertThat(cell.getText()).isEqualTo("<html><b>x");
     }
+
+    @Test void directoryModeSaysWhichFolderChooseWillPick() {
+        var panel = panel(DIRECTORY, Optional.empty());
+        assertThat(panel.primaryButton().getText()).isEqualTo("Choose");
+        assertThat(rows(panel)).containsExactly("docs");
+        assertThat(panel.statusText()).endsWith("Choose: " + dir.getFileName());
+        panel.table().setRowSelectionInterval(0, 0);
+        assertThat(panel.statusText()).endsWith("Choose: docs");
+        panel.approve();
+        assertThat(finished).containsExactly(List.of(here("docs")));
+    }
 }

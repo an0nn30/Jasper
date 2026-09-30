@@ -449,7 +449,11 @@ public final class FileChooserPanel extends JPanel {
     private String statusLine() {
         int count = model.entries().size();
         int selected = model.selection().size();
-        return (count == 1 ? "1 item" : count + " items") + (selected > 0 ? " \u00B7 " + selected + " selected" : "");
+        String line = (count == 1 ? "1 item" : count + " items") + (selected > 0 ? " · " + selected + " selected" : "");
+        if (model.request().mode() != ChooserRequest.Mode.DIRECTORY) return line;
+        List<ChooserEntry> chosen = model.selection();
+        String target = chosen.size() == 1 && chosen.getFirst().directory() ? chosen.getFirst().name() : model.name(model.location());
+        return line + " · Choose: " + safe(target);
     }
 
     private String header(ChooserModel.Column column) {

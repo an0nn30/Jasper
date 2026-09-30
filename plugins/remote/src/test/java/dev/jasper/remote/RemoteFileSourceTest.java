@@ -80,6 +80,9 @@ class RemoteFileSourceTest {
             assertThat(document.name()).isEqualTo("notes.toml");
             assertThat(resolver.location(document.key())).contains(new FileLocation.Sourced(RemoteHosts.ID, prod, "/notes.toml"));
             assertThat(resolver.location("local:/tmp/a.txt")).isEmpty();
+            EditorDocument created = resolver.document(new FileLocation.Sourced(RemoteHosts.ID, prod, "/new.txt"), window);
+            done(host, created.write("fresh\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            assertThat(Files.readString(files.resolve("new.txt"))).as("Save As to a new remote file creates it").isEqualTo("fresh\n");
             host.stopAll();
             assertThat(editor.locations).as("stopping Remote removes its resolver").isEmpty();
             assertThat(host.failures()).isEmpty();

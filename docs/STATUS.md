@@ -2,6 +2,14 @@
 
 ## Current state — 2026-09-30
 
+- **File chooser plan C: Save As anywhere** (branch `claude/file-chooser-c`, plan
+  `docs/superpowers/plans/2026-09-30-file-chooser-c.md`): Editor 0.6.1's Save As uses Jasper's chooser in Save mode,
+  starting in the document's folder (local or remote) with its name filled in, offering local places and every file
+  source with a resolver; a local document can be saved to a remote host, a remote one to this computer, and a new
+  remote file is created by its first write. An untitled tab's Save As starts where the focused terminal is. Directory
+  mode's status line names the folder Choose will pick. No API change. `./gradlew check` green: app 1349/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 34/0/0, testkit 72/0/0. Not merged.
+  GUI checks pending with the user: Save As a local file onto a host and back; Save As over an existing remote file
+  asks to replace it; Directory mode (for example SFTP's "Download selected files to") shows the Choose target.
 - **File chooser plan B2: Remote hosts and remote Open in Editor** (branch `claude/file-chooser-b2`, plan
   `docs/superpowers/plans/2026-09-30-file-chooser-b2.md`): Remote 0.8.0 registers its saved hosts as a file source
   (`dev.jasper.remote.chooser.RemoteHosts`, `files.source`): each host is a root with a connected dot, clicking it
