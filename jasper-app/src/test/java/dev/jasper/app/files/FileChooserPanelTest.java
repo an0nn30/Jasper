@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -28,8 +30,11 @@ class FileChooserPanelTest {
     @TempDir Path dir;
     private final UiState state = UiState.inMemory();
     private final ChooserPrefs prefs = new ChooserPrefs(state);
-    private final List<List<Path>> finished = new ArrayList<>();
+    private final List<List<Location>> finished = new ArrayList<>();
+    private final List<CompletableFuture<Browser>> connects = new ArrayList<>();
+    private final List<Runnable> sourceListeners = new ArrayList<>();
     private boolean replace;
+    private boolean hostConnected;
     private Optional<String> folderName = Optional.empty();
 
     @BeforeEach void tree() throws IOException {
@@ -38,13 +43,35 @@ class FileChooserPanelTest {
         Files.writeString(dir.resolve("todo.md"), "- one\n");
     }
 
-    private FileChooserPanel panel(ChooserRequest.Mode mode, Optional<String> name) {
-        var request = new ChooserRequest("Choose", mode, false, dir, Optional.of(dir), name, Optional.empty());
-        var model = new ChooserModel(request, new LocalFiles(), Runnable::run, Runnable::run, prefs.showHidden());
-        var panel = new FileChooserPanel(model, prefs, finished::add, file -> replace, () -> folderName);
+    private Location here(String name) { return Location.local(dir.resolve(name)); }
+
+    private ChooserSource hosts() {
+        return new ChooserSource() {
+            @Override public String id() { return "dev.x.hosts"; }
+            @Override public String heading() { return "Remote"; }
+            @Override public List<Root> roots() { return List.of(new Root("box", "Box", "me@box:22", hostConnected)); }
+            @Override public Runnable onChanged(Runnable listener) { sourceListeners.add(listener); return () -> sourceListeners.remove(listener); }
+            @Override public CompletableFuture<Browser> connect(String root, Optional<UUID> ownerWindow) {
+                var attempt = new CompletableFuture<Browser>();
+                connects.add(attempt);
+                return attempt;
+            }
+        };
+    }
+
+    private FileChooserPanel panel(ChooserRequest.Mode mode, Optional<String> name, List<ChooserSource> extra) {
+        var request = new ChooserRequest("Choose", mode, false, Location.local(dir), Optional.of(Location.local(dir)), name,
+            Optional.empty(), Optional.empty());
+        var sources = new ArrayList<ChooserSource>();
+        sources.add(new LocalSource(new LocalBrowser(dir)));
+        sources.addAll(extra);
+        var model = new ChooserModel(request, sources, Runnable::run, Runnable::run, prefs.showHidden());
+        var panel = new FileChooserPanel(model, prefs, dir, finished::add, file -> replace, () -> folderName);
         model.start();
         return panel;
     }
+
+    private FileChooserPanel panel(ChooserRequest.Mode mode, Optional<String> name) { return panel(mode, name, List.of()); }
 
     private static List<String> rows(FileChooserPanel panel) {
         var table = panel.table();
@@ -54,6 +81,13 @@ class FileChooserPanelTest {
     private static void press(JComponent component, int key) {
         Object name = component.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke(key, 0));
         component.getActionMap().get(name).actionPerformed(new ActionEvent(component, ActionEvent.ACTION_PERFORMED, ""));
+    }
+
+    private static Places.Place place(FileChooserPanel panel, String label) {
+        var items = panel.navigation().getModel();
+        return IntStream.range(0, items.getSize()).mapToObj(items::getElementAt)
+            .filter(item -> item instanceof Places.Place place && place.label().equals(label)).map(Places.Place.class::cast)
+            .findFirst().orElseThrow();
     }
 
     @Test void enterOnAFolderEntersItAndEnterOnAFileOpensIt() {
@@ -67,8 +101,8 @@ class FileChooserPanelTest {
         panel.table().setRowSelectionInterval(1, 1);
         assertThat(panel.nameField().getText()).isEqualTo("notes.txt");
         press(panel.table(), KeyEvent.VK_ENTER);
-        assertThat(finished).containsExactly(List.of(dir.resolve("notes.txt")));
-        assertThat(prefs.recent()).containsExactly(dir);
+        assertThat(finished).containsExactly(List.of(here("notes.txt")));
+        assertThat(prefs.recent()).containsExactly(Location.local(dir));
     }
 
     @Test void theNameFieldAcceptsPathsAndReportsProblems() {
@@ -81,7 +115,7 @@ class FileChooserPanelTest {
         assertThat(panel.statusText()).isEqualTo("There is no file named \"../missing.txt\".");
         panel.nameField().setText("../todo.md");
         panel.approve();
-        assertThat(finished).containsExactly(List.of(dir.resolve("todo.md")));
+        assertThat(finished).containsExactly(List.of(here("todo.md")));
     }
 
     @Test void saveSelectsTheNamePartAndAsksBeforeReplacing() {
@@ -93,7 +127,7 @@ class FileChooserPanelTest {
         assertThat(finished).isEmpty();
         replace = true;
         panel.approve();
-        assertThat(finished).containsExactly(List.of(dir.resolve("notes.txt")));
+        assertThat(finished).containsExactly(List.of(here("notes.txt")));
     }
 
     @Test void newFolderCreatesAndSelectsIt() {
@@ -117,11 +151,9 @@ class FileChooserPanelTest {
         assertThat(items.getElementAt(0)).isEqualTo("Places");
         assertThat(((Places.Place) items.getElementAt(1)).label()).isEqualTo("Terminal folder");
         assertThat(panel.navigation().getSelectedValue()).as("the folder shown is highlighted").isEqualTo(items.getElementAt(1));
-        panel.togglePin(dir.resolve("docs"));
-        assertThat(prefs.pinned()).containsExactly(dir.resolve("docs"));
-        Object pinned = IntStream.range(0, items.getSize()).mapToObj(items::getElementAt)
-            .filter(item -> item instanceof Places.Place place && place.section() == Places.Section.PINNED).findFirst().orElseThrow();
-        panel.navigation().setSelectedValue(pinned, false);
+        panel.togglePin(here("docs"));
+        assertThat(prefs.pinned()).containsExactly(here("docs"));
+        panel.navigation().setSelectedValue(place(panel, "docs"), false);
         assertThat(panel.pathText()).endsWith("docs");
     }
 
@@ -150,6 +182,33 @@ class FileChooserPanelTest {
         assertThat(panel.pathText()).endsWith("docs");
         panel.editPath(dir.resolve("nowhere").toString());
         assertThat(panel.statusText()).startsWith("There is no folder at ");
+    }
+
+    @Test void aSourceRootConnectsWhenOpenedAndOffersRetryWhenItFails() throws IOException {
+        Path remote = Files.createDirectory(dir.resolve("remote-home"));
+        Files.writeString(remote.resolve("r.txt"), "r");
+        var panel = panel(OPEN, Optional.empty(), List.of(hosts()));
+        var items = panel.navigation().getModel();
+        assertThat(IntStream.range(0, items.getSize()).mapToObj(items::getElementAt)).contains("Remote");
+        assertThat(place(panel, "Box").connected()).isFalse();
+        hostConnected = true;
+        sourceListeners.forEach(Runnable::run);
+        assertThat(place(panel, "Box").connected()).as("the pane follows the source").isTrue();
+        panel.navigation().setSelectedValue(place(panel, "Box"), false);
+        assertThat(panel.centerMessage()).contains("Connecting to Box\u2026");
+        assertThat(panel.centerAction()).contains("Cancel connection");
+        connects.getLast().completeExceptionally(new IOException("offline"));
+        assertThat(panel.centerMessage()).contains("Couldn't connect to Box: offline");
+        assertThat(panel.centerAction()).contains("Retry");
+        panel.pressCenterAction();
+        connects.getLast().complete(new LocalBrowser(remote));
+        assertThat(rows(panel)).containsExactly("r.txt");
+        assertThat(panel.pathText()).startsWith("Box");
+        panel.table().setRowSelectionInterval(0, 0);
+        panel.approve();
+        assertThat(finished).containsExactly(List.of(new Location("dev.x.hosts", "box", remote.resolve("r.txt").toString())));
+        panel.close();
+        assertThat(sourceListeners).isEmpty();
     }
 
     @DisabledOnOs(OS.WINDOWS)
