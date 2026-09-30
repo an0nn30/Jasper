@@ -521,7 +521,7 @@ class RemoteBrowserTest {
             var entries = new ArrayList<FileEntry>();
             browser.list(root, entries::add);
             assertThat(entries).extracting(FileEntry::name, FileEntry::kind).containsExactlyInAnyOrder(
-                tuple("conf", DIRECTORY), tuple("alias.toml", FILE), tuple("etc", DIRECTORY), tuple("gone", OTHER));
+                tuple("conf", DIRECTORY), tuple("alias.toml", FileEntry.Kind.FILE), tuple("etc", DIRECTORY), tuple("gone", OTHER));
             assertThat(entries.stream().filter(entry -> entry.name().equals("alias.toml")).findFirst().orElseThrow().size())
                 .as("a link reports its target's size").isEqualTo(6);
             assertThat(browser.stat(root + "/etc")).hasValueSatisfying(entry -> assertThat(entry.kind()).isEqualTo(DIRECTORY));
@@ -593,7 +593,8 @@ public final class RemoteBrowser implements FileBrowser {
     }
 
     @Override public byte[] read(String path, int maxBytes) throws IOException {
-        try (InputStream input = endpoint.read(path, 0)) { return input.readNBytes(maxBytes); }
+        // Reads follow links here: some endpoints refuse to open a link itself.
+        try (InputStream input = endpoint.read(SafeWrite.resolve(endpoint, path).path(), 0)) { return input.readNBytes(maxBytes); }
     }
 
     @Override public void mkdir(String path) throws IOException { endpoint.mkdir(path); }
@@ -608,7 +609,7 @@ public final class RemoteBrowser implements FileBrowser {
         Optional<dev.jasper.remote.sftp.FileEntry> target;
         try { target = SafeWrite.resolve(endpoint, path).entry(); }
         catch (IOException broken) { target = Optional.empty(); }
-        return target.map(found -> entry(path, found)).orElseGet(() -> new FileEntry(name(path), FileEntry.Kind.OTHER, -1, -1));
+        return target.map(found -> entry(path, found)).orElseGet(() -> new FileEntry(entryName(path), FileEntry.Kind.OTHER, -1, -1));
     }
 
     /** A listed name may be a bare name or, from SFTP, the whole path. */
@@ -617,7 +618,7 @@ public final class RemoteBrowser implements FileBrowser {
         return directory.endsWith("/") ? directory + listed : directory + "/" + listed;
     }
 
-    private static String name(String path) {
+    private static String entryName(String path) {
         String trimmed = path.length() > 1 && path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
         String last = trimmed.substring(trimmed.lastIndexOf('/') + 1);
         return last.isEmpty() ? "root" : last;
@@ -629,7 +630,7 @@ public final class RemoteBrowser implements FileBrowser {
             case FILE -> FileEntry.Kind.FILE;
             case LINK, SPECIAL -> FileEntry.Kind.OTHER;
         };
-        return new FileEntry(name(path), kind, kind == FileEntry.Kind.DIRECTORY ? -1 : entry.size(), entry.modifiedMillis());
+        return new FileEntry(entryName(path), kind, kind == FileEntry.Kind.DIRECTORY ? -1 : entry.size(), entry.modifiedMillis());
     }
 }
 ```
