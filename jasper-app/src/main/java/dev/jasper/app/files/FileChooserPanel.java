@@ -767,11 +767,18 @@ public final class FileChooserPanel extends JPanel {
         }
 
         private void crumb(String text, Location target) {
-            if (!labels.isEmpty()) crumbs.add(new JLabel(" \u203A "));
+            if (!labels.isEmpty()) {
+                var separator = new JLabel("\u203A");
+                separator.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
+                crumbs.add(separator);
+            }
             String label = safe(text);
             labels.add(label);
             var crumb = plain(new JButton(label));
             crumb.putClientProperty("JButton.buttonType", "borderless");
+            // As wide as the name: FlatLaf buttons otherwise pad short names out to a minimum width.
+            crumb.putClientProperty(com.formdev.flatlaf.FlatClientProperties.MINIMUM_WIDTH, 0);
+            crumb.setMargin(new Insets(1, 4, 1, 4));
             crumb.setFocusable(false);
             crumb.addActionListener(event -> model.navigate(target));
             if (!target.path().equals(Location.HOME))
