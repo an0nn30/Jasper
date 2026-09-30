@@ -208,7 +208,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Produces: `public record ChooserEntry(Path path, String name, Kind kind, long size, long modified, boolean hidden)` with `enum Kind { DIRECTORY, FILE, OTHER }` and `boolean directory()`; `size` is -1 for folders and unreadable entries, `modified` is epoch ms or -1.
-- Produces: `public final class LocalFiles` with `Path home()`, `List<ChooserEntry> list(Path) throws IOException`, `ChooserEntry entry(Path)`, `Preview preview(ChooserEntry, int maxBytes) throws IOException`, `void mkdir(Path) throws IOException`, and `public record LocalFiles.Preview(Optional<String> text, boolean binary, int items)`.
+- Produces: `public final class LocalFiles` with `Path home()`, `List<ChooserEntry> list(Path) throws IOException`, `ChooserEntry entry(Path)`, `Preview preview(ChooserEntry, int maxBytes) throws IOException`, `void mkdir(Path) throws IOException`, and `public record LocalFiles.PreviewInfo(Optional<String> text, boolean binary, int items)`.
 
 - [ ] **Step 1: Write the failing test** `LocalFilesTest.java`:
 
@@ -265,13 +265,13 @@ class LocalFilesTest {
 
     @Test void previewsTextBinaryAndFolders() throws Exception {
         Path text = Files.writeString(dir.resolve("a.txt"), "line one\r\nline\007two\n");
-        assertThat(files.preview(files.entry(text), 8192)).isEqualTo(new LocalFiles.Preview(Optional.of("line one\nline\uFFFDtwo\n"), false, 0));
+        assertThat(files.preview(files.entry(text), 8192)).isEqualTo(new LocalFiles.PreviewInfo(Optional.of("line one\nline\uFFFDtwo\n"), false, 0));
         Path binary = Files.write(dir.resolve("b.bin"), new byte[] {1, 0, 2});
-        assertThat(files.preview(files.entry(binary), 8192)).isEqualTo(new LocalFiles.Preview(Optional.empty(), true, 0));
+        assertThat(files.preview(files.entry(binary), 8192)).isEqualTo(new LocalFiles.PreviewInfo(Optional.empty(), true, 0));
         Path folder = Files.createDirectory(dir.resolve("f"));
         Files.writeString(folder.resolve("x"), "");
         Files.writeString(folder.resolve("y"), "");
-        assertThat(files.preview(files.entry(folder), 8192)).isEqualTo(new LocalFiles.Preview(Optional.empty(), false, 2));
+        assertThat(files.preview(files.entry(folder), 8192)).isEqualTo(new LocalFiles.PreviewInfo(Optional.empty(), false, 2));
         Path longer = Files.writeString(dir.resolve("long.txt"), "abcdef");
         assertThat(files.preview(files.entry(longer), 3).text()).contains("abc");
     }
@@ -356,7 +356,7 @@ public final class LocalFiles {
      * @param binary the start of the file contains a NUL byte
      * @param items a folder's item count; 0 for files
      */
-    public record Preview(Optional<String> text, boolean binary, int items) { }
+    public record PreviewInfo(Optional<String> text, boolean binary, int items) { }
 
     /** @return the user's home folder */
     public Path home() { return Path.of(System.getProperty("user.home")).toAbsolutePath().normalize(); }
@@ -400,18 +400,18 @@ public final class LocalFiles {
      * @return a folder's item count, a binary marker, or the start of a text file
      * @throws IOException when the entry cannot be read
      */
-    public Preview preview(ChooserEntry entry, int maxBytes) throws IOException {
+    public PreviewInfo preview(ChooserEntry entry, int maxBytes) throws IOException {
         if (entry.directory()) {
             int items = 0;
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(entry.path())) {
                 for (Path ignored : stream) items++;
             }
-            return new Preview(Optional.empty(), false, items);
+            return new PreviewInfo(Optional.empty(), false, items);
         }
         byte[] head;
         try (InputStream input = Files.newInputStream(entry.path())) { head = input.readNBytes(maxBytes); }
-        for (byte b : head) if (b == 0) return new Preview(Optional.empty(), true, 0);
-        return new Preview(Optional.of(printable(new String(head, StandardCharsets.UTF_8))), false, 0);
+        for (byte b : head) if (b == 0) return new PreviewInfo(Optional.empty(), true, 0);
+        return new PreviewInfo(Optional.of(printable(new String(head, StandardCharsets.UTF_8))), false, 0);
     }
 
     /** Keeps line breaks and tabs, drops carriage returns, and replaces other control characters with U+FFFD. */
@@ -999,7 +999,7 @@ public final class ChooserModel {
     private boolean ascending = true;
     private boolean loading;
     private Optional<String> error = Optional.empty();
-    private Optional<LocalFiles.Preview> preview = Optional.empty();
+    private Optional<LocalFiles.PreviewInfo> preview = Optional.empty();
     private long generation;
     private long previewGeneration;
 
@@ -1030,7 +1030,7 @@ public final class ChooserModel {
     public List<ChooserEntry> selection() { return selection; }
     public boolean loading() { return loading; }
     public Optional<String> error() { return error; }
-    public Optional<LocalFiles.Preview> preview() { return preview; }
+    public Optional<LocalFiles.PreviewInfo> preview() { return preview; }
     public String filter() { return filter; }
     public boolean showHidden() { return showHidden; }
     public Column sortColumn() { return sortColumn; }
@@ -1413,10 +1413,10 @@ Add these methods before `load()`:
         if (selection.size() != 1) return;
         ChooserEntry entry = selection.getFirst();
         worker.execute(() -> {
-            Optional<LocalFiles.Preview> result;
+            Optional<LocalFiles.PreviewInfo> result;
             try { result = Optional.of(files.preview(entry, PREVIEW_BYTES)); }
             catch (IOException | RuntimeException unreadable) { result = Optional.empty(); }
-            Optional<LocalFiles.Preview> loaded = result;
+            Optional<LocalFiles.PreviewInfo> loaded = result;
             ui.execute(() -> {
                 if (ticket != previewGeneration) return;
                 preview = loaded;
@@ -2152,12 +2152,12 @@ public final class FileChooserPanel extends JPanel {
             return;
         }
         ChooserEntry entry = selected.getFirst();
-        Optional<LocalFiles.Preview> loaded = model.preview();
+        Optional<LocalFiles.PreviewInfo> loaded = model.preview();
         previewTitle.setText(safe(entry.name()));
         previewDetails.setText(entry.directory()
             ? loaded.map(preview -> preview.items() == 1 ? "1 item" : preview.items() + " items").orElse("Folder")
             : sizeText(entry.size()) + (entry.modified() >= 0 ? " \u00B7 " + modifiedText(entry.modified()) : ""));
-        previewText.setText(loaded.flatMap(LocalFiles.Preview::text).orElse(loaded.filter(LocalFiles.Preview::binary).isPresent() ? "Binary file" : ""));
+        previewText.setText(loaded.flatMap(LocalFiles.PreviewInfo::text).orElse(loaded.filter(LocalFiles.PreviewInfo::binary).isPresent() ? "Binary file" : ""));
         previewText.setCaretPosition(0);
     }
 

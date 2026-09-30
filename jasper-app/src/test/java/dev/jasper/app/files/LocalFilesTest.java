@@ -50,13 +50,13 @@ class LocalFilesTest {
 
     @Test void previewsTextBinaryAndFolders() throws Exception {
         Path text = Files.writeString(dir.resolve("a.txt"), "line one\r\nline\007two\n");
-        assertThat(files.preview(files.entry(text), 8192)).isEqualTo(new LocalFiles.Preview(Optional.of("line one\nline�two\n"), false, 0));
+        assertThat(files.preview(files.entry(text), 8192)).isEqualTo(new LocalFiles.PreviewInfo(Optional.of("line one\nline\uFFFDtwo\n"), false, 0));
         Path binary = Files.write(dir.resolve("b.bin"), new byte[] {1, 0, 2});
-        assertThat(files.preview(files.entry(binary), 8192)).isEqualTo(new LocalFiles.Preview(Optional.empty(), true, 0));
+        assertThat(files.preview(files.entry(binary), 8192)).isEqualTo(new LocalFiles.PreviewInfo(Optional.empty(), true, 0));
         Path folder = Files.createDirectory(dir.resolve("f"));
         Files.writeString(folder.resolve("x"), "");
         Files.writeString(folder.resolve("y"), "");
-        assertThat(files.preview(files.entry(folder), 8192)).isEqualTo(new LocalFiles.Preview(Optional.empty(), false, 2));
+        assertThat(files.preview(files.entry(folder), 8192)).isEqualTo(new LocalFiles.PreviewInfo(Optional.empty(), false, 2));
         Path longer = Files.writeString(dir.resolve("long.txt"), "abcdef");
         assertThat(files.preview(files.entry(longer), 3).text()).contains("abc");
     }

@@ -20,7 +20,7 @@ public final class LocalFiles {
      * @param binary the start of the file contains a NUL byte
      * @param items a folder's item count; 0 for files
      */
-    public record Preview(Optional<String> text, boolean binary, int items) { }
+    public record PreviewInfo(Optional<String> text, boolean binary, int items) { }
 
     /** @return the user's home folder */
     public Path home() { return Path.of(System.getProperty("user.home")).toAbsolutePath().normalize(); }
@@ -64,18 +64,18 @@ public final class LocalFiles {
      * @return a folder's item count, a binary marker, or the start of a text file
      * @throws IOException when the entry cannot be read
      */
-    public Preview preview(ChooserEntry entry, int maxBytes) throws IOException {
+    public PreviewInfo preview(ChooserEntry entry, int maxBytes) throws IOException {
         if (entry.directory()) {
             int items = 0;
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(entry.path())) {
                 for (Path ignored : stream) items++;
             }
-            return new Preview(Optional.empty(), false, items);
+            return new PreviewInfo(Optional.empty(), false, items);
         }
         byte[] head;
         try (InputStream input = Files.newInputStream(entry.path())) { head = input.readNBytes(maxBytes); }
-        for (byte b : head) if (b == 0) return new Preview(Optional.empty(), true, 0);
-        return new Preview(Optional.of(printable(new String(head, StandardCharsets.UTF_8))), false, 0);
+        for (byte b : head) if (b == 0) return new PreviewInfo(Optional.empty(), true, 0);
+        return new PreviewInfo(Optional.of(printable(new String(head, StandardCharsets.UTF_8))), false, 0);
     }
 
     /** Keeps line breaks and tabs, drops carriage returns, and replaces other control characters with U+FFFD. */
@@ -84,7 +84,7 @@ public final class LocalFiles {
         text.chars().forEach(c -> {
             if (c == '\r') return;
             if (c == '\n' || c == '\t') out.append((char) c);
-            else if (c < 0x20 || c == 0x7f) out.append('�');
+            else if (c < 0x20 || c == 0x7f) out.append('\uFFFD');
             else out.append((char) c);
         });
         return out.toString();

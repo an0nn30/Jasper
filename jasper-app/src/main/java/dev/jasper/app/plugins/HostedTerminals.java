@@ -20,6 +20,7 @@ import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -211,6 +212,16 @@ final class HostedTerminals implements Terminals {
 
     /** A handle for an id an action was given; it finds its tab if the pane is open. */
     PaneHandle paneHandle(UUID id) { return registry.pane(id).<PaneHandle>map(Pane::new).orElseGet(() -> new Pane(id, NOWHERE)); }
+
+    /**
+     * The local folder of the focused pane in {@code windowId}'s selected tab, else of the active pane. For the host's
+     * file chooser; no capability applies because nothing reaches the plugin unless the user picks it.
+     */
+    Optional<Path> workingDirectory(UUID windowId) {
+        Optional<PaneEntry> pane = windowId == null ? Optional.empty()
+            : registry.window(windowId).flatMap(window -> window.selectedTab().get()).flatMap(tab -> tab.focusedPane().get());
+        return pane.or(registry::activePane).flatMap(entry -> entry.snapshot().get().workingDirectory());
+    }
 
     @Override public Optional<WindowHandle> activeWindow() { requireUi("activeWindow"); return registry.activeWindow().map(window -> new Window(window.id())); }
     @Override public Optional<PaneHandle> activePane() { requireUi("activePane"); return registry.activePane().map(Pane::new); }

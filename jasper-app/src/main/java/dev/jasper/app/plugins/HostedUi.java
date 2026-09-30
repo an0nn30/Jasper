@@ -384,10 +384,10 @@ final class HostedUi {
         dev.jasper.app.windows.PathChoice choice;
         Subscription ownerClosed;
         if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window && window.surface.shown()) {
-            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, mode);
+            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, mode, terminals.workingDirectory(null));
             ownerClosed = wrap(window.surface.onClosed(cancel));
         } else if (owner instanceof WindowHandle terminal && terminals.ownsOpenWindow(terminal)) {
-            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, mode);
+            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, mode, terminals.workingDirectory(terminal.id()));
             ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
         } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
         Subscription stopped = tracked(cancel);

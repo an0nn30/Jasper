@@ -61,7 +61,7 @@ public final class ChooserModel {
     private boolean ascending = true;
     private boolean loading;
     private Optional<String> error = Optional.empty();
-    private Optional<LocalFiles.Preview> preview = Optional.empty();
+    private Optional<LocalFiles.PreviewInfo> preview = Optional.empty();
     private long generation;
     private long previewGeneration;
     private Optional<Path> pendingSelection = Optional.empty();
@@ -97,7 +97,7 @@ public final class ChooserModel {
     public List<ChooserEntry> selection() { return selection; }
     public boolean loading() { return loading; }
     public Optional<String> error() { return error; }
-    public Optional<LocalFiles.Preview> preview() { return preview; }
+    public Optional<LocalFiles.PreviewInfo> preview() { return preview; }
     public String filter() { return filter; }
     public boolean showHidden() { return showHidden; }
     public Column sortColumn() { return sortColumn; }
@@ -252,10 +252,10 @@ public final class ChooserModel {
         if (selection.size() != 1) return;
         ChooserEntry entry = selection.getFirst();
         worker.execute(() -> {
-            Optional<LocalFiles.Preview> result;
+            Optional<LocalFiles.PreviewInfo> result;
             try { result = Optional.of(files.preview(entry, PREVIEW_BYTES)); }
             catch (IOException | RuntimeException unreadable) { result = Optional.empty(); }
-            Optional<LocalFiles.Preview> loaded = result;
+            Optional<LocalFiles.PreviewInfo> loaded = result;
             ui.execute(() -> {
                 if (ticket != previewGeneration) return;
                 preview = loaded;

@@ -1,6 +1,17 @@
 package dev.jasper.app.windows;
 
 import com.formdev.flatlaf.util.SystemInfo;
+import dev.jasper.app.files.ChooserModel;
+import dev.jasper.app.files.ChooserPrefs;
+import dev.jasper.app.files.ChooserRequest;
+import dev.jasper.app.files.FileChooserPanel;
+import dev.jasper.app.files.LocalFiles;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import javax.swing.JOptionPane;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.persistence.UiState;
@@ -29,18 +40,17 @@ import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
-import java.awt.FileDialog;
-import java.awt.Frame;
 import java.nio.file.Path;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
  * The native boundary for auxiliary windows: frame or dialog, application icon, the unified macOS title
- * bar, a menu bar so the screen menu does not vanish, theme tracking and remembered bounds. Everything
+ * bar, a menu bar so the screen menu does not vanish, theme tracking and remembered bounds. It also shows Jasper's file
+ * chooser in place of the platform's file dialogs. Everything
  * testable lives in {@link AuxiliarySurface}. EDT only; never constructed in headless tests.
  */
 public final class NativeShells {
+    private static final String CHOOSER_BOUNDS = "file-chooser";
     private final ThemeController themes;
     private final UiState state;
     private final Function<UUID, Window> terminalWindows;
@@ -190,70 +200,61 @@ public final class NativeShells {
         return owner.closed() ? Optional.empty() : selected;
     }
 
-    /** Owner-based multiple-file, single-directory or save-target selection, without global chooser properties. */
-    public java.util.List<Path> choosePaths(PathChoice choice, java.util.function.Consumer<Runnable> cancellation) {
+    /** Owner-based multiple-file, single-directory or save-target selection in Jasper's own chooser. */
+    public List<Path> choosePaths(PathChoice choice, Consumer<Runnable> cancellation) {
         Window owner = choice.terminalOwner() != null ? terminalWindows.apply(choice.terminalOwner()) : natives.get(choice.auxiliaryOwner());
         if (owner == null || !owner.isShowing()) throw new IllegalArgumentException("Picker requires a shown owner");
-        if (choice.mode() != PathChoice.Mode.DIRECTORY) {
-            int mode = choice.mode() == PathChoice.Mode.SAVE ? FileDialog.SAVE : FileDialog.LOAD;
-            FileDialog chooser = owner instanceof Dialog dialog ? new FileDialog(dialog, choice.title(), mode)
-                : new FileDialog((Frame) owner, choice.title(), mode);
-            try {
-                chooser.setMultipleMode(choice.mode() == PathChoice.Mode.FILES);
-                choice.initial().ifPresent(path -> {
-                    if (choice.mode() == PathChoice.Mode.SAVE && !java.nio.file.Files.isDirectory(path)) {
-                        if (path.getParent() != null) chooser.setDirectory(path.getParent().toString());
-                        if (path.getFileName() != null) chooser.setFile(path.getFileName().toString());
-                    } else chooser.setDirectory(path.toString());
-                });
-                cancellation.accept(chooser::dispose);
-                chooser.setVisible(true);
-                return java.util.Arrays.stream(chooser.getFiles()).map(file -> file.toPath().toAbsolutePath().normalize()).toList();
-            } finally { chooser.dispose(); }
-        }
-        var picker = new javax.swing.JFileChooser();
-        picker.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
-        picker.setMultiSelectionEnabled(false); picker.setAcceptAllFileFilterUsed(false);
-        choice.initial().ifPresent(path -> picker.setCurrentDirectory(path.toFile()));
-        var dialog = new JDialog(owner, choice.title(), Dialog.ModalityType.DOCUMENT_MODAL);
-        var selected = new java.util.ArrayList<Path>();
-        picker.addActionListener(event -> {
-            if (javax.swing.JFileChooser.APPROVE_SELECTION.equals(event.getActionCommand()) && picker.getSelectedFile() != null)
-                selected.add(picker.getSelectedFile().toPath().toAbsolutePath().normalize());
-            dialog.dispose();
-        });
-        try {
-            dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-            dialog.setContentPane(picker); dialog.pack(); dialog.setLocationRelativeTo(owner);
-            cancellation.accept(dialog::dispose);
-            dialog.setVisible(true);
-            return java.util.List.copyOf(selected);
-        } finally { dialog.dispose(); }
+        ChooserRequest.Mode mode = switch (choice.mode()) {
+            case FILES -> ChooserRequest.Mode.OPEN;
+            case DIRECTORY -> ChooserRequest.Mode.DIRECTORY;
+            case SAVE -> ChooserRequest.Mode.SAVE;
+        };
+        return showChooser(owner, ChooserRequest.of(choice.title(), mode, choice.mode() == PathChoice.Mode.FILES, choice.initial(),
+            choice.terminalFolder(), Optional.empty(), new LocalFiles().home()), cancellation);
     }
 
-    private static Optional<Path> chooseFile(Window owner, String title, Optional<Path> initialPath, Optional<String> suffix) {
-        // A dialog-owned picker must stay above its modal editor, not merely above the editor's frame.
-        FileDialog chooser = owner instanceof Dialog dialog ? new FileDialog(dialog, title, FileDialog.LOAD)
-            : new FileDialog((Frame) owner, title, FileDialog.LOAD);
+    private Optional<Path> chooseFile(Window owner, String title, Optional<Path> initialPath, Optional<String> suffix) {
+        return showChooser(owner, ChooserRequest.of(title, ChooserRequest.Mode.OPEN, false, initialPath, Optional.empty(), suffix,
+            new LocalFiles().home()), action -> { }).stream().findFirst();
+    }
+
+    /** Shows the chooser document-modally over {@code owner}; returns when it closes. Empty means cancelled. */
+    private List<Path> showChooser(Window owner, ChooserRequest request, Consumer<Runnable> cancellation) {
+        var dialog = new JDialog(owner, request.title(), Dialog.ModalityType.DOCUMENT_MODAL);
+        ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
+            var thread = new Thread(task, "jasper-file-chooser");
+            thread.setDaemon(true);
+            return thread;
+        });
+        var prefs = new ChooserPrefs(state);
+        var model = new ChooserModel(request, new LocalFiles(), worker, SwingUtilities::invokeLater, prefs.showHidden());
+        var result = new AtomicReference<List<Path>>(List.of());
+        var panel = new FileChooserPanel(model, prefs, paths -> { result.set(paths); dialog.dispose(); },
+            file -> JOptionPane.showConfirmDialog(dialog, file.getFileName() + " already exists. Do you want to replace it?",
+                "Confirm Save As", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION,
+            () -> Optional.ofNullable(JOptionPane.showInputDialog(dialog, "Folder name:", "New Folder", JOptionPane.PLAIN_MESSAGE))
+                .map(String::strip).filter(name -> !name.isEmpty()));
         try {
-            suffix.ifPresent(value -> {
-                String wanted = value.toLowerCase(Locale.ROOT);
-                // macOS and Linux honor the filter; Windows honors the pattern.
-                chooser.setFilenameFilter((directory, name) -> name.toLowerCase(Locale.ROOT).endsWith(wanted));
-                chooser.setFile("*" + value);
-            });
-            initialPath.map(path -> path.toAbsolutePath().normalize()).ifPresent(path -> {
-                if (java.nio.file.Files.isDirectory(path)) chooser.setDirectory(path.toString());
-                else {
-                    if (path.getParent() != null) chooser.setDirectory(path.getParent().toString());
-                    if (path.getFileName() != null) chooser.setFile(path.getFileName().toString());
-                }
-            });
-            chooser.setVisible(true);
-            String file = chooser.getFile();
-            return file == null ? Optional.empty() : Optional.of(Path.of(chooser.getDirectory(), file).toAbsolutePath().normalize());
+            dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+            dialog.setIconImages(ApplicationIcon.images());
+            dialog.setContentPane(panel);
+            dialog.getRootPane().setDefaultButton(panel.primaryButton());
+            var size = state.window(CHOOSER_BOUNDS).map(saved -> new java.awt.Dimension(saved.width(), saved.height()))
+                .orElse(new java.awt.Dimension(820, 520));
+            dialog.setSize(size);
+            dialog.setLocationRelativeTo(owner);
+            cancellation.accept(dialog::dispose);
+            model.start();
+            dialog.setVisible(true);
+            return result.get();
         } finally {
-            chooser.dispose();
+            Rectangle bounds = dialog.getBounds();
+            if (bounds.width > 0 && bounds.height > 0) {
+                state.putWindow(CHOOSER_BOUNDS, new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height));
+                state.save();
+            }
+            dialog.dispose();
+            worker.shutdownNow();
         }
     }
 

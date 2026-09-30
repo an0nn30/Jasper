@@ -484,12 +484,12 @@ public final class FileChooserPanel extends JPanel {
             return;
         }
         ChooserEntry entry = selected.getFirst();
-        Optional<LocalFiles.Preview> loaded = model.preview();
+        Optional<LocalFiles.PreviewInfo> loaded = model.preview();
         previewTitle.setText(safe(entry.name()));
         previewDetails.setText(entry.directory()
             ? loaded.map(preview -> preview.items() == 1 ? "1 item" : preview.items() + " items").orElse("Folder")
             : sizeText(entry.size()) + (entry.modified() >= 0 ? " \u00B7 " + modifiedText(entry.modified()) : ""));
-        previewText.setText(loaded.flatMap(LocalFiles.Preview::text).orElse(loaded.filter(LocalFiles.Preview::binary).isPresent() ? "Binary file" : ""));
+        previewText.setText(loaded.flatMap(LocalFiles.PreviewInfo::text).orElse(loaded.filter(LocalFiles.PreviewInfo::binary).isPresent() ? "Binary file" : ""));
         previewText.setCaretPosition(0);
     }
 
