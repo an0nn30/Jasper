@@ -1,6 +1,8 @@
 package dev.jasper.app.themestore;
 
 import dev.jasper.app.appearance.ThemeCatalog;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.settingsui.SettingsPage;
 import java.awt.Component;
 import java.net.URI;
 import java.nio.file.Files;
@@ -77,6 +79,9 @@ public final class ThemeStore implements AutoCloseable {
         return JOptionPane.showConfirmDialog(parent, question, "IntelliJ Themes", JOptionPane.YES_NO_OPTION,
             JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION;
     }
+
+    /** The IntelliJ Themes page for one Settings dialog, around {@code header}, the schema page holding its settings. */
+    public SettingsPage page(PageContext context, SettingsPage header) { return new IntelliJThemesPage(this, context, header); }
 
     CompletableFuture<MarketplaceClient.Page> search(String query, int offset) { return onEdt(supply(() -> client.search(query, offset))); }
 
