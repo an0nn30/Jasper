@@ -107,7 +107,7 @@ public final class CorePages {
                 .action(() -> "Read the file again after editing it elsewhere.",
                     new SchemaPage.Button("Reload from Disk", system.reload(), () -> true))
                 .action(() -> "Rewrite old setting names to the current layout; the original is backed up first.",
-                    new SchemaPage.Button("Migrate Config…", system.migrate(), system.migratable())),
+                    new SchemaPage.Button("Migrate Config\u2026", system.migrate(), system.migratable())),
             SchemaPage.page(INTELLIJ_THEMES, "IntelliJ Themes").parent(THEMES).anchor("intellij-themes")
                 .row(THEMES_MARKETPLACE_ENABLED),
             SchemaPage.page("terminal", "Terminal")

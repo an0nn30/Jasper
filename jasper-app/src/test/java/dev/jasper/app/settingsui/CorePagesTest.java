@@ -66,7 +66,7 @@ class CorePagesTest {
         var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();
         systemPage.component();
         assertThat(systemPage.actionButtons()).extracting(javax.swing.JButton::getText)
-            .containsExactly("Open in Editor", "Reveal", "Reload from Disk", "Migrate Config…");
+            .containsExactly("Open in Editor", "Reveal", "Reload from Disk", "Migrate Config\u2026");
         systemPage.actionButtons().forEach(javax.swing.JButton::doClick);
         assertThat(calls).containsExactly("open", "reveal", "reload", "migrate");
     }

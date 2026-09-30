@@ -94,9 +94,9 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Combo(() -> Fonts.families(monospaced)), List.of());
     }
 
-    static final String MORE_THEMES = "Get More Themes…";
-    static final String MANAGE_THEMES = "Manage Themes…";
-    static final String MORE_TERMINAL_THEMES = "More Terminal Themes…";
+    static final String MORE_THEMES = "Get More Themes\u2026";
+    static final String MANAGE_THEMES = "Manage Themes\u2026";
+    static final String MORE_TERMINAL_THEMES = "More Terminal Themes\u2026";
     /** The built-in terminal colours: stored value to shown text, in dropdown order. */
     private static final Map<String, String> BUILT_IN_COLORS = builtInColors();
 
@@ -108,7 +108,7 @@ public final class Editors {
         return Collections.unmodifiableMap(names);
     }
 
-    /** An editable combo of theme names ending in Get More Themes… (Manage Themes… while the Marketplace is off). */
+    /** An editable combo of theme names ending in Get More Themes\u2026 (Manage Themes\u2026 while the Marketplace is off). */
     public static Factory<String> theme(Supplier<List<String>> names) {
         return new Factory<>((setting, context) -> new ActionCombo(new Choices(names, UnaryOperator.identity(), UnaryOperator.identity(),
             index -> false,
@@ -117,7 +117,7 @@ public final class Editors {
             List.of("Get More Themes", "Marketplace"));
     }
 
-    /** Terminal colours: Match the theme, Light, Dark, then every terminal theme, ending in More Terminal Themes…. */
+    /** Terminal colours: Match the theme, Light, Dark, then every terminal theme, ending in More Terminal Themes\u2026. */
     public static Factory<String> terminalColors(Supplier<List<String>> themes) {
         return new Factory<>((setting, context) -> new ActionCombo(new Choices(
             () -> { var all = new ArrayList<>(BUILT_IN_COLORS.values()); all.addAll(themes.get()); return all; },
