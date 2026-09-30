@@ -2,6 +2,7 @@ package dev.jasper.app.persistence;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
@@ -57,5 +58,23 @@ class UiStateTest {
         state.putPanel("dev.x.hosts", new UiState.Panel("LEFT", false, 200));
         assertThatCode(state::save).doesNotThrowAnyException();
         assertThat(state.panel("dev.x.hosts")).isPresent();
+    }
+
+    @Test void remembersTheFileChoosersFoldersAndToggles() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        assertThat(state.chooser()).isEqualTo(UiState.Chooser.DEFAULT);
+        state.setChooser(new UiState.Chooser(List.of("/work/a \"quoted\"", "C:\\Users\\me"), List.of("/pinned\ttab"), true, false));
+        state.save();
+        assertThat(Files.readString(file)).contains("[chooser]",
+            "recent = [\"/work/a \\\"quoted\\\"\", \"C:\\\\Users\\\\me\"]", "pinned = [\"/pinned\\u0009tab\"]",
+            "preview = true", "show_hidden = false");
+        assertThat(UiState.load(file).chooser()).isEqualTo(state.chooser());
+    }
+
+    @Test void unreadableChooserValuesFallBackOneKeyAtATime() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, "version = 1\n[chooser]\nrecent = [1, \"/ok\"]\npinned = \"not a list\"\npreview = \"yes\"\n");
+        assertThat(UiState.load(file).chooser()).isEqualTo(new UiState.Chooser(List.of("/ok"), List.of(), false, true));
     }
 }
