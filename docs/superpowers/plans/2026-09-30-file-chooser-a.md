@@ -2156,7 +2156,7 @@ public final class FileChooserPanel extends JPanel {
         previewTitle.setText(safe(entry.name()));
         previewDetails.setText(entry.directory()
             ? loaded.map(preview -> preview.items() == 1 ? "1 item" : preview.items() + " items").orElse("Folder")
-            : size(entry.size()) + (entry.modified() >= 0 ? " \u00B7 " + modified(entry.modified()) : ""));
+            : sizeText(entry.size()) + (entry.modified() >= 0 ? " \u00B7 " + modifiedText(entry.modified()) : ""));
         previewText.setText(loaded.flatMap(LocalFiles.Preview::text).orElse(loaded.filter(LocalFiles.Preview::binary).isPresent() ? "Binary file" : ""));
         previewText.setCaretPosition(0);
     }
@@ -2220,7 +2220,7 @@ public final class FileChooserPanel extends JPanel {
         return out.toString();
     }
 
-    static String size(long bytes) {
+    static String sizeText(long bytes) {
         if (bytes < 0) return "";
         if (bytes < 1024) return bytes + " B";
         String[] units = { "KB", "MB", "GB", "TB" };
@@ -2230,7 +2230,7 @@ public final class FileChooserPanel extends JPanel {
         return String.format(Locale.ROOT, value < 10 ? "%.1f %s" : "%.0f %s", value, units[unit]);
     }
 
-    static String modified(long millis) { return MODIFIED.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())); }
+    static String modifiedText(long millis) { return MODIFIED.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())); }
 
     private final class EntryTable extends AbstractTableModel {
         private List<ChooserEntry> rows = List.of();
@@ -2243,7 +2243,8 @@ public final class FileChooserPanel extends JPanel {
 
         @Override public int getRowCount() { return rows.size(); }
         @Override public int getColumnCount() { return 3; }
-        @Override public String getColumnName(int column) { return header(ChooserModel.Column.values()[column]); }
+        /** Plain names: JTable asks while the panel's fields are still being built; {@code sync} adds the sort arrow. */
+        @Override public String getColumnName(int column) { return switch (column) { case 0 -> "Name"; case 1 -> "Modified"; default -> "Size"; }; }
         @Override public Object getValueAt(int row, int column) { return rows.get(row); }
     }
 
@@ -2261,9 +2262,9 @@ public final class FileChooserPanel extends JPanel {
                     setIcon(AppIcons.bundled(entry.directory() ? "nodes/folder"
                         : entry.kind() == ChooserEntry.Kind.FILE ? "fileTypes/text" : "fileTypes/unknown"));
                 }
-                case 1 -> setText(entry.modified() < 0 ? "" : modified(entry.modified()));
+                case 1 -> setText(entry.modified() < 0 ? "" : modifiedText(entry.modified()));
                 default -> {
-                    setText(entry.directory() ? "" : size(entry.size()));
+                    setText(entry.directory() ? "" : sizeText(entry.size()));
                     setHorizontalAlignment(SwingConstants.TRAILING);
                 }
             }
