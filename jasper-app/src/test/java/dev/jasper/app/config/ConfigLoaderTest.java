@@ -428,7 +428,7 @@ class ConfigLoaderTest {
         }
     @Test void terminalColorsDefaultToMatchAndAcceptEveryChoice() {
         assertThat(parse("").snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
-        for (var choice : TerminalColors.values())
+        for (var choice : TerminalColors.builtIns())
             assertThat(parse("[terminal]\ncolors = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
                 .snapshot().terminalColors()).isEqualTo(choice);
         var mixed = parse("terminal.colors = 'dark'\nui.theme.name = 'IntelliJ Light'\n").snapshot();
@@ -437,7 +437,7 @@ class ConfigLoaderTest {
     }
 
     @Test void invalidTerminalColorsUseTheExistingPerFieldDiagnosticPolicy() {
-        for (String value : java.util.List.of("'private-value'", "7", "true")) {
+        for (String value : java.util.List.of("'   '", "7", "true")) {
             var result = parse("[terminal]\ncolors=" + value + "\n[ui.theme]\nname='IntelliJ Light'\n");
             assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
             assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
@@ -445,7 +445,7 @@ class ConfigLoaderTest {
             assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
                 assertThat(problem.key()).isEqualTo("terminal.colors");
                 assertThat(problem.line()).isEqualTo(2);
-                assertThat(problem.message()).doesNotContain("private-value");
+                assertThat(problem.message()).doesNotContain("   ");
             });
         }
     }

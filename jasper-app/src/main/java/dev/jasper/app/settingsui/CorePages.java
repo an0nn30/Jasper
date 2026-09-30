@@ -37,6 +37,28 @@ public final class CorePages {
     public record SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
                                 BooleanSupplier migratable) { }
 
+    /** The Alacritty Themes page's id. */
+    public static final String ALACRITTY_THEMES = "themes.alacritty";
+
+    /**
+     * The pages the application supplies.
+     *
+     * @param keymap the Keymap page
+     * @param plugins the Plugins page
+     * @param tools pages under Tools, such as plugins' settings pages
+     * @param intellijThemes the IntelliJ Themes page around its schema header
+     * @param alacrittyThemes the Alacritty Themes page; empty leaves it out
+     */
+    public record Pages(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins,
+                        Function<PageContext, List<SettingsPage>> tools,
+                        BiFunction<PageContext, SettingsPage, SettingsPage> intellijThemes,
+                        Function<PageContext, Optional<SettingsPage>> alacrittyThemes) {
+        /** Keymap and Plugins only. */
+        public static Pages of(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins) {
+            return new Pages(keymap, plugins, context -> List.of(), (context, header) -> header, context -> Optional.empty());
+        }
+    }
+
     /** Every schema page's spec, in tree order, with no detected shells. */
     public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system) {
         return specs(themeNames, system, ShellChoices.NONE);
@@ -44,6 +66,12 @@ public final class CorePages {
 
     /** Every schema page's spec, in tree order. */
     public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells) {
+        return specs(themeNames, List::of, system, shells);
+    }
+
+    /** Every schema page's spec, in tree order, with the terminal themes the Terminal colors dropdown lists. */
+    public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, Supplier<List<String>> terminalThemeNames,
+                                              SystemActions system, ShellChoices shells) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
@@ -79,7 +107,7 @@ public final class CorePages {
                 .action(() -> "Read the file again after editing it elsewhere.",
                     new SchemaPage.Button("Reload from Disk", system.reload(), () -> true))
                 .action(() -> "Rewrite old setting names to the current layout; the original is backed up first.",
-                    new SchemaPage.Button("Migrate Config…", system.migrate(), system.migratable())),
+                    new SchemaPage.Button("Migrate Config\u2026", system.migrate(), system.migratable())),
             SchemaPage.page(INTELLIJ_THEMES, "IntelliJ Themes").parent(THEMES).anchor("intellij-themes")
                 .row(THEMES_MARKETPLACE_ENABLED),
             SchemaPage.page("terminal", "Terminal")
@@ -99,7 +127,7 @@ public final class CorePages {
                 .row(TERMINAL_FONT_LIGATURES)
                 .row(TERMINAL_FONT_LINE_HEIGHT, Editors.number(0.05, "×"))
                 .section("Colors")
-                .row(TERMINAL_COLORS, Editors.choice(Map.of("match", "Match the theme", "light", "Light", "dark", "Dark"))),
+                .row(TERMINAL_COLORS, Editors.terminalColors(terminalThemeNames)),
             SchemaPage.page("terminal.cursor", "Cursor").parent("terminal")
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),
@@ -159,21 +187,28 @@ public final class CorePages {
                                                                    Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools,
                                                                    BiFunction<PageContext, SettingsPage, SettingsPage> intellijThemes) {
+        return pages(themeNames, List::of, system, shells, new Pages(keymap, plugins, tools, intellijThemes, context -> Optional.empty()));
+    }
+
+    /** The whole tree for one dialog, in display order, with the pages the application supplies. */
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, Supplier<List<String>> terminalThemeNames,
+                                                                   SystemActions system, ShellChoices shells, Pages supplied) {
         return context -> {
-            var specs = specs(themeNames, system, shells);
+            var specs = specs(themeNames, terminalThemeNames, system, shells);
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();
             all.add(new GroupPage("appearance-behavior", "Appearance & Behavior", Optional.empty(), false,
                 childrenOf.apply("appearance-behavior"), context));
             for (var spec : specs.subList(0, 6)) all.add(spec.build(context));
-            all.add(keymap.apply(context));
+            all.add(supplied.keymap().apply(context));
             all.add(new GroupPage(THEMES, "Themes", Optional.empty(), false, childrenOf.apply(THEMES), context));
-            all.add(intellijThemes.apply(context, specs.get(6).build(context)));
+            all.add(supplied.intellijThemes().apply(context, specs.get(6).build(context)));
+            supplied.alacrittyThemes().apply(context).ifPresent(all::add);
             for (var spec : specs.subList(7, specs.size())) all.add(spec.build(context));
-            all.add(plugins.apply(context));
+            all.add(supplied.plugins().apply(context));
             all.add(new GroupPage("tools", "Tools", Optional.empty(), true, childrenOf.apply("tools"), context));
-            all.addAll(tools.apply(context));
+            all.addAll(supplied.tools().apply(context));
             return List.copyOf(all);
         };
     }

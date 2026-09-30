@@ -159,7 +159,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             values.get(CoreSettings.BUDDY_ENABLED), values.get(CoreSettings.PALETTE_VISIBLE_ROWS),
             values.get(CoreSettings.NOTIFICATIONS_LONG_COMMAND_SECONDS), values.get(CoreSettings.SYSTEM_RUN_IN_BACKGROUND), plugins,
             new UiFontConfig(values.get(CoreSettings.UI_FONT_FAMILY), values.get(CoreSettings.UI_FONT_SIZE)),
-            values.get(CoreSettings.TERMINAL_COLORS), values.get(CoreSettings.WINDOW_RAIL_WIDTH),
+            TerminalColors.parse(values.get(CoreSettings.TERMINAL_COLORS)), values.get(CoreSettings.WINDOW_RAIL_WIDTH),
             values.get(CoreSettings.WINDOW_TOOLBAR_HEIGHT), values.get(CoreSettings.WINDOW_STATUS_BAR_HEIGHT),
             values.get(CoreSettings.WINDOW_NATIVE_DECORATIONS));
     }

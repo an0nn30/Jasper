@@ -114,12 +114,13 @@ public final class CoreSettings {
         .label("Shell integration").keywords("integration", "prompt marks", "osc 133", "zsh", "bash", "fish").applies(Applies.NEW_PANES)
         .description("Shell integration: \"auto\" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),\n"
             + "\"manual\" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, \"off\" does neither.").build();
-    public static final Setting<TerminalColors> TERMINAL_COLORS = Setting.of("terminal.colors", SettingKind.choice(List.of(
-            Map.entry("match", TerminalColors.MATCH), Map.entry("light", TerminalColors.LIGHT), Map.entry("dark", TerminalColors.DARK))),
-            TerminalColors.MATCH)
-        .alias("ui.theme.terminal").label("Terminal colors").keywords("palette", "colours", "color scheme", "theme")
+    public static final Setting<String> TERMINAL_COLORS = Setting.of("terminal.colors",
+            SettingKind.string(text -> !text.isBlank(), "Use a terminal theme's name, or match, light or dark; using match.",
+                TerminalColors::normalize), "match")
+        .alias("ui.theme.terminal").label("Terminal colors").keywords("palette", "colours", "color scheme", "theme", "alacritty")
         .description("Terminal colors: \"match\" uses the theme's console colours (Jasper's palette when it has\n"
-            + "none); \"light\" or \"dark\" keeps Jasper's palette. Switches live.").build();
+            + "none); \"light\" or \"dark\" keeps Jasper's palette; any other value names a terminal theme from\n"
+            + "Settings > Themes > Alacritty Themes. Switches live.").build();
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), FontConfig.defaults().family())
         .alias("font.family").label("Font").keywords("font", "typeface", "family")

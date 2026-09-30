@@ -204,7 +204,7 @@ class EditorsTest {
 
         draft.stage(CoreSettings.THEMES_MARKETPLACE_ENABLED, Optional.of(false));
         names.add("Dracula");
-        ((Editors.ThemeCombo) editor).reload();
+        ((Editors.ActionCombo) editor).reload();
         assertThat(box.getItemCount()).isEqualTo(4);
         assertThat(box.getItemAt(2)).isEqualTo("Dracula");
         assertThat(box.getItemAt(3)).isEqualTo("Manage Themes\u2026");
@@ -219,14 +219,14 @@ class EditorsTest {
 
     @Test void onlyClicksEnterAndProgrammaticChoicesNavigateFromTheActionEntry() {
         var source = new javax.swing.JPanel();
-        assertThat(Editors.ThemeCombo.navigates(null)).isTrue();
-        assertThat(Editors.ThemeCombo.navigates(new java.awt.event.MouseEvent(source, java.awt.event.MouseEvent.MOUSE_RELEASED,
+        assertThat(Editors.ActionCombo.navigates(null)).isTrue();
+        assertThat(Editors.ActionCombo.navigates(new java.awt.event.MouseEvent(source, java.awt.event.MouseEvent.MOUSE_RELEASED,
             0, 0, 1, 1, 1, false))).isTrue();
-        assertThat(Editors.ThemeCombo.navigates(new java.awt.event.ActionEvent(source, java.awt.event.ActionEvent.ACTION_PERFORMED, ""))).isTrue();
-        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_ENTER))).isTrue();
-        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_DOWN))).isFalse();
-        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_PAGE_DOWN))).isFalse();
-        assertThat(Editors.ThemeCombo.navigates(key(source, java.awt.event.KeyEvent.VK_END))).isFalse();
+        assertThat(Editors.ActionCombo.navigates(new java.awt.event.ActionEvent(source, java.awt.event.ActionEvent.ACTION_PERFORMED, ""))).isTrue();
+        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_ENTER))).isTrue();
+        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_DOWN))).isFalse();
+        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_PAGE_DOWN))).isFalse();
+        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_END))).isFalse();
     }
 
     private static java.awt.event.KeyEvent key(java.awt.Component source, int code) {
@@ -252,7 +252,7 @@ class EditorsTest {
         var navigated = new ArrayList<String>();
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
         var themes = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
-        var combo = (Editors.ThemeCombo) build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, themes);
+        var combo = (Editors.ActionCombo) build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, themes);
         combo.show("Jasper Dark");
         var edits = new int[1];
         combo.onEdit(() -> edits[0]++);
@@ -277,5 +277,41 @@ class EditorsTest {
         combo.highlight(1);
         combo.enter(enter, true);
         assertThat(navigated).as("Enter on a theme row does not navigate").containsExactly("themes.intellij#marketplace");
+    }
+
+    @Test void terminalColorsOfferTheBuiltInsTheThemesAndMoreTerminalThemes() {
+        var navigated = new ArrayList<String>();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+        var ctx = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
+        var combo = (Editors.ActionCombo) build(Editors.terminalColors(() -> List.of("Dracula", "Nord")), CoreSettings.TERMINAL_COLORS, ctx);
+        @SuppressWarnings("unchecked") var box = (JComboBox<String>) combo.component();
+        assertThat(java.util.stream.IntStream.range(0, box.getItemCount()).mapToObj(box::getItemAt))
+            .containsExactly("Match the theme", "Light", "Dark", "Dracula", "Nord", "More Terminal Themes\u2026");
+        combo.show("match");
+        assertThat(combo.value()).isEqualTo("match");
+        assertThat(((JTextField) box.getEditor().getEditorComponent()).getText()).isEqualTo("Match the theme");
+        combo.show("DARK");
+        assertThat(combo.value()).isEqualTo("dark");
+        var edits = new int[1];
+        combo.onEdit(() -> edits[0]++);
+        box.setSelectedIndex(3);
+        assertThat(combo.value()).isEqualTo("Dracula");
+        assertThat(edits[0]).isPositive();
+        box.setSelectedIndex(5);
+        assertThat(navigated).containsExactly("themes.alacritty");
+        assertThat(combo.value()).as("the action is never the value").isEqualTo("Dracula");
+        combo.highlight(5);
+        combo.enter(new java.awt.event.ActionEvent(box, java.awt.event.ActionEvent.ACTION_PERFORMED, ""), true);
+        assertThat(navigated).containsExactly("themes.alacritty", "themes.alacritty");
+    }
+
+    @Test void onlyTheShownBuiltInLabelsBecomeTheirTokens() {
+        assertThat(Editors.storedColors("Match the theme")).isEqualTo("match");
+        assertThat(Editors.storedColors("Light")).isEqualTo("light");
+        assertThat(Editors.storedColors(" Dark ")).isEqualTo("dark");
+        assertThat(Editors.storedColors("match")).isEqualTo("match");
+        assertThat(Editors.storedColors("LIGHT")).isEqualTo("light");
+        assertThat(Editors.storedColors("Match The Theme")).as("a user theme of that name").isEqualTo("Match The Theme");
+        assertThat(Editors.storedColors("match the theme")).isEqualTo("match the theme");
     }
 }

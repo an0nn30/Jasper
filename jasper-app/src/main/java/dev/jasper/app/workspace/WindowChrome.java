@@ -30,8 +30,10 @@ final class WindowChrome {
     private final WindowHeader header;
     private final WindowStatusBar status = new WindowStatusBar();
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
-    private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
+    private final java.util.Map<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.LinkedHashMap<>();
     private final ButtonGroup toolbarModes = new ButtonGroup();
+    /** The built-in terminal colour choices; none is selected while a named terminal theme is in use. */
+    private final ButtonGroup terminalGroup = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
     private final JCheckBoxMenuItem railVisible = new JCheckBoxMenuItem("Rail", true);
@@ -84,8 +86,7 @@ final class WindowChrome {
         buddyVisible.setAction(owner.windowCommands().view("view.buddy"));
         railVisible.setAction(owner.windowCommands().view("view.rail"));
         JMenu terminalColors = new JMenu("Terminal Colors");
-        ButtonGroup terminalGroup = new ButtonGroup();
-        for (TerminalColors colors : TerminalColors.values()) {
+        for (TerminalColors colors : TerminalColors.builtIns()) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view(
                 "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT)));
             terminalItems.put(colors, item); terminalGroup.add(item); terminalColors.add(item);
@@ -435,7 +436,10 @@ final class WindowChrome {
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
         status.refreshTheme();
-        terminalItems.forEach((colors, item) -> item.setSelected(owner.terminalColors() == colors));
+        // A ButtonGroup ignores setSelected(false) on its selected member, so a named theme clears the group.
+        TerminalColors current = owner.terminalColors();
+        if (current.named()) terminalGroup.clearSelection();
+        else terminalItems.forEach((colors, item) -> { if (current.equals(colors)) item.setSelected(true); });
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }

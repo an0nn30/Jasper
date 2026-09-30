@@ -2,6 +2,7 @@ package dev.jasper.app.settingsui;
 
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.config.CoreSettings;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.TerminalConfig;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
@@ -19,8 +20,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -90,9 +94,51 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Combo(() -> Fonts.families(monospaced)), List.of());
     }
 
+    static final String MORE_THEMES = "Get More Themes\u2026";
+    static final String MANAGE_THEMES = "Manage Themes\u2026";
+    static final String MORE_TERMINAL_THEMES = "More Terminal Themes\u2026";
+    /** The built-in terminal colours: stored value to shown text, in dropdown order. */
+    private static final Map<String, String> BUILT_IN_COLORS = builtInColors();
+
+    private static Map<String, String> builtInColors() {
+        var names = new LinkedHashMap<String, String>();
+        names.put("match", "Match the theme");
+        names.put("light", "Light");
+        names.put("dark", "Dark");
+        return Collections.unmodifiableMap(names);
+    }
+
     /** An editable combo of theme names ending in Get More Themes\u2026 (Manage Themes\u2026 while the Marketplace is off). */
     public static Factory<String> theme(Supplier<List<String>> names) {
-        return new Factory<>((setting, context) -> new ThemeCombo(names, context), List.of("Get More Themes", "Marketplace"));
+        return new Factory<>((setting, context) -> new ActionCombo(new Choices(names, UnaryOperator.identity(), UnaryOperator.identity(),
+            index -> false,
+            () -> context.draft().value(CoreSettings.THEMES_MARKETPLACE_ENABLED) ? MORE_THEMES : MANAGE_THEMES,
+            label -> context.navigate().accept(CorePages.INTELLIJ_THEMES + (MORE_THEMES.equals(label) ? "#marketplace" : "#installed")))),
+            List.of("Get More Themes", "Marketplace"));
+    }
+
+    /** Terminal colours: Match the theme, Light, Dark, then every terminal theme, ending in More Terminal Themes\u2026. */
+    public static Factory<String> terminalColors(Supplier<List<String>> themes) {
+        return new Factory<>((setting, context) -> new ActionCombo(new Choices(
+            () -> { var all = new ArrayList<>(BUILT_IN_COLORS.values()); all.addAll(themes.get()); return all; },
+            Editors::storedColors, Editors::shownColors, index -> index == BUILT_IN_COLORS.size(),
+            () -> MORE_TERMINAL_THEMES, label -> context.navigate().accept(CorePages.ALACRITTY_THEMES))),
+            List.of("Match the theme", "Alacritty", "More Terminal Themes"));
+    }
+
+    /**
+     * A shown terminal colours entry as saved: the labels Match the theme, Light and Dark (exactly as shown) become their
+     * tokens, typed tokens are normalised, and anything else, such as a theme named "Match The Theme", is kept.
+     */
+    static String storedColors(String shown) {
+        for (var entry : BUILT_IN_COLORS.entrySet()) if (entry.getValue().equals(shown.strip())) return entry.getKey();
+        return TerminalColors.normalize(shown);
+    }
+
+    /** A saved terminal colours value as shown. */
+    static String shownColors(String stored) {
+        String normalized = TerminalColors.normalize(stored);
+        return BUILT_IN_COLORS.getOrDefault(normalized, normalized);
     }
 
     /** A text field with Browse\u2026, for a program path. */
@@ -250,22 +296,32 @@ public final class Editors {
     }
 
     /**
-     * The theme combo: the installed theme names, re-read each time the list opens, then an entry that opens Settings >
-     * Themes > IntelliJ Themes. Choosing that entry navigates and leaves the value as it was.
+     * What an {@link ActionCombo} offers.
+     *
+     * @param entries the choices as shown
+     * @param stored shown text to the stored value
+     * @param shown a stored value to shown text
+     * @param ruleBefore rows that start a group, drawn below a rule
+     * @param actionLabel the trailing entry's label, read each time the list opens
+     * @param action runs, with the label, when the trailing entry is chosen
      */
-    static final class ThemeCombo implements ValueEditor<String> {
-        static final String MORE = "Get More Themes\u2026";
-        static final String MANAGE = "Manage Themes\u2026";
-        private final Supplier<List<String>> names;
-        private final PageContext context;
+    record Choices(Supplier<List<String>> entries, UnaryOperator<String> stored, UnaryOperator<String> shown,
+                   IntPredicate ruleBefore, Supplier<String> actionLabel, Consumer<String> action) { }
+
+    /**
+     * An editable combo of choices, re-read each time the list opens, ending in an entry that runs an action (such as
+     * opening another page) instead of being chosen; the value stays as it was.
+     */
+    static final class ActionCombo implements ValueEditor<String> {
+        private final Choices choices;
         private final Model model = new Model();
         private final JComboBox<String> box = new JComboBox<>(model);
         private final List<Runnable> listeners = new ArrayList<>();
+        private String action = "";
         private boolean showing;
 
-        ThemeCombo(Supplier<List<String>> names, PageContext context) {
-            this.names = names;
-            this.context = context;
+        ActionCombo(Choices choices) {
+            this.choices = choices;
             box.setEditable(true);
             box.setPrototypeDisplayValue("JetBrains Mono NL Extra");
             box.setRenderer(new Renderer());
@@ -285,32 +341,32 @@ public final class Editors {
             });
         }
 
-        /** Re-reads the theme names, keeping the text shown, so themes installed since the page was built are offered. */
+        /** Re-reads the entries and the action's label, keeping the text shown. */
         void reload() {
             showing = true;
             try {
                 String text = editor().getText();
                 model.removeAllElements();
-                for (String name : names.get()) model.addElement(name);
-                model.addElement(actionLabel());
+                for (String entry : choices.entries().get()) model.addElement(entry);
+                action = choices.actionLabel().get();
+                model.addElement(action);
                 model.select(text);
                 editor().setText(text);
             } finally { showing = false; }
         }
 
-        private String actionLabel() { return context.draft().value(CoreSettings.THEMES_MARKETPLACE_ENABLED) ? MORE : MANAGE; }
-        private static boolean isAction(Object item) { return MORE.equals(item) || MANAGE.equals(item); }
+        private boolean isAction(Object item) { return item != null && item.equals(action); }
 
         /**
-         * Whether choosing the action entry during {@code current} should navigate. Basic and FlatLaf select as the
-         * arrow and page keys move through the open list, so only a click, Enter or a programmatic choice (no event)
-         * navigates; any other key leaves the entry unselected.
+         * Whether choosing the action entry during {@code current} should run it. Basic and FlatLaf select as the arrow
+         * and page keys move through the open list, so only a click, Enter or a programmatic choice (no event) runs it.
          */
         static boolean navigates(java.awt.AWTEvent current) {
             if (current instanceof java.awt.event.KeyEvent key) return key.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
                 || key.getKeyChar() == '\n';
             return true;
         }
+
         private JTextComponent editor() { return (JTextComponent) box.getEditor().getEditorComponent(); }
         private void edited() { if (!showing) for (Runnable listener : List.copyOf(listeners)) listener.run(); }
 
@@ -319,16 +375,16 @@ public final class Editors {
          * open list, and the arrow keys never select the action entry, so Enter on it would do nothing without this.
          */
         private void bindEnter(JTextComponent field) {
-            field.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "jasper.themeComboEnter");
-            field.getActionMap().put("jasper.themeComboEnter", new AbstractAction() {
+            field.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "jasper.actionComboEnter");
+            field.getActionMap().put("jasper.actionComboEnter", new AbstractAction() {
                 @Override public void actionPerformed(java.awt.event.ActionEvent event) { enter(event, box.isPopupVisible()); }
             });
         }
 
-        /** Enter: the highlighted action entry of the open list navigates; anything else accepts the text as usual. */
+        /** Enter: the highlighted action entry of the open list runs; anything else accepts the text as usual. */
         void enter(java.awt.event.ActionEvent event, boolean listOpen) {
             Object highlighted = popupList().map(JList::getSelectedValue).orElse(null);
-            if (listOpen && isAction(highlighted)) { open(MORE.equals(highlighted)); return; }
+            if (listOpen && isAction(highlighted)) { run(); return; }
             Action accept = editor().getActionMap().get(JTextField.notifyAction);
             if (accept != null) accept.actionPerformed(event);
         }
@@ -341,29 +397,33 @@ public final class Editors {
                 ? Optional.of(popup.getList()) : Optional.empty();
         }
 
-        private void open(boolean marketplace) {
+        private void run() {
             box.hidePopup();
-            context.navigate().accept(CorePages.INTELLIJ_THEMES + (marketplace ? "#marketplace" : "#installed"));
+            choices.action().accept(action);
         }
 
         @Override public JComponent component() { return box; }
-        @Override public String value() { return editor().getText(); }
+        @Override public String value() { return choices.stored().apply(editor().getText()); }
         @Override public void show(String value) {
             showing = true;
-            try { model.select(value); editor().setText(value); } finally { showing = false; }
+            try {
+                String text = choices.shown().apply(value);
+                model.select(text);
+                editor().setText(text);
+            } finally { showing = false; }
         }
         @Override public void onEdit(Runnable listener) { listeners.add(listener); }
 
-        /** Refuses the action entry as a selection and navigates instead. */
+        /** Refuses the action entry as a selection and runs it instead. */
         private final class Model extends DefaultComboBoxModel<String> {
             @Override public void setSelectedItem(Object item) {
                 if (isAction(item)) {
                     if (showing || !navigates(java.awt.EventQueue.getCurrentEvent())) return;
-                    // Enter on typed action text: put the chosen theme back so the sentinel is never the value.
+                    // Enter on typed action text: put the chosen entry back so the action is never the value.
                     Object chosen = getSelectedItem();
                     String text = chosen == null ? "" : chosen.toString();
                     if (!editor().getText().equals(text)) editor().setText(text);
-                    open(MORE.equals(item));
+                    run();
                     return;
                 }
                 super.setSelectedItem(item);
@@ -371,14 +431,17 @@ public final class Editors {
             void select(Object item) { super.setSelectedItem(item); }
         }
 
-        /** Draws the action entry as a link below a rule. */
-        private static final class Renderer extends DefaultListCellRenderer {
+        /** Draws the action entry as a link, and a rule above it and above each row that starts a group. */
+        private final class Renderer extends DefaultListCellRenderer {
             @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
                 var label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focused);
                 label.putClientProperty("html.disable", true);
-                if (ThemeCombo.isAction(value) && index >= 0) {
+                boolean actionEntry = isAction(value);
+                if (actionEntry && !selected) {
                     Color link = UIManager.getColor("Component.linkColor");
-                    if (link != null && !selected) label.setForeground(link);
+                    if (link != null) label.setForeground(link);
+                }
+                if (index >= 0 && (actionEntry || choices.ruleBefore().test(index))) {
                     Color rule = UIManager.getColor("Separator.foreground");
                     label.setBorder(BorderFactory.createCompoundBorder(
                         BorderFactory.createMatteBorder(1, 0, 0, 0, rule != null ? rule : Color.GRAY), label.getBorder()));

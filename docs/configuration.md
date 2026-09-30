@@ -29,7 +29,7 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
 The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
-Desk Buddy, System Settings), Themes (IntelliJ Themes), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
+Desk Buddy, System Settings), Themes (IntelliJ Themes, Alacritty Themes), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
 the search field filters the tree and highlights matching settings on the page.
 Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
 ("Ubuntu (WSL 1)"); ↻ detects them again. Program and Arguments apply only to Custom.
@@ -164,7 +164,7 @@ enabled = true
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
 | `themes.marketplace.enabled` | `true` | Boolean; `false` hides Settings › Themes › IntelliJ Themes' Marketplace tab and stops its update checks | Live |
-| `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
+| `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"`, or a terminal theme's name ([Themes](themes.md)); an unknown name is a warning and uses `"match"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -696,8 +696,19 @@ padding and the area behind the panes follow this choice; the title row, toolbar
 bar, status bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every
 window without reinstalling the look and feel, keeping shells, scrollback and splits.
 
-View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. An
-unrecognized value produces an error diagnostic and keeps `"match"`; a non-string value rejects the configuration.
+`terminal.colors` may also name a terminal theme; see [Alacritty themes](#alacritty-themes).
+
+View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. While a
+named terminal theme is in use, none of these choices is checked. Any other non-blank text names a terminal theme; an
+unknown name is a warning and the terminal uses `"match"`. A blank value is an error and keeps `"match"`; a non-string
+value rejects the configuration.
+
+### Alacritty themes
+
+Settings › Themes › Alacritty Themes lists the bundled and installed terminal themes, previews each in a sample
+terminal and installs `.toml` theme files into the `terminal-themes` folder beside `config.toml`. Choosing one sets
+`terminal.colors` to its name. The format, the folder and the problems Jasper reports are described in
+[Themes](themes.md#terminal-themes).
 
 ### Interface typography
 
