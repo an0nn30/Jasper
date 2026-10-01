@@ -154,4 +154,23 @@ class FileServersPanelTest {
         panel.setServers(views, Optional.empty());
         assertThat(panel.split.getDividerSize()).isPositive();
     }
+
+    @Test void theWrappedEmptyHintSurvivesBeingHidden() {
+        var panel = panel();
+        panel.setSize(300, 600);
+        layoutAll(panel);
+        view("docs", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        layoutAll(panel);
+        panel.setServers(List.of(), Optional.empty());
+        layoutAll(panel);
+        assertThat(panel.empty.getPreferredSize().height).as("a few lines at most").isLessThan(100);
+    }
+
+    static void layoutAll(java.awt.Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) {
+            if (child instanceof java.awt.Container c) layoutAll(c);
+        }
+    }
 }

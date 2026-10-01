@@ -338,6 +338,11 @@ public final class FileServersPanel extends JPanel {
     /** Wrapping, read-only text that looks like a label; a JTextArea never renders HTML. */
     private static JTextArea note(String text) {
         var note = new JTextArea(text) {
+            @Override public void setBounds(int x, int y, int width, int height) {
+                // Hidden children are laid out at a degenerate size; a wrapped text area would keep measuring at it.
+                if (width <= 0 || height <= 0) { width = 0; height = 0; }
+                super.setBounds(x, y, width, height);
+            }
             @Override public void updateUI() {
                 super.updateUI();
                 setFont(UIManager.getFont("Label.font"));
