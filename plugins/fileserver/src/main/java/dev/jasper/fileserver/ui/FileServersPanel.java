@@ -98,7 +98,8 @@ public final class FileServersPanel extends JPanel {
             @Override public boolean getScrollableTracksViewportWidth() { return true; }
             @Override public String getToolTipText(MouseEvent event) {
                 int index = locationToIndex(event.getPoint());
-                return index >= 0 && model.get(index) instanceof ServerRows.Server row ? tooltip(row.view()) : null;
+                Rectangle cell = index < 0 ? null : getCellBounds(index, index);
+                return cell != null && cell.contains(event.getPoint()) && model.get(index) instanceof ServerRows.Server row ? tooltip(row.view()) : null;
             }
         };
         ToolTipManager.sharedInstance().registerComponent(list);
@@ -323,8 +324,10 @@ public final class FileServersPanel extends JPanel {
     }
 
     private static JLabel label(String text) {
-        var label = new JLabel(text);
+        var label = new JLabel();
+        // html.disable must be set before the text: the UI installs the HTML view when the text is set
         label.putClientProperty("html.disable", Boolean.TRUE);
+        label.setText(text);
         return label;
     }
 

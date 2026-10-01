@@ -114,4 +114,32 @@ class FileServersPanelTest {
         panel.copyActivity.doClick();
         assertThat(events).containsExactly("clear drop", "copy 12:00:01 10.0.0.2 connected\n12:00:02 10.0.0.2 ↓ /a  5 B  0.1 s");
     }
+
+    static void labels(java.awt.Component component, List<javax.swing.JLabel> found) {
+        if (component instanceof javax.swing.JLabel label) found.add(label);
+        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) labels(child, found);
+    }
+
+    @Test void namesThatLookLikeHtmlAreShownLiterally() {
+        var panel = panel();
+        view("<html><b>x</b>", ServerState.RUNNING, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.of("<html><i>broken</i>"));
+        var found = new ArrayList<javax.swing.JLabel>();
+        for (int i = 0; i < panel.list.getModel().getSize(); i++)
+            labels(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(i), i, false, false), found);
+        labels(panel, found);
+        assertThat(found).isNotEmpty().allSatisfy(label -> assertThat(label.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).isNull());
+        assertThat(found).extracting(javax.swing.JLabel::getText).contains("<html><b>x</b>   HTTP :8080", "servers.toml: <html><i>broken</i>");
+        assertThat(panel.cardName.getText()).isEqualTo("<html><b>x</b>");
+    }
+
+    @Test void tooltipsOnlyShowOverARow() {
+        var panel = panel();
+        view("docs", ServerState.RUNNING, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        panel.list.setSize(300, 400);
+        var cell = panel.list.getCellBounds(0, 0);
+        assertThat(panel.list.getToolTipText(new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0, 5, cell.y + 2, 0, false))).isEqualTo("Running");
+        assertThat(panel.list.getToolTipText(new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0, 5, 390, 0, false))).isNull();
+    }
 }
