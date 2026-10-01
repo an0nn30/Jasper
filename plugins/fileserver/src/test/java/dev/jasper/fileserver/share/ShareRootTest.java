@@ -9,6 +9,7 @@ import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,6 +28,8 @@ class ShareRootTest {
         Files.writeString(shared.resolve("docs/a.txt"), "hello");
         Files.writeString(outside.resolve("secret.txt"), "secret");
     }
+
+    interface ThrowingAction { void run() throws Exception; }
 
     static void link(Path link, Path target) {
         try { Files.createSymbolicLink(link, target); }
@@ -47,8 +50,15 @@ class ShareRootTest {
         assertThat(ShareRoot.segments("/a/b/../c/")).containsExactly("a", "c");
     }
 
+    @Test void namesThePlatformCannotRepresentAreRefusedNotThrown() throws IOException {
+        var share = new ShareRoot(shared, false);
+        assertThatThrownBy(() -> share.resolve("x\uD800")).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.resolve("docs/x\uD800")).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.openWrite("x\uD800", false)).isInstanceOf(PathRefusedException.class);
+    }
+
     @Test void refusesNamesNoPlatformCanShareSafely() throws IOException {
-        for (String bad : new String[]{"a:b", "C:", "CON", "con.txt", "Lpt1", "aux .log", "name.", "name ", "tab\tname", "nul\0", "del\177"})
+        for (String bad : new String[]{"a:b", "C:", "CON", "con.txt", "Lpt1", "aux .log", "name.", "name ", "tab\tname", "nul\0", "del\177", "csi\u009bx"})
             assertThatThrownBy(() -> ShareRoot.segments("docs/" + bad)).as(bad).isInstanceOf(PathRefusedException.class);
         assertThat(ShareRoot.segments(".hidden/console/com10/lpt.txt")).containsExactly(".hidden", "console", "com10", "lpt.txt");
     }
@@ -84,7 +94,15 @@ class ShareRootTest {
             assertThatThrownBy(() -> share.resolve(refused)).as(refused).isInstanceOf(PathRefusedException.class);
         assertThatThrownBy(() -> share.openWrite("out-dir/new.txt", false)).isInstanceOf(PathRefusedException.class);
         assertThat(share.resolve("inward")).isEqualTo(shared.toRealPath().resolve("docs/a.txt"));
+        assertThat(share.attributes("inward").name()).as("a link reports its own name").isEqualTo("inward");
         assertThat(share.list("")).extracting(ShareEntry::name).containsExactly("docs", "inward");
+        for (var write : List.<ThrowingAction>of(
+                () -> share.openWrite("out-file", false).close(),
+                () -> share.openWrite("out-file", true).close(),
+                () -> share.mkdir("dangling"),
+                () -> share.rename("docs/a.txt", "out-file")))
+            assertThatThrownBy(write::run).isInstanceOf(IOException.class);
+        assertThat(outside.resolve("secret.txt")).as("writes never follow a final link").hasContent("secret");
         share.delete("inward");
         assertThat(shared.resolve("docs/a.txt")).as("deleting a link removes the link, not its target").exists();
     }

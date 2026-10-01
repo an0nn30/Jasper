@@ -5,6 +5,7 @@ import java.io.OutputStream;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.NotDirectoryException;
@@ -67,7 +68,7 @@ public final class ShareRoot {
     static void checkName(String name) throws PathRefusedException {
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
-            if (c < 0x20 || c == 0x7f) throw new PathRefusedException("The name contains a control character");
+            if (Character.isISOControl(c)) throw new PathRefusedException("The name contains a control character");
             if (c == ':') throw new PathRefusedException("The name contains a colon");
         }
         char last = name.charAt(name.length() - 1);
@@ -82,7 +83,7 @@ public final class ShareRoot {
         List<String> segments = segments(clientPath);
         if (segments.isEmpty()) return root;
         Path candidate = root;
-        for (String segment : segments) candidate = candidate.resolve(segment);
+        for (String segment : segments) candidate = child(candidate, segment);
         if (Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
             Path real;
             try { real = candidate.toRealPath(); }
@@ -92,7 +93,7 @@ public final class ShareRoot {
         Path parent;
         try { parent = candidate.getParent().toRealPath(); }
         catch (NoSuchFileException missing) { throw new NoSuchFileException(clientPath); }
-        return inside(parent).resolve(segments.getLast());
+        return child(inside(parent), segments.getLast());
     }
 
     /** The entry itself: its parent resolved, its own name not followed. The root for an empty path. */
@@ -100,7 +101,13 @@ public final class ShareRoot {
         List<String> segments = segments(clientPath);
         if (segments.isEmpty()) return root;
         Path parent = resolve(String.join("/", segments.subList(0, segments.size() - 1)));
-        return parent.resolve(segments.getLast());
+        return child(parent, segments.getLast());
+    }
+
+    /** A child path, refusing a name this computer's file system cannot represent. */
+    private static Path child(Path parent, String name) throws PathRefusedException {
+        try { return parent.resolve(name); }
+        catch (InvalidPathException unusable) { throw new PathRefusedException("The name cannot be used on this computer"); }
     }
 
     private Path inside(Path real) throws PathRefusedException {
@@ -111,7 +118,8 @@ public final class ShareRoot {
     public ShareEntry attributes(String clientPath) throws IOException {
         Path path = resolve(clientPath);
         var attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-        return entry(path.equals(root) ? "" : path.getFileName().toString(), attributes);
+        List<String> segments = segments(clientPath);
+        return entry(segments.isEmpty() ? "" : segments.getLast(), attributes);
     }
 
     /** A folder's entries, folders first, then by name ignoring case; unshareable names and outward links are left out. */
