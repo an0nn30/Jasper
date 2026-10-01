@@ -16,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -29,6 +30,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
@@ -45,6 +47,7 @@ class TunnelManagerTest {
     final ExecutorService ui = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("ui").factory());
     final Map<UUID, RemoteHost> hosts = new HashMap<>();
     final List<Runnable> lingering = new CopyOnWriteArrayList<>();
+    final List<String> timeoutThreads = new CopyOnWriteArrayList<>();
     final RemoteSettings settings = new RemoteSettings(Duration.ofSeconds(5), Duration.ofSeconds(10), Duration.ZERO, Duration.ZERO, false, true);
     @TempDir Path dir;
     LoopbackServer server;
@@ -64,7 +67,7 @@ class TunnelManagerTest {
         connections = new Connections(() -> settings, trust, Optional.empty(), id -> Optional.ofNullable(hosts.get(id)), Optional.of(vault),
             question -> CompletableFuture.completedFuture(HostKeyVerifier.Decision.CANCEL), background, ui,
             (delay, task) -> { lingering.add(task); return () -> lingering.remove(task); });
-        manager = new TunnelManager(connections, () -> Duration.ofSeconds(5), background, ui);
+        manager = new TunnelManager(connections, () -> { timeoutThreads.add(Thread.currentThread().getName()); return Duration.ofSeconds(5); }, background, ui);
         prod = RemoteHost.create("prod", "127.0.0.1", server.port(), "", new Auth.Vault(UUID.randomUUID()), "", Optional.empty());
         hosts.put(prod.id(), prod);
     }
@@ -120,6 +123,16 @@ class TunnelManagerTest {
         try (var socket = new Socket(InetAddress.ofLiteral("127.0.0.1"), port)) { return false; }
         catch (ConnectException refused) { return true; }
         catch (IOException other) { return false; }
+    }
+
+    /** Sends {@code text} and reads the same number of bytes back, without half-closing: MINA's server drops a forwarded port's connection on FIN. */
+    static String viaServer(int port, String text) throws IOException {
+        try (var client = new Socket(InetAddress.ofLiteral("127.0.0.1"), port)) {
+            client.setSoTimeout(10_000);
+            byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+            client.getOutputStream().write(bytes);
+            return new String(client.getInputStream().readNBytes(bytes.length), StandardCharsets.UTF_8);
+        }
     }
 
     /** Whether the other side hung up: end of stream or a reset. */
@@ -233,13 +246,7 @@ class TunnelManagerTest {
         Tunnel back = Tunnel.create("back", prod.id(), TunnelKind.REMOTE, "127.0.0.1", 0, "127.0.0.1", echo.port());
         int serverPort = up(back);
         assertThat(serverPort).as("the server chose a port").isPositive();
-        // No half-close here: MINA's server drops a forwarded port's whole connection when the client sends FIN.
-        try (var client = new Socket(InetAddress.ofLiteral("127.0.0.1"), serverPort)) {
-            client.setSoTimeout(10_000);
-            byte[] text = "through the server".getBytes(StandardCharsets.UTF_8);
-            client.getOutputStream().write(text);
-            assertThat(new String(client.getInputStream().readNBytes(text.length), StandardCharsets.UTF_8)).isEqualTo("through the server");
-        }
+        assertThat(viaServer(serverPort, "through the server")).isEqualTo("through the server");
         Counters counters = counters(back);
         awaitTrue(() -> counters.sent() == 18 && counters.received() == 18, "the relay to count");
         onUi(() -> manager.stop(back.id()));
@@ -269,6 +276,81 @@ class TunnelManagerTest {
         onUi(() -> manager.saved(kept.id()));
         assertThat(onUi(() -> manager.quickForwards())).isEmpty();
         assertThat(onUi(() -> manager.running(kept.id()))).as("saving does not stop it").isPresent();
+    }
+
+    @Test void aSecondRemoteTunnelOnTheSamePortFailsWithoutBreakingTheFirst() throws Exception {
+        int port = closedPort();
+        Tunnel first = Tunnel.create("first", prod.id(), TunnelKind.REMOTE, "127.0.0.1", port, "127.0.0.1", echo.port());
+        assertThat(up(first)).isEqualTo(port);
+        Tunnel second = Tunnel.create("second", prod.id(), TunnelKind.REMOTE, "127.0.0.1", port, "127.0.0.1", echo.port());
+        onUi(() -> manager.start(second, null));
+        assertThat(await(second.id(), TunnelState.Failed.class::isInstance, "the refusal"))
+            .isEqualTo(new TunnelState.Failed("The server refused port " + port + ": already in use or not allowed"));
+        assertThat(onUi(() -> manager.state(first.id()))).as("the first tunnel is untouched").isInstanceOf(TunnelState.Up.class);
+        assertThat(viaServer(port, "still here")).as("the first tunnel still carries").isEqualTo("still here");
+    }
+
+    @Test void restartingARemoteTunnelOnTheSamePortWorks() throws Exception {
+        int port = closedPort();
+        Tunnel running = Tunnel.create("edit 0", prod.id(), TunnelKind.REMOTE, "127.0.0.1", port, "127.0.0.1", echo.port());
+        assertThat(up(running)).isEqualTo(port);
+        for (int round = 1; round <= 8; round++) {
+            Tunnel restarted = Tunnel.create("edit " + round, prod.id(), TunnelKind.REMOTE, "127.0.0.1", port, "127.0.0.1", echo.port());
+            Tunnel stopping = running;
+            onUi(() -> { manager.stop(stopping.id()); manager.start(restarted, null); });
+            var state = await(restarted.id(), s -> s instanceof TunnelState.Up || s instanceof TunnelState.Failed, "round " + round);
+            assertThat(state).as("round " + round).isInstanceOf(TunnelState.Up.class);
+            assertThat(viaServer(port, "round " + round)).isEqualTo("round " + round);
+            running = restarted;
+        }
+    }
+
+    @Test void aSlowCancelStillRunsBeforeTheNextRequestForTheSamePort() throws Exception {
+        // The manager's background work for a stop is held back; the restart's request must still wait for it.
+        var slowCancels = new AtomicBoolean();
+        manager = new TunnelManager(connections, () -> Duration.ofSeconds(5), task -> {
+            boolean hold = slowCancels.get();
+            background.execute(() -> {
+                if (hold) { try { Thread.sleep(500); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); } }
+                task.run();
+            });
+        }, ui);
+        int port = closedPort();
+        Tunnel first = Tunnel.create("first", prod.id(), TunnelKind.REMOTE, "127.0.0.1", port, "127.0.0.1", echo.port());
+        assertThat(up(first)).isEqualTo(port);
+        slowCancels.set(true);
+        onUi(() -> manager.stop(first.id()));
+        slowCancels.set(false);
+        Tunnel second = Tunnel.create("second", prod.id(), TunnelKind.REMOTE, "127.0.0.1", port, "127.0.0.1", echo.port());
+        onUi(() -> manager.start(second, null));
+        assertThat(await(second.id(), s -> s instanceof TunnelState.Up || s instanceof TunnelState.Failed, "the restart"))
+            .isInstanceOf(TunnelState.Up.class);
+        assertThat(viaServer(port, "after the slow cancel")).isEqualTo("after the slow cancel");
+    }
+
+    @Test void stoppingATunnelClosesAClientStillInTheSocksHandshake() throws Exception {
+        Tunnel socks = Tunnel.create("socks", prod.id(), TunnelKind.DYNAMIC, "127.0.0.1", 0, "", 0);
+        int port = up(socks);
+        try (var client = new Socket(InetAddress.ofLiteral("127.0.0.1"), port)) {
+            client.setSoTimeout(2_000);
+            Thread.sleep(300); // the tunnel has accepted it and waits for the greeting
+            onUi(() -> manager.stop(socks.id()));
+            try { assertThat(client.getInputStream().read()).isEqualTo(-1); }
+            catch (SocketTimeoutException slow) { fail("stop left the half-greeted client connected"); }
+            catch (IOException reset) { /* a reset is a hang-up too */ }
+        }
+    }
+
+    @Test void connectionThreadsNeverReadTheTimeoutSetting() throws Exception {
+        Tunnel nowhere = local("127.0.0.1", 0, closedPort());
+        int port = up(nowhere);
+        try (var client = new Socket(InetAddress.ofLiteral("127.0.0.1"), port)) {
+            client.setSoTimeout(10_000);
+            ended(client);
+        }
+        Counters counters = counters(nowhere);
+        awaitTrue(() -> counters.warning().isPresent(), "a warning");
+        assertThat(timeoutThreads).as("the supplier is for the UI thread; connection threads use the value captured at start").containsOnly("ui");
     }
 
     @Test void stopAllStopsEverythingAndClearsFailures() throws Exception {

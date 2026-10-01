@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,12 +39,14 @@ import org.apache.sshd.common.util.net.SshdSocketAddress;
  * Runs tunnels on the UI thread. A start binds first, then leases the host's shared session from {@link Connections}
  * and forwards every accepted connection over its own channel; a remote tunnel asks the server for its port, pointed at
  * a loopback relay. Each running tunnel holds its own lease, so closing terminals never stops it and stopping it never
- * touches a terminal. Connection threads read only a run's session and write its counters and tracked ends. In plan
+ * touches a terminal. Connection threads read only a run's session and captured timeout, and write its counters and tracked ends. In plan
  * 7b-2 a lost session fails the tunnel.
  */
 public final class TunnelManager implements AutoCloseable {
     /** The loopback address a remote tunnel's relay listens on. */
     static final String RELAY = "127.0.0.1";
+
+    private static final CompletableFuture<Void> DONE = CompletableFuture.completedFuture(null);
 
     /** What a SOCKS client hears once its channel opened or failed; nothing for a local tunnel. */
     private interface Answer { void opened(boolean ok) throws IOException; }
@@ -54,6 +57,12 @@ public final class TunnelManager implements AutoCloseable {
     private final Map<UUID, Run> runs = new HashMap<>();
     private final Map<UUID, TunnelState> states = new HashMap<>();
     private final Map<UUID, Tunnel> quick = new LinkedHashMap<>();
+    /**
+     * The last remote-forward request or cancel queued for each session. MINA keys a session's remote forwards by port
+     * alone, so these must reach the server in the order the UI thread issued them. An entry goes when it is still the
+     * tail as it completes.
+     */
+    private final Map<ClientSession, CompletableFuture<Void>> tails = new IdentityHashMap<>();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private boolean closed;
 
@@ -76,7 +85,7 @@ public final class TunnelManager implements AutoCloseable {
     public void start(Tunnel tunnel, WindowHandle owner) {
         if (closed || runs.containsKey(tunnel.id())) return;
         UUID id = tunnel.id();
-        var run = new Run(tunnel);
+        var run = new Run(tunnel, timeout.get());
         runs.put(id, run);
         set(id, new TunnelState.Starting("Binding…"));
         ConnectionIdentity identity;
@@ -84,8 +93,10 @@ public final class TunnelManager implements AutoCloseable {
         catch (RuntimeException missing) { fail(run, "Host not found".equals(missing.getMessage()) ? "Host missing" : message(missing)); return; }
         try {
             run.listener = switch (tunnel.kind()) {
-                case LOCAL -> Listener.open(tunnel.bindAddress(), tunnel.bindPort(),
-                    socket -> carry(run, socket, new SshdSocketAddress(tunnel.targetHost(), tunnel.targetPort()), ok -> { }));
+                case LOCAL -> Listener.open(tunnel.bindAddress(), tunnel.bindPort(), socket -> {
+                    Pump.End near = Pump.of(socket);
+                    if (run.track(near)) carry(run, socket, near, new SshdSocketAddress(tunnel.targetHost(), tunnel.targetPort()), ok -> { });
+                });
                 case DYNAMIC -> Listener.open(tunnel.bindAddress(), tunnel.bindPort(), socket -> socks(run, socket));
                 case REMOTE -> Listener.open(RELAY, 0, socket -> relay(run, socket));
             };
@@ -124,7 +135,7 @@ public final class TunnelManager implements AutoCloseable {
     @Override public void close() {
         closed = true;
         for (Run run : List.copyOf(runs.values())) teardown(run);
-        runs.clear(); states.clear(); quick.clear(); listeners.clear();
+        runs.clear(); states.clear(); quick.clear(); listeners.clear(); tails.clear();
     }
 
     /** What the server is asked to listen on: {@code *} goes as 0.0.0.0, which MINA sends for an empty host anyway. */
@@ -144,21 +155,19 @@ public final class TunnelManager implements AutoCloseable {
         session.addCloseFutureListener(run.watch);
         if (!session.isOpen()) { fail(run, "Connection lost"); return; }
         if (run.tunnel.kind() != TunnelKind.REMOTE) { up(run, session, run.listener.port()); return; }
+        // MINA answers a refused request by cancelling that port on the session, which would take down the tunnel that holds it.
+        if (run.tunnel.bindPort() != 0 && remotePortHeld(run, session)) { fail(run, refusedPort(run.tunnel)); return; }
         set(id, new TunnelState.Starting("Requesting port on the server…"));
         var requested = new SshdSocketAddress(serverAddress(run.tunnel.bindAddress()), run.tunnel.bindPort());
         var relay = new SshdSocketAddress(RELAY, run.listener.port());
-        background(() -> {
+        ordered(session, () -> {
             SshdSocketAddress bound = null;
             try { bound = session.startRemotePortForwarding(requested, relay); }
             catch (IOException | RuntimeException refused) { /* reported below */ }
             SshdSocketAddress answer = bound;
             ui.execute(() -> {
-                if (runs.get(id) != run) { if (answer != null) background(() -> stopRemote(session, answer)); return; }
-                if (answer == null) {
-                    String port = run.tunnel.bindPort() == 0 ? "a port" : "port " + run.tunnel.bindPort();
-                    fail(run, "The server refused " + port + ": already in use or not allowed");
-                    return;
-                }
+                if (runs.get(id) != run) { if (answer != null) ordered(session, () -> stopRemote(session, answer)); return; }
+                if (answer == null) { fail(run, refusedPort(run.tunnel)); return; }
                 run.remoteBound = answer;
                 up(run, session, answer.getPort());
             });
@@ -185,11 +194,36 @@ public final class TunnelManager implements AutoCloseable {
         SshdSocketAddress bound = run.remoteBound;
         if (lease == null) return;
         if (bound == null) { lease.close(); return; }
-        background(() -> { stopRemote(session, bound); lease.close(); });
+        ordered(session, () -> { stopRemote(session, bound); lease.close(); });
     }
 
     private static void stopRemote(ClientSession session, SshdSocketAddress bound) {
         try { session.stopRemotePortForwarding(bound); } catch (IOException | RuntimeException gone) { /* the session is closing */ }
+    }
+
+    /** Whether another remote tunnel on {@code session} has asked for, or been given, the port {@code mine} wants. */
+    private boolean remotePortHeld(Run mine, ClientSession session) {
+        int port = mine.tunnel.bindPort();
+        return runs.values().stream().anyMatch(other -> other != mine && other.tunnel.kind() == TunnelKind.REMOTE && other.leased == session
+            && (other.remoteBound != null ? other.remoteBound.getPort() : other.tunnel.bindPort()) == port);
+    }
+
+    private static String refusedPort(Tunnel tunnel) {
+        String port = tunnel.bindPort() == 0 ? "a port" : "port " + tunnel.bindPort();
+        return "The server refused " + port + ": already in use or not allowed";
+    }
+
+    /** Runs {@code work} on the background executor once all earlier work queued for {@code session} has finished. UI thread only. */
+    private void ordered(ClientSession session, Runnable work) {
+        CompletableFuture<Void> tail = tails.getOrDefault(session, DONE).thenRunAsync(() -> {
+            try { work.run(); }
+            catch (RuntimeException broken) { // keep the chain going; report it the way the thread would have
+                Thread thread = Thread.currentThread();
+                thread.getUncaughtExceptionHandler().uncaughtException(thread, broken);
+            }
+        }, this::background);
+        tails.put(session, tail);
+        tail.whenComplete((done, failure) -> ui.execute(() -> tails.remove(session, tail)));
     }
 
     private void set(UUID id, TunnelState state) { states.put(id, state); changed(); }
@@ -201,18 +235,17 @@ public final class TunnelManager implements AutoCloseable {
 
     // ---- connection threads
 
-    /** On the connection's own thread: a channel to {@code target} over the run's session, then the pump. */
-    private void carry(Run run, Socket client, SshdSocketAddress target, Answer answer) {
-        Pump.End near = Pump.of(client);
+    /** On the connection's own thread: a channel to {@code target} over the run's session, then the pump. {@code near} is already tracked. */
+    private void carry(Run run, Socket client, Pump.End near, SshdSocketAddress target, Answer answer) {
         ClientSession session = run.session;
-        if (session == null || !run.track(near)) { near.close(); return; }
+        if (session == null) { run.untrack(near); near.close(); return; }
         ChannelDirectTcpip channel = null;
         try {
             channel = session.createDirectTcpipChannel(new SshdSocketAddress(client.getInetAddress().getHostAddress(), client.getPort()), target);
-            channel.open().verify(timeout.get());
+            channel.open().verify(run.timeout);
         } catch (IOException | RuntimeException refused) {
             if (channel != null) channel.close(true);
-            run.counters.refused(refusal(refused, target.getHostName()));
+            run.counters.refused(refusal(run, refused, target.getHostName()));
             try { answer.opened(false); } catch (IOException gone) { /* the client left */ }
             run.untrack(near);
             near.close();
@@ -227,14 +260,16 @@ public final class TunnelManager implements AutoCloseable {
 
     /** A dynamic tunnel's connection: the SOCKS5 handshake names the target. */
     private void socks(Run run, Socket client) {
-        if (run.session == null) { quietly(client); return; }
+        Pump.End near = Pump.of(client);
+        if (!run.track(near)) return;
+        if (run.session == null) { run.untrack(near); near.close(); return; }
         Socks5.Target target;
         try {
-            client.setSoTimeout(millis(timeout.get()));
+            client.setSoTimeout(millis(run.timeout));
             target = Socks5.accept(client.getInputStream(), client.getOutputStream());
             client.setSoTimeout(0);
-        } catch (IOException refused) { quietly(client); return; }
-        carry(run, client, new SshdSocketAddress(target.host(), target.port()),
+        } catch (IOException refused) { run.untrack(near); near.close(); return; }
+        carry(run, client, near, new SshdSocketAddress(target.host(), target.port()),
             ok -> Socks5.reply(client.getOutputStream(), ok ? Socks5.SUCCEEDED : Socks5.HOST_UNREACHABLE));
     }
 
@@ -243,10 +278,10 @@ public final class TunnelManager implements AutoCloseable {
         Pump.End near = Pump.of(fromServer);
         if (!run.track(near)) return;
         var target = new Socket();
-        try { target.connect(new InetSocketAddress(run.tunnel.targetHost(), run.tunnel.targetPort()), millis(timeout.get())); }
+        try { target.connect(new InetSocketAddress(run.tunnel.targetHost(), run.tunnel.targetPort()), millis(run.timeout)); }
         catch (IOException | RuntimeException refused) {
             quietly(target);
-            run.counters.refused(refusal(refused, run.tunnel.targetHost()));
+            run.counters.refused(refusal(run, refused, run.tunnel.targetHost()));
             run.untrack(near);
             near.close();
             return;
@@ -262,8 +297,8 @@ public final class TunnelManager implements AutoCloseable {
         finally { run.counters.closed(); run.untrack(near); run.untrack(far); }
     }
 
-    private String refusal(Throwable failure, String host) {
-        return "Connections are being refused: " + Failures.message(failure, timeout.get(), host);
+    private static String refusal(Run run, Throwable failure, String host) {
+        return "Connections are being refused: " + Failures.message(failure, run.timeout, host);
     }
 
     private static int millis(Duration duration) { return (int) Math.min(Integer.MAX_VALUE, Math.max(0, duration.toMillis())); }
@@ -286,6 +321,8 @@ public final class TunnelManager implements AutoCloseable {
     /** One running tunnel. Fields without volatile belong to the UI thread. */
     private static final class Run {
         final Tunnel tunnel;
+        /** The connect timeout as it was when the tunnel started: connection threads must not call the settings supplier. */
+        final Duration timeout;
         final Counters counters = new Counters();
         private final Set<Pump.End> open = ConcurrentHashMap.newKeySet();
         private volatile boolean stopped;
@@ -298,7 +335,7 @@ public final class TunnelManager implements AutoCloseable {
         SshFutureListener<CloseFuture> watch;
         SshdSocketAddress remoteBound;
 
-        Run(Tunnel tunnel) { this.tunnel = tunnel; }
+        Run(Tunnel tunnel, Duration timeout) { this.tunnel = tunnel; this.timeout = timeout; }
 
         /** Keeps {@code end} to close on stop; false, with {@code end} closed, once the run has stopped. */
         boolean track(Pump.End end) {
