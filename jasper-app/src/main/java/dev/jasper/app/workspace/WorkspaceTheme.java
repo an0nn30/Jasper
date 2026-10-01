@@ -7,6 +7,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Window;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import javax.swing.JComponent;
 import javax.swing.JPopupMenu;
 import javax.swing.JRootPane;
@@ -17,10 +18,20 @@ public final class WorkspaceTheme {
     private WorkspaceTheme() {}
 
     public static void apply(JComponent root, ResolvedTheme theme) {
+        apply(root, theme, () -> true);
+    }
+
+    /** Stops publication if a synchronous content callback transfers ownership of this root. */
+    static void apply(JComponent root, ResolvedTheme theme, BooleanSupplier stillOwned) {
+        if (!stillOwned.getAsBoolean()) return;
         root.putClientProperty("Jasper.zone", "workspace");
+        if (!stillOwned.getAsBoolean()) return;
         root.putClientProperty("Jasper.workspaceTheme", theme.matching() ? null : theme.workspace());
+        if (!stillOwned.getAsBoolean()) return;
         root.putClientProperty("Jasper.workspace.dark", theme.matching() ? null : theme.workspace().dark());
+        if (!stillOwned.getAsBoolean()) return;
         root.putClientProperty("Jasper.workspace.foreground", theme.matching() ? null : theme.workspace().tokens().get(Token.TEXT));
+        if (!stillOwned.getAsBoolean()) return;
         root.repaint();
     }
 

@@ -45,6 +45,17 @@ public final class ContentRegistry {
     public ContentEntry open(String plugin, String key, String title, UUID owner, JComponent component) {
         requireEdt();
         for (var entry : entries) if (entry.plugin().equals(plugin) && entry.key().equals(key)) {
+            if (entry.window() == null) {
+                ContentHost retry = owner != null ? hosts.get(owner) : null;
+                if (retry == null) retry = main();
+                entry.window(retry.id());
+                try { retry.mount().accept(entry); }
+                catch (RuntimeException | Error failure) {
+                    rollbackMount(retry, entry, failure);
+                    entry.window(null);
+                    throw failure;
+                }
+            }
             select(entry);
             return entry;
         }
@@ -53,9 +64,21 @@ public final class ContentRegistry {
         if (host == null) host = main();
         entries.add(entry);
         entry.window(host.id());
-        host.mount().accept(entry);
+        try { host.mount().accept(entry); }
+        catch (RuntimeException | Error failure) {
+            rollbackMount(host, entry, failure);
+            entries.remove(entry);
+            try { entry.dispose(); }
+            catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
         select(entry);
         return entry;
+    }
+
+    private static void rollbackMount(ContentHost host, ContentEntry entry, Throwable failure) {
+        try { host.remove().accept(entry); }
+        catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
     }
 
     private ContentHost main() {
@@ -81,7 +104,27 @@ public final class ContentRegistry {
         entry.active(false);
         entry.window(next.id());
         old.remove().accept(entry);
-        next.mount().accept(entry);
+        try { next.mount().accept(entry); }
+        catch (RuntimeException | Error failure) {
+            rollbackMount(next, entry, failure);
+            if (entries.contains(entry) && !entry.closed()) {
+                var recovery = new ArrayList<ContentHost>();
+                if (hosts.get(old.id()) == old) recovery.add(old);
+                for (var host : hosts.values())
+                    if (host != old && host != next && !host.detached()) recovery.add(host);
+                boolean restored = false;
+                for (var host : recovery) {
+                    entry.window(host.id());
+                    try { host.mount().accept(entry); restored = true; break; }
+                    catch (RuntimeException | Error recoveryFailure) {
+                        rollbackMount(host, entry, recoveryFailure);
+                        failure.addSuppressed(recoveryFailure);
+                    }
+                }
+                if (!restored) entry.window(null);
+            }
+            throw failure;
+        }
         select(entry);
     }
 

@@ -31,6 +31,9 @@ class PluginPaneAppearanceTest {
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
             assertThat(panel.getClientProperty("Jasper.workspaceStylerRoot")).isNull();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
+            assertThat(contributions.content().entries()).isEmpty();
+            var retry = contributions.content().open("fixture", "failed", "Recovered", owner.id(), panel);
+            assertThat(contributions.content().entries()).containsExactly(retry);
         });
     }
 
@@ -50,6 +53,9 @@ class PluginPaneAppearanceTest {
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
             assertThat(panel.getClientProperty("Jasper.workspaceStylerRoot")).isNull();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
+            assertThat(contributions.content().entries()).isEmpty();
+            var retry = contributions.content().open("fixture", "failed-zone", "Recovered", owner.id(), panel);
+            assertThat(contributions.content().entries()).containsExactly(retry);
         });
     }
 
@@ -84,6 +90,61 @@ class PluginPaneAppearanceTest {
             assertThat(list.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION_INACTIVE));
             assertThat(((java.util.Map<?, ?>) list.getClientProperty("Jasper.workspaceStyle")).get("selectionBackground"))
                 .isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION));
+        });
+    }
+
+    @Test void themePublicationCanRemovePaneWithoutRestylingDisposedOwner() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController(Theme.JASPER_LIGHT);
+            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            var contributions = new Contributions(); owner.connectContributions(contributions);
+            var removed = new JPanel(); var removedList = new JList<>(new String[] {"remove"}); removed.add(removedList);
+            var entry = contributions.content().open("fixture", "remove", "Remove", owner.id(), removed);
+            var retained = new JPanel(); var retainedList = new JList<>(new String[] {"keep"}); retained.add(retainedList);
+            contributions.content().open("fixture", "keep", "Keep", owner.id(), retained);
+            var armed = new boolean[] {true};
+            removed.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
+                if (armed[0]) { armed[0] = false; contributions.content().remove(entry); }
+            });
+            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
+            assertThat(contributions.content().entries()).doesNotContain(entry);
+            assertThat(removed.getClientProperty("Jasper.zone")).isNull();
+            assertThat(removed.getClientProperty("Jasper.workspaceTheme")).isNull();
+            assertThat(removed.getClientProperty("Jasper.workspace.dark")).isNull();
+            assertThat(removed.getClientProperty("Jasper.workspace.foreground")).isNull();
+            assertThat(removedList.getClientProperty("Jasper.workspaceStyle")).isNull();
+            assertThat(retainedList.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
+        });
+    }
+
+    @Test void themePublicationCanMovePaneWithoutOverwritingDestinationZone() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController(Theme.JASPER_LIGHT);
+            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
+                new ThemeController(Theme.JASPER_LIGHT));
+            var contributions = new Contributions(); owner.connectContributions(contributions);
+            detached.connectContributions(contributions);
+            contributions.content().setFactory(separate -> detached.id());
+            var moved = new JPanel(); var movedList = new JList<>(new String[] {"move"}); moved.add(movedList);
+            var entry = contributions.content().open("fixture", "move", "Move", owner.id(), moved);
+            var retained = new JPanel(); var retainedList = new JList<>(new String[] {"keep"}); retained.add(retainedList);
+            contributions.content().open("fixture", "keep", "Keep", owner.id(), retained);
+            var armed = new boolean[] {true};
+            moved.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
+                if (armed[0]) { armed[0] = false; contributions.content().move(entry, true); }
+            });
+            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
+            assertThat(entry.window()).isEqualTo(detached.id());
+            assertThat(moved.getClientProperty("Jasper.zone")).isEqualTo("workspace");
+            assertThat(moved.getClientProperty("Jasper.workspaceTheme")).isNull();
+            assertThat(moved.getClientProperty("Jasper.workspace.dark")).isNull();
+            assertThat(moved.getClientProperty("Jasper.workspace.foreground")).isNull();
+            assertThat(movedList.getClientProperty("Jasper.workspaceStyle")).isNull();
+            assertThat(retainedList.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
+            detached.close();
         });
     }
 

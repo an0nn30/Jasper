@@ -609,6 +609,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
     }
     private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
+        if (!hosted.containsKey(entry.component()) && !hostedStylers.containsKey(entry.component())) return;
         var listener = contentListeners.remove(entry.component());
         if (listener != null) listener.close();
         var styler = hostedStylers.remove(entry.component());
@@ -990,8 +991,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             for (var component : new ArrayList<>(hostedStylers.keySet())) {
                 var styler = hostedStylers.get(component);
                 if (styler == null) continue;
-                WorkspaceTheme.apply(component, theme);
-                styler.apply(theme);
+                WorkspaceTheme.apply(component, theme, () -> hostedStylers.get(component) == styler);
+                if (hostedStylers.get(component) == styler) styler.apply(theme);
             }
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {

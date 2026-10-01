@@ -18,6 +18,89 @@ class ContentRegistryTest {
         registry.addHost(new ContentHost(detached, true, mounted::add, mounted::remove, entry -> {}, () -> {}));
         registry.setFactory(separate -> separate ? detached : main);
     }
+    @Test void failedOpenLeavesNoEntryAndSameKeyCanMountAgain() {
+        var fail = new boolean[] {true};
+        registry.addHost(new ContentHost(main, false, entry -> {
+            if (fail[0]) { fail[0] = false; throw new IllegalStateException("mount failed"); }
+            mounted.add(entry);
+        }, mounted::remove, entry -> {}, () -> {}));
+        assertThatThrownBy(() -> registry.open("plugin.file", "one", "One", main, new JPanel()))
+            .isInstanceOf(IllegalStateException.class).hasMessage("mount failed");
+        assertThat(registry.entries()).isEmpty();
+        var entry = registry.open("plugin.file", "one", "One", main, new JPanel());
+        assertThat(registry.entries()).containsExactly(entry);
+        assertThat(mounted).containsExactly(entry);
+    }
+
+    @Test void failedDestinationMountRestoresSourceAndKeepsDirtyDocument() {
+        hosts();
+        var panel = new JTextArea("unsaved");
+        var entry = registry.open("plugin.file", "one", "One", main, panel);
+        entry.presentation("One", "", null, true, "", "");
+        var bad = UUID.randomUUID();
+        registry.addHost(new ContentHost(bad, true, e -> { throw new IllegalStateException("destination failed"); },
+            e -> {}, e -> {}, () -> {}));
+        registry.setFactory(separate -> separate ? bad : main);
+        assertThatThrownBy(() -> registry.move(entry, true)).isInstanceOf(IllegalStateException.class)
+            .hasMessage("destination failed");
+        assertThat(entry.window()).isEqualTo(main);
+        assertThat(entry.closed()).isFalse();
+        assertThat(entry.dirty()).isTrue();
+        assertThat(entry.component()).isSameAs(panel);
+        assertThat(mounted).containsExactly(entry);
+    }
+
+    @Test void failedDestinationAfterSourceUnregistersLeavesRecoverableUnmountedEntry() {
+        var source = new dev.jasper.app.lifecycle.Subscription[1];
+        source[0] = registry.addHost(new ContentHost(main, false, mounted::add, entry -> {
+            mounted.remove(entry);
+            source[0].close();
+        }, entry -> {}, () -> {}));
+        var bad = UUID.randomUUID();
+        registry.addHost(new ContentHost(bad, true, entry -> { throw new IllegalStateException("destination failed"); },
+            entry -> {}, entry -> {}, () -> {}));
+        registry.setFactory(separate -> separate ? bad : main);
+        var panel = new JTextArea("unsaved");
+        var entry = registry.open("plugin.file", "one", "One", main, panel);
+        entry.presentation("One", "", null, true, "", "");
+        // Model the source window unregistering synchronously when its final tab leaves.
+        assertThatThrownBy(() -> registry.move(entry, true)).isInstanceOf(IllegalStateException.class)
+            .hasMessage("destination failed");
+        assertThat(entry.window()).isNull();
+        assertThat(entry.closed()).isFalse();
+        assertThat(entry.dirty()).isTrue();
+        assertThat(registry.entries()).containsExactly(entry);
+        var replacement = UUID.randomUUID();
+        registry.addHost(new ContentHost(replacement, false, mounted::add, mounted::remove, e -> {}, () -> {}));
+        assertThat(registry.open("plugin.file", "one", "One", replacement, new JPanel())).isSameAs(entry);
+        assertThat(entry.component()).isSameAs(panel);
+        assertThat(entry.window()).isEqualTo(replacement);
+        assertThat(mounted).containsExactly(entry);
+    }
+
+    @Test void failedDestinationAfterSourceUnregistersUsesAnotherMainHost() {
+        var source = new dev.jasper.app.lifecycle.Subscription[1];
+        source[0] = registry.addHost(new ContentHost(main, false, mounted::add, entry -> {
+            mounted.remove(entry);
+            source[0].close();
+        }, entry -> {}, () -> {}));
+        var fallback = UUID.randomUUID();
+        registry.addHost(new ContentHost(fallback, false, mounted::add, mounted::remove, e -> {}, () -> {}));
+        var bad = UUID.randomUUID();
+        registry.addHost(new ContentHost(bad, true, entry -> { throw new IllegalStateException("destination failed"); },
+            entry -> {}, entry -> {}, () -> {}));
+        registry.setFactory(separate -> separate ? bad : fallback);
+        var panel = new JTextArea("unsaved");
+        var entry = registry.open("plugin.file", "one", "One", main, panel);
+        entry.presentation("One", "", null, true, "", "");
+        assertThatThrownBy(() -> registry.move(entry, true)).isInstanceOf(IllegalStateException.class)
+            .hasMessage("destination failed");
+        assertThat(entry.window()).isEqualTo(fallback);
+        assertThat(entry.closed()).isFalse();
+        assertThat(entry.dirty()).isTrue();
+        assertThat(entry.component()).isSameAs(panel);
+        assertThat(mounted).containsExactly(entry);
+    }
     @Test void openingAndMovingRetainIdentityAndNeverDisposeContent() {
         hosts();
         var panel = new JPanel();
