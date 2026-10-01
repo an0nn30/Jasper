@@ -53,8 +53,8 @@ public final class TunnelEditor extends JPanel {
         hosts.forEach(host::addItem);
         host.setRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
-                super.getListCellRendererComponent(list, value instanceof RemoteHost via ? via.name() + " — " + via.label() : "", index, selected, focus);
                 putClientProperty("html.disable", true);
+                super.getListCellRendererComponent(list, value instanceof RemoteHost via ? via.name() + " — " + via.label() : "", index, selected, focus);
                 return this;
             }
         });
@@ -124,7 +124,10 @@ public final class TunnelEditor extends JPanel {
         });
         cancel.addActionListener(event -> onCancel.run());
         save.addActionListener(event -> {
-            try { onSave.accept(tunnel(editing)); }
+            try {
+                Tunnel tunnelValue = tunnel(editing);
+                onSave.accept(tunnelValue);
+            }
             catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); }
         });
         refresh();

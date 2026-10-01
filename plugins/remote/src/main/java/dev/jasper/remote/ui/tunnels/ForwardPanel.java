@@ -8,6 +8,7 @@ import java.awt.Component;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Window;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -23,6 +24,7 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
@@ -60,8 +62,8 @@ public final class ForwardPanel extends JPanel {
         hosts.forEach(host::addItem);
         host.setRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
-                super.getListCellRendererComponent(list, value instanceof RemoteHost via ? via.name() : "", index, selected, focus);
                 putClientProperty("html.disable", true);
+                super.getListCellRendererComponent(list, value instanceof RemoteHost via ? via.name() : "", index, selected, focus);
                 return this;
             }
         });
@@ -110,10 +112,15 @@ public final class ForwardPanel extends JPanel {
             moreRow.setVisible(!moreRow.isVisible());
             more.setText(moreRow.isVisible() ? "Less ▾" : "More ▸");
             revalidate();
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) window.pack();
         });
         keep.addActionListener(event -> {
             saveName.setEnabled(keep.isSelected());
-            if (keep.isSelected() && saveName.getText().isBlank()) saveName.setText("Port " + remotePort.getText().strip() + " on " + via().map(RemoteHost::name).orElse("the host"));
+            if (keep.isSelected() && saveName.getText().isBlank()) {
+                String remotePortText = remotePort.getText().strip();
+                if (!remotePortText.isEmpty()) saveName.setText("Port " + remotePortText + " on " + via().map(RemoteHost::name).orElse("the host"));
+            }
         });
         cancel.addActionListener(event -> onCancel.run());
         forward.addActionListener(event -> {
@@ -123,7 +130,8 @@ public final class ForwardPanel extends JPanel {
                 RemoteHost through = via().orElseThrow(() -> new IllegalArgumentException("Choose a host"));
                 String name = keep.isSelected() ? saveName.getText().strip() : "";
                 if (keep.isSelected() && name.isEmpty()) throw new IllegalArgumentException("Name the tunnel to keep it");
-                onForward.accept(Tunnel.create(name, through.id(), TunnelKind.LOCAL, Tunnel.LOCALHOST, local, targetHost.getText(), remote));
+                Tunnel tunnel = Tunnel.create(name, through.id(), TunnelKind.LOCAL, Tunnel.LOCALHOST, local, targetHost.getText(), remote);
+                onForward.accept(tunnel);
             } catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); }
         });
     }

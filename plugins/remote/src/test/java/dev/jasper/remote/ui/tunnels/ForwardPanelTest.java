@@ -90,4 +90,15 @@ class ForwardPanelTest {
         panel.showError("A tunnel named web app exists");
         assertThat(panel.message.getText()).isEqualTo("A tunnel named web app exists");
     }
+
+    @Test void moreGrowsThePanel() {
+        var panel = panel(Optional.empty());
+        int initialHeight = panel.getPreferredSize().height;
+        panel.more.doClick();
+        int expandedHeight = panel.getPreferredSize().height;
+        assertThat(expandedHeight).isGreaterThan(initialHeight);
+        panel.more.doClick();
+        int collapsedHeight = panel.getPreferredSize().height;
+        assertThat(collapsedHeight).isEqualTo(initialHeight);
+    }
 }
