@@ -92,6 +92,7 @@ public final class FakePluginHost implements AutoCloseable {
                      dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {}
     private volatile Workspace appearance = new Workspace(Variant.DARK, dev.jasper.sdk.ui.WorkspacePalette.current(),
         dev.jasper.sdk.ui.EditorPalette.current(), dev.jasper.sdk.ui.SyntaxPalette.current());
+    private Workspace requestedAppearance = appearance;
     private boolean workspaceMatches = true;
     private final List<Entry> workspaceHandlers = new CopyOnWriteArrayList<>();
 
@@ -106,7 +107,9 @@ public final class FakePluginHost implements AutoCloseable {
         return () -> { entry.closed().set(true); workspaceHandlers.remove(entry); };
     }
 
-    /** Changes the independent workspace appearance, including same-variant color changes.
+    /** Queues an independent workspace appearance, including same-variant color changes.
+     * Workspace getters expose the last flushed snapshot until {@link #flush()} publishes this change.
+     * All workspace getters agree with each notification during its delivery.
      * @param variant workspace variant
      * @param palette workspace control colors
      * @param editor editor colors
@@ -122,12 +125,16 @@ public final class FakePluginHost implements AutoCloseable {
         publishWorkspace(next);
     }
     private void publishWorkspace(Workspace next) {
-        if (appearance.equals(next)) return;
-        appearance = next;
-        for (var entry : workspaceHandlers) events.add(() -> {
-            if (!entry.closed().get()) {
-                try { entry.handler().accept(next.variant()); }
-                catch (RuntimeException | LinkageError failure) { recordFailure(entry.pluginId() + " workspace appearance: " + failure); }
+        if (requestedAppearance.equals(next)) return;
+        requestedAppearance = next;
+        events.add(() -> {
+            appearance = next;
+            // Subscription lifetime is judged when the state is published, including plugins started since enqueue.
+            for (var entry : workspaceHandlers) {
+                if (!entry.closed().get()) {
+                    try { entry.handler().accept(next.variant()); }
+                    catch (RuntimeException | LinkageError failure) { recordFailure(entry.pluginId() + " workspace appearance: " + failure); }
+                }
             }
         });
     }

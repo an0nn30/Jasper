@@ -80,6 +80,64 @@ class FakeUiTest {
         }
     }
 
+    @Test void queuedOppositeVariantsExposeTheirOwnCompleteWorkspaceSnapshot() {
+        queuedWorkspaceSnapshots(Variant.LIGHT, Variant.DARK);
+    }
+
+    @Test void queuedSameVariantChangesExposeTheirOwnCompleteWorkspaceSnapshot() {
+        queuedWorkspaceSnapshots(Variant.DARK, Variant.DARK);
+    }
+
+    private static void queuedWorkspaceSnapshots(Variant firstVariant, Variant secondVariant) {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var appearance = context.appearance();
+            var seen = new ArrayList<List<Object>>();
+            appearance.onWorkspaceChanged(event -> seen.add(List.of(event, appearance.workspaceVariant(), appearance.variant(),
+                appearance.workspacePalette(), appearance.editorPalette(), appearance.syntaxPalette())));
+            var disposed = new java.util.concurrent.atomic.AtomicInteger();
+            var closed = appearance.onWorkspaceChanged(event -> disposed.incrementAndGet());
+            var initial = appearance.workspacePalette();
+            var first = workspaceColors(java.awt.Color.RED);
+            var second = workspaceColors(java.awt.Color.BLUE);
+            host.setWorkspace(firstVariant, first.palette(), first.editor(), first.syntax());
+            host.setWorkspace(secondVariant, second.palette(), second.editor(), second.syntax());
+            // Duplicate pending requests are quiet, even though the dispatcher has not published them yet.
+            host.setWorkspace(secondVariant, second.palette(), second.editor(), second.syntax());
+            var late = new ArrayList<List<Object>>();
+            appearance.onWorkspaceChanged(event -> late.add(List.of(event, appearance.workspaceVariant(),
+                appearance.workspacePalette(), appearance.editorPalette(), appearance.syntaxPalette())));
+            assertThat(appearance.workspacePalette()).isEqualTo(initial);
+            java.util.concurrent.CompletableFuture.runAsync(closed::close).join();
+            assertThat(seen).isEmpty();
+            host.flush();
+            assertThat(seen).containsExactly(
+                List.of(firstVariant, firstVariant, Variant.DARK, first.palette(), first.editor(), first.syntax()),
+                List.of(secondVariant, secondVariant, Variant.DARK, second.palette(), second.editor(), second.syntax()));
+            assertThat(late).containsExactly(
+                List.of(firstVariant, firstVariant, first.palette(), first.editor(), first.syntax()),
+                List.of(secondVariant, secondVariant, second.palette(), second.editor(), second.syntax()));
+            assertThat(disposed).hasValue(0);
+            assertThat(appearance.workspaceVariant()).isEqualTo(secondVariant);
+            assertThat(appearance.workspacePalette()).isEqualTo(second.palette());
+            assertThat(appearance.editorPalette()).isEqualTo(second.editor());
+            assertThat(appearance.syntaxPalette()).isEqualTo(second.syntax());
+        }
+    }
+
+    private record WorkspaceColors(dev.jasper.sdk.ui.WorkspacePalette palette,
+                                   dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {}
+
+    private static WorkspaceColors workspaceColors(java.awt.Color color) {
+        var palette = new dev.jasper.sdk.ui.WorkspacePalette(color, color, color, color, color, color, color,
+            color, color, color, color, color, color);
+        var editor = new dev.jasper.sdk.ui.EditorPalette(color, color, color, color, color, color, color);
+        var styles = new java.util.EnumMap<dev.jasper.sdk.ui.SyntaxRole, dev.jasper.sdk.ui.SyntaxStyle>(dev.jasper.sdk.ui.SyntaxRole.class);
+        for (var role : dev.jasper.sdk.ui.SyntaxRole.values())
+            styles.put(role, new dev.jasper.sdk.ui.SyntaxStyle(color, color.equals(java.awt.Color.RED), color.equals(java.awt.Color.BLUE)));
+        return new WorkspaceColors(palette, editor, new dev.jasper.sdk.ui.SyntaxPalette(styles));
+    }
+
     @Test void workspaceSubscriptionsClosedOnWorkersSuppressAlreadyQueuedCallbacks() {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});

@@ -404,6 +404,10 @@ chrome-derived syntax in match mode; no SDK values enter UIManager. `WorkspacePa
 JDK client properties to distinguish workspace controls from chrome renderers. The SDK/testkit remain JDK-only.
 `FakePluginHost.setWorkspace` and the actual hosted adapter share the same contract tests for values, notifications,
 same-variant changes, disposal and safe variant reads. The fake accepts its creating test thread or the real Swing EDT for appearance work, while rejecting background workers.
+Fake workspace changes publish their snapshot and notify current subscribers together during `flush()`. Until then,
+workspace getters expose the last flushed value. Consecutive queued changes each expose their own complete snapshot
+inside the callback; duplicate pending values are quiet. Subscriptions added before publication receive that change,
+and registrations closed before delivery remain silent. Chrome's existing fake variant/event behavior is unchanged.
 
 ### Declared settings (plan C1; SDK 0.9 completes them)
 
