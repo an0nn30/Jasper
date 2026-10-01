@@ -47,4 +47,38 @@ class TransferActivitiesTest {
         assertThat(updates).containsExactly("50% 2.0 KB of 4.0 KB", "done 4.0 KB in 2.0 s");
         assertThat(begun).hasSize(1);
     }
+
+    @Test void interleavedTransfersFromTwoServersEachGetTheirOwnActivity() {
+        var handles = new ArrayList<List<String>>();
+        var activities = new TransferActivities(spec -> {
+            var mine = new ArrayList<String>();
+            handles.add(mine);
+            return new ActivityHandle() {
+                @Override public UUID id() { return UUID.randomUUID(); }
+                @Override public void progress(double fraction, String detail) { mine.add("progress"); }
+                @Override public void detail(String detail) { mine.add("detail"); }
+                @Override public void succeed(String detail) { mine.add("done"); }
+                @Override public void fail(String detail) { mine.add("failed"); }
+                @Override public void cancelled() { mine.add("cancelled"); }
+            };
+        }, "show");
+        activities.accept(new ServerEvent.TransferStarted(AT, "a", 1, ServerEvent.Direction.DOWNLOAD, "/one", 100, () -> { }));
+        activities.accept(new ServerEvent.TransferStarted(AT, "b", 2, ServerEvent.Direction.UPLOAD, "/two", 100, () -> { }));
+        activities.accept(new ServerEvent.TransferProgress(AT.plusSeconds(2), "a", 1, 10, 100));
+        activities.accept(new ServerEvent.TransferProgress(AT.plusSeconds(2), "b", 2, 10, 100));
+        activities.accept(new ServerEvent.Transferred(AT.plusSeconds(3), "b", 2, ServerEvent.Direction.UPLOAD, "/two", 100, Duration.ofSeconds(3), true));
+        activities.accept(new ServerEvent.Transferred(AT.plusSeconds(3), "a", 1, ServerEvent.Direction.DOWNLOAD, "/one", 100, Duration.ofSeconds(3), false));
+        assertThat(handles).hasSize(2);
+        assertThat(handles.get(0)).containsExactly("progress", "failed");
+        assertThat(handles.get(1)).containsExactly("progress", "done");
+    }
+
+    @Test void aCancelledTransferEndsItsActivityAsCancelled() {
+        var activities = new TransferActivities(spec -> { begun.add(spec); return handle(); }, "show");
+        activities.accept(new ServerEvent.TransferStarted(AT, "a", 1, ServerEvent.Direction.DOWNLOAD, "/big", 100, () -> { }));
+        activities.accept(new ServerEvent.TransferProgress(AT.plusSeconds(2), "a", 1, 10, 100));
+        begun.getFirst().cancel().orElseThrow().run();
+        activities.accept(new ServerEvent.Transferred(AT.plusSeconds(3), "a", 1, ServerEvent.Direction.DOWNLOAD, "/big", 10, Duration.ofSeconds(3), false));
+        assertThat(updates).containsExactly("10% 10 B of 100 B", "cancelled");
+    }
 }

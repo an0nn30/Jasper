@@ -45,4 +45,18 @@ class ServerEventsTest {
         events.connected("10.0.0.5");
         events.transfer("10.0.0.5", ServerEvent.Direction.DOWNLOAD, "/a", -1, () -> { }).finish(true);
     }
+
+    @Test void transferIdsAreUniqueAcrossInstances() {
+        var first = new ArrayList<ServerEvent>();
+        var second = new ArrayList<ServerEvent>();
+        var a = new ServerEvents(clock, first::add);
+        var b = new ServerEvents(clock, second::add);
+        a.transfer("x", ServerEvent.Direction.DOWNLOAD, "/a", 1, () -> { });
+        b.transfer("y", ServerEvent.Direction.DOWNLOAD, "/b", 1, () -> { });
+        a.transfer("x", ServerEvent.Direction.DOWNLOAD, "/c", 1, () -> { });
+        var ids = new java.util.HashSet<Long>();
+        for (var event : java.util.stream.Stream.concat(first.stream(), second.stream()).toList())
+            ids.add(((ServerEvent.TransferStarted) event).id());
+        assertThat(ids).hasSize(3);
+    }
 }

@@ -41,9 +41,10 @@ class ServerRegistryTest {
         final ServerDefinition definition;
         final ServerEvents events;
         boolean started, stopped;
+        int stopDelayMs;
         FakeEngine(ServerDefinition definition, ServerEvents events) { this.definition = definition; this.events = events; }
         @Override public void start() throws EngineFailure { if (failure != null) throw new EngineFailure(failure); started = true; }
-        @Override public void stop() { stopped = true; }
+        @Override public void stop() { stopped = true; if (stopDelayMs > 0) { try { Thread.sleep(stopDelayMs); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } } }
         @Override public List<URI> addresses() { return List.of(URI.create("http://127.0.0.1:" + definition.port() + "/")); }
     }
 
@@ -225,8 +226,92 @@ class ServerRegistryTest {
         assertThat(registry.running()).isZero();
         registry.start(a.id(), null);
         run();
+        registry.start(b.id(), null);
+        run();
         registry.shutdown();
         assertThat(engines.getLast().stopped).as("synchronously").isTrue();
+        assertThat(engines.subList(2, engines.size())).allMatch(e -> e.stopped);
         assertThat(registry.servers()).isEmpty();
+    }
+
+    @Test void shutdownStopsEnginesInParallel() {
+        var a = definition("a", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        var b = definition("b", 8081, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        registry.setDefinitions(List.of(a, b));
+        registry.start(a.id(), null);
+        registry.start(b.id(), null);
+        run();
+        engines.forEach(engine -> engine.stopDelayMs = 400);
+        long began = System.nanoTime();
+        registry.shutdown();
+        long tookMs = (System.nanoTime() - began) / 1_000_000;
+        assertThat(engines).allMatch(engine -> engine.stopped);
+        assertThat(tookMs).as("two 400 ms stops overlap").isLessThan(700);
+    }
+
+    @Test void aRunningServerKeepsHoldingThePortItActuallyUses() {
+        var docs = definition("docs", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        registry.setDefinitions(List.of(docs));
+        registry.start(docs.id(), null);
+        run();
+        var moved = new ServerDefinition(docs.id(), "docs", Protocol.HTTP, folder, Bind.LOOPBACK, 8081, Optional.empty(), false,
+            Login.ANONYMOUS, List.of(), false, false, false);
+        var old = definition("old", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        var fresh = definition("fresh", 8081, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        registry.setDefinitions(List.of(moved, old, fresh));
+        registry.start(old.id(), null);
+        assertThat(registry.server(old.id()).orElseThrow().state().reason()).contains("Port 8080 is already used by ‘docs’");
+        registry.start(fresh.id(), null);
+        run();
+        assertThat(phase(fresh.id())).isEqualTo(RUNNING);
+    }
+
+    @Test void aStoppingServerStillHoldsItsPort() {
+        var docs = definition("docs", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        var other = definition("other", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        registry.setDefinitions(List.of(docs, other));
+        registry.start(docs.id(), null);
+        run();
+        registry.stop(docs.id());
+        registry.start(other.id(), null);
+        assertThat(phase(other.id())).isEqualTo(FAILED);
+    }
+
+    @Test void anErrorWhileBindingFailsTheStartInsteadOfHangingIt() {
+        var docs = definition("docs", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        var broken = new ServerRegistry((definition, share, login, events) -> { throw new AssertionError("boom"); },
+            new LoginResolver(Optional.of(vault.api()), () -> "dustin", () -> "pw"), background::add, Runnable::run, new TestClock(), () -> 3, observed::add);
+        broken.setDefinitions(List.of(docs));
+        var done = broken.start(docs.id(), null);
+        run();
+        assertThat(done).isCompleted();
+        assertThat(broken.server(docs.id()).orElseThrow().state()).isEqualTo(ServerState.failed("boom"));
+    }
+
+    @Test void anEngineWhoseAddressesThrowFailsTheStart() {
+        var docs = definition("docs", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        var stopped = new boolean[1];
+        var odd = new ServerRegistry((definition, share, login, events) -> new ServerEngine() {
+            @Override public void start() { }
+            @Override public void stop() { stopped[0] = true; }
+            @Override public List<URI> addresses() { throw new IllegalStateException("no network"); }
+        }, new LoginResolver(Optional.of(vault.api()), () -> "dustin", () -> "pw"), background::add, Runnable::run, new TestClock(), () -> 3, observed::add);
+        odd.setDefinitions(List.of(docs));
+        var done = odd.start(docs.id(), null);
+        run();
+        assertThat(done).isCompleted();
+        assertThat(odd.server(docs.id()).orElseThrow().state()).isEqualTo(ServerState.failed("no network"));
+        assertThat(stopped[0]).isTrue();
+    }
+
+    @Test void startingATemporaryServerWithATakenIdChangesNothing() {
+        var quick = definition("quick", 8080, Bind.LOOPBACK, Login.ANONYMOUS, false);
+        registry.startTemporary(quick, null);
+        run();
+        var again = registry.startTemporary(quick, null);
+        run();
+        assertThat(again).isCompleted();
+        assertThat(engines).hasSize(1);
+        assertThat(phase(quick.id())).isEqualTo(RUNNING);
     }
 }

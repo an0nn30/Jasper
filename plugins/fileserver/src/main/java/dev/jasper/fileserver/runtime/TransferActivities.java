@@ -6,8 +6,10 @@ import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /** Turns transfers that last more than a second into SDK activities with progress and a Cancel that drops the client. UI thread. */
@@ -17,6 +19,7 @@ public final class TransferActivities {
     private final String activateActionId;
     private final Map<Long, ServerEvent.TransferStarted> pending = new HashMap<>();
     private final Map<Long, ActivityHandle> handles = new HashMap<>();
+    private final Set<Long> cancelled = new HashSet<>();
 
     public TransferActivities(Function<ActivitySpec, ActivityHandle> begin, String activateActionId) {
         this.begin = begin;
@@ -30,8 +33,10 @@ public final class TransferActivities {
             case ServerEvent.Transferred done -> {
                 pending.remove(done.id());
                 ActivityHandle handle = handles.remove(done.id());
+                boolean wasCancelled = cancelled.remove(done.id());
                 if (handle == null) return;
                 if (done.complete()) handle.succeed(Sizes.human(done.bytes()) + " in " + Sizes.seconds(done.took()));
+                else if (wasCancelled) handle.cancelled();
                 else handle.fail("Stopped after " + Sizes.human(done.bytes()));
             }
             default -> { }
@@ -44,7 +49,7 @@ public final class TransferActivities {
         ActivityHandle handle = handles.get(progress.id());
         if (handle == null) {
             if (Duration.between(started.at(), progress.at()).compareTo(AFTER) < 0) return;
-            handle = begin.apply(new ActivitySpec(title(started), started.remote(), Optional.of(activateActionId), Optional.of(started.cancel())));
+            handle = begin.apply(new ActivitySpec(title(started), started.remote(), Optional.of(activateActionId), Optional.of(() -> { cancelled.add(started.id()); started.cancel().run(); })));
             handles.put(progress.id(), handle);
         }
         String detail = Sizes.human(progress.bytes()) + (progress.total() > 0 ? " of " + Sizes.human(progress.total()) : "");

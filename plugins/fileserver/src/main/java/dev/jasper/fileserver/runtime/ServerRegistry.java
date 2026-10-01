@@ -14,6 +14,7 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,6 +60,8 @@ public final class ServerRegistry {
         Slot(ServerDefinition definition, boolean temporary) { this.definition = definition; this.temporary = temporary; }
         UUID id() { return definition.id(); }
     }
+
+    private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(5);
 
     private final EngineFactory engines;
     private final LoginResolver logins;
@@ -139,6 +142,7 @@ public final class ServerRegistry {
 
     /** Adds a server that is never saved and starts it; it disappears when stopped. */
     public CompletableFuture<Void> startTemporary(ServerDefinition definition, WindowHandle owner) {
+        if (slots.containsKey(definition.id())) return CompletableFuture.completedFuture(null);
         slots.put(definition.id(), new Slot(definition, true));
         changed();
         return start(definition.id(), owner);
@@ -175,9 +179,9 @@ public final class ServerRegistry {
             ShareRoot share = new ShareRoot(definition.folder(), !definition.writable());
             engine = engines.create(definition, share, login, new ServerEvents(clock, event -> ui.execute(() -> record(slot, event))));
             engine.start();
-        } catch (Exception failure) {
+        } catch (Throwable failure) {
             error = failure;
-            if (engine != null) { try { engine.stop(); } catch (RuntimeException ignored) { } }
+            if (engine != null) { try { engine.stop(); } catch (Throwable ignored) { } }
             engine = null;
         }
         ServerEngine started = engine;
@@ -192,10 +196,19 @@ public final class ServerRegistry {
                 login.close();
                 fail(slot, message(failure));
             } else {
+                List<URI> addresses;
+                try { addresses = started.addresses(); }
+                catch (Throwable broken) {
+                    try { background.execute(started::stop); } catch (RejectedExecutionException closing) { started.stop(); }
+                    login.close();
+                    fail(slot, message(broken));
+                    result.complete(null);
+                    return;
+                }
                 slot.engine = started;
                 slot.login = login;
                 slot.running = definition;
-                slot.addresses = started.addresses();
+                slot.addresses = addresses;
                 slot.state = ServerState.RUNNING;
                 changed();
             }
@@ -260,12 +273,26 @@ public final class ServerRegistry {
         return CompletableFuture.allOf(stops.toArray(CompletableFuture[]::new));
     }
 
-    /** Plugin shutdown: stops every engine on this thread and forgets every server. */
+    /** Plugin shutdown: stops every engine in parallel, waiting at most 5 s in all, and forgets every server. */
     public void shutdown() {
+        var threads = new ArrayList<Thread>();
         for (Slot slot : slots.values()) {
             slot.attempt++;
-            if (slot.engine != null) { try { slot.engine.stop(); } catch (RuntimeException ignored) { } }
+            ServerEngine engine = slot.engine;
+            if (engine != null) {
+                Thread thread = new Thread(() -> { try { engine.stop(); } catch (RuntimeException ignored) { } }, "file-server-stop");
+                thread.setDaemon(true);
+                thread.start();
+                threads.add(thread);
+            }
             if (slot.login != null) slot.login.close();
+        }
+        long deadline = System.nanoTime() + SHUTDOWN_WAIT.toNanos();
+        for (Thread thread : threads) {
+            long left = deadline - System.nanoTime();
+            if (left <= 0) break;
+            try { thread.join(Math.max(1, left / 1_000_000)); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
         }
         slots.clear();
         changed();
@@ -286,9 +313,11 @@ public final class ServerRegistry {
         ServerDefinition definition = slot.definition;
         if (!Files.isDirectory(definition.folder())) return Optional.of("The folder " + definition.folder() + " does not exist");
         for (Slot other : slots.values()) {
-            if (other == slot || other.definition.port() != definition.port()) continue;
+            if (other == slot) continue;
+            ServerDefinition held = other.running != null ? other.running : other.definition;
+            if (held.port() != definition.port()) continue;
             Phase phase = other.state.phase();
-            if ((phase == Phase.STARTING || phase == Phase.RUNNING) && other.definition.bind().overlaps(definition.bind()))
+            if ((phase == Phase.STARTING || phase == Phase.RUNNING || phase == Phase.STOPPING) && held.bind().overlaps(definition.bind()))
                 return Optional.of("Port " + definition.port() + " is already used by ‘" + other.definition.name() + "’");
         }
         return Optional.empty();

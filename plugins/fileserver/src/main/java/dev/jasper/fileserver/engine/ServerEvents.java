@@ -11,7 +11,8 @@ public final class ServerEvents {
     static final Duration PROGRESS_INTERVAL = Duration.ofMillis(250);
     private final Clock clock;
     private final Consumer<ServerEvent> sink;
-    private final AtomicLong ids = new AtomicLong();
+    /** Shared by every instance: one observer sees the transfers of all servers, so ids must never repeat. */
+    private static final AtomicLong IDS = new AtomicLong();
 
     public ServerEvents(Clock clock, Consumer<ServerEvent> sink) { this.clock = clock; this.sink = sink; }
 
@@ -23,7 +24,7 @@ public final class ServerEvents {
 
     /** Starts a transfer; {@code total} is -1 when unknown and {@code cancel} drops the client. */
     public Transfer transfer(String remote, ServerEvent.Direction direction, String path, long total, Runnable cancel) {
-        var transfer = new Transfer(ids.incrementAndGet(), remote, direction, path, total, clock.instant());
+        var transfer = new Transfer(IDS.incrementAndGet(), remote, direction, path, total, clock.instant());
         emit(new ServerEvent.TransferStarted(transfer.started, remote, transfer.id, direction, path, total, cancel));
         return transfer;
     }
