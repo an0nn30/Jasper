@@ -182,9 +182,11 @@ class TunnelManagerTest {
                 .isEqualTo(new TunnelState.Failed("Port " + busy.getLocalPort() + " is already in use on this computer"));
             assertThat(server.server.getActiveSessions()).as("nothing connected").isEmpty();
             assertThat(onUi(() -> manager.failed())).isEqualTo(1);
+            assertThat(onUi(() -> manager.known())).as("a failed tunnel has a state to clear").containsExactly(db.id());
             onUi(() -> manager.stop(db.id()));
             assertThat(onUi(() -> manager.state(db.id()))).as("Stop clears a failure").isEqualTo(TunnelState.STOPPED);
             assertThat(onUi(() -> manager.failed())).isZero();
+            assertThat(onUi(() -> manager.known())).isEmpty();
         }
     }
 

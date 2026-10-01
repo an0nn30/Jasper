@@ -11,11 +11,16 @@ import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.tunnels.TunnelState;
 import dev.jasper.remote.ui.HostRows;
 import dev.jasper.remote.ui.HostsPanel;
+import dev.jasper.remote.ui.tunnels.TunnelsPanel;
 import dev.jasper.remote.ui.tunnels.TunnelsScope;
 import dev.jasper.remote.ui.tunnels.TunnelsTestAccess;
 import dev.jasper.remote.ui.tunnels.TunnelsUi;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
+import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -179,6 +184,7 @@ class TunnelsPluginTest {
         }
     }
 
+    @SuppressWarnings("try") // first is closed early on purpose
     @Test void anOutsideEditRestartsARunningTunnelAndARemovalStopsIt(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var first = new EchoServer(); var second = new EchoServer(); var host = new FakePluginHost()) {
             Started started = start(host, server, dir);
@@ -196,11 +202,122 @@ class TunnelsPluginTest {
             await(host, () -> manager.running(db.id()).map(Tunnel::targetPort).orElse(0) == second.port()
                 && manager.state(db.id()) instanceof TunnelState.Up, "the restart");
             int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
+            first.close(); // both servers echo, so only a closed first proves the traffic now reaches the second
             assertThat(EchoServer.roundTrip(port, "moved")).isEqualTo("moved");
             Files.writeString(store.file(), TunnelFile.format(List.of()));
             Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(10)));
             store.poll();
             await(host, () -> manager.state(db.id()).equals(TunnelState.STOPPED), "a removed tunnel to stop");
+        }
+    }
+
+    /** Rewrites tunnels.toml as an outside editor would and has the store notice. */
+    private static void rewrite(RemotePlugin plugin, List<Tunnel> tunnels, int secondsLater) throws Exception {
+        var store = plugin.tunnelStore();
+        Files.writeString(store.file(), TunnelFile.format(tunnels));
+        Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(secondsLater)));
+        store.poll();
+    }
+
+    @Test void aSavedQuickForwardStopsWhenItsEntryIsRemoved(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var echo = new EchoServer(); var host = new FakePluginHost()) {
+            Started started = start(host, server, dir);
+            var tunnels = started.plugin().tunnels();
+            var manager = tunnels.manager();
+            assertThat(host.invoke(TunnelsUi.FORWARD, started.window(), null)).isTrue();
+            var forward = tunnels.currentForward();
+            TunnelsTestAccess.host(forward).setSelectedItem(started.prod());
+            TunnelsTestAccess.targetHost(forward).setText("127.0.0.1");
+            TunnelsTestAccess.remotePort(forward).setText(String.valueOf(echo.port()));
+            TunnelsTestAccess.forward(forward).doClick();
+            Tunnel quick = manager.quickForwards().getFirst();
+            await(host, () -> manager.state(quick.id()) instanceof TunnelState.Up, "the quick forward to come up");
+            int port = ((TunnelState.Up) manager.state(quick.id())).boundPort();
+            assertThat(EchoServer.roundTrip(port, "quick")).isEqualTo("quick");
+            // Save as Tunnel...: the panel's route for a quick forward; the editor keeps the id and the forwarding.
+            var panel = (TunnelsPanel) host.openPanel(TunnelsUi.PANEL, started.window());
+            TunnelsTestAccess.activate(panel, quick.id());
+            TunnelsTestAccess.name(tunnels.currentEditor()).setText("kept");
+            TunnelsTestAccess.save(tunnels.currentEditor()).doClick();
+            RemotePluginTest.settle(host);
+            assertThat(started.plugin().tunnelStore().tunnel(quick.id())).as("saved under the same id").isPresent();
+            assertThat(manager.quickForwards()).as("it left the quick list").isEmpty();
+            assertThat(manager.state(quick.id())).as("and keeps running").isInstanceOf(TunnelState.Up.class);
+            rewrite(started.plugin(), List.of(), 5);
+            await(host, () -> manager.state(quick.id()).equals(TunnelState.STOPPED), "the removed tunnel to stop");
+            assertThat(manager.active()).isZero();
+            assertThatThrownBy(() -> new Socket(InetAddress.ofLiteral("127.0.0.1"), port).close()).as("nothing listens any more").isInstanceOf(ConnectException.class);
+            assertThat(host.status()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void aFailedTunnelRemovedFromTheFileReturnsToStopped(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var busy = new ServerSocket(0, 50, InetAddress.ofLiteral("127.0.0.1")); var host = new FakePluginHost()) {
+            Started started = start(host, server, dir);
+            var manager = started.plugin().tunnels().manager();
+            Tunnel db = Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, "127.0.0.1", busy.getLocalPort(), "127.0.0.1", 9);
+            started.plugin().tunnelStore().put(db);
+            RemotePluginTest.settle(host);
+            manager.start(db, null);
+            assertThat(manager.state(db.id())).isEqualTo(new TunnelState.Failed("Port " + busy.getLocalPort() + " is already in use on this computer"));
+            assertThat(manager.failed()).isEqualTo(1);
+            assertThat(host.status()).as("the status item reports the failure").hasSize(1);
+            rewrite(started.plugin(), List.of(), 5);
+            await(host, () -> manager.state(db.id()).equals(TunnelState.STOPPED), "the removed tunnel's failure to clear");
+            assertThat(manager.failed()).isZero();
+            assertThat(host.status()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void deletingARunningTunnelStopsItAndRemovesItsEntry(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var echo = new EchoServer(); var host = new FakePluginHost()) {
+            Started started = start(host, server, dir);
+            var tunnels = started.plugin().tunnels();
+            var manager = tunnels.manager();
+            Tunnel db = Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, "127.0.0.1", 0, "127.0.0.1", echo.port());
+            started.plugin().tunnelStore().put(db);
+            RemotePluginTest.settle(host);
+            var panel = (TunnelsPanel) host.openPanel(TunnelsUi.PANEL, started.window());
+            manager.start(db, null);
+            await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
+            int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
+            TunnelsTestAccess.delete(panel, db.id());
+            tunnels.currentConfirm().confirm.doClick();
+            RemotePluginTest.settle(host);
+            assertThat(started.plugin().tunnelStore().tunnels()).isEmpty();
+            assertThat(manager.state(db.id())).isEqualTo(TunnelState.STOPPED);
+            assertThatThrownBy(() -> new Socket(InetAddress.ofLiteral("127.0.0.1"), port).close()).isInstanceOf(ConnectException.class);
+            assertThat(host.windows()).as("the confirmation closed").isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void deletingATunnelWhileTheFileIsBrokenLeavesItRunning(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var echo = new EchoServer(); var host = new FakePluginHost()) {
+            Started started = start(host, server, dir);
+            var tunnels = started.plugin().tunnels();
+            var manager = tunnels.manager();
+            var store = started.plugin().tunnelStore();
+            Tunnel db = Tunnel.create("db", started.prod().id(), TunnelKind.LOCAL, "127.0.0.1", 0, "127.0.0.1", echo.port());
+            store.put(db);
+            RemotePluginTest.settle(host);
+            var panel = (TunnelsPanel) host.openPanel(TunnelsUi.PANEL, started.window());
+            manager.start(db, null);
+            await(host, () -> manager.state(db.id()) instanceof TunnelState.Up, "the tunnel to come up");
+            int port = ((TunnelState.Up) manager.state(db.id())).boundPort();
+            Files.writeString(store.file(), "[[tunnel]\nname = ");
+            Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(5)));
+            store.poll();
+            await(host, () -> store.error().isPresent(), "the broken file to be noticed");
+            TunnelsTestAccess.delete(panel, db.id());
+            tunnels.currentConfirm().confirm.doClick();
+            RemotePluginTest.settle(host);
+            assertThat(store.tunnels()).as("the removal was refused").containsExactly(db);
+            assertThat(manager.state(db.id())).as("so the tunnel was not stopped").isInstanceOf(TunnelState.Up.class);
+            assertThat(EchoServer.roundTrip(port, "still")).isEqualTo("still");
+            assertThat(host.windows()).as("the confirmation closed").isEmpty();
         }
     }
 }

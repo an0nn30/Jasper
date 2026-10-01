@@ -200,15 +200,21 @@ public final class TunnelsUi implements AutoCloseable {
         if (active > 0) ticker.start(); else ticker.stop();
     }
 
-    /** tunnels.toml changed: a removed tunnel stops, a running one whose forwarding changed restarts. */
+    /**
+     * tunnels.toml changed: a tunnel with no row left stops, a running one whose forwarding changed restarts. A row is a
+     * saved tunnel or a quick forward; the ids decide, not the running definition, which stays unnamed after Save as Tunnel.
+     */
     private void storeChanged() {
         if (closed) return;
         store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "tunnels.toml: {0}", warning));
         Map<UUID, Tunnel> saved = store.tunnels().stream().collect(Collectors.toMap(Tunnel::id, tunnel -> tunnel));
+        Set<UUID> rows = new HashSet<>(saved.keySet());
+        manager.quickForwards().forEach(quick -> rows.add(quick.id()));
+        // Running, starting or failed: stopping clears a removed tunnel's failure as well.
+        for (UUID id : manager.known()) if (!rows.contains(id)) manager.stop(id);
         for (Tunnel running : manager.runningTunnels()) {
             Tunnel now = saved.get(running.id());
-            if (now == null) { if (!running.quick()) manager.stop(running.id()); }
-            else if (!now.sameForwarding(running)) { manager.stop(running.id()); manager.start(now, owner().orElse(null)); }
+            if (now != null && !now.sameForwarding(running)) { manager.stop(running.id()); manager.start(now, owner().orElse(null)); }
         }
         refresh();
     }
@@ -284,8 +290,8 @@ public final class TunnelsUi implements AutoCloseable {
         if (closed) return;
         PluginDialog dialog = dialog(window, "Delete " + tunnel.name() + "?");
         boolean running = manager.state(tunnel.id()).running();
+        // The tunnel stops when the store reports its entry gone (storeChanged), so a refused removal leaves it running.
         var confirm = new ConfirmPanel("Delete the tunnel " + tunnel.name() + "?" + (running ? " It is running; deleting it stops it." : ""), "Delete", () -> {
-            manager.stop(tunnel.id());
             store.remove(tunnel.id()).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (failure != null && !closed) context.notices().error(message(failure));
                 dialog.close();

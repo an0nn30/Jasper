@@ -78,6 +78,8 @@ public final class TunnelManager implements AutoCloseable {
     public List<Tunnel> quickForwards() { return List.copyOf(quick.values()); }
     /** Tunnels Starting or Up. */
     public int active() { return runs.size(); }
+    /** The ids of every tunnel with a state to clear: Starting, Up or Failed, quick forwards included. UI thread only. */
+    public Set<UUID> known() { return Set.copyOf(states.keySet()); }
     public int failed() { return (int) states.values().stream().filter(TunnelState.Failed.class::isInstance).count(); }
     public Subscription onChanged(Runnable listener) { listeners.add(listener); return () -> listeners.remove(listener); }
 
