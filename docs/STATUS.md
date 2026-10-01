@@ -2,11 +2,11 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system Plan 3 final-review fixes implemented, re-review pending** (branch
+- **Theme system Plan 3 complete and independently reviewed** (branch
   `codex/theme-system-plans`): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)
   now styles mounted center controls with one chrome LAF, preserves plugin styles/direct colors, tracks dynamic
   children and combo dropdowns, and restores state on match/move/close/plugin stop. All five tasks independently reviewed;
-  the final whole-branch review requested five fixes, now implemented and awaiting focused re-review.
+  the final whole-branch review's five findings are fixed in `863ca6b9` and independently approved.
   All seven plugins audited: Remote/File Server/Vault/Editor
   custom renderers and rules use mounted-owner palettes; Vim error/bell styles remain plugin-owned; syntax and
   configured yank colors stay unchanged. [Authoring audit](plugin-authoring.md#hosted-pane-control-styling) records
@@ -21,7 +21,7 @@
   tests are retained in the plan; the final fix wave passed 99 focused tests after ownership/accessor/diagnostic REDs.
   Task 5 note-style churn is fixed (`bd4fd9cd`). The final fix wave adds ownership cancellation for synchronous
   generated writes, accessible typed color fallback for nonpublic plugin subclasses, correctly keyed warnings and
-  scoped diagnostic assertions, and the corrected three-site progress inventory. Focused independent re-review is pending. User-only native visual checklist is in
+  scoped diagnostic assertions, and the corrected three-site progress inventory. Focused independent re-review found no remaining findings or new breakage. User-only native visual checklist is in
   [themes](themes.md); no GUI, benchmark, merge or push performed. Plans 4–5 remain separate future deliverables.
 
 - **Theme workspace startup regression fixed:** the first native GUI attempt after Plan 2 found that GitHub Dark

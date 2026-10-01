@@ -4,7 +4,9 @@
 review fixes are merged to main at `5fc76c7d`; implementation deviations are recorded in plan 1 and `docs/STATUS.md`.
 [Remaining-work assessment and plans 2–5](../plans/2026-10-01-theme-system-remaining-work.md) track implementation.
 Plan 2 is implemented, headless-verified and independently reviewed, then merged and verified on local `main`
-on 2026-10-01 (not pushed); user GUI acceptance remains pending. Plans 3–5 remain future work. Plan 2 deviations are recorded in its status banner and `docs/STATUS.md`;
+on 2026-10-01 (not pushed); user GUI acceptance remains pending. Plan 3 is implemented and independently reviewed on `codex/theme-system-plans`,
+with final fixes at `863ca6b9`; local integration and user visual acceptance remain pending. Plans 4–5 remain future work.
+Plan 2 and Plan 3 deviations are recorded in their status banners and `docs/STATUS.md`;
 the assessment labels later integration decisions. The user approved the combo-dropdown clarification below on
 2026-10-01 while planning Plan 3.
 

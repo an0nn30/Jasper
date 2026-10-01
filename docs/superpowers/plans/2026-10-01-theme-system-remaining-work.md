@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 implementation is complete on `codex/theme-system-plans`, with all five tasks reviewed and final-review fixes awaiting focused re-review; Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 implementation is complete on `codex/theme-system-plans`, with all five tasks and the final-review fixes independently approved; Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -32,7 +32,7 @@ acceptance has not been performed.
 | Order | Plan | Shippable result | Depends on |
 |---|---|---|---|
 | 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Implemented, headless-verified and independently reviewed: terminal, tabs, dividers, find, icons, Editor and SDK 0.12.0; GUI acceptance pending | Merged plan 1 |
-| 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Implemented; Task 5/final review and user visual acceptance pending: hosted Swing panes adopt workspace colors with plugin-owned styles and cleanup | Plan 2 |
+| 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Implemented and independently reviewed; user visual acceptance pending: hosted Swing panes adopt workspace colors with plugin-owned styles and cleanup | Plan 2 |
 | 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Offline native catalog, reproducible conversion, safe upgrade; old stores removed | Plans 2–3 |
 | 5 | [Themes page and live reload](2026-10-01-theme-system-5-page-reload.md) | Complete user flow: browse, stage, preview, import, duplicate, remove and edit/reload | Plan 4 |
 
@@ -155,7 +155,7 @@ not represented as a fresh test of future implementation. The executor runs the 
 ## Plan 3 implementation evidence and remaining gates
 
 All five tasks are implemented; all five have passed their independent task reviews. The final
-whole-branch review requested five fixes, now implemented with focused independent re-review pending. The [execution notes](2026-10-01-theme-system-3-plugin-panes.md)
+whole-branch review requested five fixes, now implemented in `863ca6b9` and approved by focused independent re-review. The [execution notes](2026-10-01-theme-system-3-plugin-panes.md)
 retain actual per-task evidence and deviations: delegate-owned progress text (bundled bars draw no text), narrow
 synchronous `setUI` detection and silent UIResource default semantics, a source-owned hierarchy listener on excluded
 associated headers/editors, and mount/registry rollback preserving live documents when no host can accept a move.
@@ -173,4 +173,4 @@ Evidence and exact module counts are in the Plan 3 execution notes and `/tmp/mor
 Final unified fix gate: `./gradlew check` passed 7,897 tests, zero failures/errors, six skips in 3m32s;
 99 focused tests passed. All four architecture gates, 1,636-file Java hygiene and branch whitespace checks pass.
 Explicit module/plugin XML counts and logs are recorded in the Plan 3 execution notes and
-`/tmp/p3-final-{check,counts,hygiene,diff-check}.log`. Focused independent re-review of this fix wave remains pending.
+`/tmp/p3-final-{check,counts,hygiene,diff-check}.log`. Focused independent re-review approved all five findings with no new breakage; no findings remain open. Local integration and user visual acceptance remain pending.
