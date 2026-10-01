@@ -338,7 +338,9 @@ dialogs or overlays) without closing anything, before `quitting` is set and befo
 `ApplicationShutdown` arms the exit deadline. A refusal leaves Jasper running; a refused restart
 records no relaunch. Start-up rollback, a `--background` launch that cannot stay resident and the
 benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
-launch goes through `quit()` and does.
+launch goes through `quit()` and does. Since SDK 0.11.0 the same check then asks `Windows.onQuitting` guards, kept in
+`Contributions.quitGuards()` (`QuitGuards`), one at a time, pumping UI events while a decision is pending; a refusal
+cancels, and a guard that throws or fails allows the quit.
 
 `Windows.chooseSaveFile` is the save-target twin of `chooseFiles`: `PathChoice.Mode.SAVE` makes
 `NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and

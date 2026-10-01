@@ -477,6 +477,21 @@ final class HostedUi {
                 });
                 return tracked(registration::close);
             }
+            @Override public Subscription onQuitting(Supplier<java.util.concurrent.CompletableFuture<Boolean>> guard) {
+                HostedUi.this.guard("quit guard");
+                java.util.Objects.requireNonNull(guard, "guard");
+                var registration = model.quitGuards().add(() -> {
+                    var result = new java.util.concurrent.CompletableFuture<Boolean>();
+                    boolean invoked = containment.run(pluginId, "quit guard", () -> {
+                        var decision = guard.get();
+                        if (decision == null) { result.complete(true); return; }
+                        decision.whenComplete((allowed, error) -> result.complete(error != null || !Boolean.FALSE.equals(allowed)));
+                    });
+                    if (!invoked) result.complete(true);
+                    return result;
+                });
+                return tracked(registration::close);
+            }
 
             @Override public java.util.List<Path> chooseFiles(WindowOwner owner, String title, Optional<Path> initial) {
                 return localPaths(chooseLocations(owner, title, initial.map(Location::local), dev.jasper.app.windows.PathChoice.Mode.OPEN, true, Optional.empty(), Set.of()));

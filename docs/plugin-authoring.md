@@ -214,6 +214,9 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
 - `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
   it open. Since SDK 0.8.4, quitting or restarting Jasper asks the guards of your open windows first, so a guard
   can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
+- `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after plugin windows and
+  content tabs, even when your plugin has no window: a background server can ask "stop the running servers?".
+  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit.
 - In SDK 0.8.4+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
   Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
   window close. The close button is not affected.

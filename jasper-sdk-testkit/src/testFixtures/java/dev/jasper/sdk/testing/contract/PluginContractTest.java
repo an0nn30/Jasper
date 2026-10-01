@@ -624,6 +624,34 @@ public abstract class PluginContractTest {
         assertThat(h.windows()).as("asking closes nothing").hasSize(3);
     }
 
+    @Test void quitGuardsAreAskedInTurnAndOnlyAFalseDecisionRefuses() {
+        var alpha = new AtomicReference<CompletableFuture<Boolean>>(CompletableFuture.completedFuture(false));
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context ->
+            context.windows().onQuitting(() -> { asked.add("alpha"); return alpha.get(); }));
+        h.start(info("test.beta"), Set.of(), Set.of(), context ->
+            context.windows().onQuitting(() -> { asked.add("beta"); throw new IllegalStateException("broken guard"); }));
+        h.ui(() -> assertThat(h.requestQuit()).isFalse());
+        assertThat(asked).containsExactly("alpha");
+        alpha.set(CompletableFuture.completedFuture(true));
+        asked.clear();
+        h.ui(() -> assertThat(h.requestQuit()).as("a guard that throws allows the quit").isTrue());
+        assertThat(asked).containsExactly("alpha", "beta");
+        alpha.set(CompletableFuture.failedFuture(new IllegalStateException("failed decision")));
+        h.ui(() -> assertThat(h.requestQuit()).as("a failed decision allows the quit").isTrue());
+    }
+
+    @Test void aClosedQuitGuardIsNotAsked() {
+        var registration = new AtomicReference<Subscription>();
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> registration.set(
+            context.windows().onQuitting(() -> { asked.add("alpha"); return CompletableFuture.completedFuture(false); })));
+        h.ui(() -> assertThat(h.requestQuit()).isFalse());
+        h.ui(() -> registration.get().close());
+        h.ui(() -> assertThat(h.requestQuit()).isTrue());
+        assertThat(asked).containsExactly("alpha");
+    }
+
     private static PluginInfo info(String id, String... capabilities) { return new PluginInfo(id, id, "1.0.0", Set.of(capabilities)); }
 
     @Test void terminalsAreFoundThroughTheContextAndHandlesAreEqualById() {

@@ -688,17 +688,26 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Asks the closing guards of every open plugin window, as quitting or restarting Jasper does, and closes
-     * nothing. Dialogs and overlays are not asked.
+     * Asks the closing guards of every open plugin window, then every quit guard, as quitting or restarting Jasper
+     * does, and closes nothing. Dialogs and overlays are not asked. A quit guard whose future is still pending counts
+     * as a refusal here: the fake does not pump events.
      *
      * @return whether the quit may go ahead
-     * @since 0.8.4
+     * @since 0.8.4; quit guards since 0.11.0
      */
     public boolean requestQuit() {
         for (FakePluginContext context : contexts.values()) if (!context.ui.closeContent(List.copyOf(context.ui.contents), false).getNow(false)) return false;
         for (FakePluginContext context : contexts.values())
             for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows))
                 if (!window.id.equals("dialog") && !window.id.equals("overlay") && !window.mayClose()) return false;
+        for (FakePluginContext context : contexts.values())
+            for (var guard : List.copyOf(context.ui.quitGuards)) {
+                java.util.concurrent.CompletableFuture<Boolean> decision;
+                try { decision = guard.get(); }
+                catch (RuntimeException failure) { recordFailure(context.plugin().id() + " quit guard: " + failure); continue; }
+                if (decision == null) continue;
+                if (!decision.handle((allowed, error) -> error != null || !Boolean.FALSE.equals(allowed)).getNow(false)) return false;
+            }
         return true;
     }
 

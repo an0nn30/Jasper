@@ -232,6 +232,49 @@ class JasperApplicationPluginsTest {
         assertThat(spawned).as("the refused restart left no relaunch behind").isEmpty();
     }
 
+    private static final String QUIT_FIXTURE = """
+        package fix.quit;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import java.nio.file.Files;
+        import java.util.concurrent.CompletableFuture;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                context.windows().onQuitting(() -> {
+                    try { Files.writeString(context.dataDirectory().resolve("asked"), "yes"); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return CompletableFuture.completedFuture(Files.exists(context.dataDirectory().resolve("allow")));
+                });
+            }
+        }
+        """;
+
+    @Test void quitAndRestartAskQuitGuardsAndARefusalKeepsJasperRunning() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "quit.jar", PluginJars.descriptor("dev.example.quit", "1.0.0", "fix.quit.Main"),
+            Map.of("fix.quit.Main", QUIT_FIXTURE), List.of());
+        Path data = dirs.plugins().resolve("dev.example.quit/data");
+        List<String> spawned = new CopyOnWriteArrayList<>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].restartPlanner = mode -> Optional.of(List.of("jasper"));
+            application[0].spawner = command -> spawned.add(String.join(" ", command));
+            application[0].startPlugins(null, dev, false, dirs);
+        });
+        edt(application[0]::quit);
+        edt(() -> assertThat(application[0].restart(RestartMode.SAME)).as("handled: the guard said no").isTrue());
+        edt(() -> { });
+        assertThat(data.resolve("asked")).exists();
+        assertThat(terminated.getCount()).as("still running").isEqualTo(1);
+        java.nio.file.Files.writeString(data.resolve("allow"), "yes");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(spawned).as("the refused restart left no relaunch behind").isEmpty();
+    }
+
     @Test void quitNowDoesNotAskPluginWindows() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
         Path dev = home.resolve("dev-plugin");

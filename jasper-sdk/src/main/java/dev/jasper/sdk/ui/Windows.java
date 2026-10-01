@@ -1,11 +1,14 @@
 package dev.jasper.sdk.ui;
 
+import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.files.FileChoice;
 import dev.jasper.sdk.files.FileLocation;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 /** Application-built windows and dialogs with consistent chrome. */
 public interface Windows {
@@ -28,6 +31,22 @@ public interface Windows {
     default dev.jasper.sdk.Subscription onTabsClosing(java.util.function.BiFunction<java.util.List<ContentTab>,Boolean,
             java.util.concurrent.CompletableFuture<Boolean>> guard) {
         throw new UnsupportedOperationException("Workspace content is unavailable");
+    }
+
+    /**
+     * Registers a guard asked when the user quits or restarts Jasper, after plugin windows' and content tabs' guards
+     * and before anything closes. Guards are asked one at a time; one whose future completes with {@code false}
+     * cancels the quit. A guard that throws, returns {@code null} or whose future fails allows the quit. The guard
+     * runs on the UI thread and may show a modal dialog before completing its future.
+     *
+     * @param guard returns the decision, possibly after asking the user
+     * @return the registration; closing it removes the guard
+     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
+     * @throws UnsupportedOperationException if the host predates quit guards
+     * @since 0.11.0
+     */
+    default Subscription onQuitting(Supplier<CompletableFuture<Boolean>> guard) {
+        throw new UnsupportedOperationException("Quit guards are unavailable");
     }
 
     /**
