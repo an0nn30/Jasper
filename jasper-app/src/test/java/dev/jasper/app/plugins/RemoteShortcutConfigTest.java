@@ -50,7 +50,7 @@ class RemoteShortcutConfigTest {
 
     private KeyBindings.Resolved resolve(Map<String, String> overrides) {
         return KeyBindings.withOverrides(true, overrides).withExtensions(contributions.actions().stream()
-            .map(action -> new KeyBindings.Extension(action.id(), action.defaultBinding())).toList());
+            .map(dev.jasper.app.contributions.ActionEntry::extension).toList());
     }
 
     @AfterEach void stop() throws Exception {

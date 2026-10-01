@@ -17,15 +17,16 @@ final class ShortcutCatalog {
 
     static List<ShortcutEntry> rows(KeyBindings base, List<ActionEntry> actions, Map<String, String> plugins, boolean macOs) {
         var resolved = base.withExtensions(actions.stream().filter(a -> KeyBindings.extensionId(a.id()))
-            .map(a -> new KeyBindings.Extension(a.id(), a.defaultBinding())).toList());
+            .map(ActionEntry::extension).toList());
         var rows = new ArrayList<ShortcutEntry>();
         for (ActionId id : ActionId.values()) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
             resolved.bindings().strokeFor(id).orElse(null), "Terminal window", id.id().replace('_', ' '), true, KeyBindings.effectiveDefaultBinding(id, macOs)));
         for (ActionEntry action : actions) {
             String context = resolved.problems().stream().filter(problem -> problem.actionId().equals(action.id()))
                 .map(KeyBindings.Problem::message).findFirst().orElse("Terminal window");
+            String fallback = KeyBindings.extensionId(action.id()) ? action.extension().defaultFor(macOs).orElse("none") : "none";
             rows.add(new ShortcutEntry(action.id(), pluginGroup(action.id(), plugins), action.title(),
-                resolved.bindings().strokeFor(action.id()).orElse(null), context, String.join(" ", action.keywords()), true, validDefault(action.defaultBinding().orElse("none"), macOs)));
+                resolved.bindings().strokeFor(action.id()).orElse(null), context, String.join(" ", action.keywords()), true, validDefault(fallback, macOs)));
         }
         contextual(rows, actions, plugins, macOs);
         rows.sort(Comparator.comparing(ShortcutEntry::group, String.CASE_INSENSITIVE_ORDER)

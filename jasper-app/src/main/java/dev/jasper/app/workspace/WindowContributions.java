@@ -78,7 +78,7 @@ final class WindowContributions implements AutoCloseable {
     List<KeyBindings.Extension> extensions() {
         List<KeyBindings.Extension> result = new ArrayList<>();
         for (ActionEntry entry : model.actions())
-            if (KeyBindings.extensionId(entry.id())) result.add(new KeyBindings.Extension(entry.id(), entry.defaultBinding()));
+            if (KeyBindings.extensionId(entry.id())) result.add(entry.extension());
         return result;
     }
 

@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
@@ -11,6 +12,7 @@ import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
+import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
@@ -85,6 +87,25 @@ class HostedUiTest {
         assertThat(model.action("dev.x.tool.run")).isEmpty();
         assertThatIllegalArgumentException().as("a closed action can no longer be placed")
             .isThrownBy(() -> ui.toolbar().add(ToolbarItem.action("dev.x.tool.run")));
+    }
+
+    @Test void actionsCarryTheirShortcutContextAndPlatformDefaults() {
+        ui.actions().register(ActionSpec.of("dev.x.tool.new", "New").withDefaultBindings("cmd+n", "ctrl+n")
+            .withContext(ShortcutContext.panel("dev.x.tool.hosts")), context -> { });
+        ui.actions().register(ActionSpec.of("dev.x.tool.save", "Save").withDefaultBinding("cmd+s")
+            .withContext(ShortcutContext.content()), context -> { });
+        ui.actions().register(ActionSpec.of("dev.x.tool.here", "Here").withContext(ShortcutContext.terminal()), context -> { });
+        ActionEntry created = model.action("dev.x.tool.new").orElseThrow();
+        assertThat(created.defaultBinding()).contains("cmd+n");
+        assertThat(created.otherDefault()).contains("ctrl+n");
+        assertThat(created.context()).isEqualTo(KeyContext.panel("dev.x.tool.hosts"));
+        assertThat(created.extension().defaultFor(false)).contains("ctrl+n");
+        assertThat(model.action("dev.x.tool.save").orElseThrow().context()).as("content means this plugin's tabs")
+            .isEqualTo(KeyContext.content("dev.x.tool"));
+        assertThat(model.action("dev.x.tool.save").orElseThrow().extension().defaultFor(false)).contains("cmd+s");
+        assertThat(model.action("dev.x.tool.here").orElseThrow().context()).isEqualTo(KeyContext.TERMINAL);
+        assertThatIllegalArgumentException().isThrownBy(() -> ui.actions().register(ActionSpec.of("dev.x.tool.far", "Far")
+            .withContext(ShortcutContext.panel("dev.y.hosts")), context -> { }));
     }
 
     @Test void placementsAcceptOnlyThisPluginsActions() {

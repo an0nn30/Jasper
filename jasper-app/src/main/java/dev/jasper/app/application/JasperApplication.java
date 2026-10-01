@@ -441,7 +441,7 @@ public final class JasperApplication {
                 ? java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("Settings are unavailable."))
                 : configuration.saveKeybindings(changes, contributions.actions().stream()
                     .filter(a -> KeyBindings.extensionId(a.id()))
-                    .map(a -> new KeyBindings.Extension(a.id(), a.defaultBinding())).toList()));
+                    .map(ActionEntry::extension).toList()));
         contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
@@ -548,7 +548,7 @@ public final class JasperApplication {
         ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
         List<KeyBindings.Extension> extensions = new ArrayList<>();
         for (ActionEntry action : contributions.actions())
-            if (KeyBindings.extensionId(action.id())) extensions.add(new KeyBindings.Extension(action.id(), action.defaultBinding()));
+            if (KeyBindings.extensionId(action.id())) extensions.add(action.extension());
         return snapshot.bindings(macOs).withExtensions(extensions).problems();
     }
 

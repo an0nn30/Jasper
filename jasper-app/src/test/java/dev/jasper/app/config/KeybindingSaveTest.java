@@ -74,6 +74,20 @@ class KeybindingSaveTest {
         }
     }
 
+    @Test void restoringAPluginDefaultUsesItsLinuxAndWindowsDefault() throws Exception {
+        Path file = directory.resolve("config.toml");
+        var extensions = List.of(new KeyBindings.Extension("test.plugin", Optional.of("cmd+alt+1"), Optional.of("alt+1"),
+            dev.jasper.app.commands.KeyContext.GLOBAL));
+        try (var service = new ConfigService(file, false)) {
+            service.saveKeybindings(Map.of(), Map.of("test.plugin", Optional.of("ctrl+alt+shift+x")), extensions).get(5, TimeUnit.SECONDS);
+            var restored = service.saveKeybindings(Map.of("test.plugin", "ctrl+alt+shift+x"),
+                Map.of("test.plugin", Optional.empty()), extensions).get(5, TimeUnit.SECONDS);
+            assertThat(restored.snapshot().keybindings()).doesNotContainKey("test.plugin");
+            assertThat(restored.snapshot().bindings(false).withExtensions(extensions).bindings().strokeFor("test.plugin"))
+                .contains(KeyStroke.getKeyStroke("alt 1"));
+        }
+    }
+
     @Test void patchesQuotedDottedInlineAndMultilineBindingsWithoutChangingOtherValues() {
         for (String text : List.of(
                 "keybindings.copy = 'ctrl+c' # keep\n[terminal.font]\nsize=20\n",
