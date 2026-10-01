@@ -9,6 +9,7 @@ import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -177,5 +178,18 @@ class ShareRootTest {
         try (var upload = share.upload("out-file")) { upload.stream().write('x'); upload.commit(); }
         assertThat(outside.resolve("secret.txt")).as("an upload never writes through a final link").hasContent("secret");
         assertThat(names(outside)).containsExactly("secret.txt");
+    }
+
+    @Test void replacingAFileKeepsItsPermissions() throws IOException {
+        if (!Files.getFileStore(shared).supportsFileAttributeView("posix")) abort("no POSIX permissions here");
+        Path target = shared.resolve("docs/a.txt");
+        Files.setPosixFilePermissions(target, PosixFilePermissions.fromString("rwxr-x---"));
+        var share = new ShareRoot(shared, false);
+        try (var upload = share.upload("docs/a.txt")) {
+            upload.stream().write("new".getBytes(StandardCharsets.UTF_8));
+            upload.commit();
+        }
+        assertThat(target).hasContent("new");
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(target))).isEqualTo("rwxr-x---");
     }
 }

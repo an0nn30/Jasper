@@ -41,14 +41,14 @@ class BundledSamplePluginTest {
                         assertThat(dropdown.title()).isEqualTo("Sessions");
                         assertThat(dropdown.actionIds()).containsExactly("dev.jasper.remote.sessions.manage");
                     }));
-            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel", "dev.jasper.fileserver.panel");
+            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel", "dev.jasper.remote.tunnels.panel", "dev.jasper.fileserver.panel");
             assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
             assertThat(contributions.menus()).anySatisfy(menu -> {
                 assertThat(menu.target()).isEqualTo(dev.jasper.app.contributions.MenuTarget.standard(
                     dev.jasper.app.contributions.MenuTarget.Slot.FILE));
                 assertThat(menu.entries()).contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
             });
-            assertThat(contributions.status()).hasSize(5)
+            assertThat(contributions.status()).hasSize(6)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
@@ -135,11 +135,13 @@ class BundledSamplePluginTest {
                 assertThat(icon).isSameAs(dev.jasper.app.platform.AppIcons.named("NETWORK"));
                 assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
                 assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
-                assertThat(contributions.panels()).hasSize(2).allSatisfy(panel -> {
+                assertThat(contributions.panels()).hasSize(3).allSatisfy(panel -> {
                     assertThat(panel.icon()).isNotNull();
-                    assertThat(panel.icon()).isIn(dev.jasper.app.platform.AppIcons.named("FOLDER"), dev.jasper.app.platform.AppIcons.named("NETWORK"));
+                    // The tunnels panel has no semantic icon name, so it takes the catalog's swap-panels icon.
+                    assertThat(panel.icon()).isIn(dev.jasper.app.platform.AppIcons.named("FOLDER"), dev.jasper.app.platform.AppIcons.named("NETWORK"),
+                        dev.jasper.app.platform.AppIcons.bundled("actions/swapPanels"));
                 });
-                assertThat(contributions.status()).hasSize(2).anySatisfy(status -> assertThat(status.icon()).isSameAs(icon));
+                assertThat(contributions.status()).hasSize(3).anySatisfy(status -> assertThat(status.icon()).isSameAs(icon));
                 assertThat(contributions.toolbar()).singleElement().isInstanceOfSatisfying(
                     dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(menu.icon()).isSameAs(icon));
             });

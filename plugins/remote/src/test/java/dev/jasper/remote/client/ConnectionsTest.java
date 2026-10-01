@@ -33,6 +33,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.sshd.common.config.keys.PublicKeyEntry;
+import org.apache.sshd.common.util.net.SshdSocketAddress;
+import org.apache.sshd.server.forward.TcpForwardingFilter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -159,6 +161,25 @@ class ConnectionsTest {
             assertThat(onUi(() -> connections.authenticated(identity))).isFalse();
             var lease = onUi(() -> connections.lease(identity, null, status -> {})).get(10, TimeUnit.SECONDS);
             assertThat(onUi(() -> connections.authenticated(identity))).isTrue();
+            lease.close();
+        }
+    }
+
+    @Test void theClientAcceptsOnlyForwardedChannelsToALoopbackTarget(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("target", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var lease = onUi(() -> connections.lease(connections.identity(host.id()), null, status -> {})).get(10, TimeUnit.SECONDS);
+            var filter = lease.session().getFactoryManager().getForwardingFilter();
+            var loopback = new SshdSocketAddress("127.0.0.1", 5000);
+            var elsewhere = new SshdSocketAddress("192.168.1.9", 5000);
+            assertThat(filter.canConnect(TcpForwardingFilter.Type.Forwarded, loopback, lease.session())).as("a remote tunnel's relay").isTrue();
+            assertThat(filter.canConnect(TcpForwardingFilter.Type.Forwarded, elsewhere, lease.session())).as("not loopback").isFalse();
+            assertThat(filter.canConnect(TcpForwardingFilter.Type.Forwarded, new SshdSocketAddress("example.com", 5000), lease.session())).as("a name is not looked up").isFalse();
+            assertThat(filter.canConnect(TcpForwardingFilter.Type.Direct, loopback, lease.session())).as("the server may not open direct channels").isFalse();
+            assertThat(filter.canForwardAgent(lease.session(), "auth-agent-req@openssh.com")).isFalse();
+            assertThat(filter.canForwardX11(lease.session(), "x11-req")).isFalse();
+            assertThat(filter.canListen(loopback, lease.session())).isFalse();
             lease.close();
         }
     }

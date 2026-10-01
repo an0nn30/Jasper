@@ -21,9 +21,76 @@
   built-in fallback exists, while same-name overrides extend only lower-priority layers. The named-colour
   suffix concern (`Icon`, `.border`, `.rowHeight`) did not reproduce in installed-colour parity tests: skipped colours
   are restored by the existing installation path. These review fixes are recorded as plan deviations below the banner.
+  Independent review complete; `./gradlew check` passed after integrating current main: 7,720 tests,
+  0 failures/errors, 6 skipped (app 1,522). Source hygiene and diff checks passed.
   Next: plan 2 (workspace zone). GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
   the window, Settings and dialogs; a hand-written theme file in `themes/` (including a broken one's warning).
 
+- **Remote tunnels plan 7b-2: tunnels you run by hand** (branch `claude/tunnels-7b2`, plan
+  `docs/superpowers/plans/2026-09-30-jasper-remote-plan-7b2-tunnels-by-hand.md`, executed 2026-10-01, user guide in
+  `docs/remote.md`): Remote 0.10.0 (`sdk >=0.11.0`) adds saved tunnels (local, remote, dynamic SOCKS5) in
+  `data/tunnels.toml` and quick forwards, run by hand from the new Tunnels rail panel, the Tunnels palette scope (Start
+  or stop, Open in browser, Edit tunnel), the SSH menu (Toggle Tunnels, New Tunnel..., Forward a Port..., Stop All
+  Tunnels) and the terminal context menu (Forward a Port...), with live counters, Open in Browser, Copy Address and a
+  "N tunnels" status item. Package `dev.jasper.remote.tunnels`: an own engine (`Listener` binds before the lease,
+  `TunnelManager` leases the shared session and forwards each connection over its own direct-tcpip channel, `Pump`
+  counts bytes, `Socks5`), a remote tunnel through MINA's remote forwarding to a loopback relay;
+  `dev.jasper.remote.ui.tunnels` holds the UI. A lost session fails the tunnel (7b-3 reconnects). The store gives an entry
+  without an `id` a stable one derived from its name (as File Server's does since 80a6fe4d), and refuses saves while the
+  file has entries it skipped, so a save never deletes them; the final review's fix wave also made the error row read
+  "tunnels.toml has errors: <reason>" once, show names as plain text, wrap the empty-state message, fail a tunnel whose
+  lease throws, keep the per-session ordering chain alive after an Error and bracket IPv6 addresses in row text.
+  Deviations from the spec: `*` is sent to the server as `0.0.0.0`; no `RemoteRelay` class (the relay is a `Listener`
+  on `127.0.0.1:0`); the palette scope has no aliases; the rail icon is `BundledIcon.ACTIONS_SWAP_PANELS` and the
+  failing status icon `BundledIcon.STATUS_WARNING`, so `RemotePluginTest`'s semantic-icon check admits that one
+  catalog icon; `Pump` uses `java.net` sockets; local `*` binds one dual-stack wildcard socket rather than separate
+  `0.0.0.0` and `::` sockets; the shared SSH client now accepts server-initiated `forwarded-tcpip` channels, only to a
+  loopback target (needed for remote tunnels; MINA's client rejected them all by default); remote forward requests and
+  cancels on one session run in the order they were issued, and a second remote tunnel asking for a port another
+  tunnel on the same session holds is refused locally (MINA cancels by port on any failed request); palette verbs
+  re-resolve the tunnel by id; `BundledSamplePluginTest` and `RemoteShortcutConfigTest` expectations count the new
+  panel, toggle and status item; Remote is 0.10.0 because main already shipped 0.9.0. Follow-ups: Toggle Tunnels is
+  unbound (⌥⌘4 / Alt+4 would continue the approved panel series; needs the user's approval); the Tunnels panel's row
+  operations are list keys, not yet Keymap panel actions like the Sessions panel's; half-close through a remote tunnel
+  is untested against OpenSSH, and MINA's client cannot carry a target-first half-close (later client-to-target bytes
+  are lost); stopping a remote tunnel while its port request is still in flight and restarting it at once on the same
+  port can be refused once; "Allow other computers" and the exposure warning follow the checkbox, not a typed `*`,
+  `0.0.0.0` or LAN address (do early in 7b-3); `HostStore` has the same two store defects (id-less entries get a new
+  id on every read, skipped entries are dropped by the next save), a small separate task.
+  `./gradlew check` green after merging main (File Server FS-2): app 1471/0/1 (also after `:jasper-app:test --rerun`),
+  terminal 391/0/4, Editor 4782/0/0, Remote 382/0/0, Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0,
+  Sample 12/0/0, File Server 158/0/0, SDK 39/0/0, testkit 79/0/0 (7,669 tests in all, 0 failures, 6 skipped). GUI
+  checks pending with the user (`docs/remote.md`, Native acceptance for tunnels). Merged to local main 2026-10-01 (not
+  pushed).
+- **File Server FS-2: FTP/FTPS and TLS** (branch `claude/file-server-fs2`, plan
+  `docs/superpowers/plans/2026-09-30-file-server-fs2.md`): File Server 0.2.0 serves FTP with explicit FTPS (Apache
+  FtpServer 1.2.1) and HTTPS, on one self-signed EC certificate in `data/tls/` (BouncyCastle; fingerprint on the server
+  card, Show Fingerprints… with Regenerate). Require TLS refuses `USER`/`PASS` before `AUTH TLS` (530) and data
+  commands without `PROT P` (521). FTP paths stop `..` at the share root; uploads go through `ShareRoot.upload` and
+  commit only on a 226 reply; a non-zero offset is accepted only at the file's end. Logins share `LoginThrottle` (a
+  waiting address is refused unchecked). New setting `passive_ports` (the spec's `passive-ports`, renamed to match
+  the plugin's other keys). Serve Current Folder over FTP (session password). FS-1 leftovers fixed: `HttpEngine`
+  binds after its setup, replaced files keep their POSIX permissions, two event-ordering test races, and the panel's
+  empty hint wraps with the divider hidden until a server is selected. Deviations from the plan text (listed in the
+  plan's banner): the panel's note text area also guards against a degenerate hidden layout; `HttpEngine.start` reads
+  the TLS context before creating any server (no leaked thread or channel on a failed TLS start); `FtpEngine` reports
+  the innermost bind `IOException`. Full `./gradlew check` green (2026-10-01, after the final-review fixes): File Server 158 tests, whole repository
+  7,584 tests (jasper-app 1,471), 0 failures, 6 skipped. GUI checks pending: FileZilla/Cyberduck over FTP and explicit
+  FTPS, a browser over HTTPS (certificate warning, fingerprint match), Require TLS refusing a plain client, the
+  editor's TLS and passive-port controls (switching the protocol in the editor drops Use TLS and Require TLS), Show
+  Fingerprints and Regenerate, the empty panel's hint.
+  Plan decisions not listed above: active mode (`PORT`/`EPRT`) stays allowed with FtpServer's active and passive IP
+  checks on, so data connections only go to and come from the client's own address; plain FTP gets the warning "Plain
+  FTP sends the password unencrypted"; Show Fingerprints reuses `ConfirmPanel`, with Regenerate; FTP listings show dot
+  files, as HTTP's do. Final-review fixes: `TlsMaterial` creates its folder and files owner-only from the start and no
+  longer ignores an I/O error from that; the files FtpServer's `MD5` and `MMD5` read now end as complete downloads
+  (replies 251 and 252); `ShareFile` compares by path, so `RMD` refuses the working directory; the editor's Passive
+  ports row sits below the port hint; `HttpEngine` says "HTTPS" in its create-failure message.
+  **Deferred (FS-2):** the login throttle's check-then-act race across parallel sessions (shared with HTTP); a half-present
+  TLS pair (only `server.p12` or only `password`) is silently recreated, so the fingerprint can change; after
+  Regenerate the card shows the new fingerprint while running TLS servers present the old one until restarted; an FTP
+  cancel closes only the file stream; an abandoned `APPE` keeps the bytes it appended; FtpServer logs a WARN per failed
+  login; `ShareView.finish` does file I/O while holding the session's monitor.
 - **Keymap defaults K1: contexts and defaults** (branch `claude/keymap-defaults`, spec
   `docs/superpowers/specs/2026-09-30-keymap-defaults-design.md`, plan `docs/superpowers/plans/2026-09-30-keymap-defaults-k1.md`):
   actions carry a context (Global, Terminal, a plugin's tabs, a panel, a window). The most specific applicable action
@@ -86,7 +153,7 @@
   `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Final-review fixes: a `servers.toml` entry without an id gets a stable id derived from
   its name, and saves are refused while the file has skipped entries; uploads go to a hidden temporary file and replace the target atomically only when
   complete; activity refreshes coalesce into one UI task; activity-log text from clients has control characters
-  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its server and pool.
+  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its pool (FS-2 also binds only after the setup succeeds).
   Merged into local main 2026-09-30 (not pushed) on top of SDK 0.10.2 (connection activities, `Platform.browse`), which
   0.11.0 now includes; every bundled plugin declares `sdk = ">=0.11.0, <0.12"`, so the Remote tunnels plans (7b) must use
   that range. GUI checks pending with the
@@ -107,7 +174,7 @@
   Editor 4782/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0,
   SDK 36/0/0, testkit 75/0/0. Seen once during Task 1's first full check and not reproduced in six reruns (four
   alone, two whole-module): `RemotePluginTest.endingAPanesSessionClearsTheSftpView` read the SFTP panel's folder
-  ("/") right after its rows emptied; a timing flake unrelated to this plan. Not merged; plan 7b-2 builds on it.
+  ("/") right after its rows emptied; a timing flake unrelated to this plan. Merged to main at f7b9cd76; plan 7b-2 builds on it.
 - **Remote tunnels design (7b)** (branch `claude/tunnels-spec`, spec
   `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md`, brainstormed and approved section by section
   2026-09-30; written spec approved by the user the same day): tunnels with their own lifecycle (never tied to terminals)

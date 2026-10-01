@@ -54,29 +54,34 @@ import javax.swing.UIManager;
  */
 public final class FileServersPanel extends JPanel {
     public record Actions(Consumer<UUID> toggle, Consumer<Optional<UUID>> edit, Consumer<UUID> duplicate, Consumer<UUID> delete,
-                          Consumer<UUID> reveal, Consumer<String> copy, Consumer<UUID> copyPassword, Consumer<UUID> clearActivity) { }
+                          Consumer<UUID> reveal, Consumer<String> copy, Consumer<UUID> copyPassword, Consumer<UUID> clearActivity,
+                          Consumer<UUID> fingerprints) { }
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
     private static final int CONTROL_WIDTH = 28;
 
     final JButton add = new JButton("+");
     final JList<ServerRows.Row> list;
-    final JLabel empty = label("No file servers yet — press + to share a folder");
+    final JTextArea empty = note("No file servers yet — press + to share a folder");
     final JPanel details = new JPanel(new BorderLayout(0, 6));
     final JLabel cardName = label(""), cardState = label(""), cardFolder = label(""), cardAccess = label(""), cardWarnings = label("");
+    final JTextArea cardTls = note("");
     final JPanel addresses = new JPanel();
     final List<JButton> addressCopies = new ArrayList<>();
     final JButton toggle = new JButton("Start"), edit = new JButton("Edit…");
     final JTextArea activity = new JTextArea(8, 24);
     final JButton clearActivity = new JButton("Clear"), copyActivity = new JButton("Copy");
+    final JSplitPane split;
     private final DefaultListModel<ServerRows.Row> model = new DefaultListModel<>();
     private final Actions actions;
     private final Function<UUID, List<ActivityLog.Entry>> log;
     private final Path home;
     private final String firewall;
     private final ZoneId zone;
+    private final int dividerSize;
     private List<ServerRegistry.View> views = List.of();
     private Optional<String> problem = Optional.empty();
+    private Optional<String> tlsFingerprint = Optional.empty();
     private UUID selected;
     private boolean rebuilding;
 
@@ -117,7 +122,7 @@ public final class FileServersPanel extends JPanel {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         cardName.setFont(cardName.getFont().deriveFont(Font.BOLD));
         addresses.setLayout(new BoxLayout(addresses, BoxLayout.Y_AXIS));
-        for (JComponent part : List.<JComponent>of(cardName, cardState, cardFolder, cardAccess, cardWarnings, addresses)) {
+        for (JComponent part : List.<JComponent>of(cardName, cardState, cardFolder, cardAccess, cardWarnings, cardTls, addresses)) {
             part.setAlignmentX(LEFT_ALIGNMENT);
             card.add(part);
         }
@@ -144,7 +149,8 @@ public final class FileServersPanel extends JPanel {
         activityPanel.add(new JScrollPane(activity), BorderLayout.CENTER);
         details.add(activityPanel, BorderLayout.CENTER);
         details.setVisible(false);
-        var split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, details);
+        split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, details);
+        dividerSize = split.getDividerSize();
         split.setResizeWeight(0.5);
         split.setBorder(BorderFactory.createEmptyBorder());
         add(split, BorderLayout.CENTER);
@@ -183,6 +189,13 @@ public final class FileServersPanel extends JPanel {
         this.views = List.copyOf(views);
         this.problem = problem;
         rebuild();
+    }
+
+    /** The shared certificate's fingerprint, or empty before it exists; shown for servers that use TLS. */
+    public void setTlsFingerprint(Optional<String> fingerprint) {
+        if (fingerprint.equals(tlsFingerprint)) return;
+        tlsFingerprint = fingerprint;
+        refreshCard();
     }
 
     /** Re-reads the selected server's activity log. */
@@ -230,6 +243,9 @@ public final class FileServersPanel extends JPanel {
         var copyPassword = item("Copy Password", () -> actions.copyPassword().accept(id));
         copyPassword.setEnabled(phase == Phase.RUNNING && view.user().isPresent());
         menu.add(copyPassword);
+        var fingerprints = item("Show Fingerprints…", () -> actions.fingerprints().accept(id));
+        fingerprints.setEnabled(view.definition().tls());
+        menu.add(fingerprints);
         return menu;
     }
 
@@ -258,6 +274,7 @@ public final class FileServersPanel extends JPanel {
     private void refreshCard() {
         Optional<ServerRegistry.View> chosen = selectedView();
         details.setVisible(chosen.isPresent());
+        split.setDividerSize(chosen.isPresent() ? dividerSize : 0);
         addresses.removeAll();
         addressCopies.clear();
         if (chosen.isPresent()) {
@@ -271,6 +288,9 @@ public final class FileServersPanel extends JPanel {
             List<String> warnings = ServerRows.warnings(definition);
             cardWarnings.setText(warnings.isEmpty() ? "" : "⚠ " + String.join(" · ", warnings));
             cardWarnings.setVisible(!warnings.isEmpty());
+            cardTls.setText(tlsFingerprint.map(fingerprint -> "TLS certificate SHA-256 " + fingerprint)
+                .orElse("TLS certificate: created when the server first starts"));
+            cardTls.setVisible(definition.tls());
             for (URI uri : view.addresses()) {
                 var row = new JPanel();
                 row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
@@ -329,6 +349,29 @@ public final class FileServersPanel extends JPanel {
         label.putClientProperty("html.disable", Boolean.TRUE);
         label.setText(text);
         return label;
+    }
+
+    /** Wrapping, read-only text that looks like a label; a JTextArea never renders HTML. */
+    private static JTextArea note(String text) {
+        var note = new JTextArea(text) {
+            @Override public void setBounds(int x, int y, int width, int height) {
+                // Hidden children are laid out at a degenerate size; a wrapped text area would keep measuring at it.
+                if (width <= 0 || height <= 0) { width = 0; height = 0; }
+                super.setBounds(x, y, width, height);
+            }
+            @Override public void updateUI() {
+                super.updateUI();
+                setFont(UIManager.getFont("Label.font"));
+                Color hint = UIManager.getColor("Label.disabledForeground");
+                if (hint != null) setForeground(hint);
+                setOpaque(false);
+            }
+        };
+        note.setLineWrap(true);
+        note.setWrapStyleWord(true);
+        note.setEditable(false);
+        note.setFocusable(false);
+        return note;
     }
 
     private static Color color(String key, Color fallback) {

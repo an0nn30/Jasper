@@ -95,9 +95,14 @@ class HttpEngineWriteTest {
         while (!events.stream().anyMatch(e -> e instanceof ServerEvent.Transferred t && !t.complete()) && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(events).anySatisfy(e -> assertThat(e).isInstanceOfSatisfying(ServerEvent.Transferred.class, t -> assertThat(t.complete()).isFalse()));
         assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
-        try (var listing = Files.list(shared.resolve("docs"))) {
-            assertThat(listing.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("a.txt", "keep.txt");
-        }
+        List<String> names;
+        long settled = System.nanoTime() + 5_000_000_000L;
+        do {
+            try (var listing = Files.list(shared.resolve("docs"))) { names = listing.map(p -> p.getFileName().toString()).sorted().toList(); }
+            if (names.equals(List.of("a.txt", "keep.txt"))) break;
+            Thread.sleep(10);
+        } while (System.nanoTime() < settled);
+        assertThat(names).as("the temporary file is gone once the request ends").containsExactly("a.txt", "keep.txt");
     }
 
     @Test void aCancelledDownloadEndsAsStoppedNotAsAnError() throws Exception {
@@ -112,6 +117,7 @@ class HttpEngineWriteTest {
         long deadline = System.nanoTime() + 5_000_000_000L;
         while (!events.stream().anyMatch(e -> e instanceof ServerEvent.Transferred) && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(events).anySatisfy(e -> assertThat(e).isInstanceOfSatisfying(ServerEvent.Transferred.class, t -> assertThat(t.complete()).isFalse()));
+        Thread.sleep(300); // an error would be reported after the transfer ends; give it time to (not) arrive
         assertThat(events).noneMatch(e -> e instanceof ServerEvent.Failed);
     }
 

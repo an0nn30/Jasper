@@ -1,4 +1,4 @@
-# Remote: SSH and SFTP
+# Remote: SSH, SFTP and tunnels
 
 Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
@@ -115,7 +115,7 @@ table from an older Remote is reported as unknown; delete it and rebind in Keyma
 
 The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
 `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
-contributed actions. Tunnels remain a later feature.
+contributed actions. Tunnels have their own section at the end of this guide.
 
 ## Native acceptance
 
@@ -279,3 +279,71 @@ Shortcut changes apply live; app-level keybindings retain precedence. Actions ar
 `.transfers.cancel` (each suffix uses the `dev.jasper.remote` prefix). Controls inherit the
 app UI font and use SDK semantic icons. Native acceptance and the
 verified build commands are in [SFTP verification](remote-7c-verification.md).
+
+## Tunnels
+
+Remote 0.10 adds SSH tunnels. Open the **Tunnels** panel from its rail button or **SSH > Toggle Tunnels**
+(the palette's **Show Tunnels** command opens it too). A tunnel goes through a saved host: its credential, host-key
+trust and jump host apply. It has its own life: starting one never opens a terminal, closing terminals never stops it,
+and it shares the host's SSH connection with any terminals that are open.
+
+- **Local** (`-L`): a port on this computer reaches a target as seen from the host, such as
+  `localhost:5432 → db.internal:5432`.
+- **Remote** (`-R`): a port on the server comes back to a target as seen from this computer. Allowing other computers to
+  connect needs the server's `GatewayPorts` to permit it.
+- **Dynamic** (`-D`): a SOCKS5 proxy on this computer (no authentication, CONNECT only); names resolve on the server.
+
+Click **+** (or **SSH > New Tunnel...**) to add one: a name, the host to go through, the type, where to listen (port 0
+means any free port) and where to forward to. Start and stop a tunnel with the button at the end of its row, Enter or
+Space. The palette's Tunnels scope (`tunnels >`) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
+running local tunnel in the browser, Shift+Enter edits a saved tunnel. Double-clicking a saved tunnel edits it. A
+running row shows its open connections, the bytes moved each way and its uptime; right-click for Start or Stop, Open
+in Browser, Copy Address, Edit, Duplicate and Delete. The status bar counts running tunnels and failures. A tunnel
+whose host was deleted stays in the list, marked "Host missing"; edit it to choose another host.
+
+**Forward a Port...** (a terminal's context menu, the SSH menu or the palette) forwards a remote port to the same port
+on this computer's loopback (the next free one if it is taken) through the SSH pane's host, or through a host you choose
+when the command does not start from an SSH pane. **More** reveals a *Forward to host* field for a target other than the
+server itself, named as the server sees it. It starts a quick forward, listed under *Quick forwards* until you stop it
+or Jasper quits; **Save as Tunnel…** in its right-click menu (or double-clicking it) names it and keeps it, and **Keep
+as a saved tunnel** in the dialog saves it from the start.
+
+A row reports what went wrong: a busy port ("Port 5432 is already in use on this computer"), a port that needs
+administrator rights, a refused remote port ("The server refused port 8080: already in use or not allowed"), a lost
+connection ("Connection lost"), or the errors SSH sessions report. In this release a tunnel that loses its connection
+stops; start it again. When a connection cannot be forwarded (for example the server has `AllowTcpForwarding no`, or the
+target is unreachable) the tunnel stays up and its row says "Connections are being refused: <reason>" until a later
+connection succeeds.
+
+Tunnels are saved in `plugins/dev.jasper.remote/data/tunnels.toml`:
+
+```toml
+[[tunnel]]
+id = "…"                      # optional; when absent it is derived from the name, so keep names unique
+name = "pg-prod"
+host = "5f2c…"                # a saved host's id
+kind = "local"                # local | remote | dynamic
+bind_address = "localhost"    # localhost, an IP address, or * for all interfaces
+bind_port = 5432              # 0 = any free port
+target_host = "db.internal"   # local and remote only
+target_port = 5432
+start = "manual"              # manual | launch (launch is stored; nothing starts it yet)
+created = 2026-10-01T09:00:00Z
+updated = 2026-10-01T09:00:00Z
+```
+
+Edits to the file apply within a second: a running tunnel whose forwarding changed restarts, and a removed one stops.
+A file that does not parse keeps the last good tunnels and shows one error row ("tunnels.toml has errors: …"). While
+the file has entries Remote cannot read (they are reported in the log), saves from Jasper are refused until you fix or
+remove them. The actions are `dev.jasper.remote.tunnels` (Toggle Tunnels), `.tunnels.show` (Show Tunnels),
+`.tunnels.new` (New Tunnel...), `.tunnels.forward` (Forward a Port...) and `.tunnels.stop-all` (Stop All Tunnels),
+none bound by default.
+
+Native acceptance for tunnels (user-run):
+
+1. A local tunnel to a real database or web server through a real host; Open in Browser for a web one.
+2. A dynamic tunnel as a browser's SOCKS proxy with remote DNS: sites load and names resolve on the server.
+3. A remote tunnel from the server back to a local web server; `curl localhost:<port>` on the server.
+4. Forward a Port from an SSH pane, then Save as Tunnel; restart Jasper and find it saved.
+5. Stop the network or `sshd`: the tunnel shows "Connection lost" and its port closes.
+6. "Allow other computers to connect" on a local tunnel: macOS asks once to accept incoming connections.

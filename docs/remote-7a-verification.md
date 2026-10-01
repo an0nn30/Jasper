@@ -14,7 +14,7 @@ real loopback SSH authentication (password, agent, encrypted Vault key), shared 
 ProxyJump, cancellation, resize, natural exits, plugin loading/bundling and headless UI.
 Source hygiene and `git diff --check` passed. Headless panel/editor renders were inspected.
 Native desktop, system-agent/keychain and Windows acceptance remains user-run in
-[the guide](remote.md#native-acceptance). Tunnels and SFTP remain plans 7b/7c.
+[the guide](remote.md#native-acceptance). SFTP (plan 7c) and tunnels (plan 7b-2 on `claude/tunnels-7b2`; 7b-3 to follow) came after this verification.
 
 ## Independent review
 

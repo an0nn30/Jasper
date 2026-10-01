@@ -2,6 +2,7 @@ package dev.jasper.fileserver.ui;
 
 import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.Login;
+import dev.jasper.fileserver.definition.PortRange;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.ServerAddresses;
@@ -51,6 +52,8 @@ public final class ServerEditor extends JPanel {
     final JComboBox<BindChoice> reachable = new JComboBox<>();
     final JCheckBox writable = new JCheckBox("Allow changes (upload, rename, delete)");
     final JRadioButton anonymous = new JRadioButton("Anonymous"), vault = new JRadioButton("Vault account"), session = new JRadioButton("Session password");
+    final JCheckBox useTls = new JCheckBox("Use TLS"), requireTls = new JCheckBox("Require TLS (refuse logins and transfers without it)");
+    final JTextField passive = new JTextField(12);
     final JLabel accountLabel = label("none chosen"), portHint = label(" "), warnings = label(" "), message = label(" ");
     final JButton save, cancel = new JButton("Cancel");
     private final List<ServerDefinition> others;
@@ -92,6 +95,9 @@ public final class ServerEditor extends JPanel {
             autostart.setSelected(definition.autostart());
             writable.setSelected(definition.writable());
             selectBind(definition.bind());
+            useTls.setSelected(definition.tls());
+            requireTls.setSelected(definition.requireTls());
+            passive.setText(definition.passiveRange().map(PortRange::token).orElse(""));
             switch (definition.login()) {
                 case Login.Anonymous none -> anonymous.setSelected(true);
                 case Login.Session password -> session.setSelected(true);
@@ -119,6 +125,7 @@ public final class ServerEditor extends JPanel {
         row(form, at, "Reachable from", reachable);
         row(form, at, "Port", port);
         row(form, at, "", portHint);
+        row(form, at, "Passive ports", line(passive, label("FTP only; empty uses the range in Settings")));
         row(form, at, "", writable);
         var login = new JPanel();
         login.setLayout(new BoxLayout(login, BoxLayout.Y_AXIS));
@@ -126,6 +133,8 @@ public final class ServerEditor extends JPanel {
         login.add(line(vault, chooseAccount, accountLabel));
         login.add(session);
         row(form, at, "Login", login);
+        row(form, at, "Security", useTls);
+        row(form, at, "", requireTls);
         row(form, at, "", warnings);
         add(form, BorderLayout.CENTER);
         var south = new JPanel();
@@ -148,6 +157,8 @@ public final class ServerEditor extends JPanel {
         anonymous.addActionListener(event -> refresh());
         vault.addActionListener(event -> refresh());
         session.addActionListener(event -> refresh());
+        useTls.addActionListener(event -> refresh());
+        requireTls.addActionListener(event -> refresh());
         port.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { refresh(); }
             @Override public void removeUpdate(DocumentEvent event) { refresh(); }
@@ -193,9 +204,12 @@ public final class ServerEditor extends JPanel {
         } else login = Login.SESSION;
         ServerDefinition base = initial.orElse(null);
         boolean same = base != null && base.protocol() == chosen;
+        boolean tlsOn = chosen.allowsTls() && useTls.isSelected();
+        boolean requireOn = chosen == Protocol.FTP && tlsOn && requireTls.isSelected();
+        String range = passive.getText().strip();
+        Optional<PortRange> passiveRange = chosen == Protocol.FTP && !range.isEmpty() ? Optional.of(PortRange.parse(range)) : Optional.empty();
         return new ServerDefinition(existing ? base.id() : UUID.randomUUID(), nameText, chosen, folderPath, selectedBind(), portValue,
-            same ? base.passiveRange() : Optional.empty(), writable.isSelected(), login, same ? base.authorizedKeys() : List.of(),
-            same && base.tls(), same && base.requireTls(), autostart.isSelected());
+            passiveRange, writable.isSelected(), login, same ? base.authorizedKeys() : List.of(), tlsOn, requireOn, autostart.isSelected());
     }
 
     private void protocolChanged() {
@@ -208,6 +222,12 @@ public final class ServerEditor extends JPanel {
 
     private void refresh() {
         Protocol chosen = selectedProtocol();
+        boolean ftp = chosen == Protocol.FTP;
+        passive.setEnabled(ftp);
+        useTls.setEnabled(chosen.allowsTls());
+        if (!chosen.allowsTls()) useTls.setSelected(false);
+        requireTls.setEnabled(ftp && useTls.isSelected());
+        if (!requireTls.isEnabled()) requireTls.setSelected(false);
         boolean login = chosen.hasLogin();
         anonymous.setText(login ? "Anonymous" : "No login (TFTP has none)");
         anonymous.setEnabled(login && chosen.allowsAnonymous());
@@ -220,7 +240,7 @@ public final class ServerEditor extends JPanel {
         portHint.setText(linux && value > 0 && value < 1024
             ? "Ports below 1024 need root or CAP_NET_BIND_SERVICE on Linux — try " + chosen.suggestedPort(value) : " ");
         Login shown = anonymous.isSelected() ? Login.ANONYMOUS : vault.isSelected() ? new Login.Vault(new UUID(0, 0)) : Login.SESSION;
-        boolean tls = initial.filter(d -> d.protocol() == chosen).map(ServerDefinition::tls).orElse(false);
+        boolean tls = chosen.allowsTls() && useTls.isSelected();
         List<String> list = ServerRows.warnings(chosen, tls, shown, writable.isSelected(), selectedBind());
         warnings.setText(list.isEmpty() ? " " : "⚠ " + String.join(" · ", list));
     }
