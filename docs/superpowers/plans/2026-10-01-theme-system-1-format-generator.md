@@ -2601,7 +2601,7 @@ used as written. Colours are `#RRGGBB` or `#RRGGBBAA`. A mistake (an unknown key
 - or a Jasper theme file or theme plugin in the `themes` folder beside this file.
 ```
 
-  and the settings table row for `ui.theme.name` reads ``| `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |``.
+  and in the settings table row for `ui.theme.name`, the third cell becomes "A built-in theme, or a theme file or plugin in the `themes` folder", keeping the existing link to Themes after it.
 - `config.example.toml` line 119: `# Live across open windows: "Jasper Dark", "Jasper Light", "IntelliJ Light", "Darcula", or a theme in the themes folder.`
 - `CoreSettings.UI_THEME_NAME` description:
 
