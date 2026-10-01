@@ -89,7 +89,7 @@ class FileServerPluginTest {
         try (var host = new FakePluginHost(root)) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             settle(host);
-            assertThat(host.panels()).containsExactly("dev.jasper.fileserver.panel|File Servers|RIGHT|dev.jasper.fileserver.show-panel");
+            assertThat(host.panels()).containsExactly("dev.jasper.fileserver.panel|File Servers|LEFT|dev.jasper.fileserver.show-panel");
             assertThat(host.actions()).contains("dev.jasper.fileserver.show-panel|Toggle File Servers|true",
                 "dev.jasper.fileserver.new|New File Server…|true", "dev.jasper.fileserver.stop-all|Stop All File Servers|false");
             assertThat(host.status()).isEmpty();

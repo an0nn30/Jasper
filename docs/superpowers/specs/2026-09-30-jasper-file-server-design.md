@@ -299,7 +299,7 @@ cancel drops that client's connection.
 
 ### File Servers panel
 
-`PanelSpec("dev.jasper.fileserver.panel", "File Servers", icon, Anchor right)`, toggled by the plugin's own
+`PanelSpec("dev.jasper.fileserver.panel", "File Servers", icon, Anchor left)` (rail panels always open on the left, beside the rail), toggled by the plugin's own
 `dev.jasper.fileserver.show-panel` action.
 
 ```

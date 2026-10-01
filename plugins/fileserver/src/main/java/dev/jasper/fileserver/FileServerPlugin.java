@@ -152,7 +152,7 @@ public final class FileServerPlugin implements Plugin {
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
-        context.panels().register(new PanelSpec(PANEL, "File Servers", icon, Anchor.RIGHT).withToggleActionId(SHOW), this::createPanel);
+        context.panels().register(new PanelSpec(PANEL, "File Servers", icon, Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 70));
         status.setIcon(icon);
         status.setAction(SHOW);
