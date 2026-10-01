@@ -70,6 +70,9 @@ import javax.swing.JComponent;
 final class HostedUi {
     private record Context(WindowHandle window, Optional<PaneHandle> pane) implements ActionContext { }
 
+    private volatile dev.jasper.app.appearance.ResolvedTheme appearanceSnapshot;
+    private final List<Consumer<Variant>> workspaceHandlers = new ArrayList<>();
+
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
@@ -87,10 +90,37 @@ final class HostedUi {
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
              Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows, HostedTerminals terminals) {
+        this(pluginId, model, containment, ui, onUi, open, loader, variant, themeSubscriber, windows, terminals, null, null);
+    }
+
+    HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
+             BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
+             Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows, HostedTerminals terminals,
+             Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+             Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe) {
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
         this.open = open; this.loader = loader; this.variant = variant; this.themeSubscriber = themeSubscriber;
         this.windows = windows;
         this.terminals = terminals;
+        if (appearance != null) {
+            appearanceSnapshot = java.util.Objects.requireNonNull(appearance.get());
+            var registration = subscribe.apply(next -> {
+                var previous = appearanceSnapshot;
+                appearanceSnapshot = next;
+                if (!previous.workspace().equals(next.workspace())) {
+                    for (var handler : List.copyOf(workspaceHandlers)) {
+                        if (workspaceHandlers.contains(handler) && open.getAsBoolean())
+                            containment.run(pluginId, "workspace appearance", () -> handler.accept(workspaceVariant()));
+                    }
+                }
+            });
+            closers.add(registration::close);
+        }
+    }
+
+    private Variant workspaceVariant() {
+        var snapshot = appearanceSnapshot;
+        return snapshot == null ? variant.get() : snapshot.workspace().dark() ? Variant.DARK : Variant.LIGHT;
     }
 
     /** Registration needs an open context and the UI thread. */
@@ -257,7 +287,35 @@ final class HostedUi {
 
     Appearance appearance() {
         return new Appearance() {
-            @Override public Variant variant() { return variant.get(); }
+            @Override public Variant variant() {
+                var snapshot = appearanceSnapshot;
+                return snapshot == null ? variant.get() : snapshot.chrome().dark() ? Variant.DARK : Variant.LIGHT;
+            }
+            @Override public Variant workspaceVariant() { return HostedUi.this.workspaceVariant(); }
+            @Override public dev.jasper.sdk.ui.WorkspacePalette workspacePalette() {
+                requireUi("workspacePalette");
+                return appearanceSnapshot == null ? dev.jasper.sdk.ui.WorkspacePalette.current()
+                    : HostedPalettes.workspace(appearanceSnapshot.workspace());
+            }
+            @Override public dev.jasper.sdk.ui.EditorPalette editorPalette() {
+                requireUi("editorPalette");
+                return appearanceSnapshot == null ? dev.jasper.sdk.ui.EditorPalette.current()
+                    : HostedPalettes.editor(appearanceSnapshot.workspace());
+            }
+            @Override public dev.jasper.sdk.ui.SyntaxPalette syntaxPalette() {
+                requireUi("syntaxPalette");
+                return appearanceSnapshot == null ? dev.jasper.sdk.ui.SyntaxPalette.current()
+                    : HostedPalettes.syntax(appearanceSnapshot.workspace());
+            }
+            @Override public Subscription onWorkspaceChanged(Consumer<Variant> handler) {
+                guard("onWorkspaceChanged"); java.util.Objects.requireNonNull(handler, "handler");
+                if (appearanceSnapshot == null) return onChanged(handler);
+                var closed = new AtomicBoolean();
+                Consumer<Variant> guarded = value -> { if (!closed.get()) handler.accept(value); };
+                workspaceHandlers.add(guarded);
+                var removal = tracked(() -> { closed.set(true); workspaceHandlers.remove(guarded); });
+                return () -> { closed.set(true); removal.close(); };
+            }
             @Override public Subscription onChanged(Consumer<Variant> handler) {
                 guard("onChanged");
                 return themeSubscriber.apply(java.util.Objects.requireNonNull(handler, "handler"));

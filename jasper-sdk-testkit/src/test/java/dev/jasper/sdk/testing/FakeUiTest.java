@@ -80,6 +80,39 @@ class FakeUiTest {
         }
     }
 
+    @Test void workspaceSubscriptionsClosedOnWorkersSuppressAlreadyQueuedCallbacks() {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var seen = new java.util.concurrent.atomic.AtomicInteger();
+            var subscription = context.appearance().onWorkspaceChanged(value -> seen.incrementAndGet());
+            host.setVariant(Variant.LIGHT);
+            java.util.concurrent.CompletableFuture.runAsync(subscription::close).join();
+            host.flush();
+            host.setVariant(Variant.DARK); host.flush();
+            assertThat(seen).hasValue(0);
+        }
+    }
+
+    @Test void appearanceAcceptsRealEdtAndCreatingTestThreadButNotWorkers() throws Exception {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var appearance = context.appearance();
+            var palette = appearance.editorPalette();
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                assertThat(appearance.editorPalette()).isEqualTo(palette);
+                assertThat(appearance.workspacePalette()).isNotNull();
+                assertThat(appearance.syntaxPalette().styles()).hasSize(16);
+            });
+            assertThatThrownBy(() -> java.util.concurrent.CompletableFuture.supplyAsync(appearance::editorPalette).join())
+                .hasCauseInstanceOf(IllegalStateException.class);
+            var seen = new ArrayList<Variant>();
+            appearance.onWorkspaceChanged(seen::add);
+            host.setVariant(Variant.LIGHT); host.flush();
+            assertThat(appearance.workspaceVariant()).isEqualTo(Variant.LIGHT);
+            assertThat(seen).containsExactly(Variant.LIGHT);
+        }
+    }
+
     @Test void appearanceFollowsTheHostAndIconsComeFromThePluginsLoader() {
         try (var host = new FakePluginHost()) {
             List<Variant> seen = new ArrayList<>();

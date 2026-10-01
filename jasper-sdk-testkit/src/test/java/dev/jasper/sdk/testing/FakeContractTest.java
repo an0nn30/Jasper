@@ -23,6 +23,10 @@ class FakeContractTest extends PluginContractTest {
                 host.start(info, requires, optional, plugin);
             }
             @Override public boolean active(String pluginId) { return host.active(pluginId); }
+            @Override public void setWorkspace(dev.jasper.sdk.Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
+                    dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {
+                host.setWorkspace(variant, palette, editor, syntax);
+            }
             @Override public void ui(Runnable action) { action.run(); }
             @Override public void flush() { host.flush(); }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.publishApp(topic, payload); }

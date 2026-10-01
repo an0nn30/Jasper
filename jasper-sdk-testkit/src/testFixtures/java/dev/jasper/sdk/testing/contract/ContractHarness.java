@@ -139,6 +139,15 @@ public interface ContractHarness extends AutoCloseable {
     /** Changes the look and announces it. */
     void setVariant(Variant variant);
 
+    /** Sets independently chosen workspace values.
+     * @param variant workspace variant
+     * @param palette workspace controls
+     * @param editor document colors
+     * @param syntax syntax styles
+     */
+    void setWorkspace(Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
+        dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax);
+
     /** Stops every active plugin in reverse start order. */
     void stopAll();
 

@@ -85,11 +85,19 @@ class AppContractTest extends PluginContractTest {
                            TerminalRegistry terminals, List<String> notices, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
                            List<java.net.URI> browsed) {
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, browsed, null);
+    }
+
+    private static PluginHost host(Path data, Duration drainGrace,
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
+                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
+                           List<java.net.URI> browsed, WorkspaceAppearanceFixture appearance) {
         var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
             notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles,
-            browsed::add)));
+            browsed::add, appearance == null ? null : appearance::current, appearance == null ? null : appearance::subscribe)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -133,8 +141,9 @@ class AppContractTest extends PluginContractTest {
         TestShellProfiles shells = new TestShellProfiles();
         List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
         List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
+        var appearance = onEdtValue(WorkspaceAppearanceFixture::new);
         PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
-            diagnostics, shells.source(), browsed);
+            diagnostics, shells.source(), browsed, appearance);
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
@@ -285,7 +294,12 @@ class AppContractTest extends PluginContractTest {
                 onEdt(() -> shells.set(profiles.stream().map(AppContractTest::appProfile).toList()));
             }
             @Override public void finishCommand(UUID paneId, String command, int exitStatus) { onEdt(() -> terminalFixture.finishCommand(paneId, command, exitStatus)); }
+            @Override public void setWorkspace(dev.jasper.sdk.Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
+                    dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {
+                onEdt(() -> appearance.set(variant, palette, editor, syntax));
+            }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) {
+                onEdt(() -> appearance.setVariant(variant));
                 dark.set(variant == dev.jasper.sdk.Variant.DARK);
                 host.bus.publish(EventBus.APP, dev.jasper.sdk.events.AppEvents.THEME_CHANGED, new dev.jasper.sdk.events.AppEvents.ThemeChanged(variant));
             }

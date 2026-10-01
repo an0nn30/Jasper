@@ -48,6 +48,7 @@ public final class ThemeController {
         UIManager.put("Jasper.uiFontFamilyOverride", false);
         current = state.resolve();
         installOrThrow(state.choice());
+        WorkspaceDefaults.publish(current.workspace());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
@@ -94,6 +95,7 @@ public final class ThemeController {
         state = candidate;
         if (chromeChanged || !previous.equals(next) || choiceChanged) {
             current = next;
+            WorkspaceDefaults.publish(next.workspace());
             for (var listener : List.copyOf(listeners)) listener.accept(next, chromeChanged);
         }
     }

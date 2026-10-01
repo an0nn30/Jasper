@@ -223,6 +223,20 @@ public final class PluginRuntime {
     private final Consumer<String> notice;
     private final Consumer<Path> editor;
     private final ShellProfiles profiles;
+    private java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance;
+    private java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber;
+
+    /** Supplies native appearance values before plugins start. Called on the UI thread.
+     * @param current current immutable two-slot theme
+     * @param subscribe subscription that immediately replays the current value
+     */
+    public void appearance(java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> current,
+            java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        appearance = Objects.requireNonNull(current);
+        appearanceSubscriber = Objects.requireNonNull(subscribe);
+    }
+
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
@@ -370,7 +384,7 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open));
+            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);

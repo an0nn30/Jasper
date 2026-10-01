@@ -11,7 +11,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `Notices`, `Platform` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Notices`, `Platform` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
 | `dev.jasper.sdk.files` | Places plugins add to Jasper's file chooser (`FileSources`, `FileSource`, `FileBrowser`) and what `Windows.choose` returns (`FileLocation`). |
@@ -84,7 +84,7 @@ SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it ac
 programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
-guards too. Plugins declare `sdk = ">=0.11.0, <0.12"`.
+guards too. Plugins declare `sdk = ">=0.12.0, <0.13"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -105,3 +105,17 @@ elsewhere), `onProfilesChanged` fires after a shell detection completes with a c
 shell edits may not be reported), and `OpenRequest.localProfile(id)` opens one. An
 id Jasper does not list opens nothing. Both methods need `terminal.open`; the testkit scripts the list
 with `FakePluginHost.setShellProfiles`.
+
+## Workspace appearance (SDK 0.12.0)
+
+`Appearance.variant()` and `onChanged` describe application chrome. Document and workspace widgets use
+`workspaceVariant()`, `workspacePalette()`, `editorPalette()` and `syntaxPalette()`. Both variant getters are safe
+from any thread; read palettes and register listeners on the UI thread. `onWorkspaceChanged` runs after new values
+are available, including a dark theme changing to a different dark theme. Close the subscription when the widget
+is disposed; the host also removes registrations when the plugin stops.
+
+Syntax palettes contain all 16 `SyntaxRole` values with color, bold and italic emphasis; plugins classify their
+own tokens. For renderers shared with sidebars, `WorkspacePalette.current(component)` resolves the current component
+zone on every call. `current()` reads workspace defaults. Unmarked components and popups use chrome colors.
+Custom hosts implementing the older `Appearance` methods remain source compatible: new methods have defaults,
+using ordinary Swing colors when no host semantic defaults exist and plain-text syntax with italic comments.

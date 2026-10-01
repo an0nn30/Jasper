@@ -195,6 +195,20 @@ public final class FakePluginContext implements PluginContext {
     @Override public Appearance appearance() {
         return new Appearance() {
             @Override public Variant variant() { return ui.variant(); }
+            @Override public Variant workspaceVariant() { return host.workspaceAppearance().variant(); }
+            @Override public dev.jasper.sdk.ui.WorkspacePalette workspacePalette() {
+                host.requireAppearanceThread(); return host.workspaceAppearance().palette();
+            }
+            @Override public dev.jasper.sdk.ui.EditorPalette editorPalette() {
+                host.requireAppearanceThread(); return host.workspaceAppearance().editor();
+            }
+            @Override public dev.jasper.sdk.ui.SyntaxPalette syntaxPalette() {
+                host.requireAppearanceThread(); return host.workspaceAppearance().syntax();
+            }
+            @Override public Subscription onWorkspaceChanged(Consumer<Variant> handler) {
+                requireOpen();
+                var subscription = host.subscribeWorkspace(info.id(), handler); own(subscription); return subscription;
+            }
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
                 return events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant()));
             }

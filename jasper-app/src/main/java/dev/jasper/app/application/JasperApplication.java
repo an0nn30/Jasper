@@ -420,6 +420,7 @@ public final class JasperApplication {
                 file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
             this::notice, new dev.jasper.app.platform.ConfigEditor()::open,
             new PluginRuntime.ShellProfiles(shellProfiles::current, shellProfiles::onChanged));
+        plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID));

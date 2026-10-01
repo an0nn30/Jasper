@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.11.0, <0.12"
+sdk = ">=0.12.0, <0.13"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -697,4 +697,8 @@ save before completing true. Use `onClosed` to stop per-document work; plugin sh
 force-close remaining handles after the application's quit/restart guard has approved.
 Use stable session keys when Save As changes document identity; deduplicate file paths in
 the document model, not by changing a live tab's key. Do not encode remote paths as local
-`Path` values. Use `Appearance.editorPalette()` for specialized text surfaces.
+`Path` values. Use `Appearance.editorPalette()` for specialized text surfaces. Since SDK 0.12.0, use
+`workspacePalette()` and `syntaxPalette()` for workspace controls and syntax, and subscribe to
+`onWorkspaceChanged` to refresh them even when darkness stays the same. Palette reads and subscription registration
+belong on the UI thread; variant getters may run on any thread. Dispose subscriptions with their widgets.
+Use `WorkspacePalette.current(component)` in shared renderers so sidebar controls continue to follow chrome.

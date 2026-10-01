@@ -9,7 +9,7 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `contributions`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
 | `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
@@ -392,7 +392,18 @@ owners without starting a shell. Terminal enumeration and active-pane APIs conti
 report terminal content only. Plugins must tolerate an empty active pane while editing.
 
 `Appearance.editorPalette()` provides semantic surface, text, caret, selection, current-line
-and gutter colors. Jasper derives missing theme tokens; plugins retain syntax classification.
+and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole` and
+`SyntaxStyle`. `Appearance.workspaceVariant` is a safe immutable snapshot; palette getters require the UI thread.
+`onWorkspaceChanged` compares the complete workspace generated value, skips initial replay, contains handler failures,
+and removes registrations on disposal or stop. Chrome `variant` and `onChanged` retain their existing meaning.
+
+`PluginRuntime.appearance` accepts app-native `ResolvedTheme` suppliers and subscriptions. The `plugins` package
+alone adapts native tokens and syntax to SDK values (its allowed dependencies include `appearance`). The appearance
+controller publishes native Color/Boolean `Jasper.workspace.*` defaults after successful theme application, including
+chrome-derived syntax in match mode; no SDK values enter UIManager. `WorkspacePalette.current(component)` walks
+JDK client properties to distinguish workspace controls from chrome renderers. The SDK/testkit remain JDK-only.
+`FakePluginHost.setWorkspace` and the actual hosted adapter share the same contract tests for values, notifications,
+same-variant changes, disposal and safe variant reads. The fake accepts its creating test thread or the real Swing EDT for appearance work, while rejecting background workers.
 
 ### Declared settings (plan C1; SDK 0.9 completes them)
 

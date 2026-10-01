@@ -31,7 +31,19 @@ final class PluginHost {
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
                        AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
-                       Consumer<java.net.URI> browser) { }
+                       Consumer<java.net.URI> browser,
+                       java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+                       java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber) {
+        Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
+                       Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
+                       Duration drainGrace, Contributions contributions, BooleanSupplier dark,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
+                       Consumer<java.net.URI> browser) {
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notice,
+                editor, settingsFiles, clearReports, profiles, browser, null, null);
+        }
+    }
 
     record Outcome(PluginStatus.State state, String reason) { }
 

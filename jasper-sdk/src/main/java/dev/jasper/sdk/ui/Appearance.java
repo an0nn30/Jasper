@@ -18,10 +18,37 @@ public interface Appearance {
     Variant variant();
 
     /** Host-owned colors for specialized document widgets. UI thread only.
-     * @return the active theme's editor palette
+     * @return the active workspace's editor palette
      * @since 0.8.5
      */
     default EditorPalette editorPalette() { return EditorPalette.current(); }
+
+    /** Current workspace variant; safe from any thread.
+     * @return workspace darkness
+     * @since 0.12.0
+     */
+    default Variant workspaceVariant() { return variant(); }
+
+    /** Workspace control colors. UI thread only.
+     * @return the current workspace palette
+     * @since 0.12.0
+     */
+    default WorkspacePalette workspacePalette() { return WorkspacePalette.current(); }
+
+    /** Workspace syntax colors. UI thread only.
+     * @return the current syntax palette
+     * @since 0.12.0
+     */
+    default SyntaxPalette syntaxPalette() { return SyntaxPalette.current(); }
+
+    /** Reports workspace changes, including changes within the same variant, on the UI thread.
+     * @param handler receives the workspace variant after the new palettes are available
+     * @return the registration, removed when closed or the plugin stops
+     * @since 0.12.0
+     */
+    default Subscription onWorkspaceChanged(Consumer<Variant> handler) {
+        return onChanged(java.util.Objects.requireNonNull(handler, "handler"));
+    }
 
     /**
      * Runs the handler on the UI thread after each change of variant.

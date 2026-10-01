@@ -518,6 +518,47 @@ public abstract class PluginContractTest {
         assertThat(h.status()).hasSize(1);
     }
 
+    @Test void independentWorkspaceChangesExposeValuesInsideCallbacksAndRespectLifetime() {
+        var context = started("test.workspace", Set.of());
+        var a = context.appearance();
+        var seen = new AtomicInteger();
+        var disposed = new AtomicInteger();
+        var chrome = new AtomicInteger();
+        var subscription = new AtomicReference<dev.jasper.sdk.Subscription>();
+        java.awt.Color first = java.awt.Color.RED, second = java.awt.Color.BLUE;
+        var palette = new dev.jasper.sdk.ui.WorkspacePalette(first, first, first, first, first, first, first, first, first, first, first, first, first);
+        var next = new dev.jasper.sdk.ui.WorkspacePalette(second, first, first, first, first, first, first, first, first, first, first, first, first);
+        var editor = new dev.jasper.sdk.ui.EditorPalette(first, first, first, first, first, first, first);
+        var styles = new java.util.EnumMap<dev.jasper.sdk.ui.SyntaxRole, dev.jasper.sdk.ui.SyntaxStyle>(dev.jasper.sdk.ui.SyntaxRole.class);
+        for (var role : dev.jasper.sdk.ui.SyntaxRole.values()) styles.put(role, new dev.jasper.sdk.ui.SyntaxStyle(first, true, false));
+        var syntax = new dev.jasper.sdk.ui.SyntaxPalette(styles);
+        h.setWorkspace(Variant.DARK, palette, editor, syntax); h.flush();
+        h.ui(() -> {
+            a.onChanged(value -> chrome.incrementAndGet());
+            a.onWorkspaceChanged(value -> { throw new IllegalStateException("contained appearance failure"); });
+            subscription.set(a.onWorkspaceChanged(value -> {
+                seen.incrementAndGet();
+                assertThat(value).isEqualTo(Variant.DARK);
+                assertThat(a.workspacePalette()).isEqualTo(next);
+                assertThat(a.editorPalette()).isEqualTo(editor);
+                assertThat(a.syntaxPalette()).isEqualTo(syntax);
+            }));
+            var closed = a.onWorkspaceChanged(value -> disposed.incrementAndGet()); closed.close();
+        });
+        h.setWorkspace(Variant.DARK, next, editor, syntax); h.flush();
+        assertThat(seen).hasValue(1); assertThat(chrome).hasValue(0); assertThat(disposed).hasValue(0);
+        h.setWorkspace(Variant.DARK, next, editor, syntax); h.flush();
+        assertThat(seen).hasValue(1);
+        assertThat(java.util.concurrent.CompletableFuture.supplyAsync(a::workspaceVariant).join()).isEqualTo(Variant.DARK);
+        assertThat(java.util.concurrent.CompletableFuture.supplyAsync(a::variant).join()).isEqualTo(Variant.DARK);
+        for (var getter : java.util.List.<Runnable>of(() -> a.workspacePalette(), () -> a.editorPalette(), () -> a.syntaxPalette()))
+            assertThatThrownBy(() -> java.util.concurrent.CompletableFuture.runAsync(getter).join()).hasCauseInstanceOf(IllegalStateException.class);
+        subscription.get().close(); h.flush();
+        h.ui(() -> a.onWorkspaceChanged(value -> disposed.incrementAndGet()));
+        h.stopAll(); h.setWorkspace(Variant.LIGHT, palette, editor, syntax); h.flush();
+        assertThat(seen).hasValue(1); assertThat(disposed).hasValue(0);
+    }
+
     @Test void stoppingOrFailingRemovesEveryContributionAndAppearanceFollowsTheHost() {
         List<Variant> seen = Collections.synchronizedList(new ArrayList<>());
         var failed = new AtomicReference<PluginContext>();
@@ -545,7 +586,8 @@ public abstract class PluginContractTest {
         assertThat(alpha.get().appearance().variant()).isEqualTo(Variant.DARK);
         h.setVariant(Variant.LIGHT);
         h.flush();
-        assertThat(alpha.get().appearance().variant()).isEqualTo(Variant.LIGHT);
+        assertThat(java.util.concurrent.CompletableFuture.supplyAsync(() -> alpha.get().appearance().variant()).join()).isEqualTo(Variant.LIGHT);
+        assertThat(java.util.concurrent.CompletableFuture.supplyAsync(() -> alpha.get().appearance().workspaceVariant()).join()).isEqualTo(Variant.LIGHT);
         assertThat(seen).containsExactly(Variant.LIGHT);
         h.stopAll();
         assertThat(h.actions()).isEmpty();
