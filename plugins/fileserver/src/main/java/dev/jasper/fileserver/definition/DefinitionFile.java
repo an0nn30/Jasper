@@ -1,6 +1,7 @@
 package dev.jasper.fileserver.definition;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -50,7 +51,8 @@ public final class DefinitionFile {
     }
 
     private static ServerDefinition definition(TomlTable table) {
-        UUID id = string(table, "id").map(DefinitionFile::uuid).orElseGet(UUID::randomUUID);
+        // A missing id is derived from the name (names are unique per file), so the entry keeps one identity across reads.
+        UUID id = string(table, "id").map(DefinitionFile::uuid).orElseGet(() -> derivedId(string(table, "name").orElse("")));
         Protocol protocol = Protocol.parse(string(table, "protocol").orElseThrow(() -> new IllegalArgumentException("'protocol' is required")));
         String folder = string(table, "folder").orElseThrow(() -> new IllegalArgumentException("'folder' is required"));
         Path path;
@@ -62,6 +64,10 @@ public final class DefinitionFile {
             string(table, "bind").map(Bind::parse).orElse(Bind.LOOPBACK), (int) port,
             string(table, "passive_ports").map(PortRange::parse), bool(table, "writable"), login,
             strings(table, "authorized_keys"), bool(table, "tls"), bool(table, "require_tls"), bool(table, "autostart"));
+    }
+
+    private static UUID derivedId(String name) {
+        return UUID.nameUUIDFromBytes(("dev.jasper.fileserver:" + name.strip().toLowerCase(Locale.ROOT)).getBytes(StandardCharsets.UTF_8));
     }
 
     public static String format(List<ServerDefinition> definitions) {

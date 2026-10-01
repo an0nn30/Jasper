@@ -22,7 +22,8 @@ import java.util.function.Supplier;
 /**
  * The saved servers, read from and written to servers.toml. Reads and writes run on {@code background}, one at a
  * time; the list, the error and the listeners live on the UI thread. A file that fails to parse keeps the last good
- * servers and refuses saves until it parses again.
+ * servers and refuses saves until it parses again; so does a file with entries that were skipped, because a save
+ * would silently drop them.
  */
 public final class DefinitionStore {
     private final Path file;
@@ -82,6 +83,8 @@ public final class DefinitionStore {
         enqueue(() -> onBackground(() -> {
             Read current = read();
             if (current.error() != null) return current;
+            if (!current.warnings().isEmpty())
+                throw new IOException("servers.toml has entries File Server cannot read; fix or remove them before saving: " + current.warnings().getFirst());
             write(DefinitionFile.format(List.copyOf(mutation.apply(current.definitions()))));
             return read();
         }).handle((read, failure) -> {

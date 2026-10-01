@@ -41,8 +41,11 @@ class DefinitionFileTest {
             assertThat(d.port()).as("the protocol's default").isEqualTo(8080);
             assertThat(d.bind()).isEqualTo(Bind.LOOPBACK);
             assertThat(d.login()).isEqualTo(Login.ANONYMOUS);
-            assertThat(d.id()).as("a missing id is minted").isNotNull();
+            assertThat(d.id()).as("a missing id is derived from the name").isNotNull();
         });
+        assertThat(DefinitionFile.parse(text).definitions().getFirst().id()).as("stable across reads").isEqualTo(parsed.definitions().getFirst().id());
+        String shouting = DefinitionFile.HEADER + "\n[[server]]\nname = \" OK \"\nprotocol = \"http\"\n" + AT;
+        assertThat(DefinitionFile.parse(shouting).definitions().getFirst().id()).as("case and padding do not matter").isEqualTo(parsed.definitions().getFirst().id());
         assertThat(parsed.warnings()).hasSize(4)
             .anySatisfy(w -> assertThat(w).contains("server 2", "port"))
             .anySatisfy(w -> assertThat(w).contains("server 3", "duplicate name"))

@@ -72,4 +72,54 @@ class DefinitionStoreTest {
         run();
         assertThat(store.error()).isEmpty();
     }
+
+    private static String idless(String name, Path dir) {
+        return "\n[[server]]\nname = \"" + name + "\"\nprotocol = \"http\"\nfolder = \"" + dir.toAbsolutePath().toString().replace("\\", "\\\\") + "\"\n";
+    }
+
+    @Test void anEntryWithoutAnIdKeepsOneIdentityThroughEditDeleteAndUnrelatedSaves(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("servers.toml");
+        Files.writeString(file, DefinitionFile.HEADER + idless("a", dir) + idless("b", dir));
+        DefinitionStore store = store(dir);
+        store.load();
+        run();
+        ServerDefinition a = store.definitions().get(0);
+        ServerDefinition b = store.definitions().get(1);
+        assertThat(a.name()).isEqualTo("a");
+        var edited = new ServerDefinition(a.id(), "a", a.protocol(), a.folder(), a.bind(), 9191, a.passiveRange(), a.writable(), a.login(),
+            a.authorizedKeys(), a.tls(), a.requireTls(), a.autostart());
+        CompletableFuture<Void> edit = store.put(edited);
+        run();
+        assertThat(edit).as("edit").isCompleted();
+        assertThat(store.definitions()).containsExactly(edited, b);
+        var other = ServerDefinition.create("c", Protocol.HTTP, dir.toAbsolutePath());
+        store.put(other);
+        run();
+        assertThat(store.definitions()).as("b is unchanged by an unrelated save").containsExactly(edited, b, other);
+        store.load();
+        run();
+        assertThat(store.definitions()).as("a re-read finds the same ids").containsExactly(edited, b, other);
+        store.remove(b.id());
+        run();
+        assertThat(store.definitions()).as("delete").containsExactly(edited, other);
+    }
+
+    @Test void aFileWithASkippedEntryRefusesSavesAndStaysUnchanged(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("servers.toml");
+        String text = DefinitionFile.HEADER + idless("good", dir) + "\n[[server]]\nname = \"bad\"\nprotocol = \"http\"\nport = 70000\nfolder = \"/x\"\n";
+        Files.writeString(file, text);
+        DefinitionStore store = store(dir);
+        store.load();
+        run();
+        assertThat(store.warnings()).hasSize(1);
+        assertThat(store.definitions()).hasSize(1);
+        CompletableFuture<Void> refused = store.put(ServerDefinition.create("more", Protocol.HTTP, dir.toAbsolutePath()));
+        run();
+        assertThatThrownBy(refused::join).isInstanceOf(CompletionException.class)
+            .hasMessageContaining("File Server cannot read").hasMessageContaining("server 2");
+        CompletableFuture<Void> removal = store.remove(store.definitions().getFirst().id());
+        run();
+        assertThatThrownBy(removal::join).isInstanceOf(CompletionException.class).hasMessageContaining("cannot read");
+        assertThat(Files.readString(file)).isEqualTo(text);
+    }
 }
