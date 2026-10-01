@@ -2,15 +2,19 @@ package dev.jasper.fileserver;
 
 import dev.jasper.fileserver.auth.LoginResolver;
 import dev.jasper.fileserver.auth.SessionPasswords;
+import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.DefinitionStore;
+import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.LoginThrottle;
 import dev.jasper.fileserver.engine.ServerAddresses;
+import dev.jasper.fileserver.engine.ServerEvent;
 import dev.jasper.fileserver.runtime.Engines;
 import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
 import dev.jasper.fileserver.runtime.TransferActivities;
 import dev.jasper.fileserver.ui.ConfirmPanel;
+import dev.jasper.fileserver.ui.FileServerScope;
 import dev.jasper.fileserver.ui.FileServersPanel;
 import dev.jasper.fileserver.ui.ServerEditor;
 import dev.jasper.fileserver.ui.ServerRows;
@@ -18,6 +22,7 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
@@ -74,6 +79,8 @@ public final class FileServerPlugin implements Plugin {
     public static final String NEW = ID + ".new";
     public static final String STOP_ALL = ID + ".stop-all";
     public static final String STATUS = ID + ".status";
+    public static final String SERVERS = ID + ".servers";
+    public static final String SERVE_HTTP = ID + ".serve-http";
 
     /** What the plugin takes from the machine; tests replace each part. */
     record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree, Consumer<String> clipboard,
@@ -97,6 +104,8 @@ public final class FileServerPlugin implements Plugin {
     private Optional<VaultApi> vault = Optional.empty();
     private DefinitionStore store;
     private ServerRegistry registry;
+    private TransferActivities transfers;
+    private FileServerScope scope;
     private StatusItem status;
     private PluginAction stopAll;
     private Subscription quitGuard;
@@ -119,9 +128,9 @@ public final class FileServerPlugin implements Plugin {
         settings = new FileServerSettings(context.settings());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
-        var transfers = new TransferActivities(context.activities()::begin, SHOW);
+        transfers = new TransferActivities(context.activities()::begin, SHOW);
         registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics()), logins,
-            context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, transfers::accept);
+            context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
         var icon = context.appearance().icon(IconName.SERVER);
         context.actions().register(ActionSpec.of(SHOW, "Toggle File Servers").withIcon(icon)
@@ -133,6 +142,15 @@ public final class FileServerPlugin implements Plugin {
         stopAll = context.actions().register(ActionSpec.of(STOP_ALL, "Stop All File Servers").withKeywords(List.of("file server", "stop", "share")),
             invoked -> registry.stopAll());
         stopAll.setEnabled(false);
+        context.actions().register(ActionSpec.of(SERVERS, "Start or Stop a File Server…").withIcon(icon)
+                .withKeywords(List.of("file server", "start", "stop", "share")),
+            invoked -> context.palette().open(invoked.window(), FileServerScope.ID, Optional.empty(), Optional.empty()));
+        context.actions().register(ActionSpec.of(SERVE_HTTP, "Serve Current Folder over HTTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "http", "folder")),
+            invoked -> serve(invoked, Protocol.HTTP));
+        scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
+            (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
+        context.palette().register(scope);
         context.panels().register(new PanelSpec(PANEL, "File Servers", icon, Anchor.RIGHT).withToggleActionId(SHOW), this::createPanel);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 70));
         status.setIcon(icon);
@@ -164,6 +182,9 @@ public final class FileServerPlugin implements Plugin {
     ServerEditor currentEditor() { return currentEditor; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
     WindowHandle windowHandle(UUID id) { return context.terminals().window(id).orElseThrow(); }
+
+    /** Engine events reach the transfer activities only while the plugin runs: a late one must not open an activity on a closed context. */
+    void observe(ServerEvent event) { if (!stopped) transfers.accept(event); }
 
     private JComponent createPanel(PanelHost host) {
         WindowHandle window = host.window();
@@ -207,7 +228,9 @@ public final class FileServerPlugin implements Plugin {
             definition -> store.put(definition).whenComplete((ignored, failure) -> environment.ui().execute(() -> {
                 if (stopped) return;
                 if (failure != null) { if (!closed[0]) editor[0].showError(message(failure)); return; }
+                boolean dismissed = closed[0] || !window.isOpen();
                 dialog.close();
+                if (dismissed) return;
                 registry.server(definition.id()).filter(ServerRegistry.View::restartNeeded).ifPresent(view -> confirmRestart(window, view));
             })),
             dialog::close);
@@ -215,6 +238,32 @@ public final class FileServerPlugin implements Plugin {
         dialog.setContent(editor[0]);
         dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
+    }
+
+    /** Shares the folder the shell is in, read-only and on this computer only, until stopped. */
+    void serve(ActionContext invoked, Protocol protocol) {
+        Path folder = invoked.pane().or(() -> context.terminals().activePane())
+            .flatMap(pane -> pane.info().workingDirectory()).filter(Files::isDirectory).orElse(environment.home());
+        Set<Integer> used = registry.servers().stream().filter(view -> !view.state().phase().startable())
+            .map(view -> view.definition().port()).collect(Collectors.toSet());
+        int port = protocol.defaultPort();
+        while ((used.contains(port) || !environment.portFree().test(port)) && port < protocol.defaultPort() + 100) port++;
+        Path leaf = folder.getFileName();
+        String folderName = leaf == null ? folder.toString() : leaf.toString();
+        if (folderName.length() > 60) folderName = folderName.substring(0, 60) + "…";
+        var created = ServerDefinition.create(uniqueName(folderName + " (" + protocol.label() + ")"), protocol, folder);
+        var definition = new ServerDefinition(created.id(), created.name(), protocol, folder, Bind.LOOPBACK, port, Optional.empty(), false,
+            created.login(), List.of(), false, false, false);
+        registry.startTemporary(definition, invoked.window());
+        showPanel(invoked.window(), definition.id());
+    }
+
+    private void showPanel(WindowHandle window, UUID id) {
+        PanelHost host = panelHosts.get(window.id());
+        if (host == null) context.panels().toggle(PANEL, window);
+        else if (!host.visible()) host.show();
+        FileServersPanel panel = panels.get(window.id());
+        if (panel != null) panel.select(id);
     }
 
     private void confirmRestart(WindowHandle window, ServerRegistry.View view) {
@@ -297,6 +346,7 @@ public final class FileServerPlugin implements Plugin {
     private void serversChanged() {
         if (stopped) return;
         refreshPanels();
+        scope.changed();
         int running = registry.running();
         status.setText(running == 1 ? "⇅ 1 server" : "⇅ " + running + " servers");
         status.setTooltip(registry.servers().stream().filter(view -> view.state().phase() == Phase.RUNNING)

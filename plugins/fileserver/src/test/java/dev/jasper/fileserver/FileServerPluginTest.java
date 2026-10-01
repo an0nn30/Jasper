@@ -5,11 +5,16 @@ import dev.jasper.fileserver.definition.DefinitionFile;
 import dev.jasper.fileserver.definition.Login;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
+import dev.jasper.fileserver.engine.ServerEvent;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
+import dev.jasper.fileserver.ui.FileServerScope;
 import dev.jasper.fileserver.ui.FileServersPanel;
 import dev.jasper.fileserver.ui.UiTestAccess;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.terminal.PaneInfo;
+import dev.jasper.sdk.terminal.SessionKind;
+import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.vault.api.LockState;
 import java.net.URI;
@@ -18,15 +23,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.function.IntPredicate;
 import javax.swing.JMenuItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,6 +52,16 @@ class FileServerPluginTest {
     FileServerPlugin plugin() {
         return new FileServerPlugin(new FileServerPlugin.Environment(ui, List::of, port -> true, copied::add, revealed::add, home,
             "Mac OS X", ZoneOffset.UTC, (interval, task) -> () -> { }));
+    }
+
+    FileServerPlugin plugin(IntPredicate portFree) {
+        return new FileServerPlugin(new FileServerPlugin.Environment(ui, List::of, portFree, copied::add, revealed::add, home,
+            "Mac OS X", ZoneOffset.UTC, (interval, task) -> () -> { }));
+    }
+
+    static PaneInfo pane(Optional<Path> directory) {
+        return new PaneInfo("zsh", directory, Optional.empty(), 80, 24, true, SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING,
+            OptionalInt.empty(), "zsh");
     }
 
     void settle(FakePluginHost host) {
@@ -195,6 +213,107 @@ class FileServerPluginTest {
             vault.unlock();
             await(host, () -> plugin.registry().server(vaulted.id()).orElseThrow().state().phase() == Phase.RUNNING, "the server starts on unlock");
             assertThat(plugin.registry().password(vaulted.id())).contains("pw");
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().running() == 0, "the server stops");
+        }
+    }
+
+    @Test void thePaletteListsServersAndStartsThem() throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow();
+            var docs = http("docs", home, Ports.free(), Login.ANONYMOUS, false);
+            plugin.store().put(docs);
+            settle(host);
+            assertThat(host.searchScope(FileServerScope.ID, "docs", window, null)).singleElement().asString().contains("docs");
+            assertThat(host.invoke(FileServerPlugin.SERVERS, window, null)).isTrue();
+            assertThat(host.paletteOpens()).anySatisfy(line -> assertThat(line).contains(FileServerScope.ID));
+            host.executeInScope(FileServerScope.ID, "server." + docs.id(), "toggle", window, null);
+            await(host, () -> plugin.registry().running() == 1, "the palette started it");
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().running() == 0, "the server stops");
+        }
+    }
+
+    @Test void servesTheFocusedFolderOnTheNextFreePort() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> port != 8080);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            var panel = (FileServersPanel) host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, window, local)).isTrue();
+            await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            var served = plugin.registry().servers().getFirst();
+            assertThat(served.temporary()).isTrue();
+            assertThat(served.definition().name()).isEqualTo("project (HTTP)");
+            assertThat(served.definition().folder()).isEqualTo(project);
+            assertThat(served.definition().port()).as("8080 was taken").isEqualTo(8081);
+            assertThat(served.definition().bind()).isEqualTo(Bind.LOOPBACK);
+            assertThat(served.definition().writable()).isFalse();
+            assertThat(served.definition().login()).isEqualTo(Login.ANONYMOUS);
+            assertThat(panel.selected()).contains(served.definition().id());
+            UUID elsewhere = host.addTerminalPane(tab, pane(Optional.empty()));
+            assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, window, elsewhere)).isTrue();
+            await(host, () -> plugin.registry().servers().size() == 2
+                && plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the second start settles");
+            assertThat(plugin.registry().servers().get(1).definition().folder()).as("no folder: home").isEqualTo(home);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void eventsAfterStopOpenNoActivity() {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            Instant at = Instant.parse("2026-09-30T10:00:00Z");
+            plugin.observe(new ServerEvent.TransferStarted(at, "10.0.0.2", 1, ServerEvent.Direction.DOWNLOAD, "/big.iso", 4096, () -> { }));
+            plugin.observe(new ServerEvent.TransferProgress(at.plusSeconds(2), "10.0.0.2", 1, 100, 4096));
+            host.flush();
+            assertThat(host.activityLog()).as("a slow transfer while running opens an activity").isNotEmpty();
+            int before = host.activityLog().size();
+            plugin.stop();
+            plugin.observe(new ServerEvent.TransferStarted(at, "10.0.0.2", 2, ServerEvent.Direction.DOWNLOAD, "/late.iso", 4096, () -> { }));
+            plugin.observe(new ServerEvent.TransferProgress(at.plusSeconds(2), "10.0.0.2", 2, 100, 4096));
+            host.flush();
+            assertThat(host.activityLog()).as("a late event after stop does nothing").hasSize(before);
+        }
+    }
+
+    @Test void noRestartPromptWhenTheEditorOrItsWindowWasClosedBeforeTheSaveFinished() throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID pane = host.addTerminalPane(tab, pane(Optional.empty()));
+            var docs = http("docs", home, Ports.free(), Login.ANONYMOUS, false);
+            plugin.store().put(docs);
+            settle(host);
+            plugin.registry().start(docs.id(), null);
+            await(host, () -> plugin.registry().running() == 1, "the server runs");
+            var handle = plugin.registry().server(docs.id()).orElseThrow();
+            // the editor dialog is closed by something other than the save while the save is in flight
+            plugin.edit(plugin.windowHandle(window), Optional.of(handle.definition()), true);
+            UiTestAccess.port(plugin.currentEditor()).setText(String.valueOf(Ports.free()));
+            UiTestAccess.save(plugin.currentEditor()).doClick();
+            assertThat(host.requestClose("dialog")).isTrue();
+            settle(host);
+            assertThat(plugin.registry().server(docs.id()).orElseThrow().restartNeeded()).as("the save went through").isTrue();
+            assertThat(host.windows()).as("no restart question").isEmpty();
+            // the owner window closes while the save is in flight
+            plugin.edit(plugin.windowHandle(window), Optional.of(plugin.registry().server(docs.id()).orElseThrow().definition()), true);
+            UiTestAccess.port(plugin.currentEditor()).setText(String.valueOf(Ports.free()));
+            UiTestAccess.save(plugin.currentEditor()).doClick();
+            host.closeTerminalPane(pane);
+            settle(host);
+            assertThat(host.windows()).as("no restart question over a closed window").noneMatch(line -> line.contains("Restart"));
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().running() == 0, "the server stops");
         }
