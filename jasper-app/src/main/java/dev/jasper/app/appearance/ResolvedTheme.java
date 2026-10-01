@@ -1,10 +1,11 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.terminal.config.Palette;
-
 import java.util.Objects;
 
-/** Immutable chrome and terminal-palette resolution published on EDT; owns no Swing components or native resources. */
-public record ResolvedTheme(Theme chrome, Palette palette) {
-    public ResolvedTheme { Objects.requireNonNull(chrome); Objects.requireNonNull(palette); }
+/** The immutable chrome and workspace values published together on the EDT. */
+public record ResolvedTheme(GeneratedTheme chrome, GeneratedTheme workspace) {
+    public ResolvedTheme { Objects.requireNonNull(chrome); Objects.requireNonNull(workspace); }
+    public Palette palette() { return workspace.terminal(); }
+    public boolean matching() { return chrome == workspace; }
 }

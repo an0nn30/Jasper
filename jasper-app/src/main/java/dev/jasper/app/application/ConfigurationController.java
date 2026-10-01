@@ -10,9 +10,8 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
-import dev.jasper.app.config.TerminalColors;
+import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.terminalthemes.TerminalThemeCatalog;
-import dev.jasper.terminal.config.Palette;
 import dev.jasper.app.config.SettingsEdit;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.platform.ConfigEditor;
@@ -38,6 +37,8 @@ final class ConfigurationController implements AutoCloseable {
     private final Consumer<Path> editor;
     private ConfigService.State state;
     private boolean closed;
+    private boolean lastChromeDark = true;
+    private final Subscription appearance;
     private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
     private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
     /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
@@ -101,6 +102,7 @@ final class ConfigurationController implements AutoCloseable {
                             Consumer<Path> editor) {
         requireEdt();
         this.themes = themes; this.service = service; this.catalog = catalog; this.terminalThemes = terminalThemes; this.editor = editor;
+        appearance = themes.subscribe((resolved, refresh) -> lastChromeDark = resolved.chrome().dark());
         state = service.initialState();
         try { configureThemes(state); }
         catch (ThemeController.InstallationFailure ignored) {
@@ -243,8 +245,8 @@ final class ConfigurationController implements AutoCloseable {
     }
 
     /**
-     * Applies the saved theme, terminal colours and UI font from the catalog's latest scan. An unknown
-     * theme name keeps the theme showing (Jasper Dark at start-up) and is reported with the names available.
+     * Applies the requested chrome, workspace and font from the latest scan. Missing chrome uses the safe
+     * built-in of the last applied darkness; missing workspace matches chrome without changing the request.
      */
     private void configureThemes(ConfigService.State next) {
         ThemeCatalog.Snapshot available = catalog.latest();
@@ -254,30 +256,26 @@ final class ConfigurationController implements AutoCloseable {
         String name = next.snapshot().theme();
         Theme theme = available.find(name).orElse(null);
         if (theme == null) {
-            theme = themes.choice();
+            theme = lastChromeDark ? Theme.DARK : Theme.JASPER_LIGHT;
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
-                "Unknown theme \"" + name + "\"; keeping " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
+                "Unknown theme \"" + name + "\"; using " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
         }
         TerminalThemeCatalog.Snapshot terminal = terminalThemes.latest();
         for (TerminalThemeCatalog.Problem problem : terminal.problems())
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), 0, 0, "", problem.message()));
-        TerminalColors colors = next.snapshot().terminalColors();
-        Palette named = null;
-        if (colors.named()) {
-            Theme workspace = available.find(colors.name()).orElseGet(() ->
-                terminal.find(colors.name()).map(terminalThemes::converted).orElse(null));
-            named = workspace == null ? null : workspace.palette();
-            if (named == null)
-                problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
-                    "Unknown terminal colors \"" + colors.name() + "\"; using the theme's colours. Settings \u203a Themes \u203a "
-                        + "Alacritty Themes lists the terminal themes."));
-        }
+        WorkspaceThemeChoice choice = next.snapshot().workspaceTheme();
+        Theme workspace = choice.matchesChrome() ? null : available.find(choice.name()).orElseGet(() ->
+            terminal.find(choice.name()).map(terminalThemes::converted).orElse(null));
+        if (!choice.matchesChrome() && workspace == null)
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
+                "Unknown workspace theme \"" + choice.name() + "\"; matching the chrome theme."));
         var retained = new java.util.ArrayList<>(available.themes());
-        retained.add(themes.choice());
+        retained.addAll(themes.activeThemes());
         retained.add(theme);
+        if (workspace != null) retained.add(workspace);
         dev.jasper.app.appearance.ThemeManager.retainGenerated(retained);
         try {
-            themes.configure(theme, colors, named, next.snapshot().uiFont());
+            themes.configure(theme, choice, workspace, next.snapshot().uiFont());
             themeProblems = List.copyOf(problems);
         } catch (ThemeController.InstallationFailure failure) {
             Throwable cause = failure.getCause();
@@ -293,6 +291,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         if (closed) return;
         closed = true;
+        appearance.close();
         applicationListener = snapshot -> {};
         stateListeners.clear();
         for (WindowContent owner : List.copyOf(owners)) unregister(owner);

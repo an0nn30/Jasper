@@ -105,7 +105,7 @@ final class WindowCommands implements AutoCloseable {
             view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
         for (var colors : TerminalColors.builtIns()) {
             var action = view("view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT));
-            action.putValue(Action.SELECTED_KEY, owner.terminalColors().equals(colors));
+            action.putValue(Action.SELECTED_KEY, owner.terminalColorsSelected(colors));
             action.setEnabled(true);
         }
         view("view.window_settings").setEnabled(owner.settingsConnected());

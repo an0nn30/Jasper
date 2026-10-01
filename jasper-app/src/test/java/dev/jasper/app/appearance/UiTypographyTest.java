@@ -27,7 +27,7 @@ class UiTypographyTest {
             try {
                 themes.configure(Theme.INTELLIJ_LIGHT);
                 themes.configure(Theme.DARK, new UiFontConfig("NonexistentJasperFont394", 17));
-                assertThat(themes.current().chrome()).as("the theme just configured applies").isEqualTo(Theme.DARK);
+                assertThat(themes.current().chrome()).as("the theme just configured applies").isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
                 assertThat(new JLabel().getFont().getFamily()).isEqualTo(platformFamily);
                 assertThat(new JLabel().getFont().getSize2D()).isEqualTo(17);
             } finally { themes.configure(Theme.DARK, UiFontConfig.defaults()); }

@@ -72,27 +72,66 @@ class InstalledThemesTest {
         });
     }
 
-    @Test void anUnknownNameKeepsTheCurrentThemeAndListsWhatIsAvailable() throws Exception {
+    @Test void anUnknownNameUsesSafeDarkFallbackAndListsWhatIsAvailable() throws Exception {
         ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
         var themes = start("[ui.theme]\nname = 'Fixture Dark'\n");
         reload("[ui.theme]\nname = 'Nope'\n");
         edt(() -> {
-            assertThat(themes.current().chrome().name()).isEqualTo("Fixture Dark");
+            assertThat(themes.choice()).isSameAs(Theme.DARK);
             assertThat(controller.shown().diagnostics()).singleElement().satisfies(problem -> {
                 assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
                 assertThat(problem.key()).isEqualTo("ui.theme.name");
-                assertThat(problem.message()).contains("\"Nope\"").contains("keeping Fixture Dark")
+                assertThat(problem.message()).contains("\"Nope\"").contains("using Jasper Dark")
                     .contains("Available: Darcula, Fixture Dark, IntelliJ Light, Jasper Dark, Jasper Light.");
             });
+        });
+    }
+
+    @Test void missingLightChromeAndWorkspaceKeepRequestsAndRecoverAfterRepair() throws Exception {
+        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Light", false, "#f1f2f3", "eeeeee");
+        var themes = start("ui.theme.name='Fixture Light'\nui.theme.workspace='Darcula'\n");
+        Files.writeString(themes().resolve("fixture.jar"), "broken archive");
+        ThemeFixtures.plugin(themes().resolve("shadow.jar"), "Jasper Light", true, "#123456", "101820");
+        reload("ui.theme.name='Fixture Light'\nui.theme.workspace='Missing'\n");
+        edt(() -> {
+            assertThat(themes.choice()).isSameAs(Theme.JASPER_LIGHT);
+            assertThat(themes.current().workspace()).isSameAs(themes.current().chrome());
+            assertThat(themes.workspaceChoice().name()).isEqualTo("Missing");
+            assertThat(controller.snapshot().theme()).isEqualTo("Fixture Light");
+            assertThat(controller.snapshot().workspaceTheme().name()).isEqualTo("Missing");
+            assertThat(controller.shown().diagnostics()).extracting(ConfigDiagnostic::key)
+                .contains("ui.theme.name", "ui.theme.workspace");
+            assertThat(controller.shown().diagnostics()).anySatisfy(problem -> {
+                assertThat(problem.file().getFileName().toString()).isEqualTo("fixture.jar");
+                assertThat(problem.message()).contains("cannot be read");
+            });
+        });
+        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Light", false, "#f1f2f3", "eeeeee");
+        ThemeFixtures.plugin(themes().resolve("workspace.jar"), "Missing", true, "#123456", "101820");
+        reload();
+        edt(() -> {
+            assertThat(themes.choice().name()).isEqualTo("Fixture Light");
+            assertThat(themes.current().workspace().name()).isEqualTo("Missing");
+            assertThat(controller.shown().diagnostics()).isEmpty();
+        });
+    }
+
+    @Test void canonicalLightIsANativeNameRatherThanTheOldBuiltInAlias() throws Exception {
+        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Light", true, "#123456", "101820");
+        var themes = start("ui.theme.workspace='  Light  '\n");
+        edt(() -> {
+            assertThat(themes.current().workspace().name()).isEqualTo("Light");
+            assertThat(themes.current().palette().background()).isEqualTo(new Color(0x101820));
+            assertThat(controller.shown().diagnostics()).isEmpty();
         });
     }
 
     @Test void anUnknownNameAtStartUpUsesJasperDark() throws Exception {
         var themes = start("[ui.theme]\nname = ''\n");
         edt(() -> {
-            assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
             assertThat(controller.shown().diagnostics()).singleElement().satisfies(problem ->
-                assertThat(problem.message()).contains("Unknown theme \"\"").contains("keeping Jasper Dark"));
+                assertThat(problem.message()).contains("Unknown theme \"\"").contains("using Jasper Dark"));
         });
     }
 
@@ -105,7 +144,7 @@ class InstalledThemesTest {
         edt(() -> {
             var themes = new ThemeController(theme -> !theme.name().equals("Fixture Dark") && ThemeTestSupport.install(theme));
             controller = new ConfigurationTestSupport(themes, service, catalog);
-            assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
             assertThat(controller.shown().diagnostics()).singleElement().satisfies(problem -> {
                 assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
                 assertThat(problem.key()).isEqualTo("ui.theme.name");
@@ -116,7 +155,7 @@ class InstalledThemesTest {
 
     @Test void reloadRescansTheFolderSoThemesCanBeAddedAndRemovedLive() throws Exception {
         var themes = start("[ui.theme]\nname = 'Fixture Dark'\n");
-        edt(() -> assertThat(themes.current().chrome()).isEqualTo(Theme.DARK));
+        edt(() -> assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK)));
         ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
         reload();
         edt(() -> {
@@ -127,7 +166,7 @@ class InstalledThemesTest {
         Files.writeString(themes().resolve("broken.jar"), "not a zip");
         reload();
         edt(() -> {
-            assertThat(themes.current().chrome().name()).as("the theme showing stays").isEqualTo("Fixture Dark");
+            assertThat(themes.choice()).isSameAs(Theme.DARK);
             assertThat(controller.shown().diagnostics()).extracting(ConfigDiagnostic::message)
                 .anySatisfy(message -> assertThat(message).contains("broken.jar").contains("cannot be read"))
                 .anySatisfy(message -> assertThat(message).contains("Unknown theme \"Fixture Dark\""));

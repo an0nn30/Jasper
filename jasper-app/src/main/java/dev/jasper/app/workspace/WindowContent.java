@@ -884,16 +884,23 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
-    TerminalColors terminalColors() { return themes.terminalColors(); }
+    dev.jasper.app.config.WorkspaceThemeChoice workspaceChoice() { return themes.workspaceChoice(); }
 
-    /** View \u203a Terminal Colors: saved for every window; applied to this window's themes when no configuration is connected. */
-    void selectTerminalColors(TerminalColors colors) {
-        String workspaceName = switch (colors.name()) {
+    boolean terminalColorsSelected(TerminalColors colors) {
+        return workspaceChoice().name().equalsIgnoreCase(workspaceName(colors));
+    }
+
+    private static String workspaceName(TerminalColors colors) {
+        return switch (colors.name()) {
             case "light" -> "Jasper Light";
             case "dark" -> "Jasper Dark";
             default -> colors.name();
         };
-        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, workspaceName, () -> {
+    }
+
+    /** View \u203a Terminal Colors: saved for every window; applied to this window's themes when no configuration is connected. */
+    void selectTerminalColors(TerminalColors colors) {
+        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, workspaceName(colors), () -> {
             themes.configureTerminal(colors);
             chrome.refreshTheme();
         });

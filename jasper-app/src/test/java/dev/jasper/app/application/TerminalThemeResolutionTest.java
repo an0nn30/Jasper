@@ -53,7 +53,7 @@ class TerminalThemeResolutionTest {
                 var controller = new ConfigurationController(themes, service, ThemeCatalog.builtIn(), terminalThemes, path -> { });
                 Palette dracula = terminalThemes.latest().find("Dracula").orElseThrow().palette();
                 assertThat(themes.current().palette()).isEqualTo(dracula);
-                assertThat(themes.terminalColors().name()).isEqualTo("dracula");
+                assertThat(themes.workspaceChoice().name()).isEqualTo("dracula");
                 assertThat(controller.shown().diagnostics()).singleElement()
                     .satisfies(problem -> assertThat(problem.file().getFileName().toString()).isEqualTo("broken.toml"));
                 controller.close();
@@ -69,7 +69,7 @@ class TerminalThemeResolutionTest {
                 assertThat(themes.current().palette()).as("unknown: match").isEqualTo(themes.choice().palette());
                 assertThat(controller.shown().diagnostics()).anySatisfy(problem -> {
                     assertThat(problem.key()).isEqualTo("ui.theme.workspace");
-                    assertThat(problem.message()).contains("No Such Theme", "Alacritty Themes");
+                    assertThat(problem.message()).contains("No Such Theme", "matching the chrome theme");
                 });
                 controller.close();
             });

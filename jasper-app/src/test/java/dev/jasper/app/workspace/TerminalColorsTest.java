@@ -38,18 +38,18 @@ class TerminalColorsTest {
             var pane = owner.currentPane();
             owner.selectTerminalColors(TerminalColors.DARK);
             assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).as("the UI stays light").isFalse();
-            assertThat(pane.getBackground()).isEqualTo(Palette.jasperDark().background());
-            assertThat(hidden.getBackground()).as("a background tab").isEqualTo(Palette.jasperDark().background());
-            assertThat(hidden.view().palette()).isEqualTo(Palette.jasperDark());
-            assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(Palette.jasperDark());
+            assertThat(pane.getBackground()).isEqualTo(Theme.DARK.palette().background());
+            assertThat(hidden.getBackground()).as("a background tab").isEqualTo(Theme.DARK.palette().background());
+            assertThat(hidden.view().palette()).isEqualTo(Theme.DARK.palette());
+            assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(Theme.DARK.palette());
             assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             var find = hidden.findBar();
             assertThat(find.queryField().getForeground()).as("the find bar keeps UI colours")
                 .isEqualTo(UIManager.getColor("TextField.foreground"));
-            assertThat(find.getBackground()).isNotEqualTo(Palette.jasperDark().background());
+            assertThat(find.getBackground()).isNotEqualTo(Theme.DARK.palette().background());
             owner.newTab(HOME);
             assertThat(owner.currentPane().getBackground()).as("a tab opened after the switch")
-                .isEqualTo(Palette.jasperDark().background());
+                .isEqualTo(Theme.DARK.palette().background());
             var session = hidden.session();
             owner.selectTerminalColors(TerminalColors.MATCH);
             assertThat(hidden.session()).isSameAs(session);
@@ -69,7 +69,7 @@ class TerminalColorsTest {
             open(menu);
             assertThat(items.get(0).isSelected()).isTrue();
             items.get(1).doClick();
-            assertThat(owner.terminalColors()).isEqualTo(TerminalColors.LIGHT);
+            assertThat(owner.workspaceChoice().name()).isEqualTo("Jasper Light");
             assertThat(owner.theme().palette()).isEqualTo(Palette.jasperLight());
             owner.selectTerminalColors(TerminalColors.DARK);
             open(menu);
@@ -88,12 +88,28 @@ class TerminalColorsTest {
             owner.selectTerminalColors(TerminalColors.DARK);
             open(menu);
             assertThat(items.get(2).isSelected()).isTrue();
-            themes.configure(Theme.DARK, new TerminalColors("Dracula"), Palette.jasperLight(), UiFontConfig.defaults());
+            themes.configure(Theme.DARK, new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
             open(menu);
             assertThat(items).as("no built-in choice is checked for a named theme").noneMatch(JMenuItem::isSelected);
             owner.selectTerminalColors(TerminalColors.DARK);
             open(menu);
             assertThat(items).extracting(JMenuItem::isSelected).containsExactly(false, false, true);
+        });
+    }
+
+    @Test void nativeLightNameDoesNotSelectTheLegacyLightMenuChoice() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController(Theme.DARK);
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            var menu = terminalColors(owner);
+            owner.selectTerminalColors(TerminalColors.LIGHT);
+            open(menu);
+            assertThat(terminalItems(menu).get(1).isSelected()).isTrue();
+            themes.configure(Theme.DARK, new dev.jasper.app.config.WorkspaceThemeChoice("Light"),
+                Theme.DARCULA, UiFontConfig.defaults());
+            open(menu);
+            assertThat(terminalItems(menu)).noneMatch(JMenuItem::isSelected);
+            assertThat(themes.workspaceChoice().name()).isEqualTo("Light");
         });
     }
 

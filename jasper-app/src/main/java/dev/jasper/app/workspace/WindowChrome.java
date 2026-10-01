@@ -438,9 +438,8 @@ final class WindowChrome {
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
         status.refreshTheme();
         // A ButtonGroup ignores setSelected(false) on its selected member, so a named theme clears the group.
-        TerminalColors current = owner.terminalColors();
-        if (current.named()) terminalGroup.clearSelection();
-        else terminalItems.forEach((colors, item) -> { if (current.equals(colors)) item.setSelected(true); });
+        terminalGroup.clearSelection();
+        terminalItems.forEach((colors, item) -> { if (owner.terminalColorsSelected(colors)) item.setSelected(true); });
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }

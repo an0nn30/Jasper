@@ -22,9 +22,9 @@ class TerminalColorsThemeTest {
             themes.configureTerminal(TerminalColors.DARK);
             assertThat(installs).isEmpty();
             assertThat(chromeFlags).containsExactly(false);
-            assertThat(palettes).containsExactly(Palette.jasperDark());
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.INTELLIJ_LIGHT, Palette.jasperDark()));
-            assertThat(themes.terminalColors()).isEqualTo(TerminalColors.DARK);
+            assertThat(palettes).containsExactly(Theme.DARK.palette());
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK)));
+            assertThat(themes.workspaceChoice().name()).isEqualTo("Jasper Dark");
             themes.configureTerminal(TerminalColors.DARK);
             assertThat(chromeFlags).as("repeating the same choice is quiet").hasSize(1);
         } finally { new ThemeController(); }
@@ -38,23 +38,22 @@ class TerminalColorsThemeTest {
             themes.subscribe((theme, chromeChanged) -> chromeFlags.add(chromeChanged));
             chromeFlags.clear();
             themes.configure(Theme.INTELLIJ_LIGHT, TerminalColors.DARK, UiFontConfig.defaults());
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.INTELLIJ_LIGHT, Palette.jasperDark()));
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK)));
             assertThat(chromeFlags).containsExactly(true);
             themes.configure(Theme.DARK);
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.DARK, Palette.jasperDark()));
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK), dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK)));
             themes.configure(Theme.INTELLIJ_LIGHT, TerminalColors.MATCH, UiFontConfig.defaults());
             assertThat(themes.current()).as("MATCH follows the configured theme")
-                .isEqualTo(new ResolvedTheme(Theme.INTELLIJ_LIGHT, Theme.INTELLIJ_LIGHT.palette()));
+                .isEqualTo(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(Theme.INTELLIJ_LIGHT)));
         } finally { new ThemeController(); }
     }
 
 
     @Test void themeOnlyAndFontOnlyChangesKeepANamedPalette() {
-        var named = new Palette(java.awt.Color.BLACK, java.awt.Color.WHITE, java.awt.Color.BLUE, java.awt.Color.GRAY,
-            java.util.Collections.nCopies(16, java.awt.Color.GREEN));
+        var named = ThemeManager.generated(Theme.DARCULA).terminal();
         var themes = new ThemeController(Theme.DARK, ThemeTestSupport::install);
         try {
-            themes.configure(Theme.DARK, new TerminalColors("Dracula"), named, UiFontConfig.defaults());
+            themes.configure(Theme.DARK, new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
             assertThat(themes.current().palette()).isEqualTo(named);
             themes.configure(Theme.INTELLIJ_LIGHT);
             assertThat(themes.current().palette()).isEqualTo(named);

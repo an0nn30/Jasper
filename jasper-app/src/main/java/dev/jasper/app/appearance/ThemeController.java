@@ -1,7 +1,7 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.TerminalColors;
-import dev.jasper.terminal.config.Palette;
+import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.config.UiFontConfig;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
@@ -26,6 +26,7 @@ public final class ThemeController {
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<Theme> installer;
     private ThemeState state = ThemeState.defaults();
+    private ResolvedTheme current;
     private UiFontConfig uiFont = UiFontConfig.defaults();
     private final Font platformFont;
     private final float platformLabelSize;
@@ -45,43 +46,56 @@ public final class ThemeController {
         UIManager.put("defaultFont", null);
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
         UIManager.put("Jasper.uiFontFamilyOverride", false);
-        installOrThrow(state.resolve().chrome());
+        current = state.resolve();
+        installOrThrow(state.choice());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
-    public ResolvedTheme current() { requireEdt(); return state.resolve(); }
+    public ResolvedTheme current() { requireEdt(); return current; }
     /** The configured theme. */
     public Theme choice() { requireEdt(); return state.choice(); }
-    /** The configured terminal colours. */
-    public TerminalColors terminalColors() { requireEdt(); return state.terminalChoice(); }
-    /** Applies configured terminal colours to every window; the chrome is unchanged. */
-    public void configureTerminal(TerminalColors terminal) {
-        requireEdt(); apply(state.configureTerminal(Objects.requireNonNull(terminal)));
-    }
-    public void configure(Theme saved) { configure(saved, uiFont); }
-    public void configure(Theme saved, UiFontConfig font) { configure(saved, state.terminalChoice(), state.named(), font); }
-    public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) { configure(saved, terminal, null, font); }
-    /** As above, with {@code named} the palette of a named terminal choice (null for a built-in or unknown one). */
-    public void configure(Theme saved, TerminalColors terminal, Palette named, UiFontConfig font) {
+    public WorkspaceThemeChoice workspaceChoice() { requireEdt(); return state.workspaceChoice(); }
+    /** Sources that must survive cache pruning, including an active converted workspace. */
+    public List<Theme> activeThemes() {
         requireEdt();
-        apply(state.configure(Objects.requireNonNull(saved)).configureTerminal(Objects.requireNonNull(terminal), named),
-            Objects.requireNonNull(font));
+        return state.workspace() == null ? List.of(state.choice()) : List.of(state.choice(), state.workspace());
     }
-    private void apply(ThemeState candidate) { apply(candidate, uiFont); }
+    public void configureTerminal(TerminalColors terminal) {
+        requireEdt(); configure(state.choice(), terminal, uiFont);
+    }
+    public void configure(Theme saved) { requireEdt(); configure(saved, uiFont); }
+    public void configure(Theme saved, UiFontConfig font) {
+        requireEdt(); configure(saved, state.workspaceChoice(), state.workspace(), font);
+    }
+    /** Compatibility for built-in terminal-colour menu choices. */
+    public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) {
+        requireEdt(); Objects.requireNonNull(terminal);
+        Theme workspace = terminal.equals(TerminalColors.LIGHT) ? Theme.JASPER_LIGHT
+            : terminal.equals(TerminalColors.DARK) ? Theme.DARK : null;
+        configure(saved, workspace == null ? WorkspaceThemeChoice.parse(terminal.name())
+            : new WorkspaceThemeChoice(workspace.name()), workspace, font);
+    }
+    /** Resolves both slots before installing chrome, then publishes both only after successful installation. */
+    public void configure(Theme saved, WorkspaceThemeChoice choice, Theme workspaceOrNull, UiFontConfig font) {
+        requireEdt();
+        apply(new ThemeState(saved, choice, workspaceOrNull), Objects.requireNonNull(font));
+    }
     private void apply(ThemeState candidate, UiFontConfig font) {
-        ResolvedTheme previous = state.resolve(), next = candidate.resolve();
-        boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
-        boolean choiceChanged = state.choice() != candidate.choice() || !state.terminalChoice().equals(candidate.terminalChoice());
+        ResolvedTheme previous = current, next = candidate.resolve();
+        boolean chromeChanged = state.choice() != candidate.choice() || !uiFont.equals(font);
+        boolean choiceChanged = !state.workspaceChoice().equals(candidate.workspaceChoice());
         if (chromeChanged) {
             installFontDefaults(font);
-            try { installOrThrow(next.chrome()); }
+            try { installOrThrow(candidate.choice()); }
             catch (RuntimeException failure) { installFontDefaults(uiFont); throw failure; }
         }
         uiFont = font;
         UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
         state = candidate;
-        if (chromeChanged || !previous.equals(next) || choiceChanged)
+        if (chromeChanged || !previous.equals(next) || choiceChanged) {
+            current = next;
             for (var listener : List.copyOf(listeners)) listener.accept(next, chromeChanged);
+        }
     }
 
     private FontUIResource resolveFont(UiFontConfig choice) {
