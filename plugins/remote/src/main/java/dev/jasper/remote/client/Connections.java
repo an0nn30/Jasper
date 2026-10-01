@@ -38,9 +38,12 @@ import org.apache.sshd.common.NamedResource;
 import org.apache.sshd.common.config.keys.FilePasswordProvider;
 import org.apache.sshd.core.CoreModuleProperties;
 import org.apache.sshd.common.keyprovider.KeyIdentityProvider;
+import org.apache.sshd.common.session.Session;
 import org.apache.sshd.client.config.hosts.HostConfigEntryResolver;
 import org.apache.sshd.common.util.net.SshdSocketAddress;
 import org.apache.sshd.common.util.security.SecurityUtils;
+import org.apache.sshd.server.forward.StaticDecisionForwardingFilter;
+import org.apache.sshd.server.forward.TcpForwardingFilter;
 
 /** Shared sessions; all registry state belongs to the UI executor. Each shell and dependent hop owns a reference. */
 public final class Connections {
@@ -522,6 +525,13 @@ public final class Connections {
         SshClient client = SshClient.setUpDefaultClient();
         client.setHostConfigEntryResolver(HostConfigEntryResolver.EMPTY);
         client.setKeyIdentityProvider(KeyIdentityProvider.EMPTY_KEYS_PROVIDER);
+        // The client refuses every server-initiated channel by default; a remote tunnel needs the server's forwarded-tcpip
+        // connections. MINA passes the local address registered by startRemotePortForwarding, which Jasper always makes a loopback relay.
+        client.setForwardingFilter(new StaticDecisionForwardingFilter(false) {
+            @Override public boolean canConnect(TcpForwardingFilter.Type type, SshdSocketAddress address, Session session) {
+                return type == TcpForwardingFilter.Type.Forwarded && address != null && SshdSocketAddress.isLoopback(address.getHostName());
+            }
+        });
         client.setServerKeyVerifier((session, address, key) -> {
             HostKeyVerifier verifier = session.getConnectionContext().getAttribute(VERIFY);
             return verifier != null && verifier.verifyServerKey(session, address, key);

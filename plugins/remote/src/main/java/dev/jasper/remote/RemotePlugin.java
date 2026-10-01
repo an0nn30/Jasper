@@ -76,6 +76,8 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.transfer.TransferCoordinator transfers;
     private dev.jasper.remote.ui.transfers.TransferUi transferUi;
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
+    private dev.jasper.remote.tunnels.TunnelStore tunnelStore;
+    private dev.jasper.remote.ui.tunnels.TunnelsUi tunnelsUi;
     private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
     private dev.jasper.remote.edit.EditChannels editChannels;
     private dev.jasper.sdk.Subscription reopener;
@@ -167,6 +169,10 @@ public class RemotePlugin implements Plugin {
         });
         transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->sftpUi.reveal(window));
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release);
+        tunnelStore = new dev.jasper.remote.tunnels.TunnelStore(context.dataDirectory().resolve("tunnels.toml"), context.background(), ui);
+        tunnelsUi = new dev.jasper.remote.ui.tunnels.TunnelsUi(context, ui, tunnelStore,
+            new dev.jasper.remote.tunnels.TunnelManager(connections, () -> settings.connection().connectTimeout(), context.background(), ui),
+            store::hosts, store::host, paneId -> Optional.ofNullable(panes.get(paneId)).flatMap(store::host));
         remoteHosts=new dev.jasper.remote.chooser.RemoteHosts(store::hosts,connections::connected,store::onChanged,connections::onChanged,
             paneId->context.terminals().pane(paneId).flatMap(this::sftpPane).map(target->new dev.jasper.remote.chooser.RemoteHosts.Located(target.identity(),target.directory())),
             connections::resolveIdentity,(identity,window)->endpoints.open(Optional.of(identity),window,status->{}),()->context.terminals().activeWindow());
@@ -197,7 +203,8 @@ public class RemotePlugin implements Plugin {
         PluginMenu menu = context.menus().create(MENU, "SSH");
         menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
         menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
-        // View > Tools lists HOSTS and SFTP_TOGGLE: the panels name them as their toggles.
+        tunnelsUi.addToMenu(menu);
+        // View > Tools lists HOSTS, SFTP_TOGGLE and the Tunnels toggle: the panels name them as their toggles.
 
         distros = wslProfiles();
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)),
@@ -211,9 +218,10 @@ public class RemotePlugin implements Plugin {
             if (panel == null) showPanel(window); else panel.show();
         }, () -> distros, this::openDistro);
 
-        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
+        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
         store.load();
-        poll = new Timer(1000, event -> store.poll());
+        tunnelStore.load();
+        poll = new Timer(1000, event -> { store.poll(); tunnelStore.poll(); });
         poll.start();
         context.terminals().onProfilesChanged(() -> {
             if (stopped) return;
@@ -258,6 +266,7 @@ public class RemotePlugin implements Plugin {
         for (var question : Set.copyOf(questions)) question.cancel(true);
         if (poll != null) poll.stop();
         if (sessionsToolbar != null) sessionsToolbar.close();
+        if (tunnelsUi != null) tunnelsUi.close();
         if (connections != null) connections.close();
     }
 
@@ -538,11 +547,19 @@ public class RemotePlugin implements Plugin {
 
     private void deleteHost(WindowHandle window, RemoteHost host) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Delete " + host.name() + "?", window, true));
-        currentConfirm = new ConfirmPanel("Delete the saved host " + host.name() + "? Open sessions stay connected.", "Delete",
+        currentConfirm = new ConfirmPanel(deleteHostText(host), "Delete",
             () -> store.remove(host.id()).whenComplete((ignored, failure) -> ui.execute(() -> { if (failure != null) context.notices().error(message(failure)); dialog.close(); })), dialog::close);
         dialog.setContent(currentConfirm);
         dialog.onClosed(() -> currentConfirm = null);
         dialog.show();
+    }
+
+    /** The confirmation names the tunnels that go through the host: they stay, marked Host missing. */
+    private String deleteHostText(RemoteHost host) {
+        List<String> users = tunnelsUi.usersOf(host.id());
+        String tunnels = users.isEmpty() ? "" : " " + (users.size() == 1 ? "1 tunnel uses" : users.size() + " tunnels use")
+            + " this host (" + String.join(", ", users) + "); they stay, marked Host missing.";
+        return "Delete the saved host " + host.name() + "? Open sessions stay connected." + tunnels;
     }
 
     private void importConfig(WindowHandle window) {
@@ -659,4 +676,6 @@ public class RemotePlugin implements Plugin {
     GroupNamePanel currentGroupEditor() { return currentGroupEditor; }
     ConnectionPanel currentConnectionPanel() { return currentConnectionPanel; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
+    dev.jasper.remote.ui.tunnels.TunnelsUi tunnels() { return tunnelsUi; }
+    dev.jasper.remote.tunnels.TunnelStore tunnelStore() { return tunnelStore; }
 }

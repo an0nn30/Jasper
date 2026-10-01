@@ -2,6 +2,42 @@
 
 ## Current state — 2026-10-01
 
+- **Remote tunnels plan 7b-2: tunnels you run by hand** (branch `claude/tunnels-7b2`, plan
+  `docs/superpowers/plans/2026-09-30-jasper-remote-plan-7b2-tunnels-by-hand.md`, executed 2026-10-01, user guide in
+  `docs/remote.md`): Remote 0.10.0 (`sdk >=0.11.0`) adds saved tunnels (local, remote, dynamic SOCKS5) in
+  `data/tunnels.toml` and quick forwards, run by hand from the new Tunnels rail panel, the Tunnels palette scope (Start
+  or stop, Open in browser, Edit tunnel), the SSH menu (Toggle Tunnels, New Tunnel..., Forward a Port..., Stop All
+  Tunnels) and the terminal context menu (Forward a Port...), with live counters, Open in Browser, Copy Address and a
+  "N tunnels" status item. Package `dev.jasper.remote.tunnels`: an own engine (`Listener` binds before the lease,
+  `TunnelManager` leases the shared session and forwards each connection over its own direct-tcpip channel, `Pump`
+  counts bytes, `Socks5`), a remote tunnel through MINA's remote forwarding to a loopback relay;
+  `dev.jasper.remote.ui.tunnels` holds the UI. A lost session fails the tunnel (7b-3 reconnects). The store gives an entry
+  without an `id` a stable one derived from its name (as File Server's does since 80a6fe4d), and refuses saves while the
+  file has entries it skipped, so a save never deletes them; the final review's fix wave also made the error row read
+  "tunnels.toml has errors: <reason>" once, show names as plain text, wrap the empty-state message, fail a tunnel whose
+  lease throws, keep the per-session ordering chain alive after an Error and bracket IPv6 addresses in row text.
+  Deviations from the spec: `*` is sent to the server as `0.0.0.0`; no `RemoteRelay` class (the relay is a `Listener`
+  on `127.0.0.1:0`); the palette scope has no aliases; the rail icon is `BundledIcon.ACTIONS_SWAP_PANELS` and the
+  failing status icon `BundledIcon.STATUS_WARNING`, so `RemotePluginTest`'s semantic-icon check admits that one
+  catalog icon; `Pump` uses `java.net` sockets; local `*` binds one dual-stack wildcard socket rather than separate
+  `0.0.0.0` and `::` sockets; the shared SSH client now accepts server-initiated `forwarded-tcpip` channels, only to a
+  loopback target (needed for remote tunnels; MINA's client rejected them all by default); remote forward requests and
+  cancels on one session run in the order they were issued, and a second remote tunnel asking for a port another
+  tunnel on the same session holds is refused locally (MINA cancels by port on any failed request); palette verbs
+  re-resolve the tunnel by id; `BundledSamplePluginTest` and `RemoteShortcutConfigTest` expectations count the new
+  panel, toggle and status item; Remote is 0.10.0 because main already shipped 0.9.0. Follow-ups: Toggle Tunnels is
+  unbound (⌥⌘4 / Alt+4 would continue the approved panel series; needs the user's approval); the Tunnels panel's row
+  operations are list keys, not yet Keymap panel actions like the Sessions panel's; half-close through a remote tunnel
+  is untested against OpenSSH, and MINA's client cannot carry a target-first half-close (later client-to-target bytes
+  are lost); stopping a remote tunnel while its port request is still in flight and restarting it at once on the same
+  port can be refused once; "Allow other computers" and the exposure warning follow the checkbox, not a typed `*`,
+  `0.0.0.0` or LAN address (do early in 7b-3); `HostStore` has the same two store defects (id-less entries get a new
+  id on every read, skipped entries are dropped by the next save), a small separate task.
+  `./gradlew check` green after merging main (File Server FS-2): app 1471/0/1 (also after `:jasper-app:test --rerun`),
+  terminal 391/0/4, Editor 4782/0/0, Remote 382/0/0, Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0,
+  Sample 12/0/0, File Server 158/0/0, SDK 39/0/0, testkit 79/0/0 (7,669 tests in all, 0 failures, 6 skipped). GUI
+  checks pending with the user (`docs/remote.md`, Native acceptance for tunnels). Merged to local main 2026-10-01 (not
+  pushed).
 - **File Server FS-2: FTP/FTPS and TLS** (branch `claude/file-server-fs2`, plan
   `docs/superpowers/plans/2026-09-30-file-server-fs2.md`): File Server 0.2.0 serves FTP with explicit FTPS (Apache
   FtpServer 1.2.1) and HTTPS, on one self-signed EC certificate in `data/tls/` (BouncyCastle; fingerprint on the server
@@ -114,7 +150,7 @@
   Editor 4782/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0,
   SDK 36/0/0, testkit 75/0/0. Seen once during Task 1's first full check and not reproduced in six reruns (four
   alone, two whole-module): `RemotePluginTest.endingAPanesSessionClearsTheSftpView` read the SFTP panel's folder
-  ("/") right after its rows emptied; a timing flake unrelated to this plan. Not merged; plan 7b-2 builds on it.
+  ("/") right after its rows emptied; a timing flake unrelated to this plan. Merged to main at f7b9cd76; plan 7b-2 builds on it.
 - **Remote tunnels design (7b)** (branch `claude/tunnels-spec`, spec
   `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md`, brainstormed and approved section by section
   2026-09-30; written spec approved by the user the same day): tunnels with their own lifecycle (never tied to terminals)

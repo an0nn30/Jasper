@@ -1,6 +1,6 @@
 # Jasper
 
-A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP and tunnels; a plugin SDK already hosts bundled and user-installed plugins.
+A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP and tunnels, which are now bundled plugins (tunnels: plan 7b-2 on `claude/tunnels-7b2`, 7b-3 to follow); a plugin SDK already hosts bundled and user-installed plugins.
 
 Formerly Moray. The app and Java packages are now Jasper; the Git repository
 remains [an0nn30/moray](https://github.com/an0nn30/moray). Existing settings can be

@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * its actions' default bindings, and only the Keymap (app overrides) changes them. */
 class RemoteShortcutConfigTest {
     private static final String HOSTS = "dev.jasper.remote.hosts", CONNECT = "dev.jasper.remote.connect",
-        SFTP_TOGGLE = "dev.jasper.remote.sftp.toggle";
+        SFTP_TOGGLE = "dev.jasper.remote.sftp.toggle", TUNNELS_TOGGLE = "dev.jasper.remote.tunnels";
     @TempDir Path root;
     private PluginRuntime runtime;
     private Contributions contributions;
@@ -113,10 +113,11 @@ class RemoteShortcutConfigTest {
         onEdt(() -> {
             assertThat(contributions.action("dev.jasper.remote.panel.toggle")).as("no app toggle beside Remote's").isEmpty();
             assertThat(contributions.action("dev.jasper.remote.sftp.panel.toggle")).isEmpty();
+            assertThat(contributions.action("dev.jasper.remote.tunnels.panel.toggle")).isEmpty();
             assertThat(contributions.actions()).filteredOn(action -> action.id().startsWith("dev.jasper.remote.") && action.title().startsWith("Toggle "))
                 .extracting(action -> action.id() + "|" + action.title())
-                .containsExactlyInAnyOrder(HOSTS + "|Toggle SSH hosts", SFTP_TOGGLE + "|Toggle SFTP");
-            assertThat(tools()).contains(new MenuEntry.Item(HOSTS), new MenuEntry.Item(SFTP_TOGGLE));
+                .containsExactlyInAnyOrder(HOSTS + "|Toggle SSH hosts", SFTP_TOGGLE + "|Toggle SFTP", TUNNELS_TOGGLE + "|Toggle Tunnels");
+            assertThat(tools()).contains(new MenuEntry.Item(HOSTS), new MenuEntry.Item(SFTP_TOGGLE), new MenuEntry.Item(TUNNELS_TOGGLE));
         });
     }
 
