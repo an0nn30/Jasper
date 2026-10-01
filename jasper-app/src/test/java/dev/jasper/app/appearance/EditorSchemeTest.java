@@ -28,6 +28,14 @@ class EditorSchemeTest {
         assertThat(light.ansi().get(1)).isEqualTo(new Color(0xce0505));
     }
 
+    @Test void theSchemesTheBuiltInIntellijThemesNameHaveNoWarnings() {
+        // BuiltInThemes passes the darkness of the theme file it converts.
+        assertThat(EditorScheme.named("IntelliJ Light", "IntelliJ Light",
+            ThemeManager.loadBuiltIn("intellij/Light.theme.json").dark()).warnings()).isEmpty();
+        assertThat(EditorScheme.named("Darcula", "Darcula",
+            ThemeManager.loadBuiltIn("intellij/darcula.theme.json").dark()).warnings()).isEmpty();
+    }
+
     @Test void everyConsoleKeyMapsToItsPaletteField() {
         String[] ansi = {"BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "GRAY",
             "DARKGRAY", "RED_BRIGHT", "GREEN_BRIGHT", "YELLOW_BRIGHT", "BLUE_BRIGHT", "MAGENTA_BRIGHT", "CYAN_BRIGHT", "WHITE"};

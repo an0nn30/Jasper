@@ -87,7 +87,7 @@ class WorkspaceRegionsTest {
         try {
             var regions = new WorkspaceRegions(new JPanel());
             var panel = new JPanel(); regions.show(PanelRegion.LEFT, panel, 250);
-            for (var theme : java.util.List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.LIGHT)) {
+            for (var theme : java.util.List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.INTELLIJ_LIGHT)) {
                 dev.jasper.app.appearance.ThemeTestSupport.install(theme);
                 SwingUtilities.updateComponentTreeUI(regions); regions.refreshTheme(); layout(regions);
                 var split = (javax.swing.JSplitPane) regions.getComponent(0);

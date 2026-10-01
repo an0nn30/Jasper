@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TerminalColorsThemeTest {
     @Test void aTerminalOnlyChangeNotifiesOnceWithoutReinstallingTheLookAndFeel() {
         var installs = new ArrayList<Theme>();
-        var themes = new ThemeController(Theme.LIGHT, theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
+        var themes = new ThemeController(Theme.INTELLIJ_LIGHT, theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
         try {
             var chromeFlags = new ArrayList<Boolean>();
             var palettes = new ArrayList<Palette>();
@@ -23,7 +23,7 @@ class TerminalColorsThemeTest {
             assertThat(installs).isEmpty();
             assertThat(chromeFlags).containsExactly(false);
             assertThat(palettes).containsExactly(Palette.jasperDark());
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark()));
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.INTELLIJ_LIGHT, Palette.jasperDark()));
             assertThat(themes.terminalColors()).isEqualTo(TerminalColors.DARK);
             themes.configureTerminal(TerminalColors.DARK);
             assertThat(chromeFlags).as("repeating the same choice is quiet").hasSize(1);
@@ -37,14 +37,14 @@ class TerminalColorsThemeTest {
             var chromeFlags = new ArrayList<Boolean>();
             themes.subscribe((theme, chromeChanged) -> chromeFlags.add(chromeChanged));
             chromeFlags.clear();
-            themes.configure(Theme.LIGHT, TerminalColors.DARK, UiFontConfig.defaults());
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark()));
+            themes.configure(Theme.INTELLIJ_LIGHT, TerminalColors.DARK, UiFontConfig.defaults());
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.INTELLIJ_LIGHT, Palette.jasperDark()));
             assertThat(chromeFlags).containsExactly(true);
             themes.configure(Theme.DARK);
             assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.DARK, Palette.jasperDark()));
-            themes.configure(Theme.LIGHT, TerminalColors.MATCH, UiFontConfig.defaults());
+            themes.configure(Theme.INTELLIJ_LIGHT, TerminalColors.MATCH, UiFontConfig.defaults());
             assertThat(themes.current()).as("MATCH follows the configured theme")
-                .isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperLight()));
+                .isEqualTo(new ResolvedTheme(Theme.INTELLIJ_LIGHT, Theme.INTELLIJ_LIGHT.palette()));
         } finally { new ThemeController(); }
     }
 
@@ -56,7 +56,7 @@ class TerminalColorsThemeTest {
         try {
             themes.configure(Theme.DARK, new TerminalColors("Dracula"), named, UiFontConfig.defaults());
             assertThat(themes.current().palette()).isEqualTo(named);
-            themes.configure(Theme.LIGHT);
+            themes.configure(Theme.INTELLIJ_LIGHT);
             assertThat(themes.current().palette()).isEqualTo(named);
             themes.configure(Theme.DARK, UiFontConfig.defaults());
             assertThat(themes.current().palette()).isEqualTo(named);

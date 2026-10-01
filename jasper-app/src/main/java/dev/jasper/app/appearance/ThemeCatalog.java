@@ -19,14 +19,18 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
- * Every theme Jasper can install: the plugins in the {@code themes} folder beside {@code config.toml},
- * then the built-in themes. An installed theme takes precedence over a built-in theme of the same name.
+ * Every theme Jasper can install: the Jasper theme files and theme plugins in the {@code themes} folder
+ * beside {@code config.toml}, then the built-in themes. An installed theme takes precedence over a built-in theme of the same name.
  * {@link #scan()} does the file work and may run on any thread; {@link #latest()} may be read anywhere.
  */
 public final class ThemeCatalog {
-    /** A problem with one file in the themes folder, shown as a configuration warning. */
-    public record Problem(Path file, String message) {
+    /** Theme files larger than this are refused. */
+    public static final int MAX_THEME_FILE = 256 * 1024;
+
+    /** A problem with one file in the themes folder, shown as a configuration warning; {@code line} is 0 when unknown. */
+    public record Problem(Path file, int line, String message) {
         public Problem { Objects.requireNonNull(file); Objects.requireNonNull(message); }
+        public Problem(Path file, String message) { this(file, 0, message); }
     }
 
     /** One scan: the themes in precedence order, and the problems met. */
@@ -53,7 +57,7 @@ public final class ThemeCatalog {
 
     private record Loaded(List<Theme> themes, List<Problem> problems) {}
     private record Stamp(long size, FileTime modified) {}
-    private record Read(Stamp stamp, List<Theme> themes, List<Problem> problems) {}
+    private record Read(Stamp stamp, List<Theme> themes, ThemeDocument document, List<Problem> problems) {}
 
     private static final Snapshot BUILT_IN = new Snapshot(ThemeManager.builtIns(), List.of());
 
@@ -61,6 +65,11 @@ public final class ThemeCatalog {
     private final Function<Path, ThemeArchive.Contents> reader;
     /** Each archive's last read, by path; guarded by this. */
     private Map<Path, Read> reads = Map.of();
+    /**
+     * Each Jasper theme file's theme from the last scan, by path; guarded by this. An unchanged theme keeps its
+     * instance, so a configuration reload does not reinstall the look and feel for it.
+     */
+    private Map<Path, Theme> userThemes = Map.of();
     private volatile Snapshot latest = BUILT_IN;
 
     ThemeCatalog(Path directory, Function<Path, ThemeArchive.Contents> reader) {
@@ -98,18 +107,18 @@ public final class ThemeCatalog {
         if (directory == null) return latest;
         var problems = new ArrayList<Problem>();
         var next = new HashMap<Path, Read>();
-        var installed = new ArrayList<Theme>();
-        var owners = new HashMap<String, Path>();
+        var found = new ArrayList<Map.Entry<Path, Read>>();
         for (Path file : files(problems)) {
             String lower = file.getFileName().toString().toLowerCase(Locale.ROOT);
             if (lower.endsWith(".theme.json")) {
                 problems.add(new Problem(file, "Standalone .theme.json files aren't supported; install the theme plugin's .jar or .zip instead."));
                 continue;
             }
-            if (!lower.endsWith(".jar") && !lower.endsWith(".zip")) continue;
+            boolean archive = lower.endsWith(".jar") || lower.endsWith(".zip");
+            if (!archive && !lower.endsWith(".toml")) continue;
             Read read;
             // Nothing one file does may stop the scan: it becomes that file's problem.
-            try { read = read(file); }
+            try { read = read(file, archive); }
             catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
                 problems.add(new Problem(file, file.getFileName() + " cannot be read: " + failure));
                 continue;
@@ -117,14 +126,53 @@ public final class ThemeCatalog {
             if (read == null) continue;
             next.put(file, read);
             problems.addAll(read.problems());
-            for (Theme theme : read.themes()) {
+            found.add(Map.entry(file, read));
+        }
+        reads = next;
+        // "extends" may name any theme: the folder's, in file order, then the built-in themes.
+        var documents = new ArrayList<ThemeDocument>();
+        for (var entry : found) {
+            if (entry.getValue().document() != null) documents.add(entry.getValue().document());
+            entry.getValue().themes().forEach(theme -> documents.add(theme.source().document()));
+        }
+        ThemeManager.builtIns().forEach(theme -> documents.add(theme.source().document()));
+        Function<String, List<ThemeDocument>> candidates =
+            name -> documents.stream().filter(document -> key(document.name()).equals(key(name))).toList();
+        var installed = new ArrayList<Theme>();
+        var owners = new HashMap<String, Path>();
+        var nextUserThemes = new HashMap<Path, Theme>();
+        for (var entry : found) {
+            Path file = entry.getKey();
+            List<Theme> provided = entry.getValue().themes();
+            ThemeDocument document = entry.getValue().document();
+            if (document != null) {
+                Theme theme;
+                try { theme = Theme.of("user:" + file.getFileName(), new Theme.UserFile(file, ThemeResolver.resolve(document, candidates))); }
+                catch (ThemeFileException failure) {
+                    // A failure in a theme this file extends carries that file's line; the message names that file.
+                    int line = failure.origin().equals(file.getFileName().toString()) ? failure.line() : 0;
+                    problems.add(new Problem(file, line, failure.getMessage()));
+                    continue;
+                }
+                // Nothing one file does may stop the scan. The resolver and generator are not known to throw anything
+                // else for a parsed document; should they, it becomes this file's problem.
+                catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
+                    problems.add(new Problem(file, file.getFileName() + " cannot be loaded: " + failure));
+                    continue;
+                }
+                Theme previous = userThemes.get(file);
+                if (theme.equals(previous)) theme = previous;
+                nextUserThemes.put(file, theme);
+                provided = List.of(theme);
+            }
+            for (Theme theme : provided) {
                 Path owner = owners.putIfAbsent(key(theme.name()), file);
                 if (owner == null) installed.add(theme);
                 else if (owner.equals(file)) problems.add(new Problem(file, "Theme \"" + theme.name() + "\" is provided twice; the first is used."));
                 else problems.add(new Problem(file, "Theme \"" + theme.name() + "\" is also installed from " + owner.getFileName() + ", which is used."));
             }
         }
-        reads = next;
+        userThemes = nextUserThemes;
         var themes = new ArrayList<>(installed);
         for (Theme builtIn : ThemeManager.builtIns()) if (!owners.containsKey(key(builtIn.name()))) themes.add(builtIn);
         return latest = new Snapshot(themes, problems);
@@ -147,8 +195,8 @@ public final class ThemeCatalog {
         }
     }
 
-    /** The archive's themes, from the last read when its size and modified time are unchanged; null when it vanished. */
-    private Read read(Path file) {
+    /** The file's themes or document, from the last read when its size and modified time are unchanged; null when it vanished. */
+    private Read read(Path file, boolean archive) {
         Stamp stamp;
         try {
             var attributes = Files.readAttributes(file, BasicFileAttributes.class);
@@ -158,8 +206,20 @@ public final class ThemeCatalog {
         }
         Read previous = reads.get(file);
         if (previous != null && previous.stamp().equals(stamp)) return previous;
-        Loaded loaded = load(file, reader);
-        return new Read(stamp, loaded.themes(), loaded.problems());
+        if (archive) {
+            Loaded loaded = load(file, reader);
+            return new Read(stamp, loaded.themes(), null, loaded.problems());
+        }
+        String name = file.getFileName().toString();
+        if (stamp.size() > MAX_THEME_FILE)
+            return new Read(stamp, List.of(), null, List.of(new Problem(file, name + " is larger than 256 KiB.")));
+        try {
+            return new Read(stamp, List.of(), ThemeToml.parse(Files.readString(file), name), List.of());
+        } catch (ThemeFileException failure) {
+            return new Read(stamp, List.of(), null, List.of(new Problem(file, failure.line(), failure.getMessage())));
+        } catch (IOException failure) {
+            return new Read(stamp, List.of(), null, List.of(new Problem(file, name + " cannot be read: " + failure)));
+        }
     }
 
     /** The archive's themes, loaded and resolved, and every problem met; never throws for a bad archive. */
@@ -173,15 +233,20 @@ public final class ThemeCatalog {
         contents.problems().forEach(problem -> problems.add(new Problem(file, problem)));
         var themes = new ArrayList<Theme>();
         for (ThemeArchive.Found found : contents.themes()) {
-            var source = new Theme.Archive(file, found.label(), found.json());
-            ThemeLoader.Resolved resolved;
-            try { resolved = ThemeManager.load(source); }
+            // A malformed entry is the archive's problem, as it was when the Theme.Archive constructor refused it.
+            Objects.requireNonNull(found.json(), found.label());
+            Theme theme;
+            try {
+                ThemeLoader.Resolved resolved = ThemeManager.loadArchive(found.label(), found.json());
+                resolved.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
+                EditorScheme.Result scheme = scheme(found, resolved.dark());
+                scheme.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
+                theme = Theme.of("installed:" + found.label(),
+                    new Theme.Archive(file, found.label(), IntellijConversion.convert(resolved, scheme.palette(), found.label())));
+            }
             catch (ThemeLoader.ThemeException failure) { problems.add(new Problem(file, failure.getMessage())); continue; }
             catch (RuntimeException failure) { problems.add(new Problem(file, found.label() + " cannot be loaded: " + failure)); continue; }
-            resolved.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
-            EditorScheme.Result scheme = scheme(found, resolved.dark());
-            scheme.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
-            themes.add(new Theme("installed:" + found.label(), resolved.name(), resolved.dark(), scheme.palette(), source));
+            themes.add(theme);
         }
         return new Loaded(themes, problems);
     }

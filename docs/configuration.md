@@ -162,7 +162,7 @@ enabled = true
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
-| `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
+| `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `themes.marketplace.enabled` | `true` | Boolean; `false` hides Settings › Themes › IntelliJ Themes' Marketplace tab and stops its update checks | Live |
 | `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"`, or a terminal theme's name ([Themes](themes.md)); an unknown name is a warning and uses `"match"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
@@ -668,9 +668,9 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 ## Theme
 
 `ui.theme.name` names the UI theme:
-- `"Jasper Dark"` (the default);
-- `"IntelliJ Light"` (classic IntelliJ Light, the theme IntelliJ IDEA ships for its classic UI);
-- or a theme plugin installed in the `themes` folder beside this file.
+- `"Jasper Dark"` (the default) or `"Jasper Light"`;
+- `"IntelliJ Light"` or `"Darcula"` (IntelliJ's classic themes, converted);
+- or a Jasper theme file or theme plugin in the `themes` folder beside this file.
 
 The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers installing
 Marketplace themes and how a theme colours the terminal. An unknown name is a warning that lists

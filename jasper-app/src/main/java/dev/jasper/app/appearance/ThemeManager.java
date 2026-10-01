@@ -19,16 +19,17 @@ import javax.swing.UIManager;
 import javax.swing.plaf.ColorUIResource;
 
 /**
- * The built-in themes and the one path that installs any theme: resolve its IntelliJ theme file, let
- * FlatLaf build the look and feel, put back the colours FlatLaf skips (IntelliJ-only namespaces such as
- * {@code SearchEverywhere.*}), then derive Jasper's chrome keys. EDT only.
+ * The built-in themes and the one path that installs any theme. Every theme, a Jasper theme file or a converted
+ * IntelliJ one, is first generated ({@link ThemeGenerator}); its UI keys are then written as an IntelliJ theme file,
+ * FlatLaf builds the look and feel from that file, the colours FlatLaf skips (IntelliJ-only namespaces such as
+ * {@code SearchEverywhere.*}) are put back, and Jasper's chrome keys are derived. EDT only.
  */
 public final class ThemeManager {
     private static final String BASE = "dev/jasper/app/themes/";
     /**
      * Each theme a {@code parentTheme} may name, with its file under {@link #BASE}. IntelliJ's themes are
      * keyed by the id IntelliJ registers them under, which is what a {@code parentTheme} names; the classic
-     * IntelliJ Light and Jasper Dark are also reachable by name.
+     * IntelliJ Light is also reachable by name.
      */
     private static final Map<String, String> FILES = Map.ofEntries(
         Map.entry("IntelliJ Light", "intellij/Light.theme.json"),
@@ -41,34 +42,43 @@ public final class ThemeManager {
         Map.entry("Islands Dark", "intellij/islands/ManyIslandsDark.theme.json"),
         Map.entry("Islands Light", "intellij/islands/ManyIslandsLight.theme.json"),
         Map.entry("Islands Darcula", "intellij/islands/ManyIslandsDarcula.theme.json"),
-        Map.entry("JetBrainsHighContrastTheme", "intellij/islands/HighContrast.theme.json"),
-        Map.entry("Jasper Dark", "jasper-dark.theme.json"));
+        Map.entry("JetBrainsHighContrastTheme", "intellij/islands/HighContrast.theme.json"));
     /** Theme-independent application defaults: form typography, input geometry and the split divider. Every theme gets them. */
     public static final Map<String, String> APP_DEFAULTS = appDefaults();
     private static final ThemeLoader LOADER = new ThemeLoader(ThemeManager::read, FILES);
-    private static final Map<Theme, ThemeLoader.Resolved> RESOLVED = new HashMap<>();
+    private static final Map<Theme, GeneratedTheme> GENERATED = new HashMap<>();
 
     private ThemeManager() {}
 
-    /** The bundled themes, Light first. */
-    public static List<Theme> builtIns() { return List.of(Theme.LIGHT, Theme.DARK); }
+    /** The bundled themes: Jasper's own, then IntelliJ's. */
+    public static List<Theme> builtIns() { return List.of(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA); }
 
-    static ThemeLoader.Resolved resolve(Theme theme) { return RESOLVED.computeIfAbsent(theme, key -> load(key.source())); }
+    /** {@code theme}'s generated values; EDT only (the cache is unsynchronized). */
+    static GeneratedTheme generated(Theme theme) {
+        return GENERATED.computeIfAbsent(theme, key -> ThemeGenerator.generate(key.source().document()));
+    }
 
-    /** Resolves a theme's file; touches no Swing state, so it is safe off the EDT. */
-    static ThemeLoader.Resolved load(Theme.Source source) {
-        return switch (source) {
-            case Theme.Resource resource -> LOADER.load(resource.file());
-            // Parents a plugin theme names resolve against the chains Jasper ships.
-            case Theme.Archive archive ->
-                new ThemeLoader(file -> file.equals(archive.entry()) ? archive.json() : read(file), FILES).load(archive.entry());
-        };
+    /** A theme file Jasper ships, resolved; touches no Swing state. */
+    static ThemeLoader.Resolved loadBuiltIn(String file) { return LOADER.load(file); }
+
+    /** A plugin's theme file, resolved against the parent themes Jasper ships; touches no Swing state. */
+    static ThemeLoader.Resolved loadArchive(String entry, String json) {
+        return new ThemeLoader(file -> file.equals(entry) ? json : read(file), FILES).load(entry);
     }
 
     /** Installs {@code theme} as the look and feel; false when FlatLaf could not set it up. */
     public static boolean install(Theme theme) {
         requireEdt();
-        return install(resolve(theme), theme.palette().background());
+        return install(generated(theme));
+    }
+
+    /** Installs a generated theme through the same path as any IntelliJ theme; false when FlatLaf could not set it up. */
+    static boolean install(GeneratedTheme theme) {
+        requireEdt();
+        var resolved = new ThemeLoader.Resolved(theme.name(), theme.dark(), theme.author(),
+            ThemeLoader.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons()),
+            ThemeLoader.explicitColors(theme.uiKeys()), List.of(), theme.uiKeys(), theme.icons(), Map.of());
+        return install(resolved, theme.terminal().background());
     }
 
     static boolean install(ThemeLoader.Resolved resolved, Color terminalBackground) {
@@ -83,9 +93,9 @@ public final class ThemeManager {
         resolved.colors().forEach((key, color) -> {
             if (defaults.get(key) != null) return;
             defaults.put(key, new ColorUIResource(color));
-            extra.put(key, hex(color));
+            extra.put(key, UiTemplate.hex(color));
         });
-        ChromeKeys.derive(defaults, terminalBackground).forEach((key, color) -> extra.put(key, hex(color)));
+        ChromeKeys.derive(defaults, terminalBackground).forEach((key, color) -> extra.put(key, UiTemplate.hex(color)));
         // A later reinstall of this instance (a failed switch rolls back to it) rebuilds the defaults.
         laf.setExtraDefaults(extra);
         return true;
@@ -113,17 +123,12 @@ public final class ThemeManager {
         return Collections.unmodifiableMap(defaults);
     }
 
-    private static String read(String file) {
+    static String read(String file) {
         try (InputStream in = ThemeManager.class.getClassLoader().getResourceAsStream(BASE + file)) {
             return in == null ? null : new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
-    }
-
-    private static String hex(Color color) {
-        String rgb = String.format("#%06x", color.getRGB() & 0xffffff);
-        return color.getAlpha() == 255 ? rgb : rgb + String.format("%02x", color.getAlpha());
     }
 
     private static void requireEdt() {

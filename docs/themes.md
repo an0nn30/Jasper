@@ -1,8 +1,9 @@
 # Themes
 
-Jasper's UI theme is an IntelliJ theme. Two are built in: **Jasper Dark** (the default) and
-**IntelliJ Light**, the classic IntelliJ Light. Any theme plugin from the JetBrains Marketplace
-(plugins.jetbrains.com) can be installed.
+Jasper's themes are Jasper theme files: TOML that colours the whole app, the terminal palette and (from a later
+release) syntax highlighting. Four are built in: **Jasper Dark** (the default), **Jasper Light**, and IntelliJ's
+classic **IntelliJ Light** and **Darcula**, converted. Theme plugins from the JetBrains Marketplace can still be
+installed; Jasper converts them when it reads them.
 
 ## Choosing a theme
 
@@ -16,6 +17,63 @@ name = "Dracula"
 The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
 every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and
 installed theme; **Get More Themes…** at the bottom opens Settings › Themes › IntelliJ Themes.
+
+## Writing a theme
+
+Put a `.toml` file in the `themes` folder beside `config.toml` (`~/.config/jasper/themes/` on macOS) and name it in
+`ui.theme.name`. Jasper rereads the folder when the configuration is reloaded. The smallest theme names its seed colours:
+
+```toml
+name = "Mocha"
+
+[colors]
+background = "#1e1e2e"
+foreground = "#cdd6f4"
+accent     = "#89b4fa"
+
+[colors.normal]
+black = "#45475a"
+red = "#f38ba8"
+green = "#a6e3a1"
+yellow = "#f9e2af"
+blue = "#89b4fa"
+magenta = "#f5c2e7"
+cyan = "#94e2d5"
+white = "#bac2de"
+```
+
+Everything else is derived. A theme can also set:
+- `dark` (otherwise inferred from the background, or inherited through `extends`), `author`, `license`, `source`,
+  `commit`;
+- `extends = "<theme>"`: start from any other theme and change only what you write; a file may even be named like the
+  theme it extends ("Jasper Dark" extending "Jasper Dark") to replace it. Invalid candidates are skipped when
+  resolving a parent, so a broken file cannot hide a valid theme with that name. `dark` and `ui_complete` are inherited too:
+  a file extending IntelliJ Light, Darcula or a plugin theme inherits `ui_complete = true`, so its `[colors]` and
+  `[tokens]` mostly reach only the terminal and Jasper's own chrome (`Jasper.*` keys, which tokens you set
+  explicitly reach), not FlatLaf's controls; change those through `[ui]`;
+- `cursor` and `selection` (in `[colors]`) and `[colors.bright]` (otherwise each bright colour is its normal colour
+  lightened, or darkened on a light theme);
+- `ui_complete = true`, which converted IntelliJ themes use because their `[ui]` is a complete key set and Jasper's
+  template is skipped; a hand-written theme does not need it;
+- `[tokens]`: Jasper's semantic colours, any subset of `surface`, `surface_raised`, `surface_sunken`, `title_bar`,
+  `status_bar`, `sidebar`, `text`, `text_muted`, `text_disabled`, `text_on_accent`, `link`, `border`, `separator`,
+  `divider`, `focus_ring`, `hover`, `pressed`, `selection`, `selection_text`, `selection_inactive`, `text_selection`,
+  `text_selection_text`, `tab_bar`, `tab_active`, `tab_active_text`, `tab_active_border`, `tab_hover`,
+  `tab_underline`, `tab_underline_inactive`, `input_background`, `button_background`, `button_border`, `button_text`,
+  `button_default`, `scrollbar_thumb`, `scrollbar_track`, `accent`, `success`, `warning`, `error`,
+  `error_background`, `editor_background`, `editor_foreground`, `editor_caret`, `editor_selection`,
+  `editor_current_line`, `editor_gutter`, `editor_line_numbers`;
+- `[syntax]`: `keyword`, `type`, `function`, `variable`, `constant`, `number`, `string`, `comment`, `doc_comment`,
+  `annotation`, `operator`, `punctuation`, `tag`, `attribute`, `regex`, `error`, each a colour or
+  `{ color = "#…", bold = true, italic = true }`;
+- `[ui]`: raw FlatLaf or IntelliJ keys (`"Button.arc" = 6`), laid over everything else. `[ui]` values that look like a
+  Java class name (for example `com.example.Border`) are refused, except FlatLaf's own `com.formdev.flatlaf.` classes,
+  and keys ending in `UI` cannot be set.
+
+Derived text colours are adjusted until they are readable (4.5:1 for text, 3:1 for muted text); colours you write are
+used as written. Colours are `#RRGGBB` or `#RRGGBBAA`. A mistake (an unknown key, a bad colour, a missing seed, an
+`extends` that names no theme or loops) is a configuration warning naming the file and line, and that theme is skipped.
+A theme file larger than 256 KiB is skipped with a warning.
 
 ## Installing a theme
 
@@ -50,7 +108,7 @@ records where each came from.
 - A theme's `parentTheme` when it is one of the themes IntelliJ bundles: the classic `Darcula`,
   `IntelliJ` and `JetBrainsLightTheme`, the New UI `ExperimentalDark`, `ExperimentalLight` and
   `ExperimentalLightWithLightHeader`, and `Islands Dark`, `Islands Light`, `Islands Darcula` and
-  `JetBrainsHighContrastTheme`. They are vendored as parents only, not offered as themes. Any other
+  `JetBrainsHighContrastTheme`. IntelliJ Light and Darcula are also offered as built-in themes; the rest are vendored as parents only. Any other
   parent, such as another plugin's theme, is replaced by Darcula or IntelliJ by the theme's darkness,
   with a warning.
 - The theme's editor colour scheme, for the terminal (below).
@@ -68,7 +126,7 @@ With `terminal.colors = "match"` (the default), a theme that has an editor colou
 colours the terminal with the scheme's console colours: background, text, cursor, selection and
 the 16 ANSI colours.
 - **Missing colours:** colours the scheme leaves out come from its parent schemes, as in IntelliJ's console. A theme's `editorScheme` or a scheme's `parent_scheme` may name any scheme IntelliJ bundles: `Default`, `Darcula`, `IntelliJ Light`, `Light`, `Dark`, `Darcula Contrast`, `High contrast` and `Islands Dark`.
-- **No scheme:** a theme without one, and the built-in themes, use Jasper Dark or Jasper Light by the theme's darkness.
+- **No scheme:** Jasper theme files, Jasper Dark and Jasper Light included, take their terminal palette from their own `[colors]`, and IntelliJ Light and Darcula from their own editor scheme. Only an installed plugin theme without a scheme uses Jasper Dark's or Jasper Light's palette by the theme's darkness.
 - **Forcing Jasper's palettes:** `"light"` and `"dark"` always use Jasper's palettes.
 
 Scheme colours are used exactly as the theme author chose them.

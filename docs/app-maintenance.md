@@ -189,14 +189,15 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-To change Jasper Dark, edit `jasper-app/src/main/resources/dev/jasper/app/themes/jasper-dark.theme.json`
-using IntelliJ keys; `Jasper.*` keys set there win over derivation. To refresh the vendored IntelliJ
+To change Jasper Dark or Jasper Light, edit `jasper-app/src/main/resources/dev/jasper/app/themes/jasper-dark.toml` or
+`jasper-light.toml`: seeds and tokens first, `[ui]` only for a key no token covers. To change what a token colours for
+every theme, edit `UiTemplate`; to change a derivation or floor, `ThemeGenerator`. To refresh the vendored IntelliJ
 themes, change `SHA` in `tools/themes/fetch-intellij-themes.py` and rerun it from the repository
 root, then update the pinned hashes in `IntellijThemesTest`. To add a chrome key, add it to
 `ChromeKeys.KEYS` and `ChromeKeys.derive` with a fallback FlatLaf always defines, and cover it in
-`ChromeKeysTest`. Run `ThemeLoaderTest`, `ChromeKeysTest`, `ThemeManagerTest` (IntelliJ Light
-values and Jasper Dark parity) and `ThemeButtonsTest`, then `check`. Light and dark visual
-acceptance is a user check.
+`ChromeKeysTest`. Run `ThemeGeneratorTest`, `ThemeTomlTest`, `JasperLightTest`, `ThemeLoaderTest`,
+`ChromeKeysTest`, `ThemeManagerTest` (IntelliJ Light values and Jasper Dark parity) and `ThemeButtonsTest`, then
+`check`. Light and dark visual acceptance is a user check.
 
 The vendored editor schemes (`DefaultColorSchemesManager.xml` with IntelliJ's Default and Darcula, and
 each bundled scheme file) come from the same commit through the same tool, and their hashes are pinned
@@ -318,8 +319,8 @@ to the workspace minimum and scales with the UI. Keep clipping and hit testing i
 host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
-`ToolWindow.background` supplies the inner surface. Jasper Dark maps it and list/tree/table
-backgrounds to its `toolWindowBackground` color; edit the theme JSON to tune the contrast.
+`ToolWindow.background` supplies the inner surface. `UiTemplate` maps it to the `sidebar` token and list/tree/table backgrounds to `surface_sunken`; edit the
+`[tokens]` in `jasper-dark.toml` or `jasper-light.toml` to tune the contrast.
 Rail selection uses the theme's toolbar-button background and the original theme-aware icon;
 do not substitute the tab accent or a different selected icon variant.
 

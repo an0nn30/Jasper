@@ -2,6 +2,30 @@
 
 ## Current state — 2026-10-01
 
+- **Theme system plan 1: format and generator** (branch `claude/theme-system`, spec
+  `docs/superpowers/specs/2026-10-01-jasper-theme-system-design.md`, plan
+  `docs/superpowers/plans/2026-10-01-theme-system-1-format-generator.md`): themes are Jasper TOML files generated into
+  FlatLaf keys (`ThemeToml`, `ThemeResolver`, `ThemeGenerator`, `UiTemplate`). Jasper Dark is native
+  (`jasper-dark.toml`, parity with the retired JSON), Jasper Light is new, IntelliJ Light and Darcula are converted
+  bundled themes, installed IntelliJ plugins are converted in memory, and `.toml` files in the `themes` folder are
+  themes (problems carry their line). Deviations (plan banner): 48 tokens; new `ui_complete` key; no contrast floor
+  for borders; Jasper Light keeps the One Light terminal palette; the converter stays in `appearance` until plan 4;
+  `Theme.LIGHT` became `Theme.INTELLIJ_LIGHT`, whose terminal palette now comes from its own scheme; spec 2.3's
+  missing-theme fallback by the slot's last-known `dark` is deferred to plan 2 with the workspace slot (a missing theme
+  keeps the theme showing, Jasper Dark at start-up, as before); derivation values differ from spec 3's sketch
+  (`surface_raised` 6 %, `surface_sunken` 12 % toward black or white, `tab_active` = accent 18 % over the surface,
+  `sidebar` = `surface_sunken`; the full table is in `ThemeGenerator`'s JavaDoc). Converted IntelliJ themes keep their
+  named colours as `ColorPalette.*` keys (accent included), pinned by a parity test against the theme file. The
+  merge review fixes author-specific FlatLaf adjustments (Dracula and Material parity), derived foreground contrast
+  against overridden fills, and invalid parent candidates hiding valid themes of the same name. Cycles remain errors even when a
+  built-in fallback exists, while same-name overrides extend only lower-priority layers. The named-colour
+  suffix concern (`Icon`, `.border`, `.rowHeight`) did not reproduce in installed-colour parity tests: skipped colours
+  are restored by the existing installation path. These review fixes are recorded as plan deviations below the banner.
+  Independent review complete; `./gradlew check` passed after integrating current main: 7,720 tests,
+  0 failures/errors, 6 skipped (app 1,522). Source hygiene and diff checks passed.
+  Next: plan 2 (workspace zone). GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
+  the window, Settings and dialogs; a hand-written theme file in `themes/` (including a broken one's warning).
+
 - **Remote tunnels plan 7b-2: tunnels you run by hand** (branch `claude/tunnels-7b2`, plan
   `docs/superpowers/plans/2026-09-30-jasper-remote-plan-7b2-tunnels-by-hand.md`, executed 2026-10-01, user guide in
   `docs/remote.md`): Remote 0.10.0 (`sdk >=0.11.0`) adds saved tunnels (local, remote, dynamic SOCKS5) in

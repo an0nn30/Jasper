@@ -198,7 +198,7 @@ foreground (see [SDK architecture](sdk-architecture.md)).
 
 ## Themes
 
-Every theme is an IntelliJ-format `.theme.json` under `dev/jasper/app/themes/`, installed by one
+Every theme is generated into IntelliJ-format keys (resources under `dev/jasper/app/themes/`) and installed by one
 path in `ThemeManager`:
 1. `ThemeLoader` resolves the `parentTheme` chain (parent entries first, the child's replacing
    them in its order, so FlatLaf's in-order wildcards match IntelliJ's precedence), resolves the
@@ -211,11 +211,16 @@ path in `ThemeManager`:
    contrast floors for derived text.
 
 Restored and derived keys are also recorded as the instance's extra defaults, so a rollback to it
-keeps them. The built-ins are `Theme.LIGHT` (classic IntelliJ Light, vendored from
-intellij-community with provenance under `themes/intellij/`) and `Theme.DARK` (`jasper-dark.theme.json`).
+keeps them. Every theme is generated from a Jasper theme document (`ThemeToml` → `ThemeResolver` for `extends` →
+`ThemeGenerator`): the cursor, selection and bright colours (background, foreground, accent and the eight normal
+colours are required), the 48 tokens and the syntax roles are derived with contrast floors, and
+`UiTemplate` maps tokens onto FlatLaf, IntelliJ and `Jasper.*` keys under the theme's own `[ui]` keys. The generated
+keys install through the IntelliJ path above. The built-ins are `Theme.DARK` (`themes/jasper-dark.toml`),
+`Theme.JASPER_LIGHT` (`themes/jasper-light.toml`), and `Theme.INTELLIJ_LIGHT` and `Theme.DARCULA`, converted from the
+vendored IntelliJ files by `IntellijConversion` as `ui_complete` documents (their own keys install unchanged).
 Side panels paint `ToolWindow.background` through `ToolWindowSurface`; the rail stays chrome.
 
-Installed themes come from `ThemeCatalog`, which lists the plugins in the `themes` folder beside
+Installed themes come from `ThemeCatalog`, which lists the theme files and plugins in the `themes` folder beside
 `config.toml`, then the built-ins. The pieces:
 - **Reading:** `ThemeArchive` reads a Marketplace plugin (a `.jar`, or a `.zip` of `lib/*.jar`) in place, with
   caps. Its `META-INF/plugin.xml` names each theme through `themeProvider`, and a theme names its
@@ -223,10 +228,11 @@ Installed themes come from `ThemeCatalog`, which lists the plugins in the `theme
 - **Terminal palette:** `EditorScheme` turns the scheme's console colours into the theme's terminal palette,
   with the schemes IntelliJ bundles (`themes/intellij/`: Default and Darcula, the New UI and Islands schemes)
   as parents. The themes IntelliJ bundles, classic, New UI and Islands, are vendored there too as the
-  `parentTheme`s a plugin theme may name (by IntelliJ's theme id); only IntelliJ Light is offered as a theme.
+  `parentTheme`s a plugin theme may name (by IntelliJ's theme id); only IntelliJ Light and Darcula are also offered as themes.
 - **Untrusted XML:** `SafeXml` parses plugin XML with DOCTYPE and external entities disabled.
-- **Installing:** a `Theme` records its source, a bundled resource or an archive, so `ThemeManager` installs
-  an installed theme the same way as a built-in one.
+- **Theme files:** `.toml` files in the folder are Jasper themes; `extends` may name any theme in the folder or built in.
+- **Installing:** a `Theme` records its source (bundled, a theme file, or an archive) and its resolved document, so
+  `ThemeManager` installs an installed theme the same way as a built-in one.
 - **Scanning and resolving:** `ConfigService.watchWith` runs the catalog's scan on the configuration worker at start-up and
   after each read. `ConfigurationController` resolves `ui.theme.name` against the latest scan and
   shows the catalog's problems as configuration warnings. It resolves a named `terminal.colors` choice against the

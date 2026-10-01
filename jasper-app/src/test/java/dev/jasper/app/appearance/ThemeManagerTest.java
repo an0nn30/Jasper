@@ -2,9 +2,11 @@ package dev.jasper.app.appearance;
 
 import com.formdev.flatlaf.FlatLaf;
 import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.terminal.config.Palette;
 import java.awt.Color;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
@@ -75,7 +77,7 @@ class ThemeManagerTest {
     @Test void intellijLightInstallsTheClassicLightColours() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            assertThat(ThemeManager.install(Theme.LIGHT)).isTrue();
+            assertThat(ThemeManager.install(Theme.INTELLIJ_LIGHT)).isTrue();
             assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("IntelliJ Light");
             assertThat(FlatLaf.isLafDark()).isFalse();
             assertColours(Map.ofEntries(
@@ -100,6 +102,16 @@ class ThemeManagerTest {
             assertThat(UIManager.getBorder("ScrollPane.border")).isInstanceOf(com.formdev.flatlaf.ui.FlatScrollPaneBorder.class);
             assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(12f);
         } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    @Test void jasperDarkIsANativeThemeFile() {
+        assertThat(Theme.DARK.source()).isInstanceOfSatisfying(Theme.Bundled.class, bundled -> {
+            assertThat(bundled.file()).isEqualTo("jasper-dark.toml");
+            assertThat(bundled.document().uiComplete()).isEmpty();
+        });
+        assertThat(Theme.DARK.palette()).isEqualTo(new Palette(new Color(0xd5dee5), new Color(0x191c20),
+            new Color(0xd5dee5), new Color(0x35434e), Palette.jasperDark().ansi()));
+        assertThat(ThemeManager.generated(Theme.DARK).tokens().get(Token.TAB_ACTIVE)).isEqualTo(new Color(0x293d51));
     }
 
     @Test void jasperDarkUsesGraphiteSurfacesAndRetainsControlContracts() throws Exception {
@@ -138,7 +150,7 @@ class ThemeManagerTest {
     @Test void restoredAndDerivedKeysSurviveReinstallingTheSameLookAndFeel() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(Theme.LIGHT);
+            ThemeManager.install(Theme.INTELLIJ_LIGHT);
             LookAndFeel light = UIManager.getLookAndFeel();
             ThemeManager.install(Theme.DARK);
             // ThemeController rolls back like this when a later install fails.
@@ -152,7 +164,7 @@ class ThemeManagerTest {
     @Test void switchingThemesLeavesNothingOfThePreviousOneBehind() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(Theme.LIGHT);
+            ThemeManager.install(Theme.INTELLIJ_LIGHT);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNotNull();
             ThemeManager.install(Theme.DARK);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNull();
@@ -160,19 +172,29 @@ class ThemeManagerTest {
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    @Test void everyBuiltInThemeMatchesItsFile() {
-        assertThat(ThemeManager.builtIns()).containsExactly(Theme.LIGHT, Theme.DARK);
+    @Test void everyBuiltInThemeGeneratesUnderItsOwnName() {
+        assertThat(ThemeManager.builtIns()).containsExactly(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
         for (Theme theme : ThemeManager.builtIns()) {
-            var resolved = ThemeManager.resolve(theme);
-            assertThat(resolved.name()).isEqualTo(theme.name());
-            assertThat(resolved.dark()).isEqualTo(theme.dark());
+            GeneratedTheme generated = ThemeManager.generated(theme);
+            assertThat(generated.name()).isEqualTo(theme.name());
+            assertThat(generated.dark()).isEqualTo(theme.dark());
+            assertThat(generated.terminal()).isEqualTo(theme.palette());
         }
-        assertThat(Theme.LIGHT.id()).isEqualTo("intellij-light");
+        assertThat(Theme.INTELLIJ_LIGHT.id()).isEqualTo("intellij-light");
         assertThat(Theme.DARK.id()).isEqualTo("jasper-dark");
+        assertThat(Theme.DARCULA).extracting(Theme::id, Theme::name, Theme::dark).containsExactly("darcula", "Darcula", true);
     }
 
-    @Test void theBuiltInThemesLoadWithoutWarnings() {
-        for (Theme theme : ThemeManager.builtIns()) assertThat(ThemeManager.resolve(theme).warnings()).as(theme.name()).isEmpty();
+    @Test void intellijLightsTerminalPaletteIsItsEditorSchemes() {
+        assertThat(Theme.INTELLIJ_LIGHT.palette()).isNotEqualTo(Palette.jasperLight());
+        // IntelliJ Light's scheme takes its console background from its parent, Default: CONSOLE_BACKGROUND_KEY ffffff.
+        assertThat(Theme.INTELLIJ_LIGHT.palette().background()).isEqualTo(new Color(0xffffff));
+        assertThat(Theme.INTELLIJ_LIGHT.palette()).isEqualTo(EditorScheme.named("IntelliJ Light", "IntelliJ Light", false).palette());
+    }
+
+    @Test void theVendoredIntellijThemesLoadWithoutWarnings() {
+        for (String file : List.of("intellij/Light.theme.json", "intellij/darcula.theme.json"))
+            assertThat(ThemeManager.loadBuiltIn(file).warnings()).as(file).isEmpty();
     }
 
     @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {
@@ -190,6 +212,43 @@ class ThemeManagerTest {
 
     private static void assertColours(Map<String, String> expected) {
         expected.forEach((key, value) -> assertThat(hex(UIManager.getColor(key))).as(key).isEqualTo(value));
+    }
+
+    @Test void aGeneratedThemeInstallsItsTokensAsTheLookAndFeel() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            GeneratedTheme theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS);
+            assertThat(ThemeManager.install(theme)).isTrue();
+            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Mocha");
+            assertThat(FlatLaf.isLafDark()).isTrue();
+            assertThat(UIManager.getColor("Panel.background")).isEqualTo(theme.tokens().get(Token.SURFACE));
+            assertThat(UIManager.getColor("List.background")).isEqualTo(theme.tokens().get(Token.SURFACE_SUNKEN));
+            assertThat(UIManager.getColor("Jasper.tabSelectedBackground")).isEqualTo(theme.tokens().get(Token.TAB_ACTIVE));
+            assertThat(UIManager.getColor("EditorTabs.underlineColor")).as("a key FlatLaf skips is put back")
+                .isEqualTo(theme.tokens().get(Token.TAB_UNDERLINE));
+            assertThat(UIManager.getColor("Jasper.titleSearch.background")).as("ChromeKeys fills keys without a token").isNotNull();
+            assertThat(UIManager.getInt("Component.arc")).isEqualTo(4);
+            assertThat(UIManager.getFont("Label.font").getSize2D()).as("app defaults still apply").isEqualTo(12f);
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    /** The 2026-10-01 spike: FlatLaf re-derives its controls from the base variables the template sets. */
+    @Test void flatLafReDerivesUnsetControlsFromTheBaseVariables() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS));
+            Color first = UIManager.getColor("Button.disabledSelectedBackground");
+            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS.replace("#1e1e2e", "#2e3440")));
+            assertThat(UIManager.getColor("Button.disabledSelectedBackground")).isNotEqualTo(first);
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    @Test void aThemesOwnKeysWinOverTheTemplate() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + "[ui]\n\"Panel.background\" = \"#010203\"\n"));
+            assertThat(hex(UIManager.getColor("Panel.background"))).isEqualTo("#010203");
+        } finally { UIManager.setLookAndFeel(original); }
     }
 
     private static String hex(Color color) {

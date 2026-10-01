@@ -251,7 +251,7 @@ final class ConfigurationController implements AutoCloseable {
         ThemeCatalog.Snapshot available = catalog.latest();
         var problems = new java.util.ArrayList<ConfigDiagnostic>();
         for (ThemeCatalog.Problem problem : available.problems())
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), 0, 0, "", problem.message()));
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), problem.line(), 0, "", problem.message()));
         String name = next.snapshot().theme();
         Theme theme = available.find(name).orElse(null);
         if (theme == null) {

@@ -83,7 +83,7 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme);
                 var strip = owner.windowTabs(); layout(strip, 800, 38);
                 Container selected = named(strip, "select:second").getParent();
@@ -108,7 +108,7 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
-            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(chrome);
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
@@ -128,7 +128,7 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
-            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(chrome);
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
@@ -167,7 +167,7 @@ class WindowTabsTest {
             owner.reorderTab(1, 0);
             assertThat(owner.currentTab()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
-            owner.selectTheme(Theme.LIGHT);
+            owner.selectTheme(Theme.INTELLIJ_LIGHT);
             assertThat(named(strip, "select:<html>literal title")).isSameAs(control);
             assertThat(control.getClientProperty("html.disable")).isEqualTo(true);
             assertThat(control.getToolTipText()).startsWith("<html>literal title");
@@ -314,7 +314,7 @@ class WindowTabsTest {
                 owner.currentTab().rename("wide selected tab " + i);
             }
             var strip = owner.windowTabs();
-            for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme); owner.invoke(ActionId.SELECT_TAB_1); owner.update();
                 layout(strip, 380, 38);
                 var first = named(strip, "select:wide selected tab 0");

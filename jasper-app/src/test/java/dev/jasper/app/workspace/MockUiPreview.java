@@ -87,7 +87,7 @@ public final class MockUiPreview {
                 until(() -> owner[0].currentPane().running()
                     && sessions.stream().allMatch(session -> session.title().equals("dustin")));
             }
-            for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            for (Theme theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 edt(() -> {
                     owner[0].selectTheme(theme);
                     root[0].setSize(958, 958); LayoutTestSupport.layoutTree(root[0]);

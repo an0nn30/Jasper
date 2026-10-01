@@ -61,7 +61,7 @@ class PackagedResourcesTest {
                 "dev/jasper/app/themes/intellij/islands/ManyIslandsDark.theme.json",
                 "dev/jasper/app/themes/intellij/islands/IslandSchemeDark.xml",
                 "dev/jasper/app/themes/intellij/LICENSE.txt",
-                "dev/jasper/app/themes/jasper-dark.theme.json"
+                "dev/jasper/app/themes/jasper-dark.toml"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")

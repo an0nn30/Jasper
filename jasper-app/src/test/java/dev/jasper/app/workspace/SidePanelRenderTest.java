@@ -60,11 +60,11 @@ class SidePanelRenderTest {
     @Test void aSidePanelShowsTheThemesToolWindowFieldButtonAndListColours() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(Theme.LIGHT);
+            ThemeTestSupport.install(Theme.INTELLIJ_LIGHT);
             var panel = new HostsLike();
             var regions = new WorkspaceRegions(new JPanel());
             regions.show(PanelRegion.LEFT, panel.root, 280);
-            assertThemeColours(regions, panel, Theme.LIGHT);
+            assertThemeColours(regions, panel, Theme.INTELLIJ_LIGHT);
 
             ThemeTestSupport.install(Theme.DARK);
             SwingUtilities.updateComponentTreeUI(regions);

@@ -111,7 +111,7 @@ class ShellExitBehaviorTest {
         TerminalPane retained = owner.currentPane(); TerminalView retainedView = retained.view();
         edt(() -> { exit(retained, 0); owner.newTab(directory); }); deliver();
         TerminalPane running = owner.currentPane();
-        edt(() -> { running.view().setFontSize(23f); running.applyTheme(Theme.LIGHT.palette()); });
+        edt(() -> { running.view().setFontSize(23f); running.applyTheme(Theme.INTELLIJ_LIGHT.palette()); });
         var options = running.view().options(); var session = running.session();
         reload("close_on_success");
         edt(() -> {
@@ -120,7 +120,7 @@ class ShellExitBehaviorTest {
             assertThat(running.view().options()).isSameAs(options);
             assertThat(running.session()).isSameAs(session);
             assertThat(running.view().fontSize()).isEqualTo(23f);
-            assertThat(running.view().palette()).isEqualTo(Theme.LIGHT.palette());
+            assertThat(running.view().palette()).isEqualTo(Theme.INTELLIJ_LIGHT.palette());
             exit(running, 0);
         });
         until(() -> owner.tabStrip().getTabCount() == 1);

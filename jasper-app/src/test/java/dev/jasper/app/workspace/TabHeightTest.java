@@ -35,7 +35,7 @@ class TabHeightTest {
                 assertThat(header.getHeight()).isEqualTo(30);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
                 assertThat(root.getMinimumSize().height).isEqualTo(originalMinimum + 14);
-                owner.selectTheme(Theme.LIGHT); LayoutTestSupport.layoutTree(root);
+                owner.selectTheme(Theme.INTELLIJ_LIGHT); LayoutTestSupport.layoutTree(root);
                 assertThat(header.getHeight()).isEqualTo(30);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
                 assertThat(owner.currentTab()).isSameAs(tab);

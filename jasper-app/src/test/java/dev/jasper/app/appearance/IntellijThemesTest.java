@@ -75,17 +75,17 @@ class IntellijThemesTest {
     @Test void everyBundledThemeResolvesAsAPluginThemesParentWithoutWarnings() {
         PARENTS.forEach((id, dark) -> {
             String json = "{\"name\": \"Child of " + id + "\", \"dark\": " + dark + ", \"parentTheme\": \"" + id + "\"}";
-            var resolved = ThemeManager.load(new Theme.Archive(Path.of("child.jar"), "child.theme.json", json));
+            var resolved = ThemeManager.loadArchive("child.theme.json", json);
             assertThat(resolved.warnings()).as(id).isEmpty();
             assertThat(resolved.dark()).as(id).isEqualTo(dark);
         });
     }
 
     @Test void anIslandsChildInheritsTheIslandsChainNotTheClassicBase() {
-        var islands = ThemeManager.load(new Theme.Archive(Path.of("child.jar"), "child.theme.json",
-            "{\"name\": \"Child\", \"dark\": true, \"parentTheme\": \"Islands Dark\"}"));
-        var darcula = ThemeManager.load(new Theme.Archive(Path.of("child.jar"), "child.theme.json",
-            "{\"name\": \"Child\", \"dark\": true, \"parentTheme\": \"Darcula\"}"));
+        var islands = ThemeManager.loadArchive("child.theme.json",
+            "{\"name\": \"Child\", \"dark\": true, \"parentTheme\": \"Islands Dark\"}");
+        var darcula = ThemeManager.loadArchive("child.theme.json",
+            "{\"name\": \"Child\", \"dark\": true, \"parentTheme\": \"Darcula\"}");
         assertThat(islands.json()).contains("\"Island.borderColor\"");
         assertThat(darcula.json()).doesNotContain("\"Island.borderColor\"");
     }

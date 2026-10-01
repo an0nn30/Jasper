@@ -58,7 +58,7 @@ class MockUiTest {
             owner.action(ActionId.FONT_BIGGER).actionPerformed(null);
             owner.action(ActionId.FONT_RESET).actionPerformed(null);
             assertThat(pane.view().fontSize()).isEqualTo(16);
-            owner.selectTheme(Theme.LIGHT);
+            owner.selectTheme(Theme.INTELLIJ_LIGHT);
             layoutTree(owner);
             assertThat(pane.getBackground()).isEqualTo(pane.view().palette().background());
             assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));

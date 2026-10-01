@@ -19,7 +19,7 @@ class ToolWindowSurfaceTest {
     @Test void panelRegionsPaintTheToolWindowColourWhileControlsKeepTheirOwn() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(Theme.LIGHT);
+            ThemeTestSupport.install(Theme.INTELLIJ_LIGHT);
             var content = new JPanel(new BorderLayout());
             var inner = new JPanel();
             var field = new JTextField("hosts");
@@ -56,7 +56,7 @@ class ToolWindowSurfaceTest {
     @Test void roundedHostsClipOpaquePluginContentInEveryRegionAndTheme() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            for (var theme : List.of(Theme.DARK, Theme.LIGHT)) {
+            for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 ThemeTestSupport.install(theme);
                 for (var region : PanelRegion.values()) {
                     var plugin = new JPanel(); plugin.setBackground(Color.MAGENTA);
@@ -123,7 +123,7 @@ class ToolWindowSurfaceTest {
     @Test void renderersAndEditorsOfListsTablesTreesAndCombosKeepTheColoursTheirOwnerGaveThem() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(Theme.LIGHT);
+            ThemeTestSupport.install(Theme.INTELLIJ_LIGHT);
             var list = new JList<>(new String[]{"prod", "stage"});
             var table = new JTable(2, 2);
             var tree = new JTree();
