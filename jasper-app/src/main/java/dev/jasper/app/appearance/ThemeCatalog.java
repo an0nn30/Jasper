@@ -65,6 +65,11 @@ public final class ThemeCatalog {
     private final Function<Path, ThemeArchive.Contents> reader;
     /** Each archive's last read, by path; guarded by this. */
     private Map<Path, Read> reads = Map.of();
+    /**
+     * Each Jasper theme file's theme from the last scan, by path; guarded by this. An unchanged theme keeps its
+     * instance, so a configuration reload does not reinstall the look and feel for it.
+     */
+    private Map<Path, Theme> userThemes = Map.of();
     private volatile Snapshot latest = BUILT_IN;
 
     ThemeCatalog(Path directory, Function<Path, ThemeArchive.Contents> reader) {
@@ -135,13 +140,30 @@ public final class ThemeCatalog {
             name -> documents.stream().filter(document -> key(document.name()).equals(key(name))).toList();
         var installed = new ArrayList<Theme>();
         var owners = new HashMap<String, Path>();
+        var nextUserThemes = new HashMap<Path, Theme>();
         for (var entry : found) {
             Path file = entry.getKey();
             List<Theme> provided = entry.getValue().themes();
             ThemeDocument document = entry.getValue().document();
             if (document != null) {
-                try { provided = List.of(Theme.of("user:" + file.getFileName(), new Theme.UserFile(file, ThemeResolver.resolve(document, candidates)))); }
-                catch (ThemeFileException failure) { problems.add(new Problem(file, failure.line(), failure.getMessage())); continue; }
+                Theme theme;
+                try { theme = Theme.of("user:" + file.getFileName(), new Theme.UserFile(file, ThemeResolver.resolve(document, candidates))); }
+                catch (ThemeFileException failure) {
+                    // A failure in a theme this file extends carries that file's line; the message names that file.
+                    int line = failure.origin().equals(file.getFileName().toString()) ? failure.line() : 0;
+                    problems.add(new Problem(file, line, failure.getMessage()));
+                    continue;
+                }
+                // Nothing one file does may stop the scan. The resolver and generator are not known to throw anything
+                // else for a parsed document; should they, it becomes this file's problem.
+                catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
+                    problems.add(new Problem(file, file.getFileName() + " cannot be loaded: " + failure));
+                    continue;
+                }
+                Theme previous = userThemes.get(file);
+                if (theme.equals(previous)) theme = previous;
+                nextUserThemes.put(file, theme);
+                provided = List.of(theme);
             }
             for (Theme theme : provided) {
                 Path owner = owners.putIfAbsent(key(theme.name()), file);
@@ -150,6 +172,7 @@ public final class ThemeCatalog {
                 else problems.add(new Problem(file, "Theme \"" + theme.name() + "\" is also installed from " + owner.getFileName() + ", which is used."));
             }
         }
+        userThemes = nextUserThemes;
         var themes = new ArrayList<>(installed);
         for (Theme builtIn : ThemeManager.builtIns()) if (!owners.containsKey(key(builtIn.name()))) themes.add(builtIn);
         return latest = new Snapshot(themes, problems);

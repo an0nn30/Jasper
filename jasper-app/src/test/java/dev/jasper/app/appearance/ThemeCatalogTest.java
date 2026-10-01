@@ -229,6 +229,37 @@ class ThemeCatalogTest {
             .anySatisfy(message -> assertThat(message).startsWith("orphan.toml:3: ").contains("\"Nowhere\""));
     }
 
+    @Test void aProblemInAnExtendedThemeFileIsNotPlacedOnTheExtendingFilesLines() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("a.toml"), "name = \"A\"\nextends = \"B\"\n");
+        Files.writeString(themes().resolve("b.toml"), "name = \"B\"\n\nextends = \"Nowhere\"\n");
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("A")).isEmpty();
+        assertThat(snapshot.problems()).filteredOn(problem -> problem.file().getFileName().toString().equals("a.toml"))
+            .singleElement().satisfies(problem -> {
+                assertThat(problem.line()).isZero();
+                assertThat(problem.message()).startsWith("b.toml:3: ").contains("\"Nowhere\"");
+            });
+        assertThat(snapshot.problems()).filteredOn(problem -> problem.file().getFileName().toString().equals("b.toml"))
+            .singleElement().extracting(ThemeCatalog.Problem::line).isEqualTo(3);
+    }
+
+    @Test void anUnchangedThemeFileKeepsItsThemeInstanceAcrossScans() throws Exception {
+        Files.createDirectories(themes());
+        Path file = themes().resolve("mine.toml");
+        Files.writeString(file, "name = \"Mine\"\nextends = \"Jasper Dark\"\n");
+        var catalog = catalog();
+        Theme first = catalog.scan().find("Mine").orElseThrow();
+        assertThat(catalog.scan().themes()).as("an unchanged file").anySatisfy(theme -> assertThat(theme).isSameAs(first));
+        Files.setLastModifiedTime(file, FileTime.fromMillis(Files.getLastModifiedTime(file).toMillis() + 5_000));
+        assertThat(catalog.scan().find("Mine")).as("re-read, the same theme").get().isSameAs(first);
+        Files.writeString(file, "name = \"Mine\"\nextends = \"Jasper Dark\"\n[colors]\naccent = \"#ff8800\"\n");
+        Files.setLastModifiedTime(file, FileTime.fromMillis(Files.getLastModifiedTime(file).toMillis() + 10_000));
+        Theme edited = catalog.scan().find("Mine").orElseThrow();
+        assertThat(edited).as("an edited file").isNotSameAs(first).isNotEqualTo(first);
+        assertThat(catalog.scan().find("Mine")).get().isSameAs(edited);
+    }
+
     @Test void anOversizedThemeFileIsAProblem() throws Exception {
         Files.createDirectories(themes());
         Files.writeString(themes().resolve("huge.toml"), "name = \"Huge\"\n# " + "x".repeat(ThemeCatalog.MAX_THEME_FILE));
