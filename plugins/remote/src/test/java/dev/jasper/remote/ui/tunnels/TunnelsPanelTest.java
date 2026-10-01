@@ -11,8 +11,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.awt.Component;
+import java.awt.Container;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JMenuItem;
+import javax.swing.plaf.basic.BasicHTML;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
@@ -78,11 +82,55 @@ class TunnelsPanelTest {
 
     @Test void anEmptyPanelSaysHowToStartAndABrokenFileShowsOneRow() {
         panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
-        assertThat(panel.empty.getText()).isEqualTo("No tunnels yet — add one with +, or use Forward a Port... from an SSH pane");
+        assertThat(panel.empty.getText()).isEqualTo("No tunnels yet — add one with +, or use Forward a Port… from an SSH pane");
         assertThat(panel.empty.isVisible()).isTrue();
         panel.setTunnels(List.of(db), List.of(), Optional.of("line 2"), id -> TunnelState.STOPPED, id -> Optional.of("prod"));
         assertThat(rows()).containsExactly("problem tunnels.toml has errors: line 2", "db");
         assertThat(panel.menuFor(0)).isNull();
+        assertThat(panel.add.getToolTipText()).isEqualTo("New Tunnel…");
+    }
+
+    @Test void theEmptyMessageWrapsInsideARailWidePanel() {
+        panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
+        panel.setSize(260, 400);
+        layOut(panel);
+        int line = panel.empty.getFontMetrics(panel.empty.getFont()).getHeight();
+        int padding = panel.empty.getInsets().top + panel.empty.getInsets().bottom;
+        assertThat(panel.empty.getWidth()).as("it takes the panel's width, not the text's").isLessThanOrEqualTo(260);
+        assertThat(panel.empty.getPreferredSize().width).as("and asks for no more").isLessThanOrEqualTo(260);
+        assertThat(panel.empty.getHeight() - padding).as("the text runs over several lines").isGreaterThanOrEqualTo(2 * line);
+        panel.setTunnels(List.of(db), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
+        layOut(panel);
+        panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
+        layOut(panel);
+        assertThat(panel.empty.getHeight() - padding).as("hidden at 0x0 in between, it still measures at the panel's width")
+            .isBetween(2 * line, 8 * line);
+    }
+
+    /** Container.validateTree lays out hidden children too, as the real window does; revalidate needs a showing window, so run what it would. */
+    private static void layOut(Container container) {
+        for (int pass = 0; pass < 3; pass++) validate(container);
+    }
+
+    private static void validate(Container container) {
+        container.doLayout();
+        for (Component child : container.getComponents()) if (child instanceof Container inner) validate(inner);
+    }
+
+    private static void collect(Component component, List<JLabel> into) {
+        if (component instanceof JLabel label) into.add(label);
+        if (component instanceof Container container) for (Component child : container.getComponents()) collect(child, into);
+    }
+
+    @Test void tunnelTextIsShownAsPlainTextNeverAsHtml() {
+        Tunnel html = Tunnel.create("<html><b>bold</b>", PROD, TunnelKind.LOCAL, Tunnel.LOCALHOST, 5432, "db.internal", 5432);
+        panel.setTunnels(List.of(html), List.of(), Optional.of("<html>broken"), id -> new TunnelState.Failed("<html>boom"), id -> Optional.of("<html>host"));
+        var labels = new ArrayList<JLabel>();
+        for (int i = 0; i < panel.list.getModel().getSize(); i++)
+            collect(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(i), i, false, false), labels);
+        assertThat(labels).isNotEmpty().anySatisfy(label -> assertThat(label.getText()).startsWith("<html>"));
+        for (JLabel label : labels) assertThat(label.getClientProperty(BasicHTML.propertyKey)).as("no HTML view on " + label.getText()).isNull();
+        assertThat(panel.list.createToolTip().getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
     }
 
     @Test void theMenuOffersWhatTheStateAllows() {

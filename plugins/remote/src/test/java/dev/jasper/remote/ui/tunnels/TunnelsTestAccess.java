@@ -16,6 +16,9 @@ public final class TunnelsTestAccess {
     public static JButton cancel(TunnelEditor editor) { return editor.cancel; }
     public static JTextField name(TunnelEditor editor) { return editor.name; }
     public static JButton save(TunnelEditor editor) { return editor.save; }
+    public static String message(TunnelEditor editor) { return editor.message.getText(); }
+    public static JTextField listenPort(TunnelEditor editor) { return editor.listenPort; }
+    public static JTextField forwardPort(TunnelEditor editor) { return editor.forwardPort; }
 
     /** The panel's double-click on a tunnel's row: edit a saved tunnel, Save as Tunnel for a quick forward. */
     public static void activate(TunnelsPanel panel, UUID id) { panel.activate(rowOf(panel, id)); }

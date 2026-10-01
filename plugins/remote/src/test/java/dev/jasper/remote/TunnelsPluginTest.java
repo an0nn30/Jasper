@@ -320,4 +320,62 @@ class TunnelsPluginTest {
             assertThat(host.windows()).as("the confirmation closed").isEmpty();
         }
     }
+
+    @Test void aRunningTunnelWithoutAnIdSurvivesSavingAnotherTunnel(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var echo = new EchoServer(); var host = new FakePluginHost()) {
+            Started started = start(host, server, dir);
+            var tunnels = started.plugin().tunnels();
+            var manager = tunnels.manager();
+            var store = started.plugin().tunnelStore();
+            Files.writeString(store.file(), TunnelFile.HEADER + "\n[[tunnel]]\nname = \"web\"\nhost = \"" + started.prod().id()
+                + "\"\nbind_address = \"127.0.0.1\"\nbind_port = 0\ntarget_host = \"127.0.0.1\"\ntarget_port = " + echo.port() + "\n");
+            Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(5)));
+            store.poll();
+            await(host, () -> store.tunnels().size() == 1, "the hand-written entry to load");
+            Tunnel web = store.tunnels().getFirst();
+            manager.start(web, null);
+            await(host, () -> manager.state(web.id()) instanceof TunnelState.Up, "the tunnel to come up");
+            int port = ((TunnelState.Up) manager.state(web.id())).boundPort();
+            assertThat(EchoServer.roundTrip(port, "before")).isEqualTo("before");
+            // An unrelated save through the New Tunnel dialog rewrites the whole file and re-reads it.
+            assertThat(host.invoke(TunnelsUi.NEW, started.window(), null)).isTrue();
+            var editor = tunnels.currentEditor();
+            TunnelsTestAccess.name(editor).setText("other");
+            TunnelsTestAccess.listenPort(editor).setText("0");
+            TunnelsTestAccess.forwardPort(editor).setText("1");
+            TunnelsTestAccess.save(editor).doClick();
+            await(host, () -> store.tunnels().size() == 2, "the unrelated save");
+            assertThat(store.tunnels()).extracting(Tunnel::name).containsExactly("web", "other");
+            assertThat(store.tunnels().getFirst().id()).as("the entry kept its identity").isEqualTo(web.id());
+            assertThat(manager.state(web.id())).as("so the running tunnel was left alone").isInstanceOf(TunnelState.Up.class);
+            assertThat(((TunnelState.Up) manager.state(web.id())).boundPort()).isEqualTo(port);
+            assertThat(EchoServer.roundTrip(port, "after")).isEqualTo("after");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void aSaveOverASkippedEntryIsRefusedAndTheEditorSaysWhy(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            Started started = start(host, server, dir);
+            var tunnels = started.plugin().tunnels();
+            var store = started.plugin().tunnelStore();
+            String text = TunnelFile.HEADER + "\n[[tunnel]]\nname = \"bad\"\nhost = \"" + started.prod().id()
+                + "\"\nbind_port = 70000\ntarget_host = \"x\"\ntarget_port = 1\n";
+            Files.writeString(store.file(), text);
+            Files.setLastModifiedTime(store.file(), FileTime.from(Instant.now().plusSeconds(5)));
+            store.poll();
+            await(host, () -> !store.warnings().isEmpty(), "the skipped entry to be noticed");
+            assertThat(host.invoke(TunnelsUi.NEW, started.window(), null)).isTrue();
+            var editor = tunnels.currentEditor();
+            TunnelsTestAccess.name(editor).setText("other");
+            TunnelsTestAccess.listenPort(editor).setText("0");
+            TunnelsTestAccess.forwardPort(editor).setText("1");
+            TunnelsTestAccess.save(editor).doClick();
+            RemotePluginTest.settle(host);
+            assertThat(TunnelsTestAccess.message(editor)).startsWith("tunnels.toml has entries Remote cannot read; fix or remove them before saving: ")
+                .contains("tunnel 1");
+            assertThat(tunnels.currentEditor()).as("the editor stays open").isSameAs(editor);
+            assertThat(Files.readString(store.file())).as("and the file is untouched").isEqualTo(text);
+        }
+    }
 }

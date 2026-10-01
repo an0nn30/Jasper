@@ -75,7 +75,12 @@ class TunnelFileTest {
             assertThat(tunnel.kind()).as("local by default").isEqualTo(TunnelKind.LOCAL);
             assertThat(tunnel.bindAddress()).as("localhost by default").isEqualTo(Tunnel.LOCALHOST);
             assertThat(tunnel.start()).isEqualTo(TunnelStart.MANUAL);
+            assertThat(tunnel.id()).as("a missing id is derived from the name").isNotNull();
         });
+        assertThat(TunnelFile.parse(text).tunnels().getFirst().id()).as("stable across reads").isEqualTo(parsed.tunnels().getFirst().id());
+        String padded = TunnelFile.HEADER + "\n[[tunnel]]\nname = \" OK \"\nhost = \"" + HOST + "\"\nbind_port = 1\ntarget_host = \"x\"\ntarget_port = 1\n";
+        assertThat(TunnelFile.parse(padded).tunnels().getFirst().id()).as("case and padding do not matter")
+            .isEqualTo(parsed.tunnels().getFirst().id());
         assertThat(parsed.warnings()).containsExactly(
             "tunnel 2: a tunnel needs a name",
             "tunnel 3: 'kind' must be \"local\", \"remote\" or \"dynamic\"",
@@ -86,7 +91,7 @@ class TunnelFileTest {
 
     @Test void brokenTomlIsAnError() {
         assertThatThrownBy(() -> TunnelFile.parse("[[tunnel]\nname = ")).isInstanceOf(IOException.class)
-            .hasMessageStartingWith("tunnels.toml has TOML errors");
+            .hasMessageContaining("line 1").hasMessageNotContaining("tunnels.toml").hasMessageNotContaining("TOML errors");
     }
 
     @Test void savedTunnelsNeedUniqueNames() {

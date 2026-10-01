@@ -46,6 +46,8 @@ public final class TunnelEditor extends JPanel {
     public TunnelEditor(List<RemoteHost> hosts, List<Tunnel> others, Optional<Tunnel> editing, Optional<UUID> preferredHost,
                         Consumer<Tunnel> onSave, Runnable onCancel) {
         super(new BorderLayout(0, 8));
+        // These show host and tunnel names and what was typed; none of it is markup, and the property must precede the text.
+        for (JLabel label : List.of(explanation, listenLabel, forwardLabel, exposure, preview, warning, message)) label.putClientProperty("html.disable", true);
         this.others = List.copyOf(others);
         this.editingId = editing.map(Tunnel::id).orElse(null);
         setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));

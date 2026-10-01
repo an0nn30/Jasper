@@ -2,6 +2,7 @@ package dev.jasper.remote.tunnels;
 
 import dev.jasper.remote.hosts.HostFile;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -26,10 +27,10 @@ public final class TunnelFile {
 
     private TunnelFile() { }
 
-    /** Throws when the text is not valid TOML; skips and reports individual bad entries. */
+    /** Throws, with the TOML parser's first error as the message, when the text is not valid TOML; skips and reports individual bad entries. */
     public static Parsed parse(String text) throws IOException {
         TomlParseResult toml = Toml.parse(text);
-        if (toml.hasErrors()) throw new IOException("tunnels.toml has TOML errors: " + toml.errors().getFirst().toString());
+        if (toml.hasErrors()) throw new IOException(toml.errors().getFirst().toString());
         Object value = toml.get("tunnel");
         if (value == null) return new Parsed(List.of(), List.of());
         if (!(value instanceof TomlArray array)) return new Parsed(List.of(), List.of("'tunnel' must be an array of tables"));
@@ -53,8 +54,9 @@ public final class TunnelFile {
     }
 
     private static Tunnel tunnel(TomlTable table) {
-        UUID id = text(table, "id").map(TunnelFile::uuid).orElseGet(UUID::randomUUID);
         String name = text(table, "name").orElse("");
+        // A missing id is derived from the name (names are unique per file), so the entry keeps one identity across reads.
+        UUID id = text(table, "id").map(TunnelFile::uuid).orElseGet(() -> derivedId(name));
         if (name.isBlank()) throw new IllegalArgumentException("a tunnel needs a name");
         UUID host = uuid(text(table, "host").orElseThrow(() -> new IllegalArgumentException("'host' is required")));
         TunnelKind kind = switch (text(table, "kind").orElse("local")) {
@@ -74,6 +76,10 @@ public final class TunnelFile {
         Instant created = instant(table, "created").orElseGet(Instant::now);
         return new Tunnel(id, name, host, kind, text(table, "bind_address").orElse(Tunnel.LOCALHOST), bindPort,
             text(table, "target_host").orElse(""), targetPort, start, created, instant(table, "updated").orElse(created));
+    }
+
+    private static UUID derivedId(String name) {
+        return UUID.nameUUIDFromBytes(("dev.jasper.remote.tunnel:" + name.strip().toLowerCase(Locale.ROOT)).getBytes(StandardCharsets.UTF_8));
     }
 
     private static Optional<Integer> port(TomlTable table, String key) {

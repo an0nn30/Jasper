@@ -104,7 +104,8 @@ public final class TunnelManager implements AutoCloseable {
             };
         } catch (IOException | RuntimeException failure) { fail(run, message(failure)); return; }
         set(id, new TunnelState.Starting("Connecting…"));
-        run.leasing = connections.lease(identity, owner, stage -> { if (runs.get(id) == run) set(id, new TunnelState.Starting(stage)); });
+        try { run.leasing = connections.lease(identity, owner, stage -> { if (runs.get(id) == run) set(id, new TunnelState.Starting(stage)); }); }
+        catch (RuntimeException failure) { fail(run, message(failure)); return; }
         run.leasing.whenComplete((lease, failure) -> ui.execute(() -> leased(run, lease, failure)));
     }
 
@@ -217,7 +218,8 @@ public final class TunnelManager implements AutoCloseable {
 
     /** Runs {@code work} on the background executor once all earlier work queued for {@code session} has finished. UI thread only. */
     private void ordered(ClientSession session, Runnable work) {
-        CompletableFuture<Void> tail = tails.getOrDefault(session, DONE).thenRunAsync(() -> {
+        // Each link runs whatever became of the one before, an Error included: a lease must still be released.
+        CompletableFuture<Void> tail = tails.getOrDefault(session, DONE).handle((done, failure) -> (Void) null).thenRunAsync(() -> {
             try { work.run(); }
             catch (RuntimeException broken) { // keep the chain going; report it the way the thread would have
                 Thread thread = Thread.currentThread();

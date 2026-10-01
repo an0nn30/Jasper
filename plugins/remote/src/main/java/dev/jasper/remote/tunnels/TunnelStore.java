@@ -23,7 +23,8 @@ import java.util.function.Supplier;
 /**
  * The saved tunnels, read from and written to tunnels.toml the way {@code hosts.HostStore} keeps hosts: reads and writes
  * run on {@code background}; the list, the error and the listeners live on the UI thread. A file that fails to parse
- * keeps the last good tunnels and refuses saves until it parses again.
+ * keeps the last good tunnels and refuses saves until it parses again; so does a file with entries that were skipped,
+ * because a save would silently drop them. {@link #error()} is the bare reason; the surfaces add "tunnels.toml has errors: ".
  */
 public final class TunnelStore {
     private final Path file;
@@ -74,6 +75,8 @@ public final class TunnelStore {
         enqueue(() -> onBackground(() -> {
             Read current = read(true);
             if (current.error() != null) return current;
+            if (!current.warnings().isEmpty())
+                throw new IOException("tunnels.toml has entries Remote cannot read; fix or remove them before saving: " + current.warnings().getFirst());
             List<Tunnel> next = List.copyOf(mutation.apply(current.tunnels()));
             TunnelFile.validate(next);
             write(TunnelFile.format(next));
@@ -100,7 +103,7 @@ public final class TunnelStore {
     // Worker side. Returns null when nothing changed and the read was conditional.
     private Read read(boolean force) {
         try { return readFile(force); }
-        catch (IOException failure) { return new Read(List.of(), List.of(), "tunnels.toml is unreadable: " + failure.getMessage(), -2, null); }
+        catch (IOException failure) { return new Read(List.of(), List.of(), "it cannot be read (" + failure.getMessage() + ")", -2, null); }
     }
 
     private Read readFile(boolean force) throws IOException {
@@ -110,7 +113,7 @@ public final class TunnelStore {
         FileTime currentModified = Files.getLastModifiedTime(file);
         if (!force && currentSize == size && currentModified.equals(modified)) return null;
         if (currentSize > TunnelFile.MAX_BYTES)
-            return new Read(List.of(), List.of(), "tunnels.toml is larger than " + TunnelFile.MAX_BYTES + " bytes", currentSize, currentModified);
+            return new Read(List.of(), List.of(), "it is larger than " + TunnelFile.MAX_BYTES + " bytes", currentSize, currentModified);
         String text = Files.readString(file, StandardCharsets.UTF_8);
         try {
             TunnelFile.Parsed parsed = TunnelFile.parse(text);

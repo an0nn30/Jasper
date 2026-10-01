@@ -21,13 +21,13 @@ public final class TunnelRows {
 
     /** The saved name, or a quick forward's listen address. */
     public static String title(Tunnel tunnel, TunnelState state) {
-        return tunnel.quick() ? tunnel.bindAddress() + ":" + port(tunnel, state) : tunnel.name();
+        return tunnel.quick() ? bracketed(tunnel.bindAddress()) + ":" + port(tunnel, state) : tunnel.name();
     }
 
     /** "localhost:5432 → db.internal:5432", "localhost:1080 · SOCKS5" or "server localhost:8080 → localhost:8080". */
     public static String mapping(Tunnel tunnel, TunnelState state) {
-        String listen = tunnel.bindAddress() + ":" + port(tunnel, state);
-        String target = tunnel.targetHost() + ":" + tunnel.targetPort();
+        String listen = bracketed(tunnel.bindAddress()) + ":" + port(tunnel, state);
+        String target = bracketed(tunnel.targetHost()) + ":" + tunnel.targetPort();
         return switch (tunnel.kind()) {
             case LOCAL -> listen + " → " + target;
             case DYNAMIC -> listen + " · SOCKS5";
@@ -117,6 +117,9 @@ public final class TunnelRows {
     /** {@code *} and {@code localhost} are reached as localhost; an IPv6 literal goes in brackets. */
     private static String hostPart(String bindAddress) {
         if (bindAddress.equals(Tunnel.ALL) || bindAddress.equals(Tunnel.LOCALHOST)) return "localhost";
-        return bindAddress.contains(":") ? "[" + bindAddress + "]" : bindAddress;
+        return bracketed(bindAddress);
     }
+
+    /** A host as it reads before {@code :port}: an IPv6 literal goes in brackets, anything else as it is. */
+    private static String bracketed(String host) { return host.contains(":") ? "[" + host + "]" : host; }
 }

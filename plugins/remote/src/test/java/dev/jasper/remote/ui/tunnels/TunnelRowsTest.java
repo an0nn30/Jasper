@@ -37,6 +37,16 @@ class TunnelRowsTest {
         assertThat(TunnelRows.title(db, TunnelState.STOPPED)).isEqualTo("pg-prod");
     }
 
+    @Test void anIpv6AddressGoesInBracketsInTheRowText() {
+        Tunnel v6 = Tunnel.create("v6", HOST, TunnelKind.LOCAL, "::1", 8080, "::2", 9090);
+        assertThat(TunnelRows.mapping(v6, TunnelState.STOPPED)).isEqualTo("[::1]:8080 → [::2]:9090");
+        Tunnel v6Quick = Tunnel.create("", HOST, TunnelKind.LOCAL, "::1", 8080, "localhost", 1);
+        assertThat(TunnelRows.title(v6Quick, TunnelState.STOPPED)).isEqualTo("[::1]:8080");
+        assertThat(TunnelRows.mapping(Tunnel.create("v6", HOST, TunnelKind.DYNAMIC, "::1", 1080, "", 0), TunnelState.STOPPED))
+            .isEqualTo("[::1]:1080 · SOCKS5");
+        assertThat(TunnelRows.mapping(api, TunnelState.STOPPED)).as("* is not an IPv6 literal").isEqualTo("server *:8080 → localhost:8080");
+    }
+
     @Test void theDetailLineFollowsTheState() {
         Optional<String> host = Optional.of("db-primary");
         assertThat(TunnelRows.detail(db, TunnelState.STOPPED, host, now)).isEqualTo("via db-primary");

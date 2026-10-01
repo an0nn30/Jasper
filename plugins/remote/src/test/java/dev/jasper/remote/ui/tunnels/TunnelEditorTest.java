@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import javax.swing.JLabel;
+import javax.swing.plaf.basic.BasicHTML;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
@@ -124,5 +126,19 @@ class TunnelEditorTest {
         assertThat(editor.message.getText()).isEqualTo("Choose a host to go through");
         editor.showError("tunnels.toml has errors; fix it before saving");
         assertThat(editor.message.getText()).isEqualTo("tunnels.toml has errors; fix it before saving");
+    }
+
+    @Test void tunnelTextIsShownAsPlainTextNeverAsHtml() {
+        Tunnel existing = Tunnel.create("<html><b>bold</b>", prod.id(), TunnelKind.LOCAL, "localhost", 5432, "db", 5432);
+        var editor = editor(List.of(existing), Optional.empty(), Optional.empty());
+        editor.name.setText("pg");
+        editor.listenPort.setText("5432");
+        assertThat(editor.warning.getText()).as("the warning starts with a saved tunnel's name").startsWith("<html>");
+        editor.listenAddress.setText("<html>");
+        assertThat(editor.preview.getText()).as("the preview starts with what was typed").startsWith("<html>");
+        editor.showError("<html><b>refused</b>");
+        for (JLabel label : List.of(editor.explanation, editor.listenLabel, editor.forwardLabel, editor.exposure, editor.preview, editor.warning, editor.message))
+            assertThat(label.getClientProperty(BasicHTML.propertyKey)).as("no HTML view on " + label.getText()).isNull();
+        assertThat(editor.message.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
     }
 }

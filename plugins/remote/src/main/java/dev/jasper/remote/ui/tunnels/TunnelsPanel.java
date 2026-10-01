@@ -34,7 +34,9 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JToolTip;
 import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
@@ -68,7 +70,7 @@ public final class TunnelsPanel extends JPanel {
 
     final JTextField filter = new JTextField();
     final JButton add = new JButton("+");
-    final JLabel empty = new JLabel();
+    final JTextArea empty = new WrappedNote();
     final JList<Row> list;
     private final DefaultListModel<Row> model = new DefaultListModel<>();
     private final Actions actions;
@@ -89,7 +91,7 @@ public final class TunnelsPanel extends JPanel {
         var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
         header.add(title); header.add(Box.createHorizontalGlue()); header.add(add);
-        add.setToolTipText("New Tunnel");
+        add.setToolTipText("New Tunnel…");
         filter.putClientProperty("JTextField.placeholderText", "Filter tunnels…");
         var north = new JPanel(new BorderLayout(0, 6));
         north.add(header, BorderLayout.NORTH);
@@ -97,6 +99,12 @@ public final class TunnelsPanel extends JPanel {
         add(north, BorderLayout.NORTH);
         list = new JList<>(model) {
             @Override public boolean getScrollableTracksViewportWidth() { return true; }
+            // A row's tooltip starts with the tunnel's name; it is shown as text, whatever the name looks like.
+            @Override public JToolTip createToolTip() {
+                JToolTip tip = super.createToolTip();
+                tip.putClientProperty("html.disable", true);
+                return tip;
+            }
         };
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setCellRenderer((owner, value, index, selected, focused) -> render(owner, value, selected));
@@ -105,7 +113,6 @@ public final class TunnelsPanel extends JPanel {
         scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         var center = new JPanel(new BorderLayout());
         center.add(scroll, BorderLayout.CENTER);
-        empty.setBorder(BorderFactory.createEmptyBorder(12, 4, 12, 4));
         center.add(empty, BorderLayout.SOUTH);
         add(center, BorderLayout.CENTER);
 
@@ -216,7 +223,7 @@ public final class TunnelsPanel extends JPanel {
             quickShown.forEach(tunnel -> model.addElement(new Item(tunnel)));
         }
         boolean none = saved.isEmpty() && quick.isEmpty();
-        empty.setText(none ? "No tunnels yet — add one with +, or use Forward a Port... from an SSH pane" : "No tunnels match");
+        empty.setText(none ? "No tunnels yet — add one with +, or use Forward a Port… from an SSH pane" : "No tunnels match");
         empty.setVisible(none || model.size() == (error.isPresent() ? 1 : 0));
         keep.ifPresent(id -> {
             for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof Item item && item.tunnel().id().equals(id)) { list.setSelectedIndex(i); return; }
@@ -288,11 +295,44 @@ public final class TunnelsPanel extends JPanel {
     }
 
     private static JLabel text(String value, Color foreground, Font font) {
-        var label = new JLabel(value);
-        label.putClientProperty("html.disable", true);
+        var label = new JLabel();
+        label.putClientProperty("html.disable", true); // before the text: a label builds its HTML view when the text is set
+        label.setText(value);
         label.setForeground(foreground);
         label.setFont(font);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
+    }
+
+    /**
+     * A label that wraps: the empty-state message must fit a rail-wide panel. Container.validateTree lays out hidden
+     * children too, at 0x0, and a wrapped text area keeps measuring at that size; a degenerate size is taken as none, which
+     * the text UI measures as never laid out. The wrapped height depends on the width, which the layout only fixes after it
+     * asked for the height, so a new width asks for another pass.
+     */
+    static final class WrappedNote extends JTextArea {
+        WrappedNote() {
+            setEditable(false);
+            setFocusable(false);
+            setOpaque(false);
+            setLineWrap(true);
+            setWrapStyleWord(true);
+            setBorder(BorderFactory.createEmptyBorder(12, 4, 12, 4));
+        }
+
+        @Override public void updateUI() {
+            super.updateUI();
+            Font font = UIManager.getFont("Label.font");
+            if (font != null) setFont(font);
+            Color color = UIManager.getColor("Label.foreground");
+            if (color != null) setForeground(color);
+        }
+
+        @Override public void setBounds(int x, int y, int width, int height) {
+            if (width <= 0 || height <= 0) { width = 0; height = 0; }
+            boolean wider = width > 0 && width != getWidth();
+            super.setBounds(x, y, width, height);
+            if (wider) revalidate();
+        }
     }
 }

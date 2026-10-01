@@ -9,6 +9,7 @@ import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.trust.KnownHosts;
 import dev.jasper.vault.api.Credential;
 import dev.jasper.vault.api.Kind;
+import dev.jasper.sdk.terminal.WindowHandle;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetAddress;
@@ -194,6 +195,18 @@ class TunnelManagerTest {
         Tunnel orphan = Tunnel.create("orphan", UUID.randomUUID(), TunnelKind.LOCAL, Tunnel.LOCALHOST, 0, "x", 1);
         onUi(() -> manager.start(orphan, null));
         assertThat(onUi(() -> manager.state(orphan.id()))).isEqualTo(new TunnelState.Failed("Host missing"));
+    }
+
+    @Test void aLeaseThatThrowsFailsTheTunnelAndFreesThePort() throws Exception {
+        int port = closedPort();
+        Tunnel db = local("127.0.0.1", port, echo.port());
+        // Connections.lease asks the owner window whether it is open, synchronously; a handle that throws makes the call throw.
+        WindowHandle broken = (WindowHandle) java.lang.reflect.Proxy.newProxyInstance(WindowHandle.class.getClassLoader(), new Class<?>[] {WindowHandle.class},
+            (proxy, method, args) -> { throw new IllegalStateException("the window is broken"); });
+        onUi(() -> manager.start(db, broken));
+        assertThat(onUi(() -> manager.state(db.id()))).isEqualTo(new TunnelState.Failed("the window is broken"));
+        assertThat(onUi(() -> manager.active())).isZero();
+        awaitTrue(() -> refused(port), "the listener to close");
     }
 
     @Test void aRejectedLoginFailsTheTunnel() throws Exception {
