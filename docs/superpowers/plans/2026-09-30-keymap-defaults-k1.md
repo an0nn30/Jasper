@@ -60,12 +60,17 @@ only when dispatch would use it. SDK 0.11.0 adds `ShortcutContext` and `ActionSp
 5. User bindings for contributed actions are still collision-checked as Global when the configuration loads,
    because contexts are unknown until the plugin registers. The Keymap's "overrides ⟨action⟩ here" note is left for
    K3, which brings the first same-stroke pairs.
-6. Menu items keep their accelerators. As today, the accelerator of a Terminal action's menu item can still fire while
-   focus is outside a terminal pane.
+6. Menu items show their accelerators, but the keyboard reaches actions only through the root input map. A terminal
+   window's menu-bar items never fire their accelerators, so a key the root map declines reaches the focused component.
 7. The general docs sweep (`configuration.md`, `keyboard-shortcuts.md`, `README.md`, `command-palette.md`, Editor,
    Remote and Vault docs) stays in K4, as the spec says. K1 updates the SDK docs, `app-maintenance.md` and STATUS.
 8. `select_tab_9` keeps its id and behaviour. K2 turns it into Select Last Tab; its ⌘9 / Ctrl+9 default is already
    the approved one.
+9. In a terminal pane, a key whose applicable action is disabled is consumed and does nothing, where the spec's dispatch
+   step 3 lets it through. On X11 and Windows a passed-through key reaches the shell as a control character: Ctrl+Shift+C with no
+   selection sends ^C, Ctrl+Alt+Shift+L with the Vault locked sends ^L, and Ctrl+3 with fewer than three tabs sends ESC.
+   Outside terminal panes a disabled action still lets its key through, and a key with no applicable action (unbound,
+   or bound only in another context) still reaches the shell everywhere.
 
 ## File structure
 

@@ -77,7 +77,8 @@ SDK 0.11.0 adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` lim
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
 `window(id)` (one of the plugin's own panels or windows; window shortcuts take effect once plugin windows get the
 Keymap, plan K4). Where focus is, the most specific applicable action takes a
-key, and a key whose action doesn't apply, or is disabled, reaches the focused component, such as the shell.
+key, and a key whose action doesn't apply reaches the focused component, such as the shell. A disabled action's key
+does too, except in a terminal pane, where it does nothing.
 `withDefaultBindings(macOs, other)` gives a separate Linux and Windows default; with `withDefaultBinding` alone, a
 default naming cmd and shift gets alt outside macOS (`cmd+shift+x` becomes Ctrl+Alt+Shift+X).
 `FakePluginHost.actionSpec(id)` returns the registered spec. Plugins declare `sdk = ">=0.11.0, <0.12"`.

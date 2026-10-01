@@ -186,9 +186,10 @@ focused pane, else at the pane's local folder. A stopped plugin's source disappe
 rejects a panel or window id outside the plugin's namespace and maps the context onto the app's
 `dev.jasper.app.commands.KeyContext` (content becomes the plugin's own tabs), which `ActionEntry` and
 `KeyBindings.Extension` carry with the optional Linux/Windows default. `KeyBindings` keeps several actions on one
-stroke when their contexts don't conflict (same context, or Global with Terminal). `WindowContent.dispatchShortcut`
-resolves the stroke against the focus owner: an enabled action in the most specific containing context runs;
-otherwise the key is not consumed. Window contexts apply once plugin windows get the Keymap (plan K4).
+stroke when their contexts don't conflict (a conflict is the same context, or Global with Terminal, which both apply in
+a terminal pane). `WindowContent.dispatchShortcut` resolves the stroke against the focus owner: an enabled action in
+the most specific containing context runs; a disabled one takes the key without running in a terminal pane (plan K1
+Deviation 9: X11 would send it to the shell as a control character); otherwise the key is not consumed. Window contexts apply once plugin windows get the Keymap (plan K4).
 
 ## Plugins manager, install and restart
 

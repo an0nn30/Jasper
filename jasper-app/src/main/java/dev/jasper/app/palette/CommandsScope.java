@@ -90,7 +90,7 @@ public final class CommandsScope implements PaletteScope {
         return rows;
     }
 
-    /** Moved from the palette renderer: "⌘K" on macOS, "Ctrl+K" elsewhere, "" for anything but a KeyStroke. */
+    /** Moved from the palette renderer: "⇧⌘P" on macOS, "Ctrl+Shift+P" elsewhere, "" for anything but a KeyStroke. */
     public static String shortcutText(Object value, boolean macOs) {
         if (!(value instanceof KeyStroke stroke)) return "";
         int modifiers = stroke.getModifiers();
