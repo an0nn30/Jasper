@@ -5,7 +5,8 @@ review fixes are merged to main at `5fc76c7d`; implementation deviations are rec
 [Remaining-work assessment and plans 2–5](../plans/2026-10-01-theme-system-remaining-work.md) track implementation.
 Plan 2 is implemented, headless-verified and independently reviewed, then merged and verified on local `main`
 on 2026-10-01 (not pushed); user GUI acceptance remains pending. Plans 3–5 remain future work. Plan 2 deviations are recorded in its status banner and `docs/STATUS.md`;
-the assessment labels later integration decisions and the combo-popup ambiguity without silently amending this design.
+the assessment labels later integration decisions. The user approved the combo-dropdown clarification below on
+2026-10-01 while planning Plan 3.
 
 Replaces, once implemented: the IntelliJ Themes page and Marketplace client
 ([2026-09-30-intellij-theme-marketplace-design.md](2026-09-30-intellij-theme-marketplace-design.md)), the Alacritty
@@ -55,7 +56,7 @@ rather than broken.
 |---|---|
 | Jasper theme | A TOML file (section 2). Always describes chrome, workspace, terminal palette and syntax. |
 | Generated theme | A Jasper theme run through the generator (section 3): resolved tokens, syntax roles, terminal `Palette`, `dark`, and for chrome use the full FlatLaf key set. |
-| Chrome | Title bar, toolbar, rail, sidebar panels, status bar, Settings, dialogs, menus, popups, tooltips. |
+| Chrome | Title bar, toolbar, rail, sidebar panels, status bar, Settings, dialogs, menus, popups (except a workspace combo dropdown, §5.3), tooltips. |
 | Workspace | Everything inside the tabbed content area: terminal panes, editor panes, the pane tab strip, split dividers, the find bar, plugin panes. |
 | `ui.theme.name` | The chrome theme, by name. Default `Jasper Dark`. |
 | `ui.theme.workspace` | `match` (default: the chrome theme) or any theme name. Replaces `terminal.colors`, which stays a read alias. |
@@ -233,7 +234,9 @@ chrome keeps reading `UIManager`. This fixes the original screenshot.
   component from the zone restores its original style.
 - A container listener styles components added later.
 - `Jasper.workspace.exempt = true` on a component exempts its subtree.
-- Popups, menus, tooltips and dialogs opened from a pane are chrome.
+- A workspace combo box's own dropdown follows the workspace, including its background and selected rows.
+  This control-owned exception was clarified by the user on 2026-10-01. Other popups, menus, tooltips and dialogs
+  opened from a pane are chrome; never infer workspace colors by following arbitrary popup invokers.
 - With `match`, the styler does nothing.
 
 **Plan 3 spike:** a headless test builds a representative pane (list, table, tree, text field, combo, scroll pane,
@@ -438,5 +441,5 @@ theme and seeing it reload.
 - A visual theme editor (a seed-colour editor is a candidate later plan).
 - Network theme sources of any kind.
 - Per-window or per-pane themes.
-- Theming popups, menus and dialogs opened from workspace panes with the workspace theme.
+- Theming popups, menus and dialogs opened from workspace panes with the workspace theme, except a workspace combo box's own dropdown (§5.3).
 - Icon recolouring beyond choosing light or dark artwork.

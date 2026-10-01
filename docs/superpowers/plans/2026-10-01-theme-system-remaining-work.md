@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plans 3–5 remain future deliverables; generic plugin pane styling is next. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plans 3–5 remain future deliverables; Plan 3 has been expanded into five implementation-ready tasks against `main@14f9913d`, including the startup regression fix. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -91,10 +91,10 @@ These are proposed implementation details for review, not changes to the product
     values and a terminal fixture plus pre-tokenized JTextPane. No temporary global LAF installation, shell launch,
     Editor-plugin dependency or application theme event on picker changes.
 
-13. **Combo popup clarification:** section 5.3 specifically includes `popupBackground`, while section 1 and the
-    out-of-scope list put popups in chrome. Proposed interpretation: a combo's dropdown follows that control; menus,
-    tooltips and dialogs remain chrome. Plan 3 tests both cases. This is a design clarification for review, not an
-    already approved exception.
+13. **Combo popup clarification — approved by the user, 2026-10-01:** a workspace combo's own dropdown follows
+    the workspace, including selection colors. Other menus, tooltips and dialogs remain chrome. Plan 3 tests the
+    hidden combo list and separate popup boundaries without showing a native popup or following arbitrary invokers.
+    The design's section 5.3 and out-of-scope list now record this exception.
 
 ## Requirement-to-task coverage
 
@@ -144,10 +144,9 @@ or records the exact custom-paint limitation and SDK remedy. The full vendored s
 from actual source artifacts before the conversion drift golden files are committed. Do not pretend those external
 inputs have already been acquired or verified by this planning pass.
 
-The proposed `[icons]` format extension and component-aware SDK helper add to the written spec's named interfaces.
-Both preserve requirements the current code would otherwise lose; the combo exception above reconciles conflicting
-popup wording. Review them with
-this plan set; do not replace the design's five-deliverable structure.
+The component-aware SDK helper landed in Plan 2. The proposed `[icons]` format extension remains in Plan 4 to
+preserve data already retained in memory. The user-approved combo exception reconciles the design's popup wording
+and is now recorded in section 5.3. These details preserve the design's five-deliverable structure.
 
 No test run is needed for this documentation-only planning change. The previously verified baseline is cited above,
 not represented as a fresh test of future implementation. The executor runs the full check for each runnable plan.

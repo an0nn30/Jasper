@@ -2,6 +2,16 @@
 
 ## Current state — 2026-10-01
 
+- **Theme system Plan 3 implementation plan ready for review:**
+  [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md) is revised against `main@14f9913d`
+  into five tasks: effective control recipes; reversible component styles; dynamic subtree/dropdown ownership;
+  hosted-pane lifetime and Editor exemptions; bundled custom-renderer audit and acceptance. The user approved
+  workspace-colored combo dropdowns, with other popups/menus/tooltips/dialogs remaining chrome; the design records
+  that clarification. Planning inspected pinned FlatLaf 3.7 source and current mount/refresh/unmount APIs. New focus:
+  class-style precedence, UIResource restoration across chrome changes, popup selection colors, Editor/Vim ownership,
+  and the optional-key startup regression. Planning only: no implementation or fresh build claimed. Existing per-task
+  subagent implementer/reviewer workflow remains selected. Next: review this plan, then execute Plan 3.
+
 - **Theme workspace startup regression fixed:** the first native GUI attempt after Plan 2 found that GitHub Dark
   omits the optional IntelliJ `ToolWindow.background` key. The new workspace color lookup threw while creating
   `WindowContent`, and startup rollback immediately exited. Tab strips now fall back to chrome `Panel.background`,
