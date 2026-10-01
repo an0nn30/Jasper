@@ -39,6 +39,22 @@
   Ctrl+Shift+V in a panel field pastes into the field only; ⌥⌘1 / Alt+1 toggles SSH Sessions; the Keymap shows the
   Where column; menus still show each shortcut, a click still runs the item, and every menu shortcut still works from
   a terminal.
+- **File Server FS-2: FTP/FTPS and TLS** (branch `claude/file-server-fs2`, plan
+  `docs/superpowers/plans/2026-09-30-file-server-fs2.md`): File Server 0.2.0 serves FTP with explicit FTPS (Apache
+  FtpServer 1.2.1) and HTTPS, on one self-signed EC certificate in `data/tls/` (BouncyCastle; fingerprint on the server
+  card, Show Fingerprints… with Regenerate). Require TLS refuses `USER`/`PASS` before `AUTH TLS` (530) and data
+  commands without `PROT P` (521). FTP paths stop `..` at the share root; uploads go through `ShareRoot.upload` and
+  commit only on a 226 reply; a non-zero offset is accepted only at the file's end. Logins share `LoginThrottle` (a
+  waiting address is refused unchecked). New setting `passive_ports` (the spec's `passive-ports`, renamed to match
+  the plugin's other keys). Serve Current Folder over FTP (session password). FS-1 leftovers fixed: `HttpEngine`
+  binds after its setup, replaced files keep their POSIX permissions, two event-ordering test races, and the panel's
+  empty hint wraps with the divider hidden until a server is selected. Deviations from the plan text (listed in the
+  plan's banner): the panel's note text area also guards against a degenerate hidden layout; `HttpEngine.start` reads
+  the TLS context before creating any server (no leaked thread or channel on a failed TLS start); `FtpEngine` reports
+  the innermost bind `IOException`. Full `./gradlew check` green (2026-10-01): File Server 154 tests, whole repository
+  7,580 tests (jasper-app 1,471), 0 failures, 6 skipped. GUI checks pending: FileZilla/Cyberduck over FTP and explicit
+  FTPS, a browser over HTTPS (certificate warning, fingerprint match), Require TLS refusing a plain client, the
+  editor's TLS and passive-port controls, Show Fingerprints and Regenerate, the empty panel's hint.
 - **File Server FS-1: foundation and HTTP** (branch `claude/file-server-fs1`, spec
   `docs/superpowers/specs/2026-09-30-jasper-file-server-design.md`, plan
   `docs/superpowers/plans/2026-09-30-file-server-fs1.md`, user guide `docs/file-server.md`): SDK 0.11.0 adds the
@@ -64,7 +80,7 @@
   `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Final-review fixes: a `servers.toml` entry without an id gets a stable id derived from
   its name, and saves are refused while the file has skipped entries; uploads go to a hidden temporary file and replace the target atomically only when
   complete; activity refreshes coalesce into one UI task; activity-log text from clients has control characters
-  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its server and pool.
+  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its pool (FS-2 also binds only after the setup succeeds).
   Merged into local main 2026-09-30 (not pushed) on top of SDK 0.10.2 (connection activities, `Platform.browse`), which
   0.11.0 now includes; every bundled plugin declares `sdk = ">=0.11.0, <0.12"`, so the Remote tunnels plans (7b) must use
   that range. GUI checks pending with the

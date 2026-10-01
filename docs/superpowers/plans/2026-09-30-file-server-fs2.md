@@ -1,5 +1,11 @@
 # File Server FS-2: FTP/FTPS and TLS — Implementation Plan
 
+**Status:** executed on `claude/file-server-fs2` (2026-10-01), `./gradlew check` green (File Server 154 tests; whole repository 7,580, 0 failures, 6 skipped). Deviations from the plan text:
+
+1. Task 1: `FileServersPanel.note()`'s text area also overrides `setBounds` (a degenerate size is taken as none), the app's guard against Swing laying out hidden wrapped text areas at 0x0; a hidden-layout test was added.
+2. Task 3: `HttpEngine.start` reads `tls.context()` before creating any server. The plan created the `HttpsServer` first, which leaked an `idle-timeout-task` thread and a channel on every failed TLS start; the failing-start test also asserts no thread leaks.
+3. Task 5: `FtpEngine` passes the innermost `IOException` of FtpServer's bind-failure chain to `EngineFailure.bind` (the real chain is FtpServerConfigurationException, then IOException("Error while binding"), then BindException); the write test reconnects after the refused anonymous `USER`, because FtpServer closes the control connection on that 530.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add FTP with explicit FTPS and HTTPS to the File Server plugin on a shared self-signed certificate, with the editor, panel and palette support they need, and close the four items parked by FS-1's final review.
