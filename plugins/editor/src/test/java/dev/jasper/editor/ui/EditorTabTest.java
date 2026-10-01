@@ -41,6 +41,17 @@ class EditorTabTest {
         return tab;
     }
 
+    @Test void editorOwnedSurfacesAreExemptBeforeMountingWhileControlsRemainEligible() {
+        var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
+        assertThat(tab.area().getClientProperty("Jasper.workspace.exempt")).isEqualTo(true);
+        assertThat(tab.scroll().getViewport().getClientProperty("Jasper.workspace.exempt")).isEqualTo(true);
+        assertThat(tab.scroll().getGutter().getClientProperty("Jasper.workspace.exempt")).isEqualTo(true);
+        assertThat(tab.scroll().getClientProperty("Jasper.workspace.exempt")).isNull();
+        assertThat(tab.scroll().getVerticalScrollBar().getClientProperty("Jasper.workspace.exempt")).isNull();
+        assertThat(tab.retryButton().getClientProperty("Jasper.workspace.exempt")).isNull();
+        assertThat(tab.bannerFirst().getClientProperty("Jasper.workspace.exempt")).isNull();
+    }
+
     @Test void showsLoadingThenTheTextInItsLanguage() throws Exception {
         var tab = open(Files.writeString(folder.resolve("a.toml"), "a = 1\n"));
         assertThat(tab.showingText()).isFalse();

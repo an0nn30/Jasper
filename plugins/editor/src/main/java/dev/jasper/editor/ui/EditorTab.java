@@ -80,6 +80,9 @@ public final class EditorTab extends JPanel {
         scroll.setLineNumbersEnabled(true);
         scroll.setFoldIndicatorEnabled(true);
         scroll.setBorder(BorderFactory.createEmptyBorder());
+        area.putClientProperty("Jasper.workspace.exempt", true);
+        scroll.getViewport().putClientProperty("Jasper.workspace.exempt", true);
+        scroll.getGutter().putClientProperty("Jasper.workspace.exempt", true);
         edits = new Timer(300, event -> session.textEdited());
         edits.setRepeats(false);
         area.getDocument().addDocumentListener(new DocumentListener() {

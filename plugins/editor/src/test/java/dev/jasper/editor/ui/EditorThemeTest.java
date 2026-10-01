@@ -68,6 +68,8 @@ class EditorThemeTest {
         assertThat(area.getBackground()).isEqualTo(EDITOR.background());
         assertThat(area.getCaretColor()).isEqualTo(EDITOR.caret());
         assertThat(scroll.getGutter().getBackground()).isEqualTo(EDITOR.gutter());
+        assertThat(scroll.getClientProperty("FlatLaf.style")).isEqualTo(
+            Map.of("background", EDITOR.background()));
     }
 
     @Test void rethemingKeepsDocumentSelectionUndoAndDoesNotAccumulateListeners() {

@@ -10,6 +10,22 @@ import static dev.jasper.app.workspace.WorkspaceStyleFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 
 class WorkspaceStylerTest {
+    @Test void failedConstructionReleasesRootMarkerAndAllowsRetry() throws Exception {
+        edt(() -> {
+            var root = new JPanel() {
+                boolean fail = true;
+                @Override public java.awt.Component[] getComponents() {
+                    if (fail) { fail = false; throw new IllegalStateException("fixture traversal failure"); }
+                    return super.getComponents();
+                }
+            };
+            assertThatThrownBy(() -> new WorkspaceStyler(root)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("fixture traversal failure");
+            assertThat(root.getClientProperty("Jasper.workspaceStylerRoot")).isNull();
+            try (var styler = new WorkspaceStyler(root)) { styler.apply(independent()); }
+            assertThat(root.getClientProperty("Jasper.workspaceStylerRoot")).isNull();
+        });
+    }
     private LookAndFeel previousLaf;
     private java.util.Map<String, Object> previousDefaults;
     private static final java.util.Set<String> MANAGED_DEFAULTS = java.util.Set.of("ClassLoader", "defaultFont", "Label.font",

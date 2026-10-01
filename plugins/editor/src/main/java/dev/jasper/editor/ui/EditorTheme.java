@@ -5,6 +5,7 @@ import dev.jasper.sdk.ui.SyntaxPalette;
 import dev.jasper.sdk.ui.SyntaxRole;
 import java.awt.Color;
 import java.awt.Font;
+import java.util.Map;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.Style;
 import org.fife.ui.rsyntaxtextarea.SyntaxScheme;
@@ -39,6 +40,7 @@ public final class EditorTheme {
         area.setSelectionColor(fixed(editor.selection()));
         area.setCurrentLineHighlightColor(fixed(editor.currentLine()));
         scroll.setBackground(fixed(editor.background()));
+        scroll.putClientProperty("FlatLaf.style", Map.of("background", fixed(editor.background())));
         scroll.getViewport().setBackground(fixed(editor.background()));
         Gutter gutter = scroll.getGutter();
         gutter.setBackground(fixed(editor.gutter()));

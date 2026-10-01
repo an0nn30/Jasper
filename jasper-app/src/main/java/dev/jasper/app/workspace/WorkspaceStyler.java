@@ -36,8 +36,14 @@ public final class WorkspaceStyler implements AutoCloseable {
         if (root.getClientProperty(ROOT) instanceof WorkspaceStyler)
             throw new IllegalStateException("Component already has a workspace styler");
         // Notify an enclosing owner before capturing any baseline values here.
-        root.putClientProperty(ROOT, this);
-        refresh();
+        try {
+            root.putClientProperty(ROOT, this);
+            refresh();
+        } catch (RuntimeException | Error failure) {
+            try { close(); }
+            catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
     }
 
     public void apply(ResolvedTheme theme) {
