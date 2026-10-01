@@ -6,7 +6,7 @@
 user-run GUI acceptance remains pending. Baseline `main@5fc76c7d`.
 Tasks 1–7 have independent task reviews. Plan 3 (generic plugin pane styling) is next; plans 4–5 remain future work.
 Serialized `./gradlew check` passed with 7,769 tests, zero failures/errors and six skips; all architecture checks,
-`git diff --check` and Java source hygiene passed. Final fix-wave per-module XML totals are in `.superpowers/sdd/2026-10-01-theme-system-2-workspace/final-fix-report.md`.
+`git diff --check` and Java source hygiene passed. [Final per-module XML totals](#final-headless-acceptance) are below.
 The final review found one Important omission from remaining-work decision 6: selected native/Alacritty name
 collisions were silent. Native precedence is retained; a source-aware warning now identifies the shadowed Alacritty
 theme and chosen native theme, including case-insensitive collisions. Non-colliding selections remain warning-free.
@@ -495,3 +495,27 @@ A style font is `area.getFont().deriveFont((bold ? Font.BOLD : 0) | (italic ? Fo
 - [x] Hand GUI checks to the user (not run by the agent): Jasper Light chrome + Jasper Dark/Alacritty workspace; tabs/find/dividers/icons;
   switch dark workspaces without restarting Editor; match; multiple windows; menus/sidebar stay chrome. Confirm old
   IntelliJ/Alacritty pages still function. General plugin pane restyling is explicitly the next deliverable.
+
+## Final headless acceptance
+
+After the review fix wave, serialized `./gradlew check` passed in 1m 7s (85 actionable tasks: 9 executed,
+76 up-to-date). Counts below sum `TEST-*.xml` files recursively under each module's `build/test-results/test/`.
+The subsequent `1b1cb027` change removed only a trailing blank line in a test source file; no suite rerun was
+needed. The branch-wide `git diff --check 5fc76c7d` and Java source hygiene scan passed. GUI and benchmark were
+not run.
+
+| Module | Tests | Failures | Errors | Skipped |
+|---|---:|---:|---:|---:|
+| jasper-app | 1,560 | 0 | 0 | 1 |
+| jasper-buddy | 163 | 0 | 0 | 0 |
+| jasper-sdk | 44 | 0 | 0 | 0 |
+| jasper-sdk-testkit | 84 | 0 | 0 | 0 |
+| jasper-terminal | 391 | 0 | 0 | 4 |
+| plugins/editor | 4,783 | 0 | 0 | 0 |
+| plugins/fileserver | 158 | 0 | 0 | 0 |
+| plugins/history | 41 | 0 | 0 | 0 |
+| plugins/remote | 382 | 0 | 0 | 0 |
+| plugins/sample | 12 | 0 | 0 | 0 |
+| plugins/snippets | 11 | 0 | 0 | 0 |
+| plugins/vault | 140 | 0 | 0 | 1 |
+| **Total** | **7,769** | **0** | **0** | **6** |
