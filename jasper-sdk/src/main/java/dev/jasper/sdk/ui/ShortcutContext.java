@@ -6,8 +6,9 @@ import java.util.Optional;
 /**
  * Where an action's shortcut applies. A key can belong to several actions in different contexts. Where focus is, the
  * most specific applicable one runs: a panel, window or content context, then {@link #terminal()}, then
- * {@link #global()}. A key whose action does not apply where focus is, or is disabled, reaches the focused component
- * instead, for example the shell in a terminal pane.
+ * {@link #global()}. A key whose action does not apply where focus is reaches the focused component instead, for
+ * example the shell in a terminal pane. So does a key whose action is disabled, except in a terminal pane: there the
+ * key does nothing, so the shell never receives it as a control character.
  *
  * @param kind which kind of place
  * @param id the panel's or window's id for {@link Kind#PANEL} and {@link Kind#WINDOW}; empty for the other kinds
