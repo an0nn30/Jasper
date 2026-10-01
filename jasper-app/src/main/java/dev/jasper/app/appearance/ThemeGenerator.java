@@ -17,6 +17,49 @@ import static dev.jasper.app.appearance.Token.*;
  * keys. A value the theme sets is used as written; a derived text or stroke colour is moved toward the foreground
  * until it meets its contrast floor (4.5:1 text, links and status colours; 3:1 muted text, dividers and comments;
  * 2:1 disabled text). Pure: no Swing state.
+ *
+ * <p>Each token the theme does not set is derived from the seeds and from other tokens (a token another rule names is
+ * itself explicit or derived first). Below, {@code mix(a, b, t)} is {@code t} of {@code a} laid over {@code b}, and
+ * {@code readable(c, bg, r)} is {@code c} moved toward {@code text} until it reaches contrast {@code r} on {@code bg}.
+ * <ul>
+ *   <li>{@code surface}, {@code editor_background}: the background seed
+ *   <li>{@code text}, {@code editor_foreground}: the foreground seed
+ *   <li>{@code accent}: the accent seed; {@code focus_ring}, {@code tab_underline}, {@code button_default}: {@code accent}
+ *   <li>{@code editor_caret}: the cursor seed (the foreground when unset)
+ *   <li>{@code text_selection}, {@code editor_selection}: the selection seed (when unset,
+ *       {@code mix(accent, background, 0.35)} moved toward the accent to at least 1.5:1 on the background)
+ *   <li>{@code title_bar}, {@code status_bar}, {@code tab_bar}: {@code mix(text, surface, 0.04)}
+ *   <li>{@code surface_raised}: {@code mix(text, surface, 0.06)}
+ *   <li>{@code surface_sunken}: {@code mix(black, surface, 0.12)} on a dark theme, {@code mix(white, surface, 0.12)} on
+ *       a light one
+ *   <li>{@code sidebar}: {@code surface_sunken}
+ *   <li>{@code text_muted}: {@code readable(mix(text, surface, 0.65), surface, 3)}
+ *   <li>{@code text_disabled}: {@code readable(mix(text, surface, 0.45), surface, 2)}; {@code editor_line_numbers}:
+ *       {@code text_disabled}
+ *   <li>{@code text_on_accent}: black or white, whichever contrasts more with {@code button_default}
+ *   <li>{@code link}: {@code readable(accent, surface, 4.5)}
+ *   <li>{@code border}: {@code mix(text, surface, 0.16)}; {@code separator}: {@code border}
+ *   <li>{@code divider}: {@code readable(mix(text, background, 0.40), background, 3)}
+ *   <li>{@code hover}: {@code mix(text, surface, 0.08)}; {@code tab_hover}: {@code hover}
+ *   <li>{@code pressed}: {@code mix(text, surface, 0.14)}
+ *   <li>{@code selection}: {@code mix(accent, surface, 0.55)}
+ *   <li>{@code selection_text}: {@code text} when it reaches 4.5:1 on {@code selection}, else black or white
+ *   <li>{@code selection_inactive}: {@code mix(selection, surface, 0.6)}
+ *   <li>{@code text_selection_text}, {@code tab_active_text}, {@code button_text}: {@code text}
+ *   <li>{@code tab_active}: {@code mix(accent, surface, 0.18)}
+ *   <li>{@code tab_active_border}: {@code mix(accent, surface, 0.45)}
+ *   <li>{@code tab_underline_inactive}: {@code mix(text, surface, 0.45)}
+ *   <li>{@code input_background}: {@code mix(text, surface, 0.03)}
+ *   <li>{@code button_background}: {@code mix(text, surface, 0.12)}
+ *   <li>{@code button_border}: {@code mix(text, surface, 0.18)}
+ *   <li>{@code scrollbar_thumb}: {@code mix(text, surface, 0.22)}
+ *   <li>{@code scrollbar_track}: {@code mix(text, surface, 0.05)}
+ *   <li>{@code success}, {@code warning}, {@code error}: ANSI green, yellow and red, each
+ *       {@code readable(colour, status_bar, 4.5)}
+ *   <li>{@code error_background}: {@code mix(ANSI red, input_background, 0.20)}
+ *   <li>{@code editor_current_line}: {@code mix(editor_foreground, editor_background, 0.05)}
+ *   <li>{@code editor_gutter}: {@code editor_background}
+ * </ul>
  */
 final class ThemeGenerator {
     private ThemeGenerator() {}

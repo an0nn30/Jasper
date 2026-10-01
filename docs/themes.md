@@ -43,9 +43,13 @@ white = "#bac2de"
 ```
 
 Everything else is derived. A theme can also set:
-- `dark` (otherwise inferred from the background), `author`, `license`, `source`, `commit`;
+- `dark` (otherwise inferred from the background, or inherited through `extends`), `author`, `license`, `source`,
+  `commit`;
 - `extends = "<theme>"`: start from any other theme and change only what you write; a file may even be named like the
-  theme it extends ("Jasper Dark" extending "Jasper Dark") to replace it;
+  theme it extends ("Jasper Dark" extending "Jasper Dark") to replace it. `dark` and `ui_complete` are inherited too:
+  a file extending IntelliJ Light, Darcula or a plugin theme inherits `ui_complete = true`, so its `[colors]` and
+  `[tokens]` mostly reach only the terminal and Jasper's own chrome (`Jasper.*` keys, which tokens you set
+  explicitly reach), not FlatLaf's controls; change those through `[ui]`;
 - `cursor` and `selection` (in `[colors]`) and `[colors.bright]` (otherwise each bright colour is its normal colour
   lightened, or darkened on a light theme);
 - `ui_complete = true`, which converted IntelliJ themes use because their `[ui]` is a complete key set and Jasper's

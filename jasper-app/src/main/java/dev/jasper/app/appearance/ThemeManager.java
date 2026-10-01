@@ -19,9 +19,10 @@ import javax.swing.UIManager;
 import javax.swing.plaf.ColorUIResource;
 
 /**
- * The built-in themes and the one path that installs any theme: resolve its IntelliJ theme file, let
- * FlatLaf build the look and feel, put back the colours FlatLaf skips (IntelliJ-only namespaces such as
- * {@code SearchEverywhere.*}), then derive Jasper's chrome keys. EDT only.
+ * The built-in themes and the one path that installs any theme. Every theme, a Jasper theme file or a converted
+ * IntelliJ one, is first generated ({@link ThemeGenerator}); its UI keys are then written as an IntelliJ theme file,
+ * FlatLaf builds the look and feel from that file, the colours FlatLaf skips (IntelliJ-only namespaces such as
+ * {@code SearchEverywhere.*}) are put back, and Jasper's chrome keys are derived. EDT only.
  */
 public final class ThemeManager {
     private static final String BASE = "dev/jasper/app/themes/";

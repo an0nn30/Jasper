@@ -12,7 +12,7 @@ final class BuiltInThemes {
         return intellij(id, file, resolved, EditorScheme.named(scheme, scheme, resolved.dark()).palette());
     }
 
-    /** A Jasper theme file Jasper ships; it may extend nothing but itself standing alone. */
+    /** A Jasper theme file Jasper ships; it must stand alone. */
     static Theme toml(String id, String file) {
         String text = ThemeManager.read(file);
         if (text == null) throw new IllegalStateException("Missing bundled theme " + file);

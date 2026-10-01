@@ -48,11 +48,20 @@ spike A as a regression test.
 4. **Jasper Light's terminal palette is today's `Palette.jasperLight()`** (One Light), not a newly tuned ANSI set,
    so `terminal.colors = "light"` keeps its colours.
 5. **The IntelliJ converter lives in `dev.jasper.app.appearance` (`IntellijConversion`) in this plan** and converts
-   only seeds and `[ui]` (plus IntelliJ's `icons` table, carried internally in `ThemeDocument.icons`). Plan 4 moves it
-   to `dev.jasper.app.themeimport` and adds tokens and syntax.
+   only seeds and `[ui]` (plus IntelliJ's `icons` table, carried internally in `ThemeDocument.icons`). The theme's
+   named colours lead its `[ui]` as `ColorPalette.<name>` keys, as FlatLaf makes them from an IntelliJ theme's
+   `colors`, and the accent seed reads `ColorPalette.accent` / `ColorPalette.accentColor` first (final review). Plan 4
+   moves it to `dev.jasper.app.themeimport` and adds tokens and syntax.
 6. **`Theme.LIGHT` is renamed `Theme.INTELLIJ_LIGHT`**, and Jasper Light is `Theme.JASPER_LIGHT`, so nothing reads an
    ambiguous "LIGHT". IntelliJ Light's terminal palette now comes from its own editor scheme (spec 6.1), not from
    `Palette.jasperLight()`.
+7. **Spec 2.3's missing-theme fallback (Jasper Dark or Jasper Light by the slot's last-known `dark`) is not
+   implemented**: a setting naming a missing theme keeps the theme showing, and start-up uses Jasper Dark, as before.
+   Deferred to plan 2 with the workspace slot.
+8. **Derivation values differ from spec 3's sketch:** `surface_raised` is the surface 6 % toward the foreground (not
+   7 %); `surface_sunken` is 12 % toward black (dark) or white (light), not 3 %; `tab_active` is the accent 18 % over
+   the surface, not the surface 10 % toward the foreground; `sidebar` is `surface_sunken`, not the 4 % shift. The
+   table of every rule is in `ThemeGenerator`'s class JavaDoc.
 
 ### Notes for later plans
 

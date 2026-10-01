@@ -10,7 +10,12 @@
   bundled themes, installed IntelliJ plugins are converted in memory, and `.toml` files in the `themes` folder are
   themes (problems carry their line). Deviations (plan banner): 48 tokens; new `ui_complete` key; no contrast floor
   for borders; Jasper Light keeps the One Light terminal palette; the converter stays in `appearance` until plan 4;
-  `Theme.LIGHT` became `Theme.INTELLIJ_LIGHT`, whose terminal palette now comes from its own scheme. Next: plan 2
+  `Theme.LIGHT` became `Theme.INTELLIJ_LIGHT`, whose terminal palette now comes from its own scheme; spec 2.3's
+  missing-theme fallback by the slot's last-known `dark` is deferred to plan 2 with the workspace slot (a missing theme
+  keeps the theme showing, Jasper Dark at start-up, as before); derivation values differ from spec 3's sketch
+  (`surface_raised` 6 %, `surface_sunken` 12 % toward black or white, `tab_active` = accent 18 % over the surface,
+  `sidebar` = `surface_sunken`; the full table is in `ThemeGenerator`'s JavaDoc). Converted IntelliJ themes keep their
+  named colours as `ColorPalette.*` keys (accent included), pinned by a parity test against the theme file. Next: plan 2
   (workspace zone). GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
   the window, Settings and dialogs; a hand-written theme file in `themes/` (including a broken one's warning).
 

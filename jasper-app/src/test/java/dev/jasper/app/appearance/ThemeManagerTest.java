@@ -185,6 +185,13 @@ class ThemeManagerTest {
         assertThat(Theme.DARCULA).extracting(Theme::id, Theme::name, Theme::dark).containsExactly("darcula", "Darcula", true);
     }
 
+    @Test void intellijLightsTerminalPaletteIsItsEditorSchemes() {
+        assertThat(Theme.INTELLIJ_LIGHT.palette()).isNotEqualTo(Palette.jasperLight());
+        // IntelliJ Light's scheme takes its console background from its parent, Default: CONSOLE_BACKGROUND_KEY ffffff.
+        assertThat(Theme.INTELLIJ_LIGHT.palette().background()).isEqualTo(new Color(0xffffff));
+        assertThat(Theme.INTELLIJ_LIGHT.palette()).isEqualTo(EditorScheme.named("IntelliJ Light", "IntelliJ Light", false).palette());
+    }
+
     @Test void theVendoredIntellijThemesLoadWithoutWarnings() {
         for (String file : List.of("intellij/Light.theme.json", "intellij/darcula.theme.json"))
             assertThat(ThemeManager.loadBuiltIn(file).warnings()).as(file).isEmpty();
