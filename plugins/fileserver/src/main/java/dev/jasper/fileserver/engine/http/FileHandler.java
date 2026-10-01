@@ -114,7 +114,7 @@ final class FileHandler implements HttpHandler {
         headers.set("Content-Type", "text/html; charset=utf-8");
         headers.set("Content-Security-Policy", Listing.POLICY);
         headers.set("Cache-Control", "no-store");
-        headers.set("Referrer-Policy", "no-referrer");
+        headers.set("Referrer-Policy", "same-origin"); // the listing's form posts must carry their Origin; no-referrer makes it "null"
         if (!body) { send(exchange, 200, -1); return; }
         send(exchange, 200, page.length);
         try (OutputStream out = exchange.getResponseBody()) { out.write(page); }

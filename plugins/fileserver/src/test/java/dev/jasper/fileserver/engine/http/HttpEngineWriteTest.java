@@ -125,6 +125,27 @@ class HttpEngineWriteTest {
         assertThat(shared.resolve("docs/a.txt")).doesNotExist();
     }
 
+    @Test void putAndDeleteFromOtherSitesAreRefused() throws Exception {
+        start(true);
+        assertThat(raw("PUT /docs/new.txt HTTP/1.1\r\nOrigin: http://evil.example\r\n", "abc")).startsWith("HTTP/1.1 403");
+        assertThat(shared.resolve("docs/new.txt")).doesNotExist();
+        assertThat(raw("DELETE /docs/a.txt HTTP/1.1\r\nOrigin: http://evil.example\r\n", "")).startsWith("HTTP/1.1 403");
+        assertThat(shared.resolve("docs/a.txt")).exists();
+    }
+
+    @Test void aNullOriginIsRefused() throws Exception {
+        start(true);
+        String form = "Content-Type: application/x-www-form-urlencoded\r\n";
+        assertThat(raw("POST /docs/ HTTP/1.1\r\nOrigin: null\r\n" + form, "_method=DELETE&name=a.txt")).startsWith("HTTP/1.1 403");
+        assertThat(shared.resolve("docs/a.txt")).exists();
+    }
+
+    @Test void theListingKeepsItsOriginOnFormPosts() throws Exception {
+        start(true);
+        // A form post from a document with Referrer-Policy no-referrer carries "Origin: null", which the origin check refuses.
+        assertThat(send("GET", "/docs/", HttpRequest.BodyPublishers.noBody()).headers().firstValue("Referrer-Policy")).contains("same-origin");
+    }
+
     @Test void aReadOnlyShareRefusesEveryWriteAndOffersNoForms() throws Exception {
         start(false);
         assertThat(send("PUT", "/docs/new.txt", HttpRequest.BodyPublishers.ofString("x")).statusCode()).isEqualTo(403);

@@ -25,8 +25,8 @@ final class Multipart {
     }
 
     private static final int MAX_HEADERS = 16 * 1024;
-    private static final Pattern BOUNDARY = Pattern.compile("(?i)boundary=(?:\"([^\"]{1,70})\"|([^;\\s]{1,70}))");
-    private static final Pattern FILENAME = Pattern.compile("(?i)filename=\"([^\"]*)\"");
+    private static final Pattern BOUNDARY = Pattern.compile("(?i)(?:^|;)\\s*boundary=(?:\"([^\"]{1,70})\"|([^;\\s]{1,70}))");
+    private static final Pattern FILENAME = Pattern.compile("(?i)(?:^|;)\\s*filename=\"([^\"]*)\"");
     private final InputStream in;
     private final byte[] delimiter;
     private final byte[] buffer = new byte[64 * 1024];

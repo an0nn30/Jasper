@@ -50,7 +50,13 @@ class MultipartTest {
         assertThatThrownBy(() -> read("--XyZ??")).isInstanceOf(Multipart.Malformed.class);
     }
 
+    @Test void aFieldNamedLikeAFileNameIsNotAFile() throws IOException {
+        String body = "--XyZ\r\nContent-Disposition: form-data; name=xfilename=\"a.txt\"\r\n\r\nvalue\r\n--XyZ--\r\n";
+        assertThat(read(body)).isEmpty();
+    }
+
     @Test void findsTheBoundaryAndTheBaseName() {
+        assertThat(Multipart.boundary("multipart/form-data; xboundary=bad; boundary=good")).isEqualTo("good");
         assertThat(Multipart.boundary("multipart/form-data; boundary=----WebKitFormBoundary7MA4")).isEqualTo("----WebKitFormBoundary7MA4");
         assertThat(Multipart.boundary("multipart/form-data; charset=utf-8; boundary=\"a b\"")).isEqualTo("a b");
         assertThatThrownBy(() -> Multipart.boundary("multipart/form-data")).isInstanceOf(IllegalArgumentException.class);
