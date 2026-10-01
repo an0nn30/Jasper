@@ -33,6 +33,7 @@ import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Rail;
+import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
@@ -142,6 +143,8 @@ final class HostedUi {
             guard("register");
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
+            spec.context().id().ifPresent(owned -> requireNamespace(owned,
+                spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
             ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().orElse(null), spec.keywords(),
                 spec.defaultBinding(), invocation -> containment.run(pluginId, "action " + spec.id(), () ->
                     handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle)))));

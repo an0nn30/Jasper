@@ -10,6 +10,7 @@ import dev.jasper.sdk.activity.ActivitySpec;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -327,6 +328,21 @@ public final class FakePluginHost implements AutoCloseable {
             for (FakeUi.Action action : context.ui.actions.values())
                 lines.add(action.spec.id() + "|" + action.title + "|" + action.enabled);
         return lines;
+    }
+
+    /**
+     * The spec an action was registered with, including its shortcut context and platform defaults.
+     *
+     * @param actionId the action
+     * @return the spec, or empty when no started plugin registered the action
+     * @since 0.11.0
+     */
+    public Optional<ActionSpec> actionSpec(String actionId) {
+        for (FakePluginContext context : contexts.values()) {
+            FakeUi.Action action = context.ui.actions.get(actionId);
+            if (action != null) return Optional.of(action.spec);
+        }
+        return Optional.empty();
     }
 
     /**
