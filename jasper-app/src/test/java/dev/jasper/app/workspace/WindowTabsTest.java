@@ -137,6 +137,9 @@ class WindowTabsTest {
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();
+                        if (!owner.theme().matching())
+                            assertThat(text).as("inactive title uses workspace TEXT_MUTED, active %s", active)
+                                .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TEXT_MUTED));
                         assertThat(contrast(text, strip.getBackground())).as("%s UI, %s terminal, active %s", chrome, colors, active)
                             .isGreaterThanOrEqualTo(3);
                     }

@@ -41,6 +41,9 @@ class TerminalColorsTest {
             assertThat(pane.getBackground()).isEqualTo(Theme.DARK.palette().background());
             assertThat(hidden.getBackground()).as("a background tab").isEqualTo(Theme.DARK.palette().background());
             assertThat(hidden.view().palette()).isEqualTo(Theme.DARK.palette());
+            assertThat(hidden.view().palette().ansi()).as("retained terminal preserves all 16 workspace ANSI colors")
+                .containsExactlyElementsOf(Theme.DARK.palette().ansi());
+            assertThat(hidden.view().palette().ansi()).isNotEqualTo(Theme.INTELLIJ_LIGHT.palette().ansi());
             assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(Theme.DARK.palette());
             assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             var find = hidden.findBar();
