@@ -115,6 +115,7 @@ public final class FileServerPlugin implements Plugin {
     private List<String> reportedWarnings = List.of();
     private String reportedError;
     private boolean stopped;
+    private boolean activityRefreshPending;
     private ServerEditor currentEditor;
     private ConfirmPanel currentConfirm;
 
@@ -158,7 +159,7 @@ public final class FileServerPlugin implements Plugin {
         status.setVisible(false);
         store.onChanged(this::definitionsChanged);
         registry.onChanged(this::serversChanged);
-        registry.onActivity(id -> panels.values().forEach(FileServersPanel::refreshActivity));
+        registry.onActivity(id -> activityChanged());
         settings.confirmQuit.onChanged(value -> syncQuitGuard());
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> {
             if (stopped) return;
@@ -355,6 +356,16 @@ public final class FileServerPlugin implements Plugin {
         status.setVisible(running > 0);
         stopAll.setEnabled(registry.active() > 0);
         syncQuitGuard();
+    }
+
+    /** A burst of events (a transfer's progress, a busy listing) becomes one refresh on the UI thread. */
+    private void activityChanged() {
+        if (activityRefreshPending) return;
+        activityRefreshPending = true;
+        environment.ui().execute(() -> {
+            activityRefreshPending = false;
+            if (!stopped) panels.values().forEach(FileServersPanel::refreshActivity);
+        });
     }
 
     private void refreshPanels() {

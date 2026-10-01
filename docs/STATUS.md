@@ -22,9 +22,13 @@
   Open follow-up: `shutdown()` stops engines in parallel under one 5 s deadline, so `Plugin.stop()` can block up to 5 s,
   against the SDK's "must not block". `./gradlew check` green: jasper-app 1,439 tests (0 failures, 1 skipped),
   jasper-terminal 391 (0, 4 skipped), jasper-buddy 163, jasper-sdk 35, jasper-sdk-testkit 74, editor 4,782,
-  fileserver 105, history 41, remote 297, sample 12, snippets 11, vault 139 (0, 1 skipped). Earlier runs saw flaky
+  fileserver 114, history 41, remote 297, sample 12, snippets 11, vault 139 (0, 1 skipped). Earlier runs saw flaky
   `RemotePluginTest.endingAPanesSessionClearsTheSftpView`, `TransferCoordinatorTest.resumedScannedJob...` and
-  `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Not merged. GUI checks pending with the
+  `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Final-review fixes: a `servers.toml` entry without an id gets a stable id derived from
+  its name, and saves are refused while the file has skipped entries; uploads go to a hidden temporary file and replace the target atomically only when
+  complete; activity refreshes coalesce into one UI task; activity-log text from clients has control characters
+  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its server and pool.
+  Not merged. GUI checks pending with the
   user: New File Server and start it; open the URL from a phone on the LAN with All networks (macOS firewall and Local
   Network prompts); upload two files and delete one from the listing page in a real browser (Chrome, Safari, Firefox)
   on a writable server; a wrong password then an immediate retry shows a short 429 wait; a Vault account login with a

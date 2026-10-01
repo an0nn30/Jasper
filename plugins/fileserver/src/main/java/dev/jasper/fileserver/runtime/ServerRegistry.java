@@ -216,7 +216,10 @@ public final class ServerRegistry {
         });
     }
 
-    /** Stops a server; a starting one is cancelled. Completes once it has stopped. */
+    /**
+     * Stops a server. A running one completes once its engine has stopped; a starting one is cancelled and the
+     * future completes at once; a stopping one completes at once (the stop already under way is not awaited).
+     */
     public CompletableFuture<Void> stop(UUID id) {
         Slot slot = slots.get(id);
         if (slot == null) return CompletableFuture.completedFuture(null);

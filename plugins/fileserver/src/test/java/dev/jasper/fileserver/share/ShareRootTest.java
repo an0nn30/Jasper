@@ -110,6 +110,7 @@ class ShareRootTest {
     @Test void aReadOnlyShareRefusesEveryWrite() throws IOException {
         var share = new ShareRoot(shared, true);
         assertThatThrownBy(() -> share.openWrite("new.txt", false)).isInstanceOf(ReadOnlyShareException.class);
+        assertThatThrownBy(() -> share.upload("new.txt")).isInstanceOf(ReadOnlyShareException.class);
         assertThatThrownBy(() -> share.mkdir("new")).isInstanceOf(ReadOnlyShareException.class);
         assertThatThrownBy(() -> share.delete("docs/a.txt")).isInstanceOf(ReadOnlyShareException.class);
         assertThatThrownBy(() -> share.rename("docs/a.txt", "b.txt")).isInstanceOf(ReadOnlyShareException.class);
@@ -131,5 +132,50 @@ class ShareRootTest {
         assertThatThrownBy(() -> share.openWrite("docs", false)).isInstanceOf(IsFolderException.class);
         assertThatThrownBy(() -> share.delete("")).isInstanceOf(PathRefusedException.class);
         assertThatThrownBy(() -> share.rename("", "x")).isInstanceOf(PathRefusedException.class);
+    }
+
+    List<String> names(Path folder) throws IOException {
+        try (var stream = Files.list(folder)) { return stream.map(p -> p.getFileName().toString()).sorted().toList(); }
+    }
+
+    @Test void aCommittedUploadReplacesTheTargetOnlyAtTheEnd() throws IOException {
+        var share = new ShareRoot(shared, false);
+        try (var upload = share.upload("docs/a.txt")) {
+            upload.stream().write("brand new content".getBytes(StandardCharsets.UTF_8));
+            assertThat(shared.resolve("docs/a.txt")).as("untouched until the commit").hasContent("hello");
+            assertThat(names(shared.resolve("docs"))).anyMatch(n -> n.startsWith(".jasper-upload-") && n.endsWith(".part"));
+            assertThat(share.list("docs")).extracting(ShareEntry::name).as("a temporary file is not listed").containsExactly("a.txt");
+            upload.commit();
+        }
+        assertThat(shared.resolve("docs/a.txt")).hasContent("brand new content");
+        assertThat(names(shared.resolve("docs"))).containsExactly("a.txt");
+        try (var upload = share.upload("docs/fresh.txt")) {
+            upload.stream().write('x');
+            upload.commit();
+        }
+        assertThat(shared.resolve("docs/fresh.txt")).hasContent("x");
+        assertThat(names(shared.resolve("docs"))).containsExactly("a.txt", "fresh.txt");
+    }
+
+    @Test void anAbandonedUploadLeavesTheTargetAndNoTemporaryFile() throws IOException {
+        var share = new ShareRoot(shared, false);
+        try (var upload = share.upload("docs/a.txt")) { upload.stream().write("partial".getBytes(StandardCharsets.UTF_8)); }
+        try (var upload = share.upload("docs/never.txt")) { upload.stream().write('x'); }
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
+        assertThat(names(shared.resolve("docs"))).containsExactly("a.txt");
+    }
+
+    @Test void anUploadKeepsTheSamePathRules() throws IOException {
+        var share = new ShareRoot(shared, false);
+        assertThatThrownBy(() -> share.upload("docs")).isInstanceOf(IsFolderException.class);
+        assertThatThrownBy(() -> share.upload("")).isInstanceOf(IsFolderException.class);
+        assertThatThrownBy(() -> share.upload("../outside/x.txt")).isInstanceOf(PathRefusedException.class);
+        assertThatThrownBy(() -> share.upload("missing/x.txt")).isInstanceOf(NoSuchFileException.class);
+        link(shared.resolve("out-dir"), outside);
+        assertThatThrownBy(() -> share.upload("out-dir/new.txt")).isInstanceOf(PathRefusedException.class);
+        link(shared.resolve("out-file"), outside.resolve("secret.txt"));
+        try (var upload = share.upload("out-file")) { upload.stream().write('x'); upload.commit(); }
+        assertThat(outside.resolve("secret.txt")).as("an upload never writes through a final link").hasContent("secret");
+        assertThat(names(outside)).containsExactly("secret.txt");
     }
 }

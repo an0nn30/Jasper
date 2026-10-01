@@ -8,11 +8,11 @@ MobaXterm's Servers window does. This version serves **HTTP**; FTP/FTPS, SFTP an
 Choose **Toggle File Servers** in the command palette (or click the server icon on the rail) to show the panel. Each
 row is one server: a dot for its state, its name, protocol and port, and ▶ or ■ at the right to start or stop it
 (double-click or Enter does the same). Below the list, the selected server shows its folder, who may log in, every
-address other computers can use (each with **Copy**), warnings, and its activity: logins, failed logins, downloads
+address the server answers on (each with **Copy**), warnings, and its activity: logins, failed logins, downloads
 and uploads with their sizes, and errors. The activity stays in memory; **Clear** empties it.
 
 Press **+** (or **New File Server…**) to add a server. Right-click a row for Start/Stop, Edit…, Duplicate, Delete…,
-Reveal Folder, Copy Address and Copy Password. The status bar shows "⇅ 2 servers" while servers run; click it to show
+Reveal Folder, Copy Address and Copy Password. The status bar shows "⇅ 2 servers" while servers run; click it to toggle
 the panel.
 
 ## Safe by default
@@ -57,5 +57,7 @@ password. Settings live in `plugins/dev.jasper.fileserver/dev.jasper.fileserver.
 
 Any browser can download from the listing; on a writable server the listing also uploads and deletes. From a
 terminal: `curl -O http://HOST:8080/file` downloads, `curl -T file http://HOST:8080/folder/file` uploads, and
-`curl -X DELETE http://HOST:8080/folder/file` deletes. The server only answers requests addressed to an IP address,
+`curl -X DELETE http://HOST:8080/folder/file` deletes. An upload is written to a hidden `.jasper-upload-*.part` file
+in the same folder and replaces the target only once it has fully arrived, so an interrupted upload leaves the
+original alone. The server only answers requests addressed to an IP address,
 `localhost` or this computer's name, and refuses forms posted from other web sites.

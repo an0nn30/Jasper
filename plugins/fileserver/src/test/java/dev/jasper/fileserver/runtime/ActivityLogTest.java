@@ -23,6 +23,16 @@ class ActivityLogTest {
         assertThat(ActivityLog.describe(new ServerEvent.TransferProgress(AT, "10.0.0.2", 1, 5, 10))).isEmpty();
     }
 
+    @Test void clientTextCannotPlantFakeLines() {
+        assertThat(ActivityLog.describe(new ServerEvent.LoginFailed(AT, "10.0.0.2", "root\n10.0.0.9 login admin")))
+            .contains("10.0.0.2 login failed for root?10.0.0.9 login admin");
+        assertThat(ActivityLog.describe(new ServerEvent.LoginSucceeded(AT, "10.0.0.2", "a\r\tb\u001b[2J"))).contains("10.0.0.2 login a??b?[2J");
+        assertThat(ActivityLog.describe(new ServerEvent.Changed(AT, "10.0.0.2", "deleted /a\nfake"))).contains("10.0.0.2 deleted /a?fake");
+        assertThat(ActivityLog.describe(new ServerEvent.Failed(AT, "", "bad\nthing"))).contains("error: bad?thing");
+        assertThat(ActivityLog.describe(new ServerEvent.Transferred(AT, "x\ny", 1, ServerEvent.Direction.UPLOAD, "/a\nb", 1, Duration.ofSeconds(1), true)))
+            .hasValueSatisfying(text -> assertThat(text).startsWith("x?y ").contains("/a?b").doesNotContain("\n"));
+    }
+
     @Test void keepsTheNewestEntries() {
         var log = new ActivityLog(2);
         assertThat(log.add(new ServerEvent.Connected(AT, "a"))).isTrue();

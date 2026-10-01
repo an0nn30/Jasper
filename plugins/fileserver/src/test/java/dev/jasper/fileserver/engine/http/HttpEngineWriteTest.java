@@ -83,6 +83,38 @@ class HttpEngineWriteTest {
             .allSatisfy(e -> assertThat(((ServerEvent.Transferred) e).direction()).isEqualTo(ServerEvent.Direction.UPLOAD));
     }
 
+    @Test void anUploadThatDropsMidBodyLeavesTheOriginalAndNoPartialFile() throws Exception {
+        start(true);
+        try (var socket = new Socket(InetAddress.getLoopbackAddress(), engine.port())) {
+            String head = "PUT /docs/a.txt HTTP/1.1\r\nHost: 127.0.0.1:" + engine.port() + "\r\nContent-Length: 100\r\n\r\n";
+            socket.getOutputStream().write(head.getBytes(StandardCharsets.ISO_8859_1));
+            socket.getOutputStream().write("0123456789".getBytes(StandardCharsets.ISO_8859_1));
+            socket.getOutputStream().flush();
+        }
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (!events.stream().anyMatch(e -> e instanceof ServerEvent.Transferred t && !t.complete()) && System.nanoTime() < deadline) Thread.sleep(10);
+        assertThat(events).anySatisfy(e -> assertThat(e).isInstanceOfSatisfying(ServerEvent.Transferred.class, t -> assertThat(t.complete()).isFalse()));
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
+        try (var listing = Files.list(shared.resolve("docs"))) {
+            assertThat(listing.map(p -> p.getFileName().toString())).containsExactlyInAnyOrder("a.txt", "keep.txt");
+        }
+    }
+
+    @Test void aCancelledDownloadEndsAsStoppedNotAsAnError() throws Exception {
+        start(true);
+        Files.write(shared.resolve("big.bin"), new byte[32 * 1024 * 1024]);
+        try (var socket = new Socket(InetAddress.getLoopbackAddress(), engine.port())) {
+            String head = "GET /big.bin HTTP/1.1\r\nHost: 127.0.0.1:" + engine.port() + "\r\nConnection: close\r\n\r\n";
+            socket.getOutputStream().write(head.getBytes(StandardCharsets.ISO_8859_1));
+            socket.getOutputStream().flush();
+            assertThat(socket.getInputStream().readNBytes(1000)).hasSize(1000);
+        }
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (!events.stream().anyMatch(e -> e instanceof ServerEvent.Transferred) && System.nanoTime() < deadline) Thread.sleep(10);
+        assertThat(events).anySatisfy(e -> assertThat(e).isInstanceOfSatisfying(ServerEvent.Transferred.class, t -> assertThat(t.complete()).isFalse()));
+        assertThat(events).noneMatch(e -> e instanceof ServerEvent.Failed);
+    }
+
     @Test void deleteRemovesFilesAndRefusesFullFolders() throws Exception {
         start(true);
         assertThat(send("DELETE", "/docs/a.txt", HttpRequest.BodyPublishers.noBody()).statusCode()).isEqualTo(204);

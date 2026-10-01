@@ -44,11 +44,17 @@ public final class HttpEngine implements ServerEngine {
         try { created = HttpServer.create(new InetSocketAddress(address, definition.port()), 64); }
         catch (IOException failure) { throw EngineFailure.bind(failure, definition.port(), ServerAddresses.describe(address), definition.protocol()); }
         ExecutorService pool = Executors.newFixedThreadPool(WORKERS, Thread.ofPlatform().daemon().name("file-server-http-", 0).factory());
-        HostCheck hosts = HostCheck.forBind(definition.bind());
-        HttpContext context = created.createContext("/", new FileHandler(share, events, hosts));
-        if (!login.isAnonymous()) context.setAuthenticator(new ThrottledAuthenticator(definition.name(), login, throttle, events, hosts));
-        created.setExecutor(pool);
-        created.start();
+        try {
+            HostCheck hosts = HostCheck.forBind(definition.bind());
+            HttpContext context = created.createContext("/", new FileHandler(share, events, hosts));
+            if (!login.isAnonymous()) context.setAuthenticator(new ThrottledAuthenticator(definition.name(), login, throttle, events, hosts));
+            created.setExecutor(pool);
+            created.start();
+        } catch (RuntimeException | Error failure) {
+            created.stop(0);
+            pool.shutdownNow();
+            throw failure;
+        }
         server = created;
         workers = pool;
         port = created.getAddress().getPort();

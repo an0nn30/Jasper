@@ -9,6 +9,9 @@ public final class TestUi implements Executor {
 
     @Override public void execute(Runnable task) { queue.add(task); }
 
+    /** Tasks waiting to run. */
+    public int pending() { return queue.size(); }
+
     public void drain() {
         for (Runnable task; (task = queue.poll()) != null; ) task.run();
     }

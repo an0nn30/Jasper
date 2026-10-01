@@ -61,6 +61,8 @@ final class FileHandler implements HttpHandler {
             } catch (IllegalArgumentException bad) {
                 text(exchange, 400, bad.getMessage());
             } catch (IOException failure) {
+                // A response already started (a download the client cancelled): the transfer ends as incomplete, no error.
+                if (exchange.getResponseCode() != -1) return;
                 events.error(remote(exchange), failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
                 text(exchange, 500, "The server could not complete the request");
             }
@@ -215,16 +217,22 @@ final class FileHandler implements HttpHandler {
         send(exchange, 303, -1);
     }
 
+    /** Receives into a temporary file and replaces the target only once the whole body has arrived. */
     private void receive(HttpExchange exchange, InputStream in, String path, long total) throws IOException {
-        try (OutputStream out = share.openWrite(path, false)) {
+        try (ShareRoot.Upload upload = share.upload(path)) {
             var transfer = events.transfer(remote(exchange), ServerEvent.Direction.UPLOAD, display(path), total, exchange::close);
             boolean complete = false;
             try {
                 byte[] buffer = new byte[BUFFER];
+                long received = 0;
+                OutputStream out = upload.stream();
                 for (int read; (read = in.read(buffer)) >= 0; ) {
                     out.write(buffer, 0, read);
+                    received += read;
                     transfer.add(read);
                 }
+                if (total >= 0 && received != total) throw new IOException("The upload ended before all of its data arrived");
+                upload.commit();
                 complete = true;
             } finally {
                 transfer.finish(complete);

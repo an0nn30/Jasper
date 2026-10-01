@@ -3,6 +3,7 @@ package dev.jasper.fileserver.share;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -10,10 +11,13 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -31,6 +35,8 @@ public final class ShareRoot {
     private static final Set<String> RESERVED = Set.of("CON", "PRN", "AUX", "NUL",
         "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9");
+    private static final String UPLOAD_PREFIX = ".jasper-upload-";
+    private static final SecureRandom UPLOAD_NAMES = new SecureRandom();
     private final Path root;
     private final boolean readOnly;
 
@@ -129,6 +135,7 @@ public final class ShareRoot {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory)) {
             for (Path child : stream) {
                 String name = child.getFileName().toString();
+                if (name.startsWith(UPLOAD_PREFIX)) continue; // an upload in progress
                 try { checkName(name); } catch (PathRefusedException unshareable) { continue; }
                 Path real;
                 try { real = child.toRealPath(); } catch (IOException dangling) { continue; }
@@ -154,6 +161,61 @@ public final class ShareRoot {
         if (path.equals(root) || Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) throw new IsFolderException(clientPath);
         return Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
             append ? StandardOpenOption.APPEND : StandardOpenOption.TRUNCATE_EXISTING, LinkOption.NOFOLLOW_LINKS);
+    }
+
+    /**
+     * Starts replacing or creating a file without touching the target until {@link Upload#commit()}: the bytes go to
+     * a hidden temporary file in the target's folder, which then moves onto the target in one step. Closing the
+     * upload without a commit removes the temporary file and leaves the target as it was. The same refusals as
+     * {@link #openWrite}.
+     */
+    public Upload upload(String clientPath) throws IOException {
+        requireWritable();
+        Path target = entry(clientPath);
+        if (target.equals(root) || Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) throw new IsFolderException(clientPath);
+        byte[] random = new byte[8];
+        UPLOAD_NAMES.nextBytes(random);
+        Path temp = target.resolveSibling(UPLOAD_PREFIX + HexFormat.of().formatHex(random) + ".part");
+        OutputStream out = Files.newOutputStream(temp, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        return new Upload(temp, target, out);
+    }
+
+    /** A file being received; see {@link ShareRoot#upload}. */
+    public static final class Upload implements AutoCloseable {
+        private final Path temp, target;
+        private final OutputStream out;
+        private boolean finished;
+
+        private Upload(Path temp, Path target, OutputStream out) { this.temp = temp; this.target = target; this.out = out; }
+
+        /** The stream to write the new content to. */
+        public OutputStream stream() { return out; }
+
+        /** Closes the stream and moves the temporary file onto the target, replacing it. */
+        public void commit() throws IOException {
+            if (finished) throw new IllegalStateException("The upload is finished");
+            finished = true;
+            try {
+                out.close();
+                try { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
+                catch (AtomicMoveNotSupportedException unsupported) { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING); }
+            } catch (IOException | RuntimeException failure) {
+                discard();
+                throw failure;
+            }
+        }
+
+        /** Abandons the upload unless it was committed. */
+        @Override public void close() {
+            if (finished) return;
+            finished = true;
+            discard();
+        }
+
+        private void discard() {
+            try { out.close(); } catch (IOException ignored) { /* the file is removed next */ }
+            try { Files.deleteIfExists(temp); } catch (IOException ignored) { /* nothing more to do */ }
+        }
     }
 
     public void mkdir(String clientPath) throws IOException {

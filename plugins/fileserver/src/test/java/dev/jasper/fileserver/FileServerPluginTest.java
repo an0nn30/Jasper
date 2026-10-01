@@ -267,6 +267,24 @@ class FileServerPluginTest {
         }
     }
 
+    @Test void aBurstOfActivityIsOneRefreshOnTheUiThread() {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            var docs = http("docs", home, Ports.free(), Login.ANONYMOUS, false);
+            plugin.store().put(docs);
+            settle(host);
+            assertThat(ui.pending()).isZero();
+            for (int i = 0; i < 50; i++) plugin.registry().clearActivity(docs.id());
+            assertThat(ui.pending()).as("fifty events queue one refresh").isEqualTo(1);
+            ui.drain();
+            plugin.registry().clearActivity(docs.id());
+            assertThat(ui.pending()).as("a later event queues the next refresh").isEqualTo(1);
+            ui.drain();
+        }
+    }
+
     @Test void eventsAfterStopOpenNoActivity() {
         try (var host = new FakePluginHost(root)) {
             var plugin = plugin();
