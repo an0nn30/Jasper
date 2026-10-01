@@ -2,8 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Executed and independently reviewed on `codex/theme-system-plans` through the final fix wave;
-user-run GUI acceptance remains pending. Baseline `main@5fc76c7d`.
+**Status:** Executed and independently reviewed on `codex/theme-system-plans` through the final fix wave,
+then merged to local `main` on 2026-10-01. A fresh main-checkout `./gradlew check` passed: 7,769 tests,
+zero failures/errors and six skips (3m 47s). Not pushed; user-run GUI acceptance remains pending. Baseline `main@5fc76c7d`.
 Tasks 1–7 have independent task reviews. Plan 3 (generic plugin pane styling) is next; plans 4–5 remain future work.
 Serialized `./gradlew check` passed with 7,769 tests, zero failures/errors and six skips; all architecture checks,
 `git diff --check` and Java source hygiene passed. [Final per-module XML totals](#final-headless-acceptance) are below.
