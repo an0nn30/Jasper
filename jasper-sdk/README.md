@@ -9,7 +9,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext` |
 | `dev.jasper.sdk.settings` | `PluginSettings`, `Setting`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `SettingsPanel`, `SettingsPanelHost` |
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
-| `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent` |
+| `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
 | `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `Notices`, `Platform` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
@@ -72,6 +72,12 @@ with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fi
 
 SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
 whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
+
+SDK 0.10.2 adds connections, things that are up until they are not, such as a tunnel:
+`Activities.connection(ConnectionSpec)` returns a `ConnectionHandle` whose `up`, `degraded` and `down` publish
+`ConnectionEvent`s on `Activities.CONNECTIONS`. A new state is always delivered, a report that only changes the detail
+is coalesced, and `close()` (or the plugin stopping) publishes `CLOSED` once. Jasper shows connections on Buddy.
+`FakePluginHost.connectionLog()` records them.
 
 SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
 https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.

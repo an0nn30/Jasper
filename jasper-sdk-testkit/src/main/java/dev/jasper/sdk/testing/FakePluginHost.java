@@ -7,6 +7,10 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.activity.ConnectionEvent;
+import dev.jasper.sdk.activity.ConnectionHandle;
+import dev.jasper.sdk.activity.ConnectionSpec;
+import java.util.concurrent.atomic.AtomicReference;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
@@ -59,6 +63,8 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, CopyOnWriteArrayList<Entry>> subscribers = new ConcurrentHashMap<>();
     private final Map<UUID, ActivityEvent> running = new ConcurrentHashMap<>();
     private final List<ActivityEvent> activityLog = new CopyOnWriteArrayList<>();
+    private final Map<UUID, FakeConnection> connections = new ConcurrentHashMap<>();
+    private final List<ConnectionEvent> connectionLog = new CopyOnWriteArrayList<>();
     private final Map<Class<?>, Provider> committed = new LinkedHashMap<>();
     private final Map<String, Map<Class<?>, Provider>> staged = new HashMap<>();
     final FakeWorkspace workspace = new FakeWorkspace(this);
@@ -266,6 +272,13 @@ public final class FakePluginHost implements AutoCloseable {
     public List<ActivityEvent> activityLog() { return List.copyOf(activityLog); }
 
     /**
+     * Connection events delivered so far.
+     *
+     * @return the events in delivery order
+     */
+    public List<ConnectionEvent> connectionLog() { return List.copyOf(connectionLog); }
+
+    /**
      * Contained failures: throwing starts, stops, handlers, factories and background tasks.
      *
      * @return one line per failure
@@ -435,6 +448,8 @@ public final class FakePluginHost implements AutoCloseable {
             enqueue(new ActivityEvent(open.id(), id, open.title(), ActivityEvent.State.FAILED,
                 open.fraction(), reason, open.activateActionId()));
         }
+        for (FakeConnection open : List.copyOf(connections.values()))
+            if (open.pluginId.equals(id)) open.close();
     }
 
     <T> Subscription subscribe(String pluginId, Topic<T> topic, Consumer<? super T> handler) {
@@ -475,6 +490,7 @@ public final class FakePluginHost implements AutoCloseable {
 
     private void deliver(String topicId, Object payload) {
         if (payload instanceof ActivityEvent event && topicId.equals(Activities.TOPIC.id())) activityLog.add(event);
+        if (payload instanceof ConnectionEvent event && topicId.equals(Activities.CONNECTIONS.id())) connectionLog.add(event);
         for (Entry entry : subscribers.getOrDefault(topicId, new CopyOnWriteArrayList<>())) {
             if (entry.closed().get()) continue;
             try { entry.handler().accept(payload); }
@@ -557,6 +573,64 @@ public final class FakePluginHost implements AutoCloseable {
                 last = fraction;
             }
             enqueue(event(state, last, Objects.requireNonNull(detail, "detail")));
+        }
+    }
+
+    ConnectionHandle connection(String pluginId, ConnectionSpec spec) {
+        var connection = new FakeConnection(pluginId, Objects.requireNonNull(spec, "spec"));
+        connections.put(connection.id, connection);
+        connection.report(spec.state(), spec.detail());
+        return connection;
+    }
+
+    private final class FakeConnection implements ConnectionHandle {
+        private final UUID id = UUID.randomUUID();
+        private final String pluginId;
+        private final ConnectionSpec spec;
+        private boolean closed;
+        /** The last delivery queued; running empties it, so a report can only join one still waiting. */
+        private AtomicReference<ConnectionEvent> queued;
+
+        FakeConnection(String pluginId, ConnectionSpec spec) { this.pluginId = pluginId; this.spec = spec; }
+
+        @Override public UUID id() { return id; }
+        @Override public void up(String detail) { report(ConnectionEvent.State.UP, detail); }
+        @Override public void degraded(String detail) { report(ConnectionEvent.State.DEGRADED, detail); }
+        @Override public void down(String detail) { report(ConnectionEvent.State.DOWN, detail); }
+
+        @Override public void close() {
+            synchronized (this) {
+                if (closed) return;
+                closed = true;
+                connections.remove(id);
+                queue(event(ConnectionEvent.State.CLOSED, ""));
+            }
+        }
+
+        void report(ConnectionEvent.State state, String detail) {
+            ConnectionEvent event = event(state, Objects.requireNonNull(detail, "detail"));
+            synchronized (this) {
+                if (closed) return;
+                AtomicReference<ConnectionEvent> last = queued;
+                ConnectionEvent waiting = last == null ? null : last.get();
+                // The same state still waiting: only the detail changed, so the newer text replaces it.
+                if (waiting != null && waiting.state() == state && last.compareAndSet(waiting, event)) return;
+                queue(event);
+            }
+        }
+
+        private void queue(ConnectionEvent event) {
+            checkType(Activities.CONNECTIONS);
+            var slot = new AtomicReference<>(event);
+            queued = slot;
+            events.add(() -> {
+                ConnectionEvent due = slot.getAndSet(null);
+                if (due != null) deliver(Activities.CONNECTIONS.id(), due);
+            });
+        }
+
+        private ConnectionEvent event(ConnectionEvent.State state, String detail) {
+            return new ConnectionEvent(id, pluginId, spec.title(), state, detail, spec.activateActionId());
         }
     }
 

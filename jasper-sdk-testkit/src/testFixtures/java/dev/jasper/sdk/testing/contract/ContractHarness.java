@@ -3,6 +3,7 @@ package dev.jasper.sdk.testing.contract;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.activity.ActivityEvent;
+import dev.jasper.sdk.activity.ConnectionEvent;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
 import java.util.List;
@@ -31,6 +32,9 @@ public interface ContractHarness extends AutoCloseable {
 
     /** Every activity event delivered so far, in delivery order, as the application's own observer sees them. */
     List<ActivityEvent> activityLog();
+
+    /** Every connection event delivered so far, in delivery order, as the application's own observer sees them. */
+    List<ConnectionEvent> connectionLog();
 
     /** Registered actions as {@code id|title|enabled}, in registration order. */
     List<String> actions();

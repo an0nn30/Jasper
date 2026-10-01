@@ -127,6 +127,8 @@ class AppContractTest extends PluginContractTest {
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
+        List<dev.jasper.sdk.activity.ConnectionEvent> connections = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, connections::add));
         List<String> opens = new CopyOnWriteArrayList<>();
         onEdt(() -> contributions.onPaletteRequest(request -> opens.add(request.windowId() + " " + request.scopeId() + " "
             + request.query().orElse("-") + " " + request.rowId().orElse("-"))));
@@ -172,6 +174,7 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.bus.publish(EventBus.APP, topic, payload); }
             @Override public List<ActivityEvent> activityLog() { return List.copyOf(log); }
+            @Override public List<dev.jasper.sdk.activity.ConnectionEvent> connectionLog() { return List.copyOf(connections); }
             @Override public List<String> actions() {
                 return onEdtValue(() -> contributions.actions().stream()
                     .map(action -> action.id() + "|" + action.title() + "|" + action.enabled()).toList());

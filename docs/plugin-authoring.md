@@ -457,6 +457,10 @@ is reported as a notice.
 - **Activities.** `context.activities().begin(...)` returns a handle; end it exactly once.
   Progress is coalesced. Jasper shows activities on Buddy. An activity left open when the
   plugin stops is ended as failed.
+- **Connections.** `context.activities().connection(...)` announces something that is up until
+  it is not; report `up`, `degraded` or `down` as it changes and `close()` it once it no longer
+  matters. A new state is always delivered; a detail-only change is coalesced. Jasper shows
+  connections on Buddy. A connection left open when the plugin stops is closed.
 - **Services.** Publish interfaces from an exported package during `start` only, with
   `publish` or, to learn who is calling, `publishPerConsumer`. Consumers must declare
   `requires` on the provider. Put the interfaces in a separate API jar that consumers compile
@@ -527,7 +531,8 @@ A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`
 and closes inline where Jasper uses its cleanup thread.
 `host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
 drive a contributed scope as the palette would; `paletteOpens()`, `notices()` and `openedInEditor()`
-record what the plugin asked for.
+record what the plugin asked for. `connectionLog()` lists delivered connection events, as
+`activityLog()` does activities.
 
 ## Building the in-repo plugins
 

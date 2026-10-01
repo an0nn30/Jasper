@@ -6,6 +6,8 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.activity.ConnectionHandle;
+import dev.jasper.sdk.activity.ConnectionSpec;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
@@ -126,6 +128,10 @@ public final class FakePluginContext implements PluginContext {
             @Override public ActivityHandle begin(ActivitySpec spec) {
                 requireOpen();
                 return host.begin(info.id(), spec);
+            }
+            @Override public ConnectionHandle connection(ConnectionSpec spec) {
+                requireOpen();
+                return host.connection(info.id(), spec);
             }
             @Override public List<ActivityEvent> current() { return host.currentActivities(); }
         };

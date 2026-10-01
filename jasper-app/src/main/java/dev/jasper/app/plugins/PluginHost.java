@@ -41,6 +41,7 @@ final class PluginHost {
     final Containment containment;
     final EventBus bus;
     final ActivityHub activities;
+    final ConnectionHub connections;
     final ServiceRegistry services = new ServiceRegistry();
     private final Map<String, HostedContext> contexts = new LinkedHashMap<>();
     private final Map<String, PluginStatus.State> notRunning = new HashMap<>();
@@ -50,6 +51,7 @@ final class PluginHost {
         this.containment = new Containment(environment.onUi());
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
+        this.connections = new ConnectionHub(bus);
         this.terminalBridge = TerminalBridge.connect(environment.terminals(), bus);
     }
 

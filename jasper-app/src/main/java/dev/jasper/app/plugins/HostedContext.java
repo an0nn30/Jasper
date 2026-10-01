@@ -6,6 +6,8 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.activity.ConnectionHandle;
+import dev.jasper.sdk.activity.ConnectionSpec;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
@@ -103,6 +105,7 @@ final class HostedContext implements PluginContext {
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
         host.bus.removeAll(id);
         host.activities.failAll(id, reason);
+        host.connections.closeAll(id);
         declared.close();
         if (interrupt) executor.shutdownNow(); else executor.shutdown();
     }
@@ -200,6 +203,10 @@ final class HostedContext implements PluginContext {
             @Override public ActivityHandle begin(ActivitySpec spec) {
                 requireOpen();
                 return host.activities.begin(id, spec);
+            }
+            @Override public ConnectionHandle connection(ConnectionSpec spec) {
+                requireOpen();
+                return host.connections.open(id, spec);
             }
             @Override public List<ActivityEvent> current() { return host.activities.current(); }
         };
