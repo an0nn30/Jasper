@@ -14,8 +14,8 @@
   empty hint wraps with the divider hidden until a server is selected. Deviations from the plan text (listed in the
   plan's banner): the panel's note text area also guards against a degenerate hidden layout; `HttpEngine.start` reads
   the TLS context before creating any server (no leaked thread or channel on a failed TLS start); `FtpEngine` reports
-  the innermost bind `IOException`. Full `./gradlew check` green (2026-10-01): File Server 154 tests, whole repository
-  7,580 tests (jasper-app 1,471), 0 failures, 6 skipped. GUI checks pending: FileZilla/Cyberduck over FTP and explicit
+  the innermost bind `IOException`. Full `./gradlew check` green (2026-10-01, after the final-review fixes): File Server 158 tests, whole repository
+  7,584 tests (jasper-app 1,471), 0 failures, 6 skipped. GUI checks pending: FileZilla/Cyberduck over FTP and explicit
   FTPS, a browser over HTTPS (certificate warning, fingerprint match), Require TLS refusing a plain client, the
   editor's TLS and passive-port controls (switching the protocol in the editor drops Use TLS and Require TLS), Show
   Fingerprints and Regenerate, the empty panel's hint.
