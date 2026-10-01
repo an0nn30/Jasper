@@ -67,7 +67,7 @@ public final class HttpEngine implements ServerEngine {
                 created = HttpServer.create();
             }
         } catch (IOException failure) {
-            throw new EngineFailure("Could not create the HTTP server: " + failure.getMessage(), failure);
+            throw new EngineFailure("Could not create the " + (definition.tls() ? "HTTPS" : "HTTP") + " server: " + failure.getMessage(), failure);
         }
         ExecutorService pool = Executors.newFixedThreadPool(WORKERS, Thread.ofPlatform().daemon().name("file-server-http-", 0).factory());
         try {

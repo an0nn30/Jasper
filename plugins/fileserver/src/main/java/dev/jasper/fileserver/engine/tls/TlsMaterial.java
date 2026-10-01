@@ -140,8 +140,7 @@ public final class TlsMaterial {
 
     private KeyStore create() throws EngineFailure {
         try {
-            Files.createDirectories(directory);
-            ownerOnly(directory, "rwx------");
+            createDirectory();
             var generator = KeyPairGenerator.getInstance("EC");
             generator.initialize(new ECGenParameterSpec("secp256r1"));
             KeyPair pair = generator.generateKeyPair();
@@ -183,16 +182,30 @@ public final class TlsMaterial {
     private static void write(Path file, Writer content) throws IOException, GeneralSecurityException {
         Path temp = file.resolveSibling(file.getFileName() + ".tmp");
         Files.deleteIfExists(temp);
-        Files.createFile(temp);
-        ownerOnly(temp, "rw-------");
+        if (posix(file)) Files.createFile(temp, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        else Files.createFile(temp);
         try (OutputStream out = Files.newOutputStream(temp)) { content.write(out); }
         try { Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
         catch (AtomicMoveNotSupportedException unsupported) { Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING); }
     }
 
-    private static void ownerOnly(Path path, String permissions) {
-        try { Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions)); }
-        catch (UnsupportedOperationException | IOException notPosix) { /* Windows: the user's profile folder protects it */ }
+    /** Creates the folder, and any missing parents, owner-only where the file system allows it. */
+    private void createDirectory() throws IOException {
+        var owner = PosixFilePermissions.fromString("rwx------");
+        if (posix(directory)) Files.createDirectories(directory, PosixFilePermissions.asFileAttribute(owner));
+        else Files.createDirectories(directory);
+        try { Files.setPosixFilePermissions(directory, owner); }
+        catch (UnsupportedOperationException notPosix) { /* Windows: the user's profile folder protects it */ }
+    }
+
+    private static boolean posix(Path path) {
+        try {
+            Path existing = path.toAbsolutePath();
+            while (existing != null && !Files.exists(existing)) existing = existing.getParent();
+            return existing != null && Files.getFileStore(existing).supportsFileAttributeView("posix");
+        } catch (IOException unknown) {
+            return false;
+        }
     }
 
     private EngineFailure unreadable(Exception failure) {

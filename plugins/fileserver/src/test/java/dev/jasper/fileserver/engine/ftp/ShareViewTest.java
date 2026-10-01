@@ -163,6 +163,14 @@ class ShareViewTest {
         assertThat(events).isEmpty();
     }
 
+    @Test void filesWithTheSamePathAreEqual() throws Exception {
+        var view = view(false);
+        assertThat(view.getFile("/docs")).isEqualTo(view.getFile("/docs")).hasSameHashCodeAs(view.getFile("/docs"));
+        assertThat(view.getFile("/docs")).isNotEqualTo(view.getFile("/b.txt")).isNotEqualTo("/docs");
+        view.changeWorkingDirectory("docs");
+        assertThat(view.getWorkingDirectory()).isEqualTo(view.getFile("/docs"));
+    }
+
     @Test void cancellingClosesTheStream() throws Exception {
         var view = view(false);
         InputStream in = view.getFile("/docs/a.txt").createInputStream(0);

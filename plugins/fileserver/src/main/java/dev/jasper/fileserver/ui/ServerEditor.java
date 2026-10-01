@@ -124,8 +124,8 @@ public final class ServerEditor extends JPanel {
         row(form, at, "", autostart);
         row(form, at, "Reachable from", reachable);
         row(form, at, "Port", port);
-        row(form, at, "Passive ports", line(passive, label("FTP only; empty uses the range in Settings")));
         row(form, at, "", portHint);
+        row(form, at, "Passive ports", line(passive, label("FTP only; empty uses the range in Settings")));
         row(form, at, "", writable);
         var login = new JPanel();
         login.setLayout(new BoxLayout(login, BoxLayout.Y_AXIS));

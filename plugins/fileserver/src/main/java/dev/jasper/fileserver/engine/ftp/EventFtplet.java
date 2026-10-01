@@ -15,7 +15,8 @@ import org.apache.ftpserver.ftplet.FtpletResult;
 
 /**
  * Reports connections, enforces Require TLS before FtpServer runs a command, and ends each transfer with its command's
- * reply: a 226 commits an upload and completes a download, and anything else abandons the transfer. FtpServer calls
+ * reply: a 226 commits an upload and completes a download, a 251 or 252 completes the files MD5 or MMD5 read, and
+ * anything else abandons the transfer. FtpServer calls
  * these methods on the session's own thread. A command that throws skips {@code afterCommand}; its transfer ends
  * with the next one, or when the client leaves.
  */
@@ -24,6 +25,9 @@ final class EventFtplet extends DefaultFtplet {
     private static final Set<String> LOGIN = Set.of("USER", "PASS");
     private static final Set<String> DATA = Set.of("RETR", "STOR", "STOU", "APPE", "LIST", "NLST", "MLSD");
     private static final Set<String> TRANSFERS = Set.of("RETR", "STOR", "STOU", "APPE");
+    /** MD5 and MMD5 read files through the same stream a download uses; they reply 251 and 252. */
+    private static final Set<String> CHECKSUMS = Set.of("MD5", "MMD5");
+    private static final int MD5_DONE = 251, MMD5_DONE = 252;
     private final ServerEvents events;
     private final boolean requireTls;
 
@@ -54,8 +58,11 @@ final class EventFtplet extends DefaultFtplet {
     }
 
     @Override public FtpletResult afterCommand(FtpSession session, FtpRequest request, FtpReply reply) {
-        if (TRANSFERS.contains(command(request)) && session.getFileSystemView() instanceof ShareView view)
-            view.finish(reply != null && reply.getCode() == FtpReply.REPLY_226_CLOSING_DATA_CONNECTION);
+        String command = command(request);
+        if (!(session.getFileSystemView() instanceof ShareView view)) return FtpletResult.DEFAULT;
+        int code = reply == null ? 0 : reply.getCode();
+        if (TRANSFERS.contains(command)) view.finish(code == FtpReply.REPLY_226_CLOSING_DATA_CONNECTION);
+        else if (CHECKSUMS.contains(command)) view.finish(code == MD5_DONE || code == MMD5_DONE);
         return FtpletResult.DEFAULT;
     }
 

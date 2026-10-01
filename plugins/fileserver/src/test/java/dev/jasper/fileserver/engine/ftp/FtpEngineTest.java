@@ -180,6 +180,54 @@ class FtpEngineTest {
             .containsExactly("renamed /docs/new.txt to /docs/renamed.txt", "created /docs/sub", "deleted /docs/sub", "deleted /docs/renamed.txt");
     }
 
+    @Test void md5CompletesTheDownloadItReads() throws Exception {
+        start(ResolvedLogin.anonymous(), false, false, false);
+        var client = client();
+        assertThat(client.login("anonymous", "me@example.com")).isTrue();
+        assertThat(client.sendCommand("MD5 /docs/a.txt")).as(client.getReplyString()).isEqualTo(251);
+        await(() -> transfers().size() == 1, "the checksum read is logged");
+        assertThat(transfers()).singleElement().satisfies(done -> {
+            assertThat(done.path()).isEqualTo("/docs/a.txt");
+            assertThat(done.complete()).isTrue();
+            assertThat(done.bytes()).isEqualTo(5);
+        });
+        client.setFileType(FTP.BINARY_FILE_TYPE);
+        assertThat(fetch(client, "/docs/a.txt")).isEqualTo("hello");
+        await(() -> transfers().size() == 2, "the download after it is logged");
+        assertThat(transfers()).allMatch(ServerEvent.Transferred::complete);
+        client.disconnect();
+    }
+
+    @Test void mmd5CompletesEveryFileItReads() throws Exception {
+        Files.writeString(shared.resolve("b.txt"), "bee");
+        start(ResolvedLogin.anonymous(), false, false, false);
+        var client = client();
+        assertThat(client.login("anonymous", "me@example.com")).isTrue();
+        assertThat(client.sendCommand("MMD5 /docs/a.txt, /b.txt")).as(client.getReplyString()).isEqualTo(252);
+        await(() -> transfers().size() == 2, "both reads are logged");
+        assertThat(transfers()).extracting(ServerEvent.Transferred::path, ServerEvent.Transferred::complete, ServerEvent.Transferred::bytes)
+            .containsExactlyInAnyOrder(org.assertj.core.groups.Tuple.tuple("/docs/a.txt", true, 5L), org.assertj.core.groups.Tuple.tuple("/b.txt", true, 3L));
+        client.disconnect();
+    }
+
+    @Test void theWorkingDirectoryCannotBeRemoved() throws Exception {
+        Files.createDirectories(shared.resolve("empty"));
+        start(DUSTIN, true, false, false);
+        var client = client();
+        assertThat(client.login("dustin", "pw")).isTrue();
+        assertThat(client.changeWorkingDirectory("/empty")).isTrue();
+        assertThat(client.removeDirectory("/empty")).as("RMD of the working directory: " + client.getReplyString()).isFalse();
+        assertThat(shared.resolve("empty")).isDirectory();
+        assertThat(client.changeWorkingDirectory("/")).isTrue();
+        assertThat(client.removeDirectory("/empty")).isTrue();
+        assertThat(shared.resolve("empty")).doesNotExist();
+        client.disconnect();
+    }
+
+    List<ServerEvent.Transferred> transfers() {
+        return events.stream().filter(e -> e instanceof ServerEvent.Transferred).map(e -> (ServerEvent.Transferred) e).toList();
+    }
+
     @Test void aWrongPasswordIsThrottled() throws Exception {
         start(DUSTIN, false, false, false);
         var first = client();

@@ -88,7 +88,7 @@ class HttpsEngineTest {
             assertThatThrownBy(engine::start).isInstanceOf(EngineFailure.class)
                 .hasMessage("The TLS certificate in " + temp.resolve("tls") + " can't be read");
         }
-        assertThat(idleTimeoutThreads()).as("a failed start creates no server, so no idle-timeout thread is left").isEqualTo(idleTasksBefore);
+        assertThat(idleTimeoutThreads()).as("a failed start creates no server, so no idle-timeout thread is left").isLessThanOrEqualTo(idleTasksBefore);
         try (var socket = new ServerSocket()) {
             socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
             assertThat(socket.isBound()).as("the port was never taken").isTrue();

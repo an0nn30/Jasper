@@ -56,6 +56,10 @@ final class ShareFile implements FtpFile {
     /** Never the real file: nothing outside the share's checks may touch the disk. */
     @Override public Object getPhysicalFile() { return null; }
 
+    /** Two files are equal when they have the same path: FtpServer compares the working directory to a file this way. */
+    @Override public boolean equals(Object other) { return other instanceof ShareFile file && file.path.equals(path); }
+    @Override public int hashCode() { return path.hashCode(); }
+
     @Override public boolean mkdir() {
         try { view.share().mkdir(relative()); }
         catch (IOException refused) { return false; }
@@ -122,22 +126,28 @@ final class ShareFile implements FtpFile {
     }
 
     /** Counts what a download sends. */
-    private static final class CountingInput extends FilterInputStream {
+    static final class CountingInput extends FilterInputStream {
         private final ServerEvents.Transfer transfer;
+        private volatile boolean ended;
 
         CountingInput(InputStream in, ServerEvents.Transfer transfer) { super(in); this.transfer = transfer; }
 
         @Override public int read() throws IOException {
             int value = super.read();
             if (value >= 0) transfer.add(1);
+            else ended = true;
             return value;
         }
 
         @Override public int read(byte[] buffer, int offset, int length) throws IOException {
             int count = super.read(buffer, offset, length);
             if (count > 0) transfer.add(count);
+            else if (count < 0) ended = true;
             return count;
         }
+
+        /** True once a read has reached the end of the file. */
+        boolean readToEnd() { return ended; }
     }
 
     /** Counts what an upload receives; closing twice is harmless (FtpServer's STOR closes the stream twice). */

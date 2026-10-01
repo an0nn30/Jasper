@@ -54,9 +54,13 @@ final class ShareView implements FileSystemView {
 
     @Override public void dispose() { finish(false); }
 
-    /** Starts tracking a transfer, abandoning any earlier one; {@code upload} is null for downloads and appends. */
+    /**
+     * Starts tracking a transfer; {@code upload} is null for downloads and appends. An earlier transfer is abandoned,
+     * except a download that was read to its end: MMD5 reads several files in one command, and each of those counts
+     * as complete.
+     */
     synchronized void track(ServerEvents.Transfer next, ShareRoot.Upload nextUpload, Closeable nextStream, String path) {
-        finish(false);
+        finish(stream instanceof ShareFile.CountingInput in && in.readToEnd());
         transfer = next;
         upload = nextUpload;
         stream = nextStream;
