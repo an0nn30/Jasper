@@ -21,8 +21,13 @@ public final class Capabilities {
     public static final String PALETTE_CONTRIBUTE = "palette.contribute";
     /** Add places, such as saved hosts, to Jasper's file chooser. @since 0.10.0 */
     public static final String FILES_SOURCE = "files.source";
+    /**
+     * Accepting connections from other programs or computers, such as serving files. Nothing gates it: the user
+     * consents to it when the plugin is installed. @since 0.11.0
+     */
+    public static final String NETWORK_LISTEN = "network.listen";
     /** Every capability this SDK version knows. */
-    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE);
+    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE, FILES_SOURCE, NETWORK_LISTEN);
 
     private Capabilities() { }
 }
