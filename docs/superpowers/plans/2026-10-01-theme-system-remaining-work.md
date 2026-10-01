@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 implementation is complete on `codex/theme-system-plans`, with all five tasks and the final-review fixes independently approved; Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 is implemented, independently approved, merged to local `main` and verified there (not pushed); Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -173,4 +173,4 @@ Evidence and exact module counts are in the Plan 3 execution notes and `/tmp/mor
 Final unified fix gate: `./gradlew check` passed 7,897 tests, zero failures/errors, six skips in 3m32s;
 99 focused tests passed. All four architecture gates, 1,636-file Java hygiene and branch whitespace checks pass.
 Explicit module/plugin XML counts and logs are recorded in the Plan 3 execution notes and
-`/tmp/p3-final-{check,counts,hygiene,diff-check}.log`. Focused independent re-review approved all five findings with no new breakage; no findings remain open. Local integration and user visual acceptance remain pending.
+`/tmp/p3-final-{check,counts,hygiene,diff-check}.log`. Focused independent re-review approved all five findings with no new breakage; no findings remain open. Local integration is complete and verified on `main`: `./gradlew check` passed 7,897 tests, zero failures/errors and six skips (3m42s; `/tmp/moray-plan3-main-check.log`). Not pushed; user visual acceptance remains pending.

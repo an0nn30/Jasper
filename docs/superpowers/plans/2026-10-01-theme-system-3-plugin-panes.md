@@ -13,7 +13,7 @@ painters read the existing SDK palette using their mounted component; Editor ret
 
 **Spec:** [Theme design](../specs/2026-10-01-jasper-theme-system-design.md), §§1, 5.3–5.6, 9.
 **Prerequisite:** [Plan 2](2026-10-01-theme-system-2-workspace.md), implemented and merged locally.
-**Status:** Implementation complete; all five tasks independently reviewed. Final whole-branch review findings I1/I2/M1/M2/M3 are fixed in `863ca6b9` and independently approved; no findings remain open. Revised against `main@14f9913d` after the GitHub Dark startup fix.
+**Status:** Implementation complete and merged to local `main` (not pushed); all five tasks independently reviewed. Final whole-branch review findings I1/I2/M1/M2/M3 are fixed in `863ca6b9` and independently approved; no findings remain open. Revised against `main@14f9913d` after the GitHub Dark startup fix.
 The user clarified on 2026-10-01 that a workspace combo's dropdown follows the workspace; menus, tooltips and dialogs
 remain chrome. This replaces the previous three-task outline; the five tasks below are sequential review gates.
 **Execution:** Preserve the repository's per-task implementer/reviewer workflow and final whole-branch review.
@@ -77,7 +77,7 @@ terminal 391/0/0/4; SDK 44/0/0/0; testkit 84/0/0/0; Editor 4,786/0/0/0; File Ser
 History 41/0/0/0; Remote 386/0/0/0; Sample 12/0/0/0; Snippets 11/0/0/0; Vault 142/0/0/1.
 All four architecture gates passed, source hygiene passed for 1,636 Java files, and branch whitespace check
 against `5435069c` passed. Evidence: `/tmp/p3-final-{check,counts,hygiene,diff-check}.log` and
-`/tmp/p3-final-focused.log`. The known terminal timeout did not occur. Focused independent re-review of `bd4fd9cd..863ca6b9` approved all five fixes, with no new breakage or open findings. The whole-branch review covered `5435069c..bd4fd9cd`. Integration remains a separate user choice; no merge or push performed.
+`/tmp/p3-final-focused.log`. The known terminal timeout did not occur. Focused independent re-review of `bd4fd9cd..863ca6b9` approved all five fixes, with no new breakage or open findings. The whole-branch review covered `5435069c..bd4fd9cd`. User authorized local integration: fast-forwarded to `main` on 2026-10-01 and verified there with `./gradlew check` (3m42s), 7,897 tests, zero failures/errors, six skips. Evidence: `/tmp/moray-plan3-main-check.log`. No push, GUI or benchmark. Worktree retained for Plan 4 reuse.
 
 ## Global Constraints
 

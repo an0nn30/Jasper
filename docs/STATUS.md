@@ -2,8 +2,8 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system Plan 3 complete and independently reviewed** (branch
-  `codex/theme-system-plans`): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)
+- **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
+  (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)
   now styles mounted center controls with one chrome LAF, preserves plugin styles/direct colors, tracks dynamic
   children and combo dropdowns, and restores state on match/move/close/plugin stop. All five tasks independently reviewed;
   the final whole-branch review's five findings are fixed in `863ca6b9` and independently approved.
@@ -22,7 +22,9 @@
   Task 5 note-style churn is fixed (`bd4fd9cd`). The final fix wave adds ownership cancellation for synchronous
   generated writes, accessible typed color fallback for nonpublic plugin subclasses, correctly keyed warnings and
   scoped diagnostic assertions, and the corrected three-site progress inventory. Focused independent re-review found no remaining findings or new breakage. User-only native visual checklist is in
-  [themes](themes.md); no GUI, benchmark, merge or push performed. Plans 4–5 remain separate future deliverables.
+  [themes](themes.md). Local fast-forward integration was verified with a fresh `./gradlew check` from `main`: 7,897 tests,
+  zero failures/errors, six skips (3m42s; `/tmp/moray-plan3-main-check.log`). No GUI, benchmark or push performed.
+  The worktree is retained for reuse. Next: Plan 4 conversion, vendoring and migration; Plan 5 adds the Themes page and live reload.
 
 - **Theme workspace startup regression fixed:** the first native GUI attempt after Plan 2 found that GitHub Dark
   omits the optional IntelliJ `ToolWindow.background` key. The new workspace color lookup threw while creating
