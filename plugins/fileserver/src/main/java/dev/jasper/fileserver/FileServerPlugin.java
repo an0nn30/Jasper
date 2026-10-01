@@ -9,6 +9,7 @@ import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.LoginThrottle;
 import dev.jasper.fileserver.engine.ServerAddresses;
 import dev.jasper.fileserver.engine.ServerEvent;
+import dev.jasper.fileserver.engine.tls.TlsMaterial;
 import dev.jasper.fileserver.runtime.Engines;
 import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
@@ -46,6 +47,7 @@ import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -104,6 +106,7 @@ public final class FileServerPlugin implements Plugin {
     private Optional<VaultApi> vault = Optional.empty();
     private DefinitionStore store;
     private ServerRegistry registry;
+    private TlsMaterial tls;
     private TransferActivities transfers;
     private FileServerScope scope;
     private StatusItem status;
@@ -130,7 +133,8 @@ public final class FileServerPlugin implements Plugin {
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
         transfers = new TransferActivities(context.activities()::begin, SHOW);
-        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics()), logins,
+        tls = new TlsMaterial(context.dataDirectory().resolve("tls"), Clock.systemUTC(), FileServerPlugin::hostName);
+        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls), logins,
             context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
         var icon = context.appearance().icon(IconName.SERVER);
@@ -186,6 +190,14 @@ public final class FileServerPlugin implements Plugin {
 
     /** Engine events reach the transfer activities only while the plugin runs: a late one must not open an activity on a closed context. */
     void observe(ServerEvent event) { if (!stopped) transfers.accept(event); }
+
+    TlsMaterial tls() { return tls; }
+
+    /** This computer's name for the certificate; empty when the system will not say. Slow on some networks, so call it off the UI thread. */
+    static String hostName() {
+        try { return InetAddress.getLocalHost().getHostName(); }
+        catch (UnknownHostException | SecurityException unknown) { return ""; }
+    }
 
     private JComponent createPanel(PanelHost host) {
         WindowHandle window = host.window();
