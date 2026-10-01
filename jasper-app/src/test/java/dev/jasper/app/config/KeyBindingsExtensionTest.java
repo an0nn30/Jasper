@@ -23,7 +23,9 @@ class KeyBindingsExtensionTest {
         assertThat(bindings.idFor(newTab)).hasValue("new_tab");
         assertThat(bindings.actionFor(newTab)).hasValue(ActionId.NEW_TAB);
         assertThat(bindings.strokeFor("new_tab")).isEqualTo(bindings.strokeFor(ActionId.NEW_TAB)).hasValue(newTab);
-        assertThat(bindings.strokes()).hasSize(ActionId.values().length).containsEntry("new_tab", newTab);
+        long bound = java.util.Arrays.stream(ActionId.values()).filter(action -> !action.defaultBinding(true).equals("none")).count();
+        assertThat(bindings.strokes()).as("every action with a default; Reload Config has none").hasSize((int) bound)
+            .containsEntry("new_tab", newTab);
         assertThat(ActionId.forId("new_tab")).hasValue(ActionId.NEW_TAB);
         assertThat(ActionId.forId("dev.x.tool.run")).isEmpty();
         assertThat(KeyBindings.extensionId("dev.x.tool.run")).isTrue();
@@ -57,14 +59,14 @@ class KeyBindingsExtensionTest {
             extension("dev.b.four", "not a shortcut"),
             extension("dev.b.five", null)));
         KeyBindings bindings = resolved.bindings();
-        assertThat(bindings.idFor(stroke("cmd+k"))).hasValue("command_palette");
+        assertThat(bindings.idFor(stroke("cmd+k"))).hasValue("clear_scrollback");
         assertThat(bindings.idFor(stroke("cmd+alt+j"))).hasValue("dev.a.two");
         assertThat(bindings.strokeFor("dev.b.three")).isEmpty();
         assertThat(resolved.problems()).extracting(KeyBindings.Problem::kind)
             .containsOnly(KeyBindings.Problem.Kind.DEFAULT_DROPPED);
         assertThat(resolved.problems()).extracting(KeyBindings.Problem::actionId)
             .containsExactly("dev.a.one", "dev.b.three", "dev.b.four");
-        assertThat(resolved.problems().get(0).message()).contains("cmd+k", "command_palette");
+        assertThat(resolved.problems().get(0).message()).contains("cmd+k", "clear_scrollback");
         assertThat(resolved.problems().get(1).message()).contains("dev.a.two");
     }
 

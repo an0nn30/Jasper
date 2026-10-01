@@ -72,7 +72,7 @@ class KeyBindingsTest {
     }
 
     @Test
-    void tabDefaultsUsePlatformModifierWithoutCompatibilityAlt() {
+    void tabDefaultsFollowEachPlatformsTerminals() {
         for (boolean mac : new boolean[]{true, false}) {
             int modifier = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
             KeyBindings bindings = KeyBindings.defaults(mac);
@@ -80,10 +80,14 @@ class KeyBindingsTest {
                 KeyStroke stroke = KeyStroke.getKeyStroke(KeyEvent.VK_1 + number - 1, modifier);
                 assertThat(bindings.actionFor(stroke)).contains(ActionId.valueOf("SELECT_TAB_" + number));
             }
-            assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET,
-                modifier | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.PREVIOUS_TAB);
-            assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
-                modifier | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.NEXT_TAB);
+            KeyStroke previous = mac
+                ? KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, modifier | InputEvent.SHIFT_DOWN_MASK)
+                : KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
+            KeyStroke next = mac
+                ? KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET, modifier | InputEvent.SHIFT_DOWN_MASK)
+                : KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK);
+            assertThat(bindings.actionFor(previous)).contains(ActionId.PREVIOUS_TAB);
+            assertThat(bindings.actionFor(next)).contains(ActionId.NEXT_TAB);
             assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, modifier))).isEmpty();
             assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
                 modifier | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK))).isEmpty();
@@ -100,7 +104,7 @@ class KeyBindingsTest {
         assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET,
             InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.PREVIOUS_TAB);
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> KeyBindings.withOverrides(false, Map.of("copy", "ctrl+{")))
+            .isThrownBy(() -> KeyBindings.withOverrides(true, Map.of("copy", "cmd+{")))
             .withMessageContaining("copy").withMessageContaining("previous_tab");
         assertThatIllegalArgumentException().isThrownBy(() -> KeyBindings.parse("ctrl+{+]", false));
     }

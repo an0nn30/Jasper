@@ -459,8 +459,8 @@ class PaletteScopesTest {
                 var fake = new FakeScope(); owner.scopes().register(fake);
                 var router = PaletteKeyRouterTest.router(owner, true, root);
                 int mod = primary(true);
-                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
-                router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_K));
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_P, mod | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_P));
                 assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_TAB, 0))).as("claimed, ignored").isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_TAB));
@@ -476,10 +476,10 @@ class PaletteScopesTest {
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_ENTER));
                 assertThat(fake.executed).containsExactly("alpha:two");
                 assertThat(owner.commandPalette().isOpen()).isFalse();
-                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
-                router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_K));
-                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
-                assertThat(owner.commandPalette().isOpen()).as("Cmd+K with no chip closes").isFalse();
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_P, mod | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_P));
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_P, mod | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(owner.commandPalette().isOpen()).as("Shift+Cmd+P with no chip closes").isFalse();
             }
         });
     }

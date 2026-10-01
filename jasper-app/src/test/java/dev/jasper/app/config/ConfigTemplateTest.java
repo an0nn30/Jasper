@@ -27,11 +27,13 @@ import static org.assertj.core.api.Assertions.*;
 class ConfigTemplateTest {
     @TempDir Path directory;
 
-    @Test void paletteAndClearCommentsShowTheirLiteralPlatformDefaults() {
-        assertThat(ConfigTemplate.text(true)).contains("# command_palette = \"cmd+k\"", "# clear_scrollback = \"cmd+shift+k\"");
+    @Test void templateCommentsShowEachPlatformsLiteralDefaults() {
+        assertThat(ConfigTemplate.text(true)).contains("# command_palette = \"cmd+shift+p\"", "# clear_scrollback = \"cmd+k\"",
+            "# close_pane = \"cmd+w\"", "# reload_config = \"none\"");
         assertThat(ConfigTemplate.text(true)).doesNotContain("history_palette", "snippets_palette");
-        assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+k\"", "# clear_scrollback = \"ctrl+shift+k\"",
-            "Command Palette uses plain Ctrl+K");
+        assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+shift+p\"", "# clear_scrollback = \"ctrl+shift+k\"",
+            "# next_tab = \"ctrl+tab\"", "cmd means Ctrl+Shift outside macOS");
+        assertThat(ConfigTemplate.text(false)).doesNotContain("Ctrl+K");
     }
 
     @Test void commentedTemplatesParseCleanlyWithBuiltInDefaultsOnBothPlatforms() {

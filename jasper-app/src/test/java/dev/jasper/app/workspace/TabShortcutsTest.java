@@ -15,20 +15,27 @@ import static org.assertj.core.api.Assertions.*;
 class TabShortcutsTest {
     @Test void platformDefaultsDispatchRealSelectionWrapAndIgnoreMissingTabs() throws Exception {
         for (boolean mac : new boolean[]{true, false}) edt(() -> {
+            var keys = KeyBindings.defaults(mac);
             var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
-                    new ThemeController(), KeyBindings.defaults(mac));
+                    new ThemeController(), keys);
             try {
                 int modifier = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
+                KeyStroke next = keys.strokeFor(ActionId.NEXT_TAB).orElseThrow();
+                KeyStroke previous = keys.strokeFor(ActionId.PREVIOUS_TAB).orElseThrow();
+                assertThat(next).isEqualTo(mac
+                    ? KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET, modifier | InputEvent.SHIFT_DOWN_MASK)
+                    : KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK));
+                assertThat(previous).isEqualTo(mac
+                    ? KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, modifier | InputEvent.SHIFT_DOWN_MASK)
+                    : KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
                 var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
                 var first = owner.currentTab(); owner.newTab(HOME); var second = owner.currentTab();
                 owner.selectTab(first);
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_2, modifier))).isTrue();
                 assertThat(owner.currentTab()).isSameAs(second);
-                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
-                    modifier | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(root.activate(next)).isTrue();
                 assertThat(owner.currentTab()).isSameAs(first);
-                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET,
-                    modifier | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(root.activate(previous)).isTrue();
                 assertThat(owner.currentTab()).isSameAs(second);
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_9, modifier))).isTrue();
                 assertThat(owner.currentTab()).isSameAs(second);

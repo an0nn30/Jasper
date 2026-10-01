@@ -9,18 +9,18 @@ import java.util.Optional;
  */
 public enum ActionId {
     NEW_TAB("new_tab", "New Tab", "cmd+t", "ctrl+shift+t"),
-    CLOSE_TAB("close_tab", "Close Tab", "cmd+w", "ctrl+shift+w"),
+    CLOSE_TAB("close_tab", "Close Tab", "alt+cmd+w", "ctrl+alt+shift+w"),
     NEW_WINDOW("new_window", "New Window", "cmd+n", "ctrl+shift+n"),
     SPLIT_RIGHT("split_right", "Split Right", "cmd+d", "ctrl+shift+d"),
     SPLIT_DOWN("split_down", "Split Down", "cmd+shift+d", "ctrl+alt+shift+d"),
-    CLOSE_PANE("close_pane", "Close Pane", "cmd+shift+w", "ctrl+alt+shift+w"),
+    CLOSE_PANE("close_pane", "Close Pane", "cmd+w", "ctrl+shift+w"),
     ZOOM_PANE("zoom_pane", "Zoom Pane", "cmd+shift+enter", "ctrl+alt+shift+enter"),
     FOCUS_PANE_LEFT("focus_pane_left", "Focus Pane Left", "cmd+alt+left", "ctrl+alt+shift+left"),
     FOCUS_PANE_RIGHT("focus_pane_right", "Focus Pane Right", "cmd+alt+right", "ctrl+alt+shift+right"),
     FOCUS_PANE_UP("focus_pane_up", "Focus Pane Up", "cmd+alt+up", "ctrl+alt+shift+up"),
     FOCUS_PANE_DOWN("focus_pane_down", "Focus Pane Down", "cmd+alt+down", "ctrl+alt+shift+down"),
-    NEXT_TAB("next_tab", "Next Tab", "cmd+shift+]", "ctrl+shift+]"),
-    PREVIOUS_TAB("previous_tab", "Previous Tab", "cmd+shift+[", "ctrl+shift+["),
+    NEXT_TAB("next_tab", "Next Tab", "cmd+shift+]", "ctrl+tab"),
+    PREVIOUS_TAB("previous_tab", "Previous Tab", "cmd+shift+[", "ctrl+shift+tab"),
     SELECT_TAB_1("select_tab_1", "Select Tab 1", "cmd+1", "ctrl+1"),
     SELECT_TAB_2("select_tab_2", "Select Tab 2", "cmd+2", "ctrl+2"),
     SELECT_TAB_3("select_tab_3", "Select Tab 3", "cmd+3", "ctrl+3"),
@@ -30,7 +30,7 @@ public enum ActionId {
     SELECT_TAB_7("select_tab_7", "Select Tab 7", "cmd+7", "ctrl+7"),
     SELECT_TAB_8("select_tab_8", "Select Tab 8", "cmd+8", "ctrl+8"),
     SELECT_TAB_9("select_tab_9", "Select Tab 9", "cmd+9", "ctrl+9"),
-    RENAME_TAB("rename_tab", "Rename Tab", "f2", "f2"),
+    RENAME_TAB("rename_tab", "Rename Tab", "cmd+i", "ctrl+shift+i"),
     FIND("find", "Find", "cmd+f", "ctrl+shift+f"),
     FIND_NEXT("find_next", "Find Next", "cmd+g", "ctrl+shift+g"),
     FIND_PREVIOUS("find_previous", "Find Previous", "cmd+shift+g", "ctrl+alt+shift+g"),
@@ -38,14 +38,14 @@ public enum ActionId {
     NEXT_PROMPT("next_prompt", "Next Prompt", "cmd+down", "ctrl+shift+down", KeyContext.TERMINAL),
     COPY("copy", "Copy", "cmd+c", "ctrl+shift+c"),
     PASTE("paste", "Paste", "cmd+v", "ctrl+shift+v"),
-    COMMAND_PALETTE("command_palette", "Command Palette", "cmd+k", "ctrl+k"),
-    CLEAR_SCROLLBACK("clear_scrollback", "Clear Scrollback", "cmd+shift+k", "ctrl+shift+k", KeyContext.TERMINAL),
+    COMMAND_PALETTE("command_palette", "Command Palette", "cmd+shift+p", "ctrl+shift+p"),
+    CLEAR_SCROLLBACK("clear_scrollback", "Clear Scrollback", "cmd+k", "ctrl+shift+k", KeyContext.TERMINAL),
     FONT_BIGGER("font_bigger", "Increase Font Size", "cmd+=", "ctrl+shift+="),
     FONT_SMALLER("font_smaller", "Decrease Font Size", "cmd+-", "ctrl+shift+-"),
     FONT_RESET("font_reset", "Reset Font Size", "cmd+0", "ctrl+shift+0"),
     OPEN_SETTINGS("open_settings", "Settings", "cmd+,", "ctrl+shift+,"),
-    RELOAD_CONFIG("reload_config", "Reload Config", "cmd+shift+r", "ctrl+alt+shift+r"),
-    QUIT("quit", "Quit", "cmd+q", "ctrl+shift+q");
+    RELOAD_CONFIG("reload_config", "Reload Config", "none", "none"),
+    QUIT("quit", "Quit", "cmd+q", "ctrl+alt+shift+q");
 
     private final String id;
     private final String label;
