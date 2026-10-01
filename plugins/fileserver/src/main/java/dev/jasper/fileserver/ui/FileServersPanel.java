@@ -61,7 +61,7 @@ public final class FileServersPanel extends JPanel {
 
     final JButton add = new JButton("+");
     final JList<ServerRows.Row> list;
-    final JLabel empty = label("No file servers yet — press + to share a folder");
+    final JTextArea empty = note("No file servers yet — press + to share a folder");
     final JPanel details = new JPanel(new BorderLayout(0, 6));
     final JLabel cardName = label(""), cardState = label(""), cardFolder = label(""), cardAccess = label(""), cardWarnings = label("");
     final JPanel addresses = new JPanel();
@@ -69,12 +69,14 @@ public final class FileServersPanel extends JPanel {
     final JButton toggle = new JButton("Start"), edit = new JButton("Edit…");
     final JTextArea activity = new JTextArea(8, 24);
     final JButton clearActivity = new JButton("Clear"), copyActivity = new JButton("Copy");
+    final JSplitPane split;
     private final DefaultListModel<ServerRows.Row> model = new DefaultListModel<>();
     private final Actions actions;
     private final Function<UUID, List<ActivityLog.Entry>> log;
     private final Path home;
     private final String firewall;
     private final ZoneId zone;
+    private final int dividerSize;
     private List<ServerRegistry.View> views = List.of();
     private Optional<String> problem = Optional.empty();
     private UUID selected;
@@ -144,7 +146,8 @@ public final class FileServersPanel extends JPanel {
         activityPanel.add(new JScrollPane(activity), BorderLayout.CENTER);
         details.add(activityPanel, BorderLayout.CENTER);
         details.setVisible(false);
-        var split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, details);
+        split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, details);
+        dividerSize = split.getDividerSize();
         split.setResizeWeight(0.5);
         split.setBorder(BorderFactory.createEmptyBorder());
         add(split, BorderLayout.CENTER);
@@ -258,6 +261,7 @@ public final class FileServersPanel extends JPanel {
     private void refreshCard() {
         Optional<ServerRegistry.View> chosen = selectedView();
         details.setVisible(chosen.isPresent());
+        split.setDividerSize(chosen.isPresent() ? dividerSize : 0);
         addresses.removeAll();
         addressCopies.clear();
         if (chosen.isPresent()) {
@@ -329,6 +333,24 @@ public final class FileServersPanel extends JPanel {
         label.putClientProperty("html.disable", Boolean.TRUE);
         label.setText(text);
         return label;
+    }
+
+    /** Wrapping, read-only text that looks like a label; a JTextArea never renders HTML. */
+    private static JTextArea note(String text) {
+        var note = new JTextArea(text) {
+            @Override public void updateUI() {
+                super.updateUI();
+                setFont(UIManager.getFont("Label.font"));
+                Color hint = UIManager.getColor("Label.disabledForeground");
+                if (hint != null) setForeground(hint);
+                setOpaque(false);
+            }
+        };
+        note.setLineWrap(true);
+        note.setWrapStyleWord(true);
+        note.setEditable(false);
+        note.setFocusable(false);
+        return note;
     }
 
     private static Color color(String key, Color fallback) {

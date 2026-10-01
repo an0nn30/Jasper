@@ -142,4 +142,16 @@ class FileServersPanelTest {
         assertThat(panel.list.getToolTipText(new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0, 5, cell.y + 2, 0, false))).isEqualTo("Running");
         assertThat(panel.list.getToolTipText(new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0, 5, 390, 0, false))).isNull();
     }
+
+    @Test void theEmptyHintWrapsAndTheDividerShowsOnlyWithDetails() {
+        var panel = panel();
+        assertThat(panel.empty.getLineWrap()).isTrue();
+        assertThat(panel.empty.getWrapStyleWord()).isTrue();
+        assertThat(panel.empty.isEditable()).isFalse();
+        assertThat(panel.empty.getText()).isEqualTo("No file servers yet — press + to share a folder");
+        assertThat(panel.split.getDividerSize()).as("nothing selected").isZero();
+        view("docs", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        assertThat(panel.split.getDividerSize()).isPositive();
+    }
 }

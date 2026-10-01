@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -197,11 +198,22 @@ public final class ShareRoot {
             finished = true;
             try {
                 out.close();
+                keepPermissions();
                 try { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
                 catch (AtomicMoveNotSupportedException unsupported) { Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING); }
             } catch (IOException | RuntimeException failure) {
                 discard();
                 throw failure;
+            }
+        }
+
+        /** A replaced file keeps its permissions; the temporary file was created with the process's defaults. Best effort. */
+        private void keepPermissions() {
+            try {
+                if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) return;
+                Files.setPosixFilePermissions(temp, Files.getPosixFilePermissions(target, LinkOption.NOFOLLOW_LINKS));
+            } catch (UnsupportedOperationException | IOException notPosix) {
+                // Windows, or a file system without POSIX permissions: the new file keeps its defaults.
             }
         }
 
