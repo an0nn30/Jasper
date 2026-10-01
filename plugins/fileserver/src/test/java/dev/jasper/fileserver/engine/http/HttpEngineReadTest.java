@@ -142,10 +142,25 @@ class HttpEngineReadTest {
         assertThat(get("/docs/a.txt", "Authorization", good).body()).isEqualTo("hello");
         assertThat(events).filteredOn(e -> e instanceof ServerEvent.LoginSucceeded).as("logged once per client and user").hasSize(1);
         assertThat(get("/", "Authorization", bad).statusCode()).isEqualTo(401);
+        var tooSoon = get("/", "Authorization", good);
+        assertThat(tooSoon.statusCode()).as("the right password is not even checked during the delay").isEqualTo(429);
+        assertThat(tooSoon.headers().firstValue("Retry-After")).contains("1");
+        assertThat(tooSoon.headers().firstValue("X-Content-Type-Options")).contains("nosniff");
         assertThat(events).filteredOn(e -> e instanceof ServerEvent.LoginFailed).singleElement()
             .satisfies(e -> assertThat(((ServerEvent.LoginFailed) e).user()).isEqualTo("me"));
         for (int i = 0; i < 9; i++) throttle.failed("127.0.0.1");
-        assertThat(get("/", "Authorization", good).statusCode()).as("locked out").isEqualTo(429);
+        var lockedOut = get("/", "Authorization", good);
+        assertThat(lockedOut.statusCode()).as("locked out").isEqualTo(429);
+        assertThat(lockedOut.headers().firstValue("Retry-After")).isPresent();
+        assertThat(get("/", "Authorization", good).statusCode()).as("a correct guess does not lift the lockout").isEqualTo(429);
+    }
+
+    @Test void aForeignHostIsRefusedBeforeCredentialsAreChecked() throws Exception {
+        start(ResolvedLogin.password("me", "pw".toCharArray()));
+        String good = Base64.getEncoder().encodeToString("me:pw".getBytes(StandardCharsets.UTF_8));
+        String answer = raw("GET / HTTP/1.1\r\nHost: evil.example\r\nAuthorization: Basic " + good + "\r\nConnection: close\r\n\r\n");
+        assertThat(answer).startsWith("HTTP/1.1 421");
+        assertThat(events).isEmpty();
     }
 
     @Test void aBusyPortFailsWithAClearMessageAndStopCloses() throws Exception {

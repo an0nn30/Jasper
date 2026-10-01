@@ -81,7 +81,7 @@ final class FileHandler implements HttpHandler {
         ShareEntry entry = share.attributes(path);
         if (entry.directory()) {
             if (!raw.endsWith("/")) {
-                exchange.getResponseHeaders().set("Location", raw + "/");
+                exchange.getResponseHeaders().set("Location", HttpPaths.href(ShareRoot.segments(path), true));
                 send(exchange, 301, -1);
                 return;
             }

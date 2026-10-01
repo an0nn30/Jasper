@@ -45,4 +45,23 @@ class LoginThrottleTest {
         throttle.failed("a");
         assertThat(throttle.delayFor("a")).as("old failures no longer count").isEqualTo(Duration.ofSeconds(1));
     }
+
+    @Test void retryAfterIsTheDelayOrTheRemainingLockout() {
+        assertThat(throttle.retryAfter("a")).isZero();
+        throttle.failed("a");
+        assertThat(throttle.retryAfter("a")).isEqualTo(Duration.ofSeconds(1));
+        for (int i = 0; i < 9; i++) throttle.failed("a");
+        assertThat(throttle.retryAfter("a")).isEqualTo(Duration.ofMinutes(5));
+        clock.advance(Duration.ofMinutes(2));
+        assertThat(throttle.retryAfter("a")).isEqualTo(Duration.ofMinutes(3));
+        assertThat(throttle.retryAfter("b")).isZero();
+    }
+
+    @Test void aSuccessDuringALockoutKeepsTheAddressLockedOut() {
+        for (int i = 0; i < 10; i++) throttle.failed("a");
+        throttle.succeeded("a");
+        assertThat(throttle.lockedOut("a")).isTrue();
+        clock.advance(Duration.ofMinutes(5));
+        assertThat(throttle.lockedOut("a")).isFalse();
+    }
 }

@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * Slows down password guessing, per client address and shared by every server: after each failed login the next
  * attempt waits 1 s, doubling to at most 30 s; ten failures within ten minutes lock the address out for five
- * minutes. A success forgets the address. Thread-safe.
+ * minutes. A success forgets the address, unless it is locked out.  Thread-safe.
  */
 public final class LoginThrottle {
     static final Duration WINDOW = Duration.ofMinutes(10);
@@ -61,7 +61,18 @@ public final class LoginThrottle {
         }
     }
 
-    public synchronized void succeeded(String remote) { records.remove(remote); }
+    /** The time until a locked-out address may try again, else the delay before its next attempt is checked; zero when neither applies. */
+    public synchronized Duration retryAfter(String remote) {
+        Record record = current(remote);
+        if (record != null && record.lockedUntil != null) return Duration.between(clock.instant(), record.lockedUntil);
+        return delayFor(remote);
+    }
+
+    /** Forgets the address's failures; a lockout that is still running stays. */
+    public synchronized void succeeded(String remote) {
+        Record record = current(remote);
+        if (record != null && record.lockedUntil == null) records.remove(remote);
+    }
 
     /** The address's record with expired failures and lockouts dropped; null, and forgotten, when nothing is left. */
     private Record current(String remote) {

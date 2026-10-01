@@ -44,8 +44,9 @@ public final class HttpEngine implements ServerEngine {
         try { created = HttpServer.create(new InetSocketAddress(address, definition.port()), 64); }
         catch (IOException failure) { throw EngineFailure.bind(failure, definition.port(), ServerAddresses.describe(address), definition.protocol()); }
         ExecutorService pool = Executors.newFixedThreadPool(WORKERS, Thread.ofPlatform().daemon().name("file-server-http-", 0).factory());
-        HttpContext context = created.createContext("/", new FileHandler(share, events, HostCheck.forBind(definition.bind())));
-        if (!login.isAnonymous()) context.setAuthenticator(new ThrottledAuthenticator(definition.name(), login, throttle, events));
+        HostCheck hosts = HostCheck.forBind(definition.bind());
+        HttpContext context = created.createContext("/", new FileHandler(share, events, hosts));
+        if (!login.isAnonymous()) context.setAuthenticator(new ThrottledAuthenticator(definition.name(), login, throttle, events, hosts));
         created.setExecutor(pool);
         created.start();
         server = created;
