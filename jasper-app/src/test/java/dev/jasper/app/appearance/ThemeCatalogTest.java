@@ -24,7 +24,7 @@ class ThemeCatalogTest {
         assertThat(snapshot.find("intellij light")).contains(Theme.INTELLIJ_LIGHT);
         assertThat(snapshot.find("")).isEmpty();
         assertThat(snapshot.find("Dracula")).isEmpty();
-        assertThat(snapshot.names()).containsExactly("Darcula", "IntelliJ Light", "Jasper Dark");
+        assertThat(snapshot.names()).containsExactly("Darcula", "IntelliJ Light", "Jasper Dark", "Jasper Light");
         assertThat(snapshot.problems()).isEmpty();
     }
 
@@ -42,7 +42,7 @@ class ThemeCatalogTest {
         assertThat(theme.source()).isInstanceOfSatisfying(Theme.Archive.class,
             archive -> assertThat(archive.archive()).isEqualTo(themes().resolve("fixture.jar")));
         assertThat(theme.source().document().name()).isEqualTo("Fixture Dark");
-        assertThat(snapshot.themes()).as("installed themes come first").startsWith(theme).endsWith(Theme.INTELLIJ_LIGHT, Theme.DARK, Theme.DARCULA);
+        assertThat(snapshot.themes()).as("installed themes come first").startsWith(theme).endsWith(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
         assertThat(catalog().latest().themes()).as("a new catalog has scanned nothing yet").containsExactlyElementsOf(ThemeManager.builtIns());
     }
 
@@ -90,7 +90,7 @@ class ThemeCatalogTest {
         Files.writeString(themes().resolve("Dracula.theme.json"), theme("Dracula", true, null, "#282a36"));
         plugin(themes().resolve(".hidden.jar"), "Hidden", true, "#000000", "000000");
         var snapshot = catalog().scan();
-        assertThat(snapshot.names()).containsExactly("Darcula", "IntelliJ Light", "Jasper Dark");
+        assertThat(snapshot.names()).containsExactly("Darcula", "IntelliJ Light", "Jasper Dark", "Jasper Light");
         assertThat(snapshot.problems()).singleElement().satisfies(problem -> {
             assertThat(problem.file().getFileName()).hasToString("Dracula.theme.json");
             assertThat(problem.message()).contains("aren't supported").contains(".jar or .zip");

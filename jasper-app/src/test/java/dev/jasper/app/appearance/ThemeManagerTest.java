@@ -173,7 +173,7 @@ class ThemeManagerTest {
     }
 
     @Test void everyBuiltInThemeGeneratesUnderItsOwnName() {
-        assertThat(ThemeManager.builtIns()).containsExactly(Theme.INTELLIJ_LIGHT, Theme.DARK, Theme.DARCULA);
+        assertThat(ThemeManager.builtIns()).containsExactly(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
         for (Theme theme : ThemeManager.builtIns()) {
             GeneratedTheme generated = ThemeManager.generated(theme);
             assertThat(generated.name()).isEqualTo(theme.name());

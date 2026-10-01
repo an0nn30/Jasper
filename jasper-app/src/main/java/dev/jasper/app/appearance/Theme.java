@@ -25,6 +25,8 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
         public Archive { Objects.requireNonNull(archive); Objects.requireNonNull(entry); Objects.requireNonNull(document); }
     }
 
+    /** Jasper's own light theme. */
+    public static final Theme JASPER_LIGHT = BuiltInThemes.toml("jasper-light", "jasper-light.toml");
     /** Jasper's own dark theme, the default. */
     public static final Theme DARK = BuiltInThemes.toml("jasper-dark", "jasper-dark.toml");
     /** Classic IntelliJ Light, converted from intellij-community. */

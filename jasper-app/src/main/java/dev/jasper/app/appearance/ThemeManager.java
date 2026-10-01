@@ -49,8 +49,8 @@ public final class ThemeManager {
 
     private ThemeManager() {}
 
-    /** The bundled themes, Light first. */
-    public static List<Theme> builtIns() { return List.of(Theme.INTELLIJ_LIGHT, Theme.DARK, Theme.DARCULA); }
+    /** The bundled themes: Jasper's own, then IntelliJ's. */
+    public static List<Theme> builtIns() { return List.of(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA); }
 
     /** {@code theme}'s generated values; EDT only (the cache is unsynchronized). */
     static GeneratedTheme generated(Theme theme) {
