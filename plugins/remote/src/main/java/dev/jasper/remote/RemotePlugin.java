@@ -185,11 +185,13 @@ public class RemotePlugin implements Plugin {
         } catch(NoClassDefFoundError absent) { /* the Editor is not installed: files in the SFTP panel do not open */ }
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
         sftpUi.onFollowRequested(follower::request);
-        context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote")),invoked->{
+        context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote"))
+                .withDefaultBinding("cmd+shift+o").withContext(dev.jasper.sdk.ui.ShortcutContext.terminal()),invoked->{
             invoked.pane().flatMap(this::sftpPane).ifPresentOrElse(pane->sftpUi.show(invoked.window(),pane),()->sftpUi.show(invoked.window()));
         });
         context.menus().terminalContext().add(SFTP);
-        splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split")), invoked -> invoked.pane().ifPresent(this::splitSameHost));
+        splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split"))
+            .withContext(dev.jasper.sdk.ui.ShortcutContext.terminal()), invoked -> invoked.pane().ifPresent(this::splitSameHost));
         splitAction.setEnabled(false);
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
         PluginMenu menu = context.menus().create(MENU, "SSH");
@@ -235,13 +237,14 @@ public class RemotePlugin implements Plugin {
     /** Remote's navigation actions with their default bindings; Keymap rebinds them. */
     private void registerNavigation() {
         context.actions().register(ActionSpec.of(CONNECT, "Connect to SSH Host...").withIcon(icon)
-                .withKeywords(List.of("ssh", "remote", "host", "connect")).withDefaultBinding("cmd+shift+h"),
+                .withKeywords(List.of("ssh", "remote", "host", "connect")).withDefaultBindings("cmd+shift+h", "ctrl+shift+h"),
             invoked -> context.palette().open(invoked.window(), RemoteScope.ID, Optional.empty(), Optional.empty()));
         context.actions().register(ActionSpec.of(HOSTS, "Toggle SSH hosts").withIcon(icon)
-                .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBinding("cmd+shift+s"),
+                .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBindings("cmd+alt+1", "alt+1"),
             invoked -> showPanel(invoked.window()));
         context.actions().register(ActionSpec.of(SFTP_TOGGLE, "Toggle SFTP")
-                .withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp", "files", "panel", "show", "hide")),
+                .withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp", "files", "panel", "show", "hide"))
+                .withDefaultBindings("cmd+alt+2", "alt+2"),
             invoked -> sftpUi.toggle(invoked.window()));
     }
 

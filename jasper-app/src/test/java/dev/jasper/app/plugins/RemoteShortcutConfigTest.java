@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
@@ -63,8 +64,10 @@ class RemoteShortcutConfigTest {
     @Test void defaultsHoldAcrossReloadsAndAppOverridesRebindWithoutMovingMenuPlacements() throws Exception {
         start();
         onEdt(() -> {
-            assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+shift+s");
+            assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+alt+1");
+            assertThat(contributions.action(HOSTS).orElseThrow().otherDefault()).contains("alt+1");
             assertThat(contributions.action(CONNECT).orElseThrow().defaultBinding()).contains("cmd+shift+h");
+            assertThat(contributions.action(CONNECT).orElseThrow().otherDefault()).contains("ctrl+shift+h");
             var bindings = resolve(Map.of(HOSTS, "ctrl+alt+s", CONNECT, "ctrl+alt+h")).bindings();
             assertThat(bindings.strokeFor(HOSTS)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
             assertThat(bindings.strokeFor(CONNECT)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
@@ -81,8 +84,27 @@ class RemoteShortcutConfigTest {
         reload("keepalive_seconds = 9\n[shortcuts]\ntoggle_panel = 'ctrl+alt+s'\nopen_palette = 'ctrl+alt+h'\n");
         onEdt(() -> {
             assertThat(contributions.action(HOSTS)).as("an old [shortcuts] table replaces nothing").containsSame(hostsBefore);
-            assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+shift+s");
+            assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+alt+1");
+            assertThat(contributions.action(HOSTS).orElseThrow().otherDefault()).contains("alt+1");
             assertThat(contributions.action(CONNECT).orElseThrow().defaultBinding()).contains("cmd+shift+h");
+            assertThat(contributions.action(CONNECT).orElseThrow().otherDefault()).contains("ctrl+shift+h");
+        });
+    }
+
+    @Test void linuxDefaultsUseTheExplicitPairsAndTheAltRule() throws Exception {
+        start();
+        onEdt(() -> {
+            var resolved = KeyBindings.defaults(false).withExtensions(contributions.actions().stream()
+                .map(dev.jasper.app.contributions.ActionEntry::extension).toList());
+            assertThat(resolved.problems()).noneMatch(problem -> problem.actionId().startsWith("dev.jasper.remote."));
+            var bindings = resolved.bindings();
+            assertThat(bindings.strokeFor(HOSTS)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_1, InputEvent.ALT_DOWN_MASK));
+            assertThat(bindings.strokeFor(SFTP_TOGGLE)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.ALT_DOWN_MASK));
+            assertThat(bindings.strokeFor(CONNECT)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_H,
+                InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+            assertThat(bindings.strokeFor("dev.jasper.remote.sftp")).contains(KeyStroke.getKeyStroke(KeyEvent.VK_O,
+                InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+            assertThat(bindings.contextFor("dev.jasper.remote.sftp")).isEqualTo(KeyContext.TERMINAL);
         });
     }
 
@@ -106,11 +128,13 @@ class RemoteShortcutConfigTest {
             .flatMap(entry -> ((MenuEntry.Submenu) entry).entries().stream()).toList();
     }
 
-    @Test void sftpBindingIsBlankByDefaultAndAnOverrideBindsIt() throws Exception {
+    @Test void sftpBindingDefaultsToAltCmd2AndAnOverrideReplacesIt() throws Exception {
         start();
         onEdt(() -> {
-            assertThat(resolve(Map.of()).bindings().strokeFor(SFTP_TOGGLE)).isEmpty();
-            assertThat(resolve(Map.of(SFTP_TOGGLE, "cmd+alt+f")).bindings().strokeFor(SFTP_TOGGLE)).isPresent();
+            assertThat(resolve(Map.of()).bindings().strokeFor(SFTP_TOGGLE))
+                .contains(KeyStroke.getKeyStroke(KeyEvent.VK_2, InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
+            assertThat(resolve(Map.of(SFTP_TOGGLE, "cmd+alt+f")).bindings().strokeFor(SFTP_TOGGLE))
+                .contains(KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
         });
     }
 }
