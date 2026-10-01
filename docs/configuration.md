@@ -89,7 +89,6 @@ copy_on_select = false
 bell = "visual"
 on_exit = "keep_open"
 shell_integration = "auto"
-colors = "match"
 
 [terminal.font]
 family = "JetBrains Mono"
@@ -118,6 +117,7 @@ family = "system"
 [ui.theme]
 # A built-in or installed theme's name; see Themes.
 name = "Jasper Dark"
+workspace = "match"
 
 [themes.marketplace]
 # Search the JetBrains Marketplace from Settings > Themes; false keeps Jasper offline.
@@ -287,8 +287,8 @@ from a local shell can also supply remote context; Jasper does not infer SSH hos
 parsing command text.
 
 Tabs sit directly beneath the header. The selected tab has an inset rounded fill and
-thin outline from the active UI theme, with a muted blue selection in Jasper Dark.
-Independent terminal colors do not change the tab's fill, text or icon variant. Narrow
+thin outline from the active workspace theme, with a muted blue selection in Jasper Dark.
+An independent workspace theme also changes tab text and icon artwork. Narrow
 windows scroll overflowing tabs, and keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
 pixels by default, 20–72).
 
@@ -675,11 +675,13 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers installing
 Marketplace themes and how a theme colours the terminal. An unknown name is a warning that lists
-the available themes: at start-up Jasper uses Jasper Dark, and on a reload it keeps the theme
-showing. A non-string value rejects the configuration.
+the available themes: at start-up Jasper uses Jasper Dark; on reload it uses the safe built-in
+for the last successfully applied chrome darkness. The requested name stays in the file for a later retry.
+A non-string value rejects the configuration.
 
-Terminal padding and the area behind panes match the terminal palette; toolbar, menus, find
-controls and the native title follow the theme. Theme changes retain shells, scrollback, split
+Terminal padding and the area behind panes match the workspace; toolbar, menus, sidebars,
+dialogs and the native title follow the UI theme. Find controls follow the workspace. Theme changes retain shells,
+scrollback, split
 ratios and font choices, and a failed installation keeps the previous theme and can be retried
 with Reload config.
 
@@ -695,6 +697,15 @@ supported: a `[colors]` table is reported as an unknown setting and ignored. See
 selected literally. The older `terminal.colors` and `ui.theme.terminal` keys still load; their
 `light` and `dark` values become `Jasper Light` and `Jasper Dark` when migrated. A canonical
 `ui.theme.workspace = "Light"` is not changed by that compatibility conversion.
+Canonical values always win over either alias, regardless of file order. Saving or migrating
+the setting removes the older paths. Legacy `dark` now selects native Jasper Dark, whose terminal
+background is `#191c20`.
+
+The workspace setting changes terminal panes, tabs, find controls, dividers, zone-aware icons
+and Editor syntax in all windows without restarting Editor or discarding edits. Even two themes
+with the same light/dark variant produce a workspace update. A missing workspace theme warns and
+temporarily matches the chrome; its requested name stays saved for repair and reload.
+General plugin pane controls are styled by the next theme deliverable.
 
 In Settings › Terminal › Font & Colors, the workspace match checkbox follows the UI theme. Clearing
 it enables the native and Alacritty theme choices (including Jasper Light and Jasper Dark). View → Terminal Colors continues to save this

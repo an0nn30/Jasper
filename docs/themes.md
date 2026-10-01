@@ -1,7 +1,7 @@
 # Themes
 
-Jasper's themes are Jasper theme files: TOML that colours the whole app, the terminal palette and (from a later
-release) syntax highlighting. Four are built in: **Jasper Dark** (the default), **Jasper Light**, and IntelliJ's
+Jasper's themes are Jasper theme files: TOML that colours the app, workspace, terminal palette and editor syntax.
+Four are built in: **Jasper Dark** (the default), **Jasper Light**, and IntelliJ's
 classic **IntelliJ Light** and **Darcula**, converted. Theme plugins from the JetBrains Marketplace can still be
 installed; Jasper converts them when it reads them.
 
@@ -12,11 +12,15 @@ Name the theme in `config.toml`:
 ```toml
 [ui.theme]
 name = "Dracula"
+workspace = "match" # or "Jasper Dark", another native theme, or an Alacritty theme
 ```
 
 The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
 every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and
-installed theme; **Get More Themes…** at the bottom opens Settings › Themes › IntelliJ Themes.
+installed theme; **Get More Themes…** at the bottom opens Settings › Themes › IntelliJ Themes. The
+workspace choice switches independently, including between two dark themes. The pane tab strip, find controls,
+split dividers, terminal palette, zone-aware icons and Editor syntax follow it. Menus, sidebars and dialogs follow
+the UI theme. General hosted plugin pane styling follows in the next deliverable.
 
 ## Writing a theme
 
@@ -120,27 +124,31 @@ Not supported:
 - icon recolouring;
 - New UI-only layout keys.
 
-## Terminal colours
+## Workspace and terminal colours
 
-With `terminal.colors = "match"` (the default), a theme that has an editor colour scheme
-colours the terminal with the scheme's console colours: background, text, cursor, selection and
-the 16 ANSI colours.
+With `ui.theme.workspace = "match"` (the default), workspace surfaces, Editor syntax and terminal colours
+follow `ui.theme.name`. A named workspace theme supplies its own effective surface, text, syntax and terminal
+values without installing a second look and feel. A converted IntelliJ theme with an editor colour scheme
+supplies the terminal's console background, text, cursor, selection and 16 ANSI colours.
 - **Missing colours:** colours the scheme leaves out come from its parent schemes, as in IntelliJ's console. A theme's `editorScheme` or a scheme's `parent_scheme` may name any scheme IntelliJ bundles: `Default`, `Darcula`, `IntelliJ Light`, `Light`, `Dark`, `Darcula Contrast`, `High contrast` and `Islands Dark`.
 - **No scheme:** Jasper theme files, Jasper Dark and Jasper Light included, take their terminal palette from their own `[colors]`, and IntelliJ Light and Darcula from their own editor scheme. Only an installed plugin theme without a scheme uses Jasper Dark's or Jasper Light's palette by the theme's darkness.
-- **Forcing Jasper's palettes:** `"light"` and `"dark"` always use Jasper's palettes.
+- **Choosing Jasper's palettes:** `"Jasper Light"` and `"Jasper Dark"` select the complete native themes.
+  Legacy `terminal.colors = "light"` or `"dark"` maps to these names when read. Jasper Dark's native terminal
+  background is `#191c20`.
 
 Scheme colours are used exactly as the theme author chose them.
 
 ## Terminal themes
 
-`terminal.colors` can also name a terminal theme in [Alacritty](https://alacritty.org)'s format. Jasper bundles the
+`ui.theme.workspace` can also name a terminal theme in [Alacritty](https://alacritty.org)'s format. Jasper currently
+converts it in memory to a complete workspace theme. Jasper bundles the
 whole [alacritty-theme](https://github.com/alacritty/alacritty-theme) collection (177 themes, Apache 2.0), and reads
 `.toml` files you put in the `terminal-themes` folder beside `config.toml`; a file of yours wins over a bundled theme of
 the same name. A theme's name comes from its file name: `gruvbox_dark.toml` is "Gruvbox Dark". `match`, `light` and
 `dark` are Jasper's own choices and cannot be theme names.
 
 Settings › Themes › **Alacritty Themes** lists every theme with its colours and draws a sample terminal in the selected
-one; **Use** chooses it (Apply or OK switches the terminals), **Install from Disk…** checks and copies a theme file in,
+one; **Use** chooses it (Apply or OK switches the workspace), **Install from Disk…** checks and copies a theme file in,
 **Reveal Folder** shows the folder, and **Remove…** deletes one of your files. Settings › Terminal › Font & Colors lists
 the themes too, ending in **More Terminal Themes…**.
 
@@ -148,8 +156,8 @@ Jasper reads a theme's `colors.primary` foreground and background (required), `c
 16 ANSI colours), `colors.cursor.cursor` and `colors.selection.background`. A missing bright colour uses the normal one;
 a missing cursor uses the foreground and a missing selection a blend of foreground and background. Other keys (dim
 colours, search, hints, indexed colours) are ignored. A missing normal colour comes from Jasper Dark, or Jasper Light
-when the theme's background is light. An unknown name in `terminal.colors` is a warning and the terminal matches the UI
-theme.
+when the theme's background is light. An unknown name in `ui.theme.workspace` is a warning and the workspace matches the UI
+theme. The requested name remains saved so repairing or installing that theme can select it on reload.
 
 In the `terminal-themes` folder Jasper reads only `.toml` files; hidden files (a name starting with `.`) and other files
 are ignored, and a file over 64 KiB is skipped. A file that cannot be used, or a colour Jasper ignores, is reported
@@ -158,7 +166,7 @@ under the status bar's **Config warnings**, naming the file.
 ## When something is wrong
 
 Problems appear under the status bar's **Config warnings**, naming the file:
-- An unknown `ui.theme.name` lists the themes available. At start-up Jasper uses Jasper Dark; on a reload it keeps the theme showing.
+- An unknown `ui.theme.name` lists the themes available. At start-up Jasper uses Jasper Dark; on reload it uses the safe built-in for the last successfully applied chrome darkness. The requested name remains saved for a later retry.
 - A file that isn't a readable plugin, or a plugin with no theme files, is reported.
 - A theme that fails to load, or names a parent theme Jasper doesn't have, is reported.
 - Two installed themes with the same name are reported, and the file that sorts first wins.

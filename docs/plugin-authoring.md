@@ -702,3 +702,7 @@ the document model, not by changing a live tab's key. Do not encode remote paths
 `onWorkspaceChanged` to refresh them even when darkness stays the same. Palette reads and subscription registration
 belong on the UI thread; variant getters may run on any thread. Dispose subscriptions with their widgets.
 Use `WorkspacePalette.current(component)` in shared renderers so sidebar controls continue to follow chrome.
+The no-argument `current()` reads the published workspace palette. A popup or tooltip stays with chrome even when
+opened from a workspace pane. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
+workspace event; an event can change colors while `workspaceVariant()` remains `DARK` or `LIGHT`. Keep the document
+and undo model when changing only its styles.

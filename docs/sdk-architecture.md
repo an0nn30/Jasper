@@ -408,6 +408,9 @@ Fake workspace changes publish their snapshot and notify current subscribers tog
 workspace getters expose the last flushed value. Consecutive queued changes each expose their own complete snapshot
 inside the callback; duplicate pending values are quiet. Subscriptions added before publication receive that change,
 and registrations closed before delivery remain silent. Chrome's existing fake variant/event behavior is unchanged.
+Retained host-owned named icons select light or dark artwork at paint time from the component's current zone, including
+after reparenting. Workspace markers are app-native JDK properties; popup, tooltip and root-pane boundaries return to
+chrome. Custom plugin SVG artwork remains authored. Generic plugin-pane control styling is the next deliverable.
 
 ### Declared settings (plan C1; SDK 0.9 completes them)
 

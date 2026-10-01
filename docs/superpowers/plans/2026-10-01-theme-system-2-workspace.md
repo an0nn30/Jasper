@@ -2,7 +2,30 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Planned, not executed. Baseline `main@5fc76c7d`; review with the remaining-work assessment before starting.
+**Status:** Implementation and headless acceptance complete on `codex/theme-system-plans` through Task 8;
+final independent whole-branch review and user-run GUI acceptance remain pending. Baseline `main@5fc76c7d`.
+Tasks 1–7 have independent task reviews. Plan 3 (generic plugin pane styling) is next; plans 4–5 remain future work.
+Serialized `./gradlew check` passed with 7,767 tests, zero failures/errors and six skips; all architecture checks,
+`git diff --check` and Java source hygiene passed. Per-module XML totals are in Task 8's execution report.
+
+**Execution deviations and rulings:** Legacy `terminal.colors` and `ui.theme.terminal` are path-only aliases:
+only values read from those paths convert `light`/`dark` to native Jasper names; canonical native names remain literal.
+Legacy `dark` therefore uses Jasper Dark's native `#191c20` terminal background, replacing the retired `#282a36`
+hardcoded palette. The retained menu identity moved to `WorkspaceThemeChoice` because the old `TerminalColors`
+adapter mislabeled native Light; cost if wrong: revert the earlier menu refactoring, but retaining ambiguous identity
+would be incorrect. Complete-theme workspace values are materialized through an isolated private LAF without changing
+the installed chrome LAF; one EDT-owned generated cache is pruned on catalog refresh while retaining active choices.
+`UiTemplate` did not need edits; a pure inverse map covers all 48 tokens. `WindowContent` owns terminal-tab zone lifetime,
+and the rendered divider test lives in `WorkspaceThemeTest`. A JDK foreground client property supports paint-time KEY
+icon selection. The native SDK boundary uses `PluginRuntime.appearance` to supply resolved themes before start;
+workspace defaults are native Color/Boolean keys, with SDK values mapped only in app.plugins. Fake palette access
+accepts its creating test thread and Swing EDT but rejects other workers; cost if wrong: narrow testkit threading
+and update Editor tests, while production remains UI-thread confined. Fake workspace publication is queued with its
+notifications, so getters expose the last flushed snapshot and callback values stay coherent; cost if wrong: fake
+clients expecting pre-flush reads must flush or the scheduling contract must change. The existing fake method is
+`setVariant`, not the brief's `setTheme`; no alias was added. SDK 0.12.0 and seven bundled manifest ranges landed
+without changing plugin release versions. Editor maps all 16 roles to RSyntax token types, updates same-darkness
+changes and preserves documents, edits and undo state.
 
 **Goal:** Make terminal panes, their tab strip, dividers, find UI, icons and Editor follow a complete workspace theme,
 independently of chrome, with the SDK palettes that plugin restyling will consume.
@@ -73,7 +96,7 @@ All app Java paths below are relative to `jasper-app/src/main/java/dev/jasper/ap
 - `ConfigLoader` supplies path-specific legacy workspace and variant transforms; `ConfigMigration` writes the normalized loaded value for a
   transformed alias instead of just moving its old literal. Native current-key values are never transformed as aliases.
 
-- [ ] **Step 1: Add failing compatibility tests.** Use actual `ConfigLoader.parse` and `ConfigMigration.plan`:
+- [x] **Step 1: Add failing compatibility tests.** Use actual `ConfigLoader.parse` and `ConfigMigration.plan`:
 
 ```java
 @Test void workspaceCanonicalKeyWinsOverLegacyInEitherOrder() {
@@ -106,7 +129,7 @@ Also pin bad setting types as diagnosed/defaulted without discarding other valid
 surviving migration. Run `./gradlew :jasper-app:test --tests '*ConfigLoaderTest' --tests '*ConfigMigrationTest'`:
 expect missing API or incorrect old behavior before implementation.
 
-- [ ] **Step 2: Implement the value and schema migration.** The complete normalization body is:
+- [x] **Step 2: Implement the value and schema migration.** The complete normalization body is:
 
 ```java
 public record WorkspaceThemeChoice(String name) {
@@ -138,12 +161,12 @@ setting. Add `ui.theme.variant` as an alias of UI_THEME_NAME and transform strin
 `SettingWriter` with `parsed.values().get(setting)` for transformed aliases after removing their old path, preserving
 canonical precedence and backup behavior. Do not use string replacement on TOML.
 
-- [ ] **Step 3: Keep transitional UI coherent.** The old terminal selector and Alacritty Use buttons write
+- [x] **Step 3: Keep transitional UI coherent.** The old terminal selector and Alacritty Use buttons write
 `UI_THEME_WORKSPACE`. Relabel explanatory text to say it affects workspace, keep the match checkbox behavior, and
 include native theme names as well as Alacritty names. Both old pages still open. Migrate menu save paths and update
 `config.example.toml`, generated comments and configuration docs with the new key and aliases.
-- [ ] **Step 4: Run the named tests plus ConfigService/Settings tests and `./gradlew check`; expect exit 0.**
-- [ ] **Step 5: Commit** `feat(config): add workspace theme setting and legacy aliases` with the required trailer.
+- [x] **Step 4: Run the named tests plus ConfigService/Settings tests and `./gradlew check`; expect exit 0.**
+- [x] **Step 5: Commit** `feat(config): add workspace theme setting and legacy aliases` with the required trailer.
 
 ## Task 2: Generate accurate workspace values and transitional Alacritty themes
 
@@ -168,7 +191,7 @@ include native theme names as well as Alacritty names. Both old pages still open
   canonical constructor (Theme.of is package-private). Remove this source variant in plan 4. Keep appearance free of
   terminalthemes types. Make the pure native generator entry point public with JavaDoc for converter reuse.
 
-- [ ] **Step 1: Write the mandatory private-defaults isolation spike as a permanent headless test.** Capture
+- [x] **Step 1: Write the mandatory private-defaults isolation spike as a permanent headless test.** Capture
 `UIManager.getLookAndFeel()` and its color defaults, generate a different complete theme, and compare both afterward.
 Use two explicit, different colors for console background and Panel.background; assert workspace SURFACE equals the
 latter and terminal background equals the former. Add this pure-value test:
@@ -198,7 +221,7 @@ Run the two new tests first; expect missing conversion/materialization behavior.
 materializer. If `getDefaults()` mutates global state, do not temporarily install/restore a LAF; use deterministic
 pure inverse mapping with the theme's resolved explicit keys and document the tested fallback keys before continuing.
 
-- [ ] **Step 2: Implement the inverse mapping.** Use these effective defaults, with explicit token values winning:
+- [x] **Step 2: Implement the inverse mapping.** Use these effective defaults, with explicit token values winning:
 
 | Token | Effective key (first available) |
 |---|---|
@@ -221,12 +244,12 @@ alpha. Extract the key table into package-private `WorkspaceTokenKeys` for this 
 public for conversion without invoking this EDT materializer. Recompute derived syntax against the resulting editor background; explicit syntax styles survive. Avoid an
 unbounded new cache: reuse ThemeManager's theme cache, and remove obsolete user-theme entries on catalog refresh.
 
-- [ ] **Step 3: Bridge the transitional catalog from application composition.** Do not make `appearance` depend on
+- [x] **Step 3: Bridge the transitional catalog from application composition.** Do not make `appearance` depend on
 `terminalthemes` (which already depends on appearance). `ConfigurationController` asks the native catalog first,
 then converts a named terminal theme only when no native name matches. Preserve file problems. Keep native theme
 identity on unchanged scans and reuse unchanged converted values, so reloads do not spuriously notify subscribers.
-- [ ] **Step 4: Run isolation, conversion and all appearance parity tests, then `./gradlew check`.**
-- [ ] **Step 5: Commit** `feat(appearance): materialize workspace tokens and convert legacy palettes`.
+- [x] **Step 4: Run isolation, conversion and all appearance parity tests, then `./gradlew check`.**
+- [x] **Step 5: Commit** `feat(appearance): materialize workspace tokens and convert legacy palettes`.
 
 ## Task 3: Publish two slots atomically and implement missing-theme fallback
 
@@ -253,7 +276,7 @@ null only for match/missing fallback, never a signal to keep a stale workspace. 
 preserving the configured workspace choice. Retain `subscribe(BiConsumer<ResolvedTheme,Boolean>)`: the boolean means
 chrome delegate refresh. Workspace event adapters compare workspace values themselves; same darkness is not equality.
 
-- [ ] **Step 1: Add red state/publication tests.** Construct native Theme fixtures via existing test patterns. Pin:
+- [x] **Step 1: Add red state/publication tests.** Construct native Theme fixtures via existing test patterns. Pin:
 
 ```java
 assertThat(controller.current().workspace()).isSameAs(controller.current().chrome()); // default/match
@@ -269,18 +292,18 @@ fresh-start missing chrome chooses Jasper Dark; missing workspace chooses match 
 file reselects the requested theme on reload. Store requested configuration separately from fallback runtime values.
 Run the named state/controller tests; expect old one-palette semantics to fail.
 
-- [ ] **Step 2: Implement atomic state.** Materialize both candidates first. For match call the generator once and
+- [x] **Step 2: Implement atomic state.** Materialize both candidates first. For match call the generator once and
 assign the same object to both fields. Install chrome only if chrome/font changed; commit both fields only after
 installation succeeds. Then notify a snapshot of listeners. Repeated unchanged resolution sends nothing. Retain the
 existing rollback and font-offset behavior. Update every use of `theme.chrome()` that needs Theme identity to use
 `themes.choice()` instead; use generated `dark()`/`name()` elsewhere.
-- [ ] **Step 3: Resolve fallback in ConfigurationController.** Read names with the existing case/space rules. Keep
+- [x] **Step 3: Resolve fallback in ConfigurationController.** Read names with the existing case/space rules. Keep
 `lastChromeDark` updated only after successful apply; choose built-in constants directly for fallback, so a broken
 user shadow cannot replace the safe fallback. An unknown workspace uses the chrome generated object and a warning
 at `ui.theme.workspace`, while retaining the user's requested string in config. Do not mask parse diagnostics with
 fallback diagnostics. Dispose subscriptions and keep the existing cross-window publication path.
-- [ ] **Step 4: Run state/configuration/typography/rollback tests and `./gradlew check`.**
-- [ ] **Step 5: Commit** `feat(appearance): resolve chrome and workspace themes atomically`.
+- [x] **Step 4: Run state/configuration/typography/rollback tests and `./gradlew check`.**
+- [x] **Step 5: Commit** `feat(appearance): resolve chrome and workspace themes atomically`.
 
 ## Task 4: Host workspace surfaces and explicit zone boundaries
 
@@ -294,13 +317,13 @@ Use `Jasper.zone = "workspace"`, `Jasper.workspaceTheme = GeneratedTheme`, `Jasp
 workspace roots. `match` retains the zone marker for ownership but no overriding style/color payload. Paint lookup
 stops at explicit chrome boundaries and popup/window roots; no dependency from platform into this class.
 
-- [ ] **Step 1: Add headless rendered-color tests.** Under Jasper Light chrome and Jasper Dark workspace assert the
+- [x] **Step 1: Add headless rendered-color tests.** Under Jasper Light chrome and Jasper Dark workspace assert the
 selected tab, inactive tab, divider, find row, find error state, terminal background and terminal ANSI values match
 workspace tokens/palette. Verify title bar, sidebar, status bar, a JPopupMenu and a dialog's content defaults stay light.
 Assert `match` uses chrome defaults and removes all workspace overrides. Test mounting a new tab after initial apply,
 reparenting hosted content, terminal launch/error labels and existing sessions surviving a theme change.
 Run targeted workspace tests; expect the current UIManager-only tab/divider/find reads to fail.
-- [ ] **Step 2: Replace paint lookups and apply retained state.** Map WindowTabs background to TAB_BAR, active fill/text
+- [x] **Step 2: Replace paint lookups and apply retained state.** Map WindowTabs background to TAB_BAR, active fill/text
 and underline to TAB_ACTIVE/TAB_ACTIVE_TEXT/TAB_UNDERLINE, inactive titles to TEXT_MUTED, hover to TAB_HOVER. Split
 borders use DIVIDER. Find row uses SURFACE, TEXT and TEXT_MUTED; input uses INPUT_BACKGROUND/TEXT/TEXT_SELECTION;
 missing/error input uses ERROR_BACKGROUND. Explicitly style the host-owned find buttons/field now; do not wait for the
@@ -319,8 +342,8 @@ static Color resolvedColor(GeneratedTheme workspace, Token token, String chromeK
 Run `updateComponentTreeUI` only on chrome changes, then reapply workspace properties/styles. At `mountContent` mark
 hosted content; at `unmountContent` clear host-owned properties. Terminal and hosted roots are workspace; rail hosts
 remain chrome. Nested popup trees do not inherit workspace by following their invoker.
-- [ ] **Step 3: Run workspace rendering/lifetime tests and `./gradlew check`.**
-- [ ] **Step 4: Commit** `feat(workspace): paint terminal surfaces from workspace tokens`.
+- [x] **Step 3: Run workspace rendering/lifetime tests and `./gradlew check`.**
+- [x] **Step 4: Commit** `feat(workspace): paint terminal surfaces from workspace tokens`.
 
 ## Task 5: Paint-time zone-aware host icons
 
@@ -331,16 +354,16 @@ existing `NamedIconsTest`, `AppIconsTest`, `AppIconsPluginTest`, `IntellijIconsT
 `public static boolean ThemeZone.dark(Component component, boolean chromeDark)` inspect only JDK client properties.
 Treat JPopupMenu and JToolTip as chrome even when logically associated with a workspace invoker. No workspace import.
 
-- [ ] **Step 1: Add red image comparisons.** Paint the same retained named icon into a BufferedImage in light chrome,
+- [x] **Step 1: Add red image comparisons.** Paint the same retained named icon into a BufferedImage in light chrome,
 dark workspace, detached component and popup. Compare the workspace rendering with a fixed-URL dark sibling and the
 chrome rendering with the light sibling; move the same JLabel between roots and repeat. Verify disabled icons keep
 correct artwork/opacity, dimensions remain 16 logical px (dropdown 8), and custom plugin SVGs remain authored.
-- [ ] **Step 2: Implement dynamic wrappers.** Cache base catalog ids, not one globally selected variant. In paintIcon,
+- [x] **Step 2: Implement dynamic wrappers.** Cache base catalog ids, not one globally selected variant. In paintIcon,
 select explicit URL light/dark artwork using ThemeZone, falling back to the original when a sibling is absent. Keep
 proportional fitting and disabled provider behavior. Update `forBackground` to recognize the new wrapper so existing
 surface overrides still work. The KEY semantic icon uses the selected zone text color; do not recolor arbitrary SVGs.
-- [ ] **Step 3: Run icon and workspace tests plus `./gradlew check`.**
-- [ ] **Step 4: Commit** `feat(icons): choose workspace artwork at paint time`.
+- [x] **Step 3: Run icon and workspace tests plus `./gradlew check`.**
+- [x] **Step 4: Commit** `feat(icons): choose workspace artwork at paint time`.
 
 ## Task 6: SDK 0.12.0 palettes, host adapter and fake contracts
 
@@ -389,14 +412,14 @@ Define `SyntaxPalette.current()` to read `Jasper.workspace.syntax.<role>` color/
 complete plain-text palette from EditorPalette.current (comments italic). Hosted and fake Appearance override all new
 methods. `editorPalette()` now returns workspace editor colors; keep `variant()/onChanged` about chrome.
 
-- [ ] **Step 1: Add failing SDK value and contract tests.** Assert immutability, all 16 roles, missing/null rejection,
+- [x] **Step 1: Add failing SDK value and contract tests.** Assert immutability, all 16 roles, missing/null rejection,
 custom-host defaults without app keys, component-aware chrome/workspace resolution and default method source
 compatibility. Extend the contract harness with `setWorkspace(Variant, WorkspacePalette, EditorPalette, SyntaxPalette)`;
 both app harness and fake implement it. In `PluginContractTest`, subscribe, change dark→different dark, assert one
 callback and new values visible inside it; chrome handler does not fire. Close subscription and stop plugin, then
 change again and assert neither disposed handler runs. Call safe variant getters off UI thread; palette methods retain
 UI-thread checks. Compile old custom-host implementation relying only on default additions.
-- [ ] **Step 2: Implement the host boundary.** Add an app-native appearance input to PluginRuntime/PluginHost using
+- [x] **Step 2: Implement the host boundary.** Add an app-native appearance input to PluginRuntime/PluginHost using
 `Supplier<ResolvedTheme>` and `Function<Consumer<ResolvedTheme>, dev.jasper.app.lifecycle.Subscription>`; app.plugins
 adapts to SDK records. Capture immutable snapshots for safe off-thread variant reads. `HostedUi` registers workspace
 handlers through existing lifecycle containment; skip the initial replay for change listeners. Compare the whole
@@ -404,12 +427,12 @@ workspace generated value, not just darkness. Publish semantic workspace keys af
 from chrome defaults; on match publish the chrome generated palette/syntax as workspace values (only the component
 style layer disappears). Reapply these values after a chrome LAF rebuild. Never put an SDK object in
 UIManager from outside app.plugins. Add the allowed plugins→appearance package edge, no reverse edge.
-- [ ] **Step 3: Implement fake parity and versioning.** Add `FakePluginHost.setWorkspace(...)` with the same event and
+- [x] **Step 3: Implement fake parity and versioning.** Add `FakePluginHost.setWorkspace(...)` with the same event and
 lifetime rules. Make existing `setTheme(Variant)` update workspace when fake mode is match, preserving old tests. Set
 `JasperSdk.VERSION = "0.12.0"`; update every manifest range and version-sensitive fixture/document. Don't change unrelated
 plugin release numbers unless the repository packaging convention requires it; document any such bump.
-- [ ] **Step 4: Run SDK/testkit contract, HostedUi and staged-plugin tests, all architecture tasks, then `./gradlew check`.**
-- [ ] **Step 5: Commit** `feat(sdk): expose workspace and syntax palettes in 0.12.0`.
+- [x] **Step 4: Run SDK/testkit contract, HostedUi and staged-plugin tests, all architecture tasks, then `./gradlew check`.**
+- [x] **Step 5: Commit** `feat(sdk): expose workspace and syntax palettes in 0.12.0`.
 
 ## Task 7: Editor follows workspace syntax without resetting documents
 
@@ -421,11 +444,11 @@ new/extend `plugins/editor/src/test/java/dev/jasper/editor/ui/EditorThemeTest.ja
 EditorWindow gets both palettes from Appearance; EditorPlugin uses `onWorkspaceChanged`. Preserve unrelated settings
 subscriptions. Existing font/line-wrap/tab-width settings still apply on configuration changes.
 
-- [ ] **Step 1: Add the red mapping and retention tests.** Give each role a distinct literal color and font flags;
+- [x] **Step 1: Add the red mapping and retention tests.** Give each role a distinct literal color and font flags;
 assert each token type below receives its role and current editor font family/size with bold/italic combined. Capture
 document identity, text, caret, selection, undo availability and dirty flag before applying a different dark workspace;
 assert all survive and colors change. Same-theme repeated apply must not accumulate styles/listeners.
-- [ ] **Step 2: Implement the complete mapping:**
+- [x] **Step 2: Implement the complete mapping:**
 
 | Role | RSyntaxTextArea TokenTypes |
 |---|---|
@@ -451,16 +474,16 @@ any remaining `MARKUP_TAG_*`, `LITERAL_NUMBER_*` or `ERROR_*` constant into the 
 classification at runtime. Copy/update the SyntaxScheme, never call Theme.load or either XML theme. Set editor and
 gutter surfaces exactly as the existing method does; reset token font flags on every apply so italic cannot linger.
 A style font is `area.getFont().deriveFont((bold ? Font.BOLD : 0) | (italic ? Font.ITALIC : 0))`.
-- [ ] **Step 3: Run Editor theme/lifecycle tests, contract tests and `./gradlew check`.**
-- [ ] **Step 4: Commit** `feat(editor): apply workspace syntax roles to editor tokens`.
+- [x] **Step 3: Run Editor theme/lifecycle tests, contract tests and `./gradlew check`.**
+- [x] **Step 4: Commit** `feat(editor): apply workspace syntax roles to editor tokens`.
 
 ## Task 8: Close the runnable deliverable
 
-- [ ] Update `docs/themes.md`, `docs/configuration.md`, SDK architecture/authoring docs and `docs/STATUS.md`; mark this
+- [x] Update `docs/themes.md`, `docs/configuration.md`, SDK architecture/authoring docs and `docs/STATUS.md`; mark this
   plan executed only after actual completion and record any interface/derivation deviation here and in STATUS.
-- [ ] Run `./gradlew check`; report per-module XML totals, not an estimated count. Run `git diff --check` and the Java
+- [x] Run `./gradlew check`; report per-module XML totals, not an estimated count. Run `git diff --check` and the Java
   source-hygiene scan from AGENTS.md. Final independent review covers the full branch including compatibility and cleanup.
-- [ ] Commit `docs: record workspace theme delivery and acceptance checks` with the required trailer.
-- [ ] Hand GUI checks to the user: Jasper Light chrome + Jasper Dark/Alacritty workspace; tabs/find/dividers/icons;
+- [x] Commit `docs: record workspace theme delivery and acceptance checks` with the required trailer.
+- [x] Hand GUI checks to the user (not run by the agent): Jasper Light chrome + Jasper Dark/Alacritty workspace; tabs/find/dividers/icons;
   switch dark workspaces without restarting Editor; match; multiple windows; menus/sidebar stay chrome. Confirm old
   IntelliJ/Alacritty pages still function. General plugin pane restyling is explicitly the next deliverable.

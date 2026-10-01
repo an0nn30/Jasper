@@ -1,7 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Planning only, 2026-10-01. Audited against `main` at `5fc76c7d` (plan 1 plus the merge-review fixes).
-No product code changes. Plans 2–5 below await review; do not execute them as part of this planning request.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete on `codex/theme-system-plans`, pending final independent whole-branch review and user GUI acceptance. Plans 3–5 remain future deliverables; generic plugin pane styling is next. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -28,11 +27,11 @@ unfinished tasks. The earlier warning about named-color `Icon`/`.border`/`.rowHe
 installed-color parity tests passed. Baseline validation: 7,720 tests, zero failures/errors, six skips; native visual
 acceptance has not been performed.
 
-## Four remaining deliverables
+## Four sequential deliverables
 
 | Order | Plan | Shippable result | Depends on |
 |---|---|---|---|
-| 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Light chrome/dark workspace works for terminal, tabs, dividers, find, icons and Editor; SDK 0.12.0 | Merged plan 1 |
+| 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Implemented and headless-verified: terminal, tabs, dividers, find, icons, Editor and SDK 0.12.0; final independent review and GUI acceptance pending | Merged plan 1 |
 | 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Hosted Swing panes adopt the workspace; plugin-owned styles and cleanup remain correct | Plan 2 |
 | 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Offline native catalog, reproducible conversion, safe upgrade; old stores removed | Plans 2–3 |
 | 5 | [Themes page and live reload](2026-10-01-theme-system-5-page-reload.md) | Complete user flow: browse, stage, preview, import, duplicate, remove and edit/reload | Plan 4 |

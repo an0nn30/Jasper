@@ -2,18 +2,42 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system remaining work planned** (branch `codex/theme-system-plans`):
+- **Theme system Plan 2 workspace delivery** (branch `codex/theme-system-plans`, 2026-10-01):
   [assessment and requirement coverage](superpowers/plans/2026-10-01-theme-system-remaining-work.md) audits main
-  `5fc76c7d` against the full theme design. Four runnable deliverables await review:
+  `5fc76c7d` against the full theme design. Plan 2 is implemented and headless-verified, pending final independent
+  whole-branch review and user GUI acceptance. The four sequential deliverables are:
   [2: workspace zone/SDK/Editor](superpowers/plans/2026-10-01-theme-system-2-workspace.md),
   [3: plugin pane styling](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md),
   [4: conversion/vendoring/migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md),
   [5: Themes page/live reload](superpowers/plans/2026-10-01-theme-system-5-page-reload.md).
-  Planning only; product code unchanged. Proposed additions/clarifications: lossless native `[icons]`, component-aware
-  SDK palette lookup for workspace versus sidebar rendering, combo dropdown workspace styling as the explicit
-  exception to chrome popups. Preserve plan-1 deviations; old theme pages work through plan 3, native dropdowns bridge
-  plans 4–5. Each plan names implementation boundaries, red/green tests, per-task commits and final review/GUI gates.
-  Next: review the plan set, then execute plan 2. No fresh build claimed for this documentation-only change.
+  `ui.theme.workspace` independently selects a complete native or in-memory converted Alacritty workspace, with
+  `match` sharing the exact generated chrome object. Terminal panes, tabs, dividers, find controls and retained icon
+  artwork follow that zone; menus, sidebars and dialogs remain chrome. Editor follows workspace syntax and same-dark
+  changes without replacing its documents or undo state. SDK 0.12.0 exposes component-aware `WorkspacePalette`,
+  syntax roles/styles, editor palette and workspace events; all seven bundled manifests require it. Only the chrome
+  installs FlatLaf. Native effective workspace tokens from complete IntelliJ themes use a private, isolated LAF
+  materialization, with all 48 tokens inverted and authored terminal colors, syntax, identity and icons preserved.
+  One EDT-owned generated cache prunes obsolete catalog entries and retains active choices. A failed chrome install
+  publishes neither slot. Missing chrome uses the safe built-in for its last applied darkness (dark at startup);
+  missing workspace temporarily matches chrome while keeping the requested name saved for repair.
+  Legacy `terminal.colors` and `ui.theme.terminal` are read aliases only: `light`/`dark` convert to Jasper names only
+  from those paths, while canonical names stay literal and win regardless of file order. Saving removes the aliases.
+  Legacy dark now uses native Jasper Dark (`#191c20`) instead of the retired `#282a36` palette. The menu identity
+  moved to `WorkspaceThemeChoice` because the former adapter misidentified native Light; cost if wrong: revert that
+  menu refactor, but the ambiguous selection could not remain. Fake palette reads accept the creating test thread
+  and Swing EDT, rejecting other workers; cost if wrong: narrow testkit threading and adapt Editor tests, while the
+  production host remains UI-thread confined. Fake workspace setters publish snapshots with queued notifications;
+  getters expose the last flushed values, making each callback coherent; cost if wrong: clients depending on
+  pre-flush reads must flush or the fake scheduling contract needs revision. Native SDK publication uses Color/Boolean
+  UI defaults and an app.plugins-only adapter; Editor maps all 16 syntax roles. Task-level deviations and checks are
+  in the [Plan 2 banner](superpowers/plans/2026-10-01-theme-system-2-workspace.md). Serialized `./gradlew check`
+  passed: **7,767 tests, 0 failures/errors, 6 skipped** (app 1,558; Editor 4,783). All architecture gates passed;
+  `git diff --check` and the Java control/private-use/surrogate scan were clean.
+  **GUI checklist for the user, not run by the agent:** Jasper Light chrome with Jasper Dark and an Alacritty
+  workspace; tabs, find, dividers and icons; switch between dark workspaces with Editor open and unsaved edits;
+  match; multiple windows; chrome-colored menus, sidebars and dialogs; old IntelliJ Themes and Alacritty Themes
+  pages. Those old pages remain through Plan 3 and are removed in Plan 4. Next is Plan 3 generic plugin pane
+  styling; Plans 4–5 (conversion/migration and Themes page/live reload) remain future work.
 
 - **Theme system plan 1: format and generator** (branch `claude/theme-system`, spec
   `docs/superpowers/specs/2026-10-01-jasper-theme-system-design.md`, plan
@@ -24,8 +48,8 @@
   themes (problems carry their line). Deviations (plan banner): 48 tokens; new `ui_complete` key; no contrast floor
   for borders; Jasper Light keeps the One Light terminal palette; the converter stays in `appearance` until plan 4;
   `Theme.LIGHT` became `Theme.INTELLIJ_LIGHT`, whose terminal palette now comes from its own scheme; spec 2.3's
-  missing-theme fallback by the slot's last-known `dark` is deferred to plan 2 with the workspace slot (a missing theme
-  keeps the theme showing, Jasper Dark at start-up, as before); derivation values differ from spec 3's sketch
+  missing-theme fallback by the slot's last-known `dark` was deferred to Plan 2 and is now implemented as described
+  above; derivation values differ from spec 3's sketch
   (`surface_raised` 6 %, `surface_sunken` 12 % toward black or white, `tab_active` = accent 18 % over the surface,
   `sidebar` = `surface_sunken`; the full table is in `ThemeGenerator`'s JavaDoc). Converted IntelliJ themes keep their
   named colours as `ColorPalette.*` keys (accent included), pinned by a parity test against the theme file. The
@@ -36,7 +60,7 @@
   are restored by the existing installation path. These review fixes are recorded as plan deviations below the banner.
   Independent review complete; merged and pushed to main at `5fc76c7d`. `./gradlew check` passed after integrating current main: 7,720 tests,
   0 failures/errors, 6 skipped (app 1,522). Source hygiene and diff checks passed.
-  Next: plan 2 (workspace zone). GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
+  Plan 2 now implements the deferred workspace fallback above; see the current entry. GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
   the window, Settings and dialogs; a hand-written theme file in `themes/` (including a broken one's warning).
 
 - **Remote tunnels plan 7b-2: tunnels you run by hand** (branch `claude/tunnels-7b2`, plan
