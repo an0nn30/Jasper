@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
+import javax.net.ssl.SSLContext;
 
 /**
  * An HTTP or HTTPS server for one share on the JDK's HTTP server, with at most 16 requests handled at once. The
@@ -55,11 +56,12 @@ public final class HttpEngine implements ServerEngine {
         if (server != null) return;
         if (definition.tls() && tls == null) throw new IllegalStateException("HTTPS needs the TLS material");
         InetAddress address = ServerAddresses.bindAddress(definition.bind(), nics.get());
+        SSLContext ssl = definition.tls() ? tls.context() : null;
         HttpServer created;
         try {
             if (definition.tls()) {
                 HttpsServer secure = HttpsServer.create();
-                secure.setHttpsConfigurator(new HttpsConfigurator(tls.context()));
+                secure.setHttpsConfigurator(new HttpsConfigurator(ssl));
                 created = secure;
             } else {
                 created = HttpServer.create();

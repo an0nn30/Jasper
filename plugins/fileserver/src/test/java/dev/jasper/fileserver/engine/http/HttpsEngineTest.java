@@ -54,6 +54,10 @@ class HttpsEngineTest {
         return HttpClient.newBuilder().sslContext(context).build();
     }
 
+    static long idleTimeoutThreads() {
+        return Thread.getAllStackTraces().keySet().stream().filter(t -> t.isAlive() && "idle-timeout-task".equals(t.getName())).count();
+    }
+
     @Test void servesOverHttpsWithTheSharedCertificate() throws Exception {
         Path shared = Files.createDirectories(temp.resolve("shared"));
         Files.writeString(shared.resolve("a.txt"), "secret-free");
@@ -79,8 +83,12 @@ class HttpsEngineTest {
         int port = Ports.free();
         engine = new HttpEngine(definition(shared, port, true), new ShareRoot(shared, true), ResolvedLogin.anonymous(),
             new ServerEvents(Clock.systemUTC(), e -> { }), new LoginThrottle(new TestClock()), List::of, tls);
-        assertThatThrownBy(engine::start).isInstanceOf(EngineFailure.class)
-            .hasMessage("The TLS certificate in " + temp.resolve("tls") + " can't be read");
+        long idleTasksBefore = idleTimeoutThreads();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            assertThatThrownBy(engine::start).isInstanceOf(EngineFailure.class)
+                .hasMessage("The TLS certificate in " + temp.resolve("tls") + " can't be read");
+        }
+        assertThat(idleTimeoutThreads()).as("a failed start creates no server, so no idle-timeout thread is left").isEqualTo(idleTasksBefore);
         try (var socket = new ServerSocket()) {
             socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
             assertThat(socket.isBound()).as("the port was never taken").isTrue();
