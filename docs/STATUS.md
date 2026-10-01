@@ -2,6 +2,12 @@
 
 ## Current state — 2026-10-01
 
+- **Remote tunnels plan 7b-3: tunnels that stay up — handed off, plan not yet written** (branch `claude/tunnels-7b3`,
+  handoff `docs/superpowers/plans/2026-10-01-jasper-remote-plan-7b3-handoff.md`, spec
+  `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md` §3, §7–9, §11): reconnect with backoff (listeners
+  kept bound), start at launch, `WaitingForVault`, the unattended lease, Vault 0.5.0 `credentialIfAllowed`, Buddy
+  `TunnelNotices`; Remote 0.11.0. The handoff holds the ten-task design, verified code facts and pitfalls; the next agent
+  writes the plan from it (`superpowers:writing-plans`) and offers subagent-driven execution.
 - **Theme system plan 1: format and generator** (branch `claude/theme-system`, spec
   `docs/superpowers/specs/2026-10-01-jasper-theme-system-design.md`, plan
   `docs/superpowers/plans/2026-10-01-theme-system-1-format-generator.md`): themes are Jasper TOML files generated into
