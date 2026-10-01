@@ -2,6 +2,19 @@
 
 ## Current state — 2026-10-01
 
+- **Theme system remaining work planned** (branch `codex/theme-system-plans`):
+  [assessment and requirement coverage](superpowers/plans/2026-10-01-theme-system-remaining-work.md) audits main
+  `5fc76c7d` against the full theme design. Four runnable deliverables await review:
+  [2: workspace zone/SDK/Editor](superpowers/plans/2026-10-01-theme-system-2-workspace.md),
+  [3: plugin pane styling](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md),
+  [4: conversion/vendoring/migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md),
+  [5: Themes page/live reload](superpowers/plans/2026-10-01-theme-system-5-page-reload.md).
+  Planning only; product code unchanged. Proposed additions/clarifications: lossless native `[icons]`, component-aware
+  SDK palette lookup for workspace versus sidebar rendering, combo dropdown workspace styling as the explicit
+  exception to chrome popups. Preserve plan-1 deviations; old theme pages work through plan 3, native dropdowns bridge
+  plans 4–5. Each plan names implementation boundaries, red/green tests, per-task commits and final review/GUI gates.
+  Next: review the plan set, then execute plan 2. No fresh build claimed for this documentation-only change.
+
 - **Theme system plan 1: format and generator** (branch `claude/theme-system`, spec
   `docs/superpowers/specs/2026-10-01-jasper-theme-system-design.md`, plan
   `docs/superpowers/plans/2026-10-01-theme-system-1-format-generator.md`): themes are Jasper TOML files generated into
@@ -21,7 +34,7 @@
   built-in fallback exists, while same-name overrides extend only lower-priority layers. The named-colour
   suffix concern (`Icon`, `.border`, `.rowHeight`) did not reproduce in installed-colour parity tests: skipped colours
   are restored by the existing installation path. These review fixes are recorded as plan deviations below the banner.
-  Independent review complete; `./gradlew check` passed after integrating current main: 7,720 tests,
+  Independent review complete; merged and pushed to main at `5fc76c7d`. `./gradlew check` passed after integrating current main: 7,720 tests,
   0 failures/errors, 6 skipped (app 1,522). Source hygiene and diff checks passed.
   Next: plan 2 (workspace zone). GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
   the window, Settings and dialogs; a hand-written theme file in `themes/` (including a broken one's warning).

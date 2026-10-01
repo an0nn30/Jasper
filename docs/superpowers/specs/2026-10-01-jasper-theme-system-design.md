@@ -1,7 +1,10 @@
 # Jasper theme system
 
-**Status:** Design approved in chat by the user on 2026-10-01, section by section. Written specification awaiting user
-review. No plans yet.
+**Status:** Design approved in chat by the user on 2026-10-01, section by section. Plan 1 (format/generator) and its
+review fixes are merged to main at `5fc76c7d`; implementation deviations are recorded in plan 1 and `docs/STATUS.md`.
+[Remaining-work assessment and plans 2–5](../plans/2026-10-01-theme-system-remaining-work.md) are written for review,
+not executed. The assessment labels proposed integration details and the combo-popup ambiguity; these do not silently
+amend this design.
 
 Replaces, once implemented: the IntelliJ Themes page and Marketplace client
 ([2026-09-30-intellij-theme-marketplace-design.md](2026-09-30-intellij-theme-marketplace-design.md)), the Alacritty
