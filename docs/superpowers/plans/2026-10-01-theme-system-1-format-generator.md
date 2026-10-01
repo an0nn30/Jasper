@@ -4,6 +4,15 @@
 
 **Status:** Executed 2026-10-01 (Tasks 1–9 on claude/theme-system); ./gradlew check green.
 
+**Merge-review follow-up (2026-10-01):** preserve the source author through `Resolved`, document metadata and
+`GeneratedTheme` into FlatLaf (Dracula and Material installed-colour parity); enforce contrast for derived text against
+its actual fill, with a black/white fallback when the configured text cannot reach the floor; and skip invalid parent
+candidates in favour of the next valid same-name theme without hiding cycles. Same-name overrides extend only
+lower-priority layers. These intentionally update the task code below. Named colours
+ending in `Icon`, `.border` and `.rowHeight` pass installed-colour parity through the existing skipped-key restoration;
+the earlier deferred warning is withdrawn. Headless regression tests cover each review fix; native visual acceptance
+remains with the user.
+
 **Goal:** Jasper themes become TOML files generated into FlatLaf's key set: the format, `extends`, the generator with
 contrast floors, native Jasper Dark and a new Jasper Light, IntelliJ Light and Darcula converted, installed IntelliJ
 plugins converted in memory, and user theme files in the `themes` folder.
@@ -65,10 +74,6 @@ spike A as a regression test.
 
 ### Notes for later plans
 
-- **First item of plan 2 (final-review residual):** converted plugin themes install with author "Jasper", losing FlatLaf's
-  author-keyed fixes (8 colour keys differ for a Dracula-by-Zihan-Ma fixture). Carry the author via `ThemeDocument.metadata`
-  into `GeneratedTheme` and `ThemeLoader.json`; extend `PluginThemeParityTest` with an author-keyed fixture. Also: FlatLaf
-  filters `[ui]` keys ending in `Icon`, `.border` or `.rowHeight`, so such a named colour is dropped on the new path.
 - Plan 2 needs workspace tokens for `ui_complete` themes: read them from the theme's derived FlatLaf defaults (or
   extend the converter), because their generated tokens are seed-derived placeholders.
 - Plan 4 must decide how converted TOML files carry IntelliJ's `icons` table and keep `[ui]` wildcard order (tomlj

@@ -32,16 +32,36 @@ class PluginThemeParityTest {
            "Panel.background": "background", "Link.activeForeground": "comment"}}""";
 
     @Test void aConvertedPluginThemeInstallsTheSameColoursAsItsThemeFile(@TempDir Path home) throws Exception {
+        assertParity(home, THEME);
+    }
+
+    @Test void draculaKeepsItsAuthorSpecificAdjustments(@TempDir Path home) throws Exception {
+        assertParity(home, THEME.replace("Fixture", "Zihan Ma").replace("Vampire", "Dracula"));
+    }
+
+    @Test void materialKeepsItsAuthorSpecificAdjustments(@TempDir Path home) throws Exception {
+        assertParity(home, THEME.replace("Fixture", "Mallowigi"));
+    }
+
+    @Test void namedColoursWithUiSuffixesKeepTheirOriginalHandling(@TempDir Path home) throws Exception {
+        assertParity(home, THEME.replace("\"comment\": \"accentColor\"", """
+            "comment": "accentColor", "sampleIcon": "#123456", "sample.border": "#234567",
+            "sample.rowHeight": "#345678"
+            """));
+    }
+
+    private static void assertParity(Path home, String json) throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
             jar(home.resolve("themes/vampire.jar"), entries(
-                "META-INF/plugin.xml", pluginXml("Vampire", "/" + ENTRY), ENTRY, THEME));
+                "META-INF/plugin.xml", pluginXml("Vampire", "/" + ENTRY), ENTRY, json));
             var snapshot = ThemeCatalog.beside(home.resolve("config.toml")).scan();
             assertThat(snapshot.problems()).isEmpty();
-            Theme theme = snapshot.find("Vampire").orElseThrow();
+            Theme theme = snapshot.themes().stream().filter(candidate -> candidate.source() instanceof Theme.Archive)
+                .findFirst().orElseThrow();
             String label = ((Theme.Archive) theme.source()).entry();
 
-            assertThat(ThemeManager.install(ThemeManager.loadArchive(label, THEME), theme.palette().background())).isTrue();
+            assertThat(ThemeManager.install(ThemeManager.loadArchive(label, json), theme.palette().background())).isTrue();
             Map<String, String> before = colours();
             assertThat(ThemeManager.install(theme)).isTrue();
             Map<String, String> after = colours();

@@ -9,13 +9,13 @@ import java.util.List;
 import java.util.Map;
 import static dev.jasper.app.appearance.ChromeKeys.contrast;
 import static dev.jasper.app.appearance.ChromeKeys.mix;
-import static dev.jasper.app.appearance.ChromeKeys.readable;
 import static dev.jasper.app.appearance.Token.*;
 
 /**
  * Fills a resolved theme document in: missing seeds, every token and syntax role, the terminal palette and the UI
  * keys. A value the theme sets is used as written; a derived text or stroke colour is moved toward the foreground
- * until it meets its contrast floor (4.5:1 text, links and status colours; 3:1 muted text, dividers and comments;
+ * until it meets its contrast floor, falling back toward black or white when needed (4.5:1 text, links and status
+ * colours; 3:1 muted text, dividers and comments;
  * 2:1 disabled text). Pure: no Swing state.
  *
  * <p>Each token the theme does not set is derived from the seeds and from other tokens (a token another rule names is
@@ -23,7 +23,7 @@ import static dev.jasper.app.appearance.Token.*;
  * {@code readable(c, bg, r)} is {@code c} moved toward {@code text} until it reaches contrast {@code r} on {@code bg}.
  * <ul>
  *   <li>{@code surface}, {@code editor_background}: the background seed
- *   <li>{@code text}, {@code editor_foreground}: the foreground seed
+ *   <li>{@code text}, {@code editor_foreground}: the foreground seed, adjusted to 4.5:1 against their surface
  *   <li>{@code accent}: the accent seed; {@code focus_ring}, {@code tab_underline}, {@code button_default}: {@code accent}
  *   <li>{@code editor_caret}: the cursor seed (the foreground when unset)
  *   <li>{@code text_selection}, {@code editor_selection}: the selection seed (when unset,
@@ -45,7 +45,8 @@ import static dev.jasper.app.appearance.Token.*;
  *   <li>{@code selection}: {@code mix(accent, surface, 0.55)}
  *   <li>{@code selection_text}: {@code text} when it reaches 4.5:1 on {@code selection}, else black or white
  *   <li>{@code selection_inactive}: {@code mix(selection, surface, 0.6)}
- *   <li>{@code text_selection_text}, {@code tab_active_text}, {@code button_text}: {@code text}
+ *   <li>{@code text_selection_text}, {@code tab_active_text}, {@code button_text}: {@code text} when it reaches
+ *       4.5:1 on the corresponding fill, else black or white
  *   <li>{@code tab_active}: {@code mix(accent, surface, 0.18)}
  *   <li>{@code tab_active_border}: {@code mix(accent, surface, 0.45)}
  *   <li>{@code tab_underline_inactive}: {@code mix(text, surface, 0.45)}
@@ -104,7 +105,7 @@ final class ThemeGenerator {
             for (Token token : Token.values()) token(token);
             var syntax = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
             for (SyntaxRole role : SyntaxRole.values()) syntax.put(role, syntax(role));
-            return new GeneratedTheme(document.name(), dark, tokens, syntax,
+            return new GeneratedTheme(document.name(), dark, document.metadata().getOrDefault("author", "Jasper"), tokens, syntax,
                 new Palette(foreground, background, cursor, selection, ansi), uiKeys(), document.icons());
         }
 
@@ -123,7 +124,7 @@ final class ThemeGenerator {
                 case SURFACE_SUNKEN -> mix(dark ? Color.BLACK : Color.WHITE, token(SURFACE), .12);
                 case TITLE_BAR, STATUS_BAR, TAB_BAR -> mix(token(TEXT), token(SURFACE), .04);
                 case SIDEBAR -> token(SURFACE_SUNKEN);
-                case TEXT -> foreground;
+                case TEXT -> readable(foreground, token(SURFACE), 4.5, blackOrWhite(token(SURFACE)));
                 case TEXT_MUTED -> readable(mix(token(TEXT), token(SURFACE), .65), token(SURFACE), 3, token(TEXT));
                 case TEXT_DISABLED -> readable(mix(token(TEXT), token(SURFACE), .45), token(SURFACE), 2, token(TEXT));
                 case TEXT_ON_ACCENT -> blackOrWhite(token(BUTTON_DEFAULT));
@@ -138,7 +139,9 @@ final class ThemeGenerator {
                 case SELECTION_TEXT -> textOn(token(SELECTION));
                 case SELECTION_INACTIVE -> mix(token(SELECTION), token(SURFACE), .6);
                 case TEXT_SELECTION, EDITOR_SELECTION -> selection;
-                case TEXT_SELECTION_TEXT, TAB_ACTIVE_TEXT, BUTTON_TEXT -> token(TEXT);
+                case TEXT_SELECTION_TEXT -> textOn(token(TEXT_SELECTION));
+                case TAB_ACTIVE_TEXT -> textOn(token(TAB_ACTIVE));
+                case BUTTON_TEXT -> textOn(token(BUTTON_BACKGROUND));
                 case TAB_ACTIVE -> mix(token(ACCENT), token(SURFACE), .18);
                 case TAB_ACTIVE_BORDER -> mix(token(ACCENT), token(SURFACE), .45);
                 case TAB_HOVER -> token(HOVER);
@@ -154,7 +157,7 @@ final class ThemeGenerator {
                 case ERROR -> readable(ansi.get(1), token(STATUS_BAR), 4.5, token(TEXT));
                 case ERROR_BACKGROUND -> mix(ansi.get(1), token(INPUT_BACKGROUND), .20);
                 case EDITOR_BACKGROUND -> background;
-                case EDITOR_FOREGROUND -> foreground;
+                case EDITOR_FOREGROUND -> readable(foreground, token(EDITOR_BACKGROUND), 4.5, blackOrWhite(token(EDITOR_BACKGROUND)));
                 case EDITOR_CARET -> cursor;
                 case EDITOR_CURRENT_LINE -> mix(token(EDITOR_FOREGROUND), token(EDITOR_BACKGROUND), .05);
                 case EDITOR_GUTTER -> token(EDITOR_BACKGROUND);
@@ -164,6 +167,13 @@ final class ThemeGenerator {
 
         /** The text colour when it reads well on {@code fill}, else black or white, whichever contrasts more. */
         private Color textOn(Color fill) { return contrast(token(TEXT), fill) >= 4.5 ? token(TEXT) : blackOrWhite(fill); }
+
+        /** Prefer the theme's foreground, but fall back when it cannot meet the floor on this fill. */
+        private static Color readable(Color color, Color fill, double minimum, Color toward) {
+            Color adjusted = ChromeKeys.readable(color, fill, minimum, toward);
+            return contrast(adjusted, fill) >= minimum ? adjusted
+                : ChromeKeys.readable(color, fill, minimum, blackOrWhite(fill));
+        }
 
         private static Color blackOrWhite(Color fill) {
             return contrast(Color.WHITE, fill) >= contrast(Color.BLACK, fill) ? Color.WHITE : Color.BLACK;

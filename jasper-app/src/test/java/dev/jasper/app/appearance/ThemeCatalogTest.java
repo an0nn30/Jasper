@@ -65,6 +65,64 @@ class ThemeCatalogTest {
         });
     }
 
+    @Test void anInvalidOverrideDoesNotHideTheValidParentOfAnotherTheme() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("a.toml"), "name = \"Jasper Dark\"\n");
+        Files.writeString(themes().resolve("b.toml"), "name = \"Child\"\nextends = \"Jasper Dark\"\n");
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("Jasper Dark")).containsSame(Theme.DARK);
+        assertThat(snapshot.find("Child")).get().extracting(Theme::palette).isEqualTo(Theme.DARK.palette());
+        assertThat(snapshot.problems()).singleElement().satisfies(problem ->
+            assertThat(problem.file()).isEqualTo(themes().resolve("a.toml")));
+    }
+
+    @Test void anInvalidDuplicateDoesNotHideALaterUserParent() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("a.toml"), "name = \"Parent\"\nextends = \"Missing\"\n");
+        Files.writeString(themes().resolve("b.toml"), "name = \"Parent\"\nextends = \"Jasper Light\"\n");
+        Files.writeString(themes().resolve("c.toml"), "name = \"Child\"\nextends = \"Parent\"\n");
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("Parent")).get().extracting(Theme::palette).isEqualTo(Theme.JASPER_LIGHT.palette());
+        assertThat(snapshot.find("Child")).get().extracting(Theme::palette).isEqualTo(Theme.JASPER_LIGHT.palette());
+        assertThat(snapshot.problems()).singleElement().satisfies(problem ->
+            assertThat(problem.file()).isEqualTo(themes().resolve("a.toml")));
+    }
+
+    @Test void aBuiltInFallbackDoesNotHideACycleBetweenUserThemes() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("a.toml"), "name = \"Jasper Dark\"\nextends = \"Loop\"\n");
+        Files.writeString(themes().resolve("b.toml"), "name = \"Loop\"\nextends = \"Jasper Dark\"\n");
+        Files.writeString(themes().resolve("c.toml"), "name = \"Child\"\nextends = \"Jasper Dark\"\n");
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("Jasper Dark")).containsSame(Theme.DARK);
+        assertThat(snapshot.find("Loop")).isEmpty();
+        assertThat(snapshot.find("Child")).get().extracting(Theme::palette).isEqualTo(Theme.DARK.palette());
+        assertThat(snapshot.problems()).hasSize(2).allSatisfy(problem ->
+            assertThat(problem.message()).contains("cycle"));
+    }
+
+    @Test void sameNameOverridesExtendOnlyTheLowerPriorityLayers() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("a.toml"), """
+            name = "Jasper Dark"
+            extends = "Jasper Dark"
+            [colors]
+            foreground = "#eeeeee"
+            """);
+        Files.writeString(themes().resolve("b.toml"), """
+            name = "Jasper Dark"
+            extends = "Jasper Dark"
+            [colors]
+            background = "#101010"
+            """);
+        var snapshot = catalog().scan();
+        Theme theme = snapshot.find("Jasper Dark").orElseThrow();
+        assertThat(theme.palette().foreground()).isEqualTo(new Color(0xeeeeee));
+        assertThat(theme.palette().background()).isEqualTo(new Color(0x101010));
+        assertThat(snapshot.problems()).singleElement().satisfies(problem ->
+            assertThat(problem.message()).contains("also installed"));
+    }
+
     @Test void aRescanRereadsOnlyFilesWhoseSizeOrTimeChanged() throws Exception {
         plugin(themes().resolve("one.jar"), "One", true, "#111111", "111111");
         plugin(themes().resolve("two.jar"), "Two", false, "#222222", "222222");

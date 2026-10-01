@@ -69,6 +69,41 @@ class ThemeGeneratorTest {
         assertThat(theme.syntax().get(SyntaxRole.KEYWORD).italic()).isFalse();
     }
 
+    @Test void derivedTextContrastsWithAnExplicitBackground() {
+        GeneratedTheme theme = generate(SEEDS + """
+            [tokens]
+            surface = "#cdd6f4"
+            editor_background = "#cdd6f4"
+            status_bar = "#cdd6f4"
+            button_background = "#cdd6f4"
+            tab_active = "#cdd6f4"
+            text_selection = "#cdd6f4"
+            """);
+        var tokens = theme.tokens();
+        for (var pair : List.of(List.of(Token.TEXT, Token.SURFACE),
+                List.of(Token.EDITOR_FOREGROUND, Token.EDITOR_BACKGROUND), List.of(Token.BUTTON_TEXT, Token.BUTTON_BACKGROUND),
+                List.of(Token.TAB_ACTIVE_TEXT, Token.TAB_ACTIVE), List.of(Token.TEXT_SELECTION_TEXT, Token.TEXT_SELECTION)))
+            assertThat(ChromeKeys.contrast(tokens.get(pair.getFirst()), tokens.get(pair.getLast())))
+                .as(pair.getFirst().key()).isGreaterThanOrEqualTo(4.5);
+    }
+
+    @Test void contrastFloorsUseTheActualFillWhenItDiffersFromTheSurface() {
+        GeneratedTheme theme = generate(SEEDS + """
+            [tokens]
+            status_bar = "#cdd6f4"
+            """);
+        for (Token status : List.of(Token.SUCCESS, Token.WARNING, Token.ERROR))
+            assertThat(ChromeKeys.contrast(theme.tokens().get(status), new Color(0xcdd6f4)))
+                .as(status.key()).isGreaterThanOrEqualTo(4.5);
+        GeneratedTheme lightChrome = generate(SEEDS + """
+            [tokens]
+            surface = "#fafafa"
+            text = "#202020"
+            """);
+        assertThat(ChromeKeys.contrast(lightChrome.tokens().get(Token.DIVIDER), new Color(0x1e1e2e)))
+            .isGreaterThanOrEqualTo(3);
+    }
+
     @Test void explicitValuesAreKeptAsWrittenAndFeedTheDerivations() {
         GeneratedTheme theme = generate(SEEDS + """
             [tokens]

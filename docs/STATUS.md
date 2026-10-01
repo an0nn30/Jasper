@@ -15,12 +15,12 @@
   keeps the theme showing, Jasper Dark at start-up, as before); derivation values differ from spec 3's sketch
   (`surface_raised` 6 %, `surface_sunken` 12 % toward black or white, `tab_active` = accent 18 % over the surface,
   `sidebar` = `surface_sunken`; the full table is in `ThemeGenerator`'s JavaDoc). Converted IntelliJ themes keep their
-  named colours as `ColorPalette.*` keys (accent included), pinned by a parity test against the theme file. **Known
-  gap, first item of plan 2:** converted plugin themes install with the author "Jasper", so FlatLaf's author-keyed fixes
-  (for example Dracula by Zihan Ma, Material themes by Mallowigi) no longer apply; a Dracula-plugin fixture differs in 8
-  colour keys from before. Carry the theme's author through `ThemeDocument.metadata` into `GeneratedTheme` and
-  `ThemeLoader.json`, and extend `PluginThemeParityTest` with an author-keyed fixture. Also deferred: a named colour
-  whose `ColorPalette.<name>` key ends in `Icon`, `.border` or `.rowHeight` is filtered by FlatLaf on the new path.
+  named colours as `ColorPalette.*` keys (accent included), pinned by a parity test against the theme file. The
+  merge review fixes author-specific FlatLaf adjustments (Dracula and Material parity), derived foreground contrast
+  against overridden fills, and invalid parent candidates hiding valid themes of the same name. Cycles remain errors even when a
+  built-in fallback exists, while same-name overrides extend only lower-priority layers. The named-colour
+  suffix concern (`Icon`, `.border`, `.rowHeight`) did not reproduce in installed-colour parity tests: skipped colours
+  are restored by the existing installation path. These review fixes are recorded as plan deviations below the banner.
   Next: plan 2 (workspace zone). GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
   the window, Settings and dialogs; a hand-written theme file in `themes/` (including a broken one's warning).
 

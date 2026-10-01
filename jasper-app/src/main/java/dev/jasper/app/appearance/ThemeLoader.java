@@ -30,7 +30,7 @@ final class ThemeLoader {
      * table ({@code colors}, parents' entries included) with every name resolved to a {@code #rrggbb} or
      * {@code #rrggbbaa} literal, in table order.
      */
-    record Resolved(String name, boolean dark, String json, Map<String, Color> colors, List<String> warnings,
+    record Resolved(String name, boolean dark, String author, String json, Map<String, Color> colors, List<String> warnings,
                     Map<String, Object> ui, Map<String, Object> icons, Map<String, String> namedColors) {
         Resolved {
             colors = Map.copyOf(colors); warnings = List.copyOf(warnings);
@@ -94,7 +94,7 @@ final class ThemeLoader {
         json.put("colors", new LinkedHashMap<String, Object>(colors));
         json.put("ui", ui);
         if (!icons.isEmpty()) json.put("icons", icons);
-        return new Resolved(theme.name, theme.dark, write(json), explicitColors(ui), warnings, ui, icons, colors);
+        return new Resolved(theme.name, theme.dark, theme.author, write(json), explicitColors(ui), warnings, ui, icons, colors);
     }
 
     private Raw resolve(String file, List<String> chain, List<String> warnings) {

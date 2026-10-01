@@ -75,8 +75,8 @@ public final class ThemeManager {
     /** Installs a generated theme through the same path as any IntelliJ theme; false when FlatLaf could not set it up. */
     static boolean install(GeneratedTheme theme) {
         requireEdt();
-        var resolved = new ThemeLoader.Resolved(theme.name(), theme.dark(),
-            ThemeLoader.json(theme.name(), theme.dark(), "Jasper", theme.uiKeys(), theme.icons()),
+        var resolved = new ThemeLoader.Resolved(theme.name(), theme.dark(), theme.author(),
+            ThemeLoader.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons()),
             ThemeLoader.explicitColors(theme.uiKeys()), List.of(), theme.uiKeys(), theme.icons(), Map.of());
         return install(resolved, theme.terminal().background());
     }
