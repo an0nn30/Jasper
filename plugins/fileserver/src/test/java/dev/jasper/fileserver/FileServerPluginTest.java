@@ -41,7 +41,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServerPluginTest {
-    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.1.0",
+    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.2.0",
         Set.of(Capabilities.NETWORK_LISTEN, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE));
     @TempDir Path home;
     @TempDir Path root;
@@ -335,6 +335,65 @@ class FileServerPluginTest {
             assertThat(host.windows()).as("no restart question over a closed window").noneMatch(line -> line.contains("Restart"));
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().running() == 0, "the server stops");
+        }
+    }
+
+    @Test void servesTheFocusedFolderOverFtpWithASessionPassword() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> port != 2121);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            assertThat(host.actions()).contains("dev.jasper.fileserver.serve-ftp|Serve Current Folder over FTP|true");
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(host.invoke(FileServerPlugin.SERVE_FTP, window, local)).isTrue();
+            await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            var served = plugin.registry().servers().getFirst();
+            assertThat(served.temporary()).isTrue();
+            assertThat(served.definition().name()).isEqualTo("project (FTP)");
+            assertThat(served.definition().protocol()).isEqualTo(Protocol.FTP);
+            assertThat(served.definition().port()).as("2121 was taken").isEqualTo(2122);
+            assertThat(served.definition().bind()).isEqualTo(Bind.LOOPBACK);
+            assertThat(served.definition().writable()).isFalse();
+            assertThat(served.definition().login()).isEqualTo(Login.SESSION);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void showsTheCertificateFingerprintAndRegeneratesIt() throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow();
+            var panel = (FileServersPanel) host.openPanel(FileServerPlugin.PANEL, window);
+            var base = http("secure", home, Ports.free(), Login.ANONYMOUS, false);
+            var secure = new ServerDefinition(base.id(), base.name(), Protocol.HTTP, home, Bind.LOOPBACK, base.port(), Optional.empty(), false,
+                Login.ANONYMOUS, List.of(), true, false, false);
+            plugin.store().put(secure);
+            settle(host);
+            assertThat(UiTestAccess.cardTls(panel).getText()).isEqualTo("TLS certificate: created when the server first starts");
+            UiTestAccess.toggle(panel).doClick();
+            await(host, () -> plugin.registry().server(secure.id()).orElseThrow().state().phase() == Phase.RUNNING, "the HTTPS server runs");
+            String fingerprint = plugin.tls().cachedFingerprint().orElseThrow();
+            assertThat(UiTestAccess.cardTls(panel).getText()).isEqualTo("TLS certificate SHA-256 " + fingerprint);
+            assertThat(plugin.registry().server(secure.id()).orElseThrow().addresses()).containsExactly(URI.create("https://127.0.0.1:" + secure.port() + "/"));
+            click(UiTestAccess.menuFor(panel, 0), "Show Fingerprints…");
+            await(host, () -> plugin.currentConfirm() != null, "the fingerprint dialog opens");
+            assertThat(host.windows()).containsExactly("dialog|Fingerprints|true");
+            assertThat(UiTestAccess.message(plugin.currentConfirm()).getText()).isEqualTo("TLS certificate (SHA-256): " + fingerprint);
+            UiTestAccess.confirm(plugin.currentConfirm()).doClick();
+            settle(host);
+            assertThat(host.windows()).containsExactly("dialog|Regenerate the TLS certificate?|true");
+            UiTestAccess.confirm(plugin.currentConfirm()).doClick();
+            await(host, () -> plugin.tls().cachedFingerprint().filter(next -> !next.equals(fingerprint)).isPresent(), "a new certificate");
+            settle(host);
+            assertThat(UiTestAccess.cardTls(panel).getText()).isEqualTo("TLS certificate SHA-256 " + plugin.tls().cachedFingerprint().orElseThrow());
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
         }
     }
 }
