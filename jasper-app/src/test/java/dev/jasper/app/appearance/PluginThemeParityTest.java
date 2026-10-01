@@ -1,0 +1,77 @@
+package dev.jasper.app.appearance;
+
+import dev.jasper.app.testsupport.EdtTestExtension;
+import java.awt.Color;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import javax.swing.LookAndFeel;
+import javax.swing.UIDefaults;
+import javax.swing.UIManager;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
+import static dev.jasper.app.appearance.ThemeFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+
+/**
+ * A converted IntelliJ plugin theme installs exactly as the plugin's resolved {@code .theme.json} did before the theme
+ * engine: every colour FlatLaf ends up with is the same, named colours ({@code ColorPalette.*}) and the accent included.
+ */
+@ExtendWith(EdtTestExtension.class)
+class PluginThemeParityTest {
+    private static final String ENTRY = "themes/Vampire.theme.json";
+    /** A Dracula-style theme: its accent is a named colour, its parent Darcula. */
+    private static final String THEME = """
+        {"name": "Vampire", "dark": true, "author": "Fixture", "parentTheme": "Darcula",
+         "colors": {"accentColor": "#ff79c6", "background": "#282a36", "foreground": "#f8f8f2", "selection": "#44475a",
+           "comment": "accentColor"},
+         "ui": {"*": {"background": "background", "foreground": "foreground", "selectionBackground": "selection"},
+           "Panel.background": "background", "Link.activeForeground": "comment"}}""";
+
+    @Test void aConvertedPluginThemeInstallsTheSameColoursAsItsThemeFile(@TempDir Path home) throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            jar(home.resolve("themes/vampire.jar"), entries(
+                "META-INF/plugin.xml", pluginXml("Vampire", "/" + ENTRY), ENTRY, THEME));
+            var snapshot = ThemeCatalog.beside(home.resolve("config.toml")).scan();
+            assertThat(snapshot.problems()).isEmpty();
+            Theme theme = snapshot.find("Vampire").orElseThrow();
+            String label = ((Theme.Archive) theme.source()).entry();
+
+            assertThat(ThemeManager.install(ThemeManager.loadArchive(label, THEME), theme.palette().background())).isTrue();
+            Map<String, String> before = colours();
+            assertThat(ThemeManager.install(theme)).isTrue();
+            Map<String, String> after = colours();
+
+            assertThat(before).as("the theme file's own install").containsEntry("Component.accentColor", "#ff79c6")
+                .containsEntry("ColorPalette.accentColor", "#ff79c6");
+            assertThat(differences(before, after)).as("colours that differ (theme file -> converted)").isEmpty();
+            assertThat(theme.source().document().seeds()).containsEntry(Seed.ACCENT, new Color(0xff79c6));
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    /** Each key whose colour differs, or that only one side has, mapped to its two colours. */
+    private static Map<String, String> differences(Map<String, String> before, Map<String, String> after) {
+        var keys = new TreeSet<String>(before.keySet());
+        keys.addAll(after.keySet());
+        var differences = new TreeMap<String, String>();
+        for (String key : keys)
+            if (!Objects.equals(before.get(key), after.get(key))) differences.put(key, before.get(key) + " -> " + after.get(key));
+        return differences;
+    }
+
+    /** Every colour in the look and feel defaults as hex (alpha appended when not opaque), sorted by key. */
+    private static Map<String, String> colours() {
+        UIDefaults defaults = UIManager.getLookAndFeelDefaults();
+        var colours = new TreeMap<String, String>();
+        for (Object key : defaults.keySet().toArray()) {
+            if (defaults.get(key) instanceof Color color)
+                colours.put(String.valueOf(key), String.format("#%06x", color.getRGB() & 0xffffff)
+                    + (color.getAlpha() == 255 ? "" : String.format("%02x", color.getAlpha())));
+        }
+        return colours;
+    }
+}

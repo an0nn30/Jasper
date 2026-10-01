@@ -76,7 +76,7 @@ public final class ThemeManager {
         requireEdt();
         var resolved = new ThemeLoader.Resolved(theme.name(), theme.dark(),
             ThemeLoader.json(theme.name(), theme.dark(), "Jasper", theme.uiKeys(), theme.icons()),
-            ThemeLoader.explicitColors(theme.uiKeys()), List.of(), theme.uiKeys(), theme.icons());
+            ThemeLoader.explicitColors(theme.uiKeys()), List.of(), theme.uiKeys(), theme.icons(), Map.of());
         return install(resolved, theme.terminal().background());
     }
 

@@ -25,15 +25,18 @@ import java.util.regex.Pattern;
  */
 final class ThemeLoader {
     /**
-     * A resolved theme: FlatLaf's JSON input, every explicit colour keyed as the theme names it, the problems met, and
-     * the resolved {@code ui} and {@code icons} entries (named colours replaced) for conversion.
+     * A resolved theme: FlatLaf's JSON input, every explicit colour keyed as the theme names it, the problems met, the
+     * resolved {@code ui} and {@code icons} entries (named colours replaced) for conversion, and the theme's named colour
+     * table ({@code colors}, parents' entries included) with every name resolved to a {@code #rrggbb} or
+     * {@code #rrggbbaa} literal, in table order.
      */
     record Resolved(String name, boolean dark, String json, Map<String, Color> colors, List<String> warnings,
-                    Map<String, Object> ui, Map<String, Object> icons) {
+                    Map<String, Object> ui, Map<String, Object> icons, Map<String, String> namedColors) {
         Resolved {
             colors = Map.copyOf(colors); warnings = List.copyOf(warnings);
             ui = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(ui));
             icons = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(icons));
+            namedColors = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(namedColors));
         }
     }
 
@@ -91,7 +94,7 @@ final class ThemeLoader {
         json.put("colors", new LinkedHashMap<String, Object>(colors));
         json.put("ui", ui);
         if (!icons.isEmpty()) json.put("icons", icons);
-        return new Resolved(theme.name, theme.dark, write(json), explicitColors(ui), warnings, ui, icons);
+        return new Resolved(theme.name, theme.dark, write(json), explicitColors(ui), warnings, ui, icons, colors);
     }
 
     private Raw resolve(String file, List<String> chain, List<String> warnings) {
@@ -184,7 +187,8 @@ final class ThemeLoader {
             warnings.add(file + ": \"" + key + "\" has an empty value; ignoring it");
             return false;
         }
-        return !CLASS_NAME.matcher(text).matches() || text.startsWith("com.formdev.flatlaf.");
+        // FlatLaf trims a value before reading it, so a class name with surrounding spaces is still one.
+        return !CLASS_NAME.matcher(stripped).matches() || stripped.startsWith("com.formdev.flatlaf.");
     }
 
     /** A value naming a colour becomes that colour; other values, including IntelliJ palette names, pass through. */

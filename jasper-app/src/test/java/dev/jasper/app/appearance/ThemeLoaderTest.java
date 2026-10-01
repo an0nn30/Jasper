@@ -4,6 +4,7 @@ import com.formdev.flatlaf.json.Json;
 import java.awt.Color;
 import java.io.StringReader;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,13 @@ class ThemeLoaderTest {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> ui(ThemeLoader.Resolved resolved) throws Exception {
         return (Map<String, Object>) json(resolved).get("ui");
+    }
+
+    /** A map in the order of its alternating keys and values. */
+    private static Map<String, Object> ordered(Object... keysAndValues) {
+        var map = new LinkedHashMap<String, Object>();
+        for (int i = 0; i < keysAndValues.length; i += 2) map.put((String) keysAndValues[i], keysAndValues[i + 1]);
+        return map;
     }
 
     @Test void childEntriesReplaceTheParentsAndFollowTheChildsOrder() throws Exception {
@@ -126,6 +134,48 @@ class ThemeLoaderTest {
             .containsEntry("CheckBox.icon2", "com.formdev.flatlaf.icons.FlatCheckBoxIcon")
             .containsEntry("A.a", "#123456").containsEntry("A.b", "1,2,3,4")
             .containsEntry("A.c", "true").containsEntry("A.d", "Arial");
+    }
+
+    @Test void aClassNameWithSurroundingSpacesIsStillDropped() throws Exception {
+        var ui = ui(loader(Map.of("child.json", """
+            {"name": "Child", "ui": {"CheckBox.icon": "  probe.Other ", "CheckBox.icon2": " com.formdev.flatlaf.icons.FlatCheckBoxIcon",
+              "A.a": "#123456"}}"""))
+            .load("child.json"));
+        assertThat(ui).containsOnlyKeys("CheckBox.icon2", "A.a");
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void loadResolvesNamedColoursInIconsAndKeepsTheResolvedTables() throws Exception {
+        var resolved = loader(Map.of(
+            "parent.json", """
+                {"name": "Parent", "colors": {"red": "#C75450"}, "ui": {"A.x": "red"}}""",
+            "child.json", """
+                {"name": "Child", "parentTheme": "Parent", "colors": {"warn": "red", "half": "#11223344"},
+                 "ui": {"B.y": "warn"}, "icons": {"ColorPalette": {"Actions.Red": "warn", "Actions.Grey": "#afb1b3"}}}"""))
+            .load("child.json");
+        assertThat(resolved.ui()).containsExactlyEntriesOf(ordered("A.x", "#c75450", "B.y", "#c75450"));
+        assertThat(resolved.icons()).containsOnlyKeys("ColorPalette");
+        assertThat((Map<String, Object>) resolved.icons().get("ColorPalette"))
+            .containsEntry("Actions.Red", "#c75450").containsEntry("Actions.Grey", "#afb1b3");
+        assertThat(resolved.namedColors()).as("parents' names first, each resolved to a literal")
+            .containsExactly(entry("red", "#c75450"), entry("warn", "#c75450"), entry("half", "#11223344"));
+        assertThat((Map<String, Object>) json(resolved).get("icons")).isEqualTo(resolved.icons());
+    }
+
+    @Test @SuppressWarnings("unchecked")
+    void jsonWritesFlatLafInputForResolvedEntries() throws Exception {
+        var ui = ordered("Panel.background", "#010203", "Label.foreground", Map.of("os.default", "#040506"));
+        var written = (Map<String, Object>) Json.parse(new StringReader(
+            ThemeLoader.json("Name \"quoted\"", true, "Jasper", ui, Map.of())));
+        assertThat(List.copyOf(written.keySet())).as("no icons when there are none")
+            .containsExactly("name", "dark", "author", "colors", "ui");
+        assertThat(written).containsEntry("name", "Name \"quoted\"").containsEntry("dark", "true").containsEntry("author", "Jasper")
+            .containsEntry("colors", Map.of());
+        assertThat((Map<String, Object>) written.get("ui")).containsExactlyEntriesOf(ui);
+        var withIcons = (Map<String, Object>) Json.parse(new StringReader(ThemeLoader.json("Light", false, "", Map.of(),
+            Map.of("ColorPalette", Map.of("Actions.Red", "#c75450")))));
+        assertThat(withIcons).containsEntry("dark", "false").containsEntry("ui", Map.of())
+            .containsEntry("icons", Map.of("ColorPalette", Map.of("Actions.Red", "#c75450")));
     }
 
     @Test void explicitColoursApplyWildcardsInOrderAndKeepAlpha() {
