@@ -1,5 +1,7 @@
 # Keymap defaults K1: contexts and defaults — Implementation Plan
 
+> **Status (2026-09-30):** executed on `claude/keymap-defaults`; see `docs/STATUS.md`. Deviations as listed below.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give every Keymap action a context (Global, Terminal, a plugin's content tabs, a panel, a window) so that one key

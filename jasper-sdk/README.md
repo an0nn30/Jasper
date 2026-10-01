@@ -73,6 +73,14 @@ with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fi
 SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
 whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
 
+SDK 0.11.0 adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
+`global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
+`window(id)` (one of the plugin's own panels or windows). Where focus is, the most specific applicable action takes a
+key, and a key whose action doesn't apply, or is disabled, reaches the focused component, such as the shell.
+`withDefaultBindings(macOs, other)` gives a separate Linux and Windows default; with `withDefaultBinding` alone, a
+default naming cmd and shift gets alt outside macOS (`cmd+shift+x` becomes Ctrl+Alt+Shift+X).
+`FakePluginHost.actionSpec(id)` returns the registered spec. Plugins declare `sdk = ">=0.11.0, <0.12"`.
+
 SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
 https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.
 

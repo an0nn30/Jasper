@@ -180,6 +180,16 @@ the chooser dialog's worker, one at a time, and their failures show in the choos
 only the sources the caller names; with no `initial`, the chooser opens where a named source locates the owner's
 focused pane, else at the pane's local folder. A stopped plugin's source disappears from open choosers.
 
+## Shortcut contexts (SDK 0.11.0)
+
+`ShortcutContext` (`global`, `terminal`, `content`, `panel(id)`, `window(id)`) travels with `ActionSpec`. `HostedUi`
+rejects a panel or window id outside the plugin's namespace and maps the context onto the app's
+`dev.jasper.app.commands.KeyContext` (content becomes the plugin's own tabs), which `ActionEntry` and
+`KeyBindings.Extension` carry with the optional Linux/Windows default. `KeyBindings` keeps several actions on one
+stroke when their contexts don't conflict (same context, or Global with Terminal). `WindowContent.dispatchShortcut`
+resolves the stroke against the focus owner: an enabled action in the most specific containing context runs;
+otherwise the key is not consumed. Window contexts apply once plugin windows get the Keymap (plan K4).
+
 ## Plugins manager, install and restart
 
 Nothing is loaded or unloaded in a running process. The manager edits `plugins.toml` through

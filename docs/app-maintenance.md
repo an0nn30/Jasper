@@ -8,7 +8,7 @@ its real production lifecycle. No example opens a GUI or starts a child process.
 
 ## Workspace command or shortcut
 
-Start with [ActionId](../jasper-app/src/main/java/dev/jasper/app/commands/ActionId.java), [WorkspaceActions](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActions.java) and [WindowCommands](../jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommands.java). Register a real Swing action, add its stable ID/keywords, then define the default shortcut in ActionId and check platform resolution/collision validation in KeyBindings. If a new action needs nonstandard platform modifiers, update KeyBindings.effectiveDefaultBinding as well. Enablement must resolve the current pane at dispatch time. Do not capture the first pane in a long-lived action. Close registrations with the owning workspace.
+Start with [ActionId](../jasper-app/src/main/java/dev/jasper/app/commands/ActionId.java), [WorkspaceActions](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActions.java) and [WindowCommands](../jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommands.java). Register a real Swing action and add its stable ID and keywords. Then give it, in ActionId, both defaults (macOS, and Linux/Windows naming ctrl, alt and shift literally; "none" for no default) and its KeyContext (Global, or Terminal for pane-only actions). `KeymapDefaultsTest` holds the approved table and the platform principles; `KeyBindings` rejects two defaults on one stroke in conflicting contexts. Enablement must resolve the current pane at dispatch time. Do not capture the first pane in a long-lived action. Close registrations with the owning workspace.
 
 <!-- example:command -->
 ```java

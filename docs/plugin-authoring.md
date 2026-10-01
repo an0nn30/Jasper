@@ -104,7 +104,12 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Ids** of actions, top-level menus and status items start with your plugin id and a dot.
 - **Shortcuts.** `withDefaultBinding` uses the `[keybindings]` syntax. The user's configuration
   wins, then Jasper's own shortcuts, then plugin defaults in load order; a default that loses is
-  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id.
+  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id. Outside macOS,
+  `cmd` means Ctrl+Shift and a default naming cmd and shift also gets alt; give a different Linux and
+  Windows key with `withDefaultBindings("cmd+s", "ctrl+s")`. `withContext(ShortcutContext.terminal())`,
+  `content()`, `panel(id)` or `window(id)` limits where the key applies (SDK 0.11.0): the most specific
+  context around focus wins, so a panel action may reuse a Global key, and a key whose action does not
+  apply reaches the focused component.
 - **Placements** may name only actions your plugin registered. Closing an action removes it from
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
