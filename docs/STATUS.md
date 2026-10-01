@@ -33,10 +33,11 @@
   port can be refused once; "Allow other computers" and the exposure warning follow the checkbox, not a typed `*`,
   `0.0.0.0` or LAN address (do early in 7b-3); `HostStore` has the same two store defects (id-less entries get a new
   id on every read, skipped entries are dropped by the next save), a small separate task.
-  `./gradlew check` green: app 1471/0/1 (also after `:jasper-app:test --rerun`), terminal 391/0/4, Editor 4782/0/0,
-  Remote 382/0/0, Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, File Server 114/0/0,
-  SDK 39/0/0, testkit 79/0/0 (7,625 tests in all, 0 failures, 6 skipped). GUI checks pending with the user
-  (`docs/remote.md`, Native acceptance for tunnels). Not merged.
+  `./gradlew check` green after merging main (File Server FS-2): app 1471/0/1 (also after `:jasper-app:test --rerun`),
+  terminal 391/0/4, Editor 4782/0/0, Remote 382/0/0, Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0,
+  Sample 12/0/0, File Server 158/0/0, SDK 39/0/0, testkit 79/0/0 (7,669 tests in all, 0 failures, 6 skipped). GUI
+  checks pending with the user (`docs/remote.md`, Native acceptance for tunnels). Merged to local main 2026-10-01 (not
+  pushed).
 - **File Server FS-2: FTP/FTPS and TLS** (branch `claude/file-server-fs2`, plan
   `docs/superpowers/plans/2026-09-30-file-server-fs2.md`): File Server 0.2.0 serves FTP with explicit FTPS (Apache
   FtpServer 1.2.1) and HTTPS, on one self-signed EC certificate in `data/tls/` (BouncyCastle; fingerprint on the server

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-09-30 on `claude/tunnels-7b2`; executed 2026-10-01 (14 commits), deviations as recorded in docs/STATUS.md. Not merged.
+**Status:** Written 2026-09-30 on `claude/tunnels-7b2`; executed 2026-10-01 (18 commits), deviations as recorded in docs/STATUS.md. Merged to local main 2026-10-01.
 
 **Goal:** Saved SSH tunnels (local, remote, dynamic SOCKS5) and quick forwards that you start and stop by hand from a Tunnels rail panel, a palette scope and the SSH menu, with live counters, Open in Browser and Copy Address — Remote 0.9.0.
 
