@@ -11,7 +11,6 @@ import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.TerminalColors;
-import dev.jasper.app.terminalthemes.TerminalTheme;
 import dev.jasper.app.terminalthemes.TerminalThemeCatalog;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.app.config.SettingsEdit;
@@ -265,12 +264,18 @@ final class ConfigurationController implements AutoCloseable {
         TerminalColors colors = next.snapshot().terminalColors();
         Palette named = null;
         if (colors.named()) {
-            named = terminal.find(colors.name()).map(TerminalTheme::palette).orElse(null);
+            Theme workspace = available.find(colors.name()).orElseGet(() ->
+                terminal.find(colors.name()).map(terminalThemes::converted).orElse(null));
+            named = workspace == null ? null : workspace.palette();
             if (named == null)
                 problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
                     "Unknown terminal colors \"" + colors.name() + "\"; using the theme's colours. Settings \u203a Themes \u203a "
                         + "Alacritty Themes lists the terminal themes."));
         }
+        var retained = new java.util.ArrayList<>(available.themes());
+        retained.add(themes.choice());
+        retained.add(theme);
+        dev.jasper.app.appearance.ThemeManager.retainGenerated(retained);
         try {
             themes.configure(theme, colors, named, next.snapshot().uiFont());
             themeProblems = List.copyOf(problems);

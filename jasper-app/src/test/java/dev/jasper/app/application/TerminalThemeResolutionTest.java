@@ -18,6 +18,27 @@ import org.junit.jupiter.api.io.TempDir;
 class TerminalThemeResolutionTest {
     @TempDir Path dir;
 
+    @Test void nativeWorkspaceNameWinsOverALegacyName() throws Exception {
+        Path file = dir.resolve("config.toml");
+        Files.writeString(file, "[ui.theme]\nworkspace = 'IntelliJ Light'\n");
+        Files.createDirectories(dir.resolve("terminal-themes"));
+        Files.writeString(dir.resolve("terminal-themes/IntelliJ_Light.toml"),
+            "[colors.primary]\nbackground = '#010203'\nforeground = '#eeeeee'\n");
+        var legacy = TerminalThemeCatalog.beside(file);
+        assertThat(legacy.scan().find("IntelliJ Light")).isPresent();
+        var worker = Executors.newSingleThreadScheduledExecutor();
+        try (var service = new ConfigService(file, true, worker, SwingUtilities::invokeLater)) {
+            edt(() -> {
+                var themes = new ThemeController(theme -> true);
+                var controller = new ConfigurationController(themes, service, ThemeCatalog.builtIn(),
+                    legacy, path -> {});
+                assertThat(themes.current().palette()).isEqualTo(dev.jasper.app.appearance.Theme.INTELLIJ_LIGHT.palette());
+                assertThat(controller.shown().diagnostics()).isEmpty();
+                controller.close();
+            });
+        } finally { worker.shutdownNow(); }
+    }
+
     @Test void aNamedThemeColoursTheTerminalAndAnUnknownOneWarnsAndMatches() throws Exception {
         Path file = dir.resolve("config.toml");
         Files.writeString(file, "[ui.theme]\nworkspace = 'dracula'\n");

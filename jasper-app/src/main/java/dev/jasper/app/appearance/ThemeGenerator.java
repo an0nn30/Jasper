@@ -62,11 +62,26 @@ import static dev.jasper.app.appearance.Token.*;
  *   <li>{@code editor_gutter}: {@code editor_background}
  * </ul>
  */
-final class ThemeGenerator {
+public final class ThemeGenerator {
     private ThemeGenerator() {}
 
-    /** @param resolved a document from {@link ThemeResolver}, so every required seed is present */
-    static GeneratedTheme generate(ThemeDocument resolved) { return new Generation(resolved).result(); }
+    /**
+     * Generates native theme values without reading or modifying Swing state, including for palette importers.
+     * @param resolved a resolved document with background, foreground, accent and all eight normal ANSI colors
+     * @return the complete generated tokens, syntax, terminal palette and UI data
+     */
+    public static GeneratedTheme generate(ThemeDocument resolved) { return new Generation(resolved).result(); }
+
+    /** Recomputes syntax against effective workspace tokens, retaining authored overrides and original UI data. */
+    static GeneratedTheme withWorkspaceTokens(ThemeDocument document, Map<Token, Color> tokens) {
+        var original = generate(document);
+        var generation = new Generation(document);
+        generation.tokens.putAll(tokens);
+        generation.tokens.putAll(document.tokens());
+        var updated = generation.result();
+        return new GeneratedTheme(original.name(), original.dark(), original.author(), updated.tokens(), updated.syntax(),
+            original.terminal(), original.uiKeys(), original.icons());
+    }
 
     private static final class Generation {
         private final ThemeDocument document;

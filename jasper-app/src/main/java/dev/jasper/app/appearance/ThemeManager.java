@@ -54,8 +54,16 @@ public final class ThemeManager {
     public static List<Theme> builtIns() { return List.of(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA); }
 
     /** {@code theme}'s generated values; EDT only (the cache is unsynchronized). */
-    static GeneratedTheme generated(Theme theme) {
-        return GENERATED.computeIfAbsent(theme, key -> ThemeGenerator.generate(key.source().document()));
+    public static GeneratedTheme generated(Theme theme) {
+        requireEdt();
+        return GENERATED.computeIfAbsent(theme, key -> WorkspaceValues.resolve(key.source().document(),
+            ThemeGenerator.generate(key.source().document())));
+    }
+
+    /** Drops obsolete catalog values after a refresh; include active choices that should remain cached. EDT only. */
+    public static void retainGenerated(java.util.Collection<Theme> themes) {
+        requireEdt();
+        GENERATED.keySet().removeIf(theme -> !(theme.source() instanceof Theme.Bundled) && !themes.contains(theme));
     }
 
     /** A theme file Jasper ships, resolved; touches no Swing state. */

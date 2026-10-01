@@ -59,6 +59,13 @@ public final class TerminalThemeCatalog {
     /** Each file's last read, by path; guarded by this. */
     private Map<Path, Read> reads = Map.of();
     private volatile Snapshot latest;
+    /** Converted native values, guarded by this and pruned on every scan. */
+    private final Map<TerminalTheme, dev.jasper.app.appearance.Theme> converted = new HashMap<>();
+
+    /** Reuses the native conversion of an unchanged legacy palette. */
+    public synchronized dev.jasper.app.appearance.Theme converted(TerminalTheme theme) {
+        return converted.computeIfAbsent(theme, AlacrittyConversion::convert);
+    }
 
     private TerminalThemeCatalog(Path directory) { this.directory = directory; }
 
@@ -109,6 +116,7 @@ public final class TerminalThemeCatalog {
         mine.sort(Comparator.comparing(TerminalTheme::name, String.CASE_INSENSITIVE_ORDER));
         var themes = new ArrayList<>(mine);
         for (TerminalTheme theme : bundled) if (!owners.containsKey(key(theme.name()))) themes.add(theme);
+        converted.keySet().retainAll(themes);
         return latest = new Snapshot(themes, problems);
     }
 
