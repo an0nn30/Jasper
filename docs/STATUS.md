@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-09-30
+## Current state — 2026-10-01
 
 - **Remote tunnels plan 7b-2: tunnels you run by hand** (branch `claude/tunnels-7b2`, plan
   `docs/superpowers/plans/2026-09-30-jasper-remote-plan-7b2-tunnels-by-hand.md`, executed 2026-10-01, user guide in
@@ -37,6 +37,35 @@
   Remote 382/0/0, Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, File Server 114/0/0,
   SDK 39/0/0, testkit 79/0/0 (7,625 tests in all, 0 failures, 6 skipped). GUI checks pending with the user
   (`docs/remote.md`, Native acceptance for tunnels). Not merged.
+- **File Server FS-2: FTP/FTPS and TLS** (branch `claude/file-server-fs2`, plan
+  `docs/superpowers/plans/2026-09-30-file-server-fs2.md`): File Server 0.2.0 serves FTP with explicit FTPS (Apache
+  FtpServer 1.2.1) and HTTPS, on one self-signed EC certificate in `data/tls/` (BouncyCastle; fingerprint on the server
+  card, Show Fingerprints… with Regenerate). Require TLS refuses `USER`/`PASS` before `AUTH TLS` (530) and data
+  commands without `PROT P` (521). FTP paths stop `..` at the share root; uploads go through `ShareRoot.upload` and
+  commit only on a 226 reply; a non-zero offset is accepted only at the file's end. Logins share `LoginThrottle` (a
+  waiting address is refused unchecked). New setting `passive_ports` (the spec's `passive-ports`, renamed to match
+  the plugin's other keys). Serve Current Folder over FTP (session password). FS-1 leftovers fixed: `HttpEngine`
+  binds after its setup, replaced files keep their POSIX permissions, two event-ordering test races, and the panel's
+  empty hint wraps with the divider hidden until a server is selected. Deviations from the plan text (listed in the
+  plan's banner): the panel's note text area also guards against a degenerate hidden layout; `HttpEngine.start` reads
+  the TLS context before creating any server (no leaked thread or channel on a failed TLS start); `FtpEngine` reports
+  the innermost bind `IOException`. Full `./gradlew check` green (2026-10-01, after the final-review fixes): File Server 158 tests, whole repository
+  7,584 tests (jasper-app 1,471), 0 failures, 6 skipped. GUI checks pending: FileZilla/Cyberduck over FTP and explicit
+  FTPS, a browser over HTTPS (certificate warning, fingerprint match), Require TLS refusing a plain client, the
+  editor's TLS and passive-port controls (switching the protocol in the editor drops Use TLS and Require TLS), Show
+  Fingerprints and Regenerate, the empty panel's hint.
+  Plan decisions not listed above: active mode (`PORT`/`EPRT`) stays allowed with FtpServer's active and passive IP
+  checks on, so data connections only go to and come from the client's own address; plain FTP gets the warning "Plain
+  FTP sends the password unencrypted"; Show Fingerprints reuses `ConfirmPanel`, with Regenerate; FTP listings show dot
+  files, as HTTP's do. Final-review fixes: `TlsMaterial` creates its folder and files owner-only from the start and no
+  longer ignores an I/O error from that; the files FtpServer's `MD5` and `MMD5` read now end as complete downloads
+  (replies 251 and 252); `ShareFile` compares by path, so `RMD` refuses the working directory; the editor's Passive
+  ports row sits below the port hint; `HttpEngine` says "HTTPS" in its create-failure message.
+  **Deferred (FS-2):** the login throttle's check-then-act race across parallel sessions (shared with HTTP); a half-present
+  TLS pair (only `server.p12` or only `password`) is silently recreated, so the fingerprint can change; after
+  Regenerate the card shows the new fingerprint while running TLS servers present the old one until restarted; an FTP
+  cancel closes only the file stream; an abandoned `APPE` keeps the bytes it appended; FtpServer logs a WARN per failed
+  login; `ShareView.finish` does file I/O while holding the session's monitor.
 - **Keymap defaults K1: contexts and defaults** (branch `claude/keymap-defaults`, spec
   `docs/superpowers/specs/2026-09-30-keymap-defaults-design.md`, plan `docs/superpowers/plans/2026-09-30-keymap-defaults-k1.md`):
   actions carry a context (Global, Terminal, a plugin's tabs, a panel, a window). The most specific applicable action
@@ -99,7 +128,7 @@
   `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Final-review fixes: a `servers.toml` entry without an id gets a stable id derived from
   its name, and saves are refused while the file has skipped entries; uploads go to a hidden temporary file and replace the target atomically only when
   complete; activity refreshes coalesce into one UI task; activity-log text from clients has control characters
-  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its server and pool.
+  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its pool (FS-2 also binds only after the setup succeeds).
   Merged into local main 2026-09-30 (not pushed) on top of SDK 0.10.2 (connection activities, `Platform.browse`), which
   0.11.0 now includes; every bundled plugin declares `sdk = ">=0.11.0, <0.12"`, so the Remote tunnels plans (7b) must use
   that range. GUI checks pending with the

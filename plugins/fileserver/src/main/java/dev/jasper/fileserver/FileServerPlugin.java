@@ -6,9 +6,11 @@ import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.DefinitionStore;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
+import dev.jasper.fileserver.engine.EngineFailure;
 import dev.jasper.fileserver.engine.LoginThrottle;
 import dev.jasper.fileserver.engine.ServerAddresses;
 import dev.jasper.fileserver.engine.ServerEvent;
+import dev.jasper.fileserver.engine.tls.TlsMaterial;
 import dev.jasper.fileserver.runtime.Engines;
 import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
@@ -46,6 +48,7 @@ import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -81,6 +84,7 @@ public final class FileServerPlugin implements Plugin {
     public static final String STATUS = ID + ".status";
     public static final String SERVERS = ID + ".servers";
     public static final String SERVE_HTTP = ID + ".serve-http";
+    public static final String SERVE_FTP = ID + ".serve-ftp";
 
     /** What the plugin takes from the machine; tests replace each part. */
     record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree, Consumer<String> clipboard,
@@ -104,6 +108,7 @@ public final class FileServerPlugin implements Plugin {
     private Optional<VaultApi> vault = Optional.empty();
     private DefinitionStore store;
     private ServerRegistry registry;
+    private TlsMaterial tls;
     private TransferActivities transfers;
     private FileServerScope scope;
     private StatusItem status;
@@ -130,7 +135,8 @@ public final class FileServerPlugin implements Plugin {
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
         transfers = new TransferActivities(context.activities()::begin, SHOW);
-        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics()), logins,
+        tls = new TlsMaterial(context.dataDirectory().resolve("tls"), Clock.systemUTC(), FileServerPlugin::hostName);
+        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange), logins,
             context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
         var icon = context.appearance().icon(IconName.SERVER);
@@ -149,6 +155,9 @@ public final class FileServerPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SERVE_HTTP, "Serve Current Folder over HTTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "http", "folder")),
             invoked -> serve(invoked, Protocol.HTTP));
+        context.actions().register(ActionSpec.of(SERVE_FTP, "Serve Current Folder over FTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "ftp", "folder")),
+            invoked -> serve(invoked, Protocol.FTP));
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
@@ -170,6 +179,11 @@ public final class FileServerPlugin implements Plugin {
             if (!stopped && panelHosts.values().stream().anyMatch(PanelHost::visible)) registry.refreshAddresses();
         });
         store.load().whenComplete((ignored, failure) -> { if (!stopped) registry.autostart(); });
+        context.background().execute(() -> {
+            try { tls.fingerprint(); }
+            catch (EngineFailure unreadable) { /* reported when a TLS server starts or the fingerprints are shown */ }
+            environment.ui().execute(() -> { if (!stopped) refreshPanels(); });
+        });
     }
 
     @Override public void stop() {
@@ -187,6 +201,14 @@ public final class FileServerPlugin implements Plugin {
     /** Engine events reach the transfer activities only while the plugin runs: a late one must not open an activity on a closed context. */
     void observe(ServerEvent event) { if (!stopped) transfers.accept(event); }
 
+    TlsMaterial tls() { return tls; }
+
+    /** This computer's name for the certificate; empty when the system will not say. Slow on some networks, so call it off the UI thread. */
+    static String hostName() {
+        try { return InetAddress.getLocalHost().getHostName(); }
+        catch (UnknownHostException | SecurityException unknown) { return ""; }
+    }
+
     private JComponent createPanel(PanelHost host) {
         WindowHandle window = host.window();
         var panel = new FileServersPanel(new FileServersPanel.Actions(
@@ -194,8 +216,10 @@ public final class FileServerPlugin implements Plugin {
             editing -> editing.ifPresentOrElse(id -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)),
                 () -> edit(window, Optional.empty(), false)),
             this::duplicate, id -> delete(window, id), this::reveal, environment.clipboard(),
-            id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity),
+            id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity,
+            id -> showFingerprints(window, id)),
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone());
+        panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), host);
@@ -370,9 +394,46 @@ public final class FileServerPlugin implements Plugin {
 
     private void refreshPanels() {
         for (FileServersPanel panel : panels.values()) {
+            panel.setTlsFingerprint(tls.cachedFingerprint());
             panel.setServers(registry.servers(), store.error());
             panel.refreshActivity();
         }
+    }
+
+    /** Shows the shared certificate's fingerprint, offering to regenerate it; the file I/O runs off the UI thread. */
+    void showFingerprints(WindowHandle window, UUID id) {
+        if (registry.server(id).isEmpty()) return;
+        context.background().execute(() -> {
+            String text;
+            try {
+                text = tls.fingerprint().map(fingerprint -> "TLS certificate (SHA-256): " + fingerprint)
+                    .orElse("No TLS certificate yet: Jasper creates one when a TLS server first starts.");
+            } catch (EngineFailure unreadable) {
+                text = unreadable.getMessage() + ". Regenerate it to make a new one.";
+            }
+            String shown = text;
+            environment.ui().execute(() -> {
+                if (stopped || !window.isOpen()) return;
+                refreshPanels();
+                confirm(window, "Fingerprints", shown, "Regenerate Certificate…", "Close", () -> confirmRegenerate(window), () -> { });
+            });
+        });
+    }
+
+    private void confirmRegenerate(WindowHandle window) {
+        confirm(window, "Regenerate the TLS certificate?",
+            "Clients that trusted the old certificate will warn about the new one. Running TLS servers keep the old one until they restart.",
+            "Regenerate", "Cancel", () -> context.background().execute(() -> {
+                String failure = null;
+                try { tls.regenerate(); }
+                catch (EngineFailure unwritable) { failure = unwritable.getMessage(); }
+                String error = failure;
+                environment.ui().execute(() -> {
+                    if (stopped) return;
+                    if (error != null) context.notices().error(error);
+                    refreshPanels();
+                });
+            }), () -> { });
     }
 
     private Optional<String> accountName(UUID id) {

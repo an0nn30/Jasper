@@ -2,6 +2,7 @@ package dev.jasper.fileserver.ui;
 
 import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.Login;
+import dev.jasper.fileserver.definition.PortRange;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.ServerAddresses;
@@ -130,5 +131,71 @@ class ServerEditorTest {
         var mac = editor(Optional.empty(), false, true, false, List.of());
         mac.port.setText("80");
         assertThat(mac.portHint.getText().isBlank()).isTrue();
+    }
+
+    ServerEditor ftpEditor(Optional<ServerDefinition> initial, boolean existing) {
+        return new ServerEditor(List.of(), initial, existing, Set.of(Protocol.HTTP, Protocol.FTP), List.of(), false,
+            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> Optional.of(folder), false,
+            saved::add, () -> cancelled = true);
+    }
+
+    @Test void ftpOffersTlsAndAPassiveRange() {
+        var editor = ftpEditor(Optional.empty(), false);
+        assertThat(editor.protocol.getSelectedItem()).isEqualTo(Protocol.HTTP);
+        assertThat(editor.useTls.isEnabled()).as("HTTP can use TLS").isTrue();
+        assertThat(editor.requireTls.isEnabled()).as("only FTP requires TLS").isFalse();
+        assertThat(editor.passive.isEnabled()).as("only FTP has passive ports").isFalse();
+        editor.protocol.setSelectedItem(Protocol.FTP);
+        assertThat(editor.port.getText()).isEqualTo("2121");
+        assertThat(editor.session.isSelected()).as("no Vault: a session password").isTrue();
+        assertThat(editor.passive.isEnabled()).isTrue();
+        assertThat(editor.warnings.getText()).isEqualTo("\u26a0 Plain FTP sends the password unencrypted");
+        assertThat(editor.requireTls.isEnabled()).as("needs Use TLS").isFalse();
+        editor.useTls.doClick();
+        assertThat(editor.requireTls.isEnabled()).isTrue();
+        assertThat(editor.warnings.getText()).isEqualTo(" ");
+        editor.requireTls.doClick();
+        editor.name.setText("drop");
+        editor.folder.setText(folder.toString());
+        editor.passive.setText("60000-50000");
+        editor.save.doClick();
+        assertThat(editor.message.getText()).isEqualTo("A port range runs from a lower to a higher port, 1 to 65535");
+        assertThat(saved).isEmpty();
+        editor.passive.setText(" 51000-51010 ");
+        editor.save.doClick();
+        assertThat(saved).singleElement().satisfies(definition -> {
+            assertThat(definition.protocol()).isEqualTo(Protocol.FTP);
+            assertThat(definition.tls()).isTrue();
+            assertThat(definition.requireTls()).isTrue();
+            assertThat(definition.passiveRange()).contains(new PortRange(51000, 51010));
+            assertThat(definition.login()).isEqualTo(Login.SESSION);
+        });
+        editor.useTls.doClick();
+        assertThat(editor.requireTls.isSelected()).as("Require TLS goes with Use TLS").isFalse();
+        assertThat(editor.requireTls.isEnabled()).isFalse();
+    }
+
+    @Test void anEmptyPassiveRangeUsesTheSetting() {
+        var editor = ftpEditor(Optional.empty(), false);
+        editor.protocol.setSelectedItem(Protocol.FTP);
+        editor.name.setText("plain");
+        editor.folder.setText(folder.toString());
+        editor.save.doClick();
+        assertThat(saved).singleElement().satisfies(definition -> {
+            assertThat(definition.passiveRange()).isEmpty();
+            assertThat(definition.tls()).isFalse();
+        });
+    }
+
+    @Test void editingAnFtpServerKeepsItsTlsAndRange() {
+        var original = new ServerDefinition(UUID.randomUUID(), "drop", Protocol.FTP, folder, Bind.LOOPBACK, 2121,
+            Optional.of(new PortRange(52000, 52005)), true, Login.SESSION, List.of(), true, true, false);
+        var editor = ftpEditor(Optional.of(original), true);
+        assertThat(editor.passive.getText()).isEqualTo("52000-52005");
+        assertThat(editor.useTls.isSelected()).isTrue();
+        assertThat(editor.requireTls.isSelected()).isTrue();
+        assertThat(editor.requireTls.isEnabled()).isTrue();
+        editor.save.doClick();
+        assertThat(saved).singleElement().isEqualTo(original);
     }
 }
