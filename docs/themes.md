@@ -46,8 +46,10 @@ Everything else is derived. A theme can also set:
 - `dark` (otherwise inferred from the background), `author`, `license`, `source`, `commit`;
 - `extends = "<theme>"`: start from any other theme and change only what you write; a file may even be named like the
   theme it extends ("Jasper Dark" extending "Jasper Dark") to replace it;
-- `cursor`, `selection` and `[colors.bright]` (otherwise each bright colour is its normal colour lightened, or darkened
-  on a light theme);
+- `cursor` and `selection` (in `[colors]`) and `[colors.bright]` (otherwise each bright colour is its normal colour
+  lightened, or darkened on a light theme);
+- `ui_complete = true`, which converted IntelliJ themes use because their `[ui]` is a complete key set and Jasper's
+  template is skipped; a hand-written theme does not need it;
 - `[tokens]`: Jasper's semantic colours, any subset of `surface`, `surface_raised`, `surface_sunken`, `title_bar`,
   `status_bar`, `sidebar`, `text`, `text_muted`, `text_disabled`, `text_on_accent`, `link`, `border`, `separator`,
   `divider`, `focus_ring`, `hover`, `pressed`, `selection`, `selection_text`, `selection_inactive`, `text_selection`,
@@ -66,6 +68,7 @@ Everything else is derived. A theme can also set:
 Derived text colours are adjusted until they are readable (4.5:1 for text, 3:1 for muted text); colours you write are
 used as written. Colours are `#RRGGBB` or `#RRGGBBAA`. A mistake (an unknown key, a bad colour, a missing seed, an
 `extends` that names no theme or loops) is a configuration warning naming the file and line, and that theme is skipped.
+A theme file larger than 256 KiB is skipped with a warning.
 
 ## Installing a theme
 
@@ -100,7 +103,7 @@ records where each came from.
 - A theme's `parentTheme` when it is one of the themes IntelliJ bundles: the classic `Darcula`,
   `IntelliJ` and `JetBrainsLightTheme`, the New UI `ExperimentalDark`, `ExperimentalLight` and
   `ExperimentalLightWithLightHeader`, and `Islands Dark`, `Islands Light`, `Islands Darcula` and
-  `JetBrainsHighContrastTheme`. They are vendored as parents only, not offered as themes. Any other
+  `JetBrainsHighContrastTheme`. IntelliJ Light and Darcula are also offered as built-in themes; the rest are vendored as parents only. Any other
   parent, such as another plugin's theme, is replaced by Darcula or IntelliJ by the theme's darkness,
   with a warning.
 - The theme's editor colour scheme, for the terminal (below).
@@ -118,7 +121,7 @@ With `terminal.colors = "match"` (the default), a theme that has an editor colou
 colours the terminal with the scheme's console colours: background, text, cursor, selection and
 the 16 ANSI colours.
 - **Missing colours:** colours the scheme leaves out come from its parent schemes, as in IntelliJ's console. A theme's `editorScheme` or a scheme's `parent_scheme` may name any scheme IntelliJ bundles: `Default`, `Darcula`, `IntelliJ Light`, `Light`, `Dark`, `Darcula Contrast`, `High contrast` and `Islands Dark`.
-- **No scheme:** a theme without one, and the built-in themes, use Jasper Dark or Jasper Light by the theme's darkness.
+- **No scheme:** Jasper theme files, Jasper Dark and Jasper Light included, take their terminal palette from their own `[colors]`, and IntelliJ Light and Darcula from their own editor scheme. Only an installed plugin theme without a scheme uses Jasper Dark's or Jasper Light's palette by the theme's darkness.
 - **Forcing Jasper's palettes:** `"light"` and `"dark"` always use Jasper's palettes.
 
 Scheme colours are used exactly as the theme author chose them.
