@@ -132,4 +132,20 @@ class ThemeGeneratorTest {
         assertThat(UiTemplate.hex(new Color(1, 2, 3))).isEqualTo("#010203");
         assertThat(UiTemplate.hex(new Color(1, 2, 3, 4))).isEqualTo("#01020304");
     }
+
+    @Test void chromeDerivesFromTheResolvedTokensNotTheTerminalSeeds() {
+        GeneratedTheme theme = generate(SEEDS + """
+            [tokens]
+            surface = "#f4f4f4"
+            text = "#202020"
+            editor_background = "#ffffff"
+            editor_foreground = "#000000"
+            """);
+        var tokens = theme.tokens();
+        Color surface = new Color(0xf4f4f4);
+        assertThat(tokens.get(Token.HOVER)).isEqualTo(ChromeKeys.mix(new Color(0x202020), surface, .08));
+        assertThat(ChromeKeys.contrast(tokens.get(Token.TEXT_MUTED), surface)).isGreaterThanOrEqualTo(3);
+        assertThat(ChromeKeys.contrast(tokens.get(Token.LINK), surface)).isGreaterThanOrEqualTo(4.5);
+        assertThat(tokens.get(Token.EDITOR_CURRENT_LINE)).isEqualTo(ChromeKeys.mix(Color.BLACK, Color.WHITE, .05));
+    }
 }

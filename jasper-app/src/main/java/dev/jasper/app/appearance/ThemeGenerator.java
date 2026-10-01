@@ -76,21 +76,21 @@ final class ThemeGenerator {
         private Color derive(Token token) {
             return switch (token) {
                 case SURFACE -> background;
-                case SURFACE_RAISED -> mix(foreground, token(SURFACE), .06);
+                case SURFACE_RAISED -> mix(token(TEXT), token(SURFACE), .06);
                 case SURFACE_SUNKEN -> mix(dark ? Color.BLACK : Color.WHITE, token(SURFACE), .12);
-                case TITLE_BAR, STATUS_BAR, TAB_BAR -> mix(foreground, token(SURFACE), .04);
+                case TITLE_BAR, STATUS_BAR, TAB_BAR -> mix(token(TEXT), token(SURFACE), .04);
                 case SIDEBAR -> token(SURFACE_SUNKEN);
                 case TEXT -> foreground;
-                case TEXT_MUTED -> readable(mix(foreground, token(SURFACE), .65), token(SURFACE), 3, foreground);
-                case TEXT_DISABLED -> readable(mix(foreground, token(SURFACE), .45), token(SURFACE), 2, foreground);
+                case TEXT_MUTED -> readable(mix(token(TEXT), token(SURFACE), .65), token(SURFACE), 3, token(TEXT));
+                case TEXT_DISABLED -> readable(mix(token(TEXT), token(SURFACE), .45), token(SURFACE), 2, token(TEXT));
                 case TEXT_ON_ACCENT -> blackOrWhite(token(BUTTON_DEFAULT));
-                case LINK -> readable(token(ACCENT), token(SURFACE), 4.5, foreground);
-                case BORDER -> mix(foreground, token(SURFACE), .16);
+                case LINK -> readable(token(ACCENT), token(SURFACE), 4.5, token(TEXT));
+                case BORDER -> mix(token(TEXT), token(SURFACE), .16);
                 case SEPARATOR -> token(BORDER);
-                case DIVIDER -> readable(mix(foreground, background, .40), background, 3, foreground);
+                case DIVIDER -> readable(mix(token(TEXT), background, .40), background, 3, token(TEXT));
                 case FOCUS_RING, TAB_UNDERLINE, BUTTON_DEFAULT -> token(ACCENT);
-                case HOVER -> mix(foreground, token(SURFACE), .08);
-                case PRESSED -> mix(foreground, token(SURFACE), .14);
+                case HOVER -> mix(token(TEXT), token(SURFACE), .08);
+                case PRESSED -> mix(token(TEXT), token(SURFACE), .14);
                 case SELECTION -> mix(token(ACCENT), token(SURFACE), .55);
                 case SELECTION_TEXT -> textOn(token(SELECTION));
                 case SELECTION_INACTIVE -> mix(token(SELECTION), token(SURFACE), .6);
@@ -99,28 +99,28 @@ final class ThemeGenerator {
                 case TAB_ACTIVE -> mix(token(ACCENT), token(SURFACE), .18);
                 case TAB_ACTIVE_BORDER -> mix(token(ACCENT), token(SURFACE), .45);
                 case TAB_HOVER -> token(HOVER);
-                case TAB_UNDERLINE_INACTIVE -> mix(foreground, token(SURFACE), .45);
-                case INPUT_BACKGROUND -> mix(foreground, token(SURFACE), .03);
-                case BUTTON_BACKGROUND -> mix(foreground, token(SURFACE), .12);
-                case BUTTON_BORDER -> mix(foreground, token(SURFACE), .18);
-                case SCROLLBAR_THUMB -> mix(foreground, token(SURFACE), .22);
-                case SCROLLBAR_TRACK -> mix(foreground, token(SURFACE), .05);
+                case TAB_UNDERLINE_INACTIVE -> mix(token(TEXT), token(SURFACE), .45);
+                case INPUT_BACKGROUND -> mix(token(TEXT), token(SURFACE), .03);
+                case BUTTON_BACKGROUND -> mix(token(TEXT), token(SURFACE), .12);
+                case BUTTON_BORDER -> mix(token(TEXT), token(SURFACE), .18);
+                case SCROLLBAR_THUMB -> mix(token(TEXT), token(SURFACE), .22);
+                case SCROLLBAR_TRACK -> mix(token(TEXT), token(SURFACE), .05);
                 case ACCENT -> accent;
-                case SUCCESS -> readable(ansi.get(2), token(STATUS_BAR), 4.5, foreground);
-                case WARNING -> readable(ansi.get(3), token(STATUS_BAR), 4.5, foreground);
-                case ERROR -> readable(ansi.get(1), token(STATUS_BAR), 4.5, foreground);
+                case SUCCESS -> readable(ansi.get(2), token(STATUS_BAR), 4.5, token(TEXT));
+                case WARNING -> readable(ansi.get(3), token(STATUS_BAR), 4.5, token(TEXT));
+                case ERROR -> readable(ansi.get(1), token(STATUS_BAR), 4.5, token(TEXT));
                 case ERROR_BACKGROUND -> mix(ansi.get(1), token(INPUT_BACKGROUND), .20);
                 case EDITOR_BACKGROUND -> background;
                 case EDITOR_FOREGROUND -> foreground;
                 case EDITOR_CARET -> cursor;
-                case EDITOR_CURRENT_LINE -> mix(foreground, background, .05);
+                case EDITOR_CURRENT_LINE -> mix(token(EDITOR_FOREGROUND), token(EDITOR_BACKGROUND), .05);
                 case EDITOR_GUTTER -> token(EDITOR_BACKGROUND);
                 case EDITOR_LINE_NUMBERS -> token(TEXT_DISABLED);
             };
         }
 
-        /** The foreground when it reads well on {@code fill}, else black or white, whichever contrasts more. */
-        private Color textOn(Color fill) { return contrast(foreground, fill) >= 4.5 ? foreground : blackOrWhite(fill); }
+        /** The text colour when it reads well on {@code fill}, else black or white, whichever contrasts more. */
+        private Color textOn(Color fill) { return contrast(token(TEXT), fill) >= 4.5 ? token(TEXT) : blackOrWhite(fill); }
 
         private static Color blackOrWhite(Color fill) {
             return contrast(Color.WHITE, fill) >= contrast(Color.BLACK, fill) ? Color.WHITE : Color.BLACK;
