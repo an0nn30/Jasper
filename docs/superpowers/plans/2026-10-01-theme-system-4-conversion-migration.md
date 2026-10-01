@@ -14,14 +14,21 @@ script, Swing/FlatLaf 3.7, headless JUnit/AssertJ. No new runtime dependencies o
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), §§2, 6, 8–9.
 **Companion:** [Requirement coverage and decisions](2026-10-01-theme-system-remaining-work.md).
-**Status:** Implementation-ready draft for user review; not executed. Re-audited against local `main@c8365dd1`,
+**Status:** Approved by the user; inline implementation in progress (2026-10-01). Re-audited against local `main@c8365dd1`,
 with Plans 2 and 3 merged and verified. This replaces the earlier six-task outline with seven sequential review gates.
 Only existing local provenance was inspected; the other upstream inputs/licenses have not been acquired or verified.
 Task 3 freezes those inputs. The `[icons]` addition below is an explicit proposed format amendment, reviewed with this
 plan; record it in the spec when implemented. No deviation from this revised plan has been executed.
-**Execution:** Preserve per-task implementer + independent reviewer, fix/re-review rounds, then a final whole-branch
-review. Reuse `.worktrees/theme-system` / `codex/theme-system-plans`; do not commit on main. No merge or push is part
-of this planning change. Obtain the user's review of this plan before implementation.
+**Execution:** User chose inline execution after approving the plan: one implementer in this session, TDD/commits
+per task, then one independent whole-branch review. This supersedes the per-task subagent workflow in the draft. Reuse `.worktrees/theme-system` / `codex/theme-system-plans`; do not commit on main. No merge or push is part
+of this planning change. User review received; continue through all tasks without intermediate approval requests.
+
+**Execution evidence:** Task 1 completed inline: icon/native round trips, nested-value immutability, source diagnostics,
+author-specific install parity and Unicode supplementary names are tested. Initial regressions failed for missing
+icons/shallow copies; a separate Unicode regression failed before correction. Focused checks and full `./gradlew check`
+passed: **7,904 tests, zero failures/errors, six skips**. The `[icons]` amendment is recorded in the spec. No GUI run.
+The two temporary ThemeManager legacy-loader entry points remain until Task 2; its install/materialization paths
+already use the extracted data-only adapter. Inline execution (explicit user selection) replaces per-task reviewers.
 
 ## Global Constraints
 
@@ -94,9 +101,9 @@ public `ThemeResolver.resolve(ThemeDocument)` and `resolve(ThemeDocument, Functi
 The writer handles inherited documents too (needed by Plan 5); conversion callers resolve first.
 `public final FlatLafThemeData` exposes public static `json(String name, boolean dark, String author, Map<String,Object> ui, Map<String,Object> icons)`
 returning String and `explicitColors(Map<String,Object> ui)` returning Map<String,Color>, extracted from ThemeLoader. Its public static `Color color(Object value)` returns null for noncolors;
-ThemeManager and WorkspaceValues no longer mention `ThemeLoader.Resolved`; catalog input moves in Task 2.
+ThemeManager and WorkspaceValues installation paths no longer mention `ThemeLoader.Resolved`; legacy loader entry points move in Task 2.
 
-- [ ] **Step 1: Write round-trip and parity regressions.** The round-trip fixture has all five seeds, 16 ANSI colors,
+- [x] **Step 1: Write round-trip and parity regressions.** The round-trip fixture has all five seeds, 16 ANSI colors,
 48 tokens, 16 syntax roles, author/license/source/commit, explicit `dark=false` / `ui_complete=false`, alpha colors,
 escaped quotes/backslashes/newlines and Unicode. Include ordered `*.background`/specific keys in both orders,
 Long/Double/boolean values, per-OS maps and a nested icon `ColorPalette` with dark-suffixed keys. Add separate inherited
@@ -127,7 +134,7 @@ Parity tests install original and reloaded complete themes on EDT using existing
 FlatLaf defaults/icon palettes, and prove private workspace materialization does not change global UIManager state.
 Reject unsafe UI delegates/class strings, unsupported icon values and excess nesting with file/line diagnostics.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ThemeTomlWriterTest' --tests '*ThemeTomlTest' --tests '*PluginThemeParityTest' --tests '*WorkspaceValuesTest'
@@ -135,7 +142,7 @@ Reject unsafe UI delegates/class strings, unsupported icon values and excess nes
 
 Expected: missing writer/public API or `[icons]` rejected; record the actual failure, not an unrelated build error.
 
-- [ ] **Step 3: Implement the format and adapter.** Emit fixed section order: metadata/flags/parent, colors, normal,
+- [x] **Step 3: Implement the format and adapter.** Emit fixed section order: metadata/flags/parent, colors, normal,
 bright, tokens, syntax, UI, icons; use enum/ANSI order and preserve UI insertion order. Quote arbitrary keys, canonicalize
 colors to lowercase `#rrggbb[aa]`, preserve false/empty values and optional absence, end with one newline. Reject NaN,
 infinity and unsupported objects instead of silently dropping them. `[ui]` retains current scalar/per-OS semantics;
@@ -149,9 +156,9 @@ reviewed `[icons]` amendment to spec §2 and update ThemeDocument JavaDoc. Extra
 FlatLafThemeData; ThemeLoader delegates to it until Task 2 moves. Change ThemeManager's private install path to accept
 native generated data/JSON/colors directly, preserving existing author-specific behavior and APP_DEFAULTS.
 
-- [ ] **Step 4: Run GREEN and the full gate.** Repeat Step 2, then `./gradlew check`; expect exit 0 and parity assertions
+- [x] **Step 4: Run GREEN and the full gate.** Repeat Step 2, then `./gradlew check`; expect exit 0 and parity assertions
 unchanged. Independent review focuses on ordering, typed data, class filtering and global LAF isolation.
-- [ ] **Step 5: Commit the reviewed task.**
+- [x] **Step 5: Commit the reviewed task.**
 
 ```bash
 git add jasper-app/src docs/superpowers/specs/2026-10-01-jasper-theme-system-design.md

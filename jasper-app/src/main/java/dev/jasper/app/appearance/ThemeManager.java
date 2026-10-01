@@ -83,22 +83,20 @@ public final class ThemeManager {
     /** Installs a generated theme through the same path as any IntelliJ theme; false when FlatLaf could not set it up. */
     static boolean install(GeneratedTheme theme) {
         requireEdt();
-        var resolved = new ThemeLoader.Resolved(theme.name(), theme.dark(), theme.author(),
-            ThemeLoader.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons()),
-            ThemeLoader.explicitColors(theme.uiKeys()), List.of(), theme.uiKeys(), theme.icons(), Map.of());
-        return install(resolved, theme.terminal().background());
+        return install(FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons()),
+            FlatLafThemeData.explicitColors(theme.uiKeys()), theme.terminal().background());
     }
 
-    static boolean install(ThemeLoader.Resolved resolved, Color terminalBackground) {
+    static boolean install(String json, Map<String, Color> colors, Color terminalBackground) {
         requireEdt();
         FlatLaf laf;
-        try { laf = IntelliJTheme.createLaf(new ByteArrayInputStream(resolved.json().getBytes(StandardCharsets.UTF_8))); }
+        try { laf = IntelliJTheme.createLaf(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         laf.setExtraDefaults(APP_DEFAULTS);
         if (!FlatLaf.setup(laf)) return false;
         UIDefaults defaults = UIManager.getLookAndFeelDefaults();
         var extra = new LinkedHashMap<>(APP_DEFAULTS);
-        resolved.colors().forEach((key, color) -> {
+        colors.forEach((key, color) -> {
             if (defaults.get(key) != null) return;
             defaults.put(key, new ColorUIResource(color));
             extra.put(key, UiTemplate.hex(color));

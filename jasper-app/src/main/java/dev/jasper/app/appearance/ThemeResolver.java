@@ -8,20 +8,20 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** Merges a theme's {@code extends} chain and checks that the result has the seeds a theme needs. */
-final class ThemeResolver {
+public final class ThemeResolver {
     private static final List<Seed> REQUIRED = List.of(Seed.BACKGROUND, Seed.FOREGROUND, Seed.ACCENT);
 
     private ThemeResolver() {}
 
     /** {@code document} on its own: it may not extend anything. */
-    static ThemeDocument resolve(ThemeDocument document) { return resolve(document, name -> List.of()); }
+    public static ThemeDocument resolve(ThemeDocument document) { return resolve(document, name -> List.of()); }
 
     /**
      * @param candidates every theme document with a given name, highest precedence first; may include
      *                   {@code document} itself; a same-name extension uses only candidates below it, so a theme can
      *                   extend the theme it replaces
      */
-    static ThemeDocument resolve(ThemeDocument document, Function<String, List<ThemeDocument>> candidates) {
+    public static ThemeDocument resolve(ThemeDocument document, Function<String, List<ThemeDocument>> candidates) {
         return resolve(document, candidates, new ArrayList<>(), new IdentityHashMap<>());
     }
 

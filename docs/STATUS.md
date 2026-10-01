@@ -2,17 +2,18 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system Plan 4 implementation plan ready for review** (2026-10-01; not implemented):
+- **Theme system Plan 4 approved; inline implementation underway** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)
   is revised against merged `main@c8365dd1`. Seven sequential tasks cover native serialization/FlatLaf adapter,
   complete shared conversion, locked offline catalog, safe import/file operations, resumable file migration,
   pre-ConfigService startup/config integration, then native-only runtime and store removal. Preserve the selected
-  per-task implementer/reviewer workflow and final whole-branch review. The draft explicitly proposes `[icons]`
+  inline workflow chosen by the user, with one final independent review. The approved plan adds `[icons]`
   persistence; preserves current selectors until Plan 5; corrects the earlier outline's dependency cycle,
   lost-diagnostic catalog injection, OS-sensitive export and too-late startup migration. Existing local full IntelliJ
   and Alacritty pins are recorded; new upstream artifacts/licenses remain Task 3 work, not verified by planning.
-  Documentation-only checks apply; no fresh Gradle/GUI run, implementation, merge or push. Next: user plan review,
-  then execute Plan 4. Plan 5 adds the Themes page, preview/file actions and live reload.
+  Task 1 is implemented: native serialization, bounded icon data, immutable nested values and runtime FlatLaf adapter.
+  RED regressions and focused GREEN checks passed; full `./gradlew check`: 7,904 tests, zero failures/errors, six skips.
+  No GUI, merge or push. Next: continue Task 2 shared conversion. Plan 5 adds the Themes page, preview/file actions and live reload.
 
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)

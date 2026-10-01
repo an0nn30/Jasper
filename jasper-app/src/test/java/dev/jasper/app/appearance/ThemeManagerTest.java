@@ -140,7 +140,7 @@ class ThemeManagerTest {
                 {"name": "Fixture", "ui": {"SearchEverywhere.Header.background": "#123456",
                   "EditorTabs.hoverBackground": "#00000019", "ComboBox.background": "#010101"}}""")::get, Map.of())
                 .load("fixture.json");
-            assertThat(ThemeManager.install(resolved, Color.WHITE)).isTrue();
+            assertThat(ThemeManager.install(resolved.json(), resolved.colors(), Color.WHITE)).isTrue();
             assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019"));
             // FlatLaf reads IntelliJ's combo keys its own way; its value stands.
             assertThat(hex(UIManager.getColor("ComboBox.background"))).isNotEqualTo("#010101");

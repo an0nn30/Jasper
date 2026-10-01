@@ -121,6 +121,12 @@ With `extends`, `[colors]` (including `normal` and `bright`) is optional and eve
 parent's; `dark` is inherited unless set. Without `extends`, `background`, `foreground`, `accent` and the eight normal
 colours are required.
 
+**Native icon data (Plan 4 amendment approved 2026-10-01):** optional `[icons]` preserves converted IntelliJ
+icon palettes and data through export/import. String-keyed nested maps, lists and JSON scalars are supported; null,
+nonfinite numbers and foreign Java class names are rejected. The reader limits icon data to depth 32 and 100,000
+values. UI key order, per-OS values, author metadata and explicit false flags survive serialization; no icon/plugin
+classes are loaded from a theme. Runtime still uses one chrome LAF.
+
 ### 2.1 Tokens
 
 Every token is derivable from the seeds; a theme sets only those it wants to fix.

@@ -61,7 +61,8 @@ class PluginThemeParityTest {
                 .findFirst().orElseThrow();
             String label = ((Theme.Archive) theme.source()).entry();
 
-            assertThat(ThemeManager.install(ThemeManager.loadArchive(label, json), theme.palette().background())).isTrue();
+            var resolved = ThemeManager.loadArchive(label, json);
+            assertThat(ThemeManager.install(resolved.json(), resolved.colors(), theme.palette().background())).isTrue();
             Map<String, String> before = colours();
             assertThat(ThemeManager.install(theme)).isTrue();
             Map<String, String> after = colours();
@@ -69,6 +70,13 @@ class PluginThemeParityTest {
             assertThat(before).as("the theme file's own install").containsEntry("Component.accentColor", "#ff79c6")
                 .containsEntry("ColorPalette.accentColor", "#ff79c6");
             assertThat(differences(before, after)).as("colours that differ (theme file -> converted)").isEmpty();
+            var reloaded = ThemeResolver.resolve(ThemeToml.parse(ThemeTomlWriter.write(theme.source().document()), "export.toml"));
+            assertThat(ThemeManager.install(Theme.of("export", new Theme.UserFile(home.resolve("export.toml"), reloaded)))).isTrue();
+            assertThat(differences(before, colours())).as("native disk round-trip install").isEmpty();
+            var installed = UIManager.getLookAndFeel();
+            var workspace = WorkspaceValues.resolve(reloaded, ThemeGenerator.generate(reloaded));
+            assertThat(UIManager.getLookAndFeel()).isSameAs(installed);
+            assertThat(workspace.icons()).isEqualTo(theme.source().document().icons());
             assertThat(theme.source().document().seeds()).containsEntry(Seed.ACCENT, new Color(0xff79c6));
         } finally { UIManager.setLookAndFeel(original); }
     }
