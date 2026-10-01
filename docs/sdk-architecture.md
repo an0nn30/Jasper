@@ -189,6 +189,17 @@ the chooser dialog's worker, one at a time, and their failures show in the choos
 only the sources the caller names; with no `initial`, the chooser opens where a named source locates the owner's
 focused pane, else at the pane's local folder. A stopped plugin's source disappears from open choosers.
 
+## Shortcut contexts (SDK 0.11.0)
+
+`ShortcutContext` (`global`, `terminal`, `content`, `panel(id)`, `window(id)`) travels with `ActionSpec`. `HostedUi`
+rejects a panel or window id outside the plugin's namespace and maps the context onto the app's
+`dev.jasper.app.commands.KeyContext` (content becomes the plugin's own tabs), which `ActionEntry` and
+`KeyBindings.Extension` carry with the optional Linux/Windows default. `KeyBindings` keeps several actions on one
+stroke when their contexts don't conflict (a conflict is the same context, or Global with Terminal, which both apply in
+a terminal pane). `WindowContent.dispatchShortcut` resolves the stroke against the focus owner: an enabled action in
+the most specific containing context runs; a disabled one takes the key without running in a terminal pane (plan K1
+Deviation 9: X11 would send it to the shell as a control character); otherwise the key is not consumed. Window contexts apply once plugin windows get the Keymap (plan K4).
+
 ## Plugins manager, install and restart
 
 Nothing is loaded or unloaded in a running process. The manager edits `plugins.toml` through
@@ -347,7 +358,9 @@ dialogs or overlays) without closing anything, before `quitting` is set and befo
 `ApplicationShutdown` arms the exit deadline. A refusal leaves Jasper running; a refused restart
 records no relaunch. Start-up rollback, a `--background` launch that cannot stay resident and the
 benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
-launch goes through `quit()` and does.
+launch goes through `quit()` and does. Since SDK 0.11.0 the same check then asks `Windows.onQuitting` guards, kept in
+`Contributions.quitGuards()` (`QuitGuards`), one at a time, pumping UI events while a decision is pending; a refusal
+cancels, and a guard that throws or fails allows the quit.
 
 `Windows.chooseSaveFile` is the save-target twin of `chooseFiles`: `PathChoice.Mode.SAVE` makes
 `NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and

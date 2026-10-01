@@ -1,6 +1,7 @@
 package dev.jasper.app.shortcuthelp;
 
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import java.awt.event.InputEvent;
@@ -176,5 +177,34 @@ class ShortcutHelpTest {
 
     private static KeyEvent key(java.awt.Component source, int type, int code, int modifiers) {
         return new KeyEvent(source, type, 0, modifiers, code, KeyEvent.CHAR_UNDEFINED);
+    }
+
+    @Test void catalogNamesWhereEachShortcutApplies() throws Exception {
+        edt(() -> {
+            var c = new Contributions();
+            c.addAction("dev.x.save", "Save", null, List.of(), Optional.of("cmd+s"), Optional.empty(), KeyContext.content("dev.x"), ignored -> {});
+            c.addAction("dev.x.hosts.new", "New Host", null, List.of(), Optional.of("cmd+n"), Optional.of("ctrl+n"),
+                KeyContext.panel("dev.x.hosts"), ignored -> {});
+            var rows = ShortcutCatalog.rows(KeyBindings.defaults(false), c.actions(), Map.of("dev.x", "Tool"),
+                Map.of("dev.x.hosts", "Hosts"), false);
+            assertThat(rows).filteredOn(row -> row.id().equals("new_tab")).singleElement().satisfies(row -> {
+                assertThat(row.where()).isEqualTo("Global");
+                assertThat(ShortcutText.matches(row, "global", null)).isTrue();
+            });
+            assertThat(rows).filteredOn(row -> row.id().equals("clear_scrollback")).singleElement().satisfies(row -> {
+                assertThat(row.where()).isEqualTo("Terminal");
+                assertThat(row.context()).isEqualTo("In a terminal pane");
+            });
+            assertThat(rows).filteredOn(row -> row.id().equals("dev.x.save")).singleElement()
+                .satisfies(row -> assertThat(row.where()).isEqualTo("Tool tabs"));
+            assertThat(rows).filteredOn(row -> row.id().equals("dev.x.hosts.new")).singleElement().satisfies(row -> {
+                assertThat(row.where()).isEqualTo("Hosts panel");
+                assertThat(row.defaultBinding()).isEqualTo("ctrl+n");
+                assertThat(ShortcutText.format(row.stroke())).isEqualTo("Ctrl+N");
+                assertThat(row.customized(false)).isFalse();
+            });
+            assertThat(rows).filteredOn(row -> row.id().equals("palette.primary")).singleElement()
+                .satisfies(row -> assertThat(row.where()).isEqualTo("Command palette"));
+        });
     }
 }

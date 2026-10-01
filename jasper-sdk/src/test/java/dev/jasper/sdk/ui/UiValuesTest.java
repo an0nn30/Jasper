@@ -22,6 +22,23 @@ class UiValuesTest {
             new ActionSpec("dev.x.run", "Run", null, List.of(), Optional.empty()));
     }
 
+    @Test void actionSpecCarriesPlatformDefaultsAndAShortcutContext() {
+        var spec = ActionSpec.of("dev.x.tool.run", "Run");
+        assertThat(spec.otherDefaultBinding()).isEmpty();
+        assertThat(spec.context()).isEqualTo(ShortcutContext.global());
+        var paired = spec.withDefaultBindings("cmd+alt+1", "alt+1").withContext(ShortcutContext.panel("dev.x.tool.hosts"))
+            .withKeywords(List.of("hosts")).withIcon(new javax.swing.ImageIcon());
+        assertThat(paired.defaultBinding()).hasValue("cmd+alt+1");
+        assertThat(paired.otherDefaultBinding()).hasValue("alt+1");
+        assertThat(paired.context()).isEqualTo(ShortcutContext.panel("dev.x.tool.hosts"));
+        assertThat(paired.keywords()).containsExactly("hosts");
+        assertThat(spec.withDefaultBindings("cmd+m", null).otherDefaultBinding()).as("no default off macOS").hasValue("none");
+        assertThat(paired.withDefaultBinding("cmd+j").otherDefaultBinding()).as("one default again").isEmpty();
+        assertThat(new ActionSpec("dev.x.run", "Run", Optional.empty(), List.of(), Optional.of("cmd+j")).context())
+            .isEqualTo(ShortcutContext.global());
+        assertThatNullPointerException().isThrownBy(() -> spec.withContext(null));
+    }
+
     @Test void toolbarItemsAndStatusSpecsValidate() {
         assertThat(ToolbarItem.action("dev.x.run")).isEqualTo(new ToolbarItem.Button("dev.x.run"));
         var ids = new ArrayList<>(List.of("dev.x.a", "dev.x.b"));

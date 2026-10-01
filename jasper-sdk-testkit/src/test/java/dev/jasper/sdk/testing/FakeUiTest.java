@@ -3,6 +3,7 @@ package dev.jasper.sdk.testing;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItemSpec;
@@ -60,6 +61,22 @@ class FakeUiTest {
             assertThat(host.toolbar()).containsExactly("menu:Tool:dev.x.tool.stop");
             assertThat(host.menu("VIEW")).containsExactly("---", "submenu:More", "  item:dev.x.tool.stop", "===", "item:dev.x.tool.stop");
             assertThat(host.menu("top:dev.x.tool.menu")).isEmpty();
+        }
+    }
+
+    @Test void theHostKeepsEachActionsSpecAndChecksItsShortcutContext() {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
+            context.actions().register(ActionSpec.of("dev.x.tool.new", "New").withDefaultBindings("cmd+n", "ctrl+n")
+                .withContext(ShortcutContext.panel("dev.x.tool.hosts")), invoked -> { });
+            assertThat(host.actionSpec("dev.x.tool.new")).hasValueSatisfying(spec -> {
+                assertThat(spec.defaultBinding()).hasValue("cmd+n");
+                assertThat(spec.otherDefaultBinding()).hasValue("ctrl+n");
+                assertThat(spec.context()).isEqualTo(ShortcutContext.panel("dev.x.tool.hosts"));
+            });
+            assertThat(host.actionSpec("dev.x.tool.absent")).isEmpty();
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("dev.x.tool.other", "Other")
+                .withContext(ShortcutContext.window("dev.y.manager")), invoked -> { }));
         }
     }
 

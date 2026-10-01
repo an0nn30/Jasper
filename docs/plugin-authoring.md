@@ -16,8 +16,8 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.9, <0.10"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source
+sdk = ">=0.11.0, <0.12"
+capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
@@ -104,7 +104,13 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Ids** of actions, top-level menus and status items start with your plugin id and a dot.
 - **Shortcuts.** `withDefaultBinding` uses the `[keybindings]` syntax. The user's configuration
   wins, then Jasper's own shortcuts, then plugin defaults in load order; a default that loses is
-  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id.
+  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id. Outside macOS,
+  `cmd` means Ctrl+Shift and a default naming cmd and shift also gets alt; give a different Linux and
+  Windows key with `withDefaultBindings("cmd+s", "ctrl+s")`. `withContext(ShortcutContext.terminal())`,
+  `content()`, `panel(id)` or `window(id)` limits where the key applies (SDK 0.11.0): the most specific
+  context around focus wins, so a panel action may reuse a Global key, and a key whose action does not
+  apply reaches the focused component. A `window(id)` shortcut takes effect once plugin windows get the
+  Keymap (plan K4).
 - **Placements** may name only actions your plugin registered. Closing an action removes it from
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
@@ -214,6 +220,9 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
 - `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
   it open. Since SDK 0.8.4, quitting or restarting Jasper asks the guards of your open windows first, so a guard
   can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
+- `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after plugin windows and
+  content tabs, even when your plugin has no window: a background server can ask "stop the running servers?".
+  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit.
 - In SDK 0.8.4+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
   Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
   window close. The close button is not affected.
@@ -241,6 +250,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` or `localProfile(id)`, and `Terminals.profiles()` and `onProfilesChanged` |
 | `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
 | `files.source` | `FileSources.register`: add places, such as saved hosts, to the file chooser |
+| `network.listen` | nothing gated: declare it when your plugin accepts connections from other programs or computers, such as serving files |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
 without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin

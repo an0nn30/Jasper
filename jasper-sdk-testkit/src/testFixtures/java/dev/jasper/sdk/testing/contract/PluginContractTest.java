@@ -22,6 +22,7 @@ import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
@@ -430,6 +431,22 @@ public abstract class PluginContractTest {
         assertThat(h.actions()).containsExactly("test.alpha.run|Run Now|false", "test.alpha.boom|Boom|true");
     }
 
+    @Test void shortcutContextsNameOnlyThePluginsOwnPanelsAndWindows() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.new", "New").withDefaultBindings("cmd+n", "ctrl+n")
+                .withContext(ShortcutContext.panel("test.alpha.hosts")), invoked -> { });
+            context.actions().register(ActionSpec.of("test.alpha.save", "Save").withContext(ShortcutContext.content()), invoked -> { });
+            context.actions().register(ActionSpec.of("test.alpha.copy", "Copy")
+                .withContext(ShortcutContext.window("test.alpha.manager")), invoked -> { });
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alpha.foreign", "Foreign")
+                .withContext(ShortcutContext.panel("test.beta.hosts")), invoked -> { }));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alpha.near", "Near")
+                .withContext(ShortcutContext.window("test.alphabet.manager")), invoked -> { }));
+        });
+        assertThat(h.active("test.alpha")).isTrue();
+        assertThat(h.actions()).containsExactly("test.alpha.new|New|true", "test.alpha.save|Save|true", "test.alpha.copy|Copy|true");
+    }
+
     @Test void placementsNameOnlyThePluginsOwnActionsAndVanishWithThem() {
         var run = new AtomicReference<PluginAction>();
         var alpha = new AtomicReference<PluginContext>();
@@ -672,6 +689,34 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThat(h.requestQuit()).as("dialogs are not asked").isTrue());
         assertThat(asked).containsExactly("first", "second");
         assertThat(h.windows()).as("asking closes nothing").hasSize(3);
+    }
+
+    @Test void quitGuardsAreAskedInTurnAndOnlyAFalseDecisionRefuses() {
+        var alpha = new AtomicReference<CompletableFuture<Boolean>>(CompletableFuture.completedFuture(false));
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context ->
+            context.windows().onQuitting(() -> { asked.add("alpha"); return alpha.get(); }));
+        h.start(info("test.beta"), Set.of(), Set.of(), context ->
+            context.windows().onQuitting(() -> { asked.add("beta"); throw new IllegalStateException("broken guard"); }));
+        h.ui(() -> assertThat(h.requestQuit()).isFalse());
+        assertThat(asked).containsExactly("alpha");
+        alpha.set(CompletableFuture.completedFuture(true));
+        asked.clear();
+        h.ui(() -> assertThat(h.requestQuit()).as("a guard that throws allows the quit").isTrue());
+        assertThat(asked).containsExactly("alpha", "beta");
+        alpha.set(CompletableFuture.failedFuture(new IllegalStateException("failed decision")));
+        h.ui(() -> assertThat(h.requestQuit()).as("a failed decision allows the quit").isTrue());
+    }
+
+    @Test void aClosedQuitGuardIsNotAsked() {
+        var registration = new AtomicReference<Subscription>();
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> registration.set(
+            context.windows().onQuitting(() -> { asked.add("alpha"); return CompletableFuture.completedFuture(false); })));
+        h.ui(() -> assertThat(h.requestQuit()).isFalse());
+        h.ui(() -> registration.get().close());
+        h.ui(() -> assertThat(h.requestQuit()).isTrue());
+        assertThat(asked).containsExactly("alpha");
     }
 
     private static PluginInfo info(String id, String... capabilities) { return new PluginInfo(id, id, "1.0.0", Set.of(capabilities)); }

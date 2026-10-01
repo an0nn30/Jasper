@@ -40,7 +40,8 @@ public final class TransferUi implements AutoCloseable {
     TransferUi(PluginContext context, TransferCoordinator coordinator, Executor ui, Consumer<WindowHandle> showSidebar, LongSupplier clock, boolean autoRefresh) {
         this.context = context; this.coordinator = coordinator; this.ui = ui; this.showSidebar = showSidebar; this.clock = clock;
         context.actions().register(ActionSpec.of(SHOW, "Transfers").withIcon(context.appearance().icon(IconName.DOWNLOAD))
-            .withKeywords(List.of("sftp", "upload", "download", "queue")), invoked -> showSidebar.accept(invoked.window()));
+            .withKeywords(List.of("sftp", "upload", "download", "queue")).withDefaultBindings("cmd+alt+3", "alt+3"),
+            invoked -> showSidebar.accept(invoked.window()));
         context.actions().register(ActionSpec.of(CANCEL, "Cancel transfer").withIcon(context.appearance().icon(IconName.CLOSE)), invoked -> {
             if (latest != null && latest.activeJobs().size() == 1) coordinator.cancel(latest.activeJobs().getFirst());
             else showSidebar.accept(invoked.window());

@@ -1,20 +1,21 @@
 package dev.jasper.app.config;
 
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.commands.KeyContext;
 import javax.swing.KeyStroke;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -22,13 +23,40 @@ import java.util.regex.Pattern;
  * Built-in ids come from {@link ActionId}; namespaced (dotted) ids belong to contributed actions.
  * A user's binding for a dotted id is validated when the configuration loads but bound only once
  * {@link #withExtensions} learns that the action exists.
+ * <p>Every action has a {@link KeyContext}. A stroke may belong to several actions whose contexts don't conflict;
+ * {@link #resolve} picks the most specific one that applies where focus is.
  */
 public final class KeyBindings {
-    /** A contributed action and the shortcut its contributor would like, if any. */
-    public record Extension(String id, Optional<String> defaultBinding) {
+    /**
+     * A contributed action, the shortcuts its contributor would like and where they apply.
+     *
+     * @param defaultBinding the default as written, used as is on macOS
+     * @param otherDefault the Linux and Windows default when the contributor named one ("none" for no default there);
+     *                     empty means it follows from {@code defaultBinding}
+     * @param context where the shortcut applies
+     */
+    public record Extension(String id, Optional<String> defaultBinding, Optional<String> otherDefault, KeyContext context) {
         public Extension {
             if (!extensionId(id)) throw new IllegalArgumentException("not a contributed action id: '" + id + "'");
             Objects.requireNonNull(defaultBinding, "defaultBinding");
+            Objects.requireNonNull(otherDefault, "otherDefault");
+            Objects.requireNonNull(context, "context");
+        }
+
+        /** A Global action with one default for every platform. */
+        public Extension(String id, Optional<String> defaultBinding) {
+            this(id, defaultBinding, Optional.empty(), KeyContext.GLOBAL);
+        }
+
+        /**
+         * The default on this platform. macOS takes the default as written. Elsewhere an explicit other default wins;
+         * without one, cmd means Ctrl+Shift and a default naming cmd and shift gains alt, as built-in defaults always
+         * did, so {@code cmd+shift+x} does not land on the same keys as {@code cmd+x}.
+         */
+        public Optional<String> defaultFor(boolean macOs) {
+            if (macOs) return defaultBinding;
+            if (otherDefault.isPresent()) return otherDefault;
+            return defaultBinding.map(KeyBindings::withAltRule);
         }
     }
 
@@ -52,14 +80,18 @@ public final class KeyBindings {
 
     private final boolean macOs;
     private final Map<String, KeyStroke> strokesById;
-    private final Map<KeyStroke, String> idsByStroke;
+    private final Map<String, KeyContext> contexts;
+    private final Map<KeyStroke, List<String>> idsByStroke;
     private final Map<String, Optional<KeyStroke>> extensionOverrides;
 
-    private KeyBindings(boolean macOs, Map<String, KeyStroke> strokesById, Map<String, Optional<KeyStroke>> extensionOverrides) {
+    private KeyBindings(boolean macOs, Map<String, KeyStroke> strokesById, Map<String, KeyContext> contexts,
+                        Map<String, Optional<KeyStroke>> extensionOverrides) {
         this.macOs = macOs;
         this.strokesById = Collections.unmodifiableMap(new LinkedHashMap<>(strokesById));
-        Map<KeyStroke, String> reverse = new HashMap<>();
-        for (Map.Entry<String, KeyStroke> entry : strokesById.entrySet()) reverse.put(entry.getValue(), entry.getKey());
+        this.contexts = Map.copyOf(contexts);
+        Map<KeyStroke, List<String>> reverse = new HashMap<>();
+        strokesById.forEach((id, stroke) -> reverse.computeIfAbsent(stroke, ignored -> new ArrayList<>()).add(id));
+        reverse.replaceAll((stroke, ids) -> List.copyOf(ids));
         idsByStroke = Map.copyOf(reverse);
         this.extensionOverrides = Collections.unmodifiableMap(new LinkedHashMap<>(extensionOverrides));
     }
@@ -72,18 +104,16 @@ public final class KeyBindings {
     public static KeyBindings defaults(boolean macOs) {
         Map<String, KeyStroke> strokes = new LinkedHashMap<>();
         for (ActionId action : ActionId.values()) {
-            String binding = effectiveDefaultBinding(action, macOs);
-            KeyStroke stroke = parse(binding, macOs).orElseThrow();
-            putWithoutCollision(strokes, action.id(), stroke, binding);
+            String binding = action.defaultBinding(macOs);
+            Optional<KeyStroke> stroke = parse(binding, macOs);
+            if (stroke.isPresent()) putWithoutConflict(strokes, Map.of(), action.id(), action.context(), stroke.get(), binding);
         }
-        return new KeyBindings(macOs, strokes, Map.of());
+        return new KeyBindings(macOs, strokes, Map.of(), Map.of());
     }
 
-    /** Text that round-trips the effective default, including non-macOS compatibility modifiers. */
+    /** A built-in's default for this platform as written; "none" when it has none there. */
     public static String effectiveDefaultBinding(ActionId action, boolean macOs) {
-        String binding = action.defaultBinding(macOs);
-        if (action == ActionId.COMMAND_PALETTE || action == ActionId.CLEAR_SCROLLBACK) return binding;
-        return !macOs && binding.contains("cmd+shift") ? "alt+" + binding : binding;
+        return action.defaultBinding(macOs);
     }
 
     public static KeyBindings withOverrides(boolean macOs, Map<String, String> overrides) {
@@ -101,42 +131,46 @@ public final class KeyBindings {
         }
         builtIn.keySet().forEach(result::remove);
         for (Map.Entry<String, String> entry : builtIn.entrySet()) {
-            parseFor(entry.getKey(), entry.getValue(), macOs)
-                .ifPresent(stroke -> putWithoutCollision(result, entry.getKey(), stroke, entry.getValue()));
+            parseFor(entry.getKey(), entry.getValue(), macOs).ifPresent(stroke -> putWithoutConflict(result, Map.of(),
+                entry.getKey(), contextOf(entry.getKey(), Map.of()), stroke, entry.getValue()));
         }
-        // A contributed action's shortcut must not collide with anything the user or the defaults claim,
-        // but it is not bound here: the action may not exist in this launch.
+        // A contributed action's shortcut must not collide with anything the user or the defaults claim, but it is
+        // not bound here: the action may not exist in this launch. Its context is unknown until it registers, so the
+        // check treats it as Global.
         Map<String, KeyStroke> claimed = new LinkedHashMap<>(result);
         Map<String, Optional<KeyStroke>> extensionOverrides = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : extensions.entrySet()) {
             Optional<KeyStroke> parsed = parseFor(entry.getKey(), entry.getValue(), macOs);
-            parsed.ifPresent(stroke -> putWithoutCollision(claimed, entry.getKey(), stroke, entry.getValue()));
+            parsed.ifPresent(stroke -> putWithoutConflict(claimed, Map.of(), entry.getKey(), KeyContext.GLOBAL, stroke, entry.getValue()));
             extensionOverrides.put(entry.getKey(), parsed);
         }
-        return new KeyBindings(macOs, result, extensionOverrides);
+        return new KeyBindings(macOs, result, Map.of(), extensionOverrides);
     }
 
     /**
-     * Adds contributed actions in registration order. The user's binding for an action wins; otherwise
-     * its default applies unless the shortcut is already taken or invalid. Always call this on the
-     * result of {@link #withOverrides} or {@link #defaults}, never on an already extended instance.
+     * Adds contributed actions in registration order. The user's binding for an action wins; otherwise its default
+     * for this platform applies unless it is invalid or an existing binding holds the stroke in a conflicting context.
+     * Always call this on the result of {@link #withOverrides} or {@link #defaults}, never on an already extended
+     * instance.
      */
     public Resolved withExtensions(List<Extension> extensions) {
         Map<String, KeyStroke> strokes = new LinkedHashMap<>();
         strokesById.forEach((id, stroke) -> { if (!extensionId(id)) strokes.put(id, stroke); });
+        Map<String, KeyContext> registered = new LinkedHashMap<>();
+        for (Extension extension : extensions) registered.putIfAbsent(extension.id(), extension.context());
         List<Problem> problems = new ArrayList<>();
-        Set<String> registered = new LinkedHashSet<>();
-        for (Extension extension : extensions) registered.add(extension.id());
         for (Map.Entry<String, Optional<KeyStroke>> override : extensionOverrides.entrySet()) {
-            if (!registered.contains(override.getKey())) {
+            if (!registered.containsKey(override.getKey())) {
                 problems.add(new Problem(Problem.Kind.UNKNOWN_ACTION, override.getKey(), "Unknown action; ignored."));
                 continue;
             }
             override.getValue().ifPresent(stroke -> strokes.put(override.getKey(), stroke));
         }
         for (Extension extension : extensions) {
-            if (extensionOverrides.containsKey(extension.id()) || extension.defaultBinding().isEmpty()) continue;
-            String binding = extension.defaultBinding().get();
+            if (extensionOverrides.containsKey(extension.id())) continue;
+            Optional<String> wanted = extension.defaultFor(macOs);
+            if (wanted.isEmpty()) continue;
+            String binding = wanted.get();
             Optional<KeyStroke> parsed;
             try { parsed = parse(binding, macOs); }
             catch (IllegalArgumentException invalid) {
@@ -145,9 +179,7 @@ public final class KeyBindings {
                 continue;
             }
             if (parsed.isEmpty()) continue;
-            String holder = null;
-            for (Map.Entry<String, KeyStroke> existing : strokes.entrySet())
-                if (existing.getValue().equals(parsed.get())) holder = existing.getKey();
+            String holder = conflicting(strokes, registered, extension.context(), parsed.get());
             if (holder != null) {
                 problems.add(new Problem(Problem.Kind.DEFAULT_DROPPED, extension.id(), "Default shortcut '" + binding
                     + "' is already used by '" + holder + "'; bind the action under [keybindings] to give it one."));
@@ -155,11 +187,37 @@ public final class KeyBindings {
             }
             strokes.put(extension.id(), parsed.get());
         }
-        return new Resolved(new KeyBindings(macOs, strokes, extensionOverrides), problems);
+        return new Resolved(new KeyBindings(macOs, strokes, registered, extensionOverrides), problems);
     }
 
+    /** The Global or Terminal action bound to a stroke, if any; actions in owned contexts are found with {@link #resolve}. */
     public Optional<String> idFor(KeyStroke stroke) {
-        return Optional.ofNullable(idsByStroke.get(stroke));
+        for (String id : idsFor(stroke)) if (contextFor(id).level() <= 1) return Optional.of(id);
+        return Optional.empty();
+    }
+
+    /** Every action bound to a stroke: built-ins first, then contributed actions in registration order. */
+    public List<String> idsFor(KeyStroke stroke) {
+        return idsByStroke.getOrDefault(stroke, List.of());
+    }
+
+    /**
+     * The action a stroke runs where focus is: of the actions bound to it whose context applies, the most specific
+     * (an owned context, then Terminal, then Global). Empty when none applies.
+     */
+    public Optional<String> resolve(KeyStroke stroke, Predicate<KeyContext> applies) {
+        String best = null;
+        int level = -1;
+        for (String id : idsFor(stroke)) {
+            KeyContext context = contextFor(id);
+            if (context.level() > level && applies.test(context)) { best = id; level = context.level(); }
+        }
+        return Optional.ofNullable(best);
+    }
+
+    /** Where an id's shortcut applies: a built-in's own context, a registered contributed action's, otherwise Global. */
+    public KeyContext contextFor(String id) {
+        return contextOf(id, contexts);
     }
 
     public Optional<KeyStroke> strokeFor(String id) {
@@ -249,12 +307,31 @@ public final class KeyBindings {
         return Optional.of(KeyStroke.getKeyStroke(keyCode, modifiers));
     }
 
-    private static void putWithoutCollision(Map<String, KeyStroke> strokes, String id, KeyStroke stroke, String binding) {
-        for (Map.Entry<String, KeyStroke> existing : strokes.entrySet()) {
-            if (existing.getValue().equals(stroke)) {
-                throw new IllegalArgumentException(
-                    "keybinding collision for '" + binding + "': actions '" + existing.getKey() + "' and '" + id + "'");
-            }
+    /** The non-macOS rule for a contributed cmd default: one naming cmd and shift gains alt. */
+    static String withAltRule(String binding) {
+        List<String> tokens = Arrays.stream(binding.trim().toLowerCase(Locale.ROOT).split("\\+", -1)).map(String::trim).toList();
+        return tokens.contains("cmd") && tokens.contains("shift") && !tokens.contains("alt") ? "alt+" + binding : binding;
+    }
+
+    private static KeyContext contextOf(String id, Map<String, KeyContext> contexts) {
+        return ActionId.forId(id).map(ActionId::context).orElseGet(() -> contexts.getOrDefault(id, KeyContext.GLOBAL));
+    }
+
+    /** The first action holding the stroke in a context that would make it ambiguous with this one, or null. */
+    private static String conflicting(Map<String, KeyStroke> strokes, Map<String, KeyContext> contexts,
+                                      KeyContext context, KeyStroke stroke) {
+        for (Map.Entry<String, KeyStroke> existing : strokes.entrySet())
+            if (existing.getValue().equals(stroke) && contextOf(existing.getKey(), contexts).conflictsWith(context))
+                return existing.getKey();
+        return null;
+    }
+
+    private static void putWithoutConflict(Map<String, KeyStroke> strokes, Map<String, KeyContext> contexts, String id,
+                                           KeyContext context, KeyStroke stroke, String binding) {
+        String holder = conflicting(strokes, contexts, context, stroke);
+        if (holder != null) {
+            throw new IllegalArgumentException(
+                "keybinding collision for '" + binding + "': actions '" + holder + "' and '" + id + "'");
         }
         strokes.put(id, stroke);
     }

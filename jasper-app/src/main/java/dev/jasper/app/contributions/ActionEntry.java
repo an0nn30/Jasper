@@ -1,5 +1,7 @@
 package dev.jasper.app.contributions;
 
+import dev.jasper.app.commands.KeyContext;
+import dev.jasper.app.config.KeyBindings;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -12,15 +14,19 @@ public final class ActionEntry {
     private final Icon icon;
     private final List<String> keywords;
     private final Optional<String> defaultBinding;
+    private final Optional<String> otherDefault;
+    private final KeyContext context;
     private Consumer<Contributions.Invocation> handler;
     private String title;
     private boolean enabled = true;
     private boolean closed;
 
     ActionEntry(Contributions owner, String id, String title, Icon icon, List<String> keywords,
-                Optional<String> defaultBinding, Consumer<Contributions.Invocation> handler) {
+                Optional<String> defaultBinding, Optional<String> otherDefault, KeyContext context,
+                Consumer<Contributions.Invocation> handler) {
         this.owner = owner; this.id = id; this.title = title; this.icon = icon;
-        this.keywords = List.copyOf(keywords); this.defaultBinding = defaultBinding; this.handler = handler;
+        this.keywords = List.copyOf(keywords); this.defaultBinding = defaultBinding; this.otherDefault = otherDefault;
+        this.context = context; this.handler = handler;
     }
 
     public String id() { return id; }
@@ -29,6 +35,12 @@ public final class ActionEntry {
     public Icon icon() { return icon; }
     public List<String> keywords() { return keywords; }
     public Optional<String> defaultBinding() { return defaultBinding; }
+    /** The Linux and Windows default when the contributor named one; otherwise it follows from {@link #defaultBinding()}. */
+    public Optional<String> otherDefault() { return otherDefault; }
+    /** Where the action's shortcut applies. */
+    public KeyContext context() { return context; }
+    /** The action as the Keymap resolves it; only for namespaced (dotted) ids. */
+    public KeyBindings.Extension extension() { return new KeyBindings.Extension(id, defaultBinding, otherDefault, context); }
     public boolean enabled() { return enabled && !closed; }
 
     /** Runs the contributor's handler unless the action is disabled or closed. */

@@ -48,7 +48,7 @@ final class ShortcutText {
         String q = normalize(query);
         if (q.isBlank()) return true;
         if (q.contains("+")) return row.stroke() != null && tokens(q).equals(tokens(normalize(format(row.stroke()))));
-        String haystack = normalize(row.name() + " " + row.group() + " " + row.context() + " "
+        String haystack = normalize(row.name() + " " + row.group() + " " + row.context() + " " + row.where() + " "
             + row.keywords() + " " + row.id() + " " + format(row.stroke()));
         return Arrays.stream(q.split("\\s+")).allMatch(haystack::contains);
     }

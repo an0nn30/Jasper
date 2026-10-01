@@ -80,6 +80,22 @@ is coalesced, and `close()` (or the plugin stopping) publishes `CLOSED` once. Ja
 `FakePluginHost.connectionLog()` records them. `Platform.browse(URI)` opens an http or https address in the user's
 browser in the background; `FakePluginHost.browsed()` records the requests.
 
+SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it accepts connections from other
+programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
+it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
+a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
+guards too. Plugins declare `sdk = ">=0.11.0, <0.12"`.
+
+SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
+`global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
+`window(id)` (one of the plugin's own panels or windows; window shortcuts take effect once plugin windows get the
+Keymap, plan K4). Where focus is, the most specific applicable action takes a
+key, and a key whose action doesn't apply reaches the focused component, such as the shell. A disabled action's key
+does too, except in a terminal pane, where it does nothing.
+`withDefaultBindings(macOs, other)` gives a separate Linux and Windows default; with `withDefaultBinding` alone, a
+default naming cmd and shift gets alt outside macOS (`cmd+shift+x` becomes Ctrl+Alt+Shift+X).
+`FakePluginHost.actionSpec(id)` returns the registered spec.
+
 SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
 https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.
 

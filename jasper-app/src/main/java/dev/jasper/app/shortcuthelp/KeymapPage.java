@@ -152,7 +152,9 @@ public final class KeymapPage implements SettingsPage {
         KeyBindings base;
         try { base = KeyBindings.withOverrides(hooks.macOs(), draft.overrides(saved)); }
         catch (IllegalArgumentException collision) { base = KeyBindings.withOverrides(hooks.macOs(), saved); }
-        return ShortcutCatalog.rows(base, hooks.contributions().actions(), hooks.pluginNames().get(), hooks.macOs());
+        var panels = new java.util.LinkedHashMap<String, String>();
+        for (var entry : hooks.contributions().panels()) panels.put(entry.id(), entry.title());
+        return ShortcutCatalog.rows(base, hooks.contributions().actions(), hooks.pluginNames().get(), panels, hooks.macOs());
     }
 
     private void refreshRows() { if (panel != null) panel.setRows(rows()); }

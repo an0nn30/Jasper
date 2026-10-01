@@ -76,7 +76,12 @@ class DescriptorParserTest {
         }
         assertThatThrownBy(() -> DescriptorParser.parse("id = ")).isInstanceOf(DescriptorParser.InvalidDescriptor.class);
         assertThat(DescriptorParser.CAPABILITIES).isEqualTo(Set.of("terminal.observe", "terminal.selection",
-            "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source"));
+            "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen"));
+    }
+
+    @Test void acceptsTheNetworkListenCapability() throws Exception {
+        PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"network.listen\""));
+        assertThat(descriptor.capabilities()).contains("network.listen");
     }
 
     @Test void anIconAndAHomepageAreOptionalAndABadOneIsDropped() throws Exception {

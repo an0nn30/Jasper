@@ -76,7 +76,7 @@ class WindowContributionsTest {
 
             run.setEnabled(false);
             assertThat(command.action().isEnabled()).isFalse();
-            assertThat(owner.dispatchShortcut(stroke("cmd+alt+j"), null)).as("a disabled app key is still not terminal input").isTrue();
+            assertThat(owner.dispatchShortcut(stroke("cmd+alt+j"), null)).as("a disabled action leaves its key to the focused component").isFalse();
             assertThat(seen).hasSize(2);
             run.setEnabled(true);
             run.setTitle("Run It");

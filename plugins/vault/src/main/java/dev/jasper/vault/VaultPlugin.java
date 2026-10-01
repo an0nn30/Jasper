@@ -120,9 +120,10 @@ public class VaultPlugin implements Plugin {
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         locked = context.appearance().icon(IconName.LOCK);
         unlocked = context.appearance().icon(IconName.UNLOCK);
-        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("F8"),
+        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("cmd+\\"),
             invoked -> open(invoked.window(), Optional.empty()));
-        lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock")), invoked -> lock.lock());
+        lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
+            .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
         lockAction.setEnabled(false);
         clipboard = clipboardFactory.get();
         scope = new VaultScope(lock, service, clipboard, this::open, context.notices()::error);

@@ -23,19 +23,20 @@ import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 
 class CommandPaletteShortcutsTest {
-    @Test void paletteUsesLiteralPlatformModifierAndPreservesClearShortcut() {
+    @Test void paletteAndClearUseEachPlatformsLiteralDefaults() {
         for (boolean mac : new boolean[]{true, false}) {
             var keys = KeyBindings.defaults(mac);
             int primary = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
-            assertThat(keys.strokeFor(ActionId.COMMAND_PALETTE)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_K, primary));
-            assertThat(keys.strokeFor(ActionId.CLEAR_SCROLLBACK)).contains(
-                KeyStroke.getKeyStroke(KeyEvent.VK_K, primary | InputEvent.SHIFT_DOWN_MASK));
+            int clearModifiers = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+            assertThat(keys.strokeFor(ActionId.COMMAND_PALETTE)).contains(
+                KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK));
+            assertThat(keys.strokeFor(ActionId.CLEAR_SCROLLBACK)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_K, clearModifiers));
         }
         var override = KeyBindings.withOverrides(true,
-            Map.of("command_palette", "none", "clear_scrollback", "cmd+k"));
+            Map.of("command_palette", "none", "clear_scrollback", "cmd+shift+p"));
         assertThat(override.strokeFor(ActionId.COMMAND_PALETTE)).isEmpty();
         assertThat(override.strokeFor(ActionId.CLEAR_SCROLLBACK)).contains(
-            KeyStroke.getKeyStroke(KeyEvent.VK_K, InputEvent.META_DOWN_MASK));
+            KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
     }
 
     @Test void realRootBindingUsesPalettePolicyThenReturnsToNumberedTabs() throws Exception {
@@ -44,7 +45,7 @@ class CommandPaletteShortcutsTest {
                 var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
                 var first = owner.currentTab(); owner.newTab(HOME); var second = owner.currentTab();
                 int primary = primary(mac);
-                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_K, primary))).isTrue();
+                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
                 owner.commandPalette().component().queryField().setText("no such command");
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_1, primary))).isTrue();
@@ -53,7 +54,7 @@ class CommandPaletteShortcutsTest {
                 owner.windowCommands().view("view.status_bar").actionPerformed(new ActionEvent(root, 0, "menu"));
                 assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
                 assertThat(owner.status().isVisible()).isTrue();
-                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_K, primary))).isTrue();
+                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isFalse();
                 root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_1, primary));
                 assertThat(owner.currentTab()).isSameAs(first);
@@ -70,7 +71,7 @@ class CommandPaletteShortcutsTest {
             try (var owner = owner(false)) {
                 var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
                 owner.setBindings(KeyBindings.withOverrides(false, Map.of("command_palette", "alt+p")));
-                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_K, primary(false)))).isFalse();
+                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary(false) | InputEvent.SHIFT_DOWN_MASK))).isFalse();
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
                 assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
@@ -99,10 +100,10 @@ class CommandPaletteShortcutsTest {
                 var root = install(owner); install(other);
                 assertThat(manager.dispatchers).hasSize(2);
                 var dispatcher = manager.dispatchers.getFirst();
-                assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, primary(true)))).isTrue();
+                assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 owner.commandPalette().component().queryField().setText("close.fixture");
                 owner.commands().register(PaletteKeyRouterTest.command("close.fixture", owner::close));
-                dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.release(owner, KeyEvent.VK_K));
+                dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.release(owner, KeyEvent.VK_P));
                 assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(manager.dispatchers).contains(dispatcher);
                 assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(other, KeyEvent.VK_ENTER, 0))).isTrue();
@@ -111,7 +112,7 @@ class CommandPaletteShortcutsTest {
                 assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.typed(other, 'a'))).isFalse();
                 assertThat(dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.release(other, KeyEvent.VK_ENTER))).isTrue();
                 assertThat(manager.dispatchers).doesNotContain(dispatcher);
-                assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(KeyStroke.getKeyStroke(KeyEvent.VK_K, primary(true)))).isNull();
+                assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(KeyStroke.getKeyStroke(KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isNull();
             } finally { KeyboardFocusManager.setCurrentKeyboardFocusManager(prior); }
         });
     }
@@ -129,8 +130,8 @@ class CommandPaletteShortcutsTest {
                     older.commandPalette().component().queryField().setText("destination.fixture");
                     if (closeSource) ((Runnable) newer::close).run();
                 }));
-                manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_K, primary(true)));
-                manager.send(PaletteKeyRouterTest.release(newer, KeyEvent.VK_K));
+                manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK));
+                manager.send(PaletteKeyRouterTest.release(newer, KeyEvent.VK_P));
                 newer.commandPalette().component().queryField().setText("focus.fixture");
                 assertThat(manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(older.commandPalette().isOpen()).isTrue();
@@ -156,7 +157,7 @@ class CommandPaletteShortcutsTest {
                 var dispatcher = manager.dispatchers.getFirst();
                 root.setContentPane(new JPanel()); assertThat(manager.dispatchers).isEmpty();
                 root.setContentPane(owner); assertThat(manager.dispatchers).containsExactly(dispatcher);
-                dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, primary(false)));
+                dispatcher.dispatchKeyEvent(PaletteKeyRouterTest.press(owner, KeyEvent.VK_P, primary(false) | InputEvent.SHIFT_DOWN_MASK));
                 owner.close(); assertThat(manager.dispatchers).containsExactly(dispatcher);
             });
             until(() -> manager.dispatchers.isEmpty());
@@ -244,10 +245,10 @@ class CommandPaletteShortcutsTest {
                     };
                     var calls = new java.util.concurrent.atomic.AtomicInteger();
                     content.commands().register(PaletteKeyRouterTest.command("byte.fixture", calls::incrementAndGet));
-                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_K, primary(mac)));
-                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_K, primary(mac)));
-                    send.accept(PaletteKeyRouterTest.typed(view, 'k'));
-                    send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_K));
+                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_P, primary(mac) | InputEvent.SHIFT_DOWN_MASK));
+                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_P, primary(mac) | InputEvent.SHIFT_DOWN_MASK));
+                    send.accept(PaletteKeyRouterTest.typed(view, 'P'));
+                    send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_P));
                     content.commandPalette().component().queryField().setText("byte.fixture");
                     for (int code : new int[]{KeyEvent.VK_UP, KeyEvent.VK_DOWN}) {
                         send.accept(PaletteKeyRouterTest.press(view, code, 0));
@@ -261,8 +262,8 @@ class CommandPaletteShortcutsTest {
                     send.accept(PaletteKeyRouterTest.typed(view, '\n'));
                     send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_ENTER));
                     assertThat(calls.get()).isEqualTo(1);
-                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_K, primary(mac)));
-                    send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_K));
+                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_P, primary(mac) | InputEvent.SHIFT_DOWN_MASK));
+                    send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_P));
                     send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_ESCAPE, 0));
                     send.accept(PaletteKeyRouterTest.typed(view, (char) 27));
                     send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_ESCAPE));

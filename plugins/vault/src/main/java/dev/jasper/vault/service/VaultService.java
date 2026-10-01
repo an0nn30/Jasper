@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 
 /** One per plugin instance; {@link #forConsumer} hands each requiring plugin its own view. */
 public final class VaultService {
-    static final String NO_VAULT_NOTICE = "Create a vault in Credential Vault first (Open Vault..., F8)";
+    static final String NO_VAULT_NOTICE = "Create a vault in Credential Vault first (Open Vault...)";
     static final String NO_WINDOW_NOTICE = "Credential Vault has no window to ask in";
 
     private final LockManager lock;

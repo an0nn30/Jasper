@@ -2,6 +2,78 @@
 
 ## Current state — 2026-09-30
 
+- **Keymap defaults K1: contexts and defaults** (branch `claude/keymap-defaults`, spec
+  `docs/superpowers/specs/2026-09-30-keymap-defaults-design.md`, plan `docs/superpowers/plans/2026-09-30-keymap-defaults-k1.md`):
+  actions carry a context (Global, Terminal, a plugin's tabs, a panel, a window). The most specific applicable action
+  takes a key; a key with no applicable action reaches the focused component (the shell, in a terminal pane), and so
+  does a disabled action's key outside terminal panes. Built-ins have explicit macOS and Linux/Windows defaults; plugin
+  cmd+shift defaults get Alt outside macOS. Settings › Keymap has a Where column. Menu items show their shortcuts, but
+  only the root input map takes keys, so a key it declines never fires a menu item (Linux Ctrl+Shift+V in a text field
+  no longer pastes into the shell). Linux Ctrl+Tab / Ctrl+Shift+Tab switch tabs before focus traversal can take them,
+  from a text area, a table or a field too.
+  SDK 0.11.0 (with File Server's `network.listen` and `Windows.onQuitting`): `ShortcutContext`, `ActionSpec.withContext` / `withDefaultBindings`, `FakePluginHost.actionSpec`;
+  bundled plugins declare `sdk = ">=0.11.0, <0.12"`; Remote 0.9.0, Vault 0.4.0. **Moved defaults** (macOS / Linux and
+  Windows): Command Palette ⇧⌘P / Ctrl+Shift+P (was ⌘K / Ctrl+K); Clear Scrollback ⌘K, terminal only (was ⇧⌘K);
+  Close Pane ⌘W / Ctrl+Shift+W, closing the tab with its last pane (was ⇧⌘W / Ctrl+Alt+Shift+W); Close Tab ⌥⌘W /
+  Ctrl+Alt+Shift+W (was ⌘W / Ctrl+Shift+W); Rename Tab ⌘I / Ctrl+Shift+I (was F2); Reload Config unbound (was ⇧⌘R /
+  Ctrl+Alt+Shift+R); Linux Next/Previous Tab Ctrl+Tab / Ctrl+Shift+Tab (was Ctrl+Shift+] / [); Linux Quit
+  Ctrl+Alt+Shift+Q (was Ctrl+Shift+Q); SSH Sessions ⌥⌘1 / Alt+1 (was ⇧⌘S / Ctrl+Shift+S); new: SFTP ⌥⌘2 / Alt+2,
+  Transfers ⌥⌘3 / Alt+3, Open SFTP Here ⇧⌘O / Ctrl+Alt+Shift+O, Lock Vault ⇧⌘L / Ctrl+Alt+Shift+L; Open Vault
+  ⌘\ / Ctrl+Shift+\ (was F8). Deviations
+  (plan banner): the SDK type is `ShortcutContext` (`ActionContext` was taken); Find/Copy/Paste stay Global until K3;
+  palette hiding of owned-context actions, the testkit's context invocation and DEFAULT_DROPPED, and the Keymap's
+  "overrides … here" wait for K3/K4; the docs sweep is K4 (it also owns the stale F8 mentions left in
+  `docs/credential-vault.md` and `docs/command-palette.md`, and the old palette example in `docs/configuration.md`;
+  Vault's own no-vault notice no longer names F8); menu items show accelerators but never fire them from the keyboard
+  (Deviation 6); in a terminal pane a disabled action's key does nothing instead of reaching the shell, because X11 and
+  Windows would deliver it as a control character, such as ^C from Ctrl+Shift+C with no selection (Deviation 9).
+  **Upgrade note:** a user `[keybindings]` entry on a stroke that is now another action's default (⌘K, ⌘I, ⇧⌘P, ⌘W,
+  ⌥⌘W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
+  collision.
+  `./gradlew check` green after merging main: app 1471/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0,
+  Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, File Server 114/0/0, SDK 39/0/0,
+  testkit 79/0/0. Merged into local main 2026-09-30 (not pushed). GUI checks pending with
+  the user: ⇧⌘P / Ctrl+Shift+P opens the palette; ⌘K clears in a terminal and does nothing in the SSH Sessions panel's
+  search; ⌘W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
+  terminal, an Editor tab or a panel field, Ctrl+Shift+C with no selection in a terminal does nothing, and
+  Ctrl+Shift+V in a panel field pastes into the field only; ⌥⌘1 / Alt+1 toggles SSH Sessions; the Keymap shows the
+  Where column; menus still show each shortcut, a click still runs the item, and every menu shortcut still works from
+  a terminal.
+- **File Server FS-1: foundation and HTTP** (branch `claude/file-server-fs1`, spec
+  `docs/superpowers/specs/2026-09-30-jasper-file-server-design.md`, plan
+  `docs/superpowers/plans/2026-09-30-file-server-fs1.md`, user guide `docs/file-server.md`): SDK 0.11.0 adds the
+  `network.listen` capability and `Windows.onQuitting` quit guards (app `QuitGuards`, testkit fake and contract tests);
+  every bundled plugin declares `sdk = ">=0.11.0, <0.12"`. New bundled plugin File Server (`plugins/fileserver`,
+  `dev.jasper.fileserver` 0.1.0): File Servers rail panel, editor, status item, palette scope, Serve Current Folder over
+  HTTP, quit confirmation, autostart (waiting for a locked Vault), Vault or session logins, `ShareRoot` jail, login
+  throttle, and an HTTP engine on the JDK server (listings, ranges, Basic auth, uploads and deletes on writable shares,
+  Host and Origin checks). Deviations from the spec: user doc in `docs/file-server.md`; setting keys
+  `confirm_quit`/`activity_entries`; the privileged-port suggestion is port + 8000; Host/Origin checks added; palette
+  titles in house style with a scope for per-server Start/Stop; saving a temporary server adopts it. Execution
+  deviations (all listed in the plan's status banner): `ResolvedLogin.isAnonymous()`; `ShareRoot` also refuses
+  unrepresentable names and C1 control characters; the login throttle answers early or locked-out attempts with 429 and
+  `Retry-After` instead of sleeping, and the Host check runs before credentials; the listing sends
+  `Referrer-Policy: same-origin`; transfer ids are unique per JVM; the port-clash check uses the definition a running
+  engine uses; FAILED from RUNNING is not implemented (engines have no fatal-runtime channel); the panel is
+  master/detail; an Interface bind advertises one URL; the status item toggles the panel; labels set `html.disable`.
+  Open follow-up: `shutdown()` stops engines in parallel under one 5 s deadline, so `Plugin.stop()` can block up to 5 s,
+  against the SDK's "must not block". `./gradlew check` green: jasper-app 1,439 tests (0 failures, 1 skipped),
+  jasper-terminal 391 (0, 4 skipped), jasper-buddy 163, jasper-sdk 35, jasper-sdk-testkit 74, editor 4,782,
+  fileserver 114, history 41, remote 297, sample 12, snippets 11, vault 139 (0, 1 skipped). Earlier runs saw flaky
+  `RemotePluginTest.endingAPanesSessionClearsTheSftpView`, `TransferCoordinatorTest.resumedScannedJob...` and
+  `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Final-review fixes: a `servers.toml` entry without an id gets a stable id derived from
+  its name, and saves are refused while the file has skipped entries; uploads go to a hidden temporary file and replace the target atomically only when
+  complete; activity refreshes coalesce into one UI task; activity-log text from clients has control characters
+  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its server and pool.
+  Merged into local main 2026-09-30 (not pushed) on top of SDK 0.10.2 (connection activities, `Platform.browse`), which
+  0.11.0 now includes; every bundled plugin declares `sdk = ">=0.11.0, <0.12"`, so the Remote tunnels plans (7b) must use
+  that range. GUI checks pending with the
+  user: New File Server and start it; open the URL from a phone on the LAN with All networks (macOS firewall and Local
+  Network prompts); upload two files and delete one from the listing page in a real browser (Chrome, Safari, Firefox)
+  on a writable server; a wrong password then an immediate retry shows a short 429 wait; a Vault account login with a
+  locked Vault and Start With Jasper; Serve Current Folder from a terminal; the quit confirmation; Reveal Folder and
+  Copy Address.
+
 - **Remote tunnels plan 7b-1: SDK 0.10.2 connection activities** (branch `claude/tunnels-7b1`, plan
   `docs/superpowers/plans/2026-09-30-jasper-remote-plan-7b1-connection-activities.md`, executed inline 2026-09-30):
   `Activities.connection` returns a `ConnectionHandle` (`up`, `degraded`, `down`, `close`) publishing

@@ -78,7 +78,7 @@ final class WindowContributions implements AutoCloseable {
     List<KeyBindings.Extension> extensions() {
         List<KeyBindings.Extension> result = new ArrayList<>();
         for (ActionEntry entry : model.actions())
-            if (KeyBindings.extensionId(entry.id())) result.add(new KeyBindings.Extension(entry.id(), entry.defaultBinding()));
+            if (KeyBindings.extensionId(entry.id())) result.add(entry.extension());
         return result;
     }
 
@@ -92,6 +92,15 @@ final class WindowContributions implements AutoCloseable {
         if (owner.closed() || owner.commandPalette() != null && owner.commandPalette().isOpen()) return;
         Optional<java.util.UUID> pane = Optional.ofNullable(owner.currentPane()).map(TerminalPane::id);
         model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane)));
+    }
+
+    /** Whether the contributed action exists and is enabled, so its shortcut takes the key. */
+    boolean enabled(String id) { return model.action(id).map(ActionEntry::enabled).orElse(false); }
+
+    /** Whether focus is inside this window's instance of the panel. */
+    boolean panelContains(String panelId, java.awt.Component focus) {
+        PanelInstance panel = panels.get(panelId);
+        return focus != null && panel != null && panel.component != null && SwingUtilities.isDescendingFrom(focus, panel.component);
     }
 
     private void renderStatus() { owner.status().setContributed(model.status(), this::action); }

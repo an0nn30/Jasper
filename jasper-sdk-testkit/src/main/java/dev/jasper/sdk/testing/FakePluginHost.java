@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -341,6 +342,21 @@ public final class FakePluginHost implements AutoCloseable {
             for (FakeUi.Action action : context.ui.actions.values())
                 lines.add(action.spec.id() + "|" + action.title + "|" + action.enabled);
         return lines;
+    }
+
+    /**
+     * The spec an action was registered with, including its shortcut context and platform defaults.
+     *
+     * @param actionId the action
+     * @return the spec, or empty when no started plugin registered the action
+     * @since 0.11.0
+     */
+    public Optional<ActionSpec> actionSpec(String actionId) {
+        for (FakePluginContext context : contexts.values()) {
+            FakeUi.Action action = context.ui.actions.get(actionId);
+            if (action != null) return Optional.of(action.spec);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -763,17 +779,26 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Asks the closing guards of every open plugin window, as quitting or restarting Jasper does, and closes
-     * nothing. Dialogs and overlays are not asked.
+     * Asks the closing guards of every open plugin window, then every quit guard, as quitting or restarting Jasper
+     * does, and closes nothing. Dialogs and overlays are not asked. A quit guard whose future is still pending counts
+     * as a refusal here: the fake does not pump events.
      *
      * @return whether the quit may go ahead
-     * @since 0.8.4
+     * @since 0.8.4; quit guards since 0.11.0
      */
     public boolean requestQuit() {
         for (FakePluginContext context : contexts.values()) if (!context.ui.closeContent(List.copyOf(context.ui.contents), false).getNow(false)) return false;
         for (FakePluginContext context : contexts.values())
             for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows))
                 if (!window.id.equals("dialog") && !window.id.equals("overlay") && !window.mayClose()) return false;
+        for (FakePluginContext context : contexts.values())
+            for (var guard : List.copyOf(context.ui.quitGuards)) {
+                java.util.concurrent.CompletableFuture<Boolean> decision;
+                try { decision = guard.get(); }
+                catch (RuntimeException failure) { recordFailure(context.plugin().id() + " quit guard: " + failure); continue; }
+                if (decision == null) continue;
+                if (!decision.handle((allowed, error) -> error != null || !Boolean.FALSE.equals(allowed)).getNow(false)) return false;
+            }
         return true;
     }
 

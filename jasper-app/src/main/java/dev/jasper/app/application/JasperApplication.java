@@ -441,7 +441,7 @@ public final class JasperApplication {
                 ? java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("Settings are unavailable."))
                 : configuration.saveKeybindings(changes, contributions.actions().stream()
                     .filter(a -> KeyBindings.extensionId(a.id()))
-                    .map(a -> new KeyBindings.Extension(a.id(), a.defaultBinding())).toList()));
+                    .map(ActionEntry::extension).toList()));
         contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
             Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
@@ -548,7 +548,7 @@ public final class JasperApplication {
         ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
         List<KeyBindings.Extension> extensions = new ArrayList<>();
         for (ActionEntry action : contributions.actions())
-            if (KeyBindings.extensionId(action.id())) extensions.add(new KeyBindings.Extension(action.id(), action.defaultBinding()));
+            if (KeyBindings.extensionId(action.id())) extensions.add(action.extension());
         return snapshot.bindings(macOs).withExtensions(extensions).problems();
     }
 
@@ -793,11 +793,11 @@ public final class JasperApplication {
         quitNow();
     }
 
-    /** Plugin windows' closing guards, asked before quit or restart changes anything and before the exit deadline is armed. */
+    /** Plugin windows', content tabs' and quit guards, asked before quit or restart changes anything and before the exit deadline is armed. */
     private boolean pluginWindowsMayClose() {
         var requested = contributions.content().entries();
         return contributions.content().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
-            && requested.equals(contributions.content().entries());
+            && requested.equals(contributions.content().entries()) && contributions.quitGuards().mayQuit();
     }
 
     /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */

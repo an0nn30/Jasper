@@ -6,6 +6,7 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
+import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -63,10 +64,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final KeyEventDispatcher paletteDispatcher = this::paletteKeysDispatch;
     private KeyboardFocusManager paletteFocusManager;
     private javax.swing.Timer paletteTailCleanup;
+    // The tail of a focus-traversal key that ran a shortcut: its typed and released events must not traverse either.
+    private final java.util.Set<Integer> traversalHeld = new java.util.HashSet<>();
+    private boolean traversalTyped;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
+    // One root binding per stroke; dispatch picks the action for where focus is.
+    private final java.util.Map<KeyStroke, String> rootKeys = new java.util.HashMap<>();
     private WindowContributions contributed;
     private final WorkspaceRegions regions;
     private final WindowRail rail;
@@ -180,9 +186,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         scopes.register(commandsScope);
         commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs);
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
-            source -> !closed && active && bindingRoot != null && source != null
-                && SwingUtilities.isDescendingFrom(this, bindingRoot)
-                && SwingUtilities.isDescendingFrom(source, bindingRoot));
+            this::ownsKeySource);
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
@@ -282,17 +286,24 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         removeRootBindings();
         bindingRoot = root;
         bindings.strokes().forEach((actionId, stroke) -> {
+            if (rootKeys.putIfAbsent(stroke, actionId) != null) return;
             root.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(stroke, actionId);
-            root.getActionMap().put(actionId, new AbstractAction() {
-                @Override public void actionPerformed(ActionEvent event) {
-                    dispatchShortcut(stroke, KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
-                }
-            });
+            root.getActionMap().put(actionId, new RootShortcut(stroke));
         });
         syncContentBindings();
         commandPalette.install(root);
         syncPaletteDispatcher();
     }
+
+    /** The root input map's action for one stroke: it takes the key only when dispatch would use it. */
+    private final class RootShortcut extends AbstractAction {
+        private final KeyStroke stroke;
+        RootShortcut(KeyStroke stroke) { this.stroke = stroke; }
+        @Override public boolean accept(Object sender) { return isEnabled() && claimsShortcut(stroke, focusOwner()); }
+        @Override public void actionPerformed(ActionEvent event) { dispatchShortcut(stroke, focusOwner()); }
+    }
+
+    private static Component focusOwner() { return KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner(); }
 
     private boolean paletteKeysDispatch(KeyEvent event) {
         if (dev.jasper.app.platform.WindowInput.blocked(event.getComponent())) return false;
@@ -302,7 +313,48 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (owner.paletteKeys.drained() && (owner.closed || !owner.paletteAttached()))
                 owner.removePaletteDispatcher();
         }
-        return tail || paletteKeys.dispatch(event);
+        return tail || paletteKeys.dispatch(event) || traversalShortcut(event);
+    }
+
+    /** Whether a key event's component is inside this window while it is open, active and attached to its root. */
+    private boolean ownsKeySource(Component source) {
+        return !closed && active && bindingRoot != null && source != null
+            && SwingUtilities.isDescendingFrom(this, bindingRoot)
+            && SwingUtilities.isDescendingFrom(source, bindingRoot);
+    }
+
+    /**
+     * Runs a root-bound shortcut whose key is also one of the focus owner's focus-traversal keys before focus traversal
+     * takes it, such as Linux Ctrl+Tab and Ctrl+Shift+Tab in a text area, a table or a field, and swallows that key's
+     * typed and released tail wherever focus went. Plain Tab is no Keymap binding, so it still traverses.
+     */
+    private boolean traversalShortcut(KeyEvent event) {
+        switch (event.getID()) {
+            case KeyEvent.KEY_RELEASED -> { if (!traversalHeld.remove(event.getKeyCode())) return false; }
+            case KeyEvent.KEY_TYPED -> { if (!traversalTyped) return false; traversalTyped = false; }
+            case KeyEvent.KEY_PRESSED -> {
+                traversalTyped = false;
+                Component focus = event.getComponent();
+                KeyStroke stroke = KeyStroke.getKeyStrokeForEvent(event);
+                if (!ownsKeySource(focus) || !traversalKey(focus, event)
+                    || !(rootKeys.containsKey(stroke) || contentBindings.containsKey(stroke))
+                    || !claimsShortcut(stroke, focus)) return false;
+                traversalHeld.add(event.getKeyCode()); traversalTyped = true;
+                event.consume();
+                dispatchShortcut(stroke, focus);
+                return true;
+            }
+            default -> { return false; }
+        }
+        event.consume();
+        return true;
+    }
+
+    private static boolean traversalKey(Component focus, KeyEvent event) {
+        if (!focus.getFocusTraversalKeysEnabled()) return false;
+        AWTKeyStroke stroke = AWTKeyStroke.getAWTKeyStrokeForEvent(event);
+        return focus.getFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS).contains(stroke)
+            || focus.getFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS).contains(stroke);
     }
 
     private boolean paletteAttached() {
@@ -342,7 +394,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var input = bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW);
         contentBindings.forEach((stroke, key) -> {
             input.remove(stroke); bindingRoot.getActionMap().remove(key);
-            bindings.idFor(stroke).ifPresent(id -> input.put(stroke, id));
+            String rootKey = rootKeys.get(stroke);
+            if (rootKey != null) input.put(stroke, rootKey);
         });
         contentBindings.clear();
         var entry = selectedContent();
@@ -367,10 +420,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             bindingRoot.getActionMap().remove(key);
         });
         contentBindings.clear();
-        bindings.strokes().forEach((actionId, stroke) -> {
+        rootKeys.forEach((stroke, actionId) -> {
             bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW).remove(stroke);
             bindingRoot.getActionMap().remove(actionId);
         });
+        rootKeys.clear();
         bindingRoot = null;
     }
 
@@ -722,26 +776,80 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
         if (paletteKeys.dispatchShortcut(stroke, source == null ? this : source)) return true;
         var document = selectedContent();
-        // Text controls retain their native selection/clipboard behavior (including find fields).
-        if (source instanceof JTextComponent && document != null && document.commands().stream().anyMatch(command ->
-            stroke.equals(command.shortcut()) && (command.id().equals("copy") || command.id().equals("paste")))) return false;
-        if (document != null) for (var command : document.commands()) if (stroke.equals(command.shortcut())) {
-            if (command.enabled()) command.run().run(); return true;
+        if (document != null) {
+            // Text controls retain their native selection/clipboard behavior (including find fields).
+            if (source instanceof JTextComponent && nativeContentClipboard(document, stroke)) return false;
+            for (var command : document.commands()) if (stroke.equals(command.shortcut())) {
+                if (command.enabled()) command.run().run(); return true;
+            }
         }
-        Optional<String> found = bindings.idFor(stroke);
-        if (found.isEmpty()) return false;
-        Optional<ActionId> builtIn = ActionId.forId(found.get());
-        if (builtIn.isEmpty()) {
-            // A recognized contributed shortcut is an app key, never terminal input, even while disabled.
-            if (contributed != null) contributed.invoke(found.get());
-            return true;
-        }
-        ActionId id = builtIn.get();
-        if (source instanceof JTextComponent && (id == ActionId.COPY || id == ActionId.PASTE)) return false;
-        updateActions();
-        // A recognized but unavailable command is still an app key, never terminal input.
-        if (action(id).isEnabled()) invoke(id);
+        Optional<ShortcutTarget> target = shortcutTarget(stroke, source);
+        if (target.isEmpty()) return false;
+        if (!target.get().runs()) return true;
+        Optional<ActionId> builtIn = ActionId.forId(target.get().id());
+        if (builtIn.isPresent()) invoke(builtIn.get()); else contributed.invoke(target.get().id());
         return true;
+    }
+
+    /** Side-effect free apart from refreshing enablement: whether {@link #dispatchShortcut} would take the key. */
+    boolean claimsShortcut(KeyStroke stroke, Component source) {
+        if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
+        if (paletteKeys.claimsShortcut(stroke)) return true;
+        var document = selectedContent();
+        if (document != null) {
+            if (source instanceof JTextComponent && nativeContentClipboard(document, stroke)) return false;
+            if (document.commands().stream().anyMatch(command -> stroke.equals(command.shortcut()))) return true;
+        }
+        return shortcutTarget(stroke, source).isPresent();
+    }
+
+    private static boolean nativeContentClipboard(dev.jasper.app.contributions.ContentEntry document, KeyStroke stroke) {
+        return document.commands().stream().anyMatch(command ->
+            stroke.equals(command.shortcut()) && (command.id().equals("copy") || command.id().equals("paste")));
+    }
+
+    /** The action a stroke resolves to from a focus owner; a disabled one only swallows the key. */
+    private record ShortcutTarget(String id, boolean runs) {}
+
+    /**
+     * What a stroke does from this focus owner: of the actions bound to it whose context contains the focus owner, the
+     * most specific. Empty when none applies, or when that action is disabled outside a terminal pane, so the key
+     * reaches the focused component (the shell, in a terminal pane). In a terminal pane a disabled action takes the key
+     * without running (plan Deviation 9): passed through, X11 would send Ctrl+Shift+C to the shell as ^C.
+     */
+    private Optional<ShortcutTarget> shortcutTarget(KeyStroke stroke, Component source) {
+        Optional<String> found = bindings.resolve(stroke, context -> applies(context, source));
+        if (found.isEmpty()) return Optional.empty();
+        Optional<ActionId> builtIn = ActionId.forId(found.get());
+        if (builtIn.isPresent() && source instanceof JTextComponent
+            && (builtIn.get() == ActionId.COPY || builtIn.get() == ActionId.PASTE)) return Optional.empty();
+        boolean enabled;
+        if (builtIn.isEmpty()) enabled = contributed != null && contributed.enabled(found.get());
+        else { updateActions(); enabled = action(builtIn.get()).isEnabled(); }
+        if (!enabled && !within(TerminalPane.class, source)) return Optional.empty();
+        return Optional.of(new ShortcutTarget(found.get(), enabled));
+    }
+
+    /** Whether a shortcut context contains the focus owner. */
+    boolean applies(KeyContext context, Component focus) {
+        return switch (context.kind()) {
+            case GLOBAL -> true;
+            case TERMINAL -> within(TerminalPane.class, focus);
+            case CONTENT -> {
+                var entry = selectedContent();
+                yield entry != null && focus != null && entry.plugin().equals(context.owner())
+                    && SwingUtilities.isDescendingFrom(focus, entry.component());
+            }
+            case PANEL -> contributed != null && contributed.panelContains(context.owner(), focus);
+            // Plugin windows get the Keymap in plan K4; nothing in a terminal window is inside one.
+            case WINDOW -> false;
+        };
+    }
+
+    private static boolean within(Class<?> type, Component focus) {
+        for (Component component = focus; component != null; component = component.getParent())
+            if (type.isInstance(component)) return true;
+        return false;
     }
 
     void invoke(ActionId id) { workspaceActions.invoke(id); }

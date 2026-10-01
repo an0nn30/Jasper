@@ -21,6 +21,7 @@ import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Rail;
+import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
 import dev.jasper.sdk.ui.StatusProgress;
@@ -114,6 +115,7 @@ final class FakeUi {
     }
 
     final List<FakeContent> contents = new ArrayList<>();
+    final List<java.util.function.Supplier<java.util.concurrent.CompletableFuture<Boolean>>> quitGuards = new ArrayList<>();
     java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean, java.util.concurrent.CompletableFuture<Boolean>> contentGuard = (tabs,batch) -> java.util.concurrent.CompletableFuture.completedFuture(true);
     java.util.concurrent.CompletableFuture<Boolean> pendingContent;
     List<FakeContent> pendingTabs = List.of();
@@ -150,6 +152,7 @@ final class FakeUi {
     }
 
     void closeAll() {
+        quitGuards.clear();
         for (var content : List.copyOf(contents)) content.close();
         for (var item : status) item.closed = true;
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
@@ -177,6 +180,8 @@ final class FakeUi {
             context.requireOpen();
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
+            spec.context().id().ifPresent(owned -> requireNamespace(owned,
+                spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
             if (actions.containsKey(spec.id())) throw new IllegalArgumentException("Action already registered: " + spec.id());
             var action = new Action(spec, handler);
             actions.put(spec.id(), action);
@@ -429,6 +434,12 @@ final class FakeUi {
             }
             @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
                 context.requireOpen();contentGuard=guard;return ()->{if(contentGuard==guard)contentGuard=(tabs,batch)->java.util.concurrent.CompletableFuture.completedFuture(true);};
+            }
+            @Override public Subscription onQuitting(java.util.function.Supplier<java.util.concurrent.CompletableFuture<Boolean>> guard) {
+                context.requireOpen();
+                java.util.Objects.requireNonNull(guard, "guard");
+                quitGuards.add(guard);
+                return () -> quitGuards.remove(guard);
             }
 
             @Override public List<java.nio.file.Path> chooseFiles(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
