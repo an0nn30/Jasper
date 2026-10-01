@@ -94,6 +94,15 @@ final class WindowContributions implements AutoCloseable {
         model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane)));
     }
 
+    /** Whether the contributed action exists and is enabled, so its shortcut takes the key. */
+    boolean enabled(String id) { return model.action(id).map(ActionEntry::enabled).orElse(false); }
+
+    /** Whether focus is inside this window's instance of the panel. */
+    boolean panelContains(String panelId, java.awt.Component focus) {
+        PanelInstance panel = panels.get(panelId);
+        return focus != null && panel != null && panel.component != null && SwingUtilities.isDescendingFrom(focus, panel.component);
+    }
+
     private void renderStatus() { owner.status().setContributed(model.status(), this::action); }
 
         private void requestedPalette(Contributions.PaletteRequest request) {

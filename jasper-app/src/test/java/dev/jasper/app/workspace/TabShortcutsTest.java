@@ -37,7 +37,8 @@ class TabShortcutsTest {
                 assertThat(owner.currentTab()).isSameAs(first);
                 assertThat(root.activate(previous)).isTrue();
                 assertThat(owner.currentTab()).isSameAs(second);
-                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_9, modifier))).isTrue();
+                assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_9, modifier)))
+                    .as("no ninth tab: the key reaches the focused component").isFalse();
                 assertThat(owner.currentTab()).isSameAs(second);
                 assertThat(owner.dispatchShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
                     modifier | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK), owner)).isFalse();
