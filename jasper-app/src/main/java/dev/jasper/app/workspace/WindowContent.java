@@ -888,7 +888,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** View \u203a Terminal Colors: saved for every window; applied to this window's themes when no configuration is connected. */
     void selectTerminalColors(TerminalColors colors) {
-        choose(dev.jasper.app.config.CoreSettings.TERMINAL_COLORS, colors.name(), () -> {
+        String workspaceName = switch (colors.name()) {
+            case "light" -> "Jasper Light";
+            case "dark" -> "Jasper Dark";
+            default -> colors.name();
+        };
+        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, workspaceName, () -> {
             themes.configureTerminal(colors);
             chrome.refreshTheme();
         });

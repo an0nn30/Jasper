@@ -49,14 +49,61 @@ class ConfigLoaderTest {
         assertThat(wrongType.diagnostics()).singleElement().satisfies(problem -> assertThat(problem.key()).isEqualTo("ui.theme.name"));
     }
 
-    @Test void theRemovedVariantKeyIsAnOrdinaryUnknownSetting() {
+    @Test void oldVariantLightChoosesJaspersLightTheme() {
         var result = parse("[ui.theme]\nvariant = 'light'\n");
         assertThat(result.rejected()).isFalse();
-        assertThat(result.snapshot().theme()).isEqualTo("Jasper Dark");
+        assertThat(result.snapshot().theme()).isEqualTo("Jasper Light");
         assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
             assertThat(problem.key()).isEqualTo("ui.theme.variant");
             assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
         });
+    }
+
+    @Test void unsupportedOldVariantWarnsAndDefaultsWithoutChangingCanonicalNames() {
+        var old = parse("ui.theme.variant = 'neon'\nwindow.tab_height = 42\n");
+        assertThat(old.rejected()).isFalse();
+        assertThat(old.snapshot().theme()).isEqualTo(ConfigSnapshot.DEFAULT_THEME);
+        assertThat(old.snapshot().tabHeight()).isEqualTo(42);
+        assertThat(old.diagnostics()).extracting(ConfigDiagnostic::key).contains("ui.theme.variant");
+        assertThat(parse("ui.theme.name = 'Light'\n").snapshot().theme()).isEqualTo("Light");
+    }
+
+    @Test void workspaceCanonicalKeyWinsOverLegacyInEitherOrder() {
+        for (String text : java.util.List.of(
+                "terminal.colors = 'dark'\nui.theme.workspace = 'Jasper Light'\n",
+                "ui.theme.workspace = 'Jasper Light'\nterminal.colors = 'dark'\n")) {
+            var parsed = parse(text);
+            assertThat(parsed.rejected()).isFalse();
+            assertThat(parsed.snapshot().workspaceTheme().name()).isEqualTo("Jasper Light");
+        }
+    }
+
+    @Test void legacyWorkspaceAliasesNormalizeLightAndDark() {
+        for (String alias : java.util.List.of("terminal.colors", "ui.theme.terminal")) {
+            assertThat(parse(alias + " = 'light'\n").snapshot().workspaceTheme().name()).isEqualTo("Jasper Light");
+            assertThat(parse(alias + " = 'dark'\n").snapshot().workspaceTheme().name()).isEqualTo("Jasper Dark");
+        }
+        assertThat(parse("ui.theme.workspace = 'Light'\n").snapshot().workspaceTheme().name()).isEqualTo("Light");
+        assertThat(parse("ui.theme.workspace = 'jasper light'\n").snapshot().terminalColors()).isEqualTo(TerminalColors.LIGHT);
+    }
+
+    @Test void workspaceChoiceReservesOnlyMatch() {
+        assertThat(WorkspaceThemeChoice.parse(" Light ").name()).isEqualTo("Light");
+        assertThat(WorkspaceThemeChoice.parse("Dark").name()).isEqualTo("Dark");
+        assertThat(WorkspaceThemeChoice.parse(" match ").matchesChrome()).isTrue();
+        assertThat(WorkspaceThemeChoice.parse("Tokyo Night").name()).isEqualTo("Tokyo Night");
+    }
+
+    @Test void invalidWorkspaceValueDefaultsWhileOtherSettingsSurvive() {
+        var blank = parse("ui.theme.workspace = '  '\nwindow.tab_height = 40\n");
+        assertThat(blank.rejected()).isFalse();
+        assertThat(blank.snapshot().workspaceTheme()).isEqualTo(WorkspaceThemeChoice.MATCH);
+        assertThat(blank.snapshot().tabHeight()).isEqualTo(40);
+        assertThat(blank.diagnostics()).extracting(ConfigDiagnostic::key).contains("ui.theme.workspace");
+        var wrongType = parse("ui.theme.workspace = 9\nwindow.tab_height = 40\n");
+        assertThat(wrongType.rejected()).isTrue();
+        assertThat(wrongType.snapshot().workspaceTheme()).isEqualTo(WorkspaceThemeChoice.MATCH);
+        assertThat(wrongType.snapshot().tabHeight()).isEqualTo(40);
     }
 
     @Test void emptyFileSuppliesUsableDefaultsOnBothPlatforms() {
@@ -442,7 +489,8 @@ class ConfigLoaderTest {
             assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
             assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
             assertThat(result.snapshot().theme()).isEqualTo("IntelliJ Light");
-            assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
+            assertThat(result.diagnostics()).filteredOn(problem -> problem.severity() == ConfigDiagnostic.Severity.ERROR)
+                .singleElement().satisfies(problem -> {
                 assertThat(problem.key()).isEqualTo("terminal.colors");
                 assertThat(problem.line()).isEqualTo(2);
                 assertThat(problem.message()).doesNotContain("   ");

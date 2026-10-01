@@ -164,7 +164,7 @@ enabled = true
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `themes.marketplace.enabled` | `true` | Boolean; `false` hides Settings › Themes › IntelliJ Themes' Marketplace tab and stops its update checks | Live |
-| `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"`, or a terminal theme's name ([Themes](themes.md)); an unknown name is a warning and uses `"match"` | Live |
+| `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -390,7 +390,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices save: Toolbar, Status Bar and Terminal Colors write `window.toolbar`, `window.status_bar` and `terminal.colors` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
+View menu choices save: Toolbar, Status Bar and Terminal Colors write `window.toolbar`, `window.status_bar` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -634,10 +634,11 @@ while leaving View → Command Palette available.
 
 `config.toml` starts with `version = 2`. A file without `version` is version 1, whose keys still work:
 
-| Version 1 key | Version 2 key |
+| Earlier key | Current key |
 |---|---|
 | `[font]` `family`, `size`, `fallback`, `ligatures`, `line_height` | `[terminal.font]` with the same names |
-| `ui.theme.terminal` (version 1) | `terminal.colors` |
+| `ui.theme.terminal` (version 1), `terminal.colors` (version 2) | `ui.theme.workspace` |
+| `ui.theme.variant` (`light` or `dark`) | `ui.theme.name` (`Jasper Light` or `Jasper Dark`) |
 | `background.enabled` (version 1) | `system.run_in_background` |
 
 Each old key is read as its new one, with a warning: *Moved to terminal.font.size. Use Migrate Config to
@@ -686,32 +687,25 @@ The former `[colors]` table (`appearance`, `theme`) and custom palette files are
 supported: a `[colors]` table is reported as an unknown setting and ignored. See the
 [dark](design/mock-ui-dark.png) and [light](design/mock-ui-light.png) renders.
 
-## Terminal colors
+## Workspace theme
 
-`terminal.colors` chooses the terminal palette independently of the UI chrome, for example a
-light UI with a dark terminal. `"match"` (the default) uses the theme's console colours, or
-Jasper Dark or Jasper Light by the theme's darkness when it has none ([Themes](themes.md));
-`"light"` and `"dark"` always use the Jasper Light or Jasper Dark palette. Terminal views, their
-padding and the area behind the panes follow this choice; the title row, toolbar, tab strip, find
-bar, status bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every
-window without reinstalling the look and feel, keeping shells, scrollback and splits.
+`ui.theme.workspace` chooses the theme for the terminal workspace independently of `ui.theme.name`.
+`"match"` follows the interface theme. A separate choice names a native theme or an Alacritty theme;
+`"Jasper Light"` and `"Jasper Dark"` name the bundled themes. A native theme named `"Light"` is
+selected literally. The older `terminal.colors` and `ui.theme.terminal` keys still load; their
+`light` and `dark` values become `Jasper Light` and `Jasper Dark` when migrated. A canonical
+`ui.theme.workspace = "Light"` is not changed by that compatibility conversion.
 
-`terminal.colors` may also name a terminal theme; see [Alacritty themes](#alacritty-themes).
-
-In Settings › Terminal › Font & Colors, **Terminal colors follow the UI theme** is `"match"`: while it is ticked the
-terminal uses the UI theme's colours and the dropdown is off; clearing it enables the dropdown of separate choices
-(Light, Dark and every terminal theme) and returns to your last separate choice, or Dark.
-
-View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. While a
-named terminal theme is in use, none of these choices is checked. Any other non-blank text names a terminal theme; an
-unknown name is a warning and the terminal uses `"match"`. A blank value is an error and keeps `"match"`; a non-string
+In Settings › Terminal › Font & Colors, the workspace match checkbox follows the UI theme. Clearing
+it enables the native and Alacritty theme choices (including Jasper Light and Jasper Dark). View → Terminal Colors continues to save this
+workspace choice while the menu is retained. A blank value warns and uses `"match"`; a non-string
 value rejects the configuration.
 
 ### Alacritty themes
 
 Settings › Themes › Alacritty Themes lists the bundled and installed terminal themes, previews each in a sample
 terminal and installs `.toml` theme files into the `terminal-themes` folder beside `config.toml`. Choosing one sets
-`terminal.colors` to its name. The format, the folder and the problems Jasper reports are described in
+`ui.theme.workspace` to its name. The format, the folder and the problems Jasper reports are described in
 [Themes](themes.md#terminal-themes).
 
 ### Interface typography

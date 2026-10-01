@@ -61,4 +61,16 @@ class SchemaReaderTest {
         assertThat(result.values().get(WRAP)).isTrue();
         assertThat(result.problems()).extracting(SchemaReader.Problem::message).containsExactly("Superseded by view.wrap; ignored.");
     }
+
+    @Test void aliasConversionAppliesBeforeKindReadingOnlyForAlias() {
+        Setting<String> name = Setting.of("view.name", SettingKind.string(value -> !value.isBlank(), "blank"), "default")
+            .alias("old_name").label("Name").build();
+        var schema = SettingsSchema.of(List.of(name), Set.of(), Map.of());
+        var converted = new SchemaReader(schema, "old_name = 'light'\n", (path, value) -> "Full Light")
+            .read((path, value) -> false);
+        assertThat(converted.values().get(name)).isEqualTo("Full Light");
+        var canonical = new SchemaReader(schema, "view.name = 'light'\n", (path, value) -> "Full Light")
+            .read((path, value) -> false);
+        assertThat(canonical.values().get(name)).isEqualTo("light");
+    }
 }

@@ -62,7 +62,7 @@ public final class ConfigLoader {
 
     private ConfigLoader(Path file, String text, boolean macOs) {
         this.file = Objects.requireNonNull(file, "file");
-        this.reader = new SchemaReader(CoreSettings.SCHEMA, text);
+        this.reader = new SchemaReader(CoreSettings.SCHEMA, text, this::aliasValue);
         this.macOs = macOs;
     }
 
@@ -77,6 +77,28 @@ public final class ConfigLoader {
             return new Result(ConfigSnapshot.defaults(), diagnostics, true, read.values(), List.of(), List.of());
         return new Result(ConfigSnapshot.from(read.values(), keybindings, plugins), diagnostics, read.rejected(), read.values(),
             read.legacyKeys(), deadTables);
+    }
+
+    private Object aliasValue(List<String> path, Object value) {
+        if (!(value instanceof String name)) return value;
+        if (path.equals(List.of("ui", "theme", "variant"))) {
+            return switch (name.strip().toLowerCase(java.util.Locale.ROOT)) {
+                case "light" -> "Jasper Light";
+                case "dark" -> "Jasper Dark";
+                default -> {
+                    reader.warning(path, "Use light or dark for the old theme variant; using the default.");
+                    yield ConfigSnapshot.DEFAULT_THEME;
+                }
+            };
+        }
+        if (path.equals(List.of("terminal", "colors")) || path.equals(List.of("ui", "theme", "terminal"))) {
+            return switch (name.strip().toLowerCase(java.util.Locale.ROOT)) {
+                case "light" -> "Jasper Light";
+                case "dark" -> "Jasper Dark";
+                default -> name;
+            };
+        }
+        return value;
     }
 
     /** The version key and the tables other readers own. */

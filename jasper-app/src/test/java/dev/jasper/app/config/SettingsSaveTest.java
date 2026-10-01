@@ -89,6 +89,18 @@ class SettingsSaveTest {
         }
     }
 
+    @Test void savingWorkspaceRemovesSupersededAliasAndKeepsOtherContent() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "# mine\nterminal.colors = 'dark' # old\nui.theme.workspace = 'Light'\nwindow.tab_height = 40\n");
+        try (var service = new ConfigService(file, true)) {
+            var state = save(service, SettingsEdit.of(CoreSettings.UI_THEME_WORKSPACE, "Tokyo Night", service.initialState().values()));
+            String text = Files.readString(file);
+            assertThat(text).contains("# mine", "# old", "window.tab_height = 40", "ui.theme.workspace = \"Tokyo Night\"");
+            assertThat(text).doesNotContain("terminal.colors");
+            assertThat(state.snapshot().workspaceTheme().name()).isEqualTo("Tokyo Night");
+        }
+    }
+
     @Test void aMissingFileStartsFromTheTemplate() throws Exception {
         Path file = directory.resolve("new/config.toml");
         try (var service = new ConfigService(file, true)) {

@@ -290,8 +290,8 @@ class EditorsTest {
         var editor = terminalColors("", navigated);
         @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.choice.component();
         assertThat(java.util.stream.IntStream.range(0, box.getItemCount()).mapToObj(box::getItemAt))
-            .as("Match is the checkbox, not a choice").containsExactly("Light", "Dark", "Dracula", "Nord", "More Terminal Themes\u2026");
-        assertThat(editor.follow.getText()).isEqualTo("Terminal colors follow the UI theme");
+            .as("Match is the checkbox, not a choice").containsExactly("Jasper Light", "Jasper Dark", "Dracula", "Nord", "More Terminal Themes\u2026");
+        assertThat(editor.follow.getText()).isEqualTo("Workspace theme follows the UI theme");
 
         editor.show("match");
         assertThat(editor.follow.isSelected()).isTrue();
@@ -303,7 +303,7 @@ class EditorsTest {
         editor.follow.doClick();
         assertThat(editor.follow.isSelected()).isFalse();
         assertThat(box.isEnabled()).isTrue();
-        assertThat(editor.value()).as("nothing chosen before: Dark").isEqualTo("dark");
+        assertThat(editor.value()).as("nothing chosen before: Dark").isEqualTo("Jasper Dark");
         assertThat(edits[0]).isEqualTo(1);
 
         box.setSelectedIndex(2);
@@ -318,11 +318,11 @@ class EditorsTest {
         assertThat(editor.follow.isSelected()).isFalse();
         assertThat(editor.value()).isEqualTo("Nord");
         editor.show("DARK");
-        assertThat(editor.value()).isEqualTo("dark");
+        assertThat(editor.value()).isEqualTo("DARK");
 
         box.setSelectedIndex(4);
         assertThat(navigated).containsExactly("themes.alacritty");
-        assertThat(editor.value()).as("the action is never the value").isEqualTo("dark");
+        assertThat(editor.value()).as("the action is never the value").isEqualTo("DARK");
     }
 
     @Test void unTickingStartsFromTheSavedSeparateChoice() {
@@ -334,10 +334,11 @@ class EditorsTest {
 
     @Test void onlyTheShownBuiltInLabelsBecomeTheirTokens() {
         assertThat(Editors.storedColors("Match the theme")).isEqualTo("match");
-        assertThat(Editors.storedColors("Light")).isEqualTo("light");
-        assertThat(Editors.storedColors(" Dark ")).isEqualTo("dark");
+        assertThat(Editors.storedColors("Jasper Light")).isEqualTo("Jasper Light");
+        assertThat(Editors.storedColors(" Jasper Dark ")).isEqualTo("Jasper Dark");
+        assertThat(Editors.storedColors("Light")).isEqualTo("Light");
         assertThat(Editors.storedColors("match")).isEqualTo("match");
-        assertThat(Editors.storedColors("LIGHT")).isEqualTo("light");
+        assertThat(Editors.storedColors("LIGHT")).isEqualTo("LIGHT");
         assertThat(Editors.storedColors("Match The Theme")).as("a user theme of that name").isEqualTo("Match The Theme");
         assertThat(Editors.storedColors("match the theme")).isEqualTo("match the theme");
     }

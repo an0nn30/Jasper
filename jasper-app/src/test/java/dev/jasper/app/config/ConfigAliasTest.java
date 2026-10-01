@@ -24,12 +24,12 @@ class ConfigAliasTest {
                 tuple("font.size", 2, "Moved to terminal.font.size. Use Migrate Config to update the file."),
                 tuple("font.family", 3, "Moved to terminal.font.family. Use Migrate Config to update the file."),
                 tuple("background.enabled", 5, "Moved to system.run_in_background. Use Migrate Config to update the file."),
-                tuple("ui.theme.terminal", 7, "Moved to terminal.colors. Use Migrate Config to update the file."));
+                tuple("ui.theme.terminal", 7, "Moved to ui.theme.workspace. Use Migrate Config to update the file."));
         assertThat(result.legacyKeys()).containsExactly(
             new LegacyKey(List.of("font", "size"), List.of("terminal", "font", "size")),
             new LegacyKey(List.of("font", "family"), List.of("terminal", "font", "family")),
             new LegacyKey(List.of("background", "enabled"), List.of("system", "run_in_background")),
-            new LegacyKey(List.of("ui", "theme", "terminal"), List.of("terminal", "colors")));
+            new LegacyKey(List.of("ui", "theme", "terminal"), List.of("ui", "theme", "workspace")));
         assertThat(result.values().source(CoreSettings.TERMINAL_FONT_SIZE)).hasValue(List.of("font", "size"));
     }
 

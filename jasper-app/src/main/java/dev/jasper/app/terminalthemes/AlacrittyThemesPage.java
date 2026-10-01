@@ -1,7 +1,7 @@
 package dev.jasper.app.terminalthemes;
 
 import dev.jasper.app.config.CoreSettings;
-import dev.jasper.app.config.TerminalColors;
+import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settingsui.CorePages;
 import dev.jasper.app.settingsui.FillingPage;
@@ -269,9 +269,9 @@ public final class AlacrittyThemesPage implements SettingsPage {
     private void use() {
         TerminalTheme theme = list.getSelectedValue();
         if (theme == null) return;
-        context.draft().stage(CoreSettings.TERMINAL_COLORS, Optional.of(theme.name()));
+        context.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of(theme.name()));
         updateInUse();
-        message("\u201c" + theme.name() + "\u201d is chosen. Apply or OK switches the terminals to it.", false);
+        message("\u201c" + theme.name() + "\u201d is chosen. Apply or OK switches the workspace to it.", false);
         list.repaint();
     }
 
@@ -345,9 +345,9 @@ public final class AlacrittyThemesPage implements SettingsPage {
     }
 
     private String computeInUse() {
-        TerminalColors colors = TerminalColors.parse(context.draft().value(CoreSettings.TERMINAL_COLORS));
-        if (!colors.named()) return null;
-        return all.stream().map(TerminalTheme::name).filter(name -> name.equalsIgnoreCase(colors.name())).findFirst().orElse(null);
+        WorkspaceThemeChoice choice = WorkspaceThemeChoice.parse(context.draft().value(CoreSettings.UI_THEME_WORKSPACE));
+        if (choice.matchesChrome()) return null;
+        return all.stream().map(TerminalTheme::name).filter(name -> name.equalsIgnoreCase(choice.name())).findFirst().orElse(null);
     }
 
     /** Name in bold with a check when in use, the source, and the colour strip. */

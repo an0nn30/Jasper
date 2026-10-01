@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.BiFunction;
 import org.tomlj.Toml;
 import org.tomlj.TomlParseResult;
 import org.tomlj.TomlPosition;
@@ -48,6 +49,7 @@ public final class SchemaReader {
     private record AliasHit(Setting<?> setting, List<String> path, Object value) { }
 
     private final SettingsSchema schema;
+    private final BiFunction<List<String>, Object, Object> aliasValue;
     private final TomlParseResult toml;
     private final SettingValues.Builder values;
     private final List<Problem> problems = new ArrayList<>();
@@ -55,7 +57,12 @@ public final class SchemaReader {
     private boolean rejected;
 
     public SchemaReader(SettingsSchema schema, String text) {
+        this(schema, text, (path, value) -> value);
+    }
+
+    public SchemaReader(SettingsSchema schema, String text, BiFunction<List<String>, Object, Object> aliasValue) {
         this.schema = Objects.requireNonNull(schema, "schema");
+        this.aliasValue = Objects.requireNonNull(aliasValue, "aliasValue");
         this.toml = Toml.parse(Objects.requireNonNull(text, "text"));
         this.values = SettingValues.builder(schema);
     }
@@ -113,7 +120,7 @@ public final class SchemaReader {
             legacy.add(new LegacyKey(hit.path(), setting.key()));
             if (values.present(setting)) warning(hit.path(), "Superseded by " + setting.name() + "; ignored.");
             else {
-                read(setting, hit.path(), hit.value());
+                read(setting, hit.path(), aliasValue.apply(hit.path(), hit.value()));
                 warning(hit.path(), "Moved to " + setting.name() + ". Use Migrate Config to update the file.");
             }
         }

@@ -20,7 +20,7 @@ class TerminalThemeResolutionTest {
 
     @Test void aNamedThemeColoursTheTerminalAndAnUnknownOneWarnsAndMatches() throws Exception {
         Path file = dir.resolve("config.toml");
-        Files.writeString(file, "[terminal]\ncolors = 'dracula'\n");
+        Files.writeString(file, "[ui.theme]\nworkspace = 'dracula'\n");
         Files.createDirectories(dir.resolve("terminal-themes"));
         Files.writeString(dir.resolve("terminal-themes/broken.toml"), "[colors.primary\n");
         var terminalThemes = TerminalThemeCatalog.beside(file);
@@ -39,7 +39,7 @@ class TerminalThemeResolutionTest {
             });
         } finally { worker.shutdownNow(); }
 
-        Files.writeString(file, "[terminal]\ncolors = 'No Such Theme'\n");
+        Files.writeString(file, "[ui.theme]\nworkspace = 'No Such Theme'\n");
         var worker2 = Executors.newSingleThreadScheduledExecutor();
         try (var service = new ConfigService(file, true, worker2, SwingUtilities::invokeLater)) {
             edt(() -> {
@@ -47,7 +47,7 @@ class TerminalThemeResolutionTest {
                 var controller = new ConfigurationController(themes, service, ThemeCatalog.builtIn(), terminalThemes, path -> { });
                 assertThat(themes.current().palette()).as("unknown: match").isEqualTo(themes.choice().palette());
                 assertThat(controller.shown().diagnostics()).anySatisfy(problem -> {
-                    assertThat(problem.key()).isEqualTo("terminal.colors");
+                    assertThat(problem.key()).isEqualTo("ui.theme.workspace");
                     assertThat(problem.message()).contains("No Such Theme", "Alacritty Themes");
                 });
                 controller.close();

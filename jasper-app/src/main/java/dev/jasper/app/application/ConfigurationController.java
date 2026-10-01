@@ -267,7 +267,7 @@ final class ConfigurationController implements AutoCloseable {
         if (colors.named()) {
             named = terminal.find(colors.name()).map(TerminalTheme::palette).orElse(null);
             if (named == null)
-                problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "terminal.colors",
+                problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
                     "Unknown terminal colors \"" + colors.name() + "\"; using the theme's colours. Settings \u203a Themes \u203a "
                         + "Alacritty Themes lists the terminal themes."));
         }

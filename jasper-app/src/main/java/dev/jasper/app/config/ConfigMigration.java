@@ -2,6 +2,7 @@ package dev.jasper.app.config;
 
 import dev.jasper.app.settings.LegacyKey;
 import dev.jasper.app.settings.Setting;
+import dev.jasper.app.settings.SettingWriter;
 import dev.jasper.app.settings.TomlDocument;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -63,13 +64,29 @@ final class ConfigMigration {
         }
         for (LegacyKey key : parsed.legacyKeys()) {
             if (done.contains(key)) continue;
-            document = superseded(parsed, key) ? document.remove(key.from()) : document.move(key.from(), key.to());
+            if (superseded(parsed, key)) document = document.remove(key.from());
+            else if (transformed(key)) {
+                Setting<String> setting = stringSetting(key);
+                document = SettingWriter.write(document.remove(key.from()), setting,
+                    Optional.of(parsed.values().get(setting)));
+            } else document = document.move(key.from(), key.to());
         }
         for (List<String> table : byTable.keySet()) if (!table.isEmpty()) document = document.removeTableIfEmpty(table);
         for (List<String> table : removable) document = document.removeTable(table);
         document = document.removeTableIfEmpty(List.of("plugins")).removeTableIfEmpty(List.of("palette"));
         document = document.set(List.of("version"), Integer.toString(ConfigLoader.VERSION));
         return Optional.of(new Outcome(document.text(), parsed.legacyKeys().size() + removable.size()));
+    }
+
+    private static boolean transformed(LegacyKey key) {
+        return key.from().equals(List.of("ui", "theme", "variant"))
+            || key.from().equals(List.of("ui", "theme", "terminal"))
+            || key.from().equals(List.of("terminal", "colors"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Setting<String> stringSetting(LegacyKey key) {
+        return (Setting<String>) CoreSettings.SCHEMA.find(key.to()).orElseThrow();
     }
 
     /** Whether the file also sets the current key, so the old one was ignored. */

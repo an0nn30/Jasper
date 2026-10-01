@@ -2,7 +2,7 @@ package dev.jasper.app.settingsui;
 
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.config.CoreSettings;
-import dev.jasper.app.config.TerminalColors;
+import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.config.TerminalConfig;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settings.Setting;
@@ -97,14 +97,14 @@ public final class Editors {
     static final String MORE_THEMES = "Get More Themes\u2026";
     static final String MANAGE_THEMES = "Manage Themes\u2026";
     static final String MORE_TERMINAL_THEMES = "More Terminal Themes\u2026";
-    /** The built-in terminal colours: stored value to shown text, in dropdown order. */
+    /** Built-in workspace themes: stored value to shown text, in dropdown order. */
     private static final Map<String, String> BUILT_IN_COLORS = builtInColors();
 
     private static Map<String, String> builtInColors() {
         var names = new LinkedHashMap<String, String>();
         names.put("match", "Match the theme");
-        names.put("light", "Light");
-        names.put("dark", "Dark");
+        names.put("Jasper Light", "Jasper Light");
+        names.put("Jasper Dark", "Jasper Dark");
         return Collections.unmodifiableMap(names);
     }
 
@@ -118,8 +118,7 @@ public final class Editors {
     }
 
     /**
-     * Terminal colours: a checkbox, ticked for {@code match}, that makes the terminal follow the UI theme, over a
-     * dropdown of the separate choices (Light, Dark, then every terminal theme, ending in More Terminal Themes\u2026).
+     * Workspace theme: a checkbox for {@code match}, over separate native and Alacritty choices.
      */
     public static Factory<String> terminalColors(Supplier<List<String>> themes) {
         return new Factory<>((setting, context) -> new TerminalColorsEditor(themes, context),
@@ -127,17 +126,17 @@ public final class Editors {
     }
 
     /**
-     * A shown terminal colours entry as saved: the labels Match the theme, Light and Dark (exactly as shown) become their
-     * tokens, typed tokens are normalised, and anything else, such as a theme named "Match The Theme", is kept.
+     * A shown workspace theme entry as saved; typed names are preserved except for {@code match}.
      */
     static String storedColors(String shown) {
         for (var entry : BUILT_IN_COLORS.entrySet()) if (entry.getValue().equals(shown.strip())) return entry.getKey();
-        return TerminalColors.normalize(shown);
+        return shown.isBlank() ? "" : WorkspaceThemeChoice.parse(shown).name();
     }
 
-    /** A saved terminal colours value as shown. */
+    /** A saved workspace theme value as shown. */
     static String shownColors(String stored) {
-        String normalized = TerminalColors.normalize(stored);
+        if (stored.isBlank()) return "";
+        String normalized = WorkspaceThemeChoice.parse(stored).name();
         return BUILT_IN_COLORS.getOrDefault(normalized, normalized);
     }
 
@@ -296,27 +295,27 @@ public final class Editors {
     }
 
     /**
-     * Terminal colours as a choice to follow the UI theme or not: the checkbox is the value {@code match}; while it is
-     * cleared, the dropdown of separate choices is the value. Clearing it returns to the last separate choice (this
-     * dialog's, else the saved one, else Dark).
+     * Workspace theme choice: the checkbox is {@code match}; the dropdown holds a separate theme. Clearing
+     * the checkbox returns to the last separate choice in this dialog, else the saved one, else Jasper Dark.
      */
     static final class TerminalColorsEditor implements ValueEditor<String> {
-        static final String FOLLOW = "Terminal colors follow the UI theme";
+        static final String FOLLOW = "Workspace theme follows the UI theme";
         final JCheckBox follow = new JCheckBox(FOLLOW);
         final ActionCombo choice;
         private final JPanel component = new JPanel();
         private final List<Runnable> listeners = new ArrayList<>();
-        private String separate = "dark";
+        private String separate = "Jasper Dark";
         private boolean showing;
 
         TerminalColorsEditor(Supplier<List<String>> themes, PageContext context) {
             choice = new ActionCombo(new Choices(() -> {
-                    var all = new ArrayList<>(List.of(BUILT_IN_COLORS.get("light"), BUILT_IN_COLORS.get("dark")));
+                    var all = new ArrayList<>(List.of(BUILT_IN_COLORS.get("Jasper Light"), BUILT_IN_COLORS.get("Jasper Dark")));
                     all.addAll(themes.get());
-                    return all;
+                    return all.stream().distinct().toList();
                 }, Editors::storedColors, Editors::shownColors, index -> index == 2,
                 () -> MORE_TERMINAL_THEMES, label -> context.navigate().accept(CorePages.ALACRITTY_THEMES)));
-            String saved = TerminalColors.normalize(context.draft().saved(CoreSettings.TERMINAL_COLORS).orElse(""));
+            String saved = context.draft().saved(CoreSettings.UI_THEME_WORKSPACE).map(WorkspaceThemeChoice::parse)
+                .map(WorkspaceThemeChoice::name).orElse("");
             if (separate(saved)) separate = saved;
             follow.putClientProperty("html.disable", true);
             follow.setOpaque(false);
@@ -349,7 +348,7 @@ public final class Editors {
         @Override public void show(String value) {
             showing = true;
             try {
-                String normalized = TerminalColors.normalize(value);
+                String normalized = value.isBlank() ? "match" : WorkspaceThemeChoice.parse(value).name();
                 boolean follows = !separate(normalized);
                 follow.setSelected(follows);
                 if (!follows) separate = normalized;

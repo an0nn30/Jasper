@@ -19,7 +19,7 @@ public final class ConfigTemplate {
     private static final String HEADER = """
         # Jasper settings
         # Uncomment a setting to change its saved default. Live settings reload across windows.
-        # View menu choices (toolbar, status bar, terminal colors) are saved here.
+        # View menu choices (toolbar, status bar, workspace theme) are saved here.
         # Session and grid defaults affect new panes/windows as described below.
         # Reload Config forces a fresh read.
         # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
