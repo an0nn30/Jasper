@@ -24,26 +24,28 @@ the panel.
 - **Unprivileged ports.** HTTP starts at 8080 and FTP at 2121. On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
   editor suggests one 8000 higher.
 - **Jailed.** Clients cannot leave the folder, through `..` or through a link that points outside it.
-- **Warnings.** The panel and the editor warn about plain HTTP with a password, a writable server anyone can reach,
-  and a writable server open to other computers.
+- **Warnings.** The panel and the editor warn about plain HTTP or plain FTP with a password ("Plain FTP sends the
+  password unencrypted"), a writable server anyone can reach, and a writable server open to other computers. With
+  *Use TLS* but not *Require TLS*, a client may still log in without TLS; turn on *Require TLS* to refuse that.
 
 ## Logins
 
 *Anonymous* needs no login. *Session password* makes a new password each time the server starts (Copy Password
 copies it; the user name is yours). *Vault account* uses an account you keep in the Credential Vault; choose it with
 **Choose…**. The Vault may ask to unlock and to allow File Server. After a wrong password, an immediate retry from the
-same address is refused with a short wait (HTTP status 429 and a `Retry-After` header), the wait growing to half a
-minute; after ten wrong passwords the address is refused for five minutes.
+same address is refused with a short wait (HTTP answers 429 with a `Retry-After` header, FTP answers 530), the wait
+growing to half a minute; after ten wrong passwords the address is refused for five minutes.
 
 HTTP logins use Basic auth, which sends the password unencrypted; turn on **Use TLS** to serve HTTPS instead.
-On an FTP server, a client that tries `anonymous` when the server has a login is disconnected and must reconnect
-(FtpServer's behaviour).
 
 ## Serve Current Folder
 
 **Serve Current Folder over HTTP** shares the folder your shell is in (or your home folder), read-only and on this
 computer only, without saving it. It appears under *Temporary* and disappears when stopped; **Save as a Server…**
 keeps it.
+
+**Serve Current Folder over FTP** does the same with a temporary read-only FTP server on this computer only. It uses a
+session password; copy it with **Copy Password** in the server's menu.
 
 ## FTP and FTPS
 
@@ -60,6 +62,9 @@ account when the Credential Vault is installed and a session password otherwise;
 - An upload replaces the file only once it has arrived completely; a failed or interrupted transfer leaves the old
   file. Resuming an upload part-way through is refused; `APPE` appends to the end of a file. An interrupted `APPE`
   keeps the bytes already appended, because appends happen in place.
+- An upload is committed after the server sends its success reply. If saving then fails (for example the disk is
+  full), the client has already been told it worked, and the failure appears in the server's activity log.
+- A client that tries `anonymous` when the server has a login is disconnected and must reconnect.
 - `..` stops at the shared folder: `cd ..` at the top stays at `/`.
 
 ## HTTPS and the certificate
