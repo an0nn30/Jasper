@@ -192,6 +192,43 @@ class ThemeManagerTest {
         expected.forEach((key, value) -> assertThat(hex(UIManager.getColor(key))).as(key).isEqualTo(value));
     }
 
+    @Test void aGeneratedThemeInstallsItsTokensAsTheLookAndFeel() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            GeneratedTheme theme = ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS);
+            assertThat(ThemeManager.install(theme)).isTrue();
+            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Mocha");
+            assertThat(FlatLaf.isLafDark()).isTrue();
+            assertThat(UIManager.getColor("Panel.background")).isEqualTo(theme.tokens().get(Token.SURFACE));
+            assertThat(UIManager.getColor("List.background")).isEqualTo(theme.tokens().get(Token.SURFACE_SUNKEN));
+            assertThat(UIManager.getColor("Jasper.tabSelectedBackground")).isEqualTo(theme.tokens().get(Token.TAB_ACTIVE));
+            assertThat(UIManager.getColor("EditorTabs.underlineColor")).as("a key FlatLaf skips is put back")
+                .isEqualTo(theme.tokens().get(Token.TAB_UNDERLINE));
+            assertThat(UIManager.getColor("Jasper.titleSearch.background")).as("ChromeKeys fills keys without a token").isNotNull();
+            assertThat(UIManager.getInt("Component.arc")).isEqualTo(4);
+            assertThat(UIManager.getFont("Label.font").getSize2D()).as("app defaults still apply").isEqualTo(12f);
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    /** The 2026-10-01 spike: FlatLaf re-derives its controls from the base variables the template sets. */
+    @Test void flatLafReDerivesUnsetControlsFromTheBaseVariables() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS));
+            Color first = UIManager.getColor("Button.disabledSelectedBackground");
+            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS.replace("#1e1e2e", "#2e3440")));
+            assertThat(UIManager.getColor("Button.disabledSelectedBackground")).isNotEqualTo(first);
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    @Test void aThemesOwnKeysWinOverTheTemplate() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            ThemeManager.install(ThemeGeneratorTest.generate(ThemeGeneratorTest.SEEDS + "[ui]\n\"Panel.background\" = \"#010203\"\n"));
+            assertThat(hex(UIManager.getColor("Panel.background"))).isEqualTo("#010203");
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
     private static String hex(Color color) {
         if (color == null) return null;
         String rgb = String.format("#%06x", color.getRGB() & 0xffffff);

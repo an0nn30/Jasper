@@ -24,9 +24,17 @@ import java.util.regex.Pattern;
  * resolved; the explicit colours are also returned because FlatLaf skips IntelliJ-only namespaces.
  */
 final class ThemeLoader {
-    /** A resolved theme: FlatLaf's JSON input, every explicit colour keyed as the theme names it, and the problems met. */
-    record Resolved(String name, boolean dark, String json, Map<String, Color> colors, List<String> warnings) {
-        Resolved { colors = Map.copyOf(colors); warnings = List.copyOf(warnings); }
+    /**
+     * A resolved theme: FlatLaf's JSON input, every explicit colour keyed as the theme names it, the problems met, and
+     * the resolved {@code ui} and {@code icons} entries (named colours replaced) for conversion.
+     */
+    record Resolved(String name, boolean dark, String json, Map<String, Color> colors, List<String> warnings,
+                    Map<String, Object> ui, Map<String, Object> icons) {
+        Resolved {
+            colors = Map.copyOf(colors); warnings = List.copyOf(warnings);
+            ui = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(ui));
+            icons = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(icons));
+        }
     }
 
     /** A theme that cannot be resolved; the message names the theme file and the offending key. */
@@ -73,6 +81,8 @@ final class ThemeLoader {
             Object kept = withoutUnusableValues(file, key, value, warnings);
             if (kept != null) ui.put(key, named(kept, colors));
         });
+        var icons = new LinkedHashMap<String, Object>();
+        theme.icons.forEach((key, value) -> icons.put(key, named(value, colors)));
         var json = new LinkedHashMap<String, Object>();
         json.put("name", theme.name);
         json.put("dark", theme.dark);
@@ -80,8 +90,8 @@ final class ThemeLoader {
         json.put("author", theme.author);
         json.put("colors", new LinkedHashMap<String, Object>(colors));
         json.put("ui", ui);
-        if (!theme.icons.isEmpty()) json.put("icons", theme.icons);
-        return new Resolved(theme.name, theme.dark, write(json), explicitColors(ui), warnings);
+        if (!icons.isEmpty()) json.put("icons", icons);
+        return new Resolved(theme.name, theme.dark, write(json), explicitColors(ui), warnings, ui, icons);
     }
 
     private Raw resolve(String file, List<String> chain, List<String> warnings) {
@@ -192,7 +202,7 @@ final class ThemeLoader {
      * The colour of every explicit key, applied in order. A {@code *.suffix} wildcard recolours the keys
      * recorded so far with that suffix, the way IntelliJ applies it to the defaults present at that point.
      */
-    private static Map<String, Color> explicitColors(Map<String, Object> ui) {
+    static Map<String, Color> explicitColors(Map<String, Object> ui) {
         var colors = new LinkedHashMap<String, Color>();
         ui.forEach((key, raw) -> {
             if (key.startsWith("@")) return;
@@ -256,6 +266,18 @@ final class ThemeLoader {
         var result = new LinkedHashMap<String, Object>();
         map.forEach((key, value) -> result.put(key.toString(), value));
         return result;
+    }
+
+    /** FlatLaf's JSON input for already-resolved {@code ui} and {@code icons} entries (no named colours left). */
+    static String json(String name, boolean dark, String author, Map<String, Object> ui, Map<String, Object> icons) {
+        var json = new LinkedHashMap<String, Object>();
+        json.put("name", name);
+        json.put("dark", dark);
+        json.put("author", author);
+        json.put("colors", new LinkedHashMap<String, Object>());
+        json.put("ui", ui);
+        if (!icons.isEmpty()) json.put("icons", icons);
+        return write(json);
     }
 
     private static String write(Object value) {

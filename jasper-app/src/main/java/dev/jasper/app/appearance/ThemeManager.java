@@ -71,6 +71,15 @@ public final class ThemeManager {
         return install(resolve(theme), theme.palette().background());
     }
 
+    /** Installs a generated theme through the same path as any IntelliJ theme; false when FlatLaf could not set it up. */
+    static boolean install(GeneratedTheme theme) {
+        requireEdt();
+        var resolved = new ThemeLoader.Resolved(theme.name(), theme.dark(),
+            ThemeLoader.json(theme.name(), theme.dark(), "Jasper", theme.uiKeys(), theme.icons()),
+            ThemeLoader.explicitColors(theme.uiKeys()), List.of(), theme.uiKeys(), theme.icons());
+        return install(resolved, theme.terminal().background());
+    }
+
     static boolean install(ThemeLoader.Resolved resolved, Color terminalBackground) {
         requireEdt();
         FlatLaf laf;
@@ -83,9 +92,9 @@ public final class ThemeManager {
         resolved.colors().forEach((key, color) -> {
             if (defaults.get(key) != null) return;
             defaults.put(key, new ColorUIResource(color));
-            extra.put(key, hex(color));
+            extra.put(key, UiTemplate.hex(color));
         });
-        ChromeKeys.derive(defaults, terminalBackground).forEach((key, color) -> extra.put(key, hex(color)));
+        ChromeKeys.derive(defaults, terminalBackground).forEach((key, color) -> extra.put(key, UiTemplate.hex(color)));
         // A later reinstall of this instance (a failed switch rolls back to it) rebuilds the defaults.
         laf.setExtraDefaults(extra);
         return true;
@@ -119,11 +128,6 @@ public final class ThemeManager {
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
-    }
-
-    private static String hex(Color color) {
-        String rgb = String.format("#%06x", color.getRGB() & 0xffffff);
-        return color.getAlpha() == 255 ? rgb : rgb + String.format("%02x", color.getAlpha());
     }
 
     private static void requireEdt() {
