@@ -6,17 +6,32 @@ import dev.jasper.buddy.view.BuddyCompanion;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Producer for work that something other than a terminal pane volunteers: today, plugin activities.
- * Each activity is one task card keyed by its source and id. A card appears when the activity starts;
- * unlike a shell command it was declared worth showing, so there is no threshold. Progress changes the
- * detail the running card already reads, so nothing is re-posted. This producer never drives Buddy's
- * working animation, which the command notifier owns. EDT only; holds no Swing state.
+ * Producer for what something other than a terminal pane volunteers: today, plugin activities and plugin
+ * connections, each keyed by its source and id. An activity is one task card that appears when it starts; unlike
+ * a shell command it was declared worth showing, so there is no threshold. A connection is one connection card: a
+ * new state posts it again, which is new news even after it was acknowledged, and closing the connection removes
+ * it. Progress, and a report that keeps a connection's state, only change the detail the card already reads, so
+ * nothing is re-posted. A click raises the application; a card whose producer named an action then runs it and is
+ * acknowledged. This producer never drives Buddy's working animation, which the command notifier owns. EDT only;
+ * holds no Swing state.
  */
 public final class ActivityNotifier implements AutoCloseable {
+    /** What a connection card can say. */
+    public enum ConnectionState {
+        /** Available. */
+        UP,
+        /** Available with a problem, or recovering. */
+        DEGRADED,
+        /** Unavailable. */
+        DOWN
+    }
+
     private final Map<BuddyNoticeId, String> details = new HashMap<>();
+    private final Map<BuddyNoticeId, ConnectionState> connections = new HashMap<>();
     private BuddyCompanion deck;
     private Runnable activate;
 
@@ -24,11 +39,24 @@ public final class ActivityNotifier implements AutoCloseable {
      * Binds the producer to the companion.
      *
      * @param deck the companion that shows the cards
-     * @param activate what a click on a card does; an activity has no pane to focus, so the application raises itself
+     * @param activate what every click on a card does first; a producer has no pane to focus, so the application
+     *                 raises itself
      */
     public ActivityNotifier(BuddyCompanion deck, Runnable activate) {
         this.deck = Objects.requireNonNull(deck, "deck");
         this.activate = Objects.requireNonNull(activate, "activate");
+    }
+
+    /**
+     * Posts a running card whose click only raises the application.
+     *
+     * @param source the producer namespace, a plugin id
+     * @param id the activity's identity within that source
+     * @param title display title; line breaks become spaces
+     * @param detail initial detail line
+     */
+    public void started(String source, UUID id, String title, String detail) {
+        started(source, id, title, detail, Optional.empty());
     }
 
     /**
@@ -38,13 +66,15 @@ public final class ActivityNotifier implements AutoCloseable {
      * @param id the activity's identity within that source
      * @param title display title; line breaks become spaces
      * @param detail initial detail line
+     * @param action run after the application is raised when the card is clicked, which then acknowledges the
+     *               card; empty to only raise the application
      */
-    public void started(String source, UUID id, String title, String detail) {
+    public void started(String source, UUID id, String title, String detail, Optional<Runnable> action) {
         if (deck == null) return;
         var key = new BuddyNoticeId(source, id);
         details.put(key, detail);
         deck.post(new BuddyNotice(key, BuddyNotice.Kind.TASK, singleLine(title), BuddyNotice.State.RUNNING,
-            () -> details.getOrDefault(key, ""), activate));
+            () -> details.getOrDefault(key, ""), activation(key, action)));
     }
 
     /**
@@ -60,7 +90,7 @@ public final class ActivityNotifier implements AutoCloseable {
     }
 
     /**
-     * Replaces the card with its outcome.
+     * Replaces the card with its outcome; a click only raises the application.
      *
      * @param source the producer namespace
      * @param id the activity's identity
@@ -69,11 +99,26 @@ public final class ActivityNotifier implements AutoCloseable {
      * @param detail final detail line
      */
     public void finished(String source, UUID id, String title, boolean succeeded, String detail) {
+        finished(source, id, title, succeeded, detail, Optional.empty());
+    }
+
+    /**
+     * Replaces the card with its outcome.
+     *
+     * @param source the producer namespace
+     * @param id the activity's identity
+     * @param title display title
+     * @param succeeded whether the work succeeded
+     * @param detail final detail line
+     * @param action run after the application is raised when the card is clicked, which then acknowledges the
+     *               card; empty to only raise the application
+     */
+    public void finished(String source, UUID id, String title, boolean succeeded, String detail, Optional<Runnable> action) {
         if (deck == null) return;
         var key = new BuddyNoticeId(source, id);
         details.remove(key);
         deck.post(new BuddyNotice(key, BuddyNotice.Kind.TASK, singleLine(title),
-            succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
+            succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activation(key, action)));
     }
 
     /**
@@ -89,6 +134,58 @@ public final class ActivityNotifier implements AutoCloseable {
         deck.dismiss(key);
     }
 
+    /**
+     * Shows a connection. A new state posts the card again, which is new news even after it was acknowledged;
+     * the same state only changes the detail the card reads.
+     *
+     * @param source the producer namespace, a plugin id
+     * @param id the connection's identity within that source
+     * @param title display title; line breaks become spaces
+     * @param state what the card says
+     * @param detail detail line
+     * @param action run after the application is raised when the card is clicked, which then acknowledges the
+     *               card; empty to only raise the application
+     */
+    public void connection(String source, UUID id, String title, ConnectionState state, String detail, Optional<Runnable> action) {
+        if (deck == null) return;
+        var key = new BuddyNoticeId(source, id);
+        details.put(key, detail);
+        if (connections.put(key, Objects.requireNonNull(state, "state")) == state) return;
+        BuddyNotice.State shown = switch (state) {
+            case UP -> BuddyNotice.State.UP;
+            case DEGRADED -> BuddyNotice.State.DEGRADED;
+            case DOWN -> BuddyNotice.State.DOWN;
+        };
+        deck.post(new BuddyNotice(key, BuddyNotice.Kind.CONNECTION, singleLine(title), shown,
+            () -> details.getOrDefault(key, ""), activation(key, action)));
+    }
+
+    /**
+     * Removes a connection's card: its producer no longer reports it.
+     *
+     * @param source the producer namespace
+     * @param id the connection's identity
+     */
+    public void connectionClosed(String source, UUID id) {
+        if (deck == null) return;
+        var key = new BuddyNoticeId(source, id);
+        details.remove(key);
+        connections.remove(key);
+        deck.dismiss(key);
+    }
+
+    /** Raises the application; a named action then runs and the card counts as seen. */
+    private Runnable activation(BuddyNoticeId key, Optional<Runnable> action) {
+        Objects.requireNonNull(action, "action");
+        return () -> {
+            if (deck == null) return;
+            activate.run();
+            if (action.isEmpty()) return;
+            action.get().run();
+            if (deck != null) deck.acknowledge(key);
+        };
+    }
+
     private static String singleLine(String title) {
         return title.replace("\r", "").replace("\n", " ");
     }
@@ -97,5 +194,6 @@ public final class ActivityNotifier implements AutoCloseable {
         deck = null;
         activate = () -> { };
         details.clear();
+        connections.clear();
     }
 }

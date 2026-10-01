@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.time.Duration;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +49,29 @@ class PluginRuntimeTest {
                 context.activities().begin(ActivitySpec.of("Probe work")).progress(0.5, "half way");
             }
             @Override public void stop() { note(context, "stopped", "yes"); }
+        }
+        """;
+
+    static final String LINK = """
+        package fix.link;
+        import dev.jasper.sdk.activity.ConnectionEvent;
+        import dev.jasper.sdk.activity.ConnectionSpec;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import dev.jasper.sdk.ui.ActionSpec;
+        import java.nio.file.Files;
+        import java.util.Optional;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                context.actions().register(ActionSpec.of("dev.example.link.show", "Show Link"), invoked -> {
+                    try { Files.writeString(context.dataDirectory().resolve("shown"), invoked.window().id().toString()); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                });
+                context.activities().connection(new ConnectionSpec("Link via db", "reconnecting",
+                    ConnectionEvent.State.DEGRADED, Optional.of("dev.example.link.show")));
+                context.activities().connection(new ConnectionSpec("Stray", "gone",
+                    ConnectionEvent.State.DOWN, Optional.of("dev.example.other.show")));
+            }
         }
         """;
 
@@ -103,6 +128,49 @@ class PluginRuntimeTest {
         assertThat(data.resolve("stopped")).hasContent("yes");
         onEdt(() -> assertThat(deck.notices()).singleElement()
             .satisfies(notice -> assertThat(notice.state()).isEqualTo(BuddyNotice.State.FAILED)));
+    }
+
+    @Test void connectionCardsFollowTheirPluginAndRunOnlyItsOwnAction() throws Exception {
+        Path dev = root.resolve("dev/dev.example.link");
+        PluginJars.build(dev, "link.jar", PluginJars.descriptor("dev.example.link", "1.0.0", "fix.link.Main"),
+            Map.of("fix.link.Main", LINK), List.of());
+        TerminalFixture fixture = AppContractTest.onEdtValue(TerminalFixture::new);
+        UUID window = AppContractTest.onEdtValue(fixture::addWindow);
+        onEdt(() -> fixture.activateWindow(window));
+        var raised = new AtomicInteger();
+        var created = new AtomicReference<PluginRuntime>();
+        onEdt(() -> created.set(new PluginRuntime(new PluginRuntime.Options(null, root.resolve("absent"), dev, false,
+            root.resolve("plugins.toml"), root.resolve("plugins.lock")),
+            new ActivityNotifier(deck.companion(), raised::incrementAndGet), new PluginRuntime.SettingsReports(d -> { }, file -> { }),
+            new dev.jasper.app.contributions.Contributions(), AppContractTest.headlessWindows(), fixture.registry)));
+        PluginRuntime runtime = created.get();
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        onEdt(() -> {
+            assertThat(deck.notices()).hasSize(2)
+                .allSatisfy(notice -> assertThat(notice.kind()).isEqualTo(BuddyNotice.Kind.CONNECTION));
+            BuddyNotice link = notice("Link via db"), stray = notice("Stray");
+            assertThat(link.state()).isEqualTo(BuddyNotice.State.DEGRADED);
+            assertThat(link.detail().get()).isEqualTo("reconnecting");
+            assertThat(stray.state()).isEqualTo(BuddyNotice.State.DOWN);
+            link.activate().run();
+            assertThat(raised).hasValue(1);
+            assertThat(deck.acknowledged(link.id())).isTrue();
+            stray.activate().run();
+            assertThat(raised).as("another plugin's action only raises the application").hasValue(2);
+            assertThat(deck.acknowledged(stray.id())).isFalse();
+        });
+        assertThat(root.resolve("absent/dev.example.link/data/shown")).hasContent(window.toString());
+
+        var pending = new AtomicReference<List<CompletableFuture<?>>>();
+        onEdt(() -> pending.set(runtime.stop()));
+        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        settle();
+        onEdt(() -> assertThat(deck.notices()).as("stopping closes the plugin's connections").isEmpty());
+    }
+
+    private BuddyNotice notice(String title) {
+        return deck.notices().stream().filter(notice -> notice.title().equals(title)).findFirst().orElseThrow();
     }
 
     @Test void userPluginsWaitForConsentAndSafeModeSkipsThem() throws Exception {

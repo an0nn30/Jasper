@@ -102,6 +102,13 @@ final class PluginHost {
         return context != null && context.state == HostedContext.State.ACTIVE;
     }
 
+    /** UI thread: whether the plugin has not stopped and has this action registered. */
+    boolean ownsAction(String pluginId, String actionId) {
+        requireUi();
+        HostedContext context = contexts.get(pluginId);
+        return context != null && context.state != HostedContext.State.CLOSED && context.ownsAction(actionId);
+    }
+
     void settingsChanged() { settingsChanged(Set.of()); }
 
     /** Pushes each active plugin's current values; plugins in {@code reloaded} rerun their listeners even when equal. */

@@ -461,7 +461,9 @@ user's browser the same way (SDK 0.10.2); any other address throws `IllegalArgum
 - **Connections.** `context.activities().connection(...)` announces something that is up until
   it is not; report `up`, `degraded` or `down` as it changes and `close()` it once it no longer
   matters. A new state is always delivered; a detail-only change is coalesced. Jasper shows
-  connections on Buddy. A connection left open when the plugin stops is closed.
+  connections on Buddy. A connection left open when the plugin stops is closed. When an activity's
+  or a connection's `activateActionId` names one of your own actions, clicking its Buddy card runs
+  that action in the window the user used last.
 - **Services.** Publish interfaces from an exported package during `start` only, with
   `publish` or, to learn who is calling, `publishPerConsumer`. Consumers must declare
   `requires` on the provider. Put the interfaces in a separate API jar that consumers compile

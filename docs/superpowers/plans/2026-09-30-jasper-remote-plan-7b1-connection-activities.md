@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-09-30 on `claude/tunnels-spec`; not executed.
+**Status:** Written 2026-09-30 on `claude/tunnels-spec`; executed inline 2026-09-30 on `claude/tunnels-7b1` (three commits), no deviations from the plan text. Not merged.
 
 **Goal:** Give plugins a way to show connections (things that are up until they are not) on Buddy, let Buddy cards run the posting plugin's own action when clicked, and let plugins open web addresses in the user's browser — SDK 0.10.2.
 

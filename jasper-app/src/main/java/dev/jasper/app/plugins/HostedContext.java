@@ -137,6 +137,8 @@ final class HostedContext implements PluginContext {
     @Override public dev.jasper.sdk.settings.PluginSettings settings() { return declared; }
 
     @Override public Actions actions() { return ui.actions(); }
+    /** UI thread: whether this plugin registered the action and has not closed it. */
+    boolean ownsAction(String actionId) { return ui.owns(actionId); }
     @Override public Toolbar toolbar() { return ui.toolbar(); }
     @Override public Menus menus() { return ui.menus(); }
     @Override public StatusBar statusBar() { return ui.statusBar(); }

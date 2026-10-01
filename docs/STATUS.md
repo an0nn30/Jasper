@@ -2,15 +2,27 @@
 
 ## Current state — 2026-09-30
 
+- **Remote tunnels plan 7b-1: SDK 0.10.2 connection activities** (branch `claude/tunnels-7b1`, plan
+  `docs/superpowers/plans/2026-09-30-jasper-remote-plan-7b1-connection-activities.md`, executed inline 2026-09-30):
+  `Activities.connection` returns a `ConnectionHandle` (`up`, `degraded`, `down`, `close`) publishing
+  `ConnectionEvent`s on `Activities.CONNECTIONS` (states in order, detail-only reports coalesced, one `CLOSED`, closed
+  when the plugin stops); `Platform.browse(URI)` opens http/https addresses through the new `platform.Browser`; Buddy
+  shows connections as connection cards, and a card whose `activateActionId` names the source plugin's own action
+  runs it in the last active window and is acknowledged (task cards too). Testkit: `connectionLog()`, `browsed()`;
+  contract +3 cases. No deviations from the plan. `./gradlew check` green: app 1439/0/1, terminal 391/0/4,
+  Editor 4782/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0,
+  SDK 36/0/0, testkit 75/0/0. Seen once during Task 1's first full check and not reproduced in six reruns (four
+  alone, two whole-module): `RemotePluginTest.endingAPanesSessionClearsTheSftpView` read the SFTP panel's folder
+  ("/") right after its rows emptied; a timing flake unrelated to this plan. Not merged; plan 7b-2 builds on it.
 - **Remote tunnels design (7b)** (branch `claude/tunnels-spec`, spec
   `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md`, brainstormed and approved section by section
-  2026-09-30; written spec awaiting the user's review): tunnels with their own lifecycle (never tied to terminals)
+  2026-09-30; written spec approved by the user the same day): tunnels with their own lifecycle (never tied to terminals)
   through a saved host, local / remote / dynamic SOCKS5, Manually or When Jasper starts, quick unsaved forwards, a
   Tunnels rail panel, an own forwarding engine over MINA channels (live counters; reconnect with per-host backoff
   keeps the local port bound), unattended connections that never prompt (new `Connections` unattended lease, Vault
   0.4.0 `credentialIfAllowed`), and Buddy connection cards for trouble only through SDK 0.10.2 connection activities
   (plus `Platform.browse` and card activation). Replaces the tunnels outline in the Remote design's section 9. Three
-  plans: 7b-1 SDK, 7b-2 tunnels run by hand, 7b-3 tunnels that stay up. No code yet.
+  plans: 7b-1 SDK (executed, entry above), 7b-2 tunnels run by hand, 7b-3 tunnels that stay up.
 - **Terminal colors follow the UI theme** (branch `claude/terminal-follow-theme`, bounded change approved in chat
   2026-09-30, no spec): Font & Colors' Terminal colors row is a checkbox, "Terminal colors follow the UI theme" (the
   value `match`), over the dropdown of separate choices (Light, Dark, every terminal theme, More Terminal Themes…),

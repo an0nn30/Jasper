@@ -11,6 +11,7 @@ import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
+import dev.jasper.sdk.activity.ConnectionEvent;
 import dev.jasper.sdk.events.AppEvents;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,6 +34,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import dev.jasper.app.terminals.TerminalRegistry;
+import dev.jasper.app.terminals.PaneEntry;
 
 /**
  * The application's single entry to plugins: discover, resolve, load and start them once at launch,
@@ -228,7 +230,7 @@ public final class PluginRuntime {
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
     private volatile Map<String, PluginCandidate> launched = Map.of();
     private volatile PluginHost host;
-    private Subscription bridge;
+    private Subscription bridge, connectionBridge;
     private volatile PluginCatalog.Launch launch;
     private PluginAdmin admin;
     private ExecutorService adminWorker;
@@ -371,6 +373,7 @@ public final class PluginRuntime {
             dev.jasper.app.platform.Browser::open));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
+        connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
                 settingsPoller = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
                     Thread.ofPlatform().daemon().name("jasper-plugin-settings").factory());
                 settingsPoller.scheduleWithFixedDelay(() -> {
@@ -581,13 +584,42 @@ public final class PluginRuntime {
         String detail = event.fraction().isPresent()
             ? Math.round(event.fraction().getAsDouble() * 100) + "%" + (event.detail().isEmpty() ? "" : " · " + event.detail())
             : event.detail();
+        Optional<Runnable> action = activation(event.sourcePluginId(), event.activateActionId());
         switch (event.state()) {
-            case STARTED -> notifier.started(event.sourcePluginId(), event.id(), event.title(), detail);
+            case STARTED -> notifier.started(event.sourcePluginId(), event.id(), event.title(), detail, action);
             case PROGRESS -> notifier.progress(event.sourcePluginId(), event.id(), detail);
-            case SUCCEEDED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), true, event.detail());
-            case FAILED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), false, event.detail());
+            case SUCCEEDED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), true, event.detail(), action);
+            case FAILED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), false, event.detail(), action);
             case CANCELLED -> notifier.cancelled(event.sourcePluginId(), event.id());
         }
+    }
+
+    private void forwardConnection(ConnectionEvent event) {
+        switch (event.state()) {
+            case UP -> connection(event, ActivityNotifier.ConnectionState.UP);
+            case DEGRADED -> connection(event, ActivityNotifier.ConnectionState.DEGRADED);
+            case DOWN -> connection(event, ActivityNotifier.ConnectionState.DOWN);
+            case CLOSED -> notifier.connectionClosed(event.sourcePluginId(), event.id());
+        }
+    }
+
+    private void connection(ConnectionEvent event, ActivityNotifier.ConnectionState state) {
+        notifier.connection(event.sourcePluginId(), event.id(), event.title(), state, event.detail(),
+            activation(event.sourcePluginId(), event.activateActionId()));
+    }
+
+    /**
+     * A card's own activation: the source plugin's action, invoked in the window the user used last. Empty when
+     * the id names no action that plugin registered, so the card only raises the application.
+     */
+    private Optional<Runnable> activation(String source, Optional<String> actionId) {
+        PluginHost current = host;
+        if (current == null) return Optional.empty();
+        return actionId.filter(id -> current.ownsAction(source, id)).<Runnable>map(id -> () -> {
+            if (!current.ownsAction(source, id)) return;
+            terminals.activeWindow().ifPresent(window -> contributions.action(id).ifPresent(entry ->
+                entry.invoke(new Contributions.Invocation(window.id(), terminals.activePane().map(PaneEntry::id)))));
+        });
     }
 
     /**
