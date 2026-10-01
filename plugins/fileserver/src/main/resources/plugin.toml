@@ -1,0 +1,11 @@
+id = "dev.jasper.fileserver"
+name = "File Server"
+version = "0.1.0"
+entry = "dev.jasper.fileserver.FileServerPlugin"
+sdk = ">=0.11.0, <0.12"
+description = "Share a local folder with other computers over HTTP: named servers in a File Servers panel, read-only and local-only by default, with an activity log, Vault logins and Serve Current Folder."
+vendor = "Jasper"
+icon = "icons/fileserver.svg"
+homepage = "https://github.com/an0nn30/Jasper"
+capabilities = ["network.listen", "terminal.observe", "palette.contribute"]
+requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }]
