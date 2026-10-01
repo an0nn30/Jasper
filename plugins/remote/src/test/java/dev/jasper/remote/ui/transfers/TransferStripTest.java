@@ -1,5 +1,7 @@
 package dev.jasper.remote.ui.transfers;
 
+import dev.jasper.remote.testsupport.ZoneColors;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.remote.sftp.FileEntry;
@@ -9,6 +11,19 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
 class TransferStripTest {
+    @Test void separatorReadsMountedZoneAtPaintAndKeepsPadding() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
+                    parent.add(strip);
+                    assertThat(ZoneColors.rule(strip, 30, 0)).isEqualTo(WorkspacePalette.current(strip).border());
+                    assertThat(strip.getInsets()).isEqualTo(new java.awt.Insets(7, 0, 0, 0));
+                    colors.put("Jasper.workspace.border", new java.awt.Color(0x123456));
+                }
+            }
+        });
+    }
+
     final List<String> calls = new ArrayList<>();
     final TransferStrip strip = new TransferStrip(new TransferStrip.Actions((id, action) -> calls.add(action + " " + id), id -> calls.add("cancel " + id), id -> calls.add("dismiss " + id)));
 

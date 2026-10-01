@@ -1,5 +1,7 @@
 package dev.jasper.editor.vim.ui;
 
+import dev.jasper.editor.testsupport.ZoneColors;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.KeyInput;
 import dev.jasper.editor.vim.Vim;
@@ -11,6 +13,43 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class VimBarTest {
+    @Test void feedbackColorsFollowMountedPaletteOnFirstPaintWithoutAnotherCommand() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                var area = new VimTextArea(); area.setText("abc\n");
+                var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+                var bar = new VimBar(); bar.attach(editor);
+                var status = (javax.swing.JLabel) ((java.awt.BorderLayout) bar.getLayout()).getLayoutComponent(java.awt.BorderLayout.CENTER);
+                var scroll = (javax.swing.JScrollPane) ((java.awt.BorderLayout) bar.getLayout()).getLayoutComponent(java.awt.BorderLayout.NORTH);
+                @SuppressWarnings("unchecked") var output = (javax.swing.JList<VimEditor.OutputLine>) scroll.getViewport().getView();
+                colors.workspace.add(bar); ZoneColors.paint(bar);
+                assertThat(status.getForeground()).isEqualTo(WorkspacePalette.current(bar).text());
+                type(editor, "\"qp");
+                assertThat(bar.flashing()).isTrue();
+                for (var parent : java.util.List.of(colors.workspace, colors.chrome, colors.workspace)) {
+                    parent.add(bar); ZoneColors.paint(bar);
+                    var p = WorkspacePalette.current(bar);
+                    assertThat(status.getForeground()).isEqualTo(p.error());
+                    assertThat(bar.getBackground()).isEqualTo(p.accent());
+                    assertThat(((java.util.Map<?, ?>) status.getClientProperty("FlatLaf.style")).get("foreground")).isEqualTo(p.error());
+                    assertThat(((java.util.Map<?, ?>) bar.getClientProperty("FlatLaf.style")).get("background")).isEqualTo(p.accent());
+                    for (boolean error : java.util.List.of(false, true)) {
+                        var rendered = output.getCellRenderer().getListCellRendererComponent(output, new VimEditor.OutputLine("output", error), 0, false, false);
+                        assertThat(rendered.getForeground()).isEqualTo(error ? p.error() : p.text());
+                    }
+                    colors.put("Jasper.workspace.error", new java.awt.Color(0x123456));
+                    colors.put("Jasper.workspace.accent", new java.awt.Color(0x234567));
+                    ZoneColors.paint(bar);
+                    assertThat(status.getForeground()).isEqualTo(WorkspacePalette.current(bar).error());
+                    assertThat(bar.getBackground()).isEqualTo(WorkspacePalette.current(bar).accent());
+                }
+                bar.detach(); ZoneColors.paint(bar);
+                assertThat(status.getForeground()).isEqualTo(WorkspacePalette.current(bar).text());
+                assertThat(bar.getBackground()).isEqualTo(WorkspacePalette.current(bar).background());
+            }
+        });
+    }
+
     private static void type(VimEditor editor, String keys) { for (KeyInput key : KeyInput.parse(keys)) editor.feed(key); }
 
     @Test void showsTheModeThePartlyTypedCommandAndMessages() throws Exception {

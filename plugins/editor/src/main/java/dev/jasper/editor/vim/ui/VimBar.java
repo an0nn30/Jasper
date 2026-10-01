@@ -1,5 +1,6 @@
 package dev.jasper.editor.vim.ui;
 
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.editor.vim.VimEditor;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -13,7 +14,6 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.Timer;
-import javax.swing.UIManager;
 
 /**
  * The strip under a tab while Vim mode is on (spec 5.2): the mode or the last message on the left, the partly typed
@@ -23,7 +23,6 @@ import javax.swing.UIManager;
  * a question waiting for its answer ({@code :s///c}) shows there too.
  */
 public final class VimBar extends JPanel {
-    private static final Color ERROR = new Color(0xD9, 0x4F, 0x4F);
     /** The output panel shows at most this many lines at once; more scroll. */
     private static final int OUTPUT_ROWS = 12;
 
@@ -37,6 +36,7 @@ public final class VimBar extends JPanel {
     private VimEditor editor;
     private int bells;
     private boolean flashing;
+    private WorkspacePalette paintedPalette;
 
     /** An empty bar; {@link #attach} gives it an editor. */
     public VimBar() {
@@ -49,7 +49,10 @@ public final class VimBar extends JPanel {
             JLabel label = label();
             label.setText(line.text().isEmpty() ? " " : visible(line.text()));
             label.setFont(list.getFont());
-            label.setForeground(line.error() ? ERROR : UIManager.getColor("Label.foreground"));
+            WorkspacePalette palette = WorkspacePalette.current(list);
+            label.setOpaque(true);
+            label.setBackground(selected ? list.getSelectionBackground() : palette.background());
+            label.setForeground(selected ? list.getSelectionForeground() : line.error() ? palette.error() : palette.text());
             return label;
         });
         output.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
@@ -111,6 +114,7 @@ public final class VimBar extends JPanel {
             status.setText(" ");
             command.setText(" ");
             showOutput(java.util.List.of());
+            colors();
             return;
         }
         showOutput(editor.output());
@@ -157,14 +161,31 @@ public final class VimBar extends JPanel {
     }
 
     private void colors() {
-        Color background = UIManager.getColor("Panel.background");
-        Color highlight = UIManager.getColor("Component.focusColor");
-        setBackground(flashing && highlight != null ? highlight : background);
-        outputList.setBackground(background);
-        output.getViewport().setBackground(background);
-        Color foreground = UIManager.getColor("Label.foreground");
-        status.setForeground(editor != null && editor.messageIsError() ? ERROR : foreground);
-        command.setForeground(foreground);
+        WorkspacePalette palette = WorkspacePalette.current(this);
+        paintedPalette = palette;
+        background(this, flashing ? palette.accent() : palette.background());
+        background(outputList, palette.background());
+        background(output.getViewport(), palette.background());
+        foreground(status, editor != null && editor.messageIsError() ? palette.error() : palette.text());
+        foreground(command, palette.text());
+    }
+
+    // Inline plugin styles outrank the host's generated layer, including during UI delegate refresh.
+    private static void background(javax.swing.JComponent component, Color color) {
+        var style = java.util.Map.of("background", color);
+        if (!style.equals(component.getClientProperty("FlatLaf.style"))) component.putClientProperty("FlatLaf.style", style);
+        component.setBackground(color);
+    }
+
+    private static void foreground(javax.swing.JComponent component, Color color) {
+        var style = java.util.Map.of("foreground", color);
+        if (!style.equals(component.getClientProperty("FlatLaf.style"))) component.putClientProperty("FlatLaf.style", style);
+        component.setForeground(color);
+    }
+
+    @Override protected void paintComponent(Graphics graphics) {
+        if (!WorkspacePalette.current(this).equals(paintedPalette)) colors();
+        super.paintComponent(graphics);
     }
 
     /** Control characters typed with CTRL-V show as {@code ^X}, as on Vim's command line; the cursor index is kept. */

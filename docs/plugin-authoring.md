@@ -706,3 +706,67 @@ The no-argument `current()` reads the published workspace palette. A popup or to
 opened from a workspace pane. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
 workspace event; an event can change colors while `workspaceVariant()` remains `DARK` or `LIGHT`. Keep the document
 and undo model when changing only its styles.
+
+
+### Hosted pane control styling
+
+The host styles ordinary Swing controls only while mounted in a center workspace pane. It keeps one installed
+chrome LAF. Generated workspace styles sit below plugin `FlatLaf.styleClass` values, with plugin inline
+`FlatLaf.style` (String or Map) taking highest precedence. Replace either property while mounted to update it;
+the host preserves the latest plugin object and type, without mutating plugin maps. `Jasper.workspaceStyle`
+identifies host-generated values and is not a plugin customization property.
+
+For properties without delegate style support, the host uses supported component color setters. Plain plugin
+colors and observed plugin setter changes retain ownership. Swing `UIResource` defaults remain replaceable;
+a silent same-RGB replacement with the current UIManager default is treated as delegate-owned, because no event
+distinguishes that assignment from delegate installation. Prefer a plain `Color` or a plugin inline style when
+claiming a color. Custom-painted surfaces and transient renderer components still need palette-aware code.
+
+Set `Jasper.workspace.exempt` to `Boolean.TRUE` on a component to exempt its entire subtree, as Editor does for
+syntax/document surfaces. Dynamic children, replacement viewports/editors, and table headers are tracked by the
+host. Moving/removing a pane, returning to `match`, closing it, or stopping its plugin restores generated overrides;
+plugin-owned values survive. The host owns and removes its observation listeners and popup overrides. Plugins
+still close their own appearance subscriptions, timers, and document resources.
+
+Renderers resolve the mounted list/table/tree owner, never the temporary renderer label. Borders resolve their
+paint component on each paint. If a stateful control publishes plugin-owned styles (for example Vim error/bell
+feedback), refresh them on appearance callbacks and the first paint after reparenting or a palette change. Compare
+the complete immutable palette, not just darkness. A delegate `updateUI()` must not permanently replace semantic
+muted text with chrome defaults. Menus, tooltips and dialogs stay chrome; the dropdown owned by a workspace combo
+is the sole popup exception. The host explicitly marks that combo's popup list so owner-based lookup works there.
+
+```java
+area.putClientProperty("Jasper.workspace.exempt", Boolean.TRUE);
+list.setCellRenderer((owner, value, index, selected, focused) -> {
+    WorkspacePalette palette = WorkspacePalette.current(owner);
+    JLabel label = new JLabel(String.valueOf(value));
+    label.setOpaque(true);
+    label.setBackground(selected ? owner.getSelectionBackground() : palette.surfaceSunken());
+    label.setForeground(selected ? owner.getSelectionForeground() : palette.text());
+    return label;
+});
+```
+
+The bundled audit covers all seven plugins. Semantic status dots remain colored independently of selected row
+text/background; normal card text uses ordinary control colors. The audit used
+`rg -n 'UIManager.getColor|new Color\(|Color\.' plugins/*/src/main/java` plus setter/renderer/paint searches.
+
+| Plugin / occurrence | Treatment |
+|---|---|
+| Remote `HostsPanel`: active host/distro dots, muted WSL badge | Changed: mounted list palette success/muted; selected badge uses selection text |
+| Remote `TunnelsPanel`: status dots, error/detail/heading rows; `WrappedNote.updateUI` | Changed: mounted list success/warning/error/muted; normal note text refreshes at paint after delegate rebuild |
+| Remote `TransferStrip`: cached separator | Changed: paint-owner border, original top rule and seven-pixel total inset retained |
+| Remote transfer `JProgressBar`, SFTP tables/toolbars/dialogs | Inherited standard controls; rail and dialog locations stay chrome |
+| File Server `Renderer`: problem/header/state colors; wrapping `note.updateUI` | Changed: owner palette, selection text preserved, muted notes refresh after delegate rebuild; normal detail cards inherited |
+| Vault `ManagerPanel`: row detail/type, empty/status labels, empty-frame border | Changed: renderer-owner muted values, paint-time muted labels and border; selected text preserved |
+| Vault `PickerPanel` and grant renderer, dialogs/settings | Inherited owner control colors; chrome-only when hosted in dialogs/settings |
+| Editor `EditorTab` banner separator | Changed: paint-owner border, original bottom rule and padding retained |
+| Editor `VimBar`: fixed error, output text, panel background/bell | Changed: mounted palette, plugin-owned style maps, first-paint palette comparison; 150 ms bell and 12-row limit retained |
+| Editor `EditorTheme`: fixed Color copies and blending | Domain-owned syntax/document surfaces; unchanged, exempt from generic styles |
+| Editor `vim/HighlightedYank`: configured RGBA color | Domain-owned user setting; unchanged |
+| History, Snippets, Sample | No custom color/painter occurrences; inherited standard controls (or palette contributions rendered by the host) |
+
+FlatLaf 3.7 supports per-control progress track/fill colors but not progress text colors. Text on an external
+plugin's string-painted progress bar remains delegate-owned and can retain chrome colors. The only bundled
+`JProgressBar`, Remote's transfer strip, has `stringPainted == false`; status text is a separate ordinary label.
+Plugins need no FlatLaf dependency, SDK change, or version bump for these conventions.

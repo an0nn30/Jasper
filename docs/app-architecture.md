@@ -246,3 +246,29 @@ copying it in, then asks the configuration service to reload, which rescans the 
 are written under `themes/.downloads` and moved into place with one atomic replace, so a scan never sees half a
 file; the installer installs, replaces and deletes only `.jar` and `.zip` files directly in the folder, whatever
 `.sources.toml` records.
+
+
+## Hosted workspace styling
+
+`WindowContent` owns one `WorkspaceStyler` per mounted plugin center pane. `WorkspaceStyles` describes verified
+FlatLaf 3.7 control recipes; `WorkspaceStyleLayer` composes generated styles beneath plugin class and inline
+styles and reversibly owns direct fallback setters. The application keeps one chrome LAF. Before a chrome delegate
+rebuild, host layers release generated state; afterwards they rebase defaults and reapply the latest workspace.
+In match mode generated values and combo overrides are removed while observation remains for later independent use.
+
+The EDT-owned tree styler observes dynamic children and associated table headers/combo editors by identity, stops
+at chrome/exempt/popup boundaries, and styles only a combo's own dropdown popup. An excluded associated header/editor
+retains one source-owned hierarchy listener to detect a return to eligible ancestry; no generated styles or general
+property/container listeners remain on it. Removal, pane moves, plugin stop, and window disposal close layers,
+listeners, popup overrides and queued work. No static component registry is used.
+
+Mount acquisition rolls back partially published markers/styles if construction fails. Failed content opens leave
+no ghost registry entry; failed moves restore the source or another main host when available. If neither can mount,
+the live document remains explicitly unmounted and reopening the same key retries that entry without discarding edits.
+Synchronous zone callbacks can move/dispose a pane, so publication validates ownership before continuing.
+
+Editor syntax area, viewport and gutter are exempt; the outer scroll pane, scrollbars, banners and Vim bar remain
+eligible. Bundled renderers and custom borders use the SDK's mounted-owner lookup; Vim's error/bell maps are plugin
+inline styles and outrank generated values. The host sees only app-native tokens and JDK client properties. The
+[plugin authoring audit](plugin-authoring.md#hosted-pane-control-styling) records domain colors and the delegate-owned
+progress text limitation. Native visual acceptance remains a user-only check.

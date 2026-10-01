@@ -1,5 +1,7 @@
 package dev.jasper.fileserver.ui;
 
+import dev.jasper.fileserver.testsupport.ZoneColors;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.Login;
 import dev.jasper.fileserver.definition.Protocol;
@@ -23,6 +25,38 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServersPanelTest {
+    @Test void mountedServerRenderersKeepSemanticAndSelectedColors() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                var panel = panel();
+                var states = List.of(ServerState.RUNNING, ServerState.STARTING, ServerState.failed("broken"), ServerState.STOPPED);
+                for (int i = 0; i < states.size(); i++) view("server" + i, states.get(i), false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+                panel.setServers(views, Optional.empty());
+                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
+                    parent.add(panel);
+                    var p = WorkspacePalette.current(panel.list);
+                    var expected = List.of(p.success(), p.warning(), p.error(), p.textMuted());
+                    for (int i = 0; i < views.size(); i++) {
+                        var value = new ServerRows.Server(views.get(i));
+                        for (boolean selected : List.of(false, true)) {
+                            var row = (javax.swing.JPanel) panel.list.getCellRenderer().getListCellRendererComponent(panel.list, value, i, selected, false);
+                            var layout = (java.awt.BorderLayout) row.getLayout();
+                            assertThat(layout.getLayoutComponent(java.awt.BorderLayout.WEST).getForeground()).isEqualTo(expected.get(i));
+                            assertThat(layout.getLayoutComponent(java.awt.BorderLayout.CENTER).getForeground()).isEqualTo(selected ? panel.list.getSelectionForeground() : panel.list.getForeground());
+                        }
+                    }
+                    for (var value : List.<ServerRows.Row>of(new ServerRows.Problem("broken"), new ServerRows.Header("Temporary"))) {
+                        assertThat(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, value, 0, false, false).getForeground()).isEqualTo(value instanceof ServerRows.Problem ? p.error() : p.textMuted());
+                        assertThat(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, value, 0, true, false).getForeground()).isEqualTo(panel.list.getSelectionForeground());
+                    }
+                    panel.empty.updateUI(); ZoneColors.paint(panel.empty);
+                    assertThat(panel.empty.getForeground()).isEqualTo(p.textMuted());
+                    colors.put("Jasper.workspace.success", new java.awt.Color(0x123456));
+                }
+            }
+        });
+    }
+
     static final Path HOME = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().resolve("home");
     final List<String> events = new ArrayList<>();
     final Map<UUID, List<ActivityLog.Entry>> logs = new java.util.HashMap<>();

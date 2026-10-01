@@ -1,5 +1,6 @@
 package dev.jasper.remote.ui;
 
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
@@ -378,7 +379,7 @@ public final class HostsPanel extends JPanel {
         int sessions = sessionCount.applyAsInt(host);
         if (sessions > 0) {
             var status = new JPanel(new BorderLayout(4, 0)); status.setOpaque(false);
-            java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
+            java.awt.Color active = WorkspacePalette.current(owner).success();
             var dot = text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f)));
             status.add(dot, BorderLayout.WEST);
             if (sessions > 1) status.add(text(String.valueOf(sessions), foreground, owner.getFont()), BorderLayout.CENTER);
@@ -409,12 +410,12 @@ public final class HostsPanel extends JPanel {
         east.setOpaque(false);
         String badge = distro.profile().detail().orElse("");
         if (!badge.isEmpty()) {
-            java.awt.Color muted = javax.swing.UIManager.getColor("Label.disabledForeground");
+            java.awt.Color muted = WorkspacePalette.current(owner).textMuted();
             east.add(text(badge, selected || muted == null ? foreground : muted, owner.getFont().deriveFont(Math.max(9f, owner.getFont().getSize2D() - 1f))));
         }
         int sessions = distro.sessions();
         if (sessions > 0) {
-            java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
+            java.awt.Color active = WorkspacePalette.current(owner).success();
             east.add(Box.createHorizontalStrut(6));
             east.add(text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f))));
             if (sessions > 1) { east.add(Box.createHorizontalStrut(4)); east.add(text(String.valueOf(sessions), foreground, owner.getFont())); }

@@ -1,5 +1,7 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.editor.testsupport.ZoneColors;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.editor.local.LocalDocument;
 import dev.jasper.editor.local.LocalFiles;
 import dev.jasper.editor.session.DocumentSession;
@@ -26,6 +28,24 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class EditorTabTest {
+    @Test void bannerRuleFollowsMountedZoneWithoutLosingPadding() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
+                tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(), EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300));
+                var banner = (javax.swing.JComponent) tab.bannerFirst().getParent();
+                while (banner.getBorder() == null) banner = (javax.swing.JComponent) banner.getParent();
+                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
+                    parent.add(tab);
+                    assertThat(ZoneColors.rule(banner, 30, 39)).isEqualTo(WorkspacePalette.current(banner).border());
+                    assertThat(banner.getInsets()).isEqualTo(new java.awt.Insets(6, 10, 7, 10));
+                    colors.put("Jasper.workspace.border", new java.awt.Color(0x123456));
+                }
+                tab.dispose();
+            }
+        });
+    }
+
     @TempDir Path folder;
     private final List<Runnable> background = new ArrayList<>();
     private final SessionEnvironment environment = new SessionEnvironment(background::add, Runnable::run, Question::dismissed, () -> 1 << 20);

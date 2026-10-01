@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plans 3–5 remain future deliverables; Plan 3 has been expanded into five implementation-ready tasks against `main@14f9913d`, including the startup regression fix. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 implementation is complete on `codex/theme-system-plans`, with Task 5 and final whole-branch review pending; Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -32,7 +32,7 @@ acceptance has not been performed.
 | Order | Plan | Shippable result | Depends on |
 |---|---|---|---|
 | 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Implemented, headless-verified and independently reviewed: terminal, tabs, dividers, find, icons, Editor and SDK 0.12.0; GUI acceptance pending | Merged plan 1 |
-| 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Hosted Swing panes adopt the workspace; plugin-owned styles and cleanup remain correct | Plan 2 |
+| 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Implemented; Task 5/final review and user visual acceptance pending: hosted Swing panes adopt workspace colors with plugin-owned styles and cleanup | Plan 2 |
 | 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Offline native catalog, reproducible conversion, safe upgrade; old stores removed | Plans 2–3 |
 | 5 | [Themes page and live reload](2026-10-01-theme-system-5-page-reload.md) | Complete user flow: browse, stage, preview, import, duplicate, remove and edit/reload | Plan 4 |
 
@@ -150,3 +150,21 @@ and is now recorded in section 5.3. These details preserve the design's five-del
 
 No test run is needed for this documentation-only planning change. The previously verified baseline is cited above,
 not represented as a fresh test of future implementation. The executor runs the full check for each runnable plan.
+
+
+## Plan 3 implementation evidence and remaining gates
+
+All five tasks are implemented; Tasks 1–4 have passed their independent task reviews. Task 5 and the final
+whole-branch review remain controller-owned. The [execution notes](2026-10-01-theme-system-3-plugin-panes.md)
+retain actual per-task evidence and deviations: delegate-owned progress text (bundled bars draw no text), narrow
+synchronous `setUI` detection and silent UIResource default semantics, a source-owned hierarchy listener on excluded
+associated headers/editors, and mount/registry rollback preserving live documents when no host can accept a move.
+The bundled audit uses owner/paint-time palettes and plugin-owned Vim feedback styles without SDK/dependency changes.
+Task 5 composes actual Vim unit tests with one host style-layer precedence regression rather than linking plugin
+implementation classes into the application tests. Two minor style-layer diagnostics findings are still deferred to
+final review. Native GUI acceptance has not been run. Plans 4–5 still own catalog conversion/vendoring/migration,
+the Themes page, and file reload; none is implied complete by the plugin pane work.
+
+Final Task 5 headless gate: `./gradlew check` passed 7,889 tests with zero failures/errors and six skips,
+including all four architecture checks; source hygiene (1,634 Java files) and branch-wide whitespace checks pass.
+Evidence and exact module counts are in the Plan 3 execution notes and `/tmp/moray-p3-task5-{check,counts,hygiene}.log`.

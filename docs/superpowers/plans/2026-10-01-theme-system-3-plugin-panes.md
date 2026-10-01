@@ -13,10 +13,55 @@ painters read the existing SDK palette using their mounted component; Editor ret
 
 **Spec:** [Theme design](../specs/2026-10-01-jasper-theme-system-design.md), §§1, 5.3–5.6, 9.
 **Prerequisite:** [Plan 2](2026-10-01-theme-system-2-workspace.md), implemented and merged locally.
-**Status:** Implementation-ready plan, not executed. Revised against `main@14f9913d` after the GitHub Dark startup fix.
+**Status:** Implementation complete; Tasks 1–4 independently reviewed, Task 5 and final whole-branch review pending. Revised against `main@14f9913d` after the GitHub Dark startup fix.
 The user clarified on 2026-10-01 that a workspace combo's dropdown follows the workspace; menus, tooltips and dialogs
 remain chrome. This replaces the previous three-task outline; the five tasks below are sequential review gates.
 **Execution:** Preserve the repository's per-task implementer/reviewer workflow and final whole-branch review.
+
+**Execution notes:** Task 1 (`38b946d0`, review fix `9d1e7079`) verifies 25 control types and FlatLaf subclasses,
+including Jasper's own delegates. The initial full check passed 7,802 tests with zero failures/errors and six skips;
+the scoped review fix passed 58 recipe tests. FlatLaf 3.7 exposes progress track/fill but no per-component text-color
+style or setter, so progress text remains delegate-owned (the task's “as delegate supports” qualification).
+Task 2 (`5d75b46a`, fixes `6a51960c`, `bab40d60`) preserves plugin styles/direct values through clear and delegate
+refresh. Its last full check passed 7,842 tests, zero failures/errors, six skips; review fixes passed 74 focused tests.
+A shared Swing delegate can reinstall without a UI event: direct-color observation narrowly checks synchronous
+`JComponent.setUI` with public StackWalker. A silent new UIResource identity matching the current UI default remains
+replaceable; an explicit assignment of that exact default without an event is indistinguishable and follows Swing's
+UIResource convention. Ordinary Color identities and observable plugin setters remain authoritative. One intermediate
+Gradle overlap invalidated that run; final evidence was serialized. Two minor diagnostics findings remain for final review.
+Task 3 (`5bf2a468`, fix `756001d8`) owns dynamic descendants and combo dropdowns. Full check passed 7,860 tests,
+zero failures/errors, six skips; the review fix passed 34 focused lifecycle tests. A targeted source-owned hierarchy
+listener remains on a current header/editor association inside excluded ancestry so it can detect a return to eligible
+ancestry. It retains no style/property/container listeners there and is removed on association replacement, source
+removal or close. This narrow exception qualifies the no-descendant-listeners exemption rule; unrelated excluded
+children stay unobserved. Bounded queued reconciliation now survives a newer theme generation.
+Task 4 (`1690aaf1`, fix `c220f7f9`) integrates hosted lifetimes and Editor exemptions. Full check passed 7,875 tests,
+zero failures/errors, six skips; scoped review fixes passed the 1,671-test app suite and architecture check. One earlier
+full run hit the already documented terminal reflow callback timeout (STATUS's baseline-flake entry); later gates passed
+without terminal changes. Acquisition cleanup also required narrow WorkspaceStyler constructor and ContentRegistry
+changes: failed opens leave no registry entry; failed moves restore the source or another main host, otherwise preserve
+a live unmounted entry/document for same-key reopen retry. Zone publication stops when a synchronous callback changes
+ownership, preserving removed-root cleanup and destination values. These are reviewed extensions to the original file map.
+
+Task 5 audits all seven plugins. Remote, File Server, Vault and Editor semantic renderers/borders now resolve their
+mounted owners; domain/syntax and configured yank colors remain authored. Vim owns inline feedback style maps and
+refreshes the complete palette on first paint after a move or same-darkness color change. Muted/normal notes retain
+semantics after delegate rebuilds. Four local test-only palette fixtures keep module boundaries intact. One additional
+`WorkspaceStyleLayerTest` verifies effective label/panel feedback colors through host application and UI refresh;
+actual Vim tests independently pin state and published styles, avoiding a new plugin/app test dependency.
+Seven per-plugin regressions were RED, then the focused gates passed **83 tests, zero failures/errors/skips**
+(Remote 37, File Server 9, Vault 4, Editor 16, app layer 17). Logs: `/tmp/moray-p3-task5-red-*.log` and
+`/tmp/moray-p3-task5-green-*.log`. The one final serialized `./gradlew check` passed in 3m36s: **7,889 tests, zero failures/errors, six skips**.
+Exact module XML counts: app 1,672/0/0/1; Buddy 163/0/0/0; terminal 391/0/0/4; SDK 44/0/0/0;
+testkit 84/0/0/0; Editor 4,786/0/0/0; File Server 159/0/0/0; History 41/0/0/0; Remote 385/0/0/0;
+Sample 12/0/0/0; Snippets 11/0/0/0; Vault 141/0/0/1 (tests/failures/errors/skips). Counted explicit
+module/plugin `build/test-results/test/TEST-*.xml` roots only, excluding `.worktrees` recursion. All four
+architecture gates passed in check; Java source hygiene passed for 1,634 files; `git diff --check 5435069c` clean.
+Evidence: `/tmp/moray-p3-task5-check.log`, `/tmp/moray-p3-task5-counts.log`, `/tmp/moray-p3-task5-hygiene.log`.
+The full log retains dependency SLF4J/native-access warnings from plugin smoke paths; no test failures.
+Remote's transfer bar does not paint text, so the progress text-color limitation has no bundled impact. No SDK/API,
+plugin release, dependency, domain color, GUI or benchmark change. Step 4 remains open solely for controller-owned
+independent review and its findings; headless verification does not claim user native visual acceptance.
 
 ## Global Constraints
 
@@ -107,7 +152,7 @@ final class WorkspaceStyles {
 FlatLaf class names. Unsupported components yield `Recipe("", Map.of(), Map.of())`. Both maps are immutable. `direct` contains only
 properties not handled by this component's real delegate; it is not a second copy of `style`.
 
-- [ ] **Step 1: Add reusable fixture and red effective-color tests.** Use the existing `DesktopTestSupport.edt`,
+- [x] **Step 1: Add reusable fixture and red effective-color tests.** Use the existing `DesktopTestSupport.edt`,
   restoring the LAF and any UI defaults modified by a test. Put this complete value fixture in `WorkspaceStyleFixtures`:
 
 ```java
@@ -162,8 +207,8 @@ JUL handler; fail on an unsupported generated key. For focused/selected/disabled
 representative interior pixels. Use `JComponent.focusOwner`'s supported FlatLaf test hook only where the delegate
 supports it; do not require native focus. Reuse Plan 2's complete-theme fixture pattern that omits ToolWindow.background.
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*WorkspaceStylesTest'`; expect missing helper or wrong colors.
-- [ ] **Step 3: Implement the recipes against the pinned delegates.** Values are app-native `Color`s from tokens.
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*WorkspaceStylesTest'`; expect missing helper or wrong colors.
+- [x] **Step 3: Implement the recipes against the pinned delegates.** Values are app-native `Color`s from tokens.
   Keep geometry, fonts, opacity, application listeners, models, cell renderers and icons unchanged.
 
 | Component family | Required semantic values and verified key direction |
@@ -188,8 +233,8 @@ closed direct-property set is background, foreground, selectionBackground, selec
 disabledTextColor, with explicit switch/instanceof readers/writers. Unsupported custom UI delegates receive only
 valid direct setters; custom painting is documented/audited in Task 5. Do not reflect into custom component fields.
 Record the final supported key list in the test's table, so future FlatLaf upgrades have an executable contract.
-- [ ] **Step 4: Run** the focused test and `./gradlew check`; require exit 0 and no generated-style errors.
-- [ ] **Step 5: Commit** `feat(workspace): define verified Swing workspace styles` with the required trailer.
+- [x] **Step 4: Run** the focused test and `./gradlew check`; require exit 0 and no generated-style errors.
+- [x] **Step 5: Commit** `feat(workspace): define verified Swing workspace styles` with the required trailer.
 
 ## Task 2: Own and restore one component's style layer
 
@@ -214,7 +259,7 @@ chrome delegate rebuild; apply while suspended records the new recipe without wr
 latest plugin style object, class value, recipe, published composite, direct originals/last-written values, and a
 reentrancy depth in this owner. Restore exact null/String/Map plugin style and never modify its map in place.
 
-- [ ] **Step 1: Add red tests for String, Map, null and class styles.** Use this complete core test with fixture imports:
+- [x] **Step 1: Add red tests for String, Map, null and class styles.** Use this complete core test with fixture imports:
 
 ```java
 @Test void pluginEditsWinAndSurviveClearAndClose() throws Exception {
@@ -246,8 +291,8 @@ change without changing workspace, plugin style references such as `$Label.foreg
 After close, compare listener identities with the pre-owner set and confirm a new plugin edit triggers no host write.
 A malformed or unsupported plugin style must remain installed unchanged and must not abort pane construction.
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*WorkspaceStyleLayerTest'`; expect missing ownership behavior.
-- [ ] **Step 3: Implement guarded recomposition.** This is the complete composition operation (static method on the layer):
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*WorkspaceStyleLayerTest'`; expect missing ownership behavior.
+- [x] **Step 3: Implement guarded recomposition.** This is the complete composition operation (static method on the layer):
 
 ```java
 private static Object composite(JComponent component, WorkspaceStyles.Recipe recipe, Object pluginStyle) {
@@ -273,8 +318,8 @@ installed delegate without carrying a stale host baseline. Add a guard around an
 for that recovery; never recursively rebuild the whole subtree from a node listener. Pin the sequence in tests.
 
 The layer never changes the component's zone, children, font, model, document, layout, renderer or icon.
-- [ ] **Step 4: Run** layer and recipe tests, then `./gradlew check`; expect exit 0 and restored effective colors.
-- [ ] **Step 5: Commit** `feat(workspace): preserve plugin styles in a reversible color layer` with the required trailer.
+- [x] **Step 4: Run** layer and recipe tests, then `./gradlew check`; expect exit 0 and restored effective colors.
+- [x] **Step 5: Commit** `feat(workspace): preserve plugin styles in a reversible color layer` with the required trailer.
 
 ## Task 3: Track dynamic subtrees and the combo dropdown exception
 
@@ -306,7 +351,7 @@ clears overrides and popup markings but can still observe future children. Never
 JPopupMenu, JMenu/MenuElement, JToolTip, JRootPane, Window, CellRendererPane, or an exempt subtree. Observe an exempt
 root's exemption flag only, so removing it enables the existing descendants without retaining their listeners.
 
-- [ ] **Step 1: Write red tree and popup tests.** Required named cases:
+- [x] **Step 1: Write red tree and popup tests.** Required named cases:
   `lateChildReceivesCurrentTheme`, `removedChildRestoresAndDetaches`, `reparentingHasOneOwner`,
   `exemptionToggleRestoresAndResumes`, `headerViewportAndModelReplacementRestylesAssociatedComponents`,
   `matchLeavesNoGeneratedLayer`, `closeSuppressesQueuedRefresh`, and `nestedChromeAndTransientRendererStayUntouched`.
@@ -342,9 +387,9 @@ Render selected/unselected rows and read `WorkspacePalette.current(popupList)` t
 cross-boundary assertion. Test editable combos, custom renderers, delegate replacement, returning to match and close.
 A sibling JPopupMenu invoked from the same combo/pane, a tooltip and a dialog JRootPane retain chrome and no layers.
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*WorkspaceStylerTest' --tests '*WorkspaceComboPopupTest'`;
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*WorkspaceStylerTest' --tests '*WorkspaceComboPopupTest'`;
   expect missing implementation or wrong effective popup colors.
-- [ ] **Step 3: Implement identity-based ownership.** Use ContainerListeners for add/remove and PropertyChangeListeners
+- [x] **Step 3: Implement identity-based ownership.** Use ContainerListeners for add/remove and PropertyChangeListeners
   for exemption, explicit zone boundaries, `UI`, viewport/rowHeader/columnHeader/tableHeader/editor replacement.
   Associated components (notably JTableHeader) are included even before a scroll pane parents them; reconcile from
   current tree/associations, with identity/reference accounting so one path's removal does not dispose a still-owned
@@ -367,8 +412,8 @@ A sibling JPopupMenu invoked from the same combo/pane, a tooltip and a dialog JR
   still stops at popup boundaries. Do not wrap or replace the plugin renderer. On match/close/UI replacement release
   every hidden-popup layer/listener/property too. Nonstandard popup UIs get the supported combo recipe and a documented
   custom-painter fallback; they must not fail startup.
-- [ ] **Step 4: Run** tree/popup/layer tests and `./gradlew check`; expect no leaked ownership, no global LAF changes.
-- [ ] **Step 5: Commit** `feat(workspace): track pane descendants and combo dropdown colors` with the required trailer.
+- [x] **Step 4: Run** tree/popup/layer tests and `./gradlew check`; expect no leaked ownership, no global LAF changes.
+- [x] **Step 5: Commit** `feat(workspace): track pane descendants and combo dropdown colors` with the required trailer.
 
 ## Task 4: Integrate mounted panes and protect Editor-owned surfaces
 
@@ -381,7 +426,7 @@ Modify `plugins/editor/src/main/java/dev/jasper/editor/ui/EditorTab.java`, `Edit
 `updateDelegates` flag, and existing content registry mount/unmount callbacks.
 **Produces:** One private `Map<JComponent, WorkspaceStyler>` in each WindowContent, owned exactly as its hosted entries.
 
-- [ ] **Step 1: Add red integration tests.** `newHostedContentUsesCurrentWorkspaceImmediately`,
+- [x] **Step 1: Add red integration tests.** `newHostedContentUsesCurrentWorkspaceImmediately`,
   `sameDarknessUpdateRecolorsRetainedControls`, `movingContentBetweenWindowsRestoresThenRestyles`,
   `pluginStopAndWindowCloseReleaseAllStyles`, `chromeRebuildThenMatchUsesCurrentChrome`, and
   `sidebarAndAuxiliaryContentRemainChrome`. Reuse Contributions.content().open/remove/move and queued fixture launchers;
@@ -416,9 +461,9 @@ retry, search and document-tab controls remain eligible. App-side fixture tests 
 exempt editor; Editor tests verify its own actual client properties, palette colors, syntax/font flags and undo.
 This preserves module boundaries while covering both sides of the contract.
 
-- [ ] **Step 2: Run** `./gradlew :jasper-app:test --tests '*PluginPaneAppearanceTest' :jasper-plugin-editor:test --tests '*EditorTabTest' --tests '*EditorThemeTest'`;
+- [x] **Step 2: Run** `./gradlew :jasper-app:test --tests '*PluginPaneAppearanceTest' :jasper-plugin-editor:test --tests '*EditorTabTest' --tests '*EditorThemeTest'`;
   expect hosted controls unstyled or missing Editor exemptions.
-- [ ] **Step 3: Wire exact lifetime order.** Mount: install zone → create/store styler → add tab → apply current
+- [x] **Step 3: Wire exact lifetime order.** Mount: install zone → create/store styler → add tab → apply current
   resolved theme. Adding before apply lets component-aware code see its mounting location. On failure restore/close
   the partial styler and clear its zone without retaining an entry/listener. Unmount: remove/dispose styler before
   clearing zone or returning the component to the plugin; preserve normal content callbacks and tab selection.
@@ -437,8 +482,8 @@ This preserves module boundaries while covering both sides of the contract.
   its editor background as that plugin-owned scroll pane's `FlatLaf.style` background, which outranks the generated
   recipe while allowing scrollbar styling. Verify this behavior in the existing Editor theme test.
   Do not exempt the entire Editor tab. Keep the Plan 2 ColorUIResource durability fix and existing onWorkspaceChanged subscription; do not add a redundant appearance subscription.
-- [ ] **Step 4: Run** integration, Editor and previous restyler tests, then `./gradlew check`; expect exit 0.
-- [ ] **Step 5: Commit** `feat(workspace): attach pane styling to content lifetimes` with the required trailer.
+- [x] **Step 4: Run** integration, Editor and previous restyler tests, then `./gradlew check`; expect exit 0.
+- [x] **Step 5: Commit** `feat(workspace): attach pane styling to content lifetimes` with the required trailer.
 
 ## Task 5: Audit bundled custom colors and close the deliverable
 
@@ -463,7 +508,7 @@ Also update `docs/plugin-authoring.md`, `docs/sdk-architecture.md`, `docs/app-ar
 Renderers pass their JList/JTable/JTree owner, never the transient renderer JLabel. Borders read the supplied paint
 component. Chrome-only dialogs/settings retain chrome. All custom color calculations stay JDK-only.
 
-- [ ] **Step 1: Add red per-plugin zone tests.** Give chrome and workspace distinct sentinel UI colors, attach a pane
+- [x] **Step 1: Add red per-plugin zone tests.** Give chrome and workspace distinct sentinel UI colors, attach a pane
   under a workspace marker, invoke its actual renderer, then reparent it beneath a chrome marker and render again.
   Restore modified UI defaults in finally. Assert success/warning/error/muted values, ordinary and selected text,
   and a changed workspace color while darkness stays the same. Keep domain swatches and user-configured colors intact.
@@ -498,7 +543,7 @@ continues to use the generic text recipe rather than acquiring an unrelated stat
 workspace palette change and first paint after reparenting with no intervening Vim command. Assert the generic host
 style layer cannot override the current error/bell state. For Editor banner/TransferStrip/Vault borders, paint an
 interior rule pixel before/after moving zones and retain insets.
-- [ ] **Step 2: Run** these focused checks serially; expect old chrome/fixed colors in the new assertions:
+- [x] **Step 2: Run** these focused checks serially; expect old chrome/fixed colors in the new assertions:
 
 ```sh
 ./gradlew :jasper-plugin-remote:test --tests '*HostsPanelTest' --tests '*TunnelsPanelTest' --tests '*TransferStripTest'
@@ -506,7 +551,7 @@ interior rule pixel before/after moving zones and retain insets.
 ./gradlew :jasper-plugin-vault:test --tests '*ManagerPanelTest'
 ./gradlew :jasper-plugin-editor:test --tests '*EditorTabTest' --tests '*VimBarTest'
 ```
-- [ ] **Step 3: Replace only audited semantic colors.** Query WorkspacePalette per renderer/paint invocation; avoid
+- [x] **Step 3: Replace only audited semantic colors.** Query WorkspacePalette per renderer/paint invocation; avoid
   constructors caching a palette before the host mounts the component. Preserve list selection background/text for
   selected rows; keep semantic colored dots separate where a status hue would make selected text unreadable.
   Border implementations are small AbstractBorder classes or existing owner methods, read palette at paint time and
@@ -544,7 +589,7 @@ list.setCellRenderer((owner, value, index, selected, focused) -> {
   `build/test-results/test` and `plugins/*/build/test-results/test`; **do not recursively include `.worktrees`**.
   Record exact counts, source/log evidence and limitations in the plan and STATUS. Perform one independent final
   whole-branch review, resolve findings, then mark this plan executed. Do not claim native GUI verification.
-- [ ] **Step 5: Commit** `feat(plugins): use mounted workspace palettes in custom rendering` with the required trailer.
+- [x] **Step 5: Commit** `feat(plugins): use mounted workspace palettes in custom rendering` with the required trailer.
 
 ## User-only visual acceptance
 

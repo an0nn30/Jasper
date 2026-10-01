@@ -410,7 +410,13 @@ inside the callback; duplicate pending values are quiet. Subscriptions added bef
 and registrations closed before delivery remain silent. Chrome's existing fake variant/event behavior is unchanged.
 Retained host-owned named icons select light or dark artwork at paint time from the component's current zone, including
 after reparenting. Workspace markers are app-native JDK properties; popup, tooltip and root-pane boundaries return to
-chrome. Custom plugin SVG artwork remains authored. Generic plugin-pane control styling is the next deliverable.
+chrome. Custom plugin SVG artwork remains authored. Hosted center panes now use an app-native WorkspaceStyler;
+no SDK change beyond the existing 0.12.0 palettes is needed. Ordinary controls follow workspace recipes, with plugin
+inline styles above class styles above generated values. Exempt document subtrees retain plugin ownership; dynamic
+children and removal are lifetime-managed. A workspace combo's explicitly owned dropdown list is the sole popup
+exception. Custom renderers pass their mounted list/table/tree to `WorkspacePalette.current`, and borders pass their
+paint component; rail renderers therefore stay chrome. See [plugin authoring](plugin-authoring.md#hosted-pane-control-styling)
+for direct-color ownership, replacement, cleanup and the bundled audit.
 
 ### Declared settings (plan C1; SDK 0.9 completes them)
 

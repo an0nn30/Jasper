@@ -1,5 +1,6 @@
 package dev.jasper.remote.ui.tunnels;
 
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelState;
 import dev.jasper.sdk.ui.BundledIcon;
@@ -240,7 +241,7 @@ public final class TunnelsPanel extends JPanel {
         label.putClientProperty("html.disable", true);
         label.setOpaque(selected);
         label.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-        label.setForeground(selected ? owner.getSelectionForeground() : owner.getForeground());
+        label.setForeground(selected ? owner.getSelectionForeground() : value instanceof Problem ? WorkspacePalette.current(owner).error() : WorkspacePalette.current(owner).textMuted());
         label.setBorder(BorderFactory.createEmptyBorder(8, 4, 4, 4));
         label.setFont(owner.getFont().deriveFont(Font.BOLD));
         label.setText(value instanceof Heading heading ? heading.text() : ((Problem) value).message());
@@ -250,13 +251,13 @@ public final class TunnelsPanel extends JPanel {
     private Component row(JList<?> owner, Tunnel tunnel, boolean selected) {
         TunnelState state = states.apply(tunnel.id());
         Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-        Color muted = selected ? foreground : color("Label.disabledForeground", foreground);
+        Color muted = selected ? foreground : WorkspacePalette.current(owner).textMuted();
         Font font = owner.getFont();
         var row = new JPanel(new BorderLayout(8, 0));
         row.setOpaque(true);
         row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
         row.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 6));
-        var dot = text("●", dotColor(state, foreground), font.deriveFont(Math.max(8f, font.getSize2D() - 2f)));
+        var dot = text("●", dotColor(state, WorkspacePalette.current(owner)), font.deriveFont(Math.max(8f, font.getSize2D() - 2f)));
         dot.setVerticalAlignment(SwingConstants.TOP);
         row.add(dot, BorderLayout.WEST);
         String title = TunnelRows.title(tunnel, state);
@@ -267,7 +268,7 @@ public final class TunnelsPanel extends JPanel {
         lines.setOpaque(false);
         lines.add(text(title, foreground, font.deriveFont(Font.BOLD)));
         lines.add(text(tunnel.kind().letter() + "  " + mapping, foreground, font));
-        lines.add(text(detail, state instanceof TunnelState.Failed && !selected ? color("Actions.Red", muted) : muted, font));
+        lines.add(text(detail, state instanceof TunnelState.Failed && !selected ? WorkspacePalette.current(owner).error() : muted, font));
         row.add(lines, BorderLayout.CENTER);
         var button = new JLabel(icons.apply(state.running() ? BundledIcon.RUN_STOP : BundledIcon.RUN_RUN));
         button.setVerticalAlignment(SwingConstants.TOP);
@@ -279,19 +280,13 @@ public final class TunnelsPanel extends JPanel {
         return row;
     }
 
-    private static Color dotColor(TunnelState state, Color fallback) {
-        String key = switch (state) {
-            case TunnelState.Up up -> up.counters().warning().isPresent() ? "Actions.Yellow" : "Actions.Green";
-            case TunnelState.Starting starting -> "Actions.Yellow";
-            case TunnelState.Failed failed -> "Actions.Red";
-            case TunnelState.Stopped stopped -> "Label.disabledForeground";
+    private static Color dotColor(TunnelState state, WorkspacePalette palette) {
+        return switch (state) {
+            case TunnelState.Up up -> up.counters().warning().isPresent() ? palette.warning() : palette.success();
+            case TunnelState.Starting starting -> palette.warning();
+            case TunnelState.Failed failed -> palette.error();
+            case TunnelState.Stopped stopped -> palette.textMuted();
         };
-        return color(key, fallback);
-    }
-
-    private static Color color(String key, Color fallback) {
-        Color color = UIManager.getColor(key);
-        return color == null ? fallback : color;
     }
 
     private static JLabel text(String value, Color foreground, Font font) {
@@ -324,8 +319,15 @@ public final class TunnelsPanel extends JPanel {
             super.updateUI();
             Font font = UIManager.getFont("Label.font");
             if (font != null) setFont(font);
-            Color color = UIManager.getColor("Label.foreground");
-            if (color != null) setForeground(color);
+
+        }
+
+        @Override protected void paintComponent(java.awt.Graphics graphics) {
+            Color foreground = WorkspacePalette.current(this).text();
+            var style = java.util.Map.of("foreground", foreground);
+            if (!style.equals(getClientProperty("FlatLaf.style"))) putClientProperty("FlatLaf.style", style);
+            setForeground(foreground);
+            super.paintComponent(graphics);
         }
 
         @Override public void setBounds(int x, int y, int width, int height) {

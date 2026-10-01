@@ -43,6 +43,40 @@ class WorkspaceStyleLayerTest {
     }
 
 
+    @Test void pluginFeedbackMapsKeepErrorAndBellColorsThroughHostRefresh() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            var bar = new JPanel();
+            var status = new JLabel("Error");
+            bar.add(status);
+            var error = new Color(0xa13456);
+            var bell = new Color(0x3456a1);
+            // Same plugin-owned maps published by VimBar; the plugin tests exercise its actual state transitions.
+            status.putClientProperty("FlatLaf.style", Map.of("foreground", error));
+            bar.putClientProperty("FlatLaf.style", Map.of("background", bell));
+            try (var statusLayer = new WorkspaceStyleLayer(status); var barLayer = new WorkspaceStyleLayer(bar)) {
+                for (var theme : List.of(independent().workspace(), independent().chrome())) {
+                    statusLayer.apply(WorkspaceStyles.recipe(status, theme));
+                    barLayer.apply(WorkspaceStyles.recipe(bar, theme));
+                    assertThat(status.getForeground()).isEqualTo(error);
+                    assertThat(bar.getBackground()).isEqualTo(bell);
+                    statusLayer.beforeUiUpdate(); barLayer.beforeUiUpdate();
+                    SwingUtilities.updateComponentTreeUI(bar);
+                    statusLayer.afterUiUpdate(); barLayer.afterUiUpdate();
+                    assertThat(status.getForeground()).isEqualTo(error);
+                    assertThat(bar.getBackground()).isEqualTo(bell);
+                }
+                var normal = new Color(0x234567);
+                status.putClientProperty("FlatLaf.style", Map.of("foreground", normal));
+                bar.putClientProperty("FlatLaf.style", Map.of("background", normal));
+                statusLayer.apply(WorkspaceStyles.recipe(status, independent().workspace()));
+                barLayer.apply(WorkspaceStyles.recipe(bar, independent().workspace()));
+                assertThat(status.getForeground()).isEqualTo(normal);
+                assertThat(bar.getBackground()).isEqualTo(normal);
+            }
+        });
+    }
+
     @Test void pluginEditsWinAndSurviveClearAndClose() throws Exception {
         edt(() -> {
             new ThemeController(Theme.JASPER_LIGHT);

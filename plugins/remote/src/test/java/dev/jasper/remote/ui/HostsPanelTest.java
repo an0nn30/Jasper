@@ -1,5 +1,7 @@
 package dev.jasper.remote.ui;
 
+import dev.jasper.remote.testsupport.ZoneColors;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
@@ -12,6 +14,31 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class HostsPanelTest {
+    @Test void mountedHostAndDistroRenderersUseSemanticColors() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                var panel = withDistros(icon -> null);
+                panel.setHostDetails(host -> "detail", host -> 1);
+                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
+                    parent.add(panel);
+                    var palette = WorkspacePalette.current(panel.list);
+                    for (int i = 0; i < panel.list.getModel().getSize(); i++) {
+                        var row = panel.list.getModel().getElementAt(i);
+                        var labels = ZoneColors.labels(render(panel, i));
+                        if (row instanceof HostRows.Host || row instanceof HostRows.Distro distro && distro.sessions() > 0)
+                            assertThat(labels.stream().filter(l -> "\u25CF".equals(l.getText())).findFirst().orElseThrow().getForeground()).isEqualTo(palette.success());
+                        if (row instanceof HostRows.Distro) {
+                            assertThat(labels.stream().filter(l -> l.getText() != null && l.getText().startsWith("WSL ")).findFirst().orElseThrow().getForeground()).isEqualTo(palette.textMuted());
+                            var selected = ZoneColors.labels(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, row, i, true, false));
+                            assertThat(selected.stream().filter(l -> l.getText() != null && l.getText().startsWith("WSL ")).findFirst().orElseThrow().getForeground()).isEqualTo(panel.list.getSelectionForeground());
+                        }
+                    }
+                    colors.put("Jasper.workspace.success", new java.awt.Color(0x123456));
+                }
+            }
+        });
+    }
+
     @Test void groupRowsUseFolderIconsWhenExpandedCollapsedAndRevealedBySearch() {
         var folderIcons = new java.util.EnumMap<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon>(dev.jasper.sdk.ui.BundledIcon.class);
         folderIcons.put(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER, new dev.jasper.sdk.testing.FakeBundledIcon(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));

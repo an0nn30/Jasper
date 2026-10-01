@@ -1,5 +1,7 @@
 package dev.jasper.remote.ui.tunnels;
 
+import dev.jasper.remote.testsupport.ZoneColors;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.remote.tunnels.Counters;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelKind;
@@ -21,6 +23,36 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class TunnelsPanelTest {
+    @Test void mountedTunnelRowsKeepStatusAndSelectionColors() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
+                    parent.add(panel);
+                    var p = WorkspacePalette.current(panel.list);
+                    var values = List.of(up(1234), new TunnelState.Starting("connecting"), new TunnelState.Failed("broken"), TunnelState.STOPPED);
+                    var expected = List.of(p.success(), p.warning(), p.error(), p.textMuted());
+                    for (int i = 0; i < values.size(); i++) {
+                        states.put(db.id(), values.get(i)); show();
+                        var item = new TunnelsPanel.Item(db);
+                        var row = (javax.swing.JPanel) panel.list.getCellRenderer().getListCellRendererComponent(panel.list, item, 0, false, false);
+                        var dot = (JLabel) ((java.awt.BorderLayout) row.getLayout()).getLayoutComponent(java.awt.BorderLayout.WEST);
+                        assertThat(dot.getForeground()).isEqualTo(expected.get(i));
+                        var lines = (javax.swing.JPanel) ((java.awt.BorderLayout) row.getLayout()).getLayoutComponent(java.awt.BorderLayout.CENTER);
+                        assertThat(lines.getComponent(2).getForeground()).isEqualTo(i == 2 ? p.error() : p.textMuted());
+                        var selected = (javax.swing.JPanel) panel.list.getCellRenderer().getListCellRendererComponent(panel.list, item, 0, true, false);
+                        var selectedLines = (javax.swing.JPanel) ((java.awt.BorderLayout) selected.getLayout()).getLayoutComponent(java.awt.BorderLayout.CENTER);
+                        for (var line : selectedLines.getComponents()) assertThat(line.getForeground()).isEqualTo(panel.list.getSelectionForeground());
+                    }
+                    var problem = new TunnelsPanel.Problem("broken");
+                    assertThat(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, problem, 0, false, false).getForeground()).isEqualTo(p.error());
+                    colors.put("Jasper.workspace.error", new java.awt.Color(0x234567));
+                    panel.empty.updateUI(); ZoneColors.paint(panel.empty);
+                    assertThat(panel.empty.getForeground()).isEqualTo(p.text());
+                }
+            }
+        });
+    }
+
     static final UUID PROD = UUID.randomUUID();
     static final Instant NOW = Instant.parse("2026-09-30T12:00:00Z");
     final List<String> events = new ArrayList<>();

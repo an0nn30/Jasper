@@ -1,5 +1,6 @@
 package dev.jasper.remote.ui.transfers;
 
+import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
@@ -19,9 +20,15 @@ public final class TransferStrip extends JPanel {
     public TransferStrip(Actions actions) {
         super(new BorderLayout(0, 4));
         this.actions = actions;
-        Color rule = UIManager.getColor("Separator.foreground");
-        setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, rule == null ? Color.GRAY : rule),
-            BorderFactory.createEmptyBorder(6, 0, 0, 0)));
+        setBorder(new javax.swing.border.AbstractBorder() {
+            @Override public java.awt.Insets getBorderInsets(java.awt.Component component, java.awt.Insets insets) {
+                insets.set(7, 0, 0, 0); return insets;
+            }
+            @Override public void paintBorder(java.awt.Component component, java.awt.Graphics graphics, int x, int y, int width, int height) {
+                graphics.setColor(WorkspacePalette.current(component).border());
+                graphics.fillRect(x, y, width, 1);
+            }
+        });
         list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
         scroll.setBorder(BorderFactory.createEmptyBorder());
         add(label("Transfers"), BorderLayout.NORTH);

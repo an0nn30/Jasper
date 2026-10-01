@@ -1,5 +1,7 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.vault.testsupport.ZoneColors;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,6 +10,32 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ManagerPanelTest {
+    @Test void mountedManagerKeepsMutedTextAndRuleAfterUiRefresh() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                var panel = panel(new AtomicReference<>());
+                var value = new VaultManager.Row(UUID.randomUUID(), "Name", "Detail", VaultManager.Type.LOGIN);
+                var empty = ZoneColors.labels(panel).stream().filter(l -> "Nothing to show".equals(l.getText())).findFirst().orElseThrow();
+                var frame = (javax.swing.JComponent) empty.getParent();
+                for (var parent : List.of(colors.workspace, colors.chrome, colors.workspace)) {
+                    parent.add(panel);
+                    var p = WorkspacePalette.current(panel.rows);
+                    var labels = ZoneColors.labels(panel.rows.getCellRenderer().getListCellRendererComponent(panel.rows, value, 0, false, false));
+                    assertThat(labels.stream().filter(l -> "Detail".equals(l.getText())).findFirst().orElseThrow().getForeground()).isEqualTo(p.textMuted());
+                    var selected = ZoneColors.labels(panel.rows.getCellRenderer().getListCellRendererComponent(panel.rows, value, 0, true, false));
+                    for (var label : selected) assertThat(label.getForeground()).isEqualTo(panel.rows.getSelectionForeground());
+                    assertThat(ZoneColors.rule(frame, 30, 0)).isEqualTo(p.border());
+                    assertThat(frame.getInsets()).isEqualTo(new java.awt.Insets(1, 1, 1, 1));
+                    empty.updateUI(); panel.status.updateUI(); ZoneColors.paint(empty); ZoneColors.paint(panel.status);
+                    assertThat(empty.getForeground()).isEqualTo(p.textMuted());
+                    assertThat(panel.status.getForeground()).isEqualTo(p.textMuted());
+                    colors.put("Jasper.workspace.textMuted", new java.awt.Color(0x234567));
+                }
+                panel.close();
+            }
+        });
+    }
+
     @Test void controlsUseHostSemanticIcons() {
         var panel = panel(new AtomicReference<>());
         assertThat(panel.add.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.ADD));

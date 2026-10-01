@@ -1,5 +1,6 @@
 package dev.jasper.fileserver.ui;
 
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.runtime.ActivityLog;
@@ -359,11 +360,17 @@ public final class FileServersPanel extends JPanel {
                 if (width <= 0 || height <= 0) { width = 0; height = 0; }
                 super.setBounds(x, y, width, height);
             }
+            @Override protected void paintComponent(java.awt.Graphics graphics) {
+                Color foreground = WorkspacePalette.current(this).textMuted();
+                var style = java.util.Map.of("foreground", foreground);
+                if (!style.equals(getClientProperty("FlatLaf.style"))) putClientProperty("FlatLaf.style", style);
+                setForeground(foreground);
+                super.paintComponent(graphics);
+            }
             @Override public void updateUI() {
                 super.updateUI();
                 setFont(UIManager.getFont("Label.font"));
-                Color hint = UIManager.getColor("Label.disabledForeground");
-                if (hint != null) setForeground(hint);
+
                 setOpaque(false);
             }
         };
@@ -374,19 +381,14 @@ public final class FileServersPanel extends JPanel {
         return note;
     }
 
-    private static Color color(String key, Color fallback) {
-        Color color = UIManager.getColor(key);
-        return color == null ? fallback : color;
-    }
-
     private final class Renderer implements ListCellRenderer<ServerRows.Row> {
         @Override public Component getListCellRendererComponent(JList<? extends ServerRows.Row> owner, ServerRows.Row value, int index,
                                                                 boolean isSelected, boolean focused) {
             Color background = isSelected ? owner.getSelectionBackground() : owner.getBackground();
             Color foreground = isSelected ? owner.getSelectionForeground() : owner.getForeground();
             return switch (value) {
-                case ServerRows.Problem problem -> plain("servers.toml: " + problem.message(), color("Actions.Red", foreground), background, owner.getFont());
-                case ServerRows.Header header -> plain(header.title(), color("Label.disabledForeground", foreground), background, owner.getFont().deriveFont(Font.BOLD));
+                case ServerRows.Problem problem -> plain("servers.toml: " + problem.message(), isSelected ? foreground : WorkspacePalette.current(owner).error(), background, owner.getFont());
+                case ServerRows.Header header -> plain(header.title(), isSelected ? foreground : WorkspacePalette.current(owner).textMuted(), background, owner.getFont().deriveFont(Font.BOLD));
                 case ServerRows.Server server -> serverRow(owner, server.view(), foreground, background);
             };
         }
@@ -409,10 +411,10 @@ public final class FileServersPanel extends JPanel {
             row.setBackground(background);
             row.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
             Color dot = switch (phase) {
-                case RUNNING -> color("Actions.Green", foreground);
-                case STARTING, STOPPING, WAITING_FOR_VAULT -> color("Actions.Yellow", foreground);
-                case FAILED -> color("Actions.Red", foreground);
-                case STOPPED -> color("Label.disabledForeground", foreground);
+                case RUNNING -> WorkspacePalette.current(owner).success();
+                case STARTING, STOPPING, WAITING_FOR_VAULT -> WorkspacePalette.current(owner).warning();
+                case FAILED -> WorkspacePalette.current(owner).error();
+                case STOPPED -> WorkspacePalette.current(owner).textMuted();
             };
             row.add(text("●", dot, owner.getFont()), BorderLayout.WEST);
             Font font = view.temporary() ? owner.getFont().deriveFont(Font.ITALIC) : owner.getFont();

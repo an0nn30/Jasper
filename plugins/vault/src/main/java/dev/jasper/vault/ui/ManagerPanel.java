@@ -1,5 +1,6 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.sdk.ui.IconName;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
@@ -32,9 +33,9 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
     final JComboBox<String> kind = new JComboBox<>(new String[]{"All Types", "Login", "SSH Key", "Secure Note"});
     final JButton add, edit, delete, copyPublic, lock, more;
     final JButton unlock = new JButton("Unlock"), revoke = new JButton("Revoke"), closeButton = new JButton("Okay"), cancelButton = new JButton("Cancel");
-    final JLabel status = new JLabel(" ");
+    final JLabel status = new MutedLabel(" ");
     final JPopupMenu addMenu = new JPopupMenu(), moreMenu = new JPopupMenu();
-    private final JLabel empty = new JLabel("Nothing to show", SwingConstants.CENTER);
+    private final JLabel empty = new MutedLabel("Nothing to show");
     private final JPanel listCards = new JPanel(new CardLayout());
     private final JPanel cards = new JPanel(new CardLayout()), locked = new JPanel(new BorderLayout());
     private final JPanel passiveUnlock = new JPanel();
@@ -68,8 +69,16 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
         actions.add(lock); actions.add(more);
         var header = new JPanel(new BorderLayout(14, 0)); header.add(search, BorderLayout.CENTER); header.add(actions, BorderLayout.EAST);
         listCards.add(new JScrollPane(rows), "rows");
-        var emptyFrame = new JPanel(new BorderLayout()); emptyFrame.setBorder(BorderFactory.createLineBorder(borderColor()));
-        empty.setForeground(mutedColor()); emptyFrame.add(empty); listCards.add(emptyFrame, "empty");
+        var emptyFrame = new JPanel(new BorderLayout()); emptyFrame.setBorder(new javax.swing.border.AbstractBorder() {
+            @Override public java.awt.Insets getBorderInsets(java.awt.Component component, java.awt.Insets insets) {
+                insets.set(1, 1, 1, 1); return insets;
+            }
+            @Override public void paintBorder(java.awt.Component component, java.awt.Graphics graphics, int x, int y, int width, int height) {
+                graphics.setColor(WorkspacePalette.current(component).border());
+                graphics.drawRect(x, y, width - 1, height - 1);
+            }
+        });
+        empty.setHorizontalAlignment(SwingConstants.CENTER); emptyFrame.add(empty); listCards.add(emptyFrame, "empty");
         var entries = new JPanel(new BorderLayout(0, 10)); entries.add(header, BorderLayout.NORTH); entries.add(listCards, BorderLayout.CENTER);
         var grantPanel = new JPanel(new BorderLayout(0, 12)); grantPanel.add(new JLabel("Saved plugin grants"), BorderLayout.NORTH);
         grantPanel.add(new JScrollPane(grants), BorderLayout.CENTER);
@@ -78,7 +87,7 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
         grantPanel.add(grantActions, BorderLayout.SOUTH);
         passiveUnlock.add(new JLabel("Vault locked")); passiveUnlock.add(unlock); locked.add(passiveUnlock, BorderLayout.CENTER);
         cards.add(entries, "entries"); cards.add(grantPanel, "grants"); cards.add(locked, "locked"); add(cards, BorderLayout.CENTER);
-        var footer = new JPanel(new BorderLayout(12, 0)); status.setForeground(mutedColor());
+        var footer = new JPanel(new BorderLayout(12, 0));
         status.setPreferredSize(new Dimension(0, 24)); footer.add(status, BorderLayout.CENTER);
         var closing = new JPanel(new BorderLayout(12, 0));
         closing.add(cancelButton, BorderLayout.CENTER); closing.add(closeButton, BorderLayout.EAST);
@@ -125,8 +134,17 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
         var item = new JMenuItem(label); item.addActionListener(event -> action.run()); menu.add(item);
     }
     private static void popup(JPopupMenu menu, JButton button) { if (button.isShowing()) menu.show(button, 0, button.getHeight()); }
-    private static Color mutedColor() { Color color = UIManager.getColor("Label.disabledForeground"); return color == null ? Color.GRAY : color; }
-    private static Color borderColor() { Color color = UIManager.getColor("Component.borderColor"); return color == null ? Color.GRAY : color; }
+    /** Muted metadata stays semantic after a delegate rebuild or a move between zones. */
+    private static final class MutedLabel extends JLabel {
+        MutedLabel(String text) { super(text); }
+        @Override protected void paintComponent(java.awt.Graphics graphics) {
+            Color foreground = WorkspacePalette.current(this).textMuted();
+            var style = java.util.Map.of("foreground", foreground);
+            if (!style.equals(getClientProperty("FlatLaf.style"))) putClientProperty("FlatLaf.style", style);
+            setForeground(foreground);
+            super.paintComponent(graphics);
+        }
+    }
     Optional<UUID> selected() { return Optional.ofNullable(rows.getSelectedValue()).map(VaultManager.Row::id); }
     private void showEntries() { ((CardLayout) cards.getLayout()).show(cards, unlocked ? "entries" : "locked"); }
     void refresh(List<VaultManager.Row> nextRows, List<Grant> nextGrants, String text, boolean unlocked) {
@@ -191,7 +209,7 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
             name.setFont(list.getFont()); detail.setFont(list.getFont().deriveFont(list.getFont().getSize2D() - 1)); type.setFont(detail.getFont());
             setBackground(selected ? list.getSelectionBackground() : list.getBackground());
             name.setForeground(selected ? list.getSelectionForeground() : list.getForeground());
-            Color secondary = selected ? list.getSelectionForeground() : mutedColor(); detail.setForeground(secondary); type.setForeground(secondary);
+            Color secondary = selected ? list.getSelectionForeground() : WorkspacePalette.current(list).textMuted(); detail.setForeground(secondary); type.setForeground(secondary);
             return this;
         }
     }

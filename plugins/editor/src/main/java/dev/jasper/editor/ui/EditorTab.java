@@ -1,5 +1,6 @@
 package dev.jasper.editor.ui;
 
+import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.vim.EditorDefaults;
 import dev.jasper.editor.vim.Vim;
@@ -10,7 +11,6 @@ import dev.jasper.sdk.ui.EditorPalette;
 import dev.jasper.sdk.ui.SyntaxPalette;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
-import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagLayout;
@@ -29,7 +29,6 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.Timer;
-import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
@@ -181,9 +180,15 @@ public final class EditorTab extends JPanel {
         tabSize = settings.tabSize();
         vimBar.apply(font);
         if (vim != null) vim.editorDefaults(defaults());
-        Color rule = UIManager.getColor("Separator.foreground");
-        banner.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, rule == null ? Color.GRAY : rule), BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+        banner.setBorder(new javax.swing.border.AbstractBorder() {
+            @Override public java.awt.Insets getBorderInsets(java.awt.Component component, java.awt.Insets insets) {
+                insets.set(6, 10, 7, 10); return insets;
+            }
+            @Override public void paintBorder(java.awt.Component component, java.awt.Graphics graphics, int x, int y, int width, int height) {
+                graphics.setColor(WorkspacePalette.current(component).border());
+                graphics.fillRect(x, y + height - 1, width, 1);
+            }
+        });
     }
 
     /** @param commands bound in the text area's own map, which overrides RSyntaxTextArea's defaults for the same strokes */
