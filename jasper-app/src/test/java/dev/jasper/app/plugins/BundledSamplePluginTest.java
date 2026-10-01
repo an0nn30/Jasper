@@ -41,14 +41,14 @@ class BundledSamplePluginTest {
                         assertThat(dropdown.title()).isEqualTo("Sessions");
                         assertThat(dropdown.actionIds()).containsExactly("dev.jasper.remote.sessions.manage");
                     }));
-            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel");
+            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel", "dev.jasper.fileserver.panel");
             assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
             assertThat(contributions.menus()).anySatisfy(menu -> {
                 assertThat(menu.target()).isEqualTo(dev.jasper.app.contributions.MenuTarget.standard(
                     dev.jasper.app.contributions.MenuTarget.Slot.FILE));
                 assertThat(menu.entries()).contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
             });
-            assertThat(contributions.status()).hasSize(4)
+            assertThat(contributions.status()).hasSize(5)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
