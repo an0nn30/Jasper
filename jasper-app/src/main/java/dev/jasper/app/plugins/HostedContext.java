@@ -26,6 +26,7 @@ import dev.jasper.sdk.ui.Toolbar;
 import dev.jasper.sdk.ui.Windows;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -157,17 +158,39 @@ final class HostedContext implements PluginContext {
         }
 
         @Override public Platform platform() {
-            return file -> {
-                requireOpen();
-                Objects.requireNonNull(file, "file");
-                background().execute(() -> {
-                    try { host.environment.editor().accept(file); }
-                    catch (RuntimeException failure) {
-                        log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
-                        notices().error("Could not open " + file.getFileName() + " in an editor.");
-                    }
-                });
+            return new Platform() {
+                @Override public void openInEditor(Path file) {
+                    requireOpen();
+                    Objects.requireNonNull(file, "file");
+                    background().execute(() -> {
+                        try { host.environment.editor().accept(file); }
+                        catch (RuntimeException failure) {
+                            log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
+                            notices().error("Could not open " + file.getFileName() + " in an editor.");
+                        }
+                    });
+                }
+                @Override public void browse(URI uri) {
+                    requireOpen();
+                    URI address = webAddress(uri);
+                    background().execute(() -> {
+                        try { host.environment.browser().accept(address); }
+                        catch (RuntimeException failure) {
+                            log().log(System.Logger.Level.WARNING, "Could not open " + address + " in a browser", failure);
+                            notices().error("Could not open " + address + " in a browser.");
+                        }
+                    });
+                }
             };
+        }
+
+        /** Only an absolute http or https address opens in a browser. */
+        private static URI webAddress(URI uri) {
+            Objects.requireNonNull(uri, "uri");
+            String scheme = uri.getScheme();
+            if (scheme == null || uri.isOpaque() || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")))
+                throw new IllegalArgumentException("Only an http or https address opens in a browser: " + uri);
+            return uri;
         }
 
     @Override public Executor background() {

@@ -52,6 +52,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> paletteOpens() { return host.paletteOpens(); }
             @Override public List<String> notices() { return host.notices(); }
             @Override public List<java.nio.file.Path> openedInEditor() { return host.openedInEditor(); }
+            @Override public List<java.net.URI> browsed() { return host.browsed(); }
             @Override public java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory) {
                 return host.addTerminalPane(tabId, new dev.jasper.sdk.terminal.PaneInfo(title, java.util.Optional.ofNullable(directory), java.util.Optional.empty(), 80, 24,
                     true, dev.jasper.sdk.terminal.SessionKind.LOCAL, java.util.Optional.empty(), dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty(), "zsh"));

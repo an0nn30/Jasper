@@ -105,7 +105,21 @@ public final class FakePluginContext implements PluginContext {
         @Override public dev.jasper.sdk.palette.Palette palette() { return palette; }
     @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
         @Override public dev.jasper.sdk.ui.Notices notices() { return message -> { requireOpen(); host.notices.add(info.id() + ": " + Objects.requireNonNull(message, "message")); }; }
-        @Override public dev.jasper.sdk.ui.Platform platform() { return file -> { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }; }
+        @Override public dev.jasper.sdk.ui.Platform platform() {
+            return new dev.jasper.sdk.ui.Platform() {
+                @Override public void openInEditor(Path file) { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }
+                @Override public void browse(java.net.URI uri) { requireOpen(); host.browsed.add(webAddress(uri)); }
+            };
+        }
+
+        /** Only an absolute http or https address opens in a browser. */
+        private static java.net.URI webAddress(java.net.URI uri) {
+            Objects.requireNonNull(uri, "uri");
+            String scheme = uri.getScheme();
+            if (scheme == null || uri.isOpaque() || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")))
+                throw new IllegalArgumentException("Only an http or https address opens in a browser: " + uri);
+            return uri;
+        }
 
     @Override public Events events() {
         return new Events() {

@@ -77,7 +77,8 @@ SDK 0.10.2 adds connections, things that are up until they are not, such as a tu
 `Activities.connection(ConnectionSpec)` returns a `ConnectionHandle` whose `up`, `degraded` and `down` publish
 `ConnectionEvent`s on `Activities.CONNECTIONS`. A new state is always delivered, a report that only changes the detail
 is coalesced, and `close()` (or the plugin stopping) publishes `CLOSED` once. Jasper shows connections on Buddy.
-`FakePluginHost.connectionLog()` records them.
+`FakePluginHost.connectionLog()` records them. `Platform.browse(URI)` opens an http or https address in the user's
+browser in the background; `FakePluginHost.browsed()` records the requests.
 
 SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
 https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.

@@ -77,6 +77,7 @@ public final class FakePluginHost implements AutoCloseable {
         final List<String> paletteOpens = new ArrayList<>();
         final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
+    final List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
@@ -1201,6 +1202,13 @@ public final class FakePluginHost implements AutoCloseable {
 
         /** Every file a plugin asked to open in the editor. */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
+
+    /**
+     * Every web address a plugin asked to open in the browser.
+     *
+     * @return the addresses in request order
+     */
+    public List<java.net.URI> browsed() { return List.copyOf(browsed); }
     /** @return hosted content in registration order, for contract assertions */
     public List<dev.jasper.sdk.ui.ContentTab> contentTabs() {
         return contexts.values().stream().flatMap(c -> c.ui.contents.stream()).map(c -> (dev.jasper.sdk.ui.ContentTab)c).toList();

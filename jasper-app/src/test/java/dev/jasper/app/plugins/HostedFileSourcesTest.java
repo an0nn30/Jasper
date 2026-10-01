@@ -77,7 +77,7 @@ class HostedFileSourcesTest {
         host = onEdtValue(() -> new PluginHost(new PluginHost.Environment(javax.swing.SwingUtilities::invokeLater,
             javax.swing.SwingUtilities::isEventDispatchThread, data::resolve, diagnostic -> { },
             Duration.ofMillis(200), contributions, () -> true, AppContractTest.headlessWindows(), fixture.registry,
-            notice -> { }, file -> { }, new PluginSettingsFiles(data, diagnostic -> { }), file -> { }, PluginRuntime.ShellProfiles.NONE)));
+            notice -> { }, file -> { }, new PluginSettingsFiles(data, diagnostic -> { }), file -> { }, PluginRuntime.ShellProfiles.NONE, uri -> { })));
         var info = new PluginInfo("test.a", "A", "1.0.0", Set.of(Capabilities.FILES_SOURCE));
         onEdt(() -> host.start(new HostedPlugin(info, Set.of(), Set.of(), Set.of(getClass().getPackageName()), getClass().getClassLoader(),
             () -> new dev.jasper.sdk.plugin.Plugin() {

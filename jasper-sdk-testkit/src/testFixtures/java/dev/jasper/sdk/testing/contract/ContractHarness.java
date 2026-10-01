@@ -173,4 +173,6 @@ public interface ContractHarness extends AutoCloseable {
         /** Every error notice as {@code <plugin name>: <message>}. */
         List<String> notices();
         List<java.nio.file.Path> openedInEditor();
+        /** Every web address a plugin asked to open in the browser, in request order. */
+        List<java.net.URI> browsed();
 }

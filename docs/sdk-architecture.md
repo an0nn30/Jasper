@@ -167,7 +167,8 @@ the plugin's row kept as the app row's token so it comes back unchanged. Every s
 `ScopeSpec.inAll` (SDK 0.8.0, `withInAll(false)` to opt out) decides whether the All tab searches it
 too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `HostedContext.notices()`
 reaches the last active window's error handler; `platform().openInEditor` runs the application's
-`ConfigEditor` on the plugin's executor and reports failure as a notice. `PaneInfo.shell` is
+`ConfigEditor` on the plugin's executor and reports failure as a notice, and `platform().browse`
+does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
 contributors; `stagePlugins` copies each plugin's jar and runtime classpath into `lib/plugins/<id>/`.
 

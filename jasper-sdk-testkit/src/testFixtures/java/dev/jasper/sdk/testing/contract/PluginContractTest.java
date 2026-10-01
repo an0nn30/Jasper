@@ -1200,6 +1200,20 @@ public abstract class PluginContractTest {
             assertThat(h.notices()).containsExactly("test.a: It broke");
             assertThat(h.openedInEditor()).containsExactly(Path.of("/tmp/x.toml"));
         }
+    @Test void browseOpensOnlyWebAddressesAndReachesTheHost() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> {
+            a.platform().browse(java.net.URI.create("http://localhost:5432/"));
+            assertThatIllegalArgumentException().isThrownBy(() -> a.platform().browse(java.net.URI.create("file:///etc/hosts")));
+            assertThatIllegalArgumentException().isThrownBy(() -> a.platform().browse(java.net.URI.create("localhost:5432")));
+            assertThatIllegalArgumentException().isThrownBy(() -> a.platform().browse(java.net.URI.create("/relative")));
+            assertThatThrownBy(() -> a.platform().browse(null)).isInstanceOf(NullPointerException.class);
+        });
+        h.flush();
+        for (int i = 0; i < 100 && h.browsed().isEmpty(); i++) { try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }
+        assertThat(h.browsed()).containsExactly(java.net.URI.create("http://localhost:5432/"));
+    }
+
     @Test void hostedTabsPreserveIdentityAndDeferMovesDuringPromptsAndCloseDecisions() {
         try (var harness = newHarness()) {
             var context = new AtomicReference<PluginContext>();
