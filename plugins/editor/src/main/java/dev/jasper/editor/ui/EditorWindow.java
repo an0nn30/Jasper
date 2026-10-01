@@ -234,7 +234,7 @@ public final class EditorWindow {
         EditorSettings settings = environment.settings().get();
         if (vimToggled != null && vimToggled == settings.vim()) vimToggled = null;
         for (EditorTab tab : editorTabs()) {
-            tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
+            tab.apply(settings, theme, context.appearance().editorPalette(), context.appearance().syntaxPalette());
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         }
         readVimrcOnce();
@@ -649,7 +649,7 @@ public final class EditorWindow {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(session, this::closeTab, environment.timers());
-        tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
+        tab.apply(settings, theme, context.appearance().editorPalette(), context.appearance().syntaxPalette());
         tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
             () -> { activate(tab); command.run().run(); })).toList();

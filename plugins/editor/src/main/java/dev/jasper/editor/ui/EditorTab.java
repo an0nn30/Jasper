@@ -6,7 +6,8 @@ import dev.jasper.editor.vim.Vim;
 import dev.jasper.editor.vim.VimEditor;
 import dev.jasper.editor.vim.VimTextArea;
 import dev.jasper.editor.vim.ui.VimBar;
-import dev.jasper.sdk.Variant;
+import dev.jasper.sdk.ui.EditorPalette;
+import dev.jasper.sdk.ui.SyntaxPalette;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -165,17 +166,13 @@ public final class EditorTab extends JPanel {
     /**
      * @param settings font and tab size
      * @param theme the colours
-     * @param variant Jasper's light or dark look
+     * @param editor workspace editor surfaces
+     * @param syntax workspace token styles
      */
-    public void apply(EditorSettings settings, EditorTheme theme, Variant variant) {
-        apply(settings, theme, variant, dev.jasper.sdk.ui.EditorPalette.current());
-    }
-
-    /** Applies settings and the host's editor palette. */
-    public void apply(EditorSettings settings, EditorTheme theme, Variant variant, dev.jasper.sdk.ui.EditorPalette palette) {
-        theme.apply(area, scroll, variant, palette);
+    public void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax) {
         Font font = settings.font();
         area.setFont(font);
+        theme.apply(area, scroll, editor, syntax);
         scroll.getGutter().setLineNumberFont(font);
         area.setTabSize(settings.tabSize());
         tabSize = settings.tabSize();

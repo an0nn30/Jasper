@@ -6,7 +6,8 @@ import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.session.Question;
 import dev.jasper.editor.session.SessionEnvironment;
 import dev.jasper.editor.syntax.Languages;
-import dev.jasper.sdk.Variant;
+import dev.jasper.sdk.ui.SyntaxRole;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
+import org.fife.ui.rsyntaxtextarea.TokenTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -136,8 +138,34 @@ class EditorTabTest {
 
     @Test void settingsApplyTheFontAndTabSize() {
         var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
-        tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(), Variant.DARK);
+        tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(),
+            EditorThemeTest.EDITOR, EditorThemeTest.syntax(0x223300));
         assertThat(tab.area().getFont().getSize()).isEqualTo(17);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
+    }
+
+    @Test void workspaceAndFontChangesKeepDirtyDocumentAndUpdateStyledTokenFonts() throws Exception {
+        var tab = open(Files.writeString(folder.resolve("colors.txt"), "original\n"));
+        drain();
+        var first = new EditorSettings("Monospaced", 17, 2, false, 10, false);
+        var syntax = EditorThemeTest.syntax(0x223300);
+        tab.apply(first, new EditorTheme(), EditorThemeTest.EDITOR, syntax);
+        tab.area().append("changed");
+        tab.area().select(2, 5);
+        var document = tab.area().getDocument();
+        var second = new EditorSettings("Monospaced", 22, 4, false, 10, false);
+        var next = EditorThemeTest.syntax(0x334400);
+        tab.apply(second, new EditorTheme(), EditorThemeTest.EDITOR, next);
+        assertThat(tab.area().getDocument()).isSameAs(document);
+        assertThat(tab.area().getText()).isEqualTo("original\nchanged");
+        assertThat(tab.area().getSelectionStart()).isEqualTo(2);
+        assertThat(tab.area().getSelectionEnd()).isEqualTo(5);
+        assertThat(tab.area().canUndo()).isTrue();
+        assertThat(tab.session().dirty()).isTrue();
+        assertThat(tab.area().getTabSize()).isEqualTo(4);
+        var style = tab.area().getSyntaxScheme().getStyle(TokenTypes.RESERVED_WORD);
+        assertThat(style.foreground).isEqualTo(next.style(SyntaxRole.KEYWORD).color());
+        assertThat(style.font.getSize()).isEqualTo(22);
+        assertThat(style.font.getStyle()).isEqualTo(Font.BOLD | Font.ITALIC);
     }
 }

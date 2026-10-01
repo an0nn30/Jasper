@@ -71,7 +71,7 @@ public final class EditorPlugin implements Plugin {
             context.notices()::error, context.appearance().icon(IconName.FILE));
         context.settings().onChanged(() -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.settings().onChanged(() -> ui.execute(() -> { recent.prune(Instant.now()); scope.changed(); }));
-        context.appearance().onChanged(variant -> ui.execute(() -> { if (window != null) window.apply(); }));
+        context.appearance().onWorkspaceChanged(variant -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.services().publish(Editor.class, new Editor() {
             @Override public void open(Path file) { window().openLocal(file); }
             @Override public void open(EditorDocument document) { window().open(document); }

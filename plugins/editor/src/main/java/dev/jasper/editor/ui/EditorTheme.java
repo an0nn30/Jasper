@@ -1,70 +1,83 @@
 package dev.jasper.editor.ui;
 
-import dev.jasper.sdk.Variant;
+import dev.jasper.sdk.ui.EditorPalette;
+import dev.jasper.sdk.ui.SyntaxPalette;
+import dev.jasper.sdk.ui.SyntaxRole;
 import java.awt.Color;
 import java.awt.Font;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
-import org.fife.ui.rsyntaxtextarea.Theme;
+import org.fife.ui.rsyntaxtextarea.Style;
+import org.fife.ui.rsyntaxtextarea.SyntaxScheme;
+import org.fife.ui.rsyntaxtextarea.TokenTypes;
 import org.fife.ui.rtextarea.Gutter;
 import org.fife.ui.rtextarea.RTextScrollPane;
 
-/**
- * Editor colours (spec 3.4): token colours from RSyntaxTextArea's {@code idea.xml} or {@code dark.xml}, and every
- * surface from the host's semantic editor palette.
- */
+/** Applies workspace editor surfaces and semantic syntax without replacing an editor's document. */
 public final class EditorTheme {
-    private final Theme light = load("idea.xml");
-    private final Theme dark = load("dark.xml");
-
-    /**
-     * @param area the text area
-     * @param scroll its scroll pane, whose gutter is coloured too
-     * @param variant Jasper's light or dark look
-     */
-    public void apply(RSyntaxTextArea area, RTextScrollPane scroll, Variant variant) {
-        apply(area, scroll, variant, dev.jasper.sdk.ui.EditorPalette.current());
-    }
-
-    /** Applies the active host's semantic palette to every document surface. */
-    public void apply(RSyntaxTextArea area, RTextScrollPane scroll, Variant variant, dev.jasper.sdk.ui.EditorPalette palette) {
+    /** Applies the current workspace palettes to an editor and its gutter. */
+    public void apply(RSyntaxTextArea area, RTextScrollPane scroll, EditorPalette editor, SyntaxPalette syntax) {
+        SyntaxScheme scheme = (SyntaxScheme) area.getSyntaxScheme().clone();
         Font font = area.getFont();
-        (variant == Variant.DARK ? dark : light).apply(area);
-        area.setFont(font);
-        area.setBackground(palette.background());
-        area.setForeground(palette.foreground());
-        area.setCaretColor(palette.caret());
-        area.setSelectionColor(palette.selection());
-        area.setCurrentLineHighlightColor(palette.currentLine());
-        scroll.setBackground(palette.background());
-        scroll.getViewport().setBackground(palette.background());
+        for (int token = 0; token < TokenTypes.DEFAULT_NUM_TOKEN_TYPES; token++) {
+            Style current = scheme.getStyle(token);
+            Style style = current == null ? new Style() : (Style) current.clone();
+            SyntaxRole role = role(token);
+            if (role == null) {
+                style.foreground = fixed(editor.foreground());
+                style.font = font.deriveFont(Font.PLAIN);
+            } else {
+                var value = syntax.style(role);
+                style.foreground = fixed(value.color());
+                style.font = font.deriveFont((value.bold() ? Font.BOLD : 0) | (value.italic() ? Font.ITALIC : 0));
+            }
+            scheme.setStyle(token, style);
+        }
+        area.setSyntaxScheme(scheme);
+        area.setBackground(fixed(editor.background()));
+        area.setForeground(fixed(editor.foreground()));
+        area.setCaretColor(fixed(editor.caret()));
+        area.setSelectionColor(fixed(editor.selection()));
+        area.setCurrentLineHighlightColor(fixed(editor.currentLine()));
+        scroll.setBackground(fixed(editor.background()));
+        scroll.getViewport().setBackground(fixed(editor.background()));
         Gutter gutter = scroll.getGutter();
-        gutter.setBackground(palette.gutter());
-        gutter.setBorderColor(palette.gutter());
-        gutter.setFoldBackground(palette.gutter());
-        gutter.setLineNumberColor(palette.lineNumbers());
+        gutter.setBackground(fixed(editor.gutter()));
+        gutter.setBorderColor(fixed(editor.gutter()));
+        gutter.setFoldBackground(fixed(editor.gutter()));
+        gutter.setLineNumberColor(fixed(editor.lineNumbers()));
     }
 
-    /**
-     * @param base the starting colour
-     * @param toward the colour to move toward
-     * @param amount 0 keeps {@code base}, 1 gives {@code toward}
-     * @return the blend
-     */
+    // UIResource colors are delegate defaults: a chrome LAF refresh may replace them without a workspace event.
+    private static Color fixed(Color color) { return new Color(color.getRGB(), true); }
+
+    private static SyntaxRole role(int token) {
+        return switch (token) {
+            case TokenTypes.RESERVED_WORD, TokenTypes.RESERVED_WORD_2, TokenTypes.PREPROCESSOR -> SyntaxRole.KEYWORD;
+            case TokenTypes.DATA_TYPE -> SyntaxRole.TYPE;
+            case TokenTypes.FUNCTION -> SyntaxRole.FUNCTION;
+            case TokenTypes.VARIABLE -> SyntaxRole.VARIABLE;
+            case TokenTypes.LITERAL_BOOLEAN -> SyntaxRole.CONSTANT;
+            case TokenTypes.LITERAL_NUMBER_DECIMAL_INT, TokenTypes.LITERAL_NUMBER_FLOAT,
+                TokenTypes.LITERAL_NUMBER_HEXADECIMAL -> SyntaxRole.NUMBER;
+            case TokenTypes.LITERAL_STRING_DOUBLE_QUOTE, TokenTypes.LITERAL_CHAR, TokenTypes.LITERAL_BACKQUOTE -> SyntaxRole.STRING;
+            case TokenTypes.COMMENT_EOL, TokenTypes.COMMENT_MULTILINE -> SyntaxRole.COMMENT;
+            case TokenTypes.COMMENT_DOCUMENTATION, TokenTypes.COMMENT_KEYWORD, TokenTypes.COMMENT_MARKUP -> SyntaxRole.DOC_COMMENT;
+            case TokenTypes.ANNOTATION -> SyntaxRole.ANNOTATION;
+            case TokenTypes.OPERATOR -> SyntaxRole.OPERATOR;
+            case TokenTypes.SEPARATOR -> SyntaxRole.PUNCTUATION;
+            case TokenTypes.MARKUP_TAG_DELIMITER, TokenTypes.MARKUP_TAG_NAME -> SyntaxRole.TAG;
+            case TokenTypes.MARKUP_TAG_ATTRIBUTE, TokenTypes.MARKUP_TAG_ATTRIBUTE_VALUE -> SyntaxRole.ATTRIBUTE;
+            case TokenTypes.REGEX -> SyntaxRole.REGEX;
+            case TokenTypes.ERROR_IDENTIFIER, TokenTypes.ERROR_NUMBER_FORMAT,
+                TokenTypes.ERROR_STRING_DOUBLE, TokenTypes.ERROR_CHAR -> SyntaxRole.ERROR;
+            default -> null;
+        };
+    }
+
+    /** Returns a linear blend of two colors. */
     public static Color blend(Color base, Color toward, double amount) {
         return new Color((int) Math.round(base.getRed() + (toward.getRed() - base.getRed()) * amount),
             (int) Math.round(base.getGreen() + (toward.getGreen() - base.getGreen()) * amount),
             (int) Math.round(base.getBlue() + (toward.getBlue() - base.getBlue()) * amount));
-    }
-
-    private static Theme load(String name) {
-        try (InputStream in = RSyntaxTextArea.class.getResourceAsStream("/org/fife/ui/rsyntaxtextarea/themes/" + name)) {
-            if (in == null) throw new IOException("RSyntaxTextArea has no theme " + name);
-            return Theme.load(in);
-        } catch (IOException failure) {
-            throw new UncheckedIOException(failure);
-        }
     }
 }

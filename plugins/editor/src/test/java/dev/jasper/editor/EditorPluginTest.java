@@ -16,12 +16,18 @@ import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.EditorPalette;
+import dev.jasper.sdk.ui.SyntaxPalette;
+import dev.jasper.sdk.ui.SyntaxRole;
+import dev.jasper.sdk.ui.SyntaxStyle;
+import dev.jasper.sdk.ui.WorkspacePalette;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -196,7 +202,7 @@ class EditorPluginTest {
         }
     }
 
-    @Test void changingTheAppearanceRecoloursOpenTabs() throws Exception {
+    @Test void sameDarkWorkspaceChangeRecoloursOpenTabsWithoutLosingEdits() throws Exception {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             var consumer = new AtomicReference<PluginContext>();
@@ -204,10 +210,24 @@ class EditorPluginTest {
             consumer.get().services().require(Editor.class).open(Files.writeString(home.resolve("a.json"), "{\"a\": true}\n"));
             while (host.runBackground() > 0) { }
             RSyntaxTextArea area = find(host.contentComponent(host.contentTabs().getFirst())).orElseThrow();
-            Color before = area.getSyntaxScheme().getStyle(TokenTypes.RESERVED_WORD).foreground;
-            host.setVariant(consumer.get().appearance().variant() == Variant.DARK ? Variant.LIGHT : Variant.DARK);
+            area.append("extra");
+            area.select(1, 4);
+            var document = area.getDocument();
+            var styles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
+            for (var role : SyntaxRole.values()) styles.put(role, new SyntaxStyle(new Color(0x334400 + role.ordinal()), false, false));
+            var appearance = consumer.get().appearance();
+            var editor = new EditorPalette(new Color(0x202020), Color.WHITE, Color.YELLOW,
+                Color.BLUE, Color.GRAY, Color.BLACK, Color.LIGHT_GRAY);
+            host.setWorkspace(appearance.workspaceVariant(), WorkspacePalette.current(), editor, new SyntaxPalette(styles));
             host.flush();
-            assertThat(area.getSyntaxScheme().getStyle(TokenTypes.RESERVED_WORD).foreground).isNotEqualTo(before);
+            assertThat(area.getSyntaxScheme().getStyle(TokenTypes.RESERVED_WORD).foreground)
+                .isEqualTo(styles.get(SyntaxRole.KEYWORD).color());
+            assertThat(area.getBackground()).isEqualTo(editor.background());
+            assertThat(area.getDocument()).isSameAs(document);
+            assertThat(area.getText()).endsWith("extra");
+            assertThat(area.getSelectionStart()).isEqualTo(1);
+            assertThat(area.getSelectionEnd()).isEqualTo(4);
+            assertThat(area.canUndo()).isTrue();
         }
     }
 
