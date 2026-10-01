@@ -82,7 +82,7 @@ class InstalledThemesTest {
                 assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
                 assertThat(problem.key()).isEqualTo("ui.theme.name");
                 assertThat(problem.message()).contains("\"Nope\"").contains("keeping Fixture Dark")
-                    .contains("Available: Fixture Dark, IntelliJ Light, Jasper Dark.");
+                    .contains("Available: Darcula, Fixture Dark, IntelliJ Light, Jasper Dark.");
             });
         });
     }

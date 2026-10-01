@@ -19,12 +19,12 @@ class ThemeCatalogTest {
 
     @Test void theBuiltInCatalogFindsBuiltInThemesByNameIgnoringCaseAndSpaces() {
         var snapshot = ThemeCatalog.builtIn().scan();
-        assertThat(snapshot.themes()).containsExactly(Theme.LIGHT, Theme.DARK);
+        assertThat(snapshot.themes()).containsExactlyElementsOf(ThemeManager.builtIns());
         assertThat(snapshot.find("  jasper DARK ")).contains(Theme.DARK);
-        assertThat(snapshot.find("intellij light")).contains(Theme.LIGHT);
+        assertThat(snapshot.find("intellij light")).contains(Theme.INTELLIJ_LIGHT);
         assertThat(snapshot.find("")).isEmpty();
         assertThat(snapshot.find("Dracula")).isEmpty();
-        assertThat(snapshot.names()).containsExactly("IntelliJ Light", "Jasper Dark");
+        assertThat(snapshot.names()).containsExactly("Darcula", "IntelliJ Light", "Jasper Dark");
         assertThat(snapshot.problems()).isEmpty();
     }
 
@@ -41,16 +41,16 @@ class ThemeCatalogTest {
         assertThat(theme.palette().ansi().get(2)).as("Darcula's green").isEqualTo(new Color(0x5c962c));
         assertThat(theme.source()).isInstanceOfSatisfying(Theme.Archive.class,
             archive -> assertThat(archive.archive()).isEqualTo(themes().resolve("fixture.jar")));
-        assertThat(ThemeManager.load(theme.source()).name()).isEqualTo("Fixture Dark");
-        assertThat(snapshot.themes()).as("installed themes come first").startsWith(theme).endsWith(Theme.LIGHT, Theme.DARK);
-        assertThat(catalog().latest().themes()).as("a new catalog has scanned nothing yet").containsExactly(Theme.LIGHT, Theme.DARK);
+        assertThat(theme.source().document().name()).isEqualTo("Fixture Dark");
+        assertThat(snapshot.themes()).as("installed themes come first").startsWith(theme).endsWith(Theme.INTELLIJ_LIGHT, Theme.DARK, Theme.DARCULA);
+        assertThat(catalog().latest().themes()).as("a new catalog has scanned nothing yet").containsExactlyElementsOf(ThemeManager.builtIns());
     }
 
     @Test void anInstalledThemeTakesPrecedenceOverABuiltInThemeOfTheSameName() {
         plugin(themes().resolve("mine.jar"), "Jasper Dark", true, "#010203", "010203");
         var snapshot = catalog().scan();
         assertThat(snapshot.find("Jasper Dark").map(Theme::source)).get().isInstanceOf(Theme.Archive.class);
-        assertThat(snapshot.themes()).doesNotContain(Theme.DARK).contains(Theme.LIGHT);
+        assertThat(snapshot.themes()).doesNotContain(Theme.DARK).contains(Theme.INTELLIJ_LIGHT);
     }
 
     @Test void duplicateInstalledNamesWarnAndTheAlphabeticallyFirstFileWins() {
@@ -90,7 +90,7 @@ class ThemeCatalogTest {
         Files.writeString(themes().resolve("Dracula.theme.json"), theme("Dracula", true, null, "#282a36"));
         plugin(themes().resolve(".hidden.jar"), "Hidden", true, "#000000", "000000");
         var snapshot = catalog().scan();
-        assertThat(snapshot.names()).containsExactly("IntelliJ Light", "Jasper Dark");
+        assertThat(snapshot.names()).containsExactly("Darcula", "IntelliJ Light", "Jasper Dark");
         assertThat(snapshot.problems()).singleElement().satisfies(problem -> {
             assertThat(problem.file().getFileName()).hasToString("Dracula.theme.json");
             assertThat(problem.message()).contains("aren't supported").contains(".jar or .zip");
@@ -103,7 +103,7 @@ class ThemeCatalogTest {
         Path other = Files.createDirectories(home.resolve("other"));
         Files.writeString(other.resolve("themes"), "a file, not a folder");
         var snapshot = ThemeCatalog.beside(other.resolve("config.toml")).scan();
-        assertThat(snapshot.themes()).containsExactly(Theme.LIGHT, Theme.DARK);
+        assertThat(snapshot.themes()).containsExactlyElementsOf(ThemeManager.builtIns());
         assertThat(snapshot.problems()).singleElement().satisfies(problem ->
             assertThat(problem.message()).contains("Cannot read the themes folder"));
     }
@@ -144,7 +144,7 @@ class ThemeCatalogTest {
         var catalog = new ThemeCatalog(themes(), file -> new ThemeArchive.Contents(
             java.util.List.of(new ThemeArchive.Found("odd.jar!/a.theme.json", null, null, null, null)), java.util.List.of()));
         var snapshot = catalog.scan();
-        assertThat(snapshot.themes()).containsExactly(Theme.LIGHT, Theme.DARK);
+        assertThat(snapshot.themes()).containsExactlyElementsOf(ThemeManager.builtIns());
         assertThat(snapshot.problems()).singleElement().satisfies(problem -> {
             assertThat(problem.file().getFileName()).hasToString("odd.jar");
             assertThat(problem.message()).contains("cannot be read");

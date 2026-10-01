@@ -46,29 +46,30 @@ public final class ThemeManager {
     /** Theme-independent application defaults: form typography, input geometry and the split divider. Every theme gets them. */
     public static final Map<String, String> APP_DEFAULTS = appDefaults();
     private static final ThemeLoader LOADER = new ThemeLoader(ThemeManager::read, FILES);
-    private static final Map<Theme, ThemeLoader.Resolved> RESOLVED = new HashMap<>();
+    private static final Map<Theme, GeneratedTheme> GENERATED = new HashMap<>();
 
     private ThemeManager() {}
 
     /** The bundled themes, Light first. */
-    public static List<Theme> builtIns() { return List.of(Theme.LIGHT, Theme.DARK); }
+    public static List<Theme> builtIns() { return List.of(Theme.INTELLIJ_LIGHT, Theme.DARK, Theme.DARCULA); }
 
-    static ThemeLoader.Resolved resolve(Theme theme) { return RESOLVED.computeIfAbsent(theme, key -> load(key.source())); }
+    /** {@code theme}'s generated values; EDT only (the cache is unsynchronized). */
+    static GeneratedTheme generated(Theme theme) {
+        return GENERATED.computeIfAbsent(theme, key -> ThemeGenerator.generate(key.source().document()));
+    }
 
-    /** Resolves a theme's file; touches no Swing state, so it is safe off the EDT. */
-    static ThemeLoader.Resolved load(Theme.Source source) {
-        return switch (source) {
-            case Theme.Resource resource -> LOADER.load(resource.file());
-            // Parents a plugin theme names resolve against the chains Jasper ships.
-            case Theme.Archive archive ->
-                new ThemeLoader(file -> file.equals(archive.entry()) ? archive.json() : read(file), FILES).load(archive.entry());
-        };
+    /** A theme file Jasper ships, resolved; touches no Swing state. */
+    static ThemeLoader.Resolved loadBuiltIn(String file) { return LOADER.load(file); }
+
+    /** A plugin's theme file, resolved against the parent themes Jasper ships; touches no Swing state. */
+    static ThemeLoader.Resolved loadArchive(String entry, String json) {
+        return new ThemeLoader(file -> file.equals(entry) ? json : read(file), FILES).load(entry);
     }
 
     /** Installs {@code theme} as the look and feel; false when FlatLaf could not set it up. */
     public static boolean install(Theme theme) {
         requireEdt();
-        return install(resolve(theme), theme.palette().background());
+        return install(generated(theme));
     }
 
     /** Installs a generated theme through the same path as any IntelliJ theme; false when FlatLaf could not set it up. */
@@ -122,7 +123,7 @@ public final class ThemeManager {
         return Collections.unmodifiableMap(defaults);
     }
 
-    private static String read(String file) {
+    static String read(String file) {
         try (InputStream in = ThemeManager.class.getClassLoader().getResourceAsStream(BASE + file)) {
             return in == null ? null : new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException failure) {

@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class AppIconsPluginTest {
     @Test void pluginSvgRendersAsAuthoredWithPaletteRemappingAndRejectsBadArguments() {
-        var themes = new ThemeController(Theme.LIGHT);
+        var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
         try {
             var loader = getClass().getClassLoader();
             var icon = AppIcons.plugin(loader, "dev/jasper/app/icons/palette-probe.svg");

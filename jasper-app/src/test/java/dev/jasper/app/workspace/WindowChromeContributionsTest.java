@@ -173,7 +173,7 @@ class WindowChromeContributionsTest {
 
     @Test void sharedManagedIconsSizePerPlacementInMultipleWindows() throws Exception {
         edt(() -> {
-            var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.LIGHT);
+            var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.INTELLIJ_LIGHT);
             try {
                 var icon = dev.jasper.app.platform.AppIcons.plugin(getClass().getClassLoader(), "dev/jasper/app/icons/intellij/general/search.svg");
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));

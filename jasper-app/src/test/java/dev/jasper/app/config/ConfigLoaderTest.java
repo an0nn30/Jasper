@@ -289,7 +289,7 @@ class ConfigLoaderTest {
     @Test void snapshotAndResultDefensivelyCopyCollections() {
         var bindings = new HashMap<String,String>();
         bindings.put("copy", "none");
-        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.LIGHT.name(), bindings, 150, 45, TerminalConfig.defaults());
+        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.INTELLIJ_LIGHT.name(), bindings, 150, 45, TerminalConfig.defaults());
         bindings.put("copy", "cmd+c");
         assertThat(snapshot.bindings(true).strokeFor(ActionId.COPY)).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> snapshot.keybindings().put("paste", "none"));

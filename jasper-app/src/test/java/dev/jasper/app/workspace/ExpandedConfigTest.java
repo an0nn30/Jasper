@@ -217,7 +217,7 @@ class ExpandedConfigTest {
             List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1f));
         assertThat(snapshot.terminal()).isEqualTo(new TerminalConfig(new TerminalConfig.Shell("", List.of()),
             Map.of(), 10000, OptionAsMeta.LEFT, CursorStyle.BLOCK, true, .3f, false, BellMode.VISUAL));
-        var legacy = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(22f), Theme.LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults());
+        var legacy = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(22f), Theme.INTELLIJ_LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults());
         assertThat(legacy.font().size()).isEqualTo(22f);
         assertThat(legacy.fontSize()).isEqualTo(22f);
         assertThat(legacy.columns()).isEqualTo(150);

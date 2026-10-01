@@ -173,15 +173,20 @@ public final class ThemeCatalog {
         contents.problems().forEach(problem -> problems.add(new Problem(file, problem)));
         var themes = new ArrayList<Theme>();
         for (ThemeArchive.Found found : contents.themes()) {
-            var source = new Theme.Archive(file, found.label(), found.json());
-            ThemeLoader.Resolved resolved;
-            try { resolved = ThemeManager.load(source); }
+            // A malformed entry is the archive's problem, as it was when the Theme.Archive constructor refused it.
+            Objects.requireNonNull(found.json(), found.label());
+            Theme theme;
+            try {
+                ThemeLoader.Resolved resolved = ThemeManager.loadArchive(found.label(), found.json());
+                resolved.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
+                EditorScheme.Result scheme = scheme(found, resolved.dark());
+                scheme.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
+                theme = Theme.of("installed:" + found.label(),
+                    new Theme.Archive(file, found.label(), IntellijConversion.convert(resolved, scheme.palette(), found.label())));
+            }
             catch (ThemeLoader.ThemeException failure) { problems.add(new Problem(file, failure.getMessage())); continue; }
             catch (RuntimeException failure) { problems.add(new Problem(file, found.label() + " cannot be loaded: " + failure)); continue; }
-            resolved.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
-            EditorScheme.Result scheme = scheme(found, resolved.dark());
-            scheme.warnings().forEach(warning -> problems.add(new Problem(file, warning)));
-            themes.add(new Theme("installed:" + found.label(), resolved.name(), resolved.dark(), scheme.palette(), source));
+            themes.add(theme);
         }
         return new Loaded(themes, problems);
     }

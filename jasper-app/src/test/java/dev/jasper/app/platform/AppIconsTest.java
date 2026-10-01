@@ -14,7 +14,7 @@ class AppIconsTest {
 
     @Test void modernApplicationIconsAreUntintedIntellijArtwork() throws Exception {
         edt(() -> {
-            new ThemeController(Theme.LIGHT);
+            new ThemeController(Theme.INTELLIJ_LIGHT);
             try {
                 for (String name : ICONS) {
                     var icon = AppIcons.icon(name);
@@ -31,14 +31,14 @@ class AppIconsTest {
 
     @Test void theSameHostIconFollowsALiveDarkSwitch() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.LIGHT);
+            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
             try {
                 var icon = AppIcons.icon("search");
                 int[] light = IntellijIconsTest.pixels(icon);
                 themes.configure(Theme.DARK);
                 int[] dark = IntellijIconsTest.pixels(icon);
                 assertThat(dark).isNotEqualTo(light);
-                themes.configure(Theme.LIGHT);
+                themes.configure(Theme.INTELLIJ_LIGHT);
                 assertThat(IntellijIconsTest.pixels(icon)).isEqualTo(light);
                 assertThat(AppIcons.dropdown().getIconWidth()).isEqualTo(8);
                 assertThat(Arrays.stream(dark).anyMatch(pixel -> pixel == 0xff6c707e)).isFalse();
@@ -48,7 +48,7 @@ class AppIconsTest {
 
     @Test void selectedSurfacesChooseUntintedVariantsWithoutChangingSharedIcons() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.LIGHT);
+            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
             try {
                 var original = AppIcons.named("TERMINAL");
                 int[] light = IntellijIconsTest.pixels(original);
@@ -57,7 +57,7 @@ class AppIconsTest {
                 assertThat(dark).isNotEqualTo(light);
                 assertThat(IntellijIconsTest.pixels(AppIcons.forBackground(original, java.awt.Color.WHITE))).isEqualTo(light);
                 assertThat(IntellijIconsTest.pixels(original)).isEqualTo(dark);
-                themes.configure(Theme.LIGHT);
+                themes.configure(Theme.INTELLIJ_LIGHT);
                 assertThat(IntellijIconsTest.pixels(AppIcons.forBackground(original, java.awt.Color.BLACK))).isEqualTo(dark);
                 assertThat(IntellijIconsTest.pixels(original)).isEqualTo(light);
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(16, 16, 2));
@@ -68,7 +68,7 @@ class AppIconsTest {
 
     @Test void bundledIconsKeepFlatLafDisabledRendering() throws Exception {
         edt(() -> {
-            new ThemeController(Theme.LIGHT);
+            new ThemeController(Theme.INTELLIJ_LIGHT);
             try {
                 var icon = AppIcons.icon("search");
                 var disabled = javax.swing.UIManager.getLookAndFeel().getDisabledIcon(new javax.swing.JLabel(), icon);

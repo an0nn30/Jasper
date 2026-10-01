@@ -26,7 +26,7 @@ class ThemeButtonsTest {
             parent.add(field); parent.add(password); parent.add(formatted); parent.add(choices); parent.add(note);
             var dialog = new JRootPane(); var confirm = new JButton("OK"); dialog.getContentPane().add(confirm); dialog.setDefaultButton(confirm);
             int[] clicks = {0}; button.addActionListener(event -> clicks[0]++);
-            for (var theme : List.of(Theme.DARK, Theme.LIGHT)) {
+            for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 themes.configure(theme);
                 SwingUtilities.updateComponentTreeUI(parent);
                 SwingUtilities.updateComponentTreeUI(dialog);

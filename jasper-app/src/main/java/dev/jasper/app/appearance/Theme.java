@@ -5,40 +5,43 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * A theme Jasper can install: an IntelliJ-format theme and the terminal palette used when the
- * terminal matches the UI (its editor scheme's console colours, or a Jasper palette).
+ * A theme Jasper can install: its name, darkness and terminal palette, and the resolved Jasper theme document
+ * ({@code extends} merged in) it is generated from.
  */
 public record Theme(String id, String name, boolean dark, Palette palette, Source source) {
-    /** Where a theme's {@code .theme.json} comes from. */
-    public sealed interface Source permits Resource, Archive {}
-
-    /** A theme file under {@code dev/jasper/app/themes/}. */
-    public record Resource(String file) implements Source {
-        public Resource { Objects.requireNonNull(file); }
+    /** Where a theme comes from; every source carries the resolved document. */
+    public sealed interface Source permits Bundled, Archive {
+        /** The resolved theme document. */
+        ThemeDocument document();
     }
 
-    /** A theme an installed plugin provides; its JSON is read when the catalog reads {@code archive}. */
-    public record Archive(Path archive, String entry, String json) implements Source {
-        public Archive { Objects.requireNonNull(archive); Objects.requireNonNull(entry); Objects.requireNonNull(json); }
+    /** A theme Jasper ships, from {@code file} under {@code dev/jasper/app/themes/}: a Jasper theme or a converted IntelliJ one. */
+    public record Bundled(String file, ThemeDocument document) implements Source {
+        public Bundled { Objects.requireNonNull(file); Objects.requireNonNull(document); }
     }
 
-    /** Classic IntelliJ Light, vendored from intellij-community. */
-    public static final Theme LIGHT = new Theme("intellij-light", "IntelliJ Light", false, Palette.jasperLight(),
-        new Resource("intellij/Light.theme.json"));
-    /** Jasper's own dark theme. */
-    public static final Theme DARK = new Theme("jasper-dark", "Jasper Dark", true, graphitePalette(),
-        new Resource("jasper-dark.theme.json"));
-
-    private static Palette graphitePalette() {
-        var ansi = Palette.jasperDark();
-        return new Palette(new java.awt.Color(0xd5dee5), new java.awt.Color(0x191c20),
-            new java.awt.Color(0xd5dee5), new java.awt.Color(0x35434e), ansi.ansi());
+    /** A theme an installed IntelliJ plugin provides, converted when the catalog read the archive. */
+    public record Archive(Path archive, String entry, ThemeDocument document) implements Source {
+        public Archive { Objects.requireNonNull(archive); Objects.requireNonNull(entry); Objects.requireNonNull(document); }
     }
+
+    /** Jasper's own dark theme, the default. */
+    public static final Theme DARK = BuiltInThemes.intellij("jasper-dark", "jasper-dark.theme.json", BuiltInThemes.GRAPHITE);
+    /** Classic IntelliJ Light, converted from intellij-community. */
+    public static final Theme INTELLIJ_LIGHT = BuiltInThemes.intellij("intellij-light", "intellij/Light.theme.json", "IntelliJ Light");
+    /** Darcula, converted from intellij-community. */
+    public static final Theme DARCULA = BuiltInThemes.intellij("darcula", "intellij/darcula.theme.json", "Darcula");
 
     public Theme {
         Objects.requireNonNull(id);
         Objects.requireNonNull(name);
         Objects.requireNonNull(palette);
         Objects.requireNonNull(source);
+    }
+
+    /** The theme {@code source}'s document generates, under {@code id}. */
+    static Theme of(String id, Source source) {
+        GeneratedTheme generated = ThemeGenerator.generate(source.document());
+        return new Theme(id, generated.name(), generated.dark(), generated.terminal(), source);
     }
 }

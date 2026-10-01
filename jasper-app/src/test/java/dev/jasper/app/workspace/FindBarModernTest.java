@@ -44,7 +44,7 @@ class FindBarModernTest {
     @Test void modernBarIsOneRowWithInFieldTogglesAndIconOnlyNavigation() throws Exception {
         try (TerminalSession session = shell(HOME)) {
             edt(() -> {
-                new ThemeController(Theme.LIGHT);
+                new ThemeController(Theme.INTELLIJ_LIGHT);
                 var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
                 var query = bar.queryField();
                 assertThat(query.getAccessibleContext().getAccessibleName()).isEqualTo("Find in terminal");
@@ -85,7 +85,7 @@ class FindBarModernTest {
             until(() -> session.title().equals("ready"));
             FindBar[] bar = new FindBar[1];
             edt(() -> {
-                new ThemeController(Theme.LIGHT);
+                new ThemeController(Theme.INTELLIJ_LIGHT);
                 var view = new TerminalView(session, TerminalOptions.defaults());
                 view.setSize(view.getPreferredSize());
                 bar[0] = attached(view); bar[0].open();

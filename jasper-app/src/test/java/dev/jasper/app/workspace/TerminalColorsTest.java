@@ -25,7 +25,7 @@ class TerminalColorsTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[2];
         edt(() -> {
-            var themes = new ThemeController(Theme.LIGHT);
+            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
             owners[0] = content(launcher(pending), themes);
             owners[1] = content(launcher(pending), themes);
         });
@@ -53,8 +53,8 @@ class TerminalColorsTest {
             var session = hidden.session();
             owner.selectTerminalColors(TerminalColors.MATCH);
             assertThat(hidden.session()).isSameAs(session);
-            assertThat(hidden.view().palette()).isEqualTo(Palette.jasperLight());
-            assertThat(hidden.getBackground()).isEqualTo(Palette.jasperLight().background());
+            assertThat(hidden.view().palette()).isEqualTo(Theme.INTELLIJ_LIGHT.palette());
+            assertThat(hidden.getBackground()).isEqualTo(Theme.INTELLIJ_LIGHT.palette().background());
         });
     }
 

@@ -5,6 +5,7 @@ import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
@@ -75,7 +76,7 @@ class ThemeManagerTest {
     @Test void intellijLightInstallsTheClassicLightColours() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            assertThat(ThemeManager.install(Theme.LIGHT)).isTrue();
+            assertThat(ThemeManager.install(Theme.INTELLIJ_LIGHT)).isTrue();
             assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("IntelliJ Light");
             assertThat(FlatLaf.isLafDark()).isFalse();
             assertColours(Map.ofEntries(
@@ -138,7 +139,7 @@ class ThemeManagerTest {
     @Test void restoredAndDerivedKeysSurviveReinstallingTheSameLookAndFeel() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(Theme.LIGHT);
+            ThemeManager.install(Theme.INTELLIJ_LIGHT);
             LookAndFeel light = UIManager.getLookAndFeel();
             ThemeManager.install(Theme.DARK);
             // ThemeController rolls back like this when a later install fails.
@@ -152,7 +153,7 @@ class ThemeManagerTest {
     @Test void switchingThemesLeavesNothingOfThePreviousOneBehind() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(Theme.LIGHT);
+            ThemeManager.install(Theme.INTELLIJ_LIGHT);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNotNull();
             ThemeManager.install(Theme.DARK);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNull();
@@ -160,19 +161,22 @@ class ThemeManagerTest {
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    @Test void everyBuiltInThemeMatchesItsFile() {
-        assertThat(ThemeManager.builtIns()).containsExactly(Theme.LIGHT, Theme.DARK);
+    @Test void everyBuiltInThemeGeneratesUnderItsOwnName() {
+        assertThat(ThemeManager.builtIns()).containsExactly(Theme.INTELLIJ_LIGHT, Theme.DARK, Theme.DARCULA);
         for (Theme theme : ThemeManager.builtIns()) {
-            var resolved = ThemeManager.resolve(theme);
-            assertThat(resolved.name()).isEqualTo(theme.name());
-            assertThat(resolved.dark()).isEqualTo(theme.dark());
+            GeneratedTheme generated = ThemeManager.generated(theme);
+            assertThat(generated.name()).isEqualTo(theme.name());
+            assertThat(generated.dark()).isEqualTo(theme.dark());
+            assertThat(generated.terminal()).isEqualTo(theme.palette());
         }
-        assertThat(Theme.LIGHT.id()).isEqualTo("intellij-light");
+        assertThat(Theme.INTELLIJ_LIGHT.id()).isEqualTo("intellij-light");
         assertThat(Theme.DARK.id()).isEqualTo("jasper-dark");
+        assertThat(Theme.DARCULA).extracting(Theme::id, Theme::name, Theme::dark).containsExactly("darcula", "Darcula", true);
     }
 
-    @Test void theBuiltInThemesLoadWithoutWarnings() {
-        for (Theme theme : ThemeManager.builtIns()) assertThat(ThemeManager.resolve(theme).warnings()).as(theme.name()).isEmpty();
+    @Test void theVendoredIntellijThemesLoadWithoutWarnings() {
+        for (String file : List.of("intellij/Light.theme.json", "intellij/darcula.theme.json"))
+            assertThat(ThemeManager.loadBuiltIn(file).warnings()).as(file).isEmpty();
     }
 
     @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {

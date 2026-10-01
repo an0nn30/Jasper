@@ -26,7 +26,7 @@ class ShortcutSectionsTest {
                 assertThat(tree.getRowCount()).isGreaterThan(groups);
                 tree.collapseRow(0);
                 assertThat(tree.getRowCount()).isEqualTo(groups);
-                for (var theme : List.of(Theme.DARK, Theme.LIGHT)) {
+                for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                     themes.configure(theme); SwingUtilities.updateComponentTreeUI(panel);
                     assertThat(tree.getBackground()).isEqualTo(panel.getBackground());
                     assertThat(find(panel, JScrollPane.class).getViewport().getBackground()).isEqualTo(panel.getBackground());
