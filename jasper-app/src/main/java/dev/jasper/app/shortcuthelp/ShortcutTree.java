@@ -132,15 +132,20 @@ final class ShortcutTree extends JTree {
         return path != null && ((DefaultMutableTreeNode) path.getLastPathComponent()).getUserObject() instanceof ShortcutEntry item ? item : null;
     }
 
-    /** Wide rows keep the binding aligned to the right; long action names ellipsize. */
+    /** Wide rows keep the binding aligned to the right with where it applies beside it; long action names ellipsize. */
     private final class Row extends JPanel implements TreeCellRenderer {
-        private final JLabel name = new JLabel(), binding = new JLabel();
+        private final JLabel name = new JLabel(), where = new JLabel(), binding = new JLabel();
+        private final JPanel trailing = new JPanel(new BorderLayout(UIScale.scale(12), 0));
         Row() {
             super(new BorderLayout(UIScale.scale(20), 0));
             setOpaque(false);
-            name.putClientProperty("html.disable", true); binding.putClientProperty("html.disable", true);
+            name.putClientProperty("html.disable", true); where.putClientProperty("html.disable", true);
+            binding.putClientProperty("html.disable", true);
             name.setIconTextGap(UIScale.scale(8));
-            add(name, BorderLayout.CENTER); add(binding, BorderLayout.EAST);
+            binding.setHorizontalAlignment(SwingConstants.TRAILING);
+            trailing.setOpaque(false);
+            trailing.add(where, BorderLayout.CENTER); trailing.add(binding, BorderLayout.EAST);
+            add(name, BorderLayout.CENTER); add(trailing, BorderLayout.EAST);
             setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(4), 0, UIScale.scale(12)));
         }
         @Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected,
@@ -154,26 +159,38 @@ final class ShortcutTree extends JTree {
                 : java.util.Collections.list(node.children()).stream().anyMatch(child ->
                     ((DefaultMutableTreeNode) child).getUserObject() instanceof ShortcutEntry entry && entry.customized(macOs));
             name.setForeground(customized && link != null && !(selected && tree.hasFocus()) ? link : foreground);
-            binding.setForeground(selected && tree.hasFocus() ? foreground : UIManager.getColor("Label.disabledForeground"));
+            Color dim = selected && tree.hasFocus() ? foreground : UIManager.getColor("Label.disabledForeground");
+            binding.setForeground(dim); where.setForeground(dim);
             name.setFont(tree.getFont().deriveFont(item instanceof ShortcutEntry ? Font.PLAIN : Font.BOLD));
             binding.setFont(tree.getFont());
+            where.setFont(tree.getFont().deriveFont(tree.getFont().getSize2D() - 1f));
             if (item instanceof ShortcutEntry shortcut) {
                 name.setText(shortcut.name()); name.setIcon(null);
                 binding.setText(ShortcutText.format(shortcut.stroke()));
+                where.setText(shortcut.where());
                 setToolTipText(shortcut.context() + (shortcut.editable() ? " · Click to edit" : " · Read-only contextual key"));
             } else {
                 name.setText(String.valueOf(item));
                 name.setIcon(AppIcons.bundled(open ? "general/open" : "nodes/folder"));
                 binding.setText(String.valueOf(node.getChildCount()));
+                where.setText("");
                 setToolTipText(open ? "Collapse section" : "Expand section");
             }
-            getAccessibleContext().setAccessibleName(name.getText() + ", " + binding.getText());
+            column(where, 88); column(binding, 96);
+            getAccessibleContext().setAccessibleName(name.getText() + ", " + binding.getText()
+                + (where.getText().isEmpty() ? "" : ", " + where.getText()));
             getAccessibleContext().setAccessibleDescription(getToolTipText());
             return this;
         }
+        /** A minimum width for a trailing label, so the Where and binding columns line up from row to row. */
+        private void column(JLabel label, int minimum) {
+            label.setPreferredSize(null);
+            Dimension natural = label.getPreferredSize();
+            label.setPreferredSize(new Dimension(Math.max(natural.width, UIScale.scale(minimum)), natural.height));
+        }
         @Override public void setBounds(int x, int y, int width, int height) {
             super.setBounds(x, y, width, height);
-            doLayout(); // CellRendererPane does not validate compound tree renderers.
+            doLayout(); trailing.doLayout(); // CellRendererPane does not validate compound tree renderers.
         }
         @Override public Dimension getPreferredSize() {
             return new Dimension(UIScale.scale(320), getRowHeight());

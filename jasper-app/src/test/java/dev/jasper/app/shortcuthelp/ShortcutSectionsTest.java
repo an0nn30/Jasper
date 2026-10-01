@@ -151,4 +151,38 @@ class ShortcutSectionsTest {
         }
         return null;
     }
+
+    @Test void rowsShowWhereTheirShortcutApplies() throws Exception {
+        edt(() -> {
+            new ThemeController();
+            var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
+            try {
+                panel.setRows(List.of(new ShortcutEntry("clear_scrollback", "Terminal", "Clear Scrollback",
+                    KeyStroke.getKeyStroke("meta K"), "In a terminal pane", "", true, "cmd+k", "Terminal")));
+                panel.tree.expandSections(true);
+                assertThat(labels(panel.tree, "Clear Scrollback"))
+                    .contains("Clear Scrollback", "Terminal", ShortcutText.format(KeyStroke.getKeyStroke("meta K")));
+            } finally { panel.close(); }
+        });
+    }
+
+    private static List<String> labels(JTree tree, String name) {
+        for (int row = 0; row < tree.getRowCount(); row++) {
+            Object node = tree.getPathForRow(row).getLastPathComponent();
+            var cell = (Container) tree.getCellRenderer().getTreeCellRendererComponent(tree, node, false, tree.isExpanded(row),
+                tree.getModel().isLeaf(node), row, false);
+            if (!((JLabel) cell.getComponent(0)).getText().equals(name)) continue;
+            List<String> texts = new java.util.ArrayList<>();
+            collect(cell, texts);
+            return texts;
+        }
+        throw new AssertionError("no row named " + name);
+    }
+
+    private static void collect(Container root, List<String> texts) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JLabel label) texts.add(label.getText());
+            if (child instanceof Container nested) collect(nested, texts);
+        }
+    }
 }

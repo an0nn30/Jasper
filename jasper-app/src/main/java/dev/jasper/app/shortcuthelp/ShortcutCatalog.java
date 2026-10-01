@@ -1,6 +1,7 @@
 package dev.jasper.app.shortcuthelp;
 
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.ActionEntry;
 import java.awt.event.InputEvent;
@@ -16,22 +17,49 @@ final class ShortcutCatalog {
     private ShortcutCatalog() { }
 
     static List<ShortcutEntry> rows(KeyBindings base, List<ActionEntry> actions, Map<String, String> plugins, boolean macOs) {
+        return rows(base, actions, plugins, Map.of(), macOs);
+    }
+
+    /** @param panels panel titles by panel id, for actions whose shortcut applies inside a panel */
+    static List<ShortcutEntry> rows(KeyBindings base, List<ActionEntry> actions, Map<String, String> plugins,
+                                    Map<String, String> panels, boolean macOs) {
         var resolved = base.withExtensions(actions.stream().filter(a -> KeyBindings.extensionId(a.id()))
             .map(ActionEntry::extension).toList());
         var rows = new ArrayList<ShortcutEntry>();
         for (ActionId id : ActionId.values()) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
-            resolved.bindings().strokeFor(id).orElse(null), "Terminal window", id.id().replace('_', ' '), true, KeyBindings.effectiveDefaultBinding(id, macOs)));
+            resolved.bindings().strokeFor(id).orElse(null), description(id.context(), plugins, panels), id.id().replace('_', ' '),
+            true, KeyBindings.effectiveDefaultBinding(id, macOs), where(id.context(), plugins, panels)));
         for (ActionEntry action : actions) {
             String context = resolved.problems().stream().filter(problem -> problem.actionId().equals(action.id()))
-                .map(KeyBindings.Problem::message).findFirst().orElse("Terminal window");
+                .map(KeyBindings.Problem::message).findFirst().orElseGet(() -> description(action.context(), plugins, panels));
             String fallback = KeyBindings.extensionId(action.id()) ? action.extension().defaultFor(macOs).orElse("none") : "none";
             rows.add(new ShortcutEntry(action.id(), pluginGroup(action.id(), plugins), action.title(),
-                resolved.bindings().strokeFor(action.id()).orElse(null), context, String.join(" ", action.keywords()), true, validDefault(fallback, macOs)));
+                resolved.bindings().strokeFor(action.id()).orElse(null), context, String.join(" ", action.keywords()), true,
+                validDefault(fallback, macOs), where(action.context(), plugins, panels)));
         }
         contextual(rows, actions, plugins, macOs);
         rows.sort(Comparator.comparing(ShortcutEntry::group, String.CASE_INSENSITIVE_ORDER)
             .thenComparing(ShortcutEntry::name, String.CASE_INSENSITIVE_ORDER).thenComparing(ShortcutEntry::id));
         return List.copyOf(rows);
+    }
+
+    /** The Where column: Global, Terminal, a plugin's tabs, a panel or a window. */
+    static String where(KeyContext context, Map<String, String> plugins, Map<String, String> panels) {
+        return switch (context.kind()) {
+            case GLOBAL -> "Global";
+            case TERMINAL -> "Terminal";
+            case CONTENT -> plugins.getOrDefault(context.owner(), context.owner()) + " tabs";
+            case PANEL -> panels.getOrDefault(context.owner(), context.owner()) + " panel";
+            case WINDOW -> context.owner() + " window";
+        };
+    }
+
+    private static String description(KeyContext context, Map<String, String> plugins, Map<String, String> panels) {
+        return switch (context.kind()) {
+            case GLOBAL -> "Anywhere in a terminal window";
+            case TERMINAL -> "In a terminal pane";
+            case CONTENT, PANEL, WINDOW -> "Only in the " + where(context, plugins, panels);
+        };
     }
 
     private static String validDefault(String binding, boolean macOs) {
