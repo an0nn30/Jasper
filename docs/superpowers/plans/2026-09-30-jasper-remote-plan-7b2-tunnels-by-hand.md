@@ -24,7 +24,7 @@
 - Tests bind loopback addresses only (never `*` or a LAN address, which would raise the macOS firewall prompt) and contact no external host.
 - Never launch the GUI. Run the Python hygiene check from `AGENTS.md` before each commit.
 - `./gradlew check` is green at the end of every task. For counts read `*/build/test-results/test/*.xml`.
-- Recorded deviations from the spec (copy them into `docs/STATUS.md` in Task 11): `*` is sent to the server as `0.0.0.0` (MINA turns an empty host into `0.0.0.0` anyway); there is no `RemoteRelay` class — the relay is a `Listener` on `127.0.0.1:0`; the palette scope has no aliases (`ScopeSpec` has none); the rail and status icon is the catalog's `BundledIcon.ACTIONS_SWAP_PANELS` (no semantic `IconName` fits) and the failing status uses `BundledIcon.STATUS_WARNING`, so `RemotePluginTest`'s "semantic icons only" check admits that one catalog icon; `Pump` uses `java.net` sockets.
+- Recorded deviations from the spec (copy them into `docs/STATUS.md` in Task 10): `*` is sent to the server as `0.0.0.0` (MINA turns an empty host into `0.0.0.0` anyway); there is no `RemoteRelay` class — the relay is a `Listener` on `127.0.0.1:0`; the palette scope has no aliases (`ScopeSpec` has none); the rail and status icon is the catalog's `BundledIcon.ACTIONS_SWAP_PANELS` (no semantic `IconName` fits) and the failing status uses `BundledIcon.STATUS_WARNING`, so `RemotePluginTest`'s "semantic icons only" check admits that one catalog icon; `Pump` uses `java.net` sockets.
 
 ---
 
