@@ -306,6 +306,7 @@ public final class TunnelsPanel extends JPanel {
      * asked for the height, so a new width asks for another pass.
      */
     static final class WrappedNote extends JTextArea {
+        private Color semanticForeground;
         WrappedNote() {
             setEditable(false);
             setFocusable(false);
@@ -324,8 +325,11 @@ public final class TunnelsPanel extends JPanel {
 
         @Override protected void paintComponent(java.awt.Graphics graphics) {
             Color foreground = WorkspacePalette.current(this).text();
-            var style = java.util.Map.of("foreground", foreground);
-            if (!style.equals(getClientProperty("FlatLaf.style"))) putClientProperty("FlatLaf.style", style);
+            // The host may compose more keys into FlatLaf.style; compare our semantic value instead.
+            if (!foreground.equals(semanticForeground)) {
+                semanticForeground = foreground;
+                putClientProperty("FlatLaf.style", java.util.Map.of("foreground", foreground));
+            }
             setForeground(foreground);
             super.paintComponent(graphics);
         }

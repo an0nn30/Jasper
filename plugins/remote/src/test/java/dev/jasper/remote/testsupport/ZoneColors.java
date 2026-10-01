@@ -39,5 +39,32 @@ public final class ZoneColors implements AutoCloseable {
         var image = new BufferedImage(320, 100, BufferedImage.TYPE_INT_RGB); var graphics = image.createGraphics();
         try { component.paint(graphics); } finally { graphics.dispose(); }
     }
+    /** A host composite remains installed until this control's semantic color actually changes. */
+    public void assertStableSemanticStyle(JComponent component, String token) {
+        paint(component);
+        Color initial = component.getForeground();
+        var composite = Map.of("foreground", initial, "background", new Color(0x102030));
+        component.putClientProperty("FlatLaf.style", composite);
+        var events = new java.util.concurrent.atomic.AtomicInteger();
+        java.beans.PropertyChangeListener listener = event -> events.incrementAndGet();
+        component.addPropertyChangeListener("FlatLaf.style", listener);
+        try {
+            for (int i = 0; i < 3; i++) paint(component);
+            org.assertj.core.api.Assertions.assertThat(events.get()).as("unchanged paints must not republish a plugin style").isZero();
+            org.assertj.core.api.Assertions.assertThat(component.getClientProperty("FlatLaf.style")).isSameAs(composite);
+            component.updateUI();
+            component.setForeground(new Color(0x654321));
+            paint(component);
+            org.assertj.core.api.Assertions.assertThat(component.getForeground()).isEqualTo(initial);
+            org.assertj.core.api.Assertions.assertThat(events.get()).as("delegate recovery uses the effective setter without replacing the composite").isZero();
+            org.assertj.core.api.Assertions.assertThat(component.getClientProperty("FlatLaf.style")).isSameAs(composite);
+            Color next = new Color(0x123456);
+            put("Jasper.workspace." + token, next);
+            paint(component);
+            org.assertj.core.api.Assertions.assertThat(component.getForeground()).isEqualTo(next);
+            org.assertj.core.api.Assertions.assertThat(events.get()).as("a changed semantic color publishes once").isEqualTo(1);
+            org.assertj.core.api.Assertions.assertThat(((Map<?, ?>) component.getClientProperty("FlatLaf.style")).get("foreground")).isEqualTo(next);
+        } finally { component.removePropertyChangeListener("FlatLaf.style", listener); }
+    }
     @Override public void close() { previous.forEach(UIManager::put); }
 }

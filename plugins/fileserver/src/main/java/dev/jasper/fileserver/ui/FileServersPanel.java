@@ -355,6 +355,7 @@ public final class FileServersPanel extends JPanel {
     /** Wrapping, read-only text that looks like a label; a JTextArea never renders HTML. */
     private static JTextArea note(String text) {
         var note = new JTextArea(text) {
+            private Color semanticForeground;
             @Override public void setBounds(int x, int y, int width, int height) {
                 // Hidden children are laid out at a degenerate size; a wrapped text area would keep measuring at it.
                 if (width <= 0 || height <= 0) { width = 0; height = 0; }
@@ -362,8 +363,11 @@ public final class FileServersPanel extends JPanel {
             }
             @Override protected void paintComponent(java.awt.Graphics graphics) {
                 Color foreground = WorkspacePalette.current(this).textMuted();
-                var style = java.util.Map.of("foreground", foreground);
-                if (!style.equals(getClientProperty("FlatLaf.style"))) putClientProperty("FlatLaf.style", style);
+                // The host may compose more keys into FlatLaf.style; compare our semantic value instead.
+                if (!foreground.equals(semanticForeground)) {
+                    semanticForeground = foreground;
+                    putClientProperty("FlatLaf.style", java.util.Map.of("foreground", foreground));
+                }
                 setForeground(foreground);
                 super.paintComponent(graphics);
             }

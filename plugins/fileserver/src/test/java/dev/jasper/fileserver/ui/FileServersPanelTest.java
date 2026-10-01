@@ -25,6 +25,16 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServersPanelTest {
+    @Test void repeatedNotePaintsPreserveTheHostCompositeStyle() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                var panel = panel();
+                colors.workspace.add(panel);
+                colors.assertStableSemanticStyle(panel.empty, "textMuted");
+            }
+        });
+    }
+
     @Test void mountedServerRenderersKeepSemanticAndSelectedColors() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try (var colors = new ZoneColors()) {

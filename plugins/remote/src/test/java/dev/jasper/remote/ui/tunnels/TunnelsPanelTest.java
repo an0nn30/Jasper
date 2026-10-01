@@ -23,6 +23,15 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class TunnelsPanelTest {
+    @Test void repeatedNotePaintsPreserveTheHostCompositeStyle() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                colors.workspace.add(panel);
+                colors.assertStableSemanticStyle(panel.empty, "text");
+            }
+        });
+    }
+
     @Test void mountedTunnelRowsKeepStatusAndSelectionColors() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try (var colors = new ZoneColors()) {

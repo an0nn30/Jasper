@@ -136,11 +136,15 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
     private static void popup(JPopupMenu menu, JButton button) { if (button.isShowing()) menu.show(button, 0, button.getHeight()); }
     /** Muted metadata stays semantic after a delegate rebuild or a move between zones. */
     private static final class MutedLabel extends JLabel {
+        private Color semanticForeground;
         MutedLabel(String text) { super(text); }
         @Override protected void paintComponent(java.awt.Graphics graphics) {
             Color foreground = WorkspacePalette.current(this).textMuted();
-            var style = java.util.Map.of("foreground", foreground);
-            if (!style.equals(getClientProperty("FlatLaf.style"))) putClientProperty("FlatLaf.style", style);
+            // The host may compose more keys into FlatLaf.style; compare our semantic value instead.
+            if (!foreground.equals(semanticForeground)) {
+                semanticForeground = foreground;
+                putClientProperty("FlatLaf.style", java.util.Map.of("foreground", foreground));
+            }
             setForeground(foreground);
             super.paintComponent(graphics);
         }

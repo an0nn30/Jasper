@@ -10,6 +10,20 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ManagerPanelTest {
+    @Test void repeatedNotePaintsPreserveTheHostCompositeStyle() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var colors = new ZoneColors()) {
+                var panel = panel(new AtomicReference<>());
+                colors.workspace.add(panel);
+                colors.assertStableSemanticStyle(panel.status, "textMuted");
+                var empty = ZoneColors.labels(panel).stream().filter(l -> "Nothing to show".equals(l.getText())).findFirst().orElseThrow();
+                colors.put("Jasper.workspace.textMuted", new java.awt.Color(0x314253));
+                colors.assertStableSemanticStyle(empty, "textMuted");
+                panel.close();
+            }
+        });
+    }
+
     @Test void mountedManagerKeepsMutedTextAndRuleAfterUiRefresh() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try (var colors = new ZoneColors()) {
