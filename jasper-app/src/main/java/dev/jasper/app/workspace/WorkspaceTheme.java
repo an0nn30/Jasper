@@ -32,8 +32,8 @@ public final class WorkspaceTheme {
         root.repaint();
     }
 
-    public static Color color(Component component, Token token, String chromeKey) {
-        return resolvedColor(workspace(component), token, chromeKey);
+    public static Color color(Component component, Token token, String... chromeKeys) {
+        return resolvedColor(workspace(component), token, chromeKeys);
     }
 
     static GeneratedTheme workspace(Component component) {
@@ -49,8 +49,12 @@ public final class WorkspaceTheme {
         return null;
     }
 
-    static Color resolvedColor(GeneratedTheme workspace, Token token, String chromeKey) {
-        Color color = workspace == null ? UIManager.getColor(chromeKey) : workspace.tokens().get(token);
-        return Objects.requireNonNull(color, chromeKey);
+    static Color resolvedColor(GeneratedTheme workspace, Token token, String... chromeKeys) {
+        if (workspace != null) return Objects.requireNonNull(workspace.tokens().get(token), token.name());
+        for (String key : chromeKeys) {
+            Color color = UIManager.getColor(key);
+            if (color != null) return color;
+        }
+        throw new IllegalStateException("Missing chrome colors: " + String.join(", ", chromeKeys));
     }
 }

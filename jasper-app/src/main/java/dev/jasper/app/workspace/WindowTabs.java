@@ -68,7 +68,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             revealSelection = true;
         }
         if (selected != owner.selectedComponent()) { selected = owner.selectedComponent(); revealSelection = true; }
-        setBackground(WorkspaceTheme.color(this, Token.TAB_BAR, "ToolWindow.background"));
+        setBackground(WorkspaceTheme.color(this, Token.TAB_BAR, "ToolWindow.background", "Panel.background"));
         boolean retitled = false;
         for (Component tab : order) retitled |= entries.get(tab).refresh();
         // A tab that grows can push the selected tab out; keep it shown if it was shown.

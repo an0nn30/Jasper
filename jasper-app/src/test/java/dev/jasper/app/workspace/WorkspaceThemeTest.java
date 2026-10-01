@@ -12,6 +12,39 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WorkspaceThemeTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new ThemeController()); }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void completeThemeCanCreateAndRefreshWindowWithOptionalToolWindowBackground(boolean authored) throws Exception {
+        edt(() -> {
+            var base = Theme.DARCULA.source().document();
+            var ui = new java.util.LinkedHashMap<>(base.ui());
+            ui.remove("ToolWindow.background");
+            ui.put("Panel.background", "#17232f");
+            if (authored) ui.put("ToolWindow.background", "#314159");
+            var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
+                base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons());
+            var generated = ThemeGenerator.generate(document);
+            var chrome = new Theme("optional-tool-window-" + authored, generated.name(), generated.dark(),
+                generated.terminal(), new Theme.UserFile(java.nio.file.Path.of("optional-tool-window.toml"), document));
+            var themes = new ThemeController(chrome);
+            var background = new java.awt.Color(authored ? 0x314159 : 0x17232f);
+            assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(authored ? background : null);
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            assertThat(owner.windowTabs().getBackground()).isEqualTo(background);
+            themes.configure(chrome, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());
+            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.TAB_BAR));
+            themes.configure(chrome, WorkspaceThemeChoice.MATCH, null, UiFontConfig.defaults());
+            owner.update();
+            assertThat(owner.windowTabs().getBackground()).isEqualTo(background);
+            owner.windowTabs().setSize(600, 32);
+            owner.windowTabs().doLayout();
+            var image = new java.awt.image.BufferedImage(600, 32, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var graphics = image.createGraphics();
+            try { owner.windowTabs().paint(graphics); }
+            finally { graphics.dispose(); }
+        });
+    }
+
     @Test void independentWorkspaceMarksNewTabsAndPaintsStripWithoutChangingChrome() throws Exception {
         edt(() -> {
             var themes = new ThemeController(Theme.INTELLIJ_LIGHT);

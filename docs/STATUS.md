@@ -2,6 +2,15 @@
 
 ## Current state — 2026-10-01
 
+- **Theme workspace startup regression fixed:** the first native GUI attempt after Plan 2 found that GitHub Dark
+  omits the optional IntelliJ `ToolWindow.background` key. The new workspace color lookup threw while creating
+  `WindowContent`, and startup rollback immediately exited. Tab strips now fall back to chrome `Panel.background`,
+  preserving an authored ToolWindow color and independent workspace `TAB_BAR` tokens. A headless real-window-content
+  regression reproduced the logged stack before the fix and verifies absent/present keys, workspace switching and
+  retained-tab painting. Independent review approved; full `./gradlew check`: **7,771 tests, zero failures/errors,
+  six skips** (app 1,562). No GUI launched; user retry remains the native acceptance check. This correction is included
+  in the local Plan 2 integration; no push.
+
 - **Theme system Plan 2 workspace delivery** (branch `codex/theme-system-plans`, 2026-10-01):
   [assessment and requirement coverage](superpowers/plans/2026-10-01-theme-system-remaining-work.md) audits main
   `5fc76c7d` against the full theme design. Plan 2 is implemented, headless-verified and independently reviewed, then merged to local `main` on 2026-10-01;

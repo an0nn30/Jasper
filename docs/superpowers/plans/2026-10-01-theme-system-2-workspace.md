@@ -520,3 +520,13 @@ not run.
 | plugins/snippets | 11 | 0 | 0 | 0 |
 | plugins/vault | 140 | 0 | 0 | 1 |
 | **Total** | **7,769** | **0** | **0** | **6** |
+
+## Post-integration startup correction
+
+The user's native startup with GitHub Dark exposed an optional `ToolWindow.background` lookup that the built-in
+fixtures did not cover. The new strict lookup threw during `WindowContent` construction in match mode. The tab
+strip now tries that authored key before falling back to chrome `Panel.background`; an independent workspace still
+uses its exact `TAB_BAR` token. A headless complete-theme regression fails with the same startup stack before the
+fix and passes with/without the optional key, including match/independent/match changes and painting.
+Independent review approved. Full check: 7,771 tests, zero failures/errors, six skips; app 1,562 and the remaining
+modules unchanged from the table above. The agent did not launch the GUI; native retry remains with the user.
