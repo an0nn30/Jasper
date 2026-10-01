@@ -10,7 +10,7 @@ import java.util.Objects;
  */
 public record Theme(String id, String name, boolean dark, Palette palette, Source source) {
     /** Where a theme comes from; every source carries the resolved document. */
-    public sealed interface Source permits Bundled, Archive {
+    public sealed interface Source permits Bundled, UserFile, Archive {
         /** The resolved theme document. */
         ThemeDocument document();
     }
@@ -18,6 +18,11 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     /** A theme Jasper ships, from {@code file} under {@code dev/jasper/app/themes/}: a Jasper theme or a converted IntelliJ one. */
     public record Bundled(String file, ThemeDocument document) implements Source {
         public Bundled { Objects.requireNonNull(file); Objects.requireNonNull(document); }
+    }
+
+    /** A Jasper theme file in the {@code themes} folder beside {@code config.toml}. */
+    public record UserFile(Path file, ThemeDocument document) implements Source {
+        public UserFile { Objects.requireNonNull(file); Objects.requireNonNull(document); }
     }
 
     /** A theme an installed IntelliJ plugin provides, converted when the catalog read the archive. */

@@ -175,4 +175,65 @@ class ThemeCatalogTest {
         assertThat(ThemeCatalog.builtIn().directory()).isEmpty();
         assertThat(themes()).doesNotExist();
     }
+
+    @Test void aThemeFileInTheFolderIsAThemeThatMayExtendABuiltIn() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("mine.toml"), """
+            name = "Mine"
+            extends = "Jasper Dark"
+            [tokens]
+            tab_active = "#123456"
+            """);
+        var snapshot = catalog().scan();
+        assertThat(snapshot.problems()).isEmpty();
+        Theme mine = snapshot.find("mine").orElseThrow();
+        assertThat(mine.id()).isEqualTo("user:mine.toml");
+        assertThat(mine.dark()).isTrue();
+        assertThat(mine.palette()).isEqualTo(Theme.DARK.palette());
+        assertThat(mine.source()).isInstanceOfSatisfying(Theme.UserFile.class,
+            user -> assertThat(user.file()).isEqualTo(themes().resolve("mine.toml")));
+        assertThat(ThemeGenerator.generate(mine.source().document()).tokens().get(Token.TAB_ACTIVE)).isEqualTo(new Color(0x123456));
+        assertThat(snapshot.themes()).as("user themes come first").startsWith(mine);
+    }
+
+    @Test void aThemeFileMayReplaceABuiltInThemeAndExtendIt() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("dark.toml"), "name = \"Jasper Dark\"\nextends = \"Jasper Dark\"\n[colors]\naccent = \"#ff8800\"\n");
+        var snapshot = catalog().scan();
+        assertThat(snapshot.problems()).isEmpty();
+        assertThat(snapshot.find("Jasper Dark").map(Theme::source)).get().isInstanceOf(Theme.UserFile.class);
+        assertThat(snapshot.themes()).doesNotContain(Theme.DARK);
+    }
+
+    @Test void aThemeFileMayExtendAPluginTheme() throws Exception {
+        plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        Files.writeString(themes().resolve("tweak.toml"), "name = \"Tweak\"\nextends = \"Fixture Dark\"\n");
+        var snapshot = catalog().scan();
+        assertThat(snapshot.problems()).isEmpty();
+        Theme tweak = snapshot.find("Tweak").orElseThrow();
+        assertThat(tweak.palette().background()).isEqualTo(new Color(0x101820));
+        assertThat(tweak.source().document().uiComplete()).contains(true);
+    }
+
+    @Test void aBrokenThemeFileIsAProblemOnItsLine() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("bad.toml"), "name = \"Bad\"\n[colors]\nbackground = \"blue\"\n");
+        Files.writeString(themes().resolve("orphan.toml"), "name = \"Orphan\"\n\nextends = \"Nowhere\"\n");
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("Bad")).isEmpty();
+        assertThat(snapshot.find("Orphan")).isEmpty();
+        assertThat(snapshot.problems()).extracting(ThemeCatalog.Problem::line, problem -> problem.file().getFileName().toString())
+            .containsExactlyInAnyOrder(tuple(3, "bad.toml"), tuple(3, "orphan.toml"));
+        assertThat(snapshot.problems()).extracting(ThemeCatalog.Problem::message)
+            .anySatisfy(message -> assertThat(message).startsWith("bad.toml:3: ").contains("must be a colour"))
+            .anySatisfy(message -> assertThat(message).startsWith("orphan.toml:3: ").contains("\"Nowhere\""));
+    }
+
+    @Test void anOversizedThemeFileIsAProblem() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("huge.toml"), "name = \"Huge\"\n# " + "x".repeat(ThemeCatalog.MAX_THEME_FILE));
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("Huge")).isEmpty();
+        assertThat(snapshot.problems()).singleElement().satisfies(problem -> assertThat(problem.message()).contains("larger than 256 KiB"));
+    }
 }
