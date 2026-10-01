@@ -61,9 +61,9 @@ The reviewed proposal is [assets/2026-09-30-keymap-proposal.html](assets/2026-09
 | --- | --- | --- |
 | Global | anywhere in a terminal window | default for every action |
 | Terminal | in a terminal pane | built-in terminal actions |
-| Content (per plugin) | in a content tab the plugin opened (the Editor's tabs) | plugin, `ActionContext.content()` |
-| Panel (per panel id) | inside that panel (SSH Sessions, SFTP) | plugin, `ActionContext.panel(panelId)` |
-| Window (per window id) | inside that plugin window (Vault manager) | plugin, `ActionContext.window(windowId)` |
+| Content (per plugin) | in a content tab the plugin opened (the Editor's tabs) | plugin, `ShortcutContext.content()` |
+| Panel (per panel id) | inside that panel (SSH Sessions, SFTP) | plugin, `ShortcutContext.panel(panelId)` |
+| Window (per window id) | inside that plugin window (Vault manager) | plugin, `ShortcutContext.window(windowId)` |
 | File chooser, find bar | inside Jasper's file chooser or a terminal find bar | built-in |
 
 Specificity: Panel, Window, Content, File chooser, Find bar (equal, they never nest) › Terminal › Global.
@@ -108,9 +108,10 @@ their own context; the palette dispatcher, overlay blocking and the Keymap recor
 
 ## SDK 0.11.0
 
-- `dev.jasper.sdk.ui.ActionContext`: `global()`, `terminal()`, `content()`, `panel(String panelId)`,
+- `dev.jasper.sdk.ui.ShortcutContext` (named so in plan K1: `ActionContext` is the SDK's existing action-invocation
+  interface): `global()`, `terminal()`, `content()`, `panel(String panelId)`,
   `window(String windowId)`; `panel` and `window` ids must belong to the plugin.
-- `ActionSpec.withContext(ActionContext)` (default Global) and `ActionSpec.withDefaultBindings(String macOs, String other)`.
+- `ActionSpec.withContext(ShortcutContext)` (default Global) and `ActionSpec.withDefaultBindings(String macOs, String other)`.
 - Actions in a Content, Panel or Window context are not shown in the palette's Commands scope unless that context is
   focused.
 - Testkit: `FakePluginHost` records each action's context and defaults, can invoke an action "from" a context, and
