@@ -109,7 +109,8 @@ private static void installUi(PluginContext context, long stepMillis) {
   Windows key with `withDefaultBindings("cmd+s", "ctrl+s")`. `withContext(ShortcutContext.terminal())`,
   `content()`, `panel(id)` or `window(id)` limits where the key applies (SDK 0.11.0): the most specific
   context around focus wins, so a panel action may reuse a Global key, and a key whose action does not
-  apply reaches the focused component.
+  apply reaches the focused component. A `window(id)` shortcut takes effect once plugin windows get the
+  Keymap (plan K4).
 - **Placements** may name only actions your plugin registered. Closing an action removes it from
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.

@@ -24,7 +24,10 @@ public record ShortcutContext(Kind kind, Optional<String> id) {
         CONTENT,
         /** Inside one of the plugin's panels. */
         PANEL,
-        /** Inside one of the plugin's windows. */
+        /**
+         * Inside one of the plugin's windows. Window shortcuts take effect once plugin windows get the Keymap
+         * (plan K4); until then an action in this context never applies.
+         */
         WINDOW
     }
 
@@ -70,7 +73,8 @@ public record ShortcutContext(Kind kind, Optional<String> id) {
     public static ShortcutContext panel(String panelId) { return new ShortcutContext(Kind.PANEL, Optional.ofNullable(panelId)); }
 
     /**
-     * Inside one of the plugin's windows.
+     * Inside one of the plugin's windows. Window shortcuts take effect once plugin windows get the Keymap
+     * (plan K4); until then an action in this context never applies.
      *
      * @param windowId the window's id, which starts with the plugin's id and a dot
      * @return the context

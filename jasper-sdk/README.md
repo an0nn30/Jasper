@@ -75,7 +75,8 @@ whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scrip
 
 SDK 0.11.0 adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
-`window(id)` (one of the plugin's own panels or windows). Where focus is, the most specific applicable action takes a
+`window(id)` (one of the plugin's own panels or windows; window shortcuts take effect once plugin windows get the
+Keymap, plan K4). Where focus is, the most specific applicable action takes a
 key, and a key whose action doesn't apply, or is disabled, reaches the focused component, such as the shell.
 `withDefaultBindings(macOs, other)` gives a separate Linux and Windows default; with `withDefaultBinding` alone, a
 default naming cmd and shift gets alt outside macOS (`cmd+shift+x` becomes Ctrl+Alt+Shift+X).
