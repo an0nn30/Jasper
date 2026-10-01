@@ -8,8 +8,8 @@ import java.util.Optional;
  *
  * @param title non-blank title shown to the user
  * @param detail initial detail line, possibly empty
- * @param activateActionId id of an action that brings the user to this work; resolved once the
- *                         actions API exists, ignored before then
+ * @param activateActionId one of the plugin's own actions that brings the user to this work, run when the user
+ *                         clicks its card (from SDK 0.10.2); any other id only raises the application
  * @param cancel invoked when the user asks to stop the work; absent when it cannot be cancelled
  */
 public record ActivitySpec(String title, String detail, Optional<String> activateActionId, Optional<Runnable> cancel) {

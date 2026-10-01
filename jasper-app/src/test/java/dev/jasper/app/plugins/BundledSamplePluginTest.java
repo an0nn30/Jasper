@@ -41,24 +41,25 @@ class BundledSamplePluginTest {
                         assertThat(dropdown.title()).isEqualTo("Sessions");
                         assertThat(dropdown.actionIds()).containsExactly("dev.jasper.remote.sessions.manage");
                     }));
-            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel");
+            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel", "dev.jasper.fileserver.panel");
             assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
             assertThat(contributions.menus()).anySatisfy(menu -> {
                 assertThat(menu.target()).isEqualTo(dev.jasper.app.contributions.MenuTarget.standard(
                     dev.jasper.app.contributions.MenuTarget.Slot.FILE));
                 assertThat(menu.entries()).contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
             });
-            assertThat(contributions.status()).hasSize(4)
+            assertThat(contributions.status()).hasSize(5)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
-        assertThat(runtime.get().statusLines()).as("the sample and the five bundled feature plugins").hasSize(6)
+        assertThat(runtime.get().statusLines()).as("the sample and the six bundled feature plugins").hasSize(7)
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.1", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.remote", "BUNDLED", "ACTIVE"))
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.editor", "BUNDLED", "ACTIVE"));
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.editor", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.fileserver", "BUNDLED", "ACTIVE"));
         var state = new AtomicReference<BuddyNotice.State>();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (state.get() != BuddyNotice.State.DONE && System.nanoTime() < deadline) {
@@ -90,7 +91,7 @@ class BundledSamplePluginTest {
             var outcome = new CompletableFuture<PluginRuntime.Outcome>();
             onEdt(() -> runtime.get().snapshot(outcome::complete));
             var rows = outcome.get(10, TimeUnit.SECONDS).snapshot().rows();
-            assertThat(rows).hasSize(6).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
+            assertThat(rows).hasSize(7).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
             assertThat(rows).filteredOn(row -> row.id().equals("dev.jasper.remote")).singleElement()
                 .satisfies(row -> assertThat(row.homepage()).isEqualTo("https://github.com/an0nn30/Jasper"));
         } finally {

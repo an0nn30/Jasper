@@ -3,6 +3,7 @@ package dev.jasper.sdk.testing.contract;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.activity.ActivityEvent;
+import dev.jasper.sdk.activity.ConnectionEvent;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
 import java.util.List;
@@ -31,6 +32,9 @@ public interface ContractHarness extends AutoCloseable {
 
     /** Every activity event delivered so far, in delivery order, as the application's own observer sees them. */
     List<ActivityEvent> activityLog();
+
+    /** Every connection event delivered so far, in delivery order, as the application's own observer sees them. */
+    List<ConnectionEvent> connectionLog();
 
     /** Registered actions as {@code id|title|enabled}, in registration order. */
     List<String> actions();
@@ -75,7 +79,7 @@ public interface ContractHarness extends AutoCloseable {
      */
     boolean closeCommand(String windowId);
 
-    /** UI thread: asks every open plugin window's closing guards as quitting Jasper does, closing nothing; true when the quit may go ahead. */
+    /** UI thread: asks every open plugin window's closing guards, then every quit guard, as quitting Jasper does, closing nothing; true when the quit may go ahead. */
     boolean requestQuit();
 
     /** UI thread: adds a terminal window, which announces itself on the terminal topics. */
@@ -169,4 +173,6 @@ public interface ContractHarness extends AutoCloseable {
         /** Every error notice as {@code <plugin name>: <message>}. */
         List<String> notices();
         List<java.nio.file.Path> openedInEditor();
+        /** Every web address a plugin asked to open in the browser, in request order. */
+        List<java.net.URI> browsed();
 }

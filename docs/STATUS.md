@@ -11,7 +11,7 @@
   only the root input map takes keys, so a key it declines never fires a menu item (Linux Ctrl+Shift+V in a text field
   no longer pastes into the shell). Linux Ctrl+Tab / Ctrl+Shift+Tab switch tabs before focus traversal can take them,
   from a text area, a table or a field too.
-  SDK 0.11.0: `ShortcutContext`, `ActionSpec.withContext` / `withDefaultBindings`, `FakePluginHost.actionSpec`;
+  SDK 0.11.0 (with File Server's `network.listen` and `Windows.onQuitting`): `ShortcutContext`, `ActionSpec.withContext` / `withDefaultBindings`, `FakePluginHost.actionSpec`;
   bundled plugins declare `sdk = ">=0.11.0, <0.12"`; Remote 0.9.0, Vault 0.4.0. **Moved defaults** (macOS / Linux and
   Windows): Command Palette ⇧⌘P / Ctrl+Shift+P (was ⌘K / Ctrl+K); Clear Scrollback ⌘K, terminal only (was ⇧⌘K);
   Close Pane ⌘W / Ctrl+Shift+W, closing the tab with its last pane (was ⇧⌘W / Ctrl+Alt+Shift+W); Close Tab ⌥⌘W /
@@ -31,13 +31,69 @@
   ⌥⌘W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
   collision.
   `./gradlew check` green: app 1455/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0, Vault 140/0/1, Buddy 163/0/0,
-  History 41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 36/0/0, testkit 74/0/0. Not merged. GUI checks pending with
+  History 41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 36/0/0, testkit 74/0/0. Merged into local main 2026-09-30 (not pushed). GUI checks pending with
   the user: ⇧⌘P / Ctrl+Shift+P opens the palette; ⌘K clears in a terminal and does nothing in the SSH Sessions panel's
   search; ⌘W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
   terminal, an Editor tab or a panel field, Ctrl+Shift+C with no selection in a terminal does nothing, and
   Ctrl+Shift+V in a panel field pastes into the field only; ⌥⌘1 / Alt+1 toggles SSH Sessions; the Keymap shows the
   Where column; menus still show each shortcut, a click still runs the item, and every menu shortcut still works from
   a terminal.
+- **File Server FS-1: foundation and HTTP** (branch `claude/file-server-fs1`, spec
+  `docs/superpowers/specs/2026-09-30-jasper-file-server-design.md`, plan
+  `docs/superpowers/plans/2026-09-30-file-server-fs1.md`, user guide `docs/file-server.md`): SDK 0.11.0 adds the
+  `network.listen` capability and `Windows.onQuitting` quit guards (app `QuitGuards`, testkit fake and contract tests);
+  every bundled plugin declares `sdk = ">=0.11.0, <0.12"`. New bundled plugin File Server (`plugins/fileserver`,
+  `dev.jasper.fileserver` 0.1.0): File Servers rail panel, editor, status item, palette scope, Serve Current Folder over
+  HTTP, quit confirmation, autostart (waiting for a locked Vault), Vault or session logins, `ShareRoot` jail, login
+  throttle, and an HTTP engine on the JDK server (listings, ranges, Basic auth, uploads and deletes on writable shares,
+  Host and Origin checks). Deviations from the spec: user doc in `docs/file-server.md`; setting keys
+  `confirm_quit`/`activity_entries`; the privileged-port suggestion is port + 8000; Host/Origin checks added; palette
+  titles in house style with a scope for per-server Start/Stop; saving a temporary server adopts it. Execution
+  deviations (all listed in the plan's status banner): `ResolvedLogin.isAnonymous()`; `ShareRoot` also refuses
+  unrepresentable names and C1 control characters; the login throttle answers early or locked-out attempts with 429 and
+  `Retry-After` instead of sleeping, and the Host check runs before credentials; the listing sends
+  `Referrer-Policy: same-origin`; transfer ids are unique per JVM; the port-clash check uses the definition a running
+  engine uses; FAILED from RUNNING is not implemented (engines have no fatal-runtime channel); the panel is
+  master/detail; an Interface bind advertises one URL; the status item toggles the panel; labels set `html.disable`.
+  Open follow-up: `shutdown()` stops engines in parallel under one 5 s deadline, so `Plugin.stop()` can block up to 5 s,
+  against the SDK's "must not block". `./gradlew check` green: jasper-app 1,439 tests (0 failures, 1 skipped),
+  jasper-terminal 391 (0, 4 skipped), jasper-buddy 163, jasper-sdk 35, jasper-sdk-testkit 74, editor 4,782,
+  fileserver 114, history 41, remote 297, sample 12, snippets 11, vault 139 (0, 1 skipped). Earlier runs saw flaky
+  `RemotePluginTest.endingAPanesSessionClearsTheSftpView`, `TransferCoordinatorTest.resumedScannedJob...` and
+  `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Final-review fixes: a `servers.toml` entry without an id gets a stable id derived from
+  its name, and saves are refused while the file has skipped entries; uploads go to a hidden temporary file and replace the target atomically only when
+  complete; activity refreshes coalesce into one UI task; activity-log text from clients has control characters
+  replaced; a cancelled download is not logged as an error; a failed `HttpEngine.start` releases its server and pool.
+  Merged into local main 2026-09-30 (not pushed) on top of SDK 0.10.2 (connection activities, `Platform.browse`), which
+  0.11.0 now includes; every bundled plugin declares `sdk = ">=0.11.0, <0.12"`, so the Remote tunnels plans (7b) must use
+  that range. GUI checks pending with the
+  user: New File Server and start it; open the URL from a phone on the LAN with All networks (macOS firewall and Local
+  Network prompts); upload two files and delete one from the listing page in a real browser (Chrome, Safari, Firefox)
+  on a writable server; a wrong password then an immediate retry shows a short 429 wait; a Vault account login with a
+  locked Vault and Start With Jasper; Serve Current Folder from a terminal; the quit confirmation; Reveal Folder and
+  Copy Address.
+
+- **Remote tunnels plan 7b-1: SDK 0.10.2 connection activities** (branch `claude/tunnels-7b1`, plan
+  `docs/superpowers/plans/2026-09-30-jasper-remote-plan-7b1-connection-activities.md`, executed inline 2026-09-30):
+  `Activities.connection` returns a `ConnectionHandle` (`up`, `degraded`, `down`, `close`) publishing
+  `ConnectionEvent`s on `Activities.CONNECTIONS` (states in order, detail-only reports coalesced, one `CLOSED`, closed
+  when the plugin stops); `Platform.browse(URI)` opens http/https addresses through the new `platform.Browser`; Buddy
+  shows connections as connection cards, and a card whose `activateActionId` names the source plugin's own action
+  runs it in the last active window and is acknowledged (task cards too). Testkit: `connectionLog()`, `browsed()`;
+  contract +3 cases. No deviations from the plan. `./gradlew check` green: app 1439/0/1, terminal 391/0/4,
+  Editor 4782/0/0, Remote 297/0/0, Vault 139/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0,
+  SDK 36/0/0, testkit 75/0/0. Seen once during Task 1's first full check and not reproduced in six reruns (four
+  alone, two whole-module): `RemotePluginTest.endingAPanesSessionClearsTheSftpView` read the SFTP panel's folder
+  ("/") right after its rows emptied; a timing flake unrelated to this plan. Not merged; plan 7b-2 builds on it.
+- **Remote tunnels design (7b)** (branch `claude/tunnels-spec`, spec
+  `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md`, brainstormed and approved section by section
+  2026-09-30; written spec approved by the user the same day): tunnels with their own lifecycle (never tied to terminals)
+  through a saved host, local / remote / dynamic SOCKS5, Manually or When Jasper starts, quick unsaved forwards, a
+  Tunnels rail panel, an own forwarding engine over MINA channels (live counters; reconnect with per-host backoff
+  keeps the local port bound), unattended connections that never prompt (new `Connections` unattended lease, Vault
+  0.4.0 `credentialIfAllowed`), and Buddy connection cards for trouble only through SDK 0.10.2 connection activities
+  (plus `Platform.browse` and card activation). Replaces the tunnels outline in the Remote design's section 9. Three
+  plans: 7b-1 SDK (executed, entry above), 7b-2 tunnels run by hand, 7b-3 tunnels that stay up.
 - **Terminal colors follow the UI theme** (branch `claude/terminal-follow-theme`, bounded change approved in chat
   2026-09-30, no spec): Font & Colors' Terminal colors row is a checkbox, "Terminal colors follow the UI theme" (the
   value `match`), over the dropdown of separate choices (Light, Dark, every terminal theme, More Terminal Themes…),

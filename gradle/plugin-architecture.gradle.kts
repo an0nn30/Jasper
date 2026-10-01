@@ -7,7 +7,7 @@ import org.gradle.jvm.toolchain.JvmVendorSpec
 // its own packages, libraries it bundles, and the exported packages of plugins it requires.
 // Every plugins/<name>/ module (settings.gradle.kts discovers them) is checked; a plugin that requires
 // another plugin lists that plugin's exported packages here, and nothing else may be imported.
-val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"))
+val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api"))
 val pluginProjects = subprojects.filter { it.projectDir.parentFile == file("plugins") }.associateBy { it.path }
 val pluginImports = pluginProjects.keys.associateWith { declaredImports[it] ?: listOf<String>() }
 val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
@@ -25,7 +25,7 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
             val output = process.inputStream.bufferedReader().readText()
             check(process.waitFor() == 0) { output }; return output
         }
-        fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.")
+        fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") || name.startsWith("com.sun.net.httpserver.")
         val edge = Regex("^\\s*(\\S+)\\s+->\\s+(\\S+)\\s*(.*)$")
         for ((path, imports) in pluginImports) {
             val module = pluginProjects.getValue(path)

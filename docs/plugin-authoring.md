@@ -17,7 +17,7 @@ name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
 sdk = ">=0.11.0, <0.12"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source
+capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
@@ -220,6 +220,9 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
 - `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
   it open. Since SDK 0.8.4, quitting or restarting Jasper asks the guards of your open windows first, so a guard
   can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
+- `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after plugin windows and
+  content tabs, even when your plugin has no window: a background server can ask "stop the running servers?".
+  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit.
 - In SDK 0.8.4+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
   Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
   window close. The close button is not affected.
@@ -247,6 +250,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` or `localProfile(id)`, and `Terminals.profiles()` and `onProfilesChanged` |
 | `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
 | `files.source` | `FileSources.register`: add places, such as saved hosts, to the file chooser |
+| `network.listen` | nothing gated: declare it when your plugin accepts connections from other programs or computers, such as serving files |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
 without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
@@ -450,7 +454,8 @@ private static void installPaletteDemo(PluginContext context) {
 `context.notices().error(message)` shows an error the way the application shows its own, in the
 window the user is using. `context.platform().openInEditor(file)` opens a file with the user's
 editor (configured editor, then the desktop, then revealing the file), in the background; a failure
-is reported as a notice.
+is reported as a notice. `context.platform().browse(uri)` opens an http or https address in the
+user's browser the same way (SDK 0.10.2); any other address throws `IllegalArgumentException`.
 
 ## Rules that matter
 
@@ -463,6 +468,12 @@ is reported as a notice.
 - **Activities.** `context.activities().begin(...)` returns a handle; end it exactly once.
   Progress is coalesced. Jasper shows activities on Buddy. An activity left open when the
   plugin stops is ended as failed.
+- **Connections.** `context.activities().connection(...)` announces something that is up until
+  it is not; report `up`, `degraded` or `down` as it changes and `close()` it once it no longer
+  matters. A new state is always delivered; a detail-only change is coalesced. Jasper shows
+  connections on Buddy. A connection left open when the plugin stops is closed. When an activity's
+  or a connection's `activateActionId` names one of your own actions, clicking its Buddy card runs
+  that action in the window the user used last.
 - **Services.** Publish interfaces from an exported package during `start` only, with
   `publish` or, to learn who is calling, `publishPerConsumer`. Consumers must declare
   `requires` on the provider. Put the interfaces in a separate API jar that consumers compile
@@ -532,8 +543,9 @@ A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`
 `cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
 and closes inline where Jasper uses its cleanup thread.
 `host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
-drive a contributed scope as the palette would; `paletteOpens()`, `notices()` and `openedInEditor()`
-record what the plugin asked for.
+drive a contributed scope as the palette would; `paletteOpens()`, `notices()`, `openedInEditor()`
+and `browsed()` record what the plugin asked for. `connectionLog()` lists delivered connection events, as
+`activityLog()` does activities.
 
 ## Building the in-repo plugins
 

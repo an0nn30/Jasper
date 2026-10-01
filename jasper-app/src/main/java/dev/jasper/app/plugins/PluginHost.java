@@ -30,7 +30,8 @@ final class PluginHost {
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
                        AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
-                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles) { }
+                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
+                       Consumer<java.net.URI> browser) { }
 
     record Outcome(PluginStatus.State state, String reason) { }
 
@@ -41,6 +42,7 @@ final class PluginHost {
     final Containment containment;
     final EventBus bus;
     final ActivityHub activities;
+    final ConnectionHub connections;
     final ServiceRegistry services = new ServiceRegistry();
     private final Map<String, HostedContext> contexts = new LinkedHashMap<>();
     private final Map<String, PluginStatus.State> notRunning = new HashMap<>();
@@ -50,6 +52,7 @@ final class PluginHost {
         this.containment = new Containment(environment.onUi());
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
+        this.connections = new ConnectionHub(bus);
         this.terminalBridge = TerminalBridge.connect(environment.terminals(), bus);
     }
 
@@ -97,6 +100,13 @@ final class PluginHost {
     boolean active(String pluginId) {
         HostedContext context = contexts.get(pluginId);
         return context != null && context.state == HostedContext.State.ACTIVE;
+    }
+
+    /** UI thread: whether the plugin has not stopped and has this action registered. */
+    boolean ownsAction(String pluginId, String actionId) {
+        requireUi();
+        HostedContext context = contexts.get(pluginId);
+        return context != null && context.state != HostedContext.State.CLOSED && context.ownsAction(actionId);
     }
 
     void settingsChanged() { settingsChanged(Set.of()); }

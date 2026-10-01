@@ -25,6 +25,8 @@ import dev.jasper.app.files.ChooserSource;
 public final class Contributions {
     private final ContentRegistry content = new ContentRegistry();
     public ContentRegistry content() { return content; }
+    private final QuitGuards quitGuards = new QuitGuards();
+    public QuitGuards quitGuards() { return quitGuards; }
 
     /** Which part changed. */
     public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, SCOPES }

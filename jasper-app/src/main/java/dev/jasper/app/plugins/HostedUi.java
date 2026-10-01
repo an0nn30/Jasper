@@ -103,6 +103,9 @@ final class HostedUi {
         if (!onUi.getAsBoolean()) throw new IllegalStateException(what + " must be called on the UI thread: " + pluginId);
     }
 
+    /** Whether this plugin registered the action and has not closed it. */
+    boolean owns(String actionId) { return ownActions.contains(actionId); }
+
     void requireOwn(String actionId) {
         if (!ownActions.contains(actionId))
             throw new IllegalArgumentException(actionId + " is not an action registered by " + pluginId);
@@ -489,6 +492,21 @@ final class HostedUi {
                         catch (RuntimeException failure) { result.complete(false); }
                     });
                     if (!invoked) result.complete(false);
+                    return result;
+                });
+                return tracked(registration::close);
+            }
+            @Override public Subscription onQuitting(Supplier<java.util.concurrent.CompletableFuture<Boolean>> guard) {
+                HostedUi.this.guard("quit guard");
+                java.util.Objects.requireNonNull(guard, "guard");
+                var registration = model.quitGuards().add(() -> {
+                    var result = new java.util.concurrent.CompletableFuture<Boolean>();
+                    boolean invoked = containment.run(pluginId, "quit guard", () -> {
+                        var decision = guard.get();
+                        if (decision == null) { result.complete(true); return; }
+                        decision.whenComplete((allowed, error) -> result.complete(error != null || !Boolean.FALSE.equals(allowed)));
+                    });
+                    if (!invoked) result.complete(true);
                     return result;
                 });
                 return tracked(registration::close);

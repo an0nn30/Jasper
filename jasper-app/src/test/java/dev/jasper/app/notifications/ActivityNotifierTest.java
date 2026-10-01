@@ -4,7 +4,10 @@ import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.buddy.notice.BuddyNotice;
 import dev.jasper.buddy.notice.BuddyNoticeId;
 import dev.jasper.buddy.view.BuddyTestSupport;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +46,58 @@ class ActivityNotifierTest {
         assertThat(deck.notices()).as("an outcome with no running card still records the result").hasSize(2);
     }
 
+    @Test void aConnectionIsOneCardWhoseNewStateIsNewsAndWhoseDetailIsNot() {
+        var notifier = new ActivityNotifier(deck.companion(), () -> { });
+        var key = new BuddyNoticeId("dev.jasper.remote", id);
+        notifier.connection("dev.jasper.remote", id, "Tunnels via\ndb", ActivityNotifier.ConnectionState.DEGRADED,
+            "reconnecting in 1 s", Optional.empty());
+        assertThat(deck.notices()).singleElement().satisfies(notice -> {
+            assertThat(notice.id()).isEqualTo(key);
+            assertThat(notice.kind()).isEqualTo(BuddyNotice.Kind.CONNECTION);
+            assertThat(notice.state()).isEqualTo(BuddyNotice.State.DEGRADED);
+            assertThat(notice.title()).isEqualTo("Tunnels via db");
+            assertThat(notice.live()).isTrue();
+        });
+        deck.acknowledge(key);
+        int generation = deck.generation();
+        notifier.connection("dev.jasper.remote", id, "Tunnels via db", ActivityNotifier.ConnectionState.DEGRADED,
+            "reconnecting in 2 s", Optional.empty());
+        assertThat(deck.generation()).as("the same state is not new news").isEqualTo(generation);
+        assertThat(deck.acknowledged(key)).isTrue();
+        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("reconnecting in 2 s");
+
+        notifier.connection("dev.jasper.remote", id, "Tunnels via db", ActivityNotifier.ConnectionState.DOWN, "gave up", Optional.empty());
+        assertThat(deck.acknowledged(key)).as("a new state speaks up again").isFalse();
+        assertThat(deck.notices()).singleElement().satisfies(notice -> {
+            assertThat(notice.state()).isEqualTo(BuddyNotice.State.DOWN);
+            assertThat(notice.detail().get()).isEqualTo("gave up");
+        });
+
+        notifier.connectionClosed("dev.jasper.remote", id);
+        assertThat(deck.notices()).isEmpty();
+    }
+
+    @Test void aCardNamingItsProducersActionRaisesRunsItAndIsAcknowledged() {
+        var raised = new AtomicInteger();
+        var ran = new AtomicInteger();
+        var notifier = new ActivityNotifier(deck.companion(), raised::incrementAndGet);
+        UUID other = UUID.randomUUID();
+        notifier.connection("p.one", id, "Tunnels", ActivityNotifier.ConnectionState.DOWN, "gave up",
+            Optional.<Runnable>of(ran::incrementAndGet));
+        notifier.finished("p.one", other, "Upload", false, "reset");
+        var byId = deck.notices().stream().collect(Collectors.toMap(BuddyNotice::id, notice -> notice));
+
+        byId.get(new BuddyNoticeId("p.one", id)).activate().run();
+        assertThat(raised).hasValue(1);
+        assertThat(ran).hasValue(1);
+        assertThat(deck.acknowledged(new BuddyNoticeId("p.one", id))).isTrue();
+
+        byId.get(new BuddyNoticeId("p.one", other)).activate().run();
+        assertThat(raised).hasValue(2);
+        assertThat(ran).hasValue(1);
+        assertThat(deck.acknowledged(new BuddyNoticeId("p.one", other))).as("a card without an action only raises").isFalse();
+    }
+
     @Test void nothingIsPostedAfterClose() {
         var notifier = new ActivityNotifier(deck.companion(), () -> { });
         notifier.close();
@@ -51,6 +106,8 @@ class ActivityNotifierTest {
         notifier.progress("p.one", id, "x");
         notifier.finished("p.one", id, "Upload", true, "done");
         notifier.cancelled("p.one", id);
+        notifier.connection("p.one", id, "Tunnel", ActivityNotifier.ConnectionState.UP, "", Optional.empty());
+        notifier.connectionClosed("p.one", id);
         assertThat(deck.notices()).isEmpty();
     }
 }

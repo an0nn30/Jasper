@@ -9,7 +9,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext` |
 | `dev.jasper.sdk.settings` | `PluginSettings`, `Setting`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `SettingsPanel`, `SettingsPanelHost` |
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
-| `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent` |
+| `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
 | `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `Notices`, `Platform` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
@@ -73,7 +73,20 @@ with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fi
 SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
 whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
 
-SDK 0.11.0 adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
+SDK 0.10.2 adds connections, things that are up until they are not, such as a tunnel:
+`Activities.connection(ConnectionSpec)` returns a `ConnectionHandle` whose `up`, `degraded` and `down` publish
+`ConnectionEvent`s on `Activities.CONNECTIONS`. A new state is always delivered, a report that only changes the detail
+is coalesced, and `close()` (or the plugin stopping) publishes `CLOSED` once. Jasper shows connections on Buddy.
+`FakePluginHost.connectionLog()` records them. `Platform.browse(URI)` opens an http or https address in the user's
+browser in the background; `FakePluginHost.browsed()` records the requests.
+
+SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it accepts connections from other
+programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
+it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
+a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
+guards too. Plugins declare `sdk = ">=0.11.0, <0.12"`.
+
+SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
 `window(id)` (one of the plugin's own panels or windows; window shortcuts take effect once plugin windows get the
 Keymap, plan K4). Where focus is, the most specific applicable action takes a
@@ -81,7 +94,7 @@ key, and a key whose action doesn't apply reaches the focused component, such as
 does too, except in a terminal pane, where it does nothing.
 `withDefaultBindings(macOs, other)` gives a separate Linux and Windows default; with `withDefaultBinding` alone, a
 default naming cmd and shift gets alt outside macOS (`cmd+shift+x` becomes Ctrl+Alt+Shift+X).
-`FakePluginHost.actionSpec(id)` returns the registered spec. Plugins declare `sdk = ">=0.11.0, <0.12"`.
+`FakePluginHost.actionSpec(id)` returns the registered spec.
 
 SDK 0.9.3 lets `plugin.toml` carry an optional `icon` (an SVG or PNG in the plugin's jars) and `homepage` (an http or
 https link), shown in Settings › Plugins; an older Jasper rejects a manifest with these keys.

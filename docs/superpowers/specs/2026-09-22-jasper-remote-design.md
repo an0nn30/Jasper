@@ -284,6 +284,10 @@ pickers and a remote destination picker, plus a persistent, Buddy-independent tr
 manager. The [phase-1 SFTP design](2026-09-23-jasper-remote-sftp-design.md) records those
 approved decisions. Its single sidebar replaces the historical two-pane outline below.
 
+**Tunnels follow-up (2026-09-30):** The [tunnels design](2026-09-30-jasper-remote-tunnels-design.md)
+replaces the tunnels outline below: tunnels with their own lifecycle and rail panel, quick forwards, an own
+forwarding engine with live counters, reconnect that keeps the local port, and Buddy connection notices.
+
 - **Tunnels.** `Tunnel(UUID id, String name, UUID hostId, Kind LOCAL|REMOTE|DYNAMIC, String
   bindAddress, int bindPort, String targetHost, int targetPort, boolean autoStart)` in
   `data/tunnels.toml`; a "Tunnels" tab in the panel with per-row start/stop and state (stopped,
