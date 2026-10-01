@@ -101,6 +101,9 @@ final class HostedUi {
         if (!onUi.getAsBoolean()) throw new IllegalStateException(what + " must be called on the UI thread: " + pluginId);
     }
 
+    /** Whether this plugin registered the action and has not closed it. */
+    boolean owns(String actionId) { return ownActions.contains(actionId); }
+
     void requireOwn(String actionId) {
         if (!ownActions.contains(actionId))
             throw new IllegalArgumentException(actionId + " is not an action registered by " + pluginId);

@@ -7,6 +7,9 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.activity.ConnectionEvent;
+import dev.jasper.sdk.activity.ConnectionHandle;
+import dev.jasper.sdk.activity.ConnectionSpec;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.PluginContext;
@@ -281,6 +284,53 @@ public abstract class PluginContractTest {
         assertThat(h.activityLog()).extracting(ActivityEvent::state).containsExactly(STARTED, FAILED);
         assertThat(h.active("test.alpha")).isFalse();
         assertThatIllegalStateException().isThrownBy(() -> alpha.activities().begin(ActivitySpec.of("late")));
+    }
+
+    @Test void connectionsAreStampedOrderedCoalescedAndCloseOnce() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        var handle = new AtomicReference<ConnectionHandle>();
+        h.ui(() -> {
+            ConnectionHandle connection = alpha.activities().connection(new ConnectionSpec("Tunnels via db", "reconnecting",
+                ConnectionEvent.State.DEGRADED, Optional.of("test.alpha.show")));
+            handle.set(connection);
+            connection.degraded("attempt 2");
+            connection.degraded("attempt 3");
+            connection.down("gave up");
+            connection.up("back");
+            connection.up("back again");
+        });
+        h.flush();
+        assertThat(h.connectionLog()).extracting(ConnectionEvent::state)
+            .containsExactly(ConnectionEvent.State.DEGRADED, ConnectionEvent.State.DOWN, ConnectionEvent.State.UP);
+        assertThat(h.connectionLog()).extracting(ConnectionEvent::detail).containsExactly("attempt 3", "gave up", "back again");
+        ConnectionEvent first = h.connectionLog().getFirst();
+        assertThat(first.id()).isEqualTo(handle.get().id());
+        assertThat(first.sourcePluginId()).isEqualTo("test.alpha");
+        assertThat(first.title()).isEqualTo("Tunnels via db");
+        assertThat(first.activateActionId()).contains("test.alpha.show");
+
+        handle.get().degraded("delivered on its own");
+        h.flush();
+        h.ui(() -> {
+            handle.get().close();
+            handle.get().close();
+            handle.get().up("ignored after close");
+        });
+        h.flush();
+        assertThat(h.connectionLog()).extracting(ConnectionEvent::state).containsExactly(ConnectionEvent.State.DEGRADED,
+            ConnectionEvent.State.DOWN, ConnectionEvent.State.UP, ConnectionEvent.State.DEGRADED, ConnectionEvent.State.CLOSED);
+        assertThat(h.connectionLog().getLast().detail()).isEmpty();
+    }
+
+    @Test void connectionsLeftOpenCloseWhenTheirPluginStops() {
+        PluginContext alpha = started("test.alpha", Set.of());
+        alpha.activities().connection(ConnectionSpec.of("Tunnel", ConnectionEvent.State.UP));
+        h.flush();
+        h.stopAll();
+        h.flush();
+        assertThat(h.connectionLog()).extracting(ConnectionEvent::state)
+            .containsExactly(ConnectionEvent.State.UP, ConnectionEvent.State.CLOSED);
+        assertThatIllegalStateException().isThrownBy(() -> alpha.activities().connection(ConnectionSpec.of("late", ConnectionEvent.State.UP)));
     }
 
     @Test void servicesCommitAfterStartAndAreBuiltOncePerRequirer() {
@@ -1178,6 +1228,20 @@ public abstract class PluginContractTest {
             assertThat(h.notices()).containsExactly("test.a: It broke");
             assertThat(h.openedInEditor()).containsExactly(Path.of("/tmp/x.toml"));
         }
+    @Test void browseOpensOnlyWebAddressesAndReachesTheHost() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> {
+            a.platform().browse(java.net.URI.create("http://localhost:5432/"));
+            assertThatIllegalArgumentException().isThrownBy(() -> a.platform().browse(java.net.URI.create("file:///etc/hosts")));
+            assertThatIllegalArgumentException().isThrownBy(() -> a.platform().browse(java.net.URI.create("localhost:5432")));
+            assertThatIllegalArgumentException().isThrownBy(() -> a.platform().browse(java.net.URI.create("/relative")));
+            assertThatThrownBy(() -> a.platform().browse(null)).isInstanceOf(NullPointerException.class);
+        });
+        h.flush();
+        for (int i = 0; i < 100 && h.browsed().isEmpty(); i++) { try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }
+        assertThat(h.browsed()).containsExactly(java.net.URI.create("http://localhost:5432/"));
+    }
+
     @Test void hostedTabsPreserveIdentityAndDeferMovesDuringPromptsAndCloseDecisions() {
         try (var harness = newHarness()) {
             var context = new AtomicReference<PluginContext>();

@@ -76,10 +76,20 @@ class AppContractTest extends PluginContractTest {
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles) {
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, new CopyOnWriteArrayList<>());
+    }
+
+    /** As above; the web addresses plugins ask to open land in {@code browsed}. */
+    static PluginHost host(Path data, Duration drainGrace,
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
+                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
+                           List<java.net.URI> browsed) {
         var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
-            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles)));
+            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles,
+            browsed::add)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -122,11 +132,14 @@ class AppContractTest extends PluginContractTest {
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
         List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
+        List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
         PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
-            diagnostics, shells.source());
+            diagnostics, shells.source(), browsed);
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
+        List<dev.jasper.sdk.activity.ConnectionEvent> connections = new CopyOnWriteArrayList<>();
+        onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, connections::add));
         List<String> opens = new CopyOnWriteArrayList<>();
         onEdt(() -> contributions.onPaletteRequest(request -> opens.add(request.windowId() + " " + request.scopeId() + " "
             + request.query().orElse("-") + " " + request.rowId().orElse("-"))));
@@ -172,6 +185,7 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.bus.publish(EventBus.APP, topic, payload); }
             @Override public List<ActivityEvent> activityLog() { return List.copyOf(log); }
+            @Override public List<dev.jasper.sdk.activity.ConnectionEvent> connectionLog() { return List.copyOf(connections); }
             @Override public List<String> actions() {
                 return onEdtValue(() -> contributions.actions().stream()
                     .map(action -> action.id() + "|" + action.title() + "|" + action.enabled()).toList());
@@ -341,6 +355,7 @@ class AppContractTest extends PluginContractTest {
                         @Override public List<String> paletteOpens() { return List.copyOf(opens); }
                         @Override public List<String> notices() { return List.copyOf(notices); }
                         @Override public List<Path> openedInEditor() { return List.copyOf(edited); }
+                        @Override public List<java.net.URI> browsed() { return List.copyOf(browsed); }
             @Override public void close() { stopAll(); flush(); }
         };
     }

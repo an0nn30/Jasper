@@ -6,6 +6,8 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.activity.ConnectionHandle;
+import dev.jasper.sdk.activity.ConnectionSpec;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
@@ -24,6 +26,7 @@ import dev.jasper.sdk.ui.Toolbar;
 import dev.jasper.sdk.ui.Windows;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -103,6 +106,7 @@ final class HostedContext implements PluginContext {
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
         host.bus.removeAll(id);
         host.activities.failAll(id, reason);
+        host.connections.closeAll(id);
         declared.close();
         if (interrupt) executor.shutdownNow(); else executor.shutdown();
     }
@@ -133,6 +137,8 @@ final class HostedContext implements PluginContext {
     @Override public dev.jasper.sdk.settings.PluginSettings settings() { return declared; }
 
     @Override public Actions actions() { return ui.actions(); }
+    /** UI thread: whether this plugin registered the action and has not closed it. */
+    boolean ownsAction(String actionId) { return ui.owns(actionId); }
     @Override public Toolbar toolbar() { return ui.toolbar(); }
     @Override public Menus menus() { return ui.menus(); }
     @Override public StatusBar statusBar() { return ui.statusBar(); }
@@ -154,17 +160,39 @@ final class HostedContext implements PluginContext {
         }
 
         @Override public Platform platform() {
-            return file -> {
-                requireOpen();
-                Objects.requireNonNull(file, "file");
-                background().execute(() -> {
-                    try { host.environment.editor().accept(file); }
-                    catch (RuntimeException failure) {
-                        log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
-                        notices().error("Could not open " + file.getFileName() + " in an editor.");
-                    }
-                });
+            return new Platform() {
+                @Override public void openInEditor(Path file) {
+                    requireOpen();
+                    Objects.requireNonNull(file, "file");
+                    background().execute(() -> {
+                        try { host.environment.editor().accept(file); }
+                        catch (RuntimeException failure) {
+                            log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
+                            notices().error("Could not open " + file.getFileName() + " in an editor.");
+                        }
+                    });
+                }
+                @Override public void browse(URI uri) {
+                    requireOpen();
+                    URI address = webAddress(uri);
+                    background().execute(() -> {
+                        try { host.environment.browser().accept(address); }
+                        catch (RuntimeException failure) {
+                            log().log(System.Logger.Level.WARNING, "Could not open " + address + " in a browser", failure);
+                            notices().error("Could not open " + address + " in a browser.");
+                        }
+                    });
+                }
             };
+        }
+
+        /** Only an absolute http or https address opens in a browser. */
+        private static URI webAddress(URI uri) {
+            Objects.requireNonNull(uri, "uri");
+            String scheme = uri.getScheme();
+            if (scheme == null || uri.isOpaque() || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")))
+                throw new IllegalArgumentException("Only an http or https address opens in a browser: " + uri);
+            return uri;
         }
 
     @Override public Executor background() {
@@ -200,6 +228,10 @@ final class HostedContext implements PluginContext {
             @Override public ActivityHandle begin(ActivitySpec spec) {
                 requireOpen();
                 return host.activities.begin(id, spec);
+            }
+            @Override public ConnectionHandle connection(ConnectionSpec spec) {
+                requireOpen();
+                return host.connections.open(id, spec);
             }
             @Override public List<ActivityEvent> current() { return host.activities.current(); }
         };
