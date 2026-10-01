@@ -28,4 +28,5 @@ public final class UiTestAccess {
     public static JLabel message(ConfirmPanel panel) { return panel.message; }
     public static JButton confirm(ConfirmPanel panel) { return panel.confirm; }
     public static JButton cancel(ConfirmPanel panel) { return panel.cancel; }
+    public static JTextArea cardTls(FileServersPanel panel) { return panel.cardTls; }
 }

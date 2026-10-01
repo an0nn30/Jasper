@@ -51,7 +51,8 @@ public final class ServerRows {
 
     public static List<String> warnings(Protocol protocol, boolean tls, Login login, boolean writable, Bind bind) {
         var warnings = new ArrayList<String>();
-        if (protocol == Protocol.HTTP && !tls && !(login instanceof Login.Anonymous)) warnings.add("Plain HTTP sends the password unencrypted");
+        if ((protocol == Protocol.HTTP || protocol == Protocol.FTP) && !tls && !(login instanceof Login.Anonymous))
+            warnings.add("Plain " + protocol.label() + " sends the password unencrypted");
         if (writable && login instanceof Login.Anonymous && protocol != Protocol.SFTP)
             warnings.add(protocol == Protocol.TFTP ? "TFTP has no login: anyone who can reach it can change files" : "Anyone who can reach it can change files");
         if (writable && !(bind instanceof Bind.Loopback)) warnings.add("Writable and reachable from other computers");

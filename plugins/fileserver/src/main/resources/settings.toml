@@ -1,3 +1,4 @@
 # Settings for File Server. Change them in Jasper's Settings or here. Saved servers live in data/servers.toml.
 # confirm_quit = true           # ask before quitting or restarting Jasper while servers run
 # activity_entries = 500        # 50 to 5000 activity entries kept per server; applies to servers started afterwards
+# passive_ports = "50000-50100" # default FTP passive data ports; a server can set its own range

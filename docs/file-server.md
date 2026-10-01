@@ -1,7 +1,7 @@
 # File Server: share a folder with other computers
 
 File Server is bundled with Jasper. It shares a folder on this computer with other programs and computers, the way
-MobaXterm's Servers window does. This version serves **HTTP**; FTP/FTPS, SFTP and TFTP follow.
+MobaXterm's Servers window does. This version serves **HTTP, HTTPS, FTP and FTPS**; SFTP and TFTP follow.
 
 ## The File Servers panel
 
@@ -21,27 +21,59 @@ the panel.
 - **This computer only.** *Reachable from* chooses *All networks* or one network interface; the panel then lists
   the addresses others can use. macOS and Windows ask once whether Jasper may accept connections; on macOS, Jasper
   also needs Privacy & Security › Local Network.
-- **Unprivileged ports.** HTTP starts at 8080. On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
+- **Unprivileged ports.** HTTP starts at 8080 and FTP at 2121. On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
   editor suggests one 8000 higher.
 - **Jailed.** Clients cannot leave the folder, through `..` or through a link that points outside it.
-- **Warnings.** The panel and the editor warn about plain HTTP with a password, a writable server anyone can reach,
-  and a writable server open to other computers.
+- **Warnings.** The panel and the editor warn about plain HTTP or plain FTP with a password ("Plain FTP sends the
+  password unencrypted"), a writable server anyone can reach, and a writable server open to other computers. With
+  *Use TLS* but not *Require TLS*, a client may still log in without TLS; turn on *Require TLS* to refuse that.
 
 ## Logins
 
 *Anonymous* needs no login. *Session password* makes a new password each time the server starts (Copy Password
 copies it; the user name is yours). *Vault account* uses an account you keep in the Credential Vault; choose it with
 **Choose…**. The Vault may ask to unlock and to allow File Server. After a wrong password, an immediate retry from the
-same address is refused with a short wait (HTTP status 429 and a `Retry-After` header), the wait growing to half a
-minute; after ten wrong passwords the address is refused for five minutes.
+same address is refused with a short wait (HTTP answers 429 with a `Retry-After` header, FTP answers 530), the wait
+growing to half a minute; after ten wrong passwords the address is refused for five minutes.
 
-HTTP logins use Basic auth, which sends the password unencrypted; HTTPS arrives with FTP/FTPS in the next version.
+HTTP logins use Basic auth, which sends the password unencrypted; turn on **Use TLS** to serve HTTPS instead.
 
 ## Serve Current Folder
 
 **Serve Current Folder over HTTP** shares the folder your shell is in (or your home folder), read-only and on this
 computer only, without saving it. It appears under *Temporary* and disappears when stopped; **Save as a Server…**
 keeps it.
+
+**Serve Current Folder over FTP** does the same with a temporary read-only FTP server on this computer only. It uses a
+session password; copy it with **Copy Password** in the server's menu.
+
+## FTP and FTPS
+
+An FTP server shares the folder with any FTP client (FileZilla, Cyberduck, `ftp`, `curl`). New FTP servers use a Vault
+account when the Credential Vault is installed and a session password otherwise; Anonymous is allowed too.
+
+- **Passive ports.** Data connections use the server's own range, or the File Server setting "Default FTP passive
+  port range" (50000–50100) when the range is empty. Open those ports in your firewall as well as the server's port.
+- **Active mode** works, but only back to the client's own address.
+- **Use TLS** turns on explicit FTPS: clients connect to the same port and send `AUTH TLS` (FileZilla calls this
+  "Require explicit FTP over TLS"). Implicit FTPS (port 990) is not offered. **Require TLS** refuses a login before
+  `AUTH TLS` and any transfer or listing without `PROT P`.
+- Without TLS the password crosses the network in plain text; the panel and the editor warn about it.
+- An upload replaces the file only once it has arrived completely; a failed or interrupted transfer leaves the old
+  file. Resuming an upload part-way through is refused; `APPE` appends to the end of a file. An interrupted `APPE`
+  keeps the bytes already appended, because appends happen in place.
+- An upload is committed after the server sends its success reply. If saving then fails (for example the disk is
+  full), the client has already been told it worked, and the failure appears in the server's activity log.
+- A client that tries `anonymous` when the server has a login is disconnected and must reconnect.
+- `..` stops at the shared folder: `cd ..` at the top stays at `/`.
+
+## HTTPS and the certificate
+
+**Use TLS** on an HTTP server serves HTTPS. HTTPS and FTPS share one self-signed certificate, which File Server
+creates the first time a TLS server starts and keeps in `data/tls/` (owner-only). Browsers warn about a self-signed
+certificate; compare the fingerprint before you accept it. The server card shows the certificate's SHA-256
+fingerprint. **Show Fingerprints…** in a server's menu shows it too, and offers **Regenerate Certificate…**. A new
+certificate makes clients that trusted the old one warn again; running servers keep the old one until they restart.
 
 ## Quitting
 
@@ -51,7 +83,9 @@ with *Ask before quitting while servers run* in File Server's settings.
 ## Files
 
 Saved servers live in `plugins/dev.jasper.fileserver/data/servers.toml` under Jasper's home; the file never holds a
-password. Settings live in `plugins/dev.jasper.fileserver/dev.jasper.fileserver.toml`.
+password. Settings (`confirm_quit`, `activity_entries`, `passive_ports`) live in
+`plugins/dev.jasper.fileserver/dev.jasper.fileserver.toml`. The certificate lives in
+`plugins/dev.jasper.fileserver/data/tls/server.p12`, with its generated password in `data/tls/password`.
 
 ## For other programs
 

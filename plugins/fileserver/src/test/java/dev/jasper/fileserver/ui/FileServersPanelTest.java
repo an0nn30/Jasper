@@ -29,7 +29,8 @@ class FileServersPanelTest {
     final FileServersPanel.Actions actions = new FileServersPanel.Actions(
         id -> events.add("toggle " + name(id)), id -> events.add("edit " + id.map(this::name).orElse("new")),
         id -> events.add("duplicate " + name(id)), id -> events.add("delete " + name(id)), id -> events.add("reveal " + name(id)),
-        text -> events.add("copy " + text), id -> events.add("password " + name(id)), id -> events.add("clear " + name(id)));
+        text -> events.add("copy " + text), id -> events.add("password " + name(id)), id -> events.add("clear " + name(id)),
+        id -> events.add("fingerprints " + name(id)));
     final List<ServerRegistry.View> views = new ArrayList<>();
 
     String name(UUID id) { return views.stream().filter(v -> v.definition().id().equals(id)).findFirst().orElseThrow().definition().name(); }
@@ -79,6 +80,25 @@ class FileServersPanelTest {
         assertThat(events).containsExactly("copy http://127.0.0.1:8080/", "toggle docs", "edit docs", "edit new");
     }
 
+    @Test void aTlsServerShowsTheCertificateFingerprint() {
+        var panel = panel();
+        var definition = new ServerDefinition(UUID.randomUUID(), "secure", Protocol.HTTP, HOME.resolve("work"), Bind.LOOPBACK, 8443,
+            Optional.empty(), false, Login.ANONYMOUS, List.of(), true, false, false);
+        views.add(new ServerRegistry.View(definition, false, ServerState.STOPPED, List.of(), Optional.empty(), false));
+        view("plain", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        assertThat(panel.cardTls.isVisible()).isTrue();
+        assertThat(panel.cardTls.getText()).isEqualTo("TLS certificate: created when the server first starts");
+        panel.setTlsFingerprint(Optional.of("AB:CD"));
+        assertThat(panel.cardTls.getText()).isEqualTo("TLS certificate SHA-256 AB:CD");
+        assertThat(panel.cardAccess.getText()).isEqualTo("HTTP :8443 · read-only · anonymous · TLS · This computer only");
+        assertThat(titles(panel.menuFor(0))).contains("Show Fingerprints…");
+        click(panel.menuFor(0), "Show Fingerprints…");
+        assertThat(events).containsExactly("fingerprints secure");
+        panel.select(views.get(1).definition().id());
+        assertThat(panel.cardTls.isVisible()).as("no TLS, no fingerprint").isFalse();
+    }
+
     @Test void menusOfferWhatMakesSense() {
         var panel = panel();
         view("docs", ServerState.RUNNING, false, false, Bind.LOOPBACK, List.of(URI.create("http://127.0.0.1:8080/")), Optional.of("dustin"));
@@ -86,10 +106,10 @@ class FileServersPanelTest {
         view("work (HTTP)", ServerState.RUNNING, true, false, Bind.LOOPBACK, List.of(URI.create("http://127.0.0.1:8081/")), Optional.empty());
         panel.setServers(views, Optional.empty());
         assertThat(panel.list.getModel().getSize()).as("two saved, a header, one temporary").isEqualTo(4);
-        assertThat(titles(panel.menuFor(0))).containsExactly("Stop", "Edit…", "Duplicate", "Delete…", "Reveal Folder", "Copy Address", "Copy Password");
-        assertThat(titles(panel.menuFor(1))).containsExactly("Start", "Edit…", "Duplicate", "Delete…", "Reveal Folder", "Copy Address (off)", "Copy Password (off)");
+        assertThat(titles(panel.menuFor(0))).containsExactly("Stop", "Edit…", "Duplicate", "Delete…", "Reveal Folder", "Copy Address", "Copy Password", "Show Fingerprints… (off)");
+        assertThat(titles(panel.menuFor(1))).containsExactly("Start", "Edit…", "Duplicate", "Delete…", "Reveal Folder", "Copy Address (off)", "Copy Password (off)", "Show Fingerprints… (off)");
         assertThat(panel.menuFor(2)).as("the header has no menu").isNull();
-        assertThat(titles(panel.menuFor(3))).containsExactly("Stop", "Save as a Server…", "Reveal Folder", "Copy Address", "Copy Password (off)");
+        assertThat(titles(panel.menuFor(3))).containsExactly("Stop", "Save as a Server…", "Reveal Folder", "Copy Address", "Copy Password (off)", "Show Fingerprints… (off)");
         click(panel.menuFor(0), "Copy Password");
         click(panel.menuFor(1), "Duplicate");
         click(panel.menuFor(1), "Delete…");
@@ -141,5 +161,36 @@ class FileServersPanelTest {
         var cell = panel.list.getCellBounds(0, 0);
         assertThat(panel.list.getToolTipText(new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0, 5, cell.y + 2, 0, false))).isEqualTo("Running");
         assertThat(panel.list.getToolTipText(new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0, 5, 390, 0, false))).isNull();
+    }
+
+    @Test void theEmptyHintWrapsAndTheDividerShowsOnlyWithDetails() {
+        var panel = panel();
+        assertThat(panel.empty.getLineWrap()).isTrue();
+        assertThat(panel.empty.getWrapStyleWord()).isTrue();
+        assertThat(panel.empty.isEditable()).isFalse();
+        assertThat(panel.empty.getText()).isEqualTo("No file servers yet — press + to share a folder");
+        assertThat(panel.split.getDividerSize()).as("nothing selected").isZero();
+        view("docs", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        assertThat(panel.split.getDividerSize()).isPositive();
+    }
+
+    @Test void theWrappedEmptyHintSurvivesBeingHidden() {
+        var panel = panel();
+        panel.setSize(300, 600);
+        layoutAll(panel);
+        view("docs", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        layoutAll(panel);
+        panel.setServers(List.of(), Optional.empty());
+        layoutAll(panel);
+        assertThat(panel.empty.getPreferredSize().height).as("a few lines at most").isLessThan(100);
+    }
+
+    static void layoutAll(java.awt.Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) {
+            if (child instanceof java.awt.Container c) layoutAll(c);
+        }
     }
 }
