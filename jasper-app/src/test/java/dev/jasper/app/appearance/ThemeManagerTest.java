@@ -2,6 +2,7 @@ package dev.jasper.app.appearance;
 
 import com.formdev.flatlaf.FlatLaf;
 import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.terminal.config.Palette;
 import java.awt.Color;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -101,6 +102,16 @@ class ThemeManagerTest {
             assertThat(UIManager.getBorder("ScrollPane.border")).isInstanceOf(com.formdev.flatlaf.ui.FlatScrollPaneBorder.class);
             assertThat(UIManager.getFont("Label.font").getSize2D()).isEqualTo(12f);
         } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    @Test void jasperDarkIsANativeThemeFile() {
+        assertThat(Theme.DARK.source()).isInstanceOfSatisfying(Theme.Bundled.class, bundled -> {
+            assertThat(bundled.file()).isEqualTo("jasper-dark.toml");
+            assertThat(bundled.document().uiComplete()).isEmpty();
+        });
+        assertThat(Theme.DARK.palette()).isEqualTo(new Palette(new Color(0xd5dee5), new Color(0x191c20),
+            new Color(0xd5dee5), new Color(0x35434e), Palette.jasperDark().ansi()));
+        assertThat(ThemeManager.generated(Theme.DARK).tokens().get(Token.TAB_ACTIVE)).isEqualTo(new Color(0x293d51));
     }
 
     @Test void jasperDarkUsesGraphiteSurfacesAndRetainsControlContracts() throws Exception {

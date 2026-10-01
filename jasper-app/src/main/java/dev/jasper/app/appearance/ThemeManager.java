@@ -28,7 +28,7 @@ public final class ThemeManager {
     /**
      * Each theme a {@code parentTheme} may name, with its file under {@link #BASE}. IntelliJ's themes are
      * keyed by the id IntelliJ registers them under, which is what a {@code parentTheme} names; the classic
-     * IntelliJ Light and Jasper Dark are also reachable by name.
+     * IntelliJ Light is also reachable by name.
      */
     private static final Map<String, String> FILES = Map.ofEntries(
         Map.entry("IntelliJ Light", "intellij/Light.theme.json"),
@@ -41,8 +41,7 @@ public final class ThemeManager {
         Map.entry("Islands Dark", "intellij/islands/ManyIslandsDark.theme.json"),
         Map.entry("Islands Light", "intellij/islands/ManyIslandsLight.theme.json"),
         Map.entry("Islands Darcula", "intellij/islands/ManyIslandsDarcula.theme.json"),
-        Map.entry("JetBrainsHighContrastTheme", "intellij/islands/HighContrast.theme.json"),
-        Map.entry("Jasper Dark", "jasper-dark.theme.json"));
+        Map.entry("JetBrainsHighContrastTheme", "intellij/islands/HighContrast.theme.json"));
     /** Theme-independent application defaults: form typography, input geometry and the split divider. Every theme gets them. */
     public static final Map<String, String> APP_DEFAULTS = appDefaults();
     private static final ThemeLoader LOADER = new ThemeLoader(ThemeManager::read, FILES);
