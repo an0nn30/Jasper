@@ -10,6 +10,77 @@ import static dev.jasper.app.workspace.WorkspaceStyleFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 
 class WorkspaceStylerTest {
+    @Test void generatedWriteCanRemoveOrMoveSubtreeAndOtherPaneStillUpdates() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            for (boolean move : new boolean[]{false, true}) {
+              for (String trigger : java.util.List.of("FlatLaf.style", "Jasper.workspaceStyle", "background")) {
+                var source = new JPanel(); var destination = new JPanel(); var retained = new JPanel();
+                var moving = new JPanel(); var child = new JButton();
+                JComponent target = trigger.equals("background") ? new JViewport() : moving;
+                moving.add(child); moving.add(new JComboBox<>(new String[]{"one"}));
+                if (target != moving) moving.add(target);
+                source.add(moving);
+                var listeners = child.getPropertyChangeListeners();
+                try (var owner = new WorkspaceStyler(source); var next = new WorkspaceStyler(destination);
+                     var other = new WorkspaceStyler(retained)) {
+                    var alternate = recolored(independent(), Token.SURFACE, Color.MAGENTA);
+                    next.apply(alternate);
+                    var once = new java.util.concurrent.atomic.AtomicBoolean();
+                    target.addPropertyChangeListener(trigger, e -> {
+                        if (e.getNewValue() != null && once.compareAndSet(false, true)) {
+                            source.remove(moving);
+                            if (move) destination.add(moving);
+                        }
+                    });
+                    owner.apply(independent()); other.apply(independent());
+                    assertThat(once).isTrue();
+                    assertThat(retained.getBackground()).isEqualTo(independent().workspace().tokens().get(Token.SURFACE));
+                    if (move) {
+                        assertThat(moving.getBackground()).isEqualTo(Color.MAGENTA);
+                        assertThat(child.getClientProperty("Jasper.workspaceStyle")).isNotNull();
+                        assertThat(child.getClientProperty("Jasper.workspaceStylerOwner")).isSameAs(next);
+                    } else {
+                        assertReleased(moving); assertReleased(child);
+                        assertThat(child.getPropertyChangeListeners()).hasSameSizeAs(listeners);
+                    }
+                }
+                assertReleased(moving); assertReleased(child);
+                assertThat(child.getPropertyChangeListeners()).hasSameSizeAs(listeners);
+              }
+            }
+        });
+        edt(() -> {});
+    }
+
+    @Test void generatedPublicationCanCloseWholeTreeWithoutLeavingOwnership() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            for (String trigger : java.util.List.of("FlatLaf.style", "Jasper.workspaceStyle", "background")) {
+                var root = new JPanel();
+                JComponent target = trigger.equals("background") ? new JViewport() : root;
+                root.add(new JButton()); root.add(new JComboBox<>(new String[]{"one"}));
+                if (target != root) root.add(target);
+                var styler = new WorkspaceStyler(root);
+                var once = new java.util.concurrent.atomic.AtomicBoolean();
+                target.addPropertyChangeListener(trigger, e -> {
+                    if (e.getNewValue() != null && once.compareAndSet(false, true)) styler.close();
+                });
+                assertThatCode(() -> styler.apply(independent())).doesNotThrowAnyException();
+                assertThat(once).isTrue();
+                assertReleased(root);
+                for (var child : root.getComponents()) assertReleased((JComponent) child);
+            }
+        });
+        edt(() -> {});
+    }
+
+    private static void assertReleased(JComponent c) {
+        assertThat(c.getClientProperty("Jasper.workspaceStylerOwner")).isNull();
+        assertThat(c.getClientProperty("Jasper.workspaceStyle")).isNull();
+        assertThat(c.getClientProperty("FlatLaf.style")).isNull();
+    }
+
     @Test void failedConstructionReleasesRootMarkerAndAllowsRetry() throws Exception {
         edt(() -> {
             var root = new JPanel() {

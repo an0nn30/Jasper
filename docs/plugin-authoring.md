@@ -767,6 +767,7 @@ text/background; normal card text uses ordinary control colors. The audit used
 | History, Snippets, Sample | No custom color/painter occurrences; inherited standard controls (or palette contributions rendered by the host) |
 
 FlatLaf 3.7 supports per-control progress track/fill colors but not progress text colors. Text on an external
-plugin's string-painted progress bar remains delegate-owned and can retain chrome colors. The only bundled
-`JProgressBar`, Remote's transfer strip, has `stringPainted == false`; status text is a separate ordinary label.
+plugin's string-painted progress bar remains delegate-owned and can retain chrome colors. The audited bundled
+bars in Editor `Forms.progress`, Remote `ConnectionPanel`, and Remote `TransferStrip` all retain
+`stringPainted == false`; their status text uses separate ordinary labels.
 Plugins need no FlatLaf dependency, SDK change, or version bump for these conventions.

@@ -2,22 +2,26 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system Plan 3 implementation complete, independent final review pending** (branch
+- **Theme system Plan 3 final-review fixes implemented, re-review pending** (branch
   `codex/theme-system-plans`): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)
   now styles mounted center controls with one chrome LAF, preserves plugin styles/direct colors, tracks dynamic
-  children and combo dropdowns, and restores state on match/move/close/plugin stop. Tasks 1–4 independently reviewed;
-  Task 5 and final whole-branch review remain pending. All seven plugins audited: Remote/File Server/Vault/Editor
+  children and combo dropdowns, and restores state on match/move/close/plugin stop. All five tasks independently reviewed;
+  the final whole-branch review requested five fixes, now implemented and awaiting focused re-review.
+  All seven plugins audited: Remote/File Server/Vault/Editor
   custom renderers and rules use mounted-owner palettes; Vim error/bell styles remain plugin-owned; syntax and
   configured yank colors stay unchanged. [Authoring audit](plugin-authoring.md#hosted-pane-control-styling) records
-  precedence, exemptions, cleanup and progress text limitations (bundled transfer bars draw no text).
+  precedence, exemptions, cleanup and progress text limitations (all three audited bundled bars draw no text).
   Recorded deviations: narrow public `setUI` stack detection plus silent UIResource default semantics; source-owned
   hierarchy observation of excluded associated headers/editors; failed mount/registry rollback and live unmounted
   document retry. Actual Vim and host precedence are tested separately to keep module dependencies unchanged.
-  Final serialized `./gradlew check` passed **7,889 tests, zero failures/errors, six skips** (app 1,672),
-  including all four architecture gates; Java hygiene (1,634 files) and `git diff --check 5435069c` pass.
-  XML counts use explicit top-level module/plugin test roots only. Evidence: `/tmp/moray-p3-task5-check.log`,
-  `/tmp/moray-p3-task5-counts.log`, `/tmp/moray-p3-task5-hygiene.log`. Focused RED/GREEN: seven new failures
-  before implementation, then 83 focused tests pass. Two minor style-layer diagnostics findings remain for final review. User-only native visual checklist is in
+  Final serialized `./gradlew check` passed **7,897 tests, zero failures/errors, six skips** (app 1,677),
+  including all four architecture gates; Java hygiene (1,636 files) and `git diff --check 5435069c` pass.
+  XML counts use explicit top-level module/plugin test roots only. Evidence: `/tmp/p3-final-check.log`,
+  `/tmp/p3-final-counts.log`, `/tmp/p3-final-hygiene.log`. Task 5's seven RED regressions and 83 focused GREEN
+  tests are retained in the plan; the final fix wave passed 99 focused tests after ownership/accessor/diagnostic REDs.
+  Task 5 note-style churn is fixed (`bd4fd9cd`). The final fix wave adds ownership cancellation for synchronous
+  generated writes, accessible typed color fallback for nonpublic plugin subclasses, correctly keyed warnings and
+  scoped diagnostic assertions, and the corrected three-site progress inventory. Focused independent re-review is pending. User-only native visual checklist is in
   [themes](themes.md); no GUI, benchmark, merge or push performed. Plans 4–5 remain separate future deliverables.
 
 - **Theme workspace startup regression fixed:** the first native GUI attempt after Plan 2 found that GitHub Dark

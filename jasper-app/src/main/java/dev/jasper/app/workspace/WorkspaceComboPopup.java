@@ -74,7 +74,14 @@ final class WorkspaceComboPopup implements AutoCloseable {
             if (list == null) return;
             if (originalZone.isEmpty())
                 for (String key : ZONE_KEYS) originalZone.put(key, list.getClientProperty(key));
-            WorkspaceTheme.apply(list, theme);
+            JList<?> currentList = list;
+            // Record intended values before synchronous listeners can close the popup owner.
+            writtenZone.put("Jasper.zone", "workspace");
+            writtenZone.put("Jasper.workspaceTheme", theme.workspace());
+            writtenZone.put("Jasper.workspace.dark", theme.workspace().dark());
+            writtenZone.put("Jasper.workspace.foreground", theme.workspace().tokens().get(Token.TEXT));
+            WorkspaceTheme.apply(list, theme, () -> !closed && list == currentList);
+            if (closed || list != currentList) return;
             for (String key : ZONE_KEYS) writtenZone.put(key, list.getClientProperty(key));
             var wanted = new IdentityHashMap<JComponent, Boolean>();
             wanted.put(list, true);
@@ -87,8 +94,10 @@ final class WorkspaceComboPopup implements AutoCloseable {
             }
             for (JComponent c : layers.keySet().toArray(JComponent[]::new))
                 if (!wanted.containsKey(c)) layers.remove(c).close();
-            for (JComponent c : wanted.keySet())
+            for (JComponent c : wanted.keySet()) {
+                if (closed || list != currentList) return;
                 layers.computeIfAbsent(c, WorkspaceStyleLayer::new).apply(recipe(c));
+            }
         } finally { refreshing = false; }
     }
 
@@ -104,7 +113,7 @@ final class WorkspaceComboPopup implements AutoCloseable {
     }
 
     private void release() {
-        for (WorkspaceStyleLayer layer : layers.values()) layer.close();
+        for (WorkspaceStyleLayer layer : new java.util.ArrayList<>(layers.values())) layer.close();
         layers.clear();
         if (list != null) {
             for (String key : ZONE_KEYS)

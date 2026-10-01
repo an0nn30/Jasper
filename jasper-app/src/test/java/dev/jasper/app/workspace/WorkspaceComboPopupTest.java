@@ -42,6 +42,32 @@ class WorkspaceComboPopupTest {
         return ((ComboPopup) combo.getUI().getAccessibleChild(combo, 0)).getList();
     }
 
+    @Test void synchronousCloseDuringPopupPublicationRestoresDropdown() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            for (String key : java.util.List.of("FlatLaf.style", "selectionBackground", "Jasper.zone")) {
+                var combo = new JComboBox<>(new String[]{"one"}); var list = list(combo);
+                var baseline = list.getSelectionBackground();
+                var popup = new WorkspaceComboPopup(combo);
+                var once = new java.util.concurrent.atomic.AtomicBoolean();
+                java.beans.PropertyChangeListener close = e -> {
+                    if (e.getNewValue() != null && once.compareAndSet(false, true)) popup.close();
+                };
+                list.addPropertyChangeListener(key, close);
+                var listeners = list.getPropertyChangeListeners();
+                assertThatCode(() -> popup.apply(independent())).doesNotThrowAnyException();
+                assertThat(once).isTrue();
+                assertThat(list.getClientProperty("FlatLaf.style")).isNull();
+                assertThat(list.getClientProperty("Jasper.workspaceStyle")).isNull();
+                assertThat(list.getClientProperty("Jasper.zone")).isNull();
+                assertThat(list.getSelectionBackground()).isEqualTo(baseline);
+                assertThat(list.getPropertyChangeListeners()).hasSameSizeAs(listeners);
+                assertThat(list.getPropertyChangeListeners(key)).containsExactly(close);
+            }
+        });
+        edt(() -> {});
+    }
+
     @Test void hiddenDropdownFollowsSameDarknessThemesAndRestoresZone() throws Exception {
         edt(() -> {
             new ThemeController(Theme.JASPER_LIGHT);

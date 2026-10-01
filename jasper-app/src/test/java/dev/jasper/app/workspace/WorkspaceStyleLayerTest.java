@@ -43,6 +43,68 @@ class WorkspaceStyleLayerTest {
     }
 
 
+    @Test void warningsFollowOffendingInputIdentityAcrossRecovery() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            Object oldOne = UIManager.get("[style]Button.badOne");
+            Object oldTwo = UIManager.get("[style]Button.badTwo");
+            try (var logs = new StyleLogs()) {
+                UIManager.put("[style]Button.badOne", "unsupportedOne: #123456");
+                UIManager.put("[style]Button.badTwo", "unsupportedTwo: #123456");
+                var button = new JButton();
+                button.putClientProperty("FlatLaf.style", Map.of("arc", 11));
+                try (var layer = new WorkspaceStyleLayer(button)) {
+                    var recipe = WorkspaceStyles.recipe(button, independent().workspace());
+                    layer.apply(recipe);
+                    button.putClientProperty("FlatLaf.styleClass", "badOne");
+                    layer.apply(recipe); layer.apply(recipe);
+                    assertThat(logs.host()).hasSize(1);
+                    button.putClientProperty("FlatLaf.style", Map.of("arc", 13));
+                    assertThat(logs.host()).hasSize(1);
+                    button.putClientProperty("FlatLaf.styleClass", "badTwo");
+                    assertThat(logs.host()).hasSize(2);
+                    button.putClientProperty("FlatLaf.styleClass", null);
+                    assertThat(button.getClientProperty("Jasper.workspaceStyle")).isNotNull();
+                    button.putClientProperty("FlatLaf.styleClass", "badOne");
+                    assertThat(logs.host()).hasSize(2);
+                    assertThat(logs.host()).extracting(r -> r.getThrown().getMessage())
+                        .containsExactly("Unsupported style key: unsupportedOne", "Unsupported style key: unsupportedTwo");
+                    assertThat(logs.flat()).hasSize(10).allSatisfy(r -> {
+                        assertThat(r.getLevel()).isEqualTo(java.util.logging.Level.SEVERE);
+                        assertThat(r.getThrown()).isNotNull();
+                    });
+                }
+            } finally {
+                UIManager.put("[style]Button.badOne", oldOne);
+                UIManager.put("[style]Button.badTwo", oldTwo);
+            }
+        });
+    }
+
+    @Test void nonpublicPluginSubclassUsesInvocableColorFallback() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            try (var logs = new StyleLogs()) {
+            for (var panel : dev.jasper.app.testsupport.plugin.ColorWidgets.panels()) {
+                Color original = panel.getBackground();
+                try (var layer = new WorkspaceStyleLayer(panel)) {
+                    var recipe = WorkspaceStyles.recipe(panel, independent().workspace());
+                    layer.apply(recipe);
+                    assertThat(panel.getBackground()).isEqualTo(independent().workspace().tokens().get(Token.SURFACE));
+                    panel.updateUI();
+                    assertThat(panel.getBackground()).isEqualTo(independent().workspace().tokens().get(Token.SURFACE));
+                    layer.clear();
+                    assertThat(panel.getBackground()).isEqualTo(original);
+                    layer.apply(recipe);
+                }
+                assertThat(panel.getBackground()).isEqualTo(original);
+            }
+            assertThat(logs.flat()).isEmpty();
+            assertThat(logs.host()).isEmpty();
+            }
+        });
+    }
+
     @Test void pluginFeedbackMapsKeepErrorAndBellColorsThroughHostRefresh() throws Exception {
         edt(() -> {
             new ThemeController(Theme.JASPER_LIGHT);
@@ -358,6 +420,7 @@ class WorkspaceStyleLayerTest {
         edt(() -> {
             new ThemeController(Theme.JASPER_LIGHT);
             var b = new JButton();
+            try (var logs = new StyleLogs()) {
             Object invalid = Map.of("background", "not a color");
             b.putClientProperty("FlatLaf.style", invalid);
             try (var layer = new WorkspaceStyleLayer(b)) {
@@ -367,6 +430,9 @@ class WorkspaceStyleLayerTest {
                 assertThatThrownBy(() -> layer.apply(new WorkspaceStyles.Recipe("Button",
                     Map.of("misspelledHostKey", Color.RED), Map.of())))
                     .isInstanceOf(IllegalArgumentException.class);
+                assertThat(logs.host()).hasSize(1);
+                assertThat(logs.flat()).hasSize(1).allSatisfy(r -> assertThat(r.getThrown()).isNotNull());
+            }
             }
         });
     }
@@ -415,6 +481,7 @@ class WorkspaceStyleLayerTest {
     @Test void malformedAndUnsupportedPluginStylesReleaseHostAndCanRecover() throws Exception {
         edt(() -> {
             new ThemeController(Theme.JASPER_LIGHT);
+            try (var logs = new StyleLogs()) {
             for (Object invalid : List.of("invalid style", Map.of("notAStyleKey", Color.RED), 42)) {
                 var b = new JButton();
                 Color baseline = b.getBackground();
@@ -422,12 +489,17 @@ class WorkspaceStyleLayerTest {
                     var recipe = WorkspaceStyles.recipe(b, independent().workspace());
                     layer.apply(recipe);
                     b.putClientProperty("FlatLaf.style", invalid);
+                    layer.apply(recipe); layer.apply(recipe);
                     assertThat(b.getClientProperty("FlatLaf.style")).isSameAs(invalid);
                     assertThat(b.getClientProperty("Jasper.workspaceStyle")).isNull();
                     assertThat(b.getBackground()).isEqualTo(baseline);
                     b.putClientProperty("FlatLaf.style", null);
                     assertThat(b.getBackground()).isEqualTo(recipe.style().get("background"));
                 }
+            }
+            assertThat(logs.host()).hasSize(3);
+            // FlatLaf ignores the non-style scalar; the two parsed invalid values each log twice.
+            assertThat(logs.flat()).hasSize(4).allSatisfy(r -> assertThat(r.getThrown()).isNotNull());
             }
         });
     }

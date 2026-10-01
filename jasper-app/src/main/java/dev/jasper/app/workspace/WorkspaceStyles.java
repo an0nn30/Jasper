@@ -201,8 +201,21 @@ final class WorkspaceStyles {
 
     private static void put(JComponent component, boolean flat, Map<String, Object> style, Map<String, Color> direct,
                             String key, GeneratedTheme theme, Token token, String directKey) {
-        if (flat) color(style, key, theme, token);
+        if (flat && accessibleColor(component, key)) color(style, key, theme, token);
         else if (supportsDirect(component, directKey)) direct.put(directKey, theme.tokens().get(token));
+    }
+
+    private static boolean accessibleColor(JComponent component, String key) {
+        String suffix = Character.toUpperCase(key.charAt(0)) + key.substring(1);
+        try {
+            return java.lang.reflect.Modifier.isPublic(component.getClass().getMethod("get" + suffix)
+                    .getDeclaringClass().getModifiers())
+                && java.lang.reflect.Modifier.isPublic(component.getClass().getMethod("set" + suffix, Color.class)
+                    .getDeclaringClass().getModifiers());
+        } catch (NoSuchMethodException absent) {
+            // Some styleable delegate fields (e.g. tree selection colors) have no bean property.
+            return true;
+        }
     }
 
     private static boolean supportsDirect(JComponent component, String key) {

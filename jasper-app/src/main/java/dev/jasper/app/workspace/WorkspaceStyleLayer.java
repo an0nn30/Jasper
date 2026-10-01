@@ -38,6 +38,7 @@ final class WorkspaceStyleLayer implements AutoCloseable {
     private Object published;
     private WorkspaceStyles.Recipe recipe;
     private int depth;
+    private long revision;
     private boolean suspended;
     private boolean closed;
     private final java.util.Set<String> directKeys = new java.util.HashSet<>();
@@ -65,6 +66,7 @@ final class WorkspaceStyleLayer implements AutoCloseable {
                 if (current != value && !currentDefault(recipe, key, current)) overrides.put(key, current);
             });
         }
+        revision++;
         this.recipe = Objects.requireNonNull(recipe);
         if (!suspended) guarded(this::publish);
     }
@@ -72,6 +74,7 @@ final class WorkspaceStyleLayer implements AutoCloseable {
     void clear() {
         requireEdt();
         if (closed) return;
+        revision++;
         guarded(this::release);
         recipe = null;
         captureClearedValues();
@@ -80,6 +83,7 @@ final class WorkspaceStyleLayer implements AutoCloseable {
     void beforeUiUpdate() {
         requireEdt();
         if (closed || suspended) return;
+        revision++;
         suspended = true;
         guarded(this::release);
     }
@@ -95,9 +99,11 @@ final class WorkspaceStyleLayer implements AutoCloseable {
     @Override public void close() {
         requireEdt();
         if (closed) return;
-        clear();
-        component.removePropertyChangeListener(listener);
         closed = true;
+        revision++;
+        component.removePropertyChangeListener(listener);
+        guarded(this::release);
+        recipe = null;
     }
 
     private void changed(PropertyChangeEvent event) {
@@ -121,9 +127,11 @@ final class WorkspaceStyleLayer implements AutoCloseable {
             if (!suspended && recipe != null) guarded(() -> {
                 // The new delegate has already installed the composite. Remove it and reinstall
                 // just this component after restoring the pre-host UIResource provenance.
+                long expected = revision;
                 release();
+                if (!current(expected)) return;
                 component.updateUI();
-                publish();
+                if (current(expected)) publish();
             });
         } else if (!suspended && directKeys.contains(directKey(name))) {
             String key = directKey(name);
@@ -161,15 +169,18 @@ final class WorkspaceStyleLayer implements AutoCloseable {
 
     private void publish() {
         // Validate generated keys separately: a host recipe defect must never be blamed on a plugin.
+        if (closed || suspended || recipe == null) return;
+        long expected = revision;
         validate(recipe.style());
         Object composite;
+        Object offending = pluginStyle;
         try {
             validate(pluginStyle);
+            offending = pluginClass;
             validate(FlatStylingSupport.getStyleForClasses(pluginClass, recipe.type()));
             composite = composite(component, recipe, pluginStyle);
         } catch (IllegalArgumentException | ClassCastException failure) {
             release();
-            Object offending = pluginStyle != null ? pluginStyle : pluginClass;
             if (warned.put(offending, Boolean.TRUE) == null)
                 LOG.log(System.Logger.Level.WARNING, "Ignoring workspace colors for invalid plugin style", failure);
             return;
@@ -182,22 +193,37 @@ final class WorkspaceStyleLayer implements AutoCloseable {
             // otherwise an initial plugin color survives removal of the plugin's style.
             // Class state remains exclusively plugin-owned.
             component.putClientProperty(STYLE, null);
+            if (!current(expected)) return;
             for (String key : recipe.style().keySet()) capture(key);
             for (String key : recipe.direct().keySet()) capture(key);
         }
         directKeys.addAll(recipe.direct().keySet());
         published = composite;
         component.putClientProperty(STYLE, composite);
+        if (!current(expected)) return;
         component.putClientProperty(GENERATED, recipe.style());
+        if (!current(expected)) return;
         for (var entry : recipe.direct().entrySet()) {
-            if (!overrides.containsKey(entry.getKey())) write(entry.getKey(), entry.getValue());
+            if (!overrides.containsKey(entry.getKey())) {
+                written.put(entry.getKey(), entry.getValue());
+                write(entry.getKey(), entry.getValue());
+                if (!current(expected)) return;
+            }
         }
         applyDirectPluginStyle();
+        if (!current(expected)) return;
         // Plugin setters override direct fallbacks for the entire ownership lifetime.
-        overrides.forEach(this::write);
+        for (var entry : new LinkedHashMap<>(overrides).entrySet()) {
+            write(entry.getKey(), entry.getValue());
+            if (!current(expected)) return;
+        }
         for (String key : originals.keySet()) {
             if (!overrides.containsKey(key)) written.put(key, read(key));
         }
+    }
+
+    private boolean current(long expected) {
+        return !closed && !suspended && recipe != null && revision == expected;
     }
 
     private static Object composite(JComponent component, WorkspaceStyles.Recipe recipe, Object pluginStyle) {
@@ -275,9 +301,10 @@ final class WorkspaceStyleLayer implements AutoCloseable {
                 FlatStylingSupport.getStyleForClasses(pluginClass, recipe.type()), pluginStyle);
             validate(plugin);
         } catch (IllegalArgumentException | ClassCastException invalid) { return; }
+        long expected = revision;
         FlatStylingSupport.parseAndApply(null, plugin, (key, value) -> {
             String direct = directKey(key);
-            if (directKeys.contains(direct)) write(direct, (Color) value);
+            if (revision == expected && directKeys.contains(direct)) write(direct, (Color) value);
             return null;
         });
     }
@@ -300,11 +327,45 @@ final class WorkspaceStyleLayer implements AutoCloseable {
     }
 
     private Color read(String key) {
+        switch (key) {
+            case "background": return component.getBackground();
+            case "foreground": return component.getForeground();
+            case "selectionBackground":
+                if (component instanceof javax.swing.JList<?> list) return list.getSelectionBackground();
+                if (component instanceof javax.swing.JTable table) return table.getSelectionBackground();
+                if (component instanceof javax.swing.text.JTextComponent text) return text.getSelectionColor();
+                break;
+            case "selectionForeground":
+                if (component instanceof javax.swing.JList<?> list) return list.getSelectionForeground();
+                if (component instanceof javax.swing.JTable table) return table.getSelectionForeground();
+                if (component instanceof javax.swing.text.JTextComponent text) return text.getSelectedTextColor();
+                break;
+            case "caretColor": return ((javax.swing.text.JTextComponent) component).getCaretColor();
+            case "disabledTextColor": return ((javax.swing.text.JTextComponent) component).getDisabledTextColor();
+            default: break;
+        }
         try { return (Color) properties.get(propertyKey(key)).getReadMethod().invoke(component); }
         catch (IllegalAccessException | InvocationTargetException e) { throw new IllegalStateException(e); }
     }
 
     private void write(String key, Color value) {
+        switch (key) {
+            case "background": component.setBackground(value); return;
+            case "foreground": component.setForeground(value); return;
+            case "selectionBackground":
+                if (component instanceof javax.swing.JList<?> list) { list.setSelectionBackground(value); return; }
+                if (component instanceof javax.swing.JTable table) { table.setSelectionBackground(value); return; }
+                if (component instanceof javax.swing.text.JTextComponent text) { text.setSelectionColor(value); return; }
+                break;
+            case "selectionForeground":
+                if (component instanceof javax.swing.JList<?> list) { list.setSelectionForeground(value); return; }
+                if (component instanceof javax.swing.JTable table) { table.setSelectionForeground(value); return; }
+                if (component instanceof javax.swing.text.JTextComponent text) { text.setSelectedTextColor(value); return; }
+                break;
+            case "caretColor": ((javax.swing.text.JTextComponent) component).setCaretColor(value); return;
+            case "disabledTextColor": ((javax.swing.text.JTextComponent) component).setDisabledTextColor(value); return;
+            default: break;
+        }
         try { properties.get(propertyKey(key)).getWriteMethod().invoke(component, value); }
         catch (IllegalAccessException | InvocationTargetException e) { throw new IllegalStateException(e); }
     }

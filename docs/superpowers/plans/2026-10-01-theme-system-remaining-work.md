@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 implementation is complete on `codex/theme-system-plans`, with Task 5 and final whole-branch review pending; Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 implementation is complete on `codex/theme-system-plans`, with all five tasks reviewed and final-review fixes awaiting focused re-review; Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -154,17 +154,23 @@ not represented as a fresh test of future implementation. The executor runs the 
 
 ## Plan 3 implementation evidence and remaining gates
 
-All five tasks are implemented; Tasks 1–4 have passed their independent task reviews. Task 5 and the final
-whole-branch review remain controller-owned. The [execution notes](2026-10-01-theme-system-3-plugin-panes.md)
+All five tasks are implemented; all five have passed their independent task reviews. The final
+whole-branch review requested five fixes, now implemented with focused independent re-review pending. The [execution notes](2026-10-01-theme-system-3-plugin-panes.md)
 retain actual per-task evidence and deviations: delegate-owned progress text (bundled bars draw no text), narrow
 synchronous `setUI` detection and silent UIResource default semantics, a source-owned hierarchy listener on excluded
 associated headers/editors, and mount/registry rollback preserving live documents when no host can accept a move.
 The bundled audit uses owner/paint-time palettes and plugin-owned Vim feedback styles without SDK/dependency changes.
 Task 5 composes actual Vim unit tests with one host style-layer precedence regression rather than linking plugin
-implementation classes into the application tests. Two minor style-layer diagnostics findings are still deferred to
-final review. Native GUI acceptance has not been run. Plans 4–5 still own catalog conversion/vendoring/migration,
+implementation classes into the application tests. The final fix wave addresses both diagnostic minors, synchronous generated-write ownership loss,
+nonpublic plugin color-accessor fallback, and the three-site progress inventory. Task 5 note churn was fixed
+by caching semantic color independently of the host composite (`bd4fd9cd`). Native GUI acceptance has not been run. Plans 4–5 still own catalog conversion/vendoring/migration,
 the Themes page, and file reload; none is implied complete by the plugin pane work.
 
 Final Task 5 headless gate: `./gradlew check` passed 7,889 tests with zero failures/errors and six skips,
 including all four architecture checks; source hygiene (1,634 Java files) and branch-wide whitespace checks pass.
 Evidence and exact module counts are in the Plan 3 execution notes and `/tmp/moray-p3-task5-{check,counts,hygiene}.log`.
+
+Final unified fix gate: `./gradlew check` passed 7,897 tests, zero failures/errors, six skips in 3m32s;
+99 focused tests passed. All four architecture gates, 1,636-file Java hygiene and branch whitespace checks pass.
+Explicit module/plugin XML counts and logs are recorded in the Plan 3 execution notes and
+`/tmp/p3-final-{check,counts,hygiene,diff-check}.log`. Focused independent re-review of this fix wave remains pending.

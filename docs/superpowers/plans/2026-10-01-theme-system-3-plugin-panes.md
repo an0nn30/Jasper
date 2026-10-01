@@ -13,7 +13,7 @@ painters read the existing SDK palette using their mounted component; Editor ret
 
 **Spec:** [Theme design](../specs/2026-10-01-jasper-theme-system-design.md), §§1, 5.3–5.6, 9.
 **Prerequisite:** [Plan 2](2026-10-01-theme-system-2-workspace.md), implemented and merged locally.
-**Status:** Implementation complete; Tasks 1–4 independently reviewed, Task 5 and final whole-branch review pending. Revised against `main@14f9913d` after the GitHub Dark startup fix.
+**Status:** Implementation complete; all five tasks independently reviewed. Final whole-branch review findings I1/I2/M1/M2/M3 are implemented; focused re-review pending. Revised against `main@14f9913d` after the GitHub Dark startup fix.
 The user clarified on 2026-10-01 that a workspace combo's dropdown follows the workspace; menus, tooltips and dialogs
 remain chrome. This replaces the previous three-task outline; the five tasks below are sequential review gates.
 **Execution:** Preserve the repository's per-task implementer/reviewer workflow and final whole-branch review.
@@ -28,7 +28,7 @@ A shared Swing delegate can reinstall without a UI event: direct-color observati
 `JComponent.setUI` with public StackWalker. A silent new UIResource identity matching the current UI default remains
 replaceable; an explicit assignment of that exact default without an event is indistinguishable and follows Swing's
 UIResource convention. Ordinary Color identities and observable plugin setters remain authoritative. One intermediate
-Gradle overlap invalidated that run; final evidence was serialized. Two minor diagnostics findings remain for final review.
+Gradle overlap invalidated that run; final evidence was serialized. Two minor diagnostics findings were carried to final review and are addressed by the unified fix wave below.
 Task 3 (`5bf2a468`, fix `756001d8`) owns dynamic descendants and combo dropdowns. Full check passed 7,860 tests,
 zero failures/errors, six skips; the review fix passed 34 focused lifecycle tests. A targeted source-owned hierarchy
 listener remains on a current header/editor association inside excluded ancestry so it can detect a return to eligible
@@ -62,6 +62,23 @@ The full log retains dependency SLF4J/native-access warnings from plugin smoke p
 Remote's transfer bar does not paint text, so the progress text-color limitation has no bundled impact. No SDK/API,
 plugin release, dependency, domain color, GUI or benchmark change. Step 4 remains open solely for controller-owned
 independent review and its findings; headless verification does not claim user native visual acceptance.
+
+Task 5 review fix (`bd4fd9cd`) caches each note's semantic color independently of the larger host composite,
+preventing File Server/Remote/Vault note maps from being republished on every paint; 25 affected tests passed.
+All five task reviews are complete. The whole-branch review requested two Important and three Minor fixes.
+The unified final fix wave aborts stale component/tree/popup publication after synchronous close/remove/move;
+records direct/zone ownership before callbacks; and routes inaccessible runtime bean accessors to typed Swing
+fallbacks using public metadata only. Warning identity now follows the input being validated, with scoped exact
+host/FlatLaf diagnostic assertions. The progress inventory names Editor Forms, Remote ConnectionPanel and
+Remote TransferStrip, all with string painting disabled. The focused gate passed 99 tests (zero failures/errors/skips).
+Public accessor metadata inspection is a narrow controller-approved extension of the capability gate; no private
+access or global palette mutation. The one final serialized `./gradlew check` passed in 3m32s: **7,897 tests,
+zero failures/errors, six skips**. Counts (tests/failures/errors/skips): app 1,677/0/0/1; Buddy 163/0/0/0;
+terminal 391/0/0/4; SDK 44/0/0/0; testkit 84/0/0/0; Editor 4,786/0/0/0; File Server 160/0/0/0;
+History 41/0/0/0; Remote 386/0/0/0; Sample 12/0/0/0; Snippets 11/0/0/0; Vault 142/0/0/1.
+All four architecture gates passed, source hygiene passed for 1,636 Java files, and branch whitespace check
+against `5435069c` passed. Evidence: `/tmp/p3-final-{check,counts,hygiene,diff-check}.log` and
+`/tmp/p3-final-focused.log`. The known terminal timeout did not occur. Focused independent re-review remains pending.
 
 ## Global Constraints
 

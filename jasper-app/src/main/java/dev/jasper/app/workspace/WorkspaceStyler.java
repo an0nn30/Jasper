@@ -77,17 +77,26 @@ public final class WorkspaceStyler implements AutoCloseable {
         associationWatches.forEach(Component::removeHierarchyListener);
         associationWatches.clear();
         for (Node node : new ArrayList<>(nodes.values())) release(node);
-        root.putClientProperty(ROOT, null);
+        if (root.getClientProperty(ROOT) == this) root.putClientProperty(ROOT, null);
     }
 
     private void refresh() {
         if (closed) return;
         pending = true;
-        if (reconciling) return;
+        if (reconciling) {
+            // A generated property fires plugin listeners synchronously. Relinquish removed or
+            // transferred nodes now, before their interrupted publication can resume.
+            var wanted = new IdentityHashMap<Component, Boolean>();
+            collect(root, wanted, new IdentityHashMap<>());
+            for (Node node : new ArrayList<>(nodes.values()))
+                if (!wanted.containsKey(node.component) || wanted.get(node.component) != node.full
+                    || node.exempt != isExempt(node.component)) release(node);
+            return;
+        }
         reconciling = true;
         try {
             int passes = 0;
-            while (pending && passes++ < 16) {
+            while (!closed && pending && passes++ < 16) {
                 pending = false;
                 var wanted = new IdentityHashMap<Component, Boolean>();
                 var associated = new IdentityHashMap<Component, Boolean>();
@@ -105,13 +114,14 @@ public final class WorkspaceStyler implements AutoCloseable {
                     }
                 }
                 for (var entry : wanted.entrySet()) {
+                    if (closed || pending) break;
                     Node node = nodes.get(entry.getKey());
                     if (node == null) {
                         node = new Node(entry.getKey(), entry.getValue());
                         nodes.put(entry.getKey(), node);
                         node.observe();
                     }
-                    node.apply();
+                    if (!closed && !pending && nodes.get(node.component) == node) node.apply();
                 }
             }
             if (pending) queueRefresh();
@@ -189,6 +199,7 @@ public final class WorkspaceStyler implements AutoCloseable {
     }
 
     private void release(Node node) {
+        if (nodes.get(node.component) != node) return;
         nodes.remove(node.component);
         node.detach();
     }
@@ -233,8 +244,15 @@ public final class WorkspaceStyler implements AutoCloseable {
             if (component instanceof Container container) container.addContainerListener(children);
             if (component instanceof JComponent jc) {
                 jc.putClientProperty(OWNER, WorkspaceStyler.this);
-                layer = new WorkspaceStyleLayer(jc);
-                if (jc instanceof JComboBox<?> combo) popup = new WorkspaceComboPopup(combo);
+                if (closed || nodes.get(component) != this) return;
+                var acquired = new WorkspaceStyleLayer(jc);
+                if (closed || nodes.get(component) != this) { acquired.close(); return; }
+                layer = acquired;
+                if (jc instanceof JComboBox<?> combo) {
+                    var acquiredPopup = new WorkspaceComboPopup(combo);
+                    if (closed || nodes.get(component) != this) { acquiredPopup.close(); return; }
+                    popup = acquiredPopup;
+                }
                 if (suspension != 0) suspend();
             }
         }
@@ -245,7 +263,7 @@ public final class WorkspaceStyler implements AutoCloseable {
             if (suspension != 0) return;
             if (theme.matching()) layer.clear();
             else layer.apply(WorkspaceStyles.recipe((JComponent) component, theme.workspace()));
-            if (popup != null) popup.apply(theme);
+            if (!closed && nodes.get(component) == this && popup != null) popup.apply(theme);
         }
 
         void suspend() {
