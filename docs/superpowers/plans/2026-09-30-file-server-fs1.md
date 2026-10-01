@@ -1,5 +1,18 @@
 # File Server FS-1: foundation and HTTP — Implementation Plan
 
+Status: executed on `claude/file-server-fs1` (2026-09-30); not merged. Deviations from the plan text:
+
+- `ResolvedLogin`'s instance predicate is `isAnonymous()` (Java forbids a static and an instance `anonymous()` with one signature).
+- `ShareRoot` also refuses names the OS cannot represent (`InvalidPathException` becomes `PathRefusedException`) and C1 control characters; `attributes()` reports the requested entry's own name.
+- HTTP login throttle: early or locked-out attempts get 429 with `Retry-After` instead of the server sleeping; a success during a lockout does not lift it; the Host check also runs before credentials.
+- HTTP listing sends `Referrer-Policy: same-origin` (so the listing's own forms carry their Origin; `Origin: null` is refused); multipart parameter matching is anchored; 303/301 `Location` is built from canonical paths.
+- Transfer ids are unique per JVM; `shutdown()` stops engines in parallel with one 5 s deadline (this can block `Plugin.stop()` up to 5 s, against the SDK's "must not block"; flagged for follow-up); the port-clash check uses the definition a running engine actually uses.
+- Not implemented: FAILED from RUNNING (engines have no fatal-runtime channel; the JDK HTTP server does not die on its own).
+- The panel is master/detail: rows show state, name, protocol, port, warning and start/stop; folder, access, URLs with Copy and the failure reason with Retry are in the selected server's card. The firewall hint shows only for running servers reachable from other computers.
+- An Interface bind advertises one URL (the address it binds).
+- Clicking the status item toggles the panel (the SDK has only `Panels.toggle`).
+- Panel and dialog labels set `html.disable` before their text, so server names never render as Swing HTML.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship SDK 0.11.0 (`network.listen`, `Windows.onQuitting`) and a bundled File Server plugin that shares local folders over HTTP from a File Servers rail panel: saved and temporary servers, a jailed share root, Vault or session logins, an activity log, a status item, a palette scope, Serve Current Folder over HTTP and a quit confirmation.

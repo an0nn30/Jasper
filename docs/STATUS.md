@@ -2,6 +2,34 @@
 
 ## Current state — 2026-09-30
 
+- **File Server FS-1: foundation and HTTP** (branch `claude/file-server-fs1`, spec
+  `docs/superpowers/specs/2026-09-30-jasper-file-server-design.md`, plan
+  `docs/superpowers/plans/2026-09-30-file-server-fs1.md`, user guide `docs/file-server.md`): SDK 0.11.0 adds the
+  `network.listen` capability and `Windows.onQuitting` quit guards (app `QuitGuards`, testkit fake and contract tests);
+  every bundled plugin declares `sdk = ">=0.11.0, <0.12"`. New bundled plugin File Server (`plugins/fileserver`,
+  `dev.jasper.fileserver` 0.1.0): File Servers rail panel, editor, status item, palette scope, Serve Current Folder over
+  HTTP, quit confirmation, autostart (waiting for a locked Vault), Vault or session logins, `ShareRoot` jail, login
+  throttle, and an HTTP engine on the JDK server (listings, ranges, Basic auth, uploads and deletes on writable shares,
+  Host and Origin checks). Deviations from the spec: user doc in `docs/file-server.md`; setting keys
+  `confirm_quit`/`activity_entries`; the privileged-port suggestion is port + 8000; Host/Origin checks added; palette
+  titles in house style with a scope for per-server Start/Stop; saving a temporary server adopts it. Execution
+  deviations (all listed in the plan's status banner): `ResolvedLogin.isAnonymous()`; `ShareRoot` also refuses
+  unrepresentable names and C1 control characters; the login throttle answers early or locked-out attempts with 429 and
+  `Retry-After` instead of sleeping, and the Host check runs before credentials; the listing sends
+  `Referrer-Policy: same-origin`; transfer ids are unique per JVM; the port-clash check uses the definition a running
+  engine uses; FAILED from RUNNING is not implemented (engines have no fatal-runtime channel); the panel is
+  master/detail; an Interface bind advertises one URL; the status item toggles the panel; labels set `html.disable`.
+  Open follow-up: `shutdown()` stops engines in parallel under one 5 s deadline, so `Plugin.stop()` can block up to 5 s,
+  against the SDK's "must not block". `./gradlew check` green: jasper-app 1,439 tests (0 failures, 1 skipped),
+  jasper-terminal 391 (0, 4 skipped), jasper-buddy 163, jasper-sdk 35, jasper-sdk-testkit 74, editor 4,782,
+  fileserver 105, history 41, remote 297, sample 12, snippets 11, vault 139 (0, 1 skipped). Earlier runs saw flaky
+  `RemotePluginTest.endingAPanesSessionClearsTheSftpView`, `TransferCoordinatorTest.resumedScannedJob...` and
+  `TerminalAppIntegrationTest.rowResetRejects...`; none failed in the final run. Not merged. GUI checks pending with the
+  user: New File Server and start it; open the URL from a phone on the LAN with All networks (macOS firewall and Local
+  Network prompts); upload two files and delete one from the listing page in a real browser (Chrome, Safari, Firefox)
+  on a writable server; a wrong password then an immediate retry shows a short 429 wait; a Vault account login with a
+  locked Vault and Start With Jasper; Serve Current Folder from a terminal; the quit confirmation; Reveal Folder and
+  Copy Address.
 - **Terminal colors follow the UI theme** (branch `claude/terminal-follow-theme`, bounded change approved in chat
   2026-09-30, no spec): Font & Colors' Terminal colors row is a checkbox, "Terminal colors follow the UI theme" (the
   value `match`), over the dropdown of separate choices (Light, Dark, every terminal theme, More Terminal Themes…),
