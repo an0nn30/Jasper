@@ -131,8 +131,10 @@ enabled = true
 # On Linux and Windows, cmd means Ctrl+Shift; literal Ctrl combinations are often clearer. Example:
 # new_tab = "ctrl+shift+t"
 # split_down = "ctrl+alt+shift+d"
-# macOS: keep Cmd+K for Clear Scrollback and open the palette with Cmd+P.
-# command_palette = "cmd+p"
+# macOS: the palette opens with Cmd+Shift+P and Cmd+K clears the scrollback (these are the defaults).
+# command_palette = "cmd+shift+p"
 # clear_scrollback = "cmd+k"
-# Windows/Linux: free Ctrl+K for the terminal and open the palette with Ctrl+P.
-# command_palette = "ctrl+p"
+# Windows/Linux: the palette opens with Ctrl+Shift+P and Ctrl+Shift+K clears the scrollback, so Ctrl+K stays with the
+# terminal (these are the defaults).
+# command_palette = "ctrl+shift+p"
+# clear_scrollback = "ctrl+shift+k"

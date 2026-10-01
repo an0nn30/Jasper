@@ -36,6 +36,18 @@ class VaultPluginTest {
             new FileStore(context.dataDirectory().resolve("device.secret"))), Runnable::run);
     }
 
+    @Test void openAndLockHaveTheirDefaultShortcuts() {
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            var open = host.actionSpec(VaultPlugin.OPEN).orElseThrow();
+            assertThat(open.defaultBinding()).as("cmd is Ctrl+Shift off macOS: Ctrl+Shift+\\").contains("cmd+\\");
+            assertThat(open.otherDefaultBinding()).isEmpty();
+            var lock = host.actionSpec(VaultPlugin.LOCK).orElseThrow();
+            assertThat(lock.defaultBinding()).as("the Alt rule makes it Ctrl+Alt+Shift+L off macOS").contains("cmd+shift+l");
+            assertThat(lock.otherDefaultBinding()).isEmpty();
+        }
+    }
+
     @Test void cancellingOneImportDoesNotCancelSharedVaultSetup() {
         var plugin = plugin();
         try (var host = new FakePluginHost()) {

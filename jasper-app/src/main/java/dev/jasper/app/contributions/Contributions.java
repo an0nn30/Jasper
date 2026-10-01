@@ -1,5 +1,6 @@
 package dev.jasper.app.contributions;
 
+import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.lifecycle.Subscription;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -64,10 +65,18 @@ public final class Contributions {
 
     public ActionEntry addAction(String id, String title, Icon iconOrNull, List<String> keywords,
                                  Optional<String> defaultBinding, Consumer<Invocation> handler) {
+        return addAction(id, title, iconOrNull, keywords, defaultBinding, Optional.empty(), KeyContext.GLOBAL, handler);
+    }
+
+    /** An action with a separate Linux and Windows default (empty: derived) and the context its shortcut applies in. */
+    public ActionEntry addAction(String id, String title, Icon iconOrNull, List<String> keywords, Optional<String> defaultBinding,
+                                 Optional<String> otherDefault, KeyContext context, Consumer<Invocation> handler) {
         requireEdt();
         Objects.requireNonNull(handler, "handler");
+        Objects.requireNonNull(otherDefault, "otherDefault");
+        Objects.requireNonNull(context, "context");
         if (actions.containsKey(id)) throw new IllegalArgumentException("Action already registered: " + id);
-        var entry = new ActionEntry(this, id, title, iconOrNull, keywords, defaultBinding, handler);
+        var entry = new ActionEntry(this, id, title, iconOrNull, keywords, defaultBinding, otherDefault, context, handler);
         actions.put(id, entry);
         changed(Kind.ACTIONS);
         return entry;

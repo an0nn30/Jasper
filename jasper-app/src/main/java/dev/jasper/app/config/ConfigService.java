@@ -287,7 +287,7 @@ public final class ConfigService implements AutoCloseable {
                         if (builtIn.isEmpty() && extension.isEmpty()) continue;
                         String intended = edit.getValue().orElseGet(() -> builtIn
                             .map(a -> KeyBindings.effectiveDefaultBinding(a, macOs))
-                            .orElseGet(() -> extension.orElseThrow().defaultBinding().orElse("none")));
+                            .orElseGet(() -> extension.orElseThrow().defaultFor(macOs).orElse("none")));
                         if (!KeyBindings.parse(intended, macOs).equals(newBindings.strokeFor(edit.getKey())))
                             throw new IllegalArgumentException("The default shortcut for " + edit.getKey() + " is unavailable. Assign a shortcut explicitly instead.");
                     }

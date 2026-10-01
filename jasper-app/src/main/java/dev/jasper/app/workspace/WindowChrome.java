@@ -34,9 +34,9 @@ final class WindowChrome {
     private final ButtonGroup toolbarModes = new ButtonGroup();
     /** The built-in terminal colour choices; none is selected while a named terminal theme is in use. */
     private final ButtonGroup terminalGroup = new ButtonGroup();
-    private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
-    private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
-    private final JCheckBoxMenuItem railVisible = new JCheckBoxMenuItem("Rail", true);
+    private final JCheckBoxMenuItem statusVisible = new MenuBarItems.CheckBox("Status Bar", true);
+    private final JCheckBoxMenuItem buddyVisible = new MenuBarItems.CheckBox("Show Jasper", false);
+    private final JCheckBoxMenuItem railVisible = new MenuBarItems.CheckBox("Rail", true);
     private final java.util.EnumMap<MenuTarget.Slot, JMenu> standardMenus = new java.util.EnumMap<>(MenuTarget.Slot.class);
     private final List<Component> contributedToolbar = new ArrayList<>();
     private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
@@ -77,7 +77,7 @@ final class WindowChrome {
         standardMenus.put(MenuTarget.Slot.TAB, tab);
         JMenu modes = new JMenu("Toolbar");
         for (ToolbarMode mode : ToolbarMode.values()) {
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
+            JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
             item.setActionCommand(mode.name());
             toolbarModes.add(item); modes.add(item);
         }
@@ -87,7 +87,7 @@ final class WindowChrome {
         railVisible.setAction(owner.windowCommands().view("view.rail"));
         JMenu terminalColors = new JMenu("Terminal Colors");
         for (TerminalColors colors : TerminalColors.builtIns()) {
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view(
+            JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view(
                 "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT)));
             terminalItems.put(colors, item); terminalGroup.add(item); terminalColors.add(item);
         }
@@ -97,7 +97,7 @@ final class WindowChrome {
             @Override public void menuCanceled(MenuEvent event) {}
         });
         view.add(terminalColors);
-        view.add(new JMenuItem(owner.windowCommands().view("view.window_settings")));
+        view.add(new MenuBarItems.Item(owner.windowCommands().view("view.window_settings")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
@@ -203,17 +203,18 @@ final class WindowChrome {
         toolbar.revalidate(); toolbar.repaint();
     }
 
-    private List<Component> build(List<MenuEntry> entries) {
+    /** Builds contributed entries; {@code item} makes menu-bar items or ordinary popup items. */
+    private List<Component> build(List<MenuEntry> entries, java.util.function.Function<Action, JMenuItem> item) {
         List<Component> built = new ArrayList<>();
         for (MenuEntry entry : entries) {
             switch (entry) {
-                case MenuEntry.Item item -> {
-                    Action action = contributions.action(item.actionId());
-                    if (action != null) built.add(new JMenuItem(action));
+                case MenuEntry.Item placed -> {
+                    Action action = contributions.action(placed.actionId());
+                    if (action != null) built.add(item.apply(action));
                 }
                 case MenuEntry.Separator separator -> built.add(new JPopupMenu.Separator());
                 case MenuEntry.Submenu submenu -> {
-                    List<Component> children = build(submenu.entries());
+                    List<Component> children = build(submenu.entries(), item);
                     if (children.stream().noneMatch(child -> child instanceof JMenuItem)) break;
                     JMenu menu = new JMenu(submenu.title());
                     children.forEach(menu::add);
@@ -248,7 +249,7 @@ final class WindowChrome {
         contributedMenus.clear();
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
-                List<Component> built = build(section.entries());
+                List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
                 switch (section.target().type()) {
                     case STANDARD -> {
@@ -272,7 +273,7 @@ final class WindowChrome {
 
     private JMenu menu(String label, ActionId... ids) {
         JMenu menu = new JMenu(label);
-        for (ActionId id : ids) menu.add(owner.action(id));
+        for (ActionId id : ids) menu.add(new MenuBarItems.Item(owner.action(id)));
         observe(menu);
         return menu;
     }
@@ -415,7 +416,7 @@ final class WindowChrome {
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;
-                List<Component> built = build(section.entries());
+                List<Component> built = build(section.entries(), JMenuItem::new);
                 if (built.isEmpty()) continue;
                 menu.addSeparator();
                 built.forEach(menu::add);

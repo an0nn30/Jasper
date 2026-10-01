@@ -2,6 +2,43 @@
 
 ## Current state — 2026-09-30
 
+- **Keymap defaults K1: contexts and defaults** (branch `claude/keymap-defaults`, spec
+  `docs/superpowers/specs/2026-09-30-keymap-defaults-design.md`, plan `docs/superpowers/plans/2026-09-30-keymap-defaults-k1.md`):
+  actions carry a context (Global, Terminal, a plugin's tabs, a panel, a window). The most specific applicable action
+  takes a key; a key with no applicable action reaches the focused component (the shell, in a terminal pane), and so
+  does a disabled action's key outside terminal panes. Built-ins have explicit macOS and Linux/Windows defaults; plugin
+  cmd+shift defaults get Alt outside macOS. Settings › Keymap has a Where column. Menu items show their shortcuts, but
+  only the root input map takes keys, so a key it declines never fires a menu item (Linux Ctrl+Shift+V in a text field
+  no longer pastes into the shell). Linux Ctrl+Tab / Ctrl+Shift+Tab switch tabs before focus traversal can take them,
+  from a text area, a table or a field too.
+  SDK 0.11.0 (with File Server's `network.listen` and `Windows.onQuitting`): `ShortcutContext`, `ActionSpec.withContext` / `withDefaultBindings`, `FakePluginHost.actionSpec`;
+  bundled plugins declare `sdk = ">=0.11.0, <0.12"`; Remote 0.9.0, Vault 0.4.0. **Moved defaults** (macOS / Linux and
+  Windows): Command Palette ⇧⌘P / Ctrl+Shift+P (was ⌘K / Ctrl+K); Clear Scrollback ⌘K, terminal only (was ⇧⌘K);
+  Close Pane ⌘W / Ctrl+Shift+W, closing the tab with its last pane (was ⇧⌘W / Ctrl+Alt+Shift+W); Close Tab ⌥⌘W /
+  Ctrl+Alt+Shift+W (was ⌘W / Ctrl+Shift+W); Rename Tab ⌘I / Ctrl+Shift+I (was F2); Reload Config unbound (was ⇧⌘R /
+  Ctrl+Alt+Shift+R); Linux Next/Previous Tab Ctrl+Tab / Ctrl+Shift+Tab (was Ctrl+Shift+] / [); Linux Quit
+  Ctrl+Alt+Shift+Q (was Ctrl+Shift+Q); SSH Sessions ⌥⌘1 / Alt+1 (was ⇧⌘S / Ctrl+Shift+S); new: SFTP ⌥⌘2 / Alt+2,
+  Transfers ⌥⌘3 / Alt+3, Open SFTP Here ⇧⌘O / Ctrl+Alt+Shift+O, Lock Vault ⇧⌘L / Ctrl+Alt+Shift+L; Open Vault
+  ⌘\ / Ctrl+Shift+\ (was F8). Deviations
+  (plan banner): the SDK type is `ShortcutContext` (`ActionContext` was taken); Find/Copy/Paste stay Global until K3;
+  palette hiding of owned-context actions, the testkit's context invocation and DEFAULT_DROPPED, and the Keymap's
+  "overrides … here" wait for K3/K4; the docs sweep is K4 (it also owns the stale F8 mentions left in
+  `docs/credential-vault.md` and `docs/command-palette.md`, and the old palette example in `docs/configuration.md`;
+  Vault's own no-vault notice no longer names F8); menu items show accelerators but never fire them from the keyboard
+  (Deviation 6); in a terminal pane a disabled action's key does nothing instead of reaching the shell, because X11 and
+  Windows would deliver it as a control character, such as ^C from Ctrl+Shift+C with no selection (Deviation 9).
+  **Upgrade note:** a user `[keybindings]` entry on a stroke that is now another action's default (⌘K, ⌘I, ⇧⌘P, ⌘W,
+  ⌥⌘W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
+  collision.
+  `./gradlew check` green after merging main: app 1471/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0,
+  Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, File Server 114/0/0, SDK 39/0/0,
+  testkit 79/0/0. Merged into local main 2026-09-30 (not pushed). GUI checks pending with
+  the user: ⇧⌘P / Ctrl+Shift+P opens the palette; ⌘K clears in a terminal and does nothing in the SSH Sessions panel's
+  search; ⌘W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
+  terminal, an Editor tab or a panel field, Ctrl+Shift+C with no selection in a terminal does nothing, and
+  Ctrl+Shift+V in a panel field pastes into the field only; ⌥⌘1 / Alt+1 toggles SSH Sessions; the Keymap shows the
+  Where column; menus still show each shortcut, a click still runs the item, and every menu shortcut still works from
+  a terminal.
 - **File Server FS-1: foundation and HTTP** (branch `claude/file-server-fs1`, spec
   `docs/superpowers/specs/2026-09-30-jasper-file-server-design.md`, plan
   `docs/superpowers/plans/2026-09-30-file-server-fs1.md`, user guide `docs/file-server.md`): SDK 0.11.0 adds the

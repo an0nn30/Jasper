@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.11, <0.12"
+sdk = ">=0.11.0, <0.12"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -104,7 +104,13 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Ids** of actions, top-level menus and status items start with your plugin id and a dot.
 - **Shortcuts.** `withDefaultBinding` uses the `[keybindings]` syntax. The user's configuration
   wins, then Jasper's own shortcuts, then plugin defaults in load order; a default that loses is
-  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id.
+  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id. Outside macOS,
+  `cmd` means Ctrl+Shift and a default naming cmd and shift also gets alt; give a different Linux and
+  Windows key with `withDefaultBindings("cmd+s", "ctrl+s")`. `withContext(ShortcutContext.terminal())`,
+  `content()`, `panel(id)` or `window(id)` limits where the key applies (SDK 0.11.0): the most specific
+  context around focus wins, so a panel action may reuse a Global key, and a key whose action does not
+  apply reaches the focused component. A `window(id)` shortcut takes effect once plugin windows get the
+  Keymap (plan K4).
 - **Placements** may name only actions your plugin registered. Closing an action removes it from
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.

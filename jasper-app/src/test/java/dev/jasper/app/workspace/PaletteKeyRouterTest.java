@@ -24,16 +24,16 @@ class PaletteKeyRouterTest {
             try (var owner = owner(mac)) {
                 var root = install(owner); var router = router(owner, mac, root);
                 int mod = primary(mac);
-                assertThat(router.dispatch(press(owner, KeyEvent.VK_K, mod))).isTrue();
-                assertThat(router.dispatch(press(owner, KeyEvent.VK_K, mod))).isTrue();
-                assertThat(router.dispatch(typed(owner, 'k'))).isTrue();
+                assertThat(router.dispatch(press(owner, KeyEvent.VK_P, mod | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(router.dispatch(press(owner, KeyEvent.VK_P, mod | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(router.dispatch(typed(owner, 'P'))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
-                assertThat(router.dispatch(release(owner, KeyEvent.VK_K))).isTrue();
+                assertThat(router.dispatch(release(owner, KeyEvent.VK_P))).isTrue();
                 assertThat(router.drained()).isTrue();
-                assertThat(router.dispatch(press(owner, KeyEvent.VK_K, mod))).isTrue();
+                assertThat(router.dispatch(press(owner, KeyEvent.VK_P, mod | InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isFalse();
-                assertThat(router.dispatch(typed(owner, 'k'))).isTrue();
-                assertThat(router.dispatch(release(owner, KeyEvent.VK_K))).isTrue();
+                assertThat(router.dispatch(typed(owner, 'P'))).isTrue();
+                assertThat(router.dispatch(release(owner, KeyEvent.VK_P))).isTrue();
                 assertThat(router.dispatch(press(owner, KeyEvent.VK_A, 0))).isFalse();
                 assertThat(router.dispatch(typed(owner, 'a'))).isFalse();
                 assertThat(router.dispatch(release(owner, KeyEvent.VK_A))).isFalse();
@@ -55,9 +55,9 @@ class PaletteKeyRouterTest {
                 assertThat(router.dispatch(typed(other, '\n'))).isTrue();
                 assertThat(router.dispatch(release(other, KeyEvent.VK_ENTER))).isTrue();
                 assertThat(count.get()).isEqualTo(1);
-                assertThat(router.dispatch(press(other, KeyEvent.VK_K, primary(mac)))).isFalse();
-                assertThat(router.dispatch(typed(other, 'k'))).isFalse();
-                assertThat(router.dispatch(release(other, KeyEvent.VK_K))).isFalse();
+                assertThat(router.dispatch(press(other, KeyEvent.VK_P, primary(mac) | InputEvent.SHIFT_DOWN_MASK))).isFalse();
+                assertThat(router.dispatch(typed(other, 'P'))).isFalse();
+                assertThat(router.dispatch(release(other, KeyEvent.VK_P))).isFalse();
             }
         });
     }
@@ -66,14 +66,14 @@ class PaletteKeyRouterTest {
         edt(() -> {
             try (var owner = owner(true); var other = owner(true)) {
                 var router = router(owner, true, install(owner));
-                router.dispatch(press(owner, KeyEvent.VK_K, primary(true)));
+                router.dispatch(press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK));
                 assertThat(router.dispatch(press(other, KeyEvent.VK_A, 0))).isFalse();
                 assertThat(router.dispatch(typed(other, 'a'))).isFalse();
                 assertThat(router.dispatch(release(other, KeyEvent.VK_A))).isFalse();
                 assertThat(router.drained()).isFalse();
-                assertThat(router.dispatch(press(other, KeyEvent.VK_K, primary(true)))).isTrue();
-                assertThat(router.dispatch(typed(other, 'k'))).isTrue();
-                assertThat(router.dispatch(release(other, KeyEvent.VK_K))).isTrue();
+                assertThat(router.dispatch(press(other, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(router.dispatch(typed(other, 'P'))).isTrue();
+                assertThat(router.dispatch(release(other, KeyEvent.VK_P))).isTrue();
             }
         });
     }
@@ -85,7 +85,7 @@ class PaletteKeyRouterTest {
                 var router = new PaletteKeyRouter(owner.commandPalette().controller(), owner.commandPalette()::open, () -> keys[0], true,
                     source -> SwingUtilities.isDescendingFrom(source, root));
                 keys[0] = KeyBindings.withOverrides(true, Map.of("command_palette", "alt+p"));
-                assertThat(router.dispatch(press(owner, KeyEvent.VK_K, primary(true)))).isFalse();
+                assertThat(router.dispatch(press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isFalse();
                 assertThat(router.dispatch(press(owner, KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isTrue();
                 router.dispatch(release(owner, KeyEvent.VK_P));
                 var field = owner.commandPalette().component().queryField();
@@ -94,7 +94,7 @@ class PaletteKeyRouterTest {
                     assertThat(router.dispatch(release(field, code))).isFalse();
                 }
                 owner.commandPalette().dismiss(); keys[0] = KeyBindings.withOverrides(true, Map.of("command_palette", "none"));
-                assertThat(router.dispatch(press(owner, KeyEvent.VK_K, primary(true)))).isFalse();
+                assertThat(router.dispatch(press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isFalse();
                 assertThat(router.dispatch(press(owner, KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isFalse();
             }
         });
@@ -162,19 +162,19 @@ class PaletteKeyRouterTest {
         edt(() -> {
             try (var owner = owner(true); var other = owner(true)) {
                 var root = install(owner); var router = router(owner, true, root);
-                router.dispatch(press(owner, KeyEvent.VK_K, primary(true))); owner.setActive(false);
+                router.dispatch(press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK)); owner.setActive(false);
                 assertThat(owner.commandPalette().isOpen()).isFalse();
                 assertThat(router.drained()).isFalse(); router.close();
                 assertThat(router.dispatch(press(other, KeyEvent.VK_A, 0))).isFalse();
                 assertThat(router.dispatch(typed(other, 'a'))).isFalse();
-                assertThat(router.dispatch(press(other, KeyEvent.VK_K, primary(true)))).isTrue();
-                assertThat(router.dispatch(typed(other, 'k'))).isTrue();
-                assertThat(router.dispatch(release(other, KeyEvent.VK_K))).isTrue();
+                assertThat(router.dispatch(press(other, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(router.dispatch(typed(other, 'P'))).isTrue();
+                assertThat(router.dispatch(release(other, KeyEvent.VK_P))).isTrue();
                 assertThat(router.drained()).isTrue();
-                owner.setActive(true); assertThat(router.dispatch(press(owner, KeyEvent.VK_K, primary(true)))).isFalse();
-                router = router(owner, true, root); router.dispatch(press(owner, KeyEvent.VK_K, primary(true)));
+                owner.setActive(true); assertThat(router.dispatch(press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isFalse();
+                router = router(owner, true, root); router.dispatch(press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK));
                 router.reset(); assertThat(router.drained()).isTrue();
-                assertThat(router.dispatch(typed(owner, 'k'))).isFalse();
+                assertThat(router.dispatch(typed(owner, 'P'))).isFalse();
             }
         });
     }

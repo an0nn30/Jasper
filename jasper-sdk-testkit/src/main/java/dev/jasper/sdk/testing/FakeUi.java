@@ -21,6 +21,7 @@ import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Rail;
+import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
 import dev.jasper.sdk.ui.StatusProgress;
@@ -179,6 +180,8 @@ final class FakeUi {
             context.requireOpen();
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
+            spec.context().id().ifPresent(owned -> requireNamespace(owned,
+                spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
             if (actions.containsKey(spec.id())) throw new IllegalArgumentException("Action already registered: " + spec.id());
             var action = new Action(spec, handler);
             actions.put(spec.id(), action);

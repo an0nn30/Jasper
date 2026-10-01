@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.files.ChooserSource;
 import dev.jasper.app.files.Location;
 import dev.jasper.sdk.files.FileChoice;
@@ -33,6 +34,7 @@ import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Rail;
+import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
@@ -145,8 +147,11 @@ final class HostedUi {
             guard("register");
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
+            spec.context().id().ifPresent(owned -> requireNamespace(owned,
+                spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
             ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().orElse(null), spec.keywords(),
-                spec.defaultBinding(), invocation -> containment.run(pluginId, "action " + spec.id(), () ->
+                spec.defaultBinding(), spec.otherDefaultBinding(), keyContext(spec.context()),
+                invocation -> containment.run(pluginId, "action " + spec.id(), () ->
                     handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle)))));
             ownActions.add(spec.id());
             Subscription removal = tracked(() -> { ownActions.remove(spec.id()); entry.close(); });
@@ -155,6 +160,17 @@ final class HostedUi {
                 @Override public void setTitle(String title) { requireUi("setTitle"); entry.setTitle(title); }
                 @Override public void close() { removal.close(); }
             };
+        };
+    }
+
+    /** The app's form of a plugin action's shortcut context; content means this plugin's own tabs. */
+    private KeyContext keyContext(ShortcutContext context) {
+        return switch (context.kind()) {
+            case GLOBAL -> KeyContext.GLOBAL;
+            case TERMINAL -> KeyContext.TERMINAL;
+            case CONTENT -> KeyContext.content(pluginId);
+            case PANEL -> KeyContext.panel(context.id().orElseThrow());
+            case WINDOW -> KeyContext.window(context.id().orElseThrow());
         };
     }
 
