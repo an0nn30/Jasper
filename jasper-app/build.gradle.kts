@@ -58,10 +58,12 @@ tasks.named<JavaExec>("run") {
 
 tasks.test {
     systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
-    dependsOn(stagePlugins)
+    // Tests start the staged plugins and install the zips, so their contents are inputs (which also brings
+    // the task dependency); a path property alone left this task UP-TO-DATE after a plugin's code changed.
+    inputs.files(stagePlugins).withPropertyName("stagedPlugins").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
     // The installable zips, so a test can stage them through the real installer.
-    dependsOn(rootProject.tasks.named("pluginZips"))
+    inputs.files(rootProject.tasks.named("pluginZips")).withPropertyName("pluginZips").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("jasper.pluginZips", rootProject.layout.projectDirectory.dir("plugins/build/zips").asFile.absolutePath)
     dependsOn(tasks.jar, ":jasper-buddy:jar", ":jasper-terminal:jar")
     systemProperty("jasper.appJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
