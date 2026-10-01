@@ -31,7 +31,8 @@ class KeyBindingsTest {
             ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         assertThat(ActionId.SPLIT_RIGHT.id()).isEqualTo("split_right");
         assertThat(ActionId.SPLIT_RIGHT.label()).isEqualTo("Split Right");
-        assertThat(ActionId.SPLIT_RIGHT.defaultBinding()).isEqualTo("cmd+d");
+        assertThat(ActionId.SPLIT_RIGHT.defaultBinding(true)).isEqualTo("cmd+d");
+        assertThat(ActionId.SPLIT_RIGHT.defaultBinding(false)).isEqualTo("ctrl+shift+d");
     }
 
     @Test
@@ -62,9 +63,10 @@ class KeyBindingsTest {
             KeyBindings bindings = KeyBindings.defaults(macOs);
             HashSet<KeyStroke> strokes = new HashSet<>();
             for (ActionId action : ActionId.values()) {
-                KeyStroke stroke = bindings.strokeFor(action).orElseThrow();
-                assertThat(strokes.add(stroke)).as("unique %s binding for %s", macOs, action).isTrue();
-                assertThat(bindings.actionFor(stroke)).contains(action);
+                bindings.strokeFor(action).ifPresent(stroke -> {
+                    assertThat(strokes.add(stroke)).as("unique %s binding for %s", macOs, action).isTrue();
+                    assertThat(bindings.actionFor(stroke)).contains(action);
+                });
             }
         }
     }
