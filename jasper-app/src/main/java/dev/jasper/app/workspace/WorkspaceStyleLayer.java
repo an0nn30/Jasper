@@ -29,6 +29,7 @@ final class WorkspaceStyleLayer implements AutoCloseable {
     private final Map<String, Color> originals = new LinkedHashMap<>();
     private final Map<String, Color> written = new HashMap<>();
     private final Map<String, Color> overrides = new HashMap<>();
+    private final Map<String, Color> clearedValues = new HashMap<>();
     private final Map<Object, Boolean> warned = new IdentityHashMap<>();
     private Object pluginStyle;
     private Object pluginClass;
@@ -54,6 +55,12 @@ final class WorkspaceStyleLayer implements AutoCloseable {
     void apply(WorkspaceStyles.Recipe recipe) {
         requireEdt();
         if (closed) throw new IllegalStateException("Workspace style layer is closed");
+        if (this.recipe == null && !suspended) {
+            // Swing suppresses equal-RGB change events, but identity still exposes a plugin setter.
+            clearedValues.forEach((key, value) -> {
+                if (read(key) != value) overrides.put(key, read(key));
+            });
+        }
         this.recipe = Objects.requireNonNull(recipe);
         if (!suspended) guarded(this::publish);
     }
@@ -63,6 +70,7 @@ final class WorkspaceStyleLayer implements AutoCloseable {
         if (closed) return;
         guarded(this::release);
         recipe = null;
+        captureClearedValues();
     }
 
     void beforeUiUpdate() {
@@ -77,6 +85,7 @@ final class WorkspaceStyleLayer implements AutoCloseable {
         if (closed || !suspended) return;
         suspended = false;
         if (recipe != null) guarded(this::publish);
+        else captureClearedValues();
     }
 
     @Override public void close() {
@@ -114,9 +123,25 @@ final class WorkspaceStyleLayer implements AutoCloseable {
             });
         } else if (!suspended && directKeys.contains(directKey(name))) {
             String key = directKey(name);
-            overrides.put(key, read(key));
-            written.remove(key);
+            if (installingUi()) {
+                if (recipe == null) clearedValues.put(key, read(key));
+            } else {
+                overrides.put(key, read(key));
+                written.remove(key);
+            }
         }
+    }
+
+    private void captureClearedValues() {
+        for (String key : directKeys) clearedValues.put(key, read(key));
+    }
+
+    private static boolean installingUi() {
+        // A shared delegate can reinstall without changing UI identity or firing a UI event.
+        // Inspect this synchronous setter's origin rather than misclassifying UIResource
+        // values: a plugin is allowed to set those same values outside delegate installation.
+        return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).walk(frames -> frames.anyMatch(frame ->
+            frame.getDeclaringClass() == JComponent.class && frame.getMethodName().equals("setUI")));
     }
 
     private void publish() {

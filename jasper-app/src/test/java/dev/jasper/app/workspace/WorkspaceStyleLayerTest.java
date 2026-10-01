@@ -213,6 +213,63 @@ class WorkspaceStyleLayerTest {
         });
     }
 
+    @Test void equalRgbPluginSetterWhileClearedRemainsAnOverride() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            var v = new JViewport();
+            var recipe = new WorkspaceStyles.Recipe("Viewport", Map.of(), Map.of("background", Color.MAGENTA));
+            try (var layer = new WorkspaceStyleLayer(v)) {
+                layer.apply(recipe);
+                layer.clear();
+                var plugin = new Color(v.getBackground().getRGB());
+                v.setBackground(plugin);
+                layer.apply(recipe);
+                assertThat(v.getBackground()).isSameAs(plugin);
+            }
+        });
+    }
+
+    @Test void isolatedRefreshWhileClearedDoesNotBecomeAPluginOverride() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            Object previous = UIManager.get("Viewport.background");
+            try {
+                var v = new JViewport();
+                var recipe = new WorkspaceStyles.Recipe("Viewport", Map.of(), Map.of("background", Color.MAGENTA));
+                try (var layer = new WorkspaceStyleLayer(v)) {
+                    layer.apply(recipe);
+                    layer.clear();
+                    var chrome = new ColorUIResource(Color.CYAN);
+                    UIManager.put("Viewport.background", chrome);
+                    var sharedUi = v.getUI();
+                    v.updateUI();
+                    assertThat(v.getUI()).isSameAs(sharedUi);
+                    assertThat(v.getBackground()).isSameAs(chrome);
+                    layer.apply(recipe);
+                    assertThat(v.getBackground()).isSameAs(Color.MAGENTA);
+                    layer.clear();
+                    assertThat(v.getBackground()).isSameAs(chrome);
+                    var plugin = new ColorUIResource(Color.ORANGE);
+                    v.setBackground(plugin);
+                    v.updateUI();
+                    layer.apply(recipe);
+                    assertThat(v.getBackground()).isSameAs(plugin);
+                    layer.clear();
+                    // Even the exact chrome UIResource is a genuine override when set by the plugin.
+                    v.setBackground(chrome);
+                    layer.apply(recipe);
+                    assertThat(v.getBackground()).isSameAs(chrome);
+                    layer.clear();
+                    var latestPlugin = new Color(0x123456);
+                    v.setBackground(latestPlugin);
+                    layer.apply(recipe);
+                    assertThat(v.getBackground()).isSameAs(latestPlugin);
+                }
+                assertThat(v.getBackground()).isEqualTo(new Color(0x123456));
+            } finally { UIManager.put("Viewport.background", previous); }
+        });
+    }
+
     @Test void referencesResolveAgainOnApplyAndUiUpdate() throws Exception {
         edt(() -> {
             new ThemeController(Theme.JASPER_LIGHT);
