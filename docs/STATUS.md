@@ -30,8 +30,9 @@
   **Upgrade note:** a user `[keybindings]` entry on a stroke that is now another action's default (⌘K, ⌘I, ⇧⌘P, ⌘W,
   ⌥⌘W, Ctrl+Tab, Ctrl+Alt+Shift+Q, …) collides, and the loader falls back to the default keybindings, as for any
   collision.
-  `./gradlew check` green: app 1455/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0, Vault 140/0/1, Buddy 163/0/0,
-  History 41/0/0, Snippets 11/0/0, Sample 12/0/0, SDK 36/0/0, testkit 74/0/0. Merged into local main 2026-09-30 (not pushed). GUI checks pending with
+  `./gradlew check` green after merging main: app 1471/0/1, terminal 391/0/4, Editor 4782/0/0, Remote 297/0/0,
+  Vault 140/0/1, Buddy 163/0/0, History 41/0/0, Snippets 11/0/0, Sample 12/0/0, File Server 114/0/0, SDK 39/0/0,
+  testkit 79/0/0. Merged into local main 2026-09-30 (not pushed). GUI checks pending with
   the user: ⇧⌘P / Ctrl+Shift+P opens the palette; ⌘K clears in a terminal and does nothing in the SSH Sessions panel's
   search; ⌘W closes a split pane, then the tab; on Linux Ctrl+K and F2 reach the shell, Ctrl+Tab switches tabs from a
   terminal, an Editor tab or a panel field, Ctrl+Shift+C with no selection in a terminal does nothing, and
