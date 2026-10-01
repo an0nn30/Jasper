@@ -52,4 +52,3 @@ class AlacrittyConversionTest {
         return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
     }
 }
-
