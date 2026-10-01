@@ -20,6 +20,7 @@ public final class WorkspaceTheme {
         root.putClientProperty("Jasper.zone", "workspace");
         root.putClientProperty("Jasper.workspaceTheme", theme.matching() ? null : theme.workspace());
         root.putClientProperty("Jasper.workspace.dark", theme.matching() ? null : theme.workspace().dark());
+        root.putClientProperty("Jasper.workspace.foreground", theme.matching() ? null : theme.workspace().tokens().get(Token.TEXT));
         root.repaint();
     }
 
@@ -27,6 +28,7 @@ public final class WorkspaceTheme {
         root.putClientProperty("Jasper.zone", null);
         root.putClientProperty("Jasper.workspaceTheme", null);
         root.putClientProperty("Jasper.workspace.dark", null);
+        root.putClientProperty("Jasper.workspace.foreground", null);
         root.repaint();
     }
 
