@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-10-01, not executed. Spike already run (see below).
+**Status:** Executed 2026-10-01 (Tasks 1–9 on claude/theme-system); ./gradlew check green.
 
 **Goal:** Jasper themes become TOML files generated into FlatLaf's key set: the format, `extends`, the generator with
 contrast floors, native Jasper Dark and a new Jasper Light, IntelliJ Light and Darcula converted, installed IntelliJ

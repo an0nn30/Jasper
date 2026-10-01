@@ -195,8 +195,8 @@ public final class CoreSettings {
     public static final Setting<String> UI_THEME_NAME = Setting.of("ui.theme.name",
             SettingKind.string(text -> true, "", String::strip), ConfigSnapshot.DEFAULT_THEME)
         .label("Theme").keywords("theme", "dark", "light", "appearance", "look")
-        .description("The UI theme by name: \"Jasper Dark\" (the default), \"IntelliJ Light\", or a theme plugin\n"
-            + "installed in the themes folder beside this file. Switches live across windows.").build();
+        .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"IntelliJ Light\",\n"
+            + "\"Darcula\", or a theme file or theme plugin in the themes folder beside this file. Switches live across windows.").build();
     public static final Setting<Boolean> THEMES_MARKETPLACE_ENABLED = Setting.of("themes.marketplace.enabled", SettingKind.bool(), true)
         .label("Browse the JetBrains Marketplace").keywords("themes", "marketplace", "download", "update", "offline", "intellij")
         .description("Let Settings > Themes > IntelliJ Themes search plugins.jetbrains.com and check installed themes for\n"

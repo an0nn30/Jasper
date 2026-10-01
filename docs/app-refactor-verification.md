@@ -149,7 +149,8 @@ Baseline application resource entries:
 - `dev/jasper/app/themes/intellij/assets.tsv`
 - `dev/jasper/app/themes/intellij/darcula.theme.json`
 - `dev/jasper/app/themes/intellij/intellijlaf.theme.json`
-- `dev/jasper/app/themes/jasper-dark.theme.json`
+- `dev/jasper/app/themes/jasper-dark.toml`
+- `dev/jasper/app/themes/jasper-light.toml`
 
 Launcher: `dev.jasper.app.Main`. Benchmark/preview launchers are declared in
 `jasper-app/build.gradle.kts`; packaging reads the application main class and

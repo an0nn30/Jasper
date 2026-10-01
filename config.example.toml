@@ -116,7 +116,7 @@ family = "system"
 # size = 14.0
 
 [ui.theme]
-# Live across open windows: "Jasper Dark", "IntelliJ Light", or an installed theme plugin's name.
+# Live across open windows: "Jasper Dark", "Jasper Light", "IntelliJ Light", "Darcula", or a theme in the themes folder.
 name = "Jasper Dark"
 
 [themes.marketplace]

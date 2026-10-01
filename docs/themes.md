@@ -1,8 +1,9 @@
 # Themes
 
-Jasper's UI theme is an IntelliJ theme. Two are built in: **Jasper Dark** (the default) and
-**IntelliJ Light**, the classic IntelliJ Light. Any theme plugin from the JetBrains Marketplace
-(plugins.jetbrains.com) can be installed.
+Jasper's themes are Jasper theme files: TOML that colours the whole app, the terminal palette and (from a later
+release) syntax highlighting. Four are built in: **Jasper Dark** (the default), **Jasper Light**, and IntelliJ's
+classic **IntelliJ Light** and **Darcula**, converted. Theme plugins from the JetBrains Marketplace can still be
+installed; Jasper converts them when it reads them.
 
 ## Choosing a theme
 
@@ -16,6 +17,55 @@ name = "Dracula"
 The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
 every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and
 installed theme; **Get More Themes…** at the bottom opens Settings › Themes › IntelliJ Themes.
+
+## Writing a theme
+
+Put a `.toml` file in the `themes` folder beside `config.toml` (`~/.config/jasper/themes/` on macOS) and name it in
+`ui.theme.name`. Jasper rereads the folder when the configuration is reloaded. The smallest theme names its seed colours:
+
+```toml
+name = "Mocha"
+
+[colors]
+background = "#1e1e2e"
+foreground = "#cdd6f4"
+accent     = "#89b4fa"
+
+[colors.normal]
+black = "#45475a"
+red = "#f38ba8"
+green = "#a6e3a1"
+yellow = "#f9e2af"
+blue = "#89b4fa"
+magenta = "#f5c2e7"
+cyan = "#94e2d5"
+white = "#bac2de"
+```
+
+Everything else is derived. A theme can also set:
+- `dark` (otherwise inferred from the background), `author`, `license`, `source`, `commit`;
+- `extends = "<theme>"`: start from any other theme and change only what you write; a file may even be named like the
+  theme it extends ("Jasper Dark" extending "Jasper Dark") to replace it;
+- `cursor`, `selection` and `[colors.bright]` (otherwise each bright colour is its normal colour lightened, or darkened
+  on a light theme);
+- `[tokens]`: Jasper's semantic colours, any subset of `surface`, `surface_raised`, `surface_sunken`, `title_bar`,
+  `status_bar`, `sidebar`, `text`, `text_muted`, `text_disabled`, `text_on_accent`, `link`, `border`, `separator`,
+  `divider`, `focus_ring`, `hover`, `pressed`, `selection`, `selection_text`, `selection_inactive`, `text_selection`,
+  `text_selection_text`, `tab_bar`, `tab_active`, `tab_active_text`, `tab_active_border`, `tab_hover`,
+  `tab_underline`, `tab_underline_inactive`, `input_background`, `button_background`, `button_border`, `button_text`,
+  `button_default`, `scrollbar_thumb`, `scrollbar_track`, `accent`, `success`, `warning`, `error`,
+  `error_background`, `editor_background`, `editor_foreground`, `editor_caret`, `editor_selection`,
+  `editor_current_line`, `editor_gutter`, `editor_line_numbers`;
+- `[syntax]`: `keyword`, `type`, `function`, `variable`, `constant`, `number`, `string`, `comment`, `doc_comment`,
+  `annotation`, `operator`, `punctuation`, `tag`, `attribute`, `regex`, `error`, each a colour or
+  `{ color = "#…", bold = true, italic = true }`;
+- `[ui]`: raw FlatLaf or IntelliJ keys (`"Button.arc" = 6`), laid over everything else. `[ui]` values that look like a
+  Java class name (for example `com.example.Border`) are refused, except FlatLaf's own `com.formdev.flatlaf.` classes,
+  and keys ending in `UI` cannot be set.
+
+Derived text colours are adjusted until they are readable (4.5:1 for text, 3:1 for muted text); colours you write are
+used as written. Colours are `#RRGGBB` or `#RRGGBBAA`. A mistake (an unknown key, a bad colour, a missing seed, an
+`extends` that names no theme or loops) is a configuration warning naming the file and line, and that theme is skipped.
 
 ## Installing a theme
 

@@ -1,6 +1,18 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-09-30
+## Current state — 2026-10-01
+
+- **Theme system plan 1: format and generator** (branch `claude/theme-system`, spec
+  `docs/superpowers/specs/2026-10-01-jasper-theme-system-design.md`, plan
+  `docs/superpowers/plans/2026-10-01-theme-system-1-format-generator.md`): themes are Jasper TOML files generated into
+  FlatLaf keys (`ThemeToml`, `ThemeResolver`, `ThemeGenerator`, `UiTemplate`). Jasper Dark is native
+  (`jasper-dark.toml`, parity with the retired JSON), Jasper Light is new, IntelliJ Light and Darcula are converted
+  bundled themes, installed IntelliJ plugins are converted in memory, and `.toml` files in the `themes` folder are
+  themes (problems carry their line). Deviations (plan banner): 48 tokens; new `ui_complete` key; no contrast floor
+  for borders; Jasper Light keeps the One Light terminal palette; the converter stays in `appearance` until plan 4;
+  `Theme.LIGHT` became `Theme.INTELLIJ_LIGHT`, whose terminal palette now comes from its own scheme. Next: plan 2
+  (workspace zone). GUI checks for the user: Jasper Dark unchanged; Jasper Light, IntelliJ Light and Darcula across
+  the window, Settings and dialogs; a hand-written theme file in `themes/` (including a broken one's warning).
 
 - **Keymap defaults K1: contexts and defaults** (branch `claude/keymap-defaults`, spec
   `docs/superpowers/specs/2026-09-30-keymap-defaults-design.md`, plan `docs/superpowers/plans/2026-09-30-keymap-defaults-k1.md`):
