@@ -65,6 +65,10 @@ spike A as a regression test.
 
 ### Notes for later plans
 
+- **First item of plan 2 (final-review residual):** converted plugin themes install with author "Jasper", losing FlatLaf's
+  author-keyed fixes (8 colour keys differ for a Dracula-by-Zihan-Ma fixture). Carry the author via `ThemeDocument.metadata`
+  into `GeneratedTheme` and `ThemeLoader.json`; extend `PluginThemeParityTest` with an author-keyed fixture. Also: FlatLaf
+  filters `[ui]` keys ending in `Icon`, `.border` or `.rowHeight`, so such a named colour is dropped on the new path.
 - Plan 2 needs workspace tokens for `ui_complete` themes: read them from the theme's derived FlatLaf defaults (or
   extend the converter), because their generated tokens are seed-derived placeholders.
 - Plan 4 must decide how converted TOML files carry IntelliJ's `icons` table and keep `[ui]` wildcard order (tomlj
