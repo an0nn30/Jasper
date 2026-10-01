@@ -4,8 +4,8 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Jasper's semantic colours (a theme's {@code [tokens]}). Every token is derivable from the seeds;
- * tokens map onto FlatLaf, IntelliJ and {@code Jasper.*} keys.
+ * Jasper's semantic colours (a theme's {@code [tokens]}). Every token is derivable from the seeds ({@link ThemeGenerator});
+ * {@link UiTemplate} maps tokens onto FlatLaf, IntelliJ and {@code Jasper.*} keys.
  */
 public enum Token {
     SURFACE, SURFACE_RAISED, SURFACE_SUNKEN, TITLE_BAR, STATUS_BAR, SIDEBAR,

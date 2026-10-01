@@ -126,7 +126,8 @@ final class ChromeKeys {
         return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
     }
 
-    private static double luminance(Color color) {
+    /** WCAG relative luminance of an opaque colour, 0 (black) to 1 (white). */
+    static double luminance(Color color) {
         double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
         for (int i = 0; i < rgb.length; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
         return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
