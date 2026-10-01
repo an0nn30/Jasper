@@ -104,7 +104,7 @@ class WindowTabsTest {
         });
     }
 
-    @Test void selectedTabKeepsUiThemeColorsWithIndependentTerminalPalettes() throws Exception {
+    @Test void selectedTabUsesWorkspaceTokensWithIndependentTerminalPalettes() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
@@ -114,17 +114,17 @@ class WindowTabsTest {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
                     JComponent label = named(strip, "select:selected");
-                    assertThat(pixel(label.getParent(), label.getParent().getWidth() / 2, 6)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
-                    assertThat(label.getForeground()).isEqualTo(UIManager.getColor("Jasper.tabSelectedForeground"));
+                    assertThat(pixel(label.getParent(), label.getParent().getWidth() / 2, 6)).isEqualTo((owner.theme().matching() ? UIManager.getColor("Jasper.tabSelectedBackground") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_ACTIVE)));
+                    assertThat(label.getForeground()).isEqualTo((owner.theme().matching() ? UIManager.getColor("Jasper.tabSelectedForeground") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_ACTIVE_TEXT)));
                     owner.setActive(false);
-                    assertThat(label.getForeground()).isEqualTo(UIManager.getColor("Jasper.tabSelectedForeground"));
+                    assertThat(label.getForeground()).isEqualTo((owner.theme().matching() ? UIManager.getColor("Jasper.tabSelectedForeground") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_ACTIVE_TEXT)));
                     owner.setActive(true);
                 }
             }
         });
     }
 
-    @Test void stripSitsOnTheTerminalSurfaceWithReadableTitlesWhateverTheUiTheme() throws Exception {
+    @Test void stripUsesWorkspaceTabSurfaceWithReadableTitlesWhateverTheUiTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
@@ -132,13 +132,12 @@ class WindowTabsTest {
                 owner.selectTheme(chrome);
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
-                    var palette = owner.theme().palette();
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo(palette.background());
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo((owner.theme().matching() ? UIManager.getColor("ToolWindow.background") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_BAR)));
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();
-                        assertThat(contrast(text, palette.background())).as("%s UI, %s terminal, active %s", chrome, colors, active)
+                        assertThat(contrast(text, strip.getBackground())).as("%s UI, %s terminal, active %s", chrome, colors, active)
                             .isGreaterThanOrEqualTo(3);
                     }
                 }

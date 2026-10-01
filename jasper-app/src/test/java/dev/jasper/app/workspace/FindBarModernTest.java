@@ -101,6 +101,22 @@ class FindBarModernTest {
                 SwingUtilities.updateComponentTreeUI(bar[0]);
                 assertThat(query.getBackground()).as("a theme switch keeps the no-match tint")
                     .isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
+                var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+                themes.configure(Theme.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
+                    Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
+                WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
+                var tokens = themes.current().workspace().tokens();
+                assertThat(query.getBackground()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.ERROR_BACKGROUND));
+                assertThat(query.getForeground()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.TEXT));
+                assertThat(query.getSelectionColor()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.TEXT_SELECTION));
+                assertThat(bar[0].getBackground()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.SURFACE));
+                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
+                themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);
+                WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
+                assertThat(query.getBackground()).isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
+                assertThat(query.getForeground()).isEqualTo(UIManager.getColor("TextField.foreground"));
+                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isNull();
+                assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
                 bar[0].caseButton().doClick();
             });
             until(() -> bar[0].result().count() == 2);

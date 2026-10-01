@@ -585,6 +585,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     private void mountContent(dev.jasper.app.contributions.ContentEntry entry) {
+        WorkspaceTheme.apply(entry.component(), themes.current());
         hosted.put(entry.component(), entry);
         contentListeners.put(entry.component(), entry.onChanged(this::update));
         tabs.addTab(entry.title(), entry.component());
@@ -593,7 +594,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
         var listener = contentListeners.remove(entry.component());
         if (listener != null) listener.close();
-        hosted.remove(entry.component()); tabs.remove(entry.component()); update();
+        hosted.remove(entry.component()); tabs.remove(entry.component());
+        WorkspaceTheme.clear(entry.component()); update();
         if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
     }
     public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
@@ -666,7 +668,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull, profile);
         if (terminals != null) terminals.tabOpened(tab);
         tab.onChanged = () -> {
-            for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current().palette());
+            for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current());
             update();
         };
         tab.onEmpty = () -> closeTab(tab);
@@ -674,8 +676,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tab.configure = pane -> configurePane(tab, pane);
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
+        WorkspaceTheme.apply(tab, themes.current());
         tab.setBackground(themes.current().palette().background());
-        for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current().palette());
+        for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
         return tab;
@@ -722,7 +725,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
-        pane.applyTheme(themes.current().palette());
+        pane.applyTheme(themes.current());
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         float configuredFontSize = workspaceConfiguration.configuredFontSize();
         if (configured == null) {
@@ -958,14 +961,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             rail.refreshTheme();
             regions.refreshTheme();
             regions.setTerminalBackground(theme.palette().background());
-            windowTabs.setPalette(theme.palette());
+            WorkspaceTheme.apply(windowTabs, theme);
+            windowTabs.refresh();
+            hosted.keySet().forEach(component -> WorkspaceTheme.apply((JComponent) component, theme));
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
+                WorkspaceTheme.apply(tab, theme);
                 tab.setBackground(theme.palette().background());
                 for (TerminalPane pane : tab.panes()) {
                     // Zoom detaches sibling panes from the visible component hierarchy.
                     if (updateDelegates && !SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
-                    pane.applyTheme(theme.palette());
+                    pane.applyTheme(theme);
                 }
             }
             setBackground(theme.palette().background());

@@ -501,7 +501,10 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         setActive(active);
     }
 
-    void applyTheme(dev.jasper.terminal.config.Palette palette) {
+    void applyTheme(dev.jasper.app.appearance.ResolvedTheme theme) {
+        WorkspaceTheme.apply(this, theme);
+        var palette = theme.palette();
+        if (findBar != null) findBar.refreshTheme();
         setBackground(palette.background());
         setForeground(palette.foreground());
         for (var child : getComponents()) if (child instanceof JLabel label) label.setForeground(palette.foreground());

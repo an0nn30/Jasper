@@ -36,6 +36,7 @@ final class WorkspaceRegions extends JPanel {
         Host(boolean toolWindow) {
             super(new BorderLayout());
             this.toolWindow = toolWindow;
+            if (toolWindow) putClientProperty("Jasper.zone", "chrome");
             gutters(GUTTER, GUTTER, GUTTER, GUTTER);
             if (toolWindow) setMinimumSize(new Dimension(UIScale.scale(MINIMUM), UIScale.scale(MINIMUM)));
         }

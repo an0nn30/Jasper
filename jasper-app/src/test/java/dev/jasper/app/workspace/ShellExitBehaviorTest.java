@@ -111,7 +111,7 @@ class ShellExitBehaviorTest {
         TerminalPane retained = owner.currentPane(); TerminalView retainedView = retained.view();
         edt(() -> { exit(retained, 0); owner.newTab(directory); }); deliver();
         TerminalPane running = owner.currentPane();
-        edt(() -> { running.view().setFontSize(23f); running.applyTheme(Theme.INTELLIJ_LIGHT.palette()); });
+        edt(() -> { running.view().setFontSize(23f); running.applyTheme(new dev.jasper.app.appearance.ThemeController(Theme.INTELLIJ_LIGHT).current()); });
         var options = running.view().options(); var session = running.session();
         reload("close_on_success");
         edt(() -> {

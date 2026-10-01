@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.appearance.Token;
 import dev.jasper.terminal.search.FindResult;
 import dev.jasper.terminal.search.SearchQuery;
 import dev.jasper.terminal.view.TerminalView;
@@ -124,12 +125,12 @@ final class FindBar extends JPanel {
     @Override public void updateUI() {
         super.updateUI();
         // A theme change replaces UIResource colours; keep the no-match tint.
-        if (query != null) miss(missing);
+        if (query != null) refreshTheme();
     }
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(UIManager.getColor("Jasper.titleSeparator"));
+        g.setColor(WorkspaceTheme.color(this, Token.SEPARATOR, "Jasper.titleSeparator"));
         g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
     }
 
@@ -228,8 +229,38 @@ final class FindBar extends JPanel {
         query.putClientProperty(FlatClientProperties.OUTLINE, value ? FlatClientProperties.OUTLINE_ERROR : null);
         // The tint is a plain Color so the field's own updateUI keeps it; the default stays a
         // UIResource so a theme switch restores the new theme's background.
-        Color error = UIManager.getColor("Jasper.findErrorBackground");
-        query.setBackground(value && error != null ? new Color(error.getRGB(), true) : UIManager.getColor("TextField.background"));
+        Color background = WorkspaceTheme.color(this, value ? Token.ERROR_BACKGROUND : Token.INPUT_BACKGROUND,
+            value ? "Jasper.findErrorBackground" : "TextField.background");
+        query.setBackground(value ? new Color(background.getRGB(), true) : background);
+    }
+
+    /** Reapply host-owned controls after a zone or chrome change; retain query, actions and base field style. */
+    void refreshTheme() {
+        setBackground(WorkspaceTheme.color(this, Token.SURFACE, "Panel.background"));
+        setForeground(WorkspaceTheme.color(this, Token.TEXT, "Label.foreground"));
+        count.setForeground(WorkspaceTheme.color(this, Token.TEXT_MUTED, "Label.disabledForeground"));
+        query.setForeground(WorkspaceTheme.color(this, Token.TEXT, "TextField.foreground"));
+        query.setCaretColor(WorkspaceTheme.color(this, Token.TEXT, "TextField.caretForeground"));
+        query.setSelectionColor(WorkspaceTheme.color(this, Token.TEXT_SELECTION, "TextField.selectionBackground"));
+        query.setSelectedTextColor(WorkspaceTheme.color(this, Token.TEXT_SELECTION_TEXT, "TextField.selectionForeground"));
+        styleButtons(this);
+        miss(missing);
+    }
+
+    private void styleButtons(java.awt.Container root) {
+        for (var child : root.getComponents()) {
+            if (child instanceof AbstractButton button) {
+                boolean toggle = button instanceof JToggleButton;
+                String prefix = toggle ? "ToggleButton." : "Button.";
+                button.setBackground(WorkspaceTheme.color(this, Token.SURFACE, prefix + "background"));
+                button.setForeground(WorkspaceTheme.color(this, Token.TEXT, prefix + "foreground"));
+                button.putClientProperty(FlatClientProperties.STYLE, WorkspaceTheme.workspace(this) == null ? null :
+                    java.util.Map.of("toolbar.hoverBackground", WorkspaceTheme.color(this, Token.HOVER, prefix + "background"),
+                        "toolbar.pressedBackground", WorkspaceTheme.color(this, Token.PRESSED, prefix + "background"),
+                        "toolbar.selectedBackground", WorkspaceTheme.color(this, Token.SELECTION, prefix + "background")));
+            }
+            if (child instanceof java.awt.Container container) styleButtons(container);
+        }
     }
 
     private void remember() {

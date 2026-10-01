@@ -1,8 +1,8 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.appearance.Token;
 import dev.jasper.app.platform.SystemFonts;
-import dev.jasper.terminal.config.Palette;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
 import java.awt.event.*;
@@ -13,7 +13,7 @@ import javax.swing.*;
 
 /**
  * IntelliJ-style editor tabs over WindowContent's retained Swing selection model. The strip sits on the
- * terminal palette's background, whatever the UI theme paints its tool windows with.
+ * workspace tab surface, independently of the surrounding chrome.
  */
 final class WindowTabs extends JPanel implements AutoCloseable {
     private static final int MIN_TAB = 80, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6;
@@ -38,7 +38,6 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     private boolean revealSelection = true;
     private boolean active = true;
     private boolean disposed;
-    private Palette palette;
 
     WindowTabs(WindowContent owner) {
         super(null);
@@ -69,7 +68,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             revealSelection = true;
         }
         if (selected != owner.selectedComponent()) { selected = owner.selectedComponent(); revealSelection = true; }
-        setBackground(palette == null ? UIManager.getColor("ToolWindow.background") : palette.background());
+        setBackground(WorkspaceTheme.color(this, Token.TAB_BAR, "ToolWindow.background"));
         boolean retitled = false;
         for (Component tab : order) retitled |= entries.get(tab).refresh();
         // A tab that grows can push the selected tab out; keep it shown if it was shown.
@@ -80,28 +79,6 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     }
 
     void setActive(boolean active) { this.active = active; refresh(); }
-
-    /** The terminal palette the strip sits on; unselected titles fall back to its foreground when the theme's are unreadable. */
-    void setPalette(Palette palette) { this.palette = palette; refresh(); }
-
-    /** The theme's colour for {@code key}, or the terminal foreground when that is too faint on the strip. */
-    private Color onSurface(String key) {
-        Color preferred = UIManager.getColor(key);
-        if (palette == null || contrast(preferred, palette.background()) >= 3) return preferred;
-        return palette.foreground();
-    }
-
-    /** The WCAG contrast ratio of two opaque colours. */
-    private static double contrast(Color a, Color b) {
-        double first = luminance(a), second = luminance(b);
-        return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
-    }
-
-    private static double luminance(Color color) {
-        double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
-        for (int i = 0; i < rgb.length; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
-        return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
-    }
 
     /** Scrolls the strip without changing the selected terminal. */
     private void wheel(MouseWheelEvent event) {
@@ -287,15 +264,15 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             String shortcut = owner.tabShortcut(order.indexOf(tab));
             String tip = capped(owner.tabTooltip(tab));
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
-            Color surface = UIManager.getColor("Jasper.tabSelectedBackground");
+            Color surface = WorkspaceTheme.color(this, Token.TAB_ACTIVE, "Jasper.tabSelectedBackground");
             select.setIcon(tab == selected ? AppIcons.forBackground(owner.tabIcon(tab), surface) : owner.tabIcon(tab));
             close.setIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE"), surface) : AppIcons.named("CLOSE"));
             close.setRolloverIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface)
                 : AppIcons.named("CLOSE_HOVERED"));
             select.setSelected(tab == selected);
             select.setFont(SystemFonts.ui(Font.PLAIN, 13f));
-            select.setForeground(tab == selected ? UIManager.getColor("Jasper.tabSelectedForeground")
-                : onSurface(!active ? "Jasper.titleInactiveForeground" : "Jasper.titleForeground"));
+            select.setForeground(tab == selected ? WorkspaceTheme.color(this, Token.TAB_ACTIVE_TEXT, "Jasper.tabSelectedForeground")
+                : WorkspaceTheme.color(this, Token.TEXT_MUTED, !active ? "Jasper.titleInactiveForeground" : "Jasper.titleForeground"));
             close.setVisible(tab == selected || hovered);
             return retitled;
         }
@@ -319,11 +296,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                 if (width <= 0 || height <= 0) return;
                 var shape = new java.awt.geom.RoundRectangle2D.Float(horizontal + stroke / 2, vertical + stroke / 2,
                     width, height, UIScale.scale(8f), UIScale.scale(8f));
-                g.setColor(UIManager.getColor(tab == selected ? "Jasper.tabSelectedBackground" : "Jasper.tabHoverBackground"));
+                g.setColor(WorkspaceTheme.color(this, tab == selected ? Token.TAB_ACTIVE : Token.TAB_HOVER, tab == selected ? "Jasper.tabSelectedBackground" : "Jasper.tabHoverBackground"));
                 g.fill(shape);
                 if (tab == selected) {
                     g.setStroke(new BasicStroke(stroke));
-                    g.setColor(UIManager.getColor(active ? "Jasper.tabSelectedBorder" : "Jasper.tabSelectedBorderInactive"));
+                    g.setColor(WorkspaceTheme.color(this, active ? Token.TAB_UNDERLINE : Token.TAB_UNDERLINE_INACTIVE, active ? "Jasper.tabSelectedBorder" : "Jasper.tabSelectedBorderInactive"));
                     g.draw(shape);
                 }
             } finally { g.dispose(); }
