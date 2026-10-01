@@ -124,15 +124,16 @@ public final class ForwardPanel extends JPanel {
         });
         cancel.addActionListener(event -> onCancel.run());
         forward.addActionListener(event -> {
+            Tunnel tunnel;
             try {
                 int remote = port(remotePort, 1, "The remote port must be a number from 1 to 65535");
                 int local = port(localPort, 0, "The local port must be a number from 0 to 65535");
                 RemoteHost through = via().orElseThrow(() -> new IllegalArgumentException("Choose a host"));
                 String name = keep.isSelected() ? saveName.getText().strip() : "";
                 if (keep.isSelected() && name.isEmpty()) throw new IllegalArgumentException("Name the tunnel to keep it");
-                Tunnel tunnel = Tunnel.create(name, through.id(), TunnelKind.LOCAL, Tunnel.LOCALHOST, local, targetHost.getText(), remote);
-                onForward.accept(tunnel);
-            } catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); }
+                tunnel = Tunnel.create(name, through.id(), TunnelKind.LOCAL, Tunnel.LOCALHOST, local, targetHost.getText(), remote);
+            } catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); return; }
+            onForward.accept(tunnel);
         });
     }
 

@@ -124,11 +124,10 @@ public final class TunnelEditor extends JPanel {
         });
         cancel.addActionListener(event -> onCancel.run());
         save.addActionListener(event -> {
-            try {
-                Tunnel tunnelValue = tunnel(editing);
-                onSave.accept(tunnelValue);
-            }
-            catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); }
+            Tunnel tunnel;
+            try { tunnel = tunnel(editing); }
+            catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); return; }
+            onSave.accept(tunnel);
         });
         refresh();
     }
