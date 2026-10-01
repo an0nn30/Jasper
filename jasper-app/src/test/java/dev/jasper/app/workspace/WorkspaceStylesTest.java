@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
 import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.util.*;
 import java.util.logging.*;
 import java.util.stream.Stream;
@@ -113,6 +114,129 @@ class WorkspaceStylesTest {
             assertThat(recipe.style()).isUnmodifiable();
             assertThat(recipe.direct()).isUnmodifiable();
         });
+    }
+
+    @Test void flatLafSubclassKeepsFullTabbedPaneRecipe() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            var deck = new TerminalDeck();
+            deck.addTab("one", new JPanel());
+            var theme = independent().workspace();
+            var recipe = WorkspaceStyles.recipe(deck, theme);
+            assertThat(recipe.type()).isEqualTo("TabbedPane");
+            assertThat(recipe.style()).containsEntry("selectedBackground", theme.tokens().get(Token.TAB_ACTIVE))
+                .containsEntry("underlineColor", theme.tokens().get(Token.TAB_UNDERLINE))
+                .containsEntry("contentAreaColor", theme.tokens().get(Token.SURFACE));
+            applyRecipe(deck, recipe);
+            var ui = (com.formdev.flatlaf.ui.FlatStylingSupport.StyleableUI) deck.getUI();
+            assertThat(ui.getStyleableValue(deck, "selectedBackground"))
+                .isEqualTo(theme.tokens().get(Token.TAB_ACTIVE));
+            assertThat(ui.getStyleableValue(deck, "underlineColor"))
+                .isEqualTo(theme.tokens().get(Token.TAB_UNDERLINE));
+        });
+    }
+
+    @ParameterizedTest(name = "effective {0}") @MethodSource("controls")
+    void everyRecipeKeyReachesRealDelegateOrComponent(String type, Supplier<JComponent> factory, Set<String> keys) throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            var component = factory.get();
+            var recipe = WorkspaceStyles.recipe(component, independent().workspace());
+            applyRecipe(component, recipe);
+            for (var entry : recipe.style().entrySet()) {
+                Object effective = effective(component, entry.getKey());
+                assertThat(effective).as(type + "." + entry.getKey()).isEqualTo(entry.getValue());
+            }
+            for (var entry : recipe.direct().entrySet())
+                assertThat(effective(component, entry.getKey())).as(type + "." + entry.getKey())
+                    .isEqualTo(entry.getValue());
+        });
+    }
+
+    private static Object effective(JComponent component, String key) {
+        return switch (key) {
+            case "background" -> component.getBackground();
+            case "foreground" -> component.getForeground();
+            case "selectionBackground" -> component instanceof JList<?> list ? list.getSelectionBackground()
+                : component instanceof JTable table ? table.getSelectionBackground()
+                : component instanceof JTextComponent text ? text.getSelectionColor() : styleable(component, key);
+            case "selectionForeground" -> component instanceof JList<?> list ? list.getSelectionForeground()
+                : component instanceof JTable table ? table.getSelectionForeground()
+                : component instanceof JTextComponent text ? text.getSelectedTextColor() : styleable(component, key);
+            case "selectionColor" -> ((JTextComponent) component).getSelectionColor();
+            case "selectedTextColor" -> ((JTextComponent) component).getSelectedTextColor();
+            case "caretColor" -> ((JTextComponent) component).getCaretColor();
+            case "disabledTextColor" -> ((JTextComponent) component).getDisabledTextColor();
+            case "gridColor" -> ((JTable) component).getGridColor();
+            default -> styleable(component, key);
+        };
+    }
+
+    private static Object styleable(JComponent component, String key) {
+        return ((com.formdev.flatlaf.ui.FlatStylingSupport.StyleableUI) component.getUI())
+            .getStyleableValue(component, key);
+    }
+
+    @Test void compositeFamiliesExposeSemanticColorsAndPaint() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            var theme = independent().workspace();
+            var combo = new JComboBox<>(new String[] {"one", "two"});
+            applyRecipe(combo, WorkspaceStyles.recipe(combo, theme));
+            assertThat(combo.getBackground()).isEqualTo(theme.tokens().get(Token.INPUT_BACKGROUND));
+            assertThat(styleable(combo, "buttonArrowColor")).isEqualTo(theme.tokens().get(Token.TEXT));
+            assertThat(styleable(combo, "popupBackground")).isEqualTo(theme.tokens().get(Token.SURFACE_SUNKEN));
+            assertThat(hasPixel(paint(combo, 180, 32), theme.tokens().get(Token.INPUT_BACKGROUND))).isTrue();
+
+            for (AbstractButton button : List.of(new JCheckBox("chosen"), new JRadioButton("chosen"))) {
+                button.setSelected(true);
+                applyRecipe(button, WorkspaceStyles.recipe(button, theme));
+                assertThat(styleable(button, "icon.selectedBackground")).isEqualTo(theme.tokens().get(Token.ACCENT));
+                assertThat(styleable(button, "icon.checkmarkColor")).isEqualTo(theme.tokens().get(Token.TEXT_ON_ACCENT));
+                assertThat(hasPixel(paint(button, 180, 32), theme.tokens().get(Token.ACCENT)))
+                    .as(button.getClass().getSimpleName() + " selected icon").isTrue();
+            }
+
+            var bar = new JScrollBar();
+            bar.setValues(20, 30, 0, 100);
+            applyRecipe(bar, WorkspaceStyles.recipe(bar, theme));
+            assertThat(styleable(bar, "track")).isEqualTo(theme.tokens().get(Token.SCROLLBAR_TRACK));
+            assertThat(styleable(bar, "thumb")).isEqualTo(theme.tokens().get(Token.SCROLLBAR_THUMB));
+            assertThat(hasPixel(paint(bar, 24, 150), theme.tokens().get(Token.SCROLLBAR_THUMB))).isTrue();
+
+            var split = new JSplitPane();
+            applyRecipe(split, WorkspaceStyles.recipe(split, theme));
+            assertThat(styleable(split, "draggingColor")).isEqualTo(theme.tokens().get(Token.DIVIDER));
+            assertThat(styleable(split, "gripColor")).isEqualTo(theme.tokens().get(Token.DIVIDER));
+            assertThat(hasPixel(paint(split, 180, 80), theme.tokens().get(Token.SURFACE)))
+                .as("split-pane surface").isTrue();
+
+            var tabs = new JTabbedPane();
+            tabs.addTab("one", new JPanel());
+            applyRecipe(tabs, WorkspaceStyles.recipe(tabs, theme));
+            assertThat(styleable(tabs, "selectedBackground")).isEqualTo(theme.tokens().get(Token.TAB_ACTIVE));
+            assertThat(styleable(tabs, "underlineColor")).isEqualTo(theme.tokens().get(Token.TAB_UNDERLINE));
+            assertThat(hasPixel(paint(tabs, 180, 80), theme.tokens().get(Token.TAB_ACTIVE))).isTrue();
+
+            var toolbar = new JToolBar();
+            toolbar.add(new JButton("item"));
+            applyRecipe(toolbar, WorkspaceStyles.recipe(toolbar, theme));
+            assertThat(toolbar.getBackground()).isEqualTo(theme.tokens().get(Token.SURFACE));
+            assertThat(styleable(toolbar, "separatorColor")).isEqualTo(theme.tokens().get(Token.SEPARATOR));
+            assertThat(hasPixel(paint(toolbar, 180, 36), theme.tokens().get(Token.SURFACE))).isTrue();
+
+            var separator = new JSeparator();
+            applyRecipe(separator, WorkspaceStyles.recipe(separator, theme));
+            assertThat(separator.getForeground()).isEqualTo(theme.tokens().get(Token.SEPARATOR));
+            assertThat(hasPixel(paint(separator, 180, 6), theme.tokens().get(Token.SEPARATOR))).isTrue();
+        });
+    }
+
+    private static boolean hasPixel(BufferedImage image, Color color) {
+        for (int y = 0; y < image.getHeight(); y++)
+            for (int x = 0; x < image.getWidth(); x++)
+                if (new Color(image.getRGB(x, y), true).equals(color)) return true;
+        return false;
     }
 
     @Test void listAndHeaderUseWorkspaceColorsWithoutChangingChrome() throws Exception {

@@ -30,9 +30,7 @@ final class WorkspaceStyles {
         if (type.isEmpty()) return new Recipe("", Map.of(), Map.of());
         var style = new LinkedHashMap<String, Object>();
         var direct = new LinkedHashMap<String, Color>();
-        boolean flat = component.getUI() instanceof StyleableUI
-            && (component.getUI().getClass().getPackageName().equals("com.formdev.flatlaf.ui")
-                || component.getUI() instanceof com.formdev.flatlaf.ui.FlatListUI);
+        boolean flat = flatDelegate(component.getUI());
         switch (type) {
             case "Panel" -> {
                 put(component, flat, style, direct, "background", theme, Token.SURFACE);
@@ -181,6 +179,15 @@ final class WorkspaceStyles {
             default -> throw new IllegalStateException(type);
         }
         return new Recipe(type, style, direct);
+    }
+
+    private static boolean flatDelegate(javax.swing.plaf.ComponentUI ui) {
+        if (!(ui instanceof StyleableUI)) return false;
+        for (Class<?> kind = ui.getClass(); kind != null; kind = kind.getSuperclass()) {
+            if (kind.getPackageName().equals("com.formdev.flatlaf.ui")
+                && kind.getSimpleName().startsWith("Flat")) return true;
+        }
+        return false;
     }
 
     private static void color(Map<String, Object> style, String key, GeneratedTheme theme, Token token) {
