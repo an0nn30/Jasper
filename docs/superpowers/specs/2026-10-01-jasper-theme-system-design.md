@@ -3,8 +3,8 @@
 **Status:** Design approved in chat by the user on 2026-10-01, section by section. Plan 1 (format/generator) and its
 review fixes are merged to main at `5fc76c7d`; implementation deviations are recorded in plan 1 and `docs/STATUS.md`.
 [Remaining-work assessment and plans 2–5](../plans/2026-10-01-theme-system-remaining-work.md) track implementation.
-Plan 2 is implemented and headless-verified on its branch, pending final independent whole-branch review and user GUI
-acceptance. Plans 3–5 remain future work. Plan 2 deviations are recorded in its status banner and `docs/STATUS.md`;
+Plan 2 is implemented, headless-verified and independently reviewed on its branch; user GUI acceptance remains
+pending. Plans 3–5 remain future work. Plan 2 deviations are recorded in its status banner and `docs/STATUS.md`;
 the assessment labels later integration decisions and the combo-popup ambiguity without silently amending this design.
 
 Replaces, once implemented: the IntelliJ Themes page and Marketplace client

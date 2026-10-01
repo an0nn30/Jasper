@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete on `codex/theme-system-plans`, pending final independent whole-branch review and user GUI acceptance. Plans 3–5 remain future deliverables; generic plugin pane styling is next. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed on `codex/theme-system-plans`; user GUI acceptance remains pending. Plans 3–5 remain future deliverables; generic plugin pane styling is next. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -31,7 +31,7 @@ acceptance has not been performed.
 
 | Order | Plan | Shippable result | Depends on |
 |---|---|---|---|
-| 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Implemented and headless-verified: terminal, tabs, dividers, find, icons, Editor and SDK 0.12.0; final independent review and GUI acceptance pending | Merged plan 1 |
+| 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Implemented, headless-verified and independently reviewed: terminal, tabs, dividers, find, icons, Editor and SDK 0.12.0; GUI acceptance pending | Merged plan 1 |
 | 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Hosted Swing panes adopt the workspace; plugin-owned styles and cleanup remain correct | Plan 2 |
 | 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Offline native catalog, reproducible conversion, safe upgrade; old stores removed | Plans 2–3 |
 | 5 | [Themes page and live reload](2026-10-01-theme-system-5-page-reload.md) | Complete user flow: browse, stage, preview, import, duplicate, remove and edit/reload | Plan 4 |

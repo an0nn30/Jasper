@@ -2,14 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Implementation and headless acceptance complete on `codex/theme-system-plans` through Task 8;
-the final review collision diagnostic fix awaits scoped independent re-review, and user-run GUI acceptance remains pending. Baseline `main@5fc76c7d`.
+**Status:** Executed and independently reviewed on `codex/theme-system-plans` through the final fix wave;
+user-run GUI acceptance remains pending. Baseline `main@5fc76c7d`.
 Tasks 1–7 have independent task reviews. Plan 3 (generic plugin pane styling) is next; plans 4–5 remain future work.
 Serialized `./gradlew check` passed with 7,769 tests, zero failures/errors and six skips; all architecture checks,
 `git diff --check` and Java source hygiene passed. Final fix-wave per-module XML totals are in `.superpowers/sdd/2026-10-01-theme-system-2-workspace/final-fix-report.md`.
 The final review found one Important omission from remaining-work decision 6: selected native/Alacritty name
 collisions were silent. Native precedence is retained; a source-aware warning now identifies the shadowed Alacritty
 theme and chosen native theme, including case-insensitive collisions. Non-colliding selections remain warning-free.
+The full-branch independent review covered `5fc76c7d..ec030a72`; scoped independent re-review approved
+`ec030a72..1b1cb027` with no actionable findings. Fix commit `1a389653` adds the diagnostic and regressions;
+`1b1cb027` removes one inherited trailing test-file blank line found by the branch-wide diff check. The
+bundled-source collision path lacks a dedicated test; its fallback was reviewed, while user-source exact/mixed-case
+collisions and a non-collision control are tested. This is a coverage limit, not an open review finding.
 
 **Execution deviations and rulings:** Legacy `terminal.colors` and `ui.theme.terminal` are path-only aliases:
 only values read from those paths convert `light`/`dark` to native Jasper names; canonical native names remain literal.

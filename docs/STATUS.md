@@ -4,8 +4,8 @@
 
 - **Theme system Plan 2 workspace delivery** (branch `codex/theme-system-plans`, 2026-10-01):
   [assessment and requirement coverage](superpowers/plans/2026-10-01-theme-system-remaining-work.md) audits main
-  `5fc76c7d` against the full theme design. Plan 2 is implemented and headless-verified; the final review collision diagnostic fix awaits scoped independent
-  re-review and user GUI acceptance. The four sequential deliverables are:
+  `5fc76c7d` against the full theme design. Plan 2 is implemented, headless-verified and independently reviewed;
+  user GUI acceptance remains pending. The four sequential deliverables are:
   [2: workspace zone/SDK/Editor](superpowers/plans/2026-10-01-theme-system-2-workspace.md),
   [3: plugin pane styling](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md),
   [4: conversion/vendoring/migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md),
@@ -35,7 +35,11 @@
   `git diff --check` and the Java control/private-use/surrogate scan were clean.
   Final review fix: selected native/Alacritty name collisions keep native precedence and now warn with the shadowed
   source and chosen native theme. Exact-case and mixed-case collisions are covered, with a warning-free non-collision
-  control. This fulfills remaining-work decision 6 in the transitional Plan 2 delivery; scoped re-review is pending.
+  control. This fulfills remaining-work decision 6 in the transitional Plan 2 delivery. The whole-branch review
+  (`5fc76c7d..ec030a72`) found this omission; the fix wave `1a389653` and whitespace cleanup `1b1cb027`
+  passed scoped independent re-review (`ec030a72..1b1cb027`) with no actionable findings. The bundled-source
+  collision warning has no dedicated test; the source fallback was reviewed, and exact/mixed-case user-source
+  collisions plus the non-collision control are tested. No GUI, benchmark, push or merge was performed.
   **GUI checklist for the user, not run by the agent:** Jasper Light chrome with Jasper Dark and an Alacritty
   workspace; tabs, find, dividers and icons; switch between dark workspaces with Editor open and unsaved edits;
   match; multiple windows; chrome-colored menus, sidebars and dialogs; old IntelliJ Themes and Alacritty Themes
