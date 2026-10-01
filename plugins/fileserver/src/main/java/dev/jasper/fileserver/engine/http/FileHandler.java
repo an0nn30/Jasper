@@ -11,9 +11,11 @@ import dev.jasper.fileserver.share.ReadOnlyShareException;
 import dev.jasper.fileserver.share.ShareEntry;
 import dev.jasper.fileserver.share.ShareRoot;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URLConnection;
+import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
@@ -23,12 +25,16 @@ import java.nio.file.NoSuchFileException;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /** Answers every request of one HTTP server from its share. Runs on the engine's worker threads. */
 final class FileHandler implements HttpHandler {
     static final int BUFFER = 64 * 1024;
+    static final int FORM_LIMIT = 64 * 1024;
     private final ShareRoot share;
     private final ServerEvents events;
     private final HostCheck hosts;
@@ -50,6 +56,8 @@ final class FileHandler implements HttpHandler {
                 text(exchange, 404, "Not found");
             } catch (IsFolderException | FileAlreadyExistsException | DirectoryNotEmptyException conflict) {
                 text(exchange, 409, conflict instanceof DirectoryNotEmptyException ? "The folder is not empty" : conflict.getMessage());
+            } catch (Multipart.Malformed malformed) {
+                text(exchange, 400, malformed.getMessage());
             } catch (IllegalArgumentException bad) {
                 text(exchange, 400, bad.getMessage());
             } catch (IOException failure) {
@@ -70,8 +78,17 @@ final class FileHandler implements HttpHandler {
         switch (exchange.getRequestMethod()) {
             case "GET" -> get(exchange, raw, path, true);
             case "HEAD" -> get(exchange, raw, path, false);
+            case "PUT", "DELETE", "POST" -> {
+                if (!sameOrigin(exchange)) { text(exchange, 403, "Requests from other sites are refused"); return; }
+                if (share.readOnly()) throw new ReadOnlyShareException();
+                switch (exchange.getRequestMethod()) {
+                    case "PUT" -> put(exchange, path);
+                    case "DELETE" -> delete(exchange, path);
+                    default -> post(exchange, path);
+                }
+            }
             default -> {
-                exchange.getResponseHeaders().set("Allow", "GET, HEAD");
+                exchange.getResponseHeaders().set("Allow", share.readOnly() ? "GET, HEAD" : "GET, HEAD, PUT, DELETE, POST");
                 text(exchange, 405, "Method not allowed");
             }
         }
@@ -92,7 +109,7 @@ final class FileHandler implements HttpHandler {
     }
 
     private void listing(HttpExchange exchange, String path, boolean body) throws IOException {
-        byte[] page = Listing.render(ShareRoot.segments(path), share.list(path), ZoneId.systemDefault()).getBytes(StandardCharsets.UTF_8);
+        byte[] page = Listing.render(ShareRoot.segments(path), share.list(path), !share.readOnly(), ZoneId.systemDefault()).getBytes(StandardCharsets.UTF_8);
         var headers = exchange.getResponseHeaders();
         headers.set("Content-Type", "text/html; charset=utf-8");
         headers.set("Content-Security-Policy", Listing.POLICY);
@@ -144,6 +161,93 @@ final class FileHandler implements HttpHandler {
                 transfer.finish(complete);
             }
         }
+    }
+
+    /** A browser form from another site carries its Origin; curl and the share's own pages pass. */
+    private static boolean sameOrigin(HttpExchange exchange) {
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin == null) return true;
+        String host = exchange.getRequestHeaders().getFirst("Host");
+        return host != null && (origin.equalsIgnoreCase("http://" + host) || origin.equalsIgnoreCase("https://" + host));
+    }
+
+    private void put(HttpExchange exchange, String path) throws IOException {
+        boolean existed;
+        try { existed = !share.attributes(path).directory(); }
+        catch (NoSuchFileException absent) { existed = false; }
+        long total = -1;
+        String length = exchange.getRequestHeaders().getFirst("Content-Length");
+        if (length != null) {
+            try { total = Long.parseLong(length.strip()); } catch (NumberFormatException unknown) { total = -1; }
+        }
+        receive(exchange, exchange.getRequestBody(), path, total);
+        send(exchange, existed ? 204 : 201, -1);
+    }
+
+    private void delete(HttpExchange exchange, String path) throws IOException {
+        share.delete(path);
+        events.changed(remote(exchange), "deleted " + display(path));
+        send(exchange, 204, -1);
+    }
+
+    /** The listing's forms: an upload of any number of files, or a delete of one entry. Answers with the folder. */
+    private void post(HttpExchange exchange, String path) throws IOException {
+        if (!share.attributes(path).directory()) throw new IllegalArgumentException("Forms are posted to a folder");
+        List<String> folder = ShareRoot.segments(path);
+        String contentType = Optional.ofNullable(exchange.getRequestHeaders().getFirst("Content-Type")).orElse("");
+        String type = contentType.toLowerCase(Locale.ROOT);
+        if (type.startsWith("multipart/form-data")) {
+            Multipart.read(exchange.getRequestBody(), Multipart.boundary(contentType), (fileName, content) -> {
+                String name = Multipart.baseName(fileName);
+                if (!name.isEmpty()) receive(exchange, content, child(folder, name), -1);
+            });
+        } else if (type.startsWith("application/x-www-form-urlencoded")) {
+            Map<String, String> form = form(exchange.getRequestBody());
+            String name = form.getOrDefault("name", "");
+            if (!"DELETE".equals(form.get("_method")) || name.isEmpty()) throw new IllegalArgumentException("This form is not understood");
+            String target = child(folder, name);
+            share.delete(target);
+            events.changed(remote(exchange), "deleted " + display(target));
+        } else {
+            throw new IllegalArgumentException("This form is not understood");
+        }
+        exchange.getResponseHeaders().set("Location", HttpPaths.href(folder, true));
+        send(exchange, 303, -1);
+    }
+
+    private void receive(HttpExchange exchange, InputStream in, String path, long total) throws IOException {
+        try (OutputStream out = share.openWrite(path, false)) {
+            var transfer = events.transfer(remote(exchange), ServerEvent.Direction.UPLOAD, display(path), total, exchange::close);
+            boolean complete = false;
+            try {
+                byte[] buffer = new byte[BUFFER];
+                for (int read; (read = in.read(buffer)) >= 0; ) {
+                    out.write(buffer, 0, read);
+                    transfer.add(read);
+                }
+                complete = true;
+            } finally {
+                transfer.finish(complete);
+            }
+        }
+    }
+
+    private static String child(List<String> folder, String name) {
+        return "/" + String.join("/", folder) + (folder.isEmpty() ? "" : "/") + name;
+    }
+
+    private static Map<String, String> form(InputStream in) throws IOException {
+        byte[] bytes = in.readNBytes(FORM_LIMIT + 1);
+        if (bytes.length > FORM_LIMIT) throw new IllegalArgumentException("The form is too large");
+        var form = new HashMap<String, String>();
+        for (String pair : new String(bytes, StandardCharsets.US_ASCII).split("&")) {
+            if (pair.isEmpty()) continue;
+            int equals = pair.indexOf('=');
+            String key = URLDecoder.decode(equals < 0 ? pair : pair.substring(0, equals), StandardCharsets.UTF_8);
+            String value = equals < 0 ? "" : URLDecoder.decode(pair.substring(equals + 1), StandardCharsets.UTF_8);
+            form.putIfAbsent(key, value);
+        }
+        return form;
     }
 
     /** The share path as the activity log shows it, such as "/docs/a.txt". */
