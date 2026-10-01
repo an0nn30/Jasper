@@ -95,7 +95,8 @@ class FileServerPluginTest {
             assertThat(host.status()).isEmpty();
             assertThat(host.declared("dev.jasper.fileserver"))
                 .anySatisfy(line -> assertThat(line).startsWith("confirm_quit"))
-                .anySatisfy(line -> assertThat(line).startsWith("activity_entries"));
+                .anySatisfy(line -> assertThat(line).startsWith("activity_entries"))
+                .anySatisfy(line -> assertThat(line).startsWith("passive_ports"));
         }
     }
 

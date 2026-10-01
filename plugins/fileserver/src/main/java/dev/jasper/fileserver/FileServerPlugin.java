@@ -134,7 +134,7 @@ public final class FileServerPlugin implements Plugin {
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
         transfers = new TransferActivities(context.activities()::begin, SHOW);
         tls = new TlsMaterial(context.dataDirectory().resolve("tls"), Clock.systemUTC(), FileServerPlugin::hostName);
-        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls), logins,
+        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange), logins,
             context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
         var icon = context.appearance().icon(IconName.SERVER);

@@ -45,6 +45,9 @@ class ServerRowsTest {
             .containsExactly("Anyone who can reach it can change files", "Writable and reachable from other computers");
         assertThat(ServerRows.warnings(definition("d", Protocol.TFTP, true, Bind.LOOPBACK, Login.ANONYMOUS)))
             .containsExactly("TFTP has no login: anyone who can reach it can change files");
+        assertThat(ServerRows.warnings(definition("e", Protocol.FTP, false, Bind.LOOPBACK, Login.SESSION))).containsExactly("Plain FTP sends the password unencrypted");
+        assertThat(ServerRows.warnings(Protocol.FTP, true, Login.SESSION, false, Bind.LOOPBACK)).as("TLS on").isEmpty();
+        assertThat(ServerRows.warnings(definition("f", Protocol.FTP, false, Bind.LOOPBACK, Login.ANONYMOUS))).as("no password to leak").isEmpty();
     }
 
     @Test void namesFoldersStatesAndFirewalls() {
