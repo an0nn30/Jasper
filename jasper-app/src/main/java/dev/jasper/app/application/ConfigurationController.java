@@ -264,8 +264,19 @@ final class ConfigurationController implements AutoCloseable {
         for (TerminalThemeCatalog.Problem problem : terminal.problems())
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), 0, 0, "", problem.message()));
         WorkspaceThemeChoice choice = next.snapshot().workspaceTheme();
-        Theme workspace = choice.matchesChrome() ? null : available.find(choice.name()).orElseGet(() ->
-            terminal.find(choice.name()).map(terminalThemes::converted).orElse(null));
+        Theme workspace = null;
+        if (!choice.matchesChrome()) {
+            workspace = available.find(choice.name()).orElse(null);
+            var legacy = terminal.find(choice.name()).orElse(null);
+            if (workspace != null && legacy != null) {
+                String source = legacy.file().map(Path::toString).orElse("the bundled Alacritty collection");
+                problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, legacy.file().orElse(next.file()),
+                    0, 0, "ui.theme.workspace", "Alacritty theme \"" + legacy.name() + "\" from " + source
+                        + " is shadowed; using native theme \"" + workspace.name() + "\"."));
+            } else if (legacy != null) {
+                workspace = terminalThemes.converted(legacy);
+            }
+        }
         if (!choice.matchesChrome() && workspace == null)
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
                 "Unknown workspace theme \"" + choice.name() + "\"; matching the chrome theme."));

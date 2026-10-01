@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.terminalthemes.TerminalThemeCatalog;
 import dev.jasper.terminal.config.Palette;
 import java.nio.file.Files;
@@ -14,18 +15,47 @@ import java.util.concurrent.Executors;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TerminalThemeResolutionTest {
     @TempDir Path dir;
 
-    @Test void nativeWorkspaceNameWinsOverALegacyName() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"IntelliJ_Light", "iNtElLiJ_lIgHt"})
+    void nativeWorkspaceNameWinsAndWarnsAboutTheShadowedLegacySource(String legacyName) throws Exception {
         Path file = dir.resolve("config.toml");
         Files.writeString(file, "[ui.theme]\nworkspace = 'IntelliJ Light'\n");
         Files.createDirectories(dir.resolve("terminal-themes"));
-        Files.writeString(dir.resolve("terminal-themes/IntelliJ_Light.toml"),
+        Path legacyFile = dir.resolve("terminal-themes/" + legacyName + ".toml");
+        Files.writeString(legacyFile,
             "[colors.primary]\nbackground = '#010203'\nforeground = '#eeeeee'\n");
         var legacy = TerminalThemeCatalog.beside(file);
         assertThat(legacy.scan().find("IntelliJ Light")).isPresent();
+        var worker = Executors.newSingleThreadScheduledExecutor();
+        try (var service = new ConfigService(file, true, worker, SwingUtilities::invokeLater)) {
+            edt(() -> {
+                var themes = new ThemeController(theme -> true);
+                var controller = new ConfigurationController(themes, service, ThemeCatalog.builtIn(),
+                    legacy, path -> {});
+                assertThat(themes.current().palette()).isEqualTo(dev.jasper.app.appearance.Theme.INTELLIJ_LIGHT.palette());
+                assertThat(controller.shown().diagnostics()).singleElement().satisfies(problem -> {
+                    assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+                    assertThat(problem.file()).isEqualTo(legacyFile);
+                    assertThat(problem.key()).isEqualTo("ui.theme.workspace");
+                    assertThat(problem.message()).contains("Alacritty", legacyFile.toString(),
+                        "IntelliJ Light", "native", "using");
+                });
+                controller.close();
+            });
+        } finally { worker.shutdownNow(); }
+    }
+
+    @Test void nativeWorkspaceWithoutALegacyCollisionDoesNotWarn() throws Exception {
+        Path file = dir.resolve("config.toml");
+        Files.writeString(file, "[ui.theme]\nworkspace = 'IntelliJ Light'\n");
+        var legacy = TerminalThemeCatalog.bundledOnly();
+        assertThat(legacy.latest().find("IntelliJ Light")).isEmpty();
         var worker = Executors.newSingleThreadScheduledExecutor();
         try (var service = new ConfigService(file, true, worker, SwingUtilities::invokeLater)) {
             edt(() -> {

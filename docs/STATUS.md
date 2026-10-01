@@ -4,8 +4,8 @@
 
 - **Theme system Plan 2 workspace delivery** (branch `codex/theme-system-plans`, 2026-10-01):
   [assessment and requirement coverage](superpowers/plans/2026-10-01-theme-system-remaining-work.md) audits main
-  `5fc76c7d` against the full theme design. Plan 2 is implemented and headless-verified, pending final independent
-  whole-branch review and user GUI acceptance. The four sequential deliverables are:
+  `5fc76c7d` against the full theme design. Plan 2 is implemented and headless-verified; the final review collision diagnostic fix awaits scoped independent
+  re-review and user GUI acceptance. The four sequential deliverables are:
   [2: workspace zone/SDK/Editor](superpowers/plans/2026-10-01-theme-system-2-workspace.md),
   [3: plugin pane styling](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md),
   [4: conversion/vendoring/migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md),
@@ -31,8 +31,11 @@
   pre-flush reads must flush or the fake scheduling contract needs revision. Native SDK publication uses Color/Boolean
   UI defaults and an app.plugins-only adapter; Editor maps all 16 syntax roles. Task-level deviations and checks are
   in the [Plan 2 banner](superpowers/plans/2026-10-01-theme-system-2-workspace.md). Serialized `./gradlew check`
-  passed: **7,767 tests, 0 failures/errors, 6 skipped** (app 1,558; Editor 4,783). All architecture gates passed;
+  passed: **7,769 tests, 0 failures/errors, 6 skipped** (app 1,560; Editor 4,783). All architecture gates passed;
   `git diff --check` and the Java control/private-use/surrogate scan were clean.
+  Final review fix: selected native/Alacritty name collisions keep native precedence and now warn with the shadowed
+  source and chosen native theme. Exact-case and mixed-case collisions are covered, with a warning-free non-collision
+  control. This fulfills remaining-work decision 6 in the transitional Plan 2 delivery; scoped re-review is pending.
   **GUI checklist for the user, not run by the agent:** Jasper Light chrome with Jasper Dark and an Alacritty
   workspace; tabs, find, dividers and icons; switch between dark workspaces with Editor open and unsaved edits;
   match; multiple windows; chrome-colored menus, sidebars and dialogs; old IntelliJ Themes and Alacritty Themes

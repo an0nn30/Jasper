@@ -3,10 +3,13 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Status:** Implementation and headless acceptance complete on `codex/theme-system-plans` through Task 8;
-final independent whole-branch review and user-run GUI acceptance remain pending. Baseline `main@5fc76c7d`.
+the final review collision diagnostic fix awaits scoped independent re-review, and user-run GUI acceptance remains pending. Baseline `main@5fc76c7d`.
 Tasks 1–7 have independent task reviews. Plan 3 (generic plugin pane styling) is next; plans 4–5 remain future work.
-Serialized `./gradlew check` passed with 7,767 tests, zero failures/errors and six skips; all architecture checks,
-`git diff --check` and Java source hygiene passed. Per-module XML totals are in Task 8's execution report.
+Serialized `./gradlew check` passed with 7,769 tests, zero failures/errors and six skips; all architecture checks,
+`git diff --check` and Java source hygiene passed. Final fix-wave per-module XML totals are in `.superpowers/sdd/2026-10-01-theme-system-2-workspace/final-fix-report.md`.
+The final review found one Important omission from remaining-work decision 6: selected native/Alacritty name
+collisions were silent. Native precedence is retained; a source-aware warning now identifies the shadowed Alacritty
+theme and chosen native theme, including case-insensitive collisions. Non-colliding selections remain warning-free.
 
 **Execution deviations and rulings:** Legacy `terminal.colors` and `ui.theme.terminal` are path-only aliases:
 only values read from those paths convert `light`/`dark` to native Jasper names; canonical native names remain literal.
