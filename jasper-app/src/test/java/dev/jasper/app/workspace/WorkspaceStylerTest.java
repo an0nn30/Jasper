@@ -186,6 +186,98 @@ class WorkspaceStylerTest {
         });
     }
 
+    @Test void newerThemeDoesNotDropPendingReconciliation() throws Exception {
+        var root = new JPanel[1];
+        var styler = new WorkspaceStyler[1];
+        var styled = new java.util.concurrent.atomic.AtomicInteger();
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            root[0] = new JPanel();
+            addOnceStyledChild(root[0], styled);
+            styler[0] = new WorkspaceStyler(root[0]);
+            styler[0].apply(independent());
+            styler[0].apply(recolored(independent(), Token.BUTTON_BACKGROUND, Color.MAGENTA));
+            assertThat(styled.get()).isLessThan(40);
+        });
+        // Drain both the superseded callback and any current-generation replacement.
+        edt(() -> {});
+        edt(() -> {
+            try {
+                assertThat(styled.get()).isEqualTo(40);
+                assertThat(root[0].getComponentCount()).isEqualTo(40);
+                for (var child : root[0].getComponents())
+                    assertThat(child.getBackground()).isEqualTo(Color.MAGENTA);
+            } finally { styler[0].close(); }
+        });
+    }
+
+    private static void addOnceStyledChild(JPanel root, java.util.concurrent.atomic.AtomicInteger count) {
+        var child = new JButton();
+        var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+        child.addPropertyChangeListener("Jasper.workspaceStyle", event -> {
+            if (event.getNewValue() != null && first.getAndSet(false) && count.incrementAndGet() < 40)
+                addOnceStyledChild(root, count);
+        });
+        root.add(child);
+    }
+
+    @Test void associatedHeaderMovedAcrossBoundariesReleasesAndResumes() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            var root = new JPanel(); var table = new JTable(1, 1); root.add(table);
+            var chrome = new JPanel(); chrome.putClientProperty("Jasper.zone", "chrome"); root.add(chrome);
+            var exempt = new JPanel(); exempt.putClientProperty("Jasper.workspace.exempt", true); root.add(exempt);
+            var ignored = new JLabel(); exempt.add(ignored);
+            var ignoredProperties = ignored.getPropertyChangeListeners();
+            var ignoredHierarchy = ignored.getHierarchyListeners();
+            var header = table.getTableHeader();
+            var background = header.getBackground();
+            var properties = header.getPropertyChangeListeners();
+            var hierarchy = header.getHierarchyListeners();
+            var containers = header.getContainerListeners();
+            try (var styler = new WorkspaceStyler(root)) {
+                styler.apply(independent());
+                for (var boundary : new JPanel[]{chrome, exempt}) {
+                    assertThat(header.getClientProperty("Jasper.workspaceStyle")).isNotNull();
+                    boundary.add(header);
+                    assertThat(header.getClientProperty("Jasper.workspaceStyle")).isNull();
+                    assertThat(header.getClientProperty("Jasper.workspaceStylerOwner")).isNull();
+                    assertThat(header.getBackground()).isSameAs(background);
+                    assertThat(header.getPropertyChangeListeners()).containsExactlyInAnyOrder(properties);
+                    assertThat(header.getContainerListeners()).containsExactlyInAnyOrder(containers);
+                    assertThat(header.getHierarchyListeners()).hasSize(hierarchy.length + 1);
+                    boundary.remove(header); // Unparented, but the live table association is eligible again.
+                    assertThat(header.getClientProperty("Jasper.workspaceStyle")).isNotNull();
+                }
+                exempt.add(header);
+                assertThat(ignored.getPropertyChangeListeners()).containsExactlyInAnyOrder(ignoredProperties);
+                assertThat(ignored.getHierarchyListeners()).containsExactlyInAnyOrder(ignoredHierarchy);
+            }
+            assertThat(header.getHierarchyListeners()).containsExactlyInAnyOrder(hierarchy);
+            assertThat(header.getPropertyChangeListeners()).containsExactlyInAnyOrder(properties);
+        });
+    }
+
+    @Test void associationWatchesDetachOnReplacementAndSourceRemoval() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            var root = new JPanel(); var table = new JTable(1, 1); root.add(table);
+            var exempt = new JPanel(); exempt.putClientProperty("Jasper.workspace.exempt", true); root.add(exempt);
+            var original = table.getTableHeader(); var originalListeners = original.getHierarchyListeners();
+            var replacement = new JTableHeader(table.getColumnModel()); var replacementListeners = replacement.getHierarchyListeners();
+            try (var styler = new WorkspaceStyler(root)) {
+                styler.apply(independent());
+                exempt.add(original);
+                table.setTableHeader(replacement);
+                assertThat(original.getHierarchyListeners()).containsExactlyInAnyOrder(originalListeners);
+                exempt.add(replacement);
+                assertThat(replacement.getHierarchyListeners()).hasSize(replacementListeners.length + 1);
+                root.remove(table);
+                assertThat(replacement.getHierarchyListeners()).containsExactlyInAnyOrder(replacementListeners);
+            }
+        });
+    }
+
     private static void addStyleDrivenChild(JPanel root, java.util.concurrent.atomic.AtomicInteger count) {
         var child = new JButton();
         child.addPropertyChangeListener("Jasper.workspaceStyle", event -> {

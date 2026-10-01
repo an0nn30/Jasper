@@ -6,6 +6,8 @@ import java.awt.Container;
 import java.awt.Window;
 import java.awt.event.ContainerAdapter;
 import java.awt.event.ContainerEvent;
+import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -19,6 +21,7 @@ public final class WorkspaceStyler implements AutoCloseable {
     private static final String EXEMPT = "Jasper.workspace.exempt";
     private final JComponent root;
     private final IdentityHashMap<Component, Node> nodes = new IdentityHashMap<>();
+    private final IdentityHashMap<Component, HierarchyListener> associationWatches = new IdentityHashMap<>();
     private ResolvedTheme theme;
     private int suspension;
     private long generation;
@@ -65,6 +68,8 @@ public final class WorkspaceStyler implements AutoCloseable {
         if (closed) return;
         closed = true;
         generation++;
+        associationWatches.forEach(Component::removeHierarchyListener);
+        associationWatches.clear();
         for (Node node : new ArrayList<>(nodes.values())) release(node);
         root.putClientProperty(ROOT, null);
     }
@@ -79,7 +84,9 @@ public final class WorkspaceStyler implements AutoCloseable {
             while (pending && passes++ < 16) {
                 pending = false;
                 var wanted = new IdentityHashMap<Component, Boolean>();
-                collect(root, wanted);
+                var associated = new IdentityHashMap<Component, Boolean>();
+                collect(root, wanted, associated);
+                reconcileAssociationWatches(associated);
                 for (Node node : new ArrayList<>(nodes.values()))
                     if (!wanted.containsKey(node.component) || wanted.get(node.component) != node.full
                         || node.exempt != isExempt(node.component)) release(node);
@@ -111,11 +118,29 @@ public final class WorkspaceStyler implements AutoCloseable {
         long expected = generation;
         SwingUtilities.invokeLater(() -> {
             queued = false;
-            if (!closed && expected == generation) refresh();
+            if (closed) return;
+            if (expected == generation) refresh();
+            else if (pending) queueRefresh(); // Preserve work requested by a newer bounded pass.
         });
     }
 
-    private void collect(Component c, IdentityHashMap<Component, Boolean> wanted) {
+    private void reconcileAssociationWatches(IdentityHashMap<Component, Boolean> wanted) {
+        for (Component component : associationWatches.keySet().toArray(Component[]::new))
+            if (!wanted.containsKey(component)) component.removeHierarchyListener(associationWatches.remove(component));
+        for (Component component : wanted.keySet()) {
+            if (associationWatches.containsKey(component)) continue;
+            // The eligible source owns this narrow watch even while the associated component
+            // is inside an excluded subtree. No style/property/container listeners are retained there.
+            HierarchyListener listener = event -> {
+                if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) refresh();
+            };
+            associationWatches.put(component, listener);
+            component.addHierarchyListener(listener);
+        }
+    }
+
+    private void collect(Component c, IdentityHashMap<Component, Boolean> wanted,
+                         IdentityHashMap<Component, Boolean> associated) {
         if (c == null || wanted.containsKey(c) || transientBoundary(c)) return;
         boolean full = true;
         if (c instanceof JComponent jc) {
@@ -126,15 +151,18 @@ public final class WorkspaceStyler implements AutoCloseable {
         wanted.put(c, full);
         if (!full) return;
         if (c instanceof Container container)
-            for (Component child : container.getComponents()) collect(child, wanted);
-        if (c instanceof JTable table) associated(table.getTableHeader(), wanted);
+            for (Component child : container.getComponents()) collect(child, wanted, associated);
+        if (c instanceof JTable table) associated(table.getTableHeader(), wanted, associated);
         if (c instanceof JComboBox<?> combo && combo.isEditable() && combo.getEditor() != null)
-            associated(combo.getEditor().getEditorComponent(), wanted);
+            associated(combo.getEditor().getEditorComponent(), wanted, associated);
     }
 
-    private void associated(Component c, IdentityHashMap<Component, Boolean> wanted) {
+    private void associated(Component c, IdentityHashMap<Component, Boolean> wanted,
+                            IdentityHashMap<Component, Boolean> associated) {
+        if (c == null) return;
+        associated.put(c, true);
         // Physical ownership wins over a stale association after reparenting.
-        for (Component parent = c == null ? null : c.getParent(); parent != null; parent = parent.getParent()) {
+        for (Component parent = c.getParent(); parent != null; parent = parent.getParent()) {
             if (transientBoundary(parent) || isExempt(parent)) return;
             if (parent instanceof JComponent jc) {
                 if ("chrome".equals(jc.getClientProperty("Jasper.zone"))) return;
@@ -142,7 +170,7 @@ public final class WorkspaceStyler implements AutoCloseable {
                 if (jc.getClientProperty(OWNER) instanceof WorkspaceStyler owner && owner != this) return;
             }
         }
-        collect(c, wanted);
+        collect(c, wanted, associated);
     }
 
     private static boolean isExempt(Component c) {
