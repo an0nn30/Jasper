@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Objects;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.plaf.UIResource;
 
 /** Reversible, EDT-confined ownership of one component's generated workspace colors. */
 final class WorkspaceStyleLayer implements AutoCloseable {
@@ -56,9 +58,11 @@ final class WorkspaceStyleLayer implements AutoCloseable {
         requireEdt();
         if (closed) throw new IllegalStateException("Workspace style layer is closed");
         if (this.recipe == null && !suspended) {
-            // Swing suppresses equal-RGB change events, but identity still exposes a plugin setter.
+            // Equal-RGB setters emit no event. A silent replacement by the current UIResource
+            // default is replaceable Swing state; plain colors remain plugin-owned.
             clearedValues.forEach((key, value) -> {
-                if (read(key) != value) overrides.put(key, read(key));
+                Color current = read(key);
+                if (current != value && !currentDefault(recipe, key, current)) overrides.put(key, current);
             });
         }
         this.recipe = Objects.requireNonNull(recipe);
@@ -130,6 +134,17 @@ final class WorkspaceStyleLayer implements AutoCloseable {
                 written.remove(key);
             }
         }
+    }
+
+    private static boolean currentDefault(WorkspaceStyles.Recipe recipe, String key, Color value) {
+        String defaultKey = switch (key) {
+            case "caretColor" -> "caretForeground";
+            case "disabledTextColor" -> "inactiveForeground";
+            default -> key;
+        };
+        // Assigning this exact default without a property event is observationally identical
+        // to delegate installation; follow Swing's replaceable UIResource convention.
+        return value instanceof UIResource && value == UIManager.getColor(recipe.type() + "." + defaultKey);
     }
 
     private void captureClearedValues() {

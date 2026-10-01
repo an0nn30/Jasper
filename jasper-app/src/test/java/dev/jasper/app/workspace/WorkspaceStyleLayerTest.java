@@ -213,6 +213,37 @@ class WorkspaceStyleLayerTest {
         });
     }
 
+    @Test void silentEqualRgbSharedDelegateRefreshRemainsReplaceable() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.JASPER_LIGHT);
+            Object previous = UIManager.get("Viewport.background");
+            try {
+                var v = new JViewport();
+                var recipe = new WorkspaceStyles.Recipe("Viewport", Map.of(), Map.of("background", Color.MAGENTA));
+                try (var layer = new WorkspaceStyleLayer(v)) {
+                    layer.apply(recipe);
+                    layer.clear();
+                    var events = new ArrayList<String>();
+                    v.addPropertyChangeListener(e -> {
+                        if (e.getPropertyName().equals("background") || e.getPropertyName().equals("UI"))
+                            events.add(e.getPropertyName());
+                    });
+                    var chrome = new ColorUIResource(v.getBackground().getRGB());
+                    UIManager.put("Viewport.background", chrome);
+                    var sharedUi = v.getUI();
+                    v.updateUI();
+                    assertThat(v.getUI()).isSameAs(sharedUi);
+                    assertThat(v.getBackground()).isSameAs(chrome);
+                    assertThat(events).isEmpty();
+                    layer.apply(recipe);
+                    assertThat(v.getBackground()).isSameAs(Color.MAGENTA);
+                    layer.clear();
+                    assertThat(v.getBackground()).isSameAs(chrome);
+                }
+            } finally { UIManager.put("Viewport.background", previous); }
+        });
+    }
+
     @Test void equalRgbPluginSetterWhileClearedRemainsAnOverride() throws Exception {
         edt(() -> {
             new ThemeController(Theme.JASPER_LIGHT);
