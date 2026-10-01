@@ -2732,7 +2732,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `ServerDefinition`, `Login` (Task 5); `dev.jasper.vault.api.{VaultApi, Credential, CredentialDescriptor, Kind, LockState}`.
 - Produces (package `dev.jasper.fileserver.auth`):
-  - `ResolvedLogin implements AutoCloseable`: `static anonymous()`, `static password(String user, char[] password)` (copies), `boolean anonymous()`, `Optional<String> user()`, `boolean matches(String user, char[] password)` (constant time; false after close), `Optional<String> revealPassword()`, `close()` (zeroes)
+  - `ResolvedLogin implements AutoCloseable`: `static anonymous()`, `static password(String user, char[] password)` (copies), `boolean isAnonymous()`, `Optional<String> user()`, `boolean matches(String user, char[] password)` (constant time; false after close), `Optional<String> revealPassword()`, `close()` (zeroes)
   - `SessionPasswords.generate()` → 20 characters from `ALPHABET` (no `0 O o 1 l I`)
   - `LoginUnavailableException extends Exception`
   - `LoginResolver(Optional<VaultApi> vault, Supplier<String> user, Supplier<String> passwords)`; `boolean vaultPresent()`; `boolean needsUnlock(ServerDefinition)`; `CompletableFuture<ResolvedLogin> resolve(ServerDefinition, WindowHandle ownerOrNull)` failing with `LoginUnavailableException` messages `NO_VAULT`, `MISSING`, `NOT_PROVIDED`
@@ -2832,7 +2832,7 @@ class ResolvedLoginTest {
         char[] secret = "s3cret".toCharArray();
         var login = ResolvedLogin.password("me", secret);
         secret[0] = 'X';
-        assertThat(login.anonymous()).isFalse();
+        assertThat(login.isAnonymous()).isFalse();
         assertThat(login.user()).contains("me");
         assertThat(login.matches("me", "s3cret".toCharArray())).as("the password was copied").isTrue();
         assertThat(login.matches("Me", "s3cret".toCharArray())).isFalse();
@@ -2842,7 +2842,7 @@ class ResolvedLoginTest {
         login.close();
         assertThat(login.matches("me", "s3cret".toCharArray())).isFalse();
         assertThat(login.revealPassword()).isEmpty();
-        assertThat(ResolvedLogin.anonymous().anonymous()).isTrue();
+        assertThat(ResolvedLogin.anonymous().isAnonymous()).isTrue();
         assertThat(ResolvedLogin.anonymous().matches("me", "x".toCharArray())).isFalse();
         assertThatThrownBy(() -> ResolvedLogin.password(" ", "x".toCharArray())).hasMessageContaining("user name");
     }
@@ -2902,7 +2902,7 @@ class LoginResolverTest {
 
     @Test void anonymousAndSessionLoginsNeedNoVault() {
         var resolver = resolver(Optional.empty());
-        assertThat(resolver.resolve(with(Login.ANONYMOUS), null).join().anonymous()).isTrue();
+        assertThat(resolver.resolve(with(Login.ANONYMOUS), null).join().isAnonymous()).isTrue();
         ResolvedLogin session = resolver.resolve(with(Login.SESSION), null).join();
         assertThat(session.user()).contains("dustin");
         assertThat(session.revealPassword()).contains("generated-password-1");
@@ -2982,7 +2982,7 @@ public final class ResolvedLogin implements AutoCloseable {
         return new ResolvedLogin(user, password.clone());
     }
 
-    public boolean anonymous() { return user == null; }
+    public boolean isAnonymous() { return user == null; }
     public Optional<String> user() { return Optional.ofNullable(user); }
 
     /** Compares both parts in constant time. */
@@ -3993,7 +3993,7 @@ public final class HttpEngine implements ServerEngine {
         catch (IOException failure) { throw EngineFailure.bind(failure, definition.port(), ServerAddresses.describe(address), definition.protocol()); }
         ExecutorService pool = Executors.newFixedThreadPool(WORKERS, Thread.ofPlatform().daemon().name("file-server-http-", 0).factory());
         HttpContext context = created.createContext("/", new FileHandler(share, events, HostCheck.forBind(definition.bind())));
-        if (!login.anonymous()) context.setAuthenticator(new ThrottledAuthenticator(definition.name(), login, throttle, events));
+        if (!login.isAnonymous()) context.setAuthenticator(new ThrottledAuthenticator(definition.name(), login, throttle, events));
         created.setExecutor(pool);
         created.start();
         server = created;
