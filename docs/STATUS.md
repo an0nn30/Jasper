@@ -2,6 +2,16 @@
 
 ## Current state — 2026-10-01
 
+- **Hidden-rail terminal framing** (2026-10-01, user visually accepted): the terminal/tab column
+  now fills its available workspace with square corners whenever the rail is hidden or empty. Showing
+  the rail restores the rounded frame, exterior spacing and lower corner spacer; plugin panel hosts
+  keep their existing treatment. Updated the maintenance recipe and prior size expectations. A new
+  headless light/dark render check covers hide/show/hide, flush bounds, corner pixels and edge input;
+  existing rounded-frame repaint checks now explicitly show the rail. Independent review approved;
+  `./gradlew check` passed: **7,898 tests, zero failures/errors, six skips** (app 1,678).
+  Changed-Java source hygiene and `git diff --check` pass. The user approved the appearance and
+  authorized merging to `main` and pushing. No agent-launched GUI or benchmark. Check log: `/tmp/rail-edge-check.log`.
+
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)
   now styles mounted center controls with one chrome LAF, preserves plugin styles/direct colors, tracks dynamic

@@ -19,8 +19,9 @@ import javax.swing.UIManager;
 /**
  * The terminal column (the tab strip over the deck) with up to three panel regions around it. BOTTOM
  * wraps the center, RIGHT wraps that, LEFT wraps that, so the bottom region spans only the terminal
- * and the side regions run the full height beside the tabs. With no region shown the
- * center retains its rounded frame and exterior gutter. The center frame is painted in the terminal
+ * and the side regions run the full height beside the tabs. The center has a rounded frame and
+ * exterior gutter only while the rail is visible; otherwise it fills its available area edge to edge.
+ * The center frame is painted in the terminal
  * palette's background, never a theme's tool window colour. EDT only.
  */
 final class WorkspaceRegions extends JPanel {
@@ -31,6 +32,7 @@ final class WorkspaceRegions extends JPanel {
         private static final int GUTTER = 6, ARC = 16;
 
         private final boolean toolWindow;
+        private boolean rounded = true;
 
         Host() { this(true); }
         Host(boolean toolWindow) {
@@ -49,7 +51,7 @@ final class WorkspaceRegions extends JPanel {
         private java.awt.Shape surface() {
             var insets = getInsets();
             int width = Math.max(0, getWidth() - insets.left - insets.right);
-            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = UIScale.scale(ARC);
+            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = rounded ? UIScale.scale(ARC) : 0;
             return new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
         }
 
@@ -63,7 +65,7 @@ final class WorkspaceRegions extends JPanel {
                 g.fillRect(0, 0, getWidth(), getHeight());
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 // The terminal column (tab strip included) is one surface in the terminal palette, so every
-                // theme shows all four rounded corners against the window chrome.
+                // theme follows the same frame, including its optional rounded corners.
                 g.setColor(getBackground()); g.fill(surface());
             } finally { g.dispose(); }
         }
@@ -110,6 +112,10 @@ final class WorkspaceRegions extends JPanel {
     }
 
     private final Host center = new Host(false);
+    private final JPanel lowerInset = new JPanel() {
+        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(Host.ARC / 2)); }
+        @Override public Dimension getMinimumSize() { return getPreferredSize(); }
+    };
     private boolean railVisible;
     private boolean statusVisible;
     private boolean headerVisible;
@@ -120,16 +126,12 @@ final class WorkspaceRegions extends JPanel {
     WorkspaceRegions(JComponent center) {
         super(new BorderLayout());
         this.center.add(center, BorderLayout.CENTER);
-        var lowerInset = new JPanel() {
-            @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(Host.ARC / 2)); }
-            @Override public Dimension getMinimumSize() { return getPreferredSize(); }
-        };
         lowerInset.setOpaque(false);
         this.center.add(lowerInset, BorderLayout.SOUTH);
         rebuild();
     }
 
-    /** The terminal palette background of the whole rounded center, tab strip and lower arc included. */
+    /** The terminal palette background of the whole center, including the tab strip and any lower arc. */
     void setTerminalBackground(java.awt.Color background) { center.setBackground(background); }
 
     void show(PanelRegion region, JComponent content, int size) {
@@ -170,7 +172,7 @@ final class WorkspaceRegions extends JPanel {
     /** Reapplies the tool window colour after a theme change reset the region backgrounds. */
     void refreshTheme() { hosts.values().forEach(ToolWindowSurface::apply); }
 
-    /** The visible rail already supplies balanced spacing; do not add a second gutter beside it. */
+    /** A visible rail frames the terminal; hiding it lets the terminal fill its available area. */
     void setRailVisible(boolean visible) {
         if (railVisible == visible) return;
         railVisible = visible;
@@ -198,8 +200,14 @@ final class WorkspaceRegions extends JPanel {
         int top = headerVisible ? 0 : 6;
         int leading = railVisible ? 0 : 6;
         int trailing = statusVisible ? 0 : 6;
-        center.gutters(top, contents.containsKey(PanelRegion.LEFT) ? 0 : leading,
-            contents.containsKey(PanelRegion.BOTTOM) ? 0 : trailing, contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
+        center.rounded = railVisible;
+        lowerInset.setVisible(railVisible);
+        if (railVisible) {
+            center.gutters(top, 0, contents.containsKey(PanelRegion.BOTTOM) ? 0 : trailing,
+                contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
+        } else {
+            center.gutters(0, 0, 0, 0);
+        }
         hosts.forEach((region, host) -> host.gutters(region == PanelRegion.BOTTOM ? 0 : top,
             region == PanelRegion.RIGHT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.LEFT) ? 0 : leading,
             trailing, region == PanelRegion.LEFT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.RIGHT) ? 0 : 6));

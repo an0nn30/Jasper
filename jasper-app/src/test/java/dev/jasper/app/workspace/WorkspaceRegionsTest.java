@@ -27,14 +27,15 @@ class WorkspaceRegionsTest {
     @Test void theCenterKeepsItsRoundedFrameWhenPanelsOpenAndClose() {
         var deck = new JPanel();
         var regions = new WorkspaceRegions(deck);
+        regions.setRailVisible(true);
         deck.setMinimumSize(new java.awt.Dimension(420, 320));
         assertThat(regions.getMinimumSize()).as("terminal minimum includes the surface gutter")
-            .isEqualTo(new java.awt.Dimension(432, 340));
+            .isEqualTo(new java.awt.Dimension(426, 340));
         deck.setMinimumSize(new java.awt.Dimension(500, 360));
         assertThat(regions.getMinimumSize()).as("terminal font/split minimum changes propagate")
-            .isEqualTo(new java.awt.Dimension(512, 380));
+            .isEqualTo(new java.awt.Dimension(506, 380));
         layout(regions);
-        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 580));
+        assertThat(in(regions, deck)).isEqualTo(new Rectangle(0, 6, 994, 580));
         assertThat(regions.content(PanelRegion.LEFT)).isNull();
         assertThat(regions.size(PanelRegion.LEFT)).isEqualTo(WorkspaceRegions.DEFAULT_SIDE);
 
@@ -44,19 +45,20 @@ class WorkspaceRegionsTest {
         assertThat(regions.content(PanelRegion.LEFT)).isSameAs(left);
         assertThat(in(regions, left.getParent()).width).isEqualTo(250);
         assertThat(in(regions, left.getParent()).x).isZero();
-        assertThat(in(regions, left)).as("content inset within its rounded host").isEqualTo(new Rectangle(6, 6, 244, 588));
+        assertThat(in(regions, left)).as("content inset within its rounded host").isEqualTo(new Rectangle(0, 6, 250, 588));
         assertThat(in(regions, deck).x).isGreaterThan(250);
         assertThat(in(regions, deck).x + in(regions, deck).width).isEqualTo(994);
 
         regions.hide(PanelRegion.LEFT);
         layout(regions);
-        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 580));
+        assertThat(in(regions, deck)).isEqualTo(new Rectangle(0, 6, 994, 580));
         assertThat(regions.size(PanelRegion.LEFT)).as("the last size is remembered").isEqualTo(250);
     }
 
     @Test void bottomSitsUnderTheCenterOnlyBetweenTheSideRegions() {
         var deck = new JPanel();
         var regions = new WorkspaceRegions(deck);
+        regions.setRailVisible(true);
         var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
         regions.show(PanelRegion.LEFT, left, 200);
         regions.show(PanelRegion.RIGHT, right, 300);

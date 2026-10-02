@@ -294,15 +294,20 @@ padding. Keep compact palette rows tall enough for these insets. Plugin forms in
 these defaults; upstream theme assets should not be edited to duplicate them.
 
 
-Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and
-matching rounded corners for the terminal/tab column. Keep the layout-only terminal
+Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and,
+while the rail is visible, matching rounded corners for the terminal/tab column. With
+the rail hidden or empty, the terminal/tab column has square corners, no exterior
+gutters and no lower corner spacer: it fills the available workspace edge to edge.
+Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
 beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
 left/center/bottom surface has no additional leading gutter. Hiding or emptying the
-rail restores that gutter without reparenting plugin content. A visible status bar
+rail restores that gutter on plugin panel hosts without reparenting their content.
+The following gutter and lower-inset rules apply to the terminal column only while
+the rail is visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header

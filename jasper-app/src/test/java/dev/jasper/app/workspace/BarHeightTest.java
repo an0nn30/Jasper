@@ -102,7 +102,7 @@ class BarHeightTest {
                     dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
                     int top = SwingUtilities.convertPoint(owner.status(), 0, 0, owner).y;
                     var grid = owner.tabStrip();
-                    int surfaceBottom = SwingUtilities.convertPoint(grid, 0, grid.getHeight(), owner).y + UIScale.scale(8);
+                    int surfaceBottom = SwingUtilities.convertPoint(grid, 0, grid.getHeight(), owner).y;
                     assertThat(surfaceBottom).as("no extra chrome gutter above the status bar").isEqualTo(top);
                     var crumbs = WindowTabsTest.named(owner.status(), "pathBreadcrumbs");
                     JLabel folder = Arrays.stream(crumbs.getComponents()).filter(JLabel.class::isInstance).map(JLabel.class::cast)

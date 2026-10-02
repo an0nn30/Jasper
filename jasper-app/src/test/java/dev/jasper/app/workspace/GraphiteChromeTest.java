@@ -13,10 +13,54 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class GraphiteChromeTest {
+    @Test void hiddenRailLetsTheTerminalReachEveryWorkspaceEdge() throws Exception {
+        for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            try (var owner = content(launcher(new ArrayDeque<>()))) {
+                owner.selectTheme(theme);
+                var root = new javax.swing.JRootPane();
+                try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                    showRail(owner);
+                    for (boolean visible : new boolean[]{false, true, false}) {
+                        owner.setRailVisible(visible);
+                        root.setSize(1000, 640); layoutTree(root); layoutTree(root);
+                        var regions = owner.regions();
+                        var column = owner.windowTabs().getParent();
+                        var bounds = javax.swing.SwingUtilities.convertRectangle(column.getParent(), column.getBounds(), regions);
+                        if (visible) {
+                            assertThat(bounds.width).isLessThan(regions.getWidth());
+                            assertThat(bounds.height).isLessThan(regions.getHeight());
+                            continue;
+                        }
+                        assertThat(bounds).as("no gutter or bottom spacer when the rail is hidden")
+                            .isEqualTo(new java.awt.Rectangle(0, 0, regions.getWidth(), regions.getHeight()));
+                        var image = new java.awt.image.BufferedImage(regions.getWidth(), regions.getHeight(), 2);
+                        var g = image.createGraphics();
+                        try { regions.paint(g); } finally { g.dispose(); }
+                        int terminal = owner.theme().palette().background().getRGB();
+                        for (int x : new int[]{0, image.getWidth() - 1}) for (int y : new int[]{0, image.getHeight() - 1}) {
+                            assertThat(image.getRGB(x, y)).as("square terminal corner (%s,%s), %s", x, y, theme)
+                                .isEqualTo(terminal);
+                            assertThat(column.getParent().contains(x, y)).as("edge receives input").isTrue();
+                        }
+                        var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
+                        javax.imageio.ImageIO.write(image, "png", output.resolve("hidden-rail-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                    }
+                }
+            }
+        }
+    }
+
+    private static void showRail(WindowContent owner) {
+        owner.rail().render(java.util.List.of(new WindowRail.PanelButton("hosts", "SSH hosts",
+            dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.contributions.PanelRegion.LEFT, false)), java.util.List.of());
+        owner.setRailVisible(true);
+    }
+
     @Test void partialRepaintsKeepAllFourWorkspaceCornersRounded() throws Exception {
         for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
+                showRail(owner);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     root.setSize(1000, 640); layoutTree(root); layoutTree(root);
@@ -62,6 +106,7 @@ class GraphiteChromeTest {
         for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
+                showRail(owner);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
