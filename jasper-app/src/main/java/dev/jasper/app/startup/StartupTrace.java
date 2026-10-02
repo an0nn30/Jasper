@@ -82,6 +82,7 @@ public final class StartupTrace {
     private final Deque<WindowTrace> windows = new ArrayDeque<>(); // guarded by windowsLock
     private final Object windowsLock = new Object();
     private final Object fileLock = new Object();
+    private boolean fileFailureReported; // guarded by fileLock
     private final AtomicBoolean settling = new AtomicBoolean();
     private volatile boolean settled;
     private volatile JvmStatus jvm;
@@ -233,7 +234,10 @@ public final class StartupTrace {
         synchronized (fileLock) {
             try { StartupTraceFile.write(file, document(status())); }
             catch (IOException | RuntimeException failure) {
-                environment.log().accept("Could not write the start-up trace " + file + ": " + failure.getMessage());
+                if (!fileFailureReported) {
+                    fileFailureReported = true;
+                    environment.log().accept("Could not write the start-up trace " + file + ": " + failure);
+                }
             }
         }
     }

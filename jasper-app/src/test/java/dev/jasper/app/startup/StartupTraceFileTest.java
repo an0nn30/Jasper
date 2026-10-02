@@ -71,10 +71,15 @@ class StartupTraceFileTest {
         Path blocked = temp.resolve("a-file");
         Files.writeString(blocked, "not a directory");
         StartupTrace trace = fixture.trace(blocked.resolve("trace.json"));
+        WindowTrace window = trace.window("cold");
         trace.mark(StartupTrace.Milestone.PLUGINS_BOUND);
         trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
         assertThat(fixture.log).hasSize(2);
         assertThat(fixture.log.get(1)).startsWith("Could not write the start-up trace ");
+        window.mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(fixture.log).hasSize(3);
+        assertThat(fixture.log.get(1)).startsWith("Could not write the start-up trace ");
+        assertThat(fixture.log).noneMatch(entry -> entry.startsWith("Could not write the start-up trace ") && !entry.equals(fixture.log.get(1)));
     }
 
     @SuppressWarnings("unchecked")
