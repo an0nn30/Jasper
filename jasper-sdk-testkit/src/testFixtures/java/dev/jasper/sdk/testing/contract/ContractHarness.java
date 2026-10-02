@@ -148,6 +148,11 @@ public interface ContractHarness extends AutoCloseable {
     void setWorkspace(Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
         dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax);
 
+    /** Sets the opacity every plugin component reports and announces it as a workspace change.
+     * @param opacity from 0.1 to 1
+     */
+    void setWorkspaceOpacity(double opacity);
+
     /** Stops every active plugin in reverse start order. */
     void stopAll();
 

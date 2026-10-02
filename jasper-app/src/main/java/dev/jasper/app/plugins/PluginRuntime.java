@@ -237,6 +237,16 @@ public final class PluginRuntime {
         appearanceSubscriber = Objects.requireNonNull(subscribe);
     }
 
+    private GlassSource glass = GlassSource.NONE;
+
+    /** Supplies window opacity for plugins before they start. UI thread.
+     * @param source the app's per-window lookup
+     */
+    public void glass(GlassSource source) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        glass = Objects.requireNonNull(source);
+    }
+
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
@@ -384,7 +394,7 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber));
+            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, glass));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);

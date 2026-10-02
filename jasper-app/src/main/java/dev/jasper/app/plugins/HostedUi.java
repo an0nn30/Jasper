@@ -84,6 +84,7 @@ final class HostedUi {
     private final Function<Consumer<Variant>, Subscription> themeSubscriber;
     private final AuxiliaryWindows windows;
     private final HostedTerminals terminals;
+    private final GlassSource glass;
     private final Set<String> ownActions = new HashSet<>();
     private final List<Runnable> closers = new ArrayList<>();
 
@@ -98,23 +99,38 @@ final class HostedUi {
              Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows, HostedTerminals terminals,
              Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
              Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe) {
+        this(pluginId, model, containment, ui, onUi, open, loader, variant, themeSubscriber, windows, terminals,
+            appearance, subscribe, GlassSource.NONE);
+    }
+
+    HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
+             BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
+             Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows, HostedTerminals terminals,
+             Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+             Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> subscribe,
+             GlassSource glass) {
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
         this.open = open; this.loader = loader; this.variant = variant; this.themeSubscriber = themeSubscriber;
         this.windows = windows;
         this.terminals = terminals;
+        this.glass = glass == null ? GlassSource.NONE : glass;
         if (appearance != null) {
             appearanceSnapshot = java.util.Objects.requireNonNull(appearance.get());
             var registration = subscribe.apply(next -> {
                 var previous = appearanceSnapshot;
                 appearanceSnapshot = next;
-                if (!previous.workspace().equals(next.workspace())) {
-                    for (var handler : List.copyOf(workspaceHandlers)) {
-                        if (workspaceHandlers.contains(handler) && open.getAsBoolean())
-                            containment.run(pluginId, "workspace appearance", () -> handler.accept(workspaceVariant()));
-                    }
-                }
+                if (!previous.workspace().equals(next.workspace())) announceWorkspace();
             });
             closers.add(registration::close);
+        }
+        var glassRegistration = this.glass.subscribe().apply(this::announceWorkspace);
+        closers.add(glassRegistration::close);
+    }
+
+    private void announceWorkspace() {
+        for (var handler : List.copyOf(workspaceHandlers)) {
+            if (workspaceHandlers.contains(handler) && open.getAsBoolean())
+                containment.run(pluginId, "workspace appearance", () -> handler.accept(workspaceVariant()));
         }
     }
 
@@ -306,6 +322,10 @@ final class HostedUi {
                 requireUi("syntaxPalette");
                 return appearanceSnapshot == null ? dev.jasper.sdk.ui.SyntaxPalette.current()
                     : HostedPalettes.syntax(appearanceSnapshot.workspace());
+            }
+            @Override public double workspaceOpacity(java.awt.Component component) {
+                requireUi("workspaceOpacity");
+                return glass.opacity().applyAsDouble(java.util.Objects.requireNonNull(component, "component"));
             }
             @Override public Subscription onWorkspaceChanged(Consumer<Variant> handler) {
                 guard("onWorkspaceChanged"); java.util.Objects.requireNonNull(handler, "handler");

@@ -99,6 +99,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private boolean closed;
     private float backgroundOpacity = 1f;
+    private Runnable glassListener = () -> {};
     private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
     private boolean rearranging;
     private WindowTerminals terminals;
@@ -619,6 +620,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             tabs.addTab(entry.title(), component);
             styler.apply(themes.current());
             selectTab(component); update();
+            if (backgroundOpacity < 1f) glassListener.run();
         } catch (RuntimeException | Error failure) {
             var listener = contentListeners.remove(component);
             if (listener != null) listener.close();
@@ -638,6 +640,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (styler != null) styler.close();
         hosted.remove(entry.component()); tabs.remove(entry.component());
         WorkspaceTheme.clear(entry.component()); update();
+        if (backgroundOpacity < 1f) glassListener.run();
         if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
     }
     public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
@@ -1073,9 +1076,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tabs.setOpaque(!glass);
         for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
         repaint();
+        glassListener.run();
     }
 
-    float backgroundOpacity() { return backgroundOpacity; }
+    /** The opacity in effect for this window, as last applied; 1 is opaque. EDT only.
+     * @return from 0.1 to 1
+     */
+    public float backgroundOpacity() { return backgroundOpacity; }
+
+    /** Runs when this window's background opacity changes, or hosted content enters or leaves it while translucent.
+     * EDT only; replaces any earlier listener.
+     * @param listener the callback
+     */
+    public void setGlassListener(Runnable listener) { glassListener = Objects.requireNonNull(listener); }
 
     int tabHeight() { return tabHeight; }
 

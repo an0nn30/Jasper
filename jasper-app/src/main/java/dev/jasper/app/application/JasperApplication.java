@@ -68,6 +68,7 @@ public final class JasperApplication {
     private final ThemeController themes;
     private final ThemeCatalog themeCatalog;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
+    private final List<Runnable> glassListeners = new ArrayList<>();
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -265,6 +266,14 @@ public final class JasperApplication {
         return timer::stop;
     }
 
+    /** The opacity in effect behind {@code component}: its terminal window's, or 1 outside one. */
+    private double glassOpacity(Component component) {
+        for (TerminalWindow window : windows) if (window.owns(component)) return window.content().backgroundOpacity();
+        return 1.0;
+    }
+
+    private void glassChanged() { for (Runnable listener : List.copyOf(glassListeners)) listener.run(); }
+
     /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
     public TerminalWindow newWindow() { return openWindow(null, false); }
 
@@ -291,6 +300,7 @@ public final class JasperApplication {
         if (configuration != null) configuration.register(window.content());
         window.content().connectContributions(contributions, uiState);
         window.content().connectTerminals(terminals, window::toFront);
+        window.content().setGlassListener(this::glassChanged);
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
@@ -432,6 +442,10 @@ public final class JasperApplication {
                 file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
             this::notice, new dev.jasper.app.platform.ConfigEditor()::open,
             new PluginRuntime.ShellProfiles(shellProfiles::current, shellProfiles::onChanged));
+        plugins.glass(new dev.jasper.app.plugins.GlassSource(this::glassOpacity, listener -> {
+            glassListeners.add(listener);
+            return new Subscription(() -> glassListeners.remove(listener));
+        }));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),

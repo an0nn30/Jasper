@@ -95,6 +95,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Runtime semantics every implementation of the SDK must share. Test bodies run off the UI thread. */
@@ -557,6 +558,31 @@ public abstract class PluginContractTest {
         h.ui(() -> a.onWorkspaceChanged(value -> disposed.incrementAndGet()));
         h.stopAll(); h.setWorkspace(Variant.LIGHT, palette, editor, syntax); h.flush();
         assertThat(seen).hasValue(1); assertThat(disposed).hasValue(0);
+    }
+
+    @Test void workspaceOpacityStartsOpaqueAndChangesAreWorkspaceChanges() {
+        var context = started("test.glass", Set.of());
+        var a = context.appearance();
+        var seen = new AtomicInteger();
+        var chrome = new AtomicInteger();
+        var subscription = new AtomicReference<dev.jasper.sdk.Subscription>();
+        var component = new javax.swing.JPanel();
+        h.ui(() -> {
+            assertThat(a.workspaceOpacity(new javax.swing.JPanel())).isEqualTo(1.0);
+            assertThatNullPointerException().isThrownBy(() -> a.workspaceOpacity(null));
+            a.onChanged(value -> chrome.incrementAndGet());
+            subscription.set(a.onWorkspaceChanged(value -> {
+                seen.incrementAndGet();
+                assertThat(a.workspaceOpacity(component)).isEqualTo(0.8);
+            }));
+        });
+        h.setWorkspaceOpacity(0.8); h.flush();
+        assertThat(seen).hasValue(1); assertThat(chrome).hasValue(0);
+        h.setWorkspaceOpacity(0.8); h.flush();
+        assertThat(seen).hasValue(1);
+        subscription.get().close();
+        h.setWorkspaceOpacity(1.0); h.flush();
+        assertThat(seen).hasValue(1); assertThat(chrome).hasValue(0);
     }
 
     @Test void stoppingOrFailingRemovesEveryContributionAndAppearanceFollowsTheHost() {

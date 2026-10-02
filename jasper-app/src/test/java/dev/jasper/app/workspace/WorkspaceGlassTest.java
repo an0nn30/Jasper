@@ -185,6 +185,37 @@ class WorkspaceGlassTest {
         });
     }
 
+    @Test void theGlassListenerRunsOncePerRealOpacityChange() throws Exception {
+        edt(() -> {
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            int[] runs = {0};
+            owner.setGlassListener(() -> runs[0]++);
+            owner.applyBackgroundOpacity(0.5);
+            assertThat(runs[0]).isEqualTo(1);
+            owner.applyBackgroundOpacity(0.5);
+            assertThat(runs[0]).as("an unchanged opacity is quiet").isEqualTo(1);
+            owner.applyBackgroundOpacity(1);
+            assertThat(runs[0]).isEqualTo(2);
+        });
+    }
+
+    @Test void hostedContentEnteringOrLeavingATranslucentWindowRunsTheGlassListener() throws Exception {
+        edt(() -> {
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
+            int[] runs = {0};
+            owner.setGlassListener(() -> runs[0]++);
+            model.content().open("dev.editor", "opaque", "Opaque", owner.id(), new JPanel()).requestClose();
+            assertThat(runs[0]).as("an opaque window has no glass to announce").isZero();
+            owner.applyBackgroundOpacity(0.6);
+            runs[0] = 0;
+            var entry = model.content().open("dev.editor", "glass", "Glass", owner.id(), new JPanel());
+            assertThat(runs[0]).as("mounted").isEqualTo(1);
+            entry.requestClose();
+            assertThat(runs[0]).as("unmounted").isEqualTo(2);
+        });
+    }
+
     @Test void requestsCombineSavedSettingsWithTheWorkspaceTheme() throws Exception {
         edt(() -> {
             var themes = new ThemeController();

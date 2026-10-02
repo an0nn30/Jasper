@@ -85,19 +85,21 @@ class AppContractTest extends PluginContractTest {
                            TerminalRegistry terminals, List<String> notices, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
                            List<java.net.URI> browsed) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, browsed, null);
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, browsed, null,
+            GlassSource.NONE);
     }
 
     private static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
-                           List<java.net.URI> browsed, WorkspaceAppearanceFixture appearance) {
+                           List<java.net.URI> browsed, WorkspaceAppearanceFixture appearance, GlassSource glass) {
         var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
             notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles,
-            browsed::add, appearance == null ? null : appearance::current, appearance == null ? null : appearance::subscribe)));
+            browsed::add, appearance == null ? null : appearance::current, appearance == null ? null : appearance::subscribe,
+            glass)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -142,8 +144,14 @@ class AppContractTest extends PluginContractTest {
         List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
         List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
         var appearance = onEdtValue(WorkspaceAppearanceFixture::new);
+        double[] opacity = {1.0};
+        List<Runnable> glassListeners = new java.util.ArrayList<>();
+        var glass = new GlassSource(component -> opacity[0], listener -> {
+            glassListeners.add(listener);
+            return new dev.jasper.app.lifecycle.Subscription(() -> glassListeners.remove(listener));
+        });
         PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
-            diagnostics, shells.source(), browsed, appearance);
+            diagnostics, shells.source(), browsed, appearance, glass);
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
@@ -297,6 +305,14 @@ class AppContractTest extends PluginContractTest {
             @Override public void setWorkspace(dev.jasper.sdk.Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
                     dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {
                 onEdt(() -> appearance.set(variant, palette, editor, syntax));
+            }
+            @Override public void setWorkspaceOpacity(double next) {
+                // Like a window's glass: listeners hear only real changes, on the UI thread.
+                onEdt(() -> {
+                    if (opacity[0] == next) return;
+                    opacity[0] = next;
+                    for (Runnable listener : List.copyOf(glassListeners)) listener.run();
+                });
             }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) {
                 onEdt(() -> appearance.setVariant(variant));
