@@ -20,7 +20,7 @@ class BundledWorkspaceParityTest {
             for (String file : Files.readAllLines(root.resolve("index.txt"))) {
                 var document = ThemeToml.parse(Files.readString(root.resolve(file)), file);
                 if (!document.uiComplete().orElse(false)) continue;
-                var theme = Theme.of(file, new Theme.Bundled(file, document));
+                var theme = Theme.of(file, new Theme.Bundled(file, () -> document));
                 var values = ThemeManager.generated(theme);
                 assertThat(ThemeManager.install(theme)).as(file).isTrue();
                 WorkspaceTokenKeys.KEYS.forEach((token, key) -> {

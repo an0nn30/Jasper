@@ -14,15 +14,49 @@
   - **Removed:** the Themes page, its pickers, preview, sample terminal and syntax sample, Duplicate, Remove, Open
     themes folder and About, and the now-unused `ThemeDuplicate` and `ThemeFiles` duplicate/removal operations.
     The notices still ship (now checked by `PackagedResourcesTest`). The theme-system spec §7 carries a superseded banner.
-  - Not done: GUI check (Settings over its window and other windows, switching apps, the dropdowns, the gear and an
-    import), merge, push.
+  - Merged into local main 2026-10-02 after merging main (`c4211cf1`) into the branch; not pushed. Merged-tree
+    `./gradlew check`: **7,954/0/0/6**. Not done: GUI check (Settings over its window and other windows, switching apps, the
+    dropdowns, the gear and an import), push.
+
+- **Built-in theme catalog no longer stalls start-up** (branch `claude/theme-catalog-edt`, user request in chat
+  2026-10-02): building the application parsed all 284 bundled theme files on the EDT (`ThemeCatalog`'s built-in
+  snapshot), about 1.5 s cold, nearly all of it tomlj reading the converted themes' `[ui]` and `[icons]` tables (96% of
+  the 9.4 MB). This is the start-up side of the cold-JVM cost behind the contended-endpoint test below, which now
+  warms up outside its window; before that warm-up landed, this change alone made the test pass cold (5 of 5). A
+  bundled theme's name, darkness and palette now come from its file up to the first `[ui]` or `[icons]` table
+  (`ThemeTomlWriter` writes them last); `Theme.Bundled` parses the whole file on its first `document()` call, once, and
+  bundled themes are equal by file. The native scan and the importer match bundled `extends` parents by name before
+  reading their documents. A cold catalog load takes about 250 ms; parsing in parallel was measured and rejected
+  (1.7x). `BuiltInThemesTest` checks every bundled theme against its whole file. Full check after rebasing on `e0e61461`: **7,975/0/0/6**. Not done: GUI
+  check, push.
+
+- **`:b` name test no longer depends on the temp folder** (merged into main as `f1c1acd3` and pushed, 2026-10-02):
+  `ExFilesTest.bufferSelectsATabByNumberOrName` failed on the dev Mac, whose `java.io.tmpdir` holds "zz", because `:b`
+  matches whole paths, as Vim 9.1 does (checked with `/usr/bin/vim`). The test's buffers now live under a fixed `/work`
+  folder. Open: `ExFiles.match` tries exact, ends-with, starts-with, contains and stops at the first level with any
+  match; Vim tries contains, starts-with, ends-with, exact and stops at the first with exactly one. With buffers `xab`
+  and `abab`, Vim's `:b ab` selects `abab` where Jasper reports E93.
+
+- **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
+  user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
+  failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
+  (about 900 classes, mostly `Theme`'s built-in TOML parse through tomlj/ANTLR, plus FlatLaf/font setup), the same with
+  or without the child-held lock, with zero samples in `FileChannel.lock`; later compositions take under 10 ms with
+  the lock held. The cold case also never exercised the contended path: the child released the lock before shutdown
+  ran. The test now composes and quits once uncontended before the lock child starts; the 1 s budget is unchanged.
+  A temporary mutation (shutdown actions run on the EDT) still fails both cases. 10 isolated class runs and 5
+  method-only runs pass. `./gradlew check --continue`: **7,971 tests, 1 failure, 6 skips**. The failure is a separate,
+  pre-existing, machine-dependent assertion, `ExFilesTest.bufferSelectsATabByNumberOrName` (`:b zz` expects no match,
+  but this Mac's temp folder `/var/folders/d0/…psfzzxc…/T/` contains "zz"); it passes with a `java.io.tmpdir` without
+  "zz", and was previously hidden because `:jasper-app:test` failed first. It was fixed separately on main
+  (`185a5f8e`). Merged into main (`5729a684`) and pushed 2026-10-02.
 
 - **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
   chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
   and hid its detail. They are gone, so the hint bar always shows the selected row's detail and verbs. Typed prefixes,
   scope shortcuts and the query-field chip are unchanged. `WindowContent.scopeShortcut` became `paletteShortcut`,
-  because the title search field is its only remaining caller. Merged into local main 2026-10-02; not pushed.
-  Not done: GUI check, push.
+  because the title search field is its only remaining caller. Merged into main 2026-10-02 and pushed with `5729a684`.
+  Not done: GUI check.
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
