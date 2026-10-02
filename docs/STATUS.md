@@ -2,6 +2,20 @@
 
 ## Current state — 2026-10-02
 
+- **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
+  user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
+  failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
+  (about 900 classes, mostly `Theme`'s built-in TOML parse through tomlj/ANTLR, plus FlatLaf/font setup), the same with
+  or without the child-held lock, with zero samples in `FileChannel.lock`; later compositions take under 10 ms with
+  the lock held. The cold case also never exercised the contended path: the child released the lock before shutdown
+  ran. The test now composes and quits once uncontended before the lock child starts; the 1 s budget is unchanged.
+  A temporary mutation (shutdown actions run on the EDT) still fails both cases. 10 isolated class runs and 5
+  method-only runs pass. `./gradlew check --continue`: **7,971 tests, 1 failure, 6 skips**. The failure is a separate,
+  pre-existing, machine-dependent assertion, `ExFilesTest.bufferSelectsATabByNumberOrName` (`:b zz` expects no match,
+  but this Mac's temp folder `/var/folders/d0/…psfzzxc…/T/` contains "zz"); it passes with a `java.io.tmpdir` without
+  "zz", and was previously hidden because `:jasper-app:test` failed first. It was fixed separately on main
+  (`185a5f8e`). Merged into local main 2026-10-02; not pushed.
+
 - **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
   chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
   and hid its detail. They are gone, so the hint bar always shows the selected row's detail and verbs. Typed prefixes,
