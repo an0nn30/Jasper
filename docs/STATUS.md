@@ -13,7 +13,8 @@
   method-only runs pass. `./gradlew check --continue`: **7,971 tests, 1 failure, 6 skips**. The failure is a separate,
   pre-existing, machine-dependent assertion, `ExFilesTest.bufferSelectsATabByNumberOrName` (`:b zz` expects no match,
   but this Mac's temp folder `/var/folders/d0/…psfzzxc…/T/` contains "zz"); it passes with a `java.io.tmpdir` without
-  "zz", and was previously hidden because `:jasper-app:test` failed first. Not fixed here. Not merged or pushed.
+  "zz", and was previously hidden because `:jasper-app:test` failed first. It was fixed separately on main
+  (`185a5f8e`). Merged into local main 2026-10-02; not pushed.
 
 - **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
   chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
