@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.dock.Slot;
 import java.util.function.Consumer;
+import javax.swing.ButtonGroup;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
@@ -23,9 +24,11 @@ final class ToolWindowMenu {
     static JPopupMenu create(Slot current, boolean visible, Consumer<Slot> move, Runnable hide) {
         var menu = new JPopupMenu();
         var moveTo = new JMenu("Move to");
+        var group = new ButtonGroup();
         for (Slot slot : Slot.values()) {
             var item = new JCheckBoxMenuItem(slot.displayName(), slot == current);
             if (slot != current) item.addActionListener(event -> move.accept(slot));
+            group.add(item);
             moveTo.add(item);
         }
         menu.add(moveTo);

@@ -7,6 +7,7 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.util.function.Supplier;
+import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -55,8 +56,8 @@ final class ToolWindowHeader extends JPanel {
         buttons.add(options);
         buttons.add(Box.createHorizontalStrut(2));
         buttons.add(hide);
-        // A scaling border: 10px before the title, 6px after the buttons.
-        setBorder(new FlatEmptyBorder(0, 10, 0, 6));
+        // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern WorkspaceRegions.Host.gutters uses.
+        setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, 10, 0, 6), null));
         add(title, BorderLayout.CENTER);
         add(buttons, BorderLayout.EAST);
     }

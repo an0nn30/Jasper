@@ -5,6 +5,7 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Font;
+import java.awt.Insets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -44,6 +45,7 @@ class ToolWindowHeaderTest {
             .map(item -> ((JMenuItem) item).getText())).as("the current slot is checked").containsExactly("Left Bottom");
         item(menu, "Bottom Right").doClick();
         item(menu, "Left Bottom").doClick();
+        assertThat(((JCheckBoxMenuItem) item(menu, "Left Bottom")).isSelected()).as("clicking the current slot keeps it checked").isTrue();
         item(menu, "Hide").doClick();
         assertThat(events).as("choosing the current slot does nothing").containsExactly("move:BOTTOM_RIGHT", "hide");
         assertThat(item(menu(Slot.RIGHT_TOP, false), "Hide").isEnabled()).as("nothing to hide").isFalse();
@@ -56,6 +58,7 @@ class ToolWindowHeaderTest {
         assertThat(header.titleLabel().getFont().getStyle() & Font.BOLD).isEqualTo(Font.BOLD);
         header.updateUI();
         SwingUtilities.updateComponentTreeUI(header);
+        assertThat(header.getInsets()).as("padding survives a look-and-feel update").isEqualTo(new Insets(0, UIScale.scale(10), 0, UIScale.scale(6)));
         assertThat(header.titleLabel().getFont().isBold()).as("bold after a look-and-feel change").isTrue();
         assertThat(header.optionsButton().getAccessibleContext().getAccessibleName()).isEqualTo("Options");
         assertThat(header.optionsButton().getToolTipText()).isEqualTo("Options");
