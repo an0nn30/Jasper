@@ -105,6 +105,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private ConfigService.State configurationState;
     static final String REJECTED_CHOICE = "config.toml has errors, so changes can't be saved until they're fixed.";
     private Runnable unregisterConfiguration = () -> {};
+    private java.util.function.Consumer<TerminalPane> firstTerminal = pane -> { };
+    private boolean firstTerminalSeen;
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
     Consumer<String> onTitle = title -> {};
@@ -129,6 +131,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                     listener.accept(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
         } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
         return new Subscription(() -> activityListeners.remove(listener));
+    }
+
+    /** Called once, on the EDT, when this window's first terminal is configured: start-up timing. */
+    public void onFirstTerminal(java.util.function.Consumer<TerminalPane> action) {
+        firstTerminal = java.util.Objects.requireNonNull(action, "action");
     }
 
     private void emit(WorkspaceActivity.Event event) {
@@ -778,6 +785,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             JPopupMenu popup = chrome.contextMenu();
             popup.show(pane.view(), event.getX(), event.getY());
         });
+        if (!firstTerminalSeen) {
+            firstTerminalSeen = true;
+            firstTerminal.accept(pane);
+        }
     }
 
     void selectTab(Component tab) {
