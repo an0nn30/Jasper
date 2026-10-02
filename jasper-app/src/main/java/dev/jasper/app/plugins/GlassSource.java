@@ -9,7 +9,7 @@ import java.util.function.ToDoubleFunction;
 /**
  * How translucent the window behind a plugin component is, for {@code Appearance.workspaceOpacity}. EDT only.
  *
- * @param opacity the opacity in effect behind a component; 1 when it is in no translucent window
+ * @param opacity the opacity in effect behind a component; 1 unless it is in the workspace area of a translucent window
  * @param subscribe registers a callback for any change of it: a window's opacity, or hosted content entering or
  *                  leaving a translucent window
  */

@@ -122,8 +122,10 @@ using ordinary Swing colors when no host semantic defaults exist and plain-text 
 
 ## Workspace opacity (SDK 0.12.1)
 
-`Appearance.workspaceOpacity(Component)` returns how opaque the workspace is behind a component: 1.0 in an ordinary
-window (and the default for hosts that do not implement it), less than 1.0 in a translucent ("glass") window. Opacity
+`Appearance.workspaceOpacity(Component)` returns how opaque the workspace is behind a component: 1.0 unless the
+component is in the workspace area (terminals and hosted content tabs) of a translucent ("glass") window, where it is
+less than 1.0. Chrome, tool windows and side panels stay opaque and report 1.0, as does a host that does not implement
+it. Opacity
 belongs to the window, so ask about the component you paint and ask again after it moves; call it on the UI thread
 (a null component throws `NullPointerException`). `onWorkspaceChanged` also reports changes of it, including a
 component entering or leaving a translucent window, and an opacity change alone fires it.

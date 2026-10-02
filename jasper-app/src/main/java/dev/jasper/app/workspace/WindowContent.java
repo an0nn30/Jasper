@@ -98,7 +98,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private boolean closed;
-    private float backgroundOpacity = 1f;
+    // Kept as given, so callers read back exactly what was applied; terminal components take it as a float.
+    private double backgroundOpacity = 1;
     private Runnable glassListener = () -> {};
     private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
     private boolean rearranging;
@@ -620,7 +621,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             tabs.addTab(entry.title(), component);
             styler.apply(themes.current());
             selectTab(component); update();
-            if (backgroundOpacity < 1f) glassListener.run();
         } catch (RuntimeException | Error failure) {
             var listener = contentListeners.remove(component);
             if (listener != null) listener.close();
@@ -631,6 +631,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             WorkspaceTheme.clear(component);
             throw failure;
         }
+        // After the mount stands: a failing glass handler must not roll it back.
+        if (backgroundOpacity < 1) glassListener.run();
     }
     private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
         if (!hosted.containsKey(entry.component()) && !hostedStylers.containsKey(entry.component())) return;
@@ -640,7 +642,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (styler != null) styler.close();
         hosted.remove(entry.component()); tabs.remove(entry.component());
         WorkspaceTheme.clear(entry.component()); update();
-        if (backgroundOpacity < 1f) glassListener.run();
+        if (backgroundOpacity < 1) glassListener.run();
         if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
     }
     public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
@@ -723,7 +725,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
         WorkspaceTheme.apply(tab, themes.current());
         tab.setBackground(themes.current().palette().background());
-        tab.setBackgroundOpacity(backgroundOpacity);
+        tab.setBackgroundOpacity((float) backgroundOpacity);
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
@@ -1068,9 +1070,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * solid.
      */
     void applyBackgroundOpacity(double opacity) {
+        if (closed || opacity == backgroundOpacity) return;
+        backgroundOpacity = opacity;
         float value = (float) opacity;
-        if (closed || value == backgroundOpacity) return;
-        backgroundOpacity = value;
         boolean glass = value < 1f;
         regions.setGlass(value);
         tabs.setOpaque(!glass);
@@ -1082,7 +1084,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The opacity in effect for this window, as last applied; 1 is opaque. EDT only.
      * @return from 0.1 to 1
      */
-    public float backgroundOpacity() { return backgroundOpacity; }
+    public double backgroundOpacity() { return backgroundOpacity; }
+
+    /** The opacity behind {@code component}: this window's opacity when it sits in the workspace centre, where the
+     * terminal tabs and hosted content live, and 1 anywhere else (chrome, the rail, side and bottom panels). EDT only.
+     * @param component a component that may be in this window
+     * @return from 0.1 to 1
+     */
+    public double workspaceOpacity(Component component) {
+        return component != null && SwingUtilities.isDescendingFrom(component, tabs) ? backgroundOpacity : 1;
+    }
 
     /** Runs when this window's background opacity changes, or hosted content enters or leaves it while translucent.
      * EDT only; replaces any earlier listener.

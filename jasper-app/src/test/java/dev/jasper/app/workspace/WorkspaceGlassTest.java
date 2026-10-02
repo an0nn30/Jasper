@@ -216,6 +216,59 @@ class WorkspaceGlassTest {
         });
     }
 
+    @Test void onlyTheWorkspaceCentreReportsTheWindowsOpacity() throws Exception {
+        edt(() -> {
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
+            var hosted = new JPanel();
+            var inside = new JPanel();
+            hosted.add(inside);
+            model.content().open("dev.editor", "glass", "Glass", owner.id(), hosted);
+            var side = new JPanel();
+            var sideChild = new JPanel();
+            side.add(sideChild);
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, side, 200);
+            assertThat(owner.workspaceOpacity(inside)).as("opaque window").isEqualTo(1.0);
+            var terminalTab = owner.tabStrip().getComponentAt(0);
+
+            owner.applyBackgroundOpacity(0.5);
+            assertThat(owner.workspaceOpacity(hosted)).as("hosted centre content").isEqualTo(0.5);
+            assertThat(owner.workspaceOpacity(inside)).as("inside hosted centre content").isEqualTo(0.5);
+            assertThat(owner.workspaceOpacity(terminalTab)).as("a terminal tab").isEqualTo(0.5);
+            assertThat(owner.workspaceOpacity(side)).as("a side panel").isEqualTo(1.0);
+            assertThat(owner.workspaceOpacity(sideChild)).as("inside a side panel").isEqualTo(1.0);
+            assertThat(owner.workspaceOpacity(owner.status())).as("the status bar").isEqualTo(1.0);
+            assertThat(owner.workspaceOpacity(owner.chrome().header())).as("the header").isEqualTo(1.0);
+            assertThat(owner.workspaceOpacity(new JPanel())).as("a detached component").isEqualTo(1.0);
+        });
+    }
+
+    @Test void theOpacityKeepsTheExactValueItWasGiven() throws Exception {
+        edt(() -> {
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.applyBackgroundOpacity(0.8);
+            assertThat(owner.backgroundOpacity()).isEqualTo(0.8);
+            assertThat(owner.workspaceOpacity(owner.currentPane())).isEqualTo(0.8);
+            assertThat(owner.currentTab().isOpaque()).as("terminal tabs still follow").isFalse();
+        });
+    }
+
+    @Test void anErrorFromTheGlassListenerAfterAMountLeavesNoHalfMountedContent() throws Exception {
+        edt(() -> {
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
+            owner.applyBackgroundOpacity(0.6);
+            owner.setGlassListener(() -> { throw new AssertionError("a plugin handler failed"); });
+            var component = new JPanel();
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> model.content().open("dev.editor", "glass", "Glass", owner.id(), component))
+                .as("errors other than contained ones propagate").isInstanceOf(AssertionError.class);
+            assertThat(owner.tabStrip().indexOfComponent(component)).as("the registry rolled the mount back").isEqualTo(-1);
+            assertThat(owner.selectedContent()).isNull();
+            assertThat(model.content().entries()).isEmpty();
+        });
+    }
+
     @Test void requestsCombineSavedSettingsWithTheWorkspaceTheme() throws Exception {
         edt(() -> {
             var themes = new ThemeController();

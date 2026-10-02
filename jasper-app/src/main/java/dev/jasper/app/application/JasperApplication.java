@@ -266,9 +266,9 @@ public final class JasperApplication {
         return timer::stop;
     }
 
-    /** The opacity in effect behind {@code component}: its terminal window's, or 1 outside one. */
+    /** The opacity in effect behind {@code component}: its terminal window's within that window's workspace area, else 1. */
     private double glassOpacity(Component component) {
-        for (TerminalWindow window : windows) if (window.owns(component)) return window.content().backgroundOpacity();
+        for (TerminalWindow window : windows) if (window.owns(component)) return window.content().workspaceOpacity(component);
         return 1.0;
     }
 

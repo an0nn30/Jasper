@@ -41,9 +41,11 @@ public interface Appearance {
      */
     default SyntaxPalette syntaxPalette() { return SyntaxPalette.current(); }
 
-    /** How opaque the workspace behind {@code component} is: 1 unless the window holding it is translucent, in which
-     * case paint the component's own background with this alpha (the window shows the desktop through it). Changes,
-     * including the component moving to another window, are reported through {@link #onWorkspaceChanged}. UI thread only.
+    /** How opaque the workspace behind {@code component} is: 1 unless the component is in the workspace area of a
+     * translucent window (where terminals and hosted content tabs live), in which case paint the component's own
+     * background with this alpha (the window shows the desktop through it). Chrome, tool windows and side panels stay
+     * opaque and report 1. Changes, including the component moving to another window, are reported through
+     * {@link #onWorkspaceChanged}. UI thread only.
      * @param component a component of this plugin's, shown or not
      * @return the opacity in effect, from 0.1 to 1
      * @since 0.12.1
