@@ -21,6 +21,9 @@ application {
     applicationDefaultJvmArgs = listOf(
         "--enable-native-access=ALL-UNNAMED",
         "-Dapple.awt.application.name=Jasper",
+        // Workspace glass: AWT refuses translucency on a decorated frame, so WindowGlass reaches the peer directly.
+        "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
+        "--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED",
     )
 }
 
@@ -85,7 +88,8 @@ for ((taskName, entryPoint) in listOf("bench" to "Bench", "memoryBench" to "Memo
         description = "Opt-in native ${if (taskName == "bench") "throughput" else "memory"} benchmark; requires --args with --output and --revision."
         classpath = sourceSets["main"].runtimeClasspath
         mainClass = "dev.jasper.app.benchmark.$entryPoint"
-        jvmArgs("--enable-native-access=ALL-UNNAMED", "-Dapple.awt.application.name=Jasper benchmark")
+        jvmArgs("--enable-native-access=ALL-UNNAMED", "-Dapple.awt.application.name=Jasper benchmark",
+            "--add-opens=java.desktop/java.awt=ALL-UNNAMED", "--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED")
     }
 }
 

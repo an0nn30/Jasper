@@ -7,6 +7,7 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
+import dev.jasper.app.platform.WindowGlass;
 import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -24,6 +25,7 @@ public final class TerminalWindow implements AutoCloseable {
     private final JFrame frame = new JFrame("Jasper");
     private final WindowContent content;
     private final MacTitleBar titleBar;
+    private final WindowGlass glass;
     private boolean closed;
     private final WindowAdapter events = new WindowAdapter() {
         @Override public void windowClosing(WindowEvent event) { if (content.mayClose()) close(); }
@@ -64,6 +66,8 @@ public final class TerminalWindow implements AutoCloseable {
         frame.setFocusTraversalPolicy(content.getFocusTraversalPolicy());
         content.onMinimumSizeChanged = this::updateMinimumSize;
         if (titleBar != null) titleBar.attach(frame);
+        glass = new WindowGlass(frame.getRootPane(), WindowGlass.Platform.current(), content::applyBackgroundOpacity);
+        content.setGlassRequests(levels -> glass.request(levels.opacity(), levels.blur()));
         frame.addWindowListener(events); frame.pack();
         if (initial != null) {
             updateMinimumSize();
@@ -127,7 +131,7 @@ public final class TerminalWindow implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
-        closed = true; content.close();
+        closed = true; glass.close(); content.close();
         if (titleBar != null) titleBar.close();
         frame.removeWindowListener(events); frame.dispose();
         callbacks.closed().accept(this);
