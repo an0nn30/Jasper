@@ -160,7 +160,7 @@ class DockDragTest {
         assertThat(w.drag.target()).as("away from home").hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_BOTTOM));
         w.mouse(source, MouseEvent.MOUSE_DRAGGED, home);
         assertThat(w.left.dropGroups().get(0).bounds().contains(SwingUtilities.convertPoint(w.content, home, w.left)))
-            .as("lifted out, its old place lies below the top group, in the second group's drop space").isFalse();
+            .as("lifted out, its old place still lies in the top group, which keeps the button's step").isTrue();
         assertThat(w.drag.target()).as("but it is still its own place").hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
         assertThat(w.left.gapBounds()).as("the gap opens where the button was").hasValue(homeBounds);
         w.mouse(source, MouseEvent.MOUSE_RELEASED, home);
@@ -171,6 +171,53 @@ class DockDragTest {
         assertThat(w.state.active(Slot.LEFT_TOP)).hasValue("c");
         assertThat(w.state.visible("c")).isTrue();
         assertThat(w.shown).isEmpty();
+    }
+
+    @Test void theSecondGroupStaysReachableWhenTheLastTopButtonIsLifted() {
+        var w = new Window();
+        w.state.move("d", Slot.LEFT_BOTTOM, 0);
+        Point upperHalfOfD = w.center(w.button(w.left, "d"));
+        upperHalfOfD.translate(0, -5);
+        var source = w.button(w.left, "c");
+        Point home = w.center(source);
+        w.dragTo(source, upperHalfOfD);
+        assertThat(w.drag.target()).as("above d's middle, d did not slide up into c's square")
+            .hasValue(DockDropResolver.Target.stripe(Slot.LEFT_BOTTOM, 0));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, home);
+        assertThat(w.drag.target()).as("back on c's old place, from what the stripe shows")
+            .hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, upperHalfOfD);
+        w.mouse(source, MouseEvent.MOUSE_RELEASED, upperHalfOfD);
+        assertThat(w.state.ids(Slot.LEFT_BOTTOM)).as("c went above d").containsExactly("c", "d");
+        assertThat(w.state.ids(Slot.LEFT_TOP)).containsExactly("a", "b");
+    }
+
+    @Test void theHomeOnlyAppliesUntilTheCursorLeavesIt() {
+        var w = new Window();
+        var source = w.button(w.left, "b");
+        Point home = w.center(source);
+        Point lowerInHome = new Point(home.x, home.y + 6);
+        w.dragTo(source, lowerInHome);
+        assertThat(w.drag.target()).as("pressed, moved and still on the spot: its own place")
+            .hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 1));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, w.cell(1, 1));
+        assertThat(w.drag.target()).hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_BOTTOM));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, lowerInHome);
+        assertThat(w.drag.target()).as("coming back is resolved from what the stripe shows: c slid up into b's square, below its middle")
+            .hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
+    }
+
+    @Test void aResizeAfterTheDragStartsClearsTheHome() {
+        var w = new Window();
+        var source = w.button(w.left, "b");
+        Point home = w.center(source);
+        w.dragTo(source, new Point(home.x, home.y + 6));
+        assertThat(w.drag.target()).as("on the spot").hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 1));
+        w.rootPane.setSize(1120, 800);
+        w.layout();
+        w.content.dispatchEvent(new ComponentEvent(w.content, ComponentEvent.COMPONENT_RESIZED));
+        assertThat(w.drag.target()).as("the snapshot is stale after a resize: the resolver decides again")
+            .hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
     }
 
     @Test void aStripeDropMovesTheWindowAndKeepsItsVisibility() {

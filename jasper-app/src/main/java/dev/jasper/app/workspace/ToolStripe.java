@@ -35,8 +35,9 @@ import javax.swing.UIManager;
  * separator; flexible space; and the foot group, pinned to the bottom. A button is selected while its window shows;
  * a click toggles the window and a right-click opens its {@link ToolWindowMenu}. During a dock drag the stripe shows
  * all three groups with their separators (an empty group as one button's drop space), lifts the dragged window's
- * button out, and opens a gap where the window would drop. The stripe owns no state: the window renders it again
- * after every change. EDT only.
+ * button out, and opens a gap where the window would drop. The lifted button's step stays empty at the end of its group,
+ * so no later group slides under the cursor, and a gap in that group uses it. The stripe owns no state: the window
+ * renders it again after every change. EDT only.
  */
 final class ToolStripe extends JPanel {
     /** One tool window's button. */
@@ -232,7 +233,8 @@ final class ToolStripe extends JPanel {
 
     /**
      * Square buttons 3 px in from each side and 4 px apart; separators inset 7 px; the foot ends 4 px from the bottom.
-     * During a drag every group shows, the lifted button gets no space and, with the gap, the gap takes one button's.
+     * During a drag every group shows and the lifted button's step stays empty at the end of its group. With the gap,
+     * the gap takes that step when it opens in the lifted button's group and one more step in any other group.
      */
     private Placement place(boolean withGap) {
         var placement = new Placement();
@@ -273,10 +275,15 @@ final class ToolStripe extends JPanel {
         return groups.get(group).stream().filter(button -> !dragging || !ids.get(button).equals(lifted)).toList();
     }
 
+    /** True while the dragged window's button belongs to this group of this stripe. */
+    private boolean liftedIn(Slot.Group group) {
+        return dragging && groups.get(group).stream().anyMatch(button -> ids.get(button).equals(lifted));
+    }
+
     private int footCount(boolean withGap) {
         int shown = shown(Slot.Group.FOOT).size();
         boolean gapHere = withGap && dragging && gapGroup == Slot.Group.FOOT;
-        return shown + (gapHere || dragging && shown == 0 ? 1 : 0);
+        return shown + (gapHere || dragging && (liftedIn(Slot.Group.FOOT) || shown == 0) ? 1 : 0);
     }
 
     /** Lays a group out downward from y and returns where the next item starts. */
@@ -296,8 +303,9 @@ final class ToolStripe extends JPanel {
             rects.add(at);
             y += step;
         }
-        // An empty group shows one button's drop space during a drag.
-        if (dragging && shown.isEmpty() && !gapHere) y += step;
+        // The lifted button's step stays empty at the end of its group, and an empty group shows one button's drop space;
+        // a gap in the group takes that step.
+        if (dragging && !gapHere && (shown.isEmpty() || liftedIn(group))) y += step;
         placement.buttons.put(group, rects);
         return y;
     }

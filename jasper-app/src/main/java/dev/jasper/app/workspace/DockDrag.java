@@ -33,11 +33,12 @@ import javax.swing.SwingUtilities;
  * mouse events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
  * synthetic events. While it runs, both stripes show all three groups with the dragged button lifted out, the target
  * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}; the real
- * layout does not change. A stripe button's old place stays its own target, so releasing it where it was changes
- * nothing even when lifting it out left that place outside its group. Releasing the left button over a target hands
+ * layout does not change. Until the cursor first leaves a stripe button's old place, that place is its own target, so
+ * pressing, moving a few pixels and releasing on the spot changes nothing even where the drag layout shifts the
+ * stripe; after that the resolver decides from what the stripes show. Releasing the left button over a target hands
  * the drop to {@link #onDrop}; releasing it anywhere else, Esc, {@link #cancel} or another press (a right or middle
- * click, or a left press after a lost release) ends the drag without one. A window resize while dragging resolves the
- * target again. EDT only.
+ * click, or a left press after a lost release) ends the drag without one. A window resize while dragging forgets the
+ * old place and resolves the target again. EDT only.
  */
 final class DockDrag {
     /** How far, in logical pixels, a press must move before it becomes a drag. */
@@ -61,7 +62,10 @@ final class DockDrag {
     private String dragging;
     private Point last;
     private Optional<DockDropResolver.Target> target = Optional.empty();
-    /** A dragged stripe button's old place in root coordinates, its slot and its index there; null for a header drag. */
+    /**
+     * A dragged stripe button's old place in root coordinates, its slot and its index there. Null for a header drag,
+     * once the cursor has left it and after a resize.
+     */
     private Rectangle home;
     private Slot homeSlot;
     private int homeIndex;
@@ -76,6 +80,7 @@ final class DockDrag {
         this.stripes = List.of(left, right);
         root.addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent event) {
+                forgetHome();
                 if (active()) update(last);
             }
         });
@@ -167,8 +172,8 @@ final class DockDrag {
         for (ToolStripe stripe : stripes)
             if (stripe.isVisible()) for (DockDropResolver.Group group : stripe.dropGroups()) groups.add(inRoot(stripe, group));
         Rectangle workspace = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), root);
-        target = home != null && home.contains(at)
-            ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex))
+        if (home != null && !home.contains(at)) forgetHome();
+        target = home != null ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex))
             : DockDropResolver.resolve(at, groups, workspace);
         for (ToolStripe stripe : stripes)
             stripe.showGap(target.filter(DockDropResolver.Target::onStripe).map(DockDropResolver.Target::slot).orElse(null),
@@ -193,8 +198,7 @@ final class DockDrag {
         pressedId = null;
         source = null;
         target = Optional.empty();
-        home = null;
-        homeSlot = null;
+        forgetHome();
         if (!wasActive) return;
         KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(escape);
         for (ToolStripe stripe : stripes) stripe.endDrag();
@@ -204,6 +208,11 @@ final class DockDrag {
             parent.remove(overlay);
             parent.repaint();
         }
+    }
+
+    private void forgetHome() {
+        home = null;
+        homeSlot = null;
     }
 
     private JLayeredPane layers() {
