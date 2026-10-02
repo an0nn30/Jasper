@@ -82,6 +82,20 @@ class NotificationCenterTest {
         assertThat(kinds()).containsExactly("Upserted", "CardRequested");
     }
 
+    @Test void aRepeatThatShowsItsCardNoLongerWaitsForFocus() {
+        var center = center();
+        presence = Delivery.Presence.BACKGROUND;
+        UUID id = center.post(request(STICKY, "s")).orElseThrow();
+        assertThat(kinds()).containsExactly("Upserted");
+        presence = Delivery.Presence.FOCUSED;
+        clock.advance(Duration.ofSeconds(5));
+        assertThat(center.post(request(STICKY, "s"))).contains(id);
+        assertThat(kinds()).containsExactly("Upserted", "Upserted", "CardRequested");
+        center.focusReturned();
+        assertThat(kinds()).as("the card was requested once; focus does not request it again")
+            .containsExactly("Upserted", "Upserted", "CardRequested");
+    }
+
     @Test void aWaitingCardReadMeanwhileNeverShows() {
         var center = center();
         presence = Delivery.Presence.BACKGROUND;

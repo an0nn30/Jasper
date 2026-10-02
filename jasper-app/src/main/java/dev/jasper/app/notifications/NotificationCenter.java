@@ -115,8 +115,10 @@ public final class NotificationCenter {
             history.put(entry.id(), entry);
             trim();
         }
-        if (outcome.card()) emit(new Change.Upserted(entry), new Change.CardRequested(entry));
-        else {
+        if (outcome.card()) {
+            pending.remove(entry.id()); // a repeat may still wait from an earlier background post; its card shows now
+            emit(new Change.Upserted(entry), new Change.CardRequested(entry));
+        } else {
             if (outcome.pending()) pending.add(entry.id());
             emit(new Change.Upserted(entry));
         }
