@@ -323,7 +323,8 @@ Every plugin also has its default group (`<plugin-id>`, `CARD`) and the host's `
 
 1. **App errors and info → `jasper.general`.** Everything that today reaches `WindowContent.onError` / `onInfo` or
    `JasperApplication.notice` / `info`: shell launch failure (with directory and cause, as an incident; the pane still
-   closes), palette errors, theme install failure (today one modal per window; now one notification), rejected
+   closes, except that the window's only pane stays open showing its failure, so the window and its card survive —
+   amended 2026-10-02, plan 1 Task 9 review), palette errors, theme install failure (today one modal per window; now one notification), rejected
    View-menu saves, config save / migrate / open / reveal failures, and the Migrate Config result (INFO).
 2. **Config problems → `jasper.config`.** When the set from `ConfigurationController.shown()` gains a problem not
    notified before: title "config.toml has errors" (or "…has warnings"), content the first problem and "and N more",
