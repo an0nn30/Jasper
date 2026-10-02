@@ -1,6 +1,6 @@
 # Jasper workspace glass: opacity, blur and the Clear themes
 
-**Status:** Design approved in chat by the user on 2026-10-02, section by section. Plan 1 (foundation) executed on claude/workspace-glass; plan 2 (editor) not written. Plan 1 deviations are listed in the plan and docs/STATUS.md.
+**Status:** Design approved in chat by the user on 2026-10-02, section by section. Plan 1 (foundation) executed on claude/workspace-glass; plan 2 (editor) not written. Plan 1 deviations are listed in the plan and docs/STATUS.md. Amended 2026-10-02: blur moves to a public NSVisualEffectView and becomes on/off (see the amendment at the end).
 
 ## Purpose
 
@@ -214,3 +214,25 @@ mode, native fullscreen; switching back to an opaque theme; a packaged build (`C
 2. **Editor glass** — SDK 0.12.1, testkit contract, editor plugin.
 
 Work happens on `claude/workspace-glass` in `.worktrees/workspace-glass`.
+
+## Amendment 2026-10-02: blur through NSVisualEffectView
+
+**Why.** The private `CGSSetWindowBackgroundBlurRadius` blurs the translucent window's whole rectangle, but macOS
+draws the window with rounded corners (16 pt here), so the square corners outside that shape showed blurred backdrop:
+slivers at all four corners. A public `NSVisualEffectView` behind the content view can be masked to the window's
+corner radius; the user compared materials and chose `hudWindow`.
+
+**What changed.**
+
+- Blur is on or off. Apple's materials have no strength, so there is no blur level any more.
+- A dark workspace theme (`GeneratedTheme.dark()`) uses `hudWindow` (NSVisualEffectMaterial 13) with the effect view's
+  appearance forced to `NSAppearanceNameDarkAqua`; a light one uses `underWindowBackground` (21) forced to
+  `NSAppearanceNameAqua`.
+- Theme format: `[workspace] blur` is a boolean (`blur = true`); Clear Dark and Clear Light set `blur = true` and keep
+  their opacities.
+- Setting: `ui.workspace.blur` is `"theme"` (the default: follow the workspace theme), `"on"` or `"off"`.
+- The CoreGraphics radius path is removed (the native call, its symbol lookups and the radius scale); the blur uses
+  only public AppKit. The two JDK internals for translucency are unchanged.
+- The effect view's corner mask follows the window: it is refreshed when the window enters or leaves full screen
+  (square corners, no mask, in full screen) and when it changes screen.
+- No migration: nothing had been released.

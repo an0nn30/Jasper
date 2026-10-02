@@ -175,11 +175,15 @@ failure leaves an opaque window.
   window background (FlatLaf sets the frame's a turn after a UI-theme switch, and AWT then makes the peer opaque) is
   watched through `WindowGlass.Platform.watch`: `WindowGlass` reports opaque at once and re-applies on the next turn,
   and `MacGlass` restores that newer background later.
-- **Blur** is `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by `gradle/mac-glass.gradle`).
-  It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it, and calls the private
-  `CGSSetWindowBackgroundBlurRadius` on the main thread, never waiting for it. `./gradlew :jasper-app:run` passes
-  `-Djasper.glassLibrary`; a packaged app loads it from `Contents/app/`. Tune the radius with
-  `WindowGlass.MAX_BLUR_RADIUS` (0-1 maps linearly onto 0-40).
+- **Blur** is on or off (`WindowGlass.Blur`: `NONE`, `DARK` or `LIGHT`, from the request's blur and whether the
+  workspace theme is dark) and lives in `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by
+  `gradle/mac-glass.gradle`). It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it
+  and, on the main thread without waiting, places a public `NSVisualEffectView` behind the content view: material
+  `hudWindow` (13) in the dark appearance, or `underWindowBackground` (21) in the light one (`MacGlass.DARK_MATERIAL`
+  and `LIGHT_MATERIAL`). The view is masked to the window's rounded corners (AppKit's `_cornerRadius`, else 10 pt) and
+  observes full-screen and screen changes to refresh the mask (none in full screen); removing the view removes those
+  observers. Only public AppKit is used. `./gradlew :jasper-app:run` passes `-Djasper.glassLibrary`; a packaged app
+  loads it from `Contents/app/`.
 - **Painting**: the window peer is the only non-opaque ancestor. `WorkspaceRegions`' center host fills its rounded
   surface with the terminal background at the opacity in effect (`Src`), so a strip no pane covers is glass too;
   `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and

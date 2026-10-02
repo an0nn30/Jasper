@@ -4,25 +4,32 @@
 
 - **Workspace glass, plan 1 (foundation)** (branch `claude/workspace-glass`, user request 2026-10-02):
   [spec](superpowers/specs/2026-10-02-jasper-workspace-glass-design.md),
-  [plan](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md). Themes gain `[workspace] opacity/blur`;
-  Settings › Appearance › Workspace overrides them (`ui.workspace.opacity`, `ui.workspace.blur`, percent); bundled
-  Clear Dark (0.95/0.5) and Clear Light (0.93/0.5) are ported from Terminal.app (catalog 286). On macOS, `WindowGlass`
-  makes the window translucent through two JDK internals (new launcher flags) and blurs behind it through
-  `libjasper-glass.dylib`; terminal panes paint their default background with alpha inside a cleared surface, and any
-  failure keeps the window opaque. Deviations from the spec: ancestors stay opaque and the workspace host clears a
-  hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no `TerminalOptions` field), and it takes
-  a `float`; `WindowGlass` follows the root pane. Rulings made during execution: `ClearThemesTest` runs under
-  `EdtTestExtension`; the Workspace section keeps its own "Choose workspace theme…" button (Terminal › Font & Colors
-  has one too). The final review's fix wave makes a window translucent again after a UI-theme switch's deferred
-  opaque frame background (restoring the newer background later), fills the whole terminal surface with one glass
-  fill instead of clearing it (the lower-arc strip was a hole), and finds the blurred `NSWindow` through any layer
-  ancestor.
-  `./gradlew check --continue`: BUILD SUCCESSFUL; 8,023 tests, 0 failures, 0 errors, 6 skipped across all modules
-  (jasper-app 1,800, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins 5,538).
-  Not done: plan 2 (editor glass, SDK 0.12.1); GUI checks (user-run): Clear Dark beside Terminal.app's, the blur
-  radius at 0.5, live opacity/blur changes, splits, hidden-rail mode, native fullscreen, switching back to an
-  opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a packaged build loading
-  `Contents/app/libjasper-glass.dylib`, and Settings rows disabled off macOS.
+  [plan](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md). Themes gain `[workspace] opacity/blur`; Settings
+  › Appearance › Workspace overrides them (`ui.workspace.opacity` in percent, `ui.workspace.blur`
+  `"theme"`/`"on"`/`"off"`); bundled Clear Dark (0.95, blur on) and Clear Light (0.93, blur on) are ported from
+  Terminal.app (catalog 286). On macOS, `WindowGlass` makes the window translucent through two JDK internals (new
+  launcher flags) and blurs behind it through `libjasper-glass.dylib`; terminal panes paint their default background
+  with alpha inside a cleared surface, and any failure keeps the window opaque. Deviations from the spec: ancestors stay
+  opaque and the workspace host clears a hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no
+  `TerminalOptions` field), and it takes a `float`; `WindowGlass` follows the root pane. Rulings made during execution:
+  `ClearThemesTest` runs under `EdtTestExtension`; the Workspace section keeps its own "Choose workspace theme…" button
+  (Terminal › Font & Colors has one too). The final review's fix wave makes a window translucent again after a UI-theme
+  switch's deferred opaque frame background (restoring the newer background later), fills the whole terminal surface
+  with one glass fill instead of clearing it (the lower-arc strip was a hole), and finds the blurred `NSWindow` through
+  any layer ancestor. Typing lag and blank live resizes with glass on came from Java2D's Metal pipeline rendering
+  antialiased translucent `Src` fills in software (`fc127ca9`: plain rectangular fills, opaque chrome corners). Blur
+  then moved from the private CoreGraphics radius, which blurred the square corners outside the rounded window, to a
+  public `NSVisualEffectView` masked to the window's corners: on/off, `hudWindow` for dark workspace themes and a light
+  `underWindowBackground` for light ones; theme `blur` is a boolean and the CoreGraphics path is gone (spec amendment
+  2026-10-02). `GlassSettings`' blur component is `blurChoice` (a `WorkspaceBlur`), so `blur()` can stay the
+  `Optional<Boolean>` that `GlassLevels.resolve` reads.
+  `./gradlew check --continue`: BUILD SUCCESSFUL; 8,028 tests, 0 failures, 0 errors, 6 skipped across all modules
+  (jasper-app 1,805, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins 5,538). Not
+  done: plan 2 (editor glass, SDK 0.12.1); GUI checks (user-run): Clear Dark beside Terminal.app's, the Clear Dark
+  (`hudWindow`) versus Clear Light (light `underWindowBackground`) material, rounded corners without slivers and square
+  full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, hidden-rail mode,
+  native fullscreen, switching back to an opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a
+  packaged build loading `Contents/app/libjasper-glass.dylib`, and Settings rows disabled off macOS.
 - **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
   user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
   failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
