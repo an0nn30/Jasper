@@ -104,7 +104,7 @@ class WindowPanelsTest {
             assertThat(first.regions().content(PanelRegion.LEFT)).isNull();
             assertThat(first.regions().content(PanelRegion.RIGHT)).isNotNull();
             assertThat(UiState.load(file).panel("dev.x.hosts")).get().satisfies(panel -> {
-                assertThat(panel.region()).isEqualTo("RIGHT");
+                assertThat(panel.slot()).isEqualTo(Slot.RIGHT_TOP);
                 assertThat(panel.visible()).isTrue();
             });
 

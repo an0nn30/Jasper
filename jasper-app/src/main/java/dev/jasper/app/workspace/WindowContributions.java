@@ -7,6 +7,9 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.contributions.PanelRegion;
 import dev.jasper.app.contributions.PanelSite;
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Side;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.lifecycle.Subscription;
 import java.awt.event.ActionEvent;
@@ -153,9 +156,9 @@ final class WindowContributions implements AutoCloseable {
             if (panels.containsKey(entry.id())) continue;
             var panel = new PanelInstance(entry);
             var saved = state.panel(entry.id());
-            panel.region = saved.map(value -> PanelRegion.valueOf(value.region()))
+            panel.region = saved.map(value -> PanelRegion.valueOf(value.slot().side().name()))
                 .orElse(PanelRegion.valueOf(entry.defaultSlot().side().name()));
-            panel.size = saved.map(UiState.Panel::size).orElse(owner.regions().size(panel.region));
+            panel.size = savedSize(panel.region);
             panels.put(entry.id(), panel);
             if (saved.map(UiState.Panel::visible).orElse(false)) showPanel(entry.id());
         }
@@ -212,8 +215,30 @@ final class WindowContributions implements AutoCloseable {
     }
 
     private void persist(PanelInstance panel) {
-        state.putPanel(panel.entry.id(), new UiState.Panel(panel.region.name(), panel.visible, Math.clamp(panel.size, 80, 4000)));
+        remember(panel);
         state.save();
+    }
+
+    /** Bridge until Task 8: a region's remembered size is its side's. */
+    private int savedSize(PanelRegion region) {
+        var dock = state.dock();
+        return switch (region) {
+            case LEFT -> dock.leftWidth();
+            case RIGHT -> dock.rightWidth();
+            case BOTTOM -> dock.bottomHeight();
+        };
+    }
+
+    /** Bridge until Task 8: the panel's region becomes its side's first slot and its size the side's size. */
+    private void remember(PanelInstance panel) {
+        var dock = state.dock();
+        int size = Math.clamp(panel.size, DockState.MIN_SIZE, DockState.MAX_SIZE);
+        state.putPanel(panel.entry.id(), new UiState.Panel(Slot.of(Side.valueOf(panel.region.name()), false), UiState.Panel.LAST, panel.visible));
+        state.setDock(switch (panel.region) {
+            case LEFT -> new UiState.Dock(size, dock.rightWidth(), dock.bottomHeight(), dock.leftRatio(), dock.rightRatio(), dock.bottomRatio());
+            case RIGHT -> new UiState.Dock(dock.leftWidth(), size, dock.bottomHeight(), dock.leftRatio(), dock.rightRatio(), dock.bottomRatio());
+            case BOTTOM -> new UiState.Dock(dock.leftWidth(), dock.rightWidth(), size, dock.leftRatio(), dock.rightRatio(), dock.bottomRatio());
+        });
     }
 
     private void renderRail() {
@@ -299,8 +324,7 @@ final class WindowContributions implements AutoCloseable {
         actions.values().forEach(action -> action.setEnabled(false));
         if (panelRequests != null) { panelRequests.close(); panelRequests = null; }
         for (PanelInstance panel : panels.values()) {
-            if (panel.visible) { panel.size = owner.regions().size(panel.region); state.putPanel(panel.entry.id(),
-                new UiState.Panel(panel.region.name(), true, Math.clamp(panel.size, 80, 4000))); }
+            if (panel.visible) { panel.size = owner.regions().size(panel.region); remember(panel); }
             if (panel.site != null) panel.site.notifyClosed();
         }
         state.save();
