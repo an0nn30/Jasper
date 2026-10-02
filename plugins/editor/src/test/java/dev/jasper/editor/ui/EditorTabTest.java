@@ -46,6 +46,67 @@ class EditorTabTest {
         });
     }
 
+    /** A component without a peer is never validated, so lays each container out top-down, twice for scroll panes. */
+    private static void layOut(java.awt.Component component) {
+        for (int pass = 0; pass < 2; pass++) layOutOnce(component);
+    }
+
+    private static void layOutOnce(java.awt.Component component) {
+        if (!(component instanceof java.awt.Container container)) return;
+        container.doLayout();
+        for (var child : container.getComponents()) layOutOnce(child);
+    }
+
+    /** Without a peer RSyntaxTextArea cannot take its first font metrics from its own graphics, so gives it one. */
+    private static void measure(EditorTab tab) {
+        try {
+            var image = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var refresh = org.fife.ui.rsyntaxtextarea.RSyntaxTextArea.class.getDeclaredMethod("refreshFontMetrics", java.awt.Graphics2D.class);
+            refresh.setAccessible(true);
+            refresh.invoke(tab.area(), image.createGraphics());
+            var flag = org.fife.ui.rsyntaxtextarea.RSyntaxTextArea.class.getDeclaredField("metricsNeverRefreshed");
+            flag.setAccessible(true);
+            flag.setBoolean(tab.area(), false);
+        } catch (ReflectiveOperationException failed) {
+            throw new AssertionError(failed);
+        }
+    }
+
+    @Test void translucentWorkspaceLetsTheGlassSurfaceFillTextAndGutterOnceAtTheWorkspaceOpacity() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
+            var settings = new EditorSettings("Monospaced", 17, 2, false, 10, false);
+            var syntax = EditorThemeTest.syntax(0x223300);
+            tab.apply(settings, new EditorTheme(), EditorThemeTest.EDITOR, syntax, 0.5);
+            tab.setSize(600, 400);
+            layOut(tab);
+            measure(tab);
+            var image = new java.awt.image.BufferedImage(600, 400, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g = image.createGraphics();
+            tab.paint(g);
+            g.dispose();
+            var view = tab.scroll().getViewport();
+            var inArea = javax.swing.SwingUtilities.convertPoint(view, view.getWidth() - 20, view.getHeight() - 20, tab);
+            int text = image.getRGB(inArea.x, inArea.y);
+            assertThat(text >>> 24).isEqualTo(128);
+            assertThat(text & 0xFFFFFF).isEqualTo(EditorThemeTest.EDITOR.background().getRGB() & 0xFFFFFF);
+            var header = tab.scroll().getRowHeader();
+            var inGutter = javax.swing.SwingUtilities.convertPoint(header, header.getWidth() / 2, header.getHeight() - 20, tab);
+            int gutter = image.getRGB(inGutter.x, inGutter.y);
+            assertThat(gutter >>> 24).isEqualTo(128);
+            assertThat(gutter & 0xFFFFFF).isEqualTo(EditorThemeTest.EDITOR.gutter().getRGB() & 0xFFFFFF);
+
+            tab.apply(settings, new EditorTheme(), EditorThemeTest.EDITOR, syntax, 1.0);
+            layOut(tab);
+            var opaque = new java.awt.image.BufferedImage(600, 400, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var g2 = opaque.createGraphics();
+            tab.paint(g2);
+            g2.dispose();
+            assertThat(opaque.getRGB(inArea.x, inArea.y) >>> 24).isEqualTo(255);
+            tab.dispose();
+        });
+    }
+
     @TempDir Path folder;
     private final List<Runnable> background = new ArrayList<>();
     private final SessionEnvironment environment = new SessionEnvironment(background::add, Runnable::run, Question::dismissed, () -> 1 << 20);

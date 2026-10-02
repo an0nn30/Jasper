@@ -15,8 +15,21 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 
 /** Applies workspace editor surfaces and semantic syntax without replacing an editor's document. */
 public final class EditorTheme {
-    /** Applies the current workspace palettes to an editor and its gutter. */
+    private static final Color CLEAR = new Color(0, 0, 0, 0);
+
+    /** Applies the current workspace palettes to an editor and its gutter, fully opaque. */
     public void apply(RSyntaxTextArea area, RTextScrollPane scroll, EditorPalette editor, SyntaxPalette syntax) {
+        apply(area, scroll, editor, syntax, 1.0);
+    }
+
+    /**
+     * Applies the current workspace palettes to an editor and its gutter. Below 1, {@code opacity} makes the editor and
+     * gutter backgrounds clear and their components non-opaque, so the enclosing {@link GlassSurface} paints the only
+     * glass; the current-line highlight takes that alpha.
+     *
+     * @param opacity the workspace opacity behind the editor, from 0.1 to 1
+     */
+    public void apply(RSyntaxTextArea area, RTextScrollPane scroll, EditorPalette editor, SyntaxPalette syntax, double opacity) {
         SyntaxScheme scheme = (SyntaxScheme) area.getSyntaxScheme().clone();
         Font font = area.getFont();
         for (int token = 0; token < TokenTypes.DEFAULT_NUM_TOKEN_TYPES; token++) {
@@ -34,19 +47,36 @@ public final class EditorTheme {
             scheme.setStyle(token, style);
         }
         area.setSyntaxScheme(scheme);
-        area.setBackground(fixed(editor.background()));
+        boolean glass = opacity < 1;
+        Color background = glass ? CLEAR : fixed(editor.background());
+        Color gutterBackground = glass ? CLEAR : fixed(editor.gutter());
+        area.setBackground(background);
+        area.setOpaque(!glass);
         area.setForeground(fixed(editor.foreground()));
         area.setCaretColor(fixed(editor.caret()));
         area.setSelectionColor(fixed(editor.selection()));
-        area.setCurrentLineHighlightColor(fixed(editor.currentLine()));
-        scroll.setBackground(fixed(editor.background()));
-        scroll.putClientProperty("FlatLaf.style", Map.of("background", fixed(editor.background())));
-        scroll.getViewport().setBackground(fixed(editor.background()));
+        area.setCurrentLineHighlightColor(glass ? translucent(editor.currentLine(), opacity) : fixed(editor.currentLine()));
+        scroll.setOpaque(!glass);
+        scroll.setBackground(background);
+        scroll.putClientProperty("FlatLaf.style", Map.of("background", background));
+        scroll.getViewport().setOpaque(!glass);
+        scroll.getViewport().setBackground(background);
+        if (scroll.getRowHeader() != null) {
+            scroll.getRowHeader().setOpaque(!glass);
+            scroll.getRowHeader().setBackground(gutterBackground);
+        }
         Gutter gutter = scroll.getGutter();
-        gutter.setBackground(fixed(editor.gutter()));
+        gutter.setOpaque(!glass);
+        gutter.setBackground(gutterBackground);
+        // Line numbers and fold indicators fill with the gutter background themselves; clear, they leave the glass.
+        for (var child : gutter.getComponents()) if (child instanceof javax.swing.JComponent component) component.setOpaque(!glass);
         gutter.setBorderColor(fixed(editor.gutter()));
-        gutter.setFoldBackground(fixed(editor.gutter()));
+        gutter.setFoldBackground(gutterBackground);
         gutter.setLineNumberColor(fixed(editor.lineNumbers()));
+    }
+
+    private static Color translucent(Color color, double opacity) {
+        return new Color(color.getRed(), color.getGreen(), color.getBlue(), (int) Math.round(255 * opacity));
     }
 
     // UIResource colors are delegate defaults: a chrome LAF refresh may replace them without a workspace event.

@@ -91,6 +91,15 @@ class EditorWindowTest {
         return window.selected().orElseThrow();
     }
 
+    @Test void aTabsGlassSurfaceFollowsTheWorkspaceOpacity() throws Exception {
+        EditorTab tab = opened(file("glass.txt", "x\n"));
+        assertThat(tab.surface().opacity()).isEqualTo(1.0);
+        host.setWorkspaceOpacity(0.7);
+        host.flush();
+        window.apply();
+        assertThat(tab.surface().opacity()).isEqualTo(0.7);
+    }
+
     @Test void aDocumentIsReportedOnceItsFirstReadSucceeds() throws Exception {
         Path file = file("recent.txt", "text\n");
         window.openLocal(file);
