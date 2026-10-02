@@ -39,6 +39,9 @@ public final class ThemeFiles {
         this.home = Objects.requireNonNull(home).toAbsolutePath().normalize(); this.fault = Objects.requireNonNull(fault);
     }
 
+    /** Creates and validates the native themes directory, off EDT. */
+    public Path ensureDirectory() throws IOException { worker(); return locked(this::directory); }
+
     /** Frozen expected state for removal, revalidated immediately before either destructive operation. */
     public record Removal(Path path, String sha256, String fileKey) {}
     /** Creates an inherited copy only while the selected parent and requested name remain current. */

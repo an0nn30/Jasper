@@ -20,7 +20,7 @@ class ThemesPageTest {
     private final PageContext context = new PageContext(draft, id -> {}, Runnable::run, (title, initial) -> Optional.empty(), () -> {});
     private final AtomicReference<ThemeCatalog.Snapshot> catalog = new AtomicReference<>(new ThemeCatalog.Snapshot(List.of(Theme.DARK, Theme.JASPER_LIGHT), List.of()));
     private ThemesPage page() {
-        return new ThemesPage(context, catalog::get, () -> ConfigSnapshot.defaults().viewOptions(12, Theme.DARK.palette()));
+        return new ThemesPage(context, catalog::get, () -> ConfigSnapshot.defaults().viewOptions(12, Theme.DARK.palette()), ThemePageFixture.actions(context));
     }
     private static void select(ThemePicker picker, String name) {
         for (int i = 0; i < picker.list.getModel().getSize(); i++) {
@@ -111,7 +111,7 @@ class ThemesPageTest {
 
     @Test void disposalReleasesDraftListenerEvenBeforeLazyConstruction() {
         var reads = new AtomicInteger();
-        var page = new ThemesPage(context, () -> { reads.incrementAndGet(); return catalog.get(); }, () -> ConfigSnapshot.defaults().viewOptions(12, Theme.DARK.palette()));
+        var page = new ThemesPage(context, () -> { reads.incrementAndGet(); return catalog.get(); }, () -> ConfigSnapshot.defaults().viewOptions(12, Theme.DARK.palette()), ThemePageFixture.actions(context));
         page.dispose(); page.dispose(); int before = reads.get();
         draft.stage(CoreSettings.UI_THEME_NAME, Optional.of("Jasper Light"));
         assertThat(reads.get()).isEqualTo(before);

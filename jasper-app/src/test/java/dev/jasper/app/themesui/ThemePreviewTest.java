@@ -44,7 +44,7 @@ class ThemePreviewTest {
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
         var context = new PageContext(draft, s -> {}, Runnable::run, (s,p) -> Optional.empty(), () -> {});
         var page = new ThemesPage(context, () -> new ThemeCatalog.Snapshot(List.of(Theme.JASPER_LIGHT), List.of()),
-            () -> ConfigSnapshot.defaults().viewOptions(12, Theme.DARK.palette()));
+            () -> ConfigSnapshot.defaults().viewOptions(12, Theme.DARK.palette()), ThemePageFixture.actions(context));
         try {
             draft.stage(CoreSettings.UI_THEME_NAME, Optional.of("Jasper Light")); page.component();
             assertThat(page.preview.themes.matching()).isTrue();

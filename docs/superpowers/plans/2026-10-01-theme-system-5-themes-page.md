@@ -10,7 +10,7 @@
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), especially §§2.3, 6.3, 7–9. Read it together with this plan, [Plan 4](2026-10-01-theme-system-4-conversion-migration.md), and [STATUS](../../STATUS.md).
 
-**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Task 4 is complete (local two-zone preview); full check 7,962/0/0/6. Tasks 5–6 remain.
+**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Task 4 is complete (local two-zone preview); full check 7,962/0/0/6. Task 5 is complete (owned asynchronous file actions and dialogs); full check 7,974/0/0/6. Task 6 remains.
 
 **Execution ruling:** Task 1 preserves the pre-existing bounded startup scan wait on EDT; the original plan incorrectly described its caller as off EDT. No new runtime EDT waits are introduced. Cost: existing initial scan latency remains; a bootstrap handoff change is separate work.
 
@@ -324,7 +324,7 @@ git commit -m "feat(themes): preview staged chrome and workspace locally" -m "Co
 - Produces ThemeImportView `(ThemeImporter.ImportPlan plan, Consumer<Map<String,ThemeImporter.ConflictChoice>> commit, Runnable cancel)`; owns rows/decisions but performs no I/O. ThemeDialogs owns concrete name/confirmation dialogs, not a new interface. ThemeNotices exposes `static String read() throws IOException` for the packaged text and the controller displays it in a plain JTextArea.
 - Final ThemesPage constructor is `(PageContext, Supplier<ThemeCatalog.Snapshot>, Supplier<TerminalOptions>, ThemeActions)`. Page owns/closes actions. No placeholder/no-op actions in production registration.
 
-- [ ] **Step 1: Write failing tests.** Use real temporary themes/importer and a controllable ExecutorService plus headless AuxiliaryWindows Shells, patterned after PluginManagerTest. Tests click actual view buttons and complete queued worker tasks explicitly. Required assertions:
+- [x] **Step 1: Write failing tests.** Use real temporary themes/importer and a controllable ExecutorService plus headless AuxiliaryWindows Shells, patterned after PluginManagerTest. Tests click actual view buttons and complete queued worker tasks explicitly. Required assertions:
 
 ```java
 assertThat(view.choices().get(conflictingItem.id())).isEqualTo(ThemeImporter.ConflictChoice.SKIP);
@@ -341,7 +341,7 @@ Lifetime tests: double-click while busy invokes one commit; close before plannin
 
 Duplicate prompts default name, rejects a collision and stages only the initiating picker after successful publication. Remove rejects match/bundled, successful trash does not prompt permanent deletion, false trash prompts separately, cancel retains file, edited intent refuses both attempts. About must read the packaged JAR resource; folder opening creates/reveals the actual config override home's themes folder, not the default home.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ThemeActionsTest' --tests '*ThemeImportViewTest' --tests '*ThemeNoticesTest' --tests '*ThemesPageTest'
@@ -349,7 +349,7 @@ Duplicate prompts default name, rejects a collision and stages only the initiati
 
 Expected: missing action controller/views and final constructor.
 
-- [ ] **Step 3: Implement the workflows.** Add one serialized worker per page, busy gating and generation/disposed checks visible across threads. `close()` invalidates the lifetime, cancels unstarted work and calls orderly worker shutdown; do not interrupt a confirmed publication already executing. Worker jobs check lifetime before starting unconfirmed work. Planning/conversion/commit/duplicate/removal/notices reads run off EDT; marshal completion to SwingUtilities.invokeLater and verify lifetime before touching context/surfaces. Do not cancel a running filesystem commit by pretending it never happened; after successful or partially successful writes, call the supplied refresh even if the page closed. The refresh future completes after the catalog scan, and the page updates only when still live. Exceptions become plain-text operation reports, not uncaught EDT failures.
+- [x] **Step 3: Implement the workflows.** Add one serialized worker per page, busy gating and generation/disposed checks visible across threads. `close()` invalidates the lifetime, cancels unstarted work and calls orderly worker shutdown; do not interrupt a confirmed publication already executing. Worker jobs check lifetime before starting unconfirmed work. Planning/conversion/commit/duplicate/removal/notices reads run off EDT; marshal completion to SwingUtilities.invokeLater and verify lifetime before touching context/surfaces. Do not cancel a running filesystem commit by pretending it never happened; after successful or partially successful writes, call the supplied refresh even if the page closed. The refresh future completes after the catalog scan, and the page updates only when still live. Exceptions become plain-text operation reports, not uncaught EDT failures.
 
 Create all confirmation/import/report surfaces through AuxiliaryWindows, owned by context.surface().get(); close them on controller close and refuse to open if owner is null/closed. Use bounded scrollable import rows and a fixed action footer; provider warnings/failures remain visible, and zero viable providers disables commit. User name/content is data. Import invokes existing immutable plan/commit methods, never edits sources and never reconverts while committing. Unsupported file suffix is rejected before submission. No native confirmation is invoked by tests.
 
@@ -357,8 +357,8 @@ Bind buttons to the active picker. After Duplicate, stage the returned name only
 
 Read notices from `/dev/jasper/app/themes/THIRD-PARTY-THEMES.md` (the existing packaged resource); keep resource UTF-8/size bounded at 1 MiB, with a visible error if absent. No Markdown web renderer is necessary. Task 6 installs the page factory and concrete Desktop functions.
 
-- [ ] **Step 4: Run GREEN.** Repeat Step 2 plus `*ThemeImporterTest`, `*ThemeDuplicateTest`, `*ThemeRemovalTest`; `./gradlew verifyApplicationArchitecture` passes. No test touches a real desktop/trash or opens a native dialog.
-- [ ] **Step 5: Commit.**
+- [x] **Step 4: Run GREEN.** Repeat Step 2 plus `*ThemeImporterTest`, `*ThemeDuplicateTest`, `*ThemeRemovalTest`; `./gradlew verifyApplicationArchitecture` passes. No test touches a real desktop/trash or opens a native dialog.
+- [x] **Step 5: Commit.**
 
 ```bash
 git add jasper-app/src
