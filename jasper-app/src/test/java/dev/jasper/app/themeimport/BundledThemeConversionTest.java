@@ -17,6 +17,7 @@ class BundledThemeConversionTest {
             "--sources", ROOT.resolve("third_party/themes").toString(), "--output", themes.toString(),
             "--notices", notices.toString()});
         Path bundled = ROOT.resolve("jasper-app/src/main/resources/dev/jasper/app/themes");
+        assertThat(Files.readAllBytes(themes.resolve("legacy-aliases.json"))).isEqualTo(Files.readAllBytes(bundled.resolve("legacy-aliases.json")));
         var index = Files.readAllLines(themes.resolve("index.txt"));
         assertThat(index).doesNotHaveDuplicates().contains("jasper-dark.toml", "jasper-light.toml");
         assertThat(Files.readString(themes.resolve("index.txt"))).isEqualTo(Files.readString(bundled.resolve("index.txt")));

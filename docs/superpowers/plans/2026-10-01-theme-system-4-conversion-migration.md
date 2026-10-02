@@ -500,6 +500,8 @@ git add jasper-app/src/main/java/dev/jasper/app/themeimport jasper-app/src/test/
 git commit -m "feat(themes): import native themes with safe conflict handling" -m "Co-Authored-By: Codex <noreply@openai.com>"
 ```
 
+**Task 5 complete:** bounded journal, no-clobber migration, source ownership and interruption recovery verified. All converted bytes are staged before any original moves so local-parent dependencies survive resume. Legacy Alacritty aliases are generated offline alongside the index. Per-provider serialization errors retain originals while unrelated inputs proceed.
+
 ## Task 5: Resumable filesystem migration with preserved source ownership
 
 **Files:** Create `themeimport/{ThemeMigration,MigrationJournal}.java`, tests `ThemeMigrationTest.java`,
@@ -513,7 +515,7 @@ Nested `MigrationReport` contains `String generation`, `boolean completed`, `Map
 Keys in rename maps are normalized old names and values are actual new names. `run` writes recovery state, never
 `.migrated`; `complete` verifies the journal generation before marking the pass complete, after Task 6 saves config.
 
-- [ ] **Step 1: Write interruption/ownership regressions.** Temporary home contains multi-provider archive, user native
+- [x] **Step 1: Write interruption/ownership regressions.** Temporary home contains multi-provider archive, user native
 file, two Alacritty inputs, an invalid archive and occupied legacy destinations. Test every durable boundary with a
 package-private `Consumer<String>` hook (labels: `intent`, `output`, `original`, `before-complete`, `complete`). Throw
 an injected exception only after the corresponding durable write; construct a fresh migration object to resume.
@@ -543,9 +545,9 @@ invalid/corrupt/traversing journal fails closed with originals intact. A corrupt
 Precedence tests interleave native/archive filenames both ways and user Alacritty/bundled/native names. Assert rename
 maps describe the source that previously won each slot, not merely the first converter result. Test equal-byte legacy
 destination occupancy, changed source hashes, missing sources and diagnostics after marker.
-- [ ] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*ThemeMigrationTest' --tests '*MigrationJournalTest'`.
+- [x] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*ThemeMigrationTest' --tests '*MigrationJournalTest'`.
 Expected: missing migration/journal or resume semantics.
-- [ ] **Step 3: Implement the bounded journal and state machine.** Scan direct regular non-hidden files under themes
+- [x] **Step 3: Implement the bounded journal and state machine.** Scan direct regular non-hidden files under themes
 (`.jar`, `.zip`, `.theme.json`) and terminal-themes (`.toml`), skipping symlinks and legacy/. Do not rewrite native TOMLs.
 Capture pre-upgrade ownership using the baseline catalog file order and Plan 2 workspace precedence before publishing
 anything. Existing native files remain authoritative where they already won; use KEEP_BOTH for migrated collisions,
@@ -569,9 +571,9 @@ saved diagnostics and no new conversion/output activity; suppress resolved diagn
 changed failed input as changed with manual Import as the retry route. Persist changes to that diagnostic state.
 Retain rename maps until config completion; a config failure can retry without reconverting or losing moved sources.
 Use the same per-home lock as interactive import. Recoverable per-source errors do not abort unrelated sources.
-- [ ] **Step 4: Run GREEN.** Repeat Step 2 plus Task 4 tests and `./gradlew check`; review the state machine using each
+- [x] **Step 4: Run GREEN.** Repeat Step 2 plus Task 4 tests and `./gradlew check`; review the state machine using each
 crash window, including publication succeeded but the following journal write failed.
-- [ ] **Step 5: Commit after review.**
+- [x] **Step 5: Commit after review.**
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/themeimport jasper-app/src/test/java/dev/jasper/app/themeimport

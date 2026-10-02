@@ -83,6 +83,7 @@ public final class ConvertThemes {
                     generated.put("licenses/" + source.id() + "/" + name, Files.readAllBytes(ThemeSources.safe(root, asset.path())));
             }
         }
+        generated.put("legacy-aliases.json", legacyAliases(manifest).getBytes(StandardCharsets.UTF_8));
         String index = String.join("\n", generated.keySet().stream().filter(key -> key.endsWith(".toml")).toList()) + "\n";
         generated.put("index.txt", index.getBytes(StandardCharsets.UTF_8));
         byte[] noticeBytes = (notice.toString().stripTrailing() + "\n").getBytes(StandardCharsets.UTF_8);
@@ -145,6 +146,23 @@ public final class ConvertThemes {
         }
         return results;
     }
+    private static String legacyAliases(ThemeSources.Manifest manifest) {
+        var names = new TreeMap<String, String>();
+        var aliases = new TreeMap<String, String>();
+        for (var source : manifest.sources()) for (var variant : source.variants()) if (variant.included()) {
+            names.put(variant.name().strip().toLowerCase(java.util.Locale.ROOT), variant.name());
+            for (String alias : variant.aliases()) aliases.putIfAbsent(alias.strip().toLowerCase(java.util.Locale.ROOT), variant.name());
+        }
+        var legacy = new LinkedHashMap<String, Object>();
+        for (var source : manifest.sources()) if (source.id().equals("alacritty")) for (var variant : source.variants()) {
+            String key = variant.name().strip().toLowerCase(java.util.Locale.ROOT);
+            String canonical = names.getOrDefault(key, aliases.get(key));
+            if (canonical == null) throw new IllegalArgumentException("Missing native replacement for legacy palette " + variant.name());
+            legacy.put(key, canonical);
+        }
+        return dev.jasper.app.appearance.FlatLafThemeData.write(legacy) + "\n";
+    }
+
     private static void put(ZipOutputStream zip, String name, byte[] bytes) throws IOException {
         zip.putNextEntry(new ZipEntry(name)); zip.write(bytes); zip.closeEntry();
     }

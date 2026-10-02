@@ -29,7 +29,7 @@
   cooperating home/process locks. Directory-swap and partial-publication regressions pass. Cleanup failure after a
   committed publication is logged without losing the reported success; only owned temporary identity is cleaned.
   External edits observed before publish abort, with no unsupported cross-process compare-and-swap claim.
-  No GUI, merge or push. Next: Task 5 resumable migration. Plan 5 adds the Themes page, preview/file actions and live reload.
+  Task 5 is complete: journaled intent/publication/relocation, identity-checked recovery, persisted failures and old-slot ownership. All outputs stage before originals move to preserve local parents across interruptions. Full `./gradlew check`: **7,967 tests, zero failures/errors, six skips**. Generated aliases preserve old Alacritty names. No GUI, merge or push. Next: Task 6 startup/config handshake. Plan 5 adds the Themes page, preview/file actions and live reload.
 
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)

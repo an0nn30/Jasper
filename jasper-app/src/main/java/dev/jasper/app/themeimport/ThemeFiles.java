@@ -52,6 +52,25 @@ public final class ThemeFiles {
         });
     }
 
+    /** Journal publication: the pre-recorded path must remain free; never allocates another name on retry. */
+    Path createAt(Path requested, ThemeDocument document) throws IOException {
+        worker(); byte[] bytes = serialized(document);
+        return locked(() -> {
+            Path directory = directory();
+            Path absolute = requested.toAbsolutePath();
+            if (!absolute.equals(absolute.normalize()) || absolute.getParent() == null
+                    || !absolute.getParent().toRealPath().equals(directory)
+                    || !absolute.getFileName().toString().matches("[a-z0-9][a-z0-9-]*\\.toml"))
+                throw new IOException("Unsafe planned theme path");
+            Path target = directory.resolve(absolute.getFileName());
+            try (var children = Files.list(directory)) {
+                if (children.anyMatch(path -> path.getFileName().toString().equalsIgnoreCase(target.getFileName().toString())))
+                    throw new IOException("Planned theme path is occupied");
+            }
+            publish(target, bytes, null); return target;
+        });
+    }
+
     /** Replaces only the canonical regular user file whose observed bytes still match the expected hash. */
     public void replace(Path target, String expectedSha256, ThemeDocument document) throws IOException {
         worker();
@@ -162,7 +181,32 @@ public final class ThemeFiles {
     }
 
     private void publish(Path target, byte[] bytes, Callable<Void> replacementCheck) throws IOException {
-        Path directory = directory();
+        publishIn(directory(), target, bytes, replacementCheck, fault, this::directory);
+    }
+
+    /** Same publication/owned-cleanup guarantees for bounded journal and marker bytes. */
+    static void publishState(Path target, byte[] bytes, String expectedHash) throws IOException {
+        Path parent = target.getParent();
+        Callable<Path> guard = () -> {
+            for (Path cursor = target; cursor != null; cursor = cursor.getParent())
+                if (Files.isSymbolicLink(cursor)) throw new IOException("Symbolic link in migration state path");
+            if (!Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Unsafe migration state directory");
+            return parent;
+        };
+        guardChecked(guard);
+        Object before = expectedHash == null ? null : identity(target);
+        Callable<Void> check = expectedHash == null ? null : () -> {
+            if (!Objects.equals(before, identity(target))
+                    || !ThemeSources.hash(MigrationJournal.readBounded(target, MigrationJournal.MAX_BYTES)).equals(expectedHash))
+                throw new IOException("Migration state changed unexpectedly");
+            return null;
+        };
+        publishIn(parent, target, bytes, check, (stage, path) -> {}, guard);
+    }
+    private static Path guardChecked(Callable<Path> guard) throws IOException { return call(guard); }
+
+    private static void publishIn(Path directory, Path target, byte[] bytes, Callable<Void> replacementCheck,
+                                  BiConsumer<String, Path> fault, Callable<Path> guard) throws IOException {
         Object directoryKey = identity(directory);
         var handle = Files.newDirectoryStream(directory);
         Path temporary = null; Object temporaryKey = null;
@@ -170,13 +214,13 @@ public final class ThemeFiles {
             temporary = Files.createTempFile(directory, ".jasper-theme-", ".tmp");
             temporaryKey = identity(temporary);
             fault.accept("temp", temporary);
-            if (!directory().equals(directory) || !Objects.equals(directoryKey, identity(directory)))
+            if (!guardChecked(guard).equals(directory) || !Objects.equals(directoryKey, identity(directory)))
                 throw new IOException("Themes directory changed before temporary write");
             try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
                 var buffer = ByteBuffer.wrap(bytes); while (buffer.hasRemaining()) channel.write(buffer); channel.force(true);
             }
             fault.accept("publish", target);
-            if (!directory().equals(directory) || !Objects.equals(directoryKey, identity(directory)))
+            if (!guardChecked(guard).equals(directory) || !Objects.equals(directoryKey, identity(directory)))
                 throw new IOException("Themes directory changed during publication");
             if (!Files.isRegularFile(temporary, LinkOption.NOFOLLOW_LINKS) || !Objects.equals(temporaryKey, identity(temporary)))
                 throw new IOException("Theme temporary changed during publication");
