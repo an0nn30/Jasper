@@ -180,10 +180,11 @@ failure leaves an opaque window.
   `gradle/mac-glass.gradle`). It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it
   and, on the main thread without waiting, places a public `NSVisualEffectView` behind the content view: material
   `hudWindow` (13) in the dark appearance, or `underWindowBackground` (21) in the light one (`MacGlass.DARK_MATERIAL`
-  and `LIGHT_MATERIAL`). The view is masked to the window's rounded corners (AppKit's `_cornerRadius`, else 10 pt) and
-  observes full-screen and screen changes to refresh the mask (none in full screen); removing the view removes those
-  observers. Only public AppKit is used. `./gradlew :jasper-app:run` passes `-Djasper.glassLibrary`; a packaged app
-  loads it from `Contents/app/`.
+  and `LIGHT_MATERIAL`). The view is masked to the window's rounded corners and a `JasperCornerObserver`, kept alive by
+  the view as an associated object, refreshes the mask on full-screen and screen changes (none in full screen); it
+  lives and dies with the view, and removing the view stops it. There is no private CoreGraphics call; the corner
+  radius comes from AppKit's private `_cornerRadius` when present, else 10 pt. `./gradlew :jasper-app:run` passes
+  `-Djasper.glassLibrary`; a packaged app loads it from `Contents/app/`.
 - **Painting**: the window peer is the only non-opaque ancestor. `WorkspaceRegions`' center host fills its rounded
   surface with the terminal background at the opacity in effect (`Src`), so a strip no pane covers is glass too;
   `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and

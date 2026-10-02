@@ -1,7 +1,8 @@
 // Blurs the desktop behind a translucent Jasper window with a public NSVisualEffectView placed behind the content view:
 // one of Apple's fixed-strength materials, in the appearance the workspace theme asks for, masked to the window's
-// rounded corners (square in full screen; the mask follows full-screen and screen changes). Only public AppKit is
-// used. JAWT_GetAWT is looked up at run time, so a missing symbol only disables blur.
+// rounded corners (square in full screen; the mask follows full-screen and screen changes). There is no private
+// CoreGraphics call; the corner radius comes from AppKit's private _cornerRadius when the window answers it, else 10 pt.
+// JAWT_GetAWT is looked up at run time, so a missing symbol only disables blur.
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
@@ -52,8 +53,8 @@ static CALayer *JasperLayer(JNIEnv *env, jobject window) {
 
 /** The identifier of the effect view setEffect adds behind the content view. */
 static NSString *const JasperEffectIdentifier = @"dev.jasper.glass.effect";
-/** The key under which the effect view keeps its notification observer tokens. */
-static const void *JasperObserversKey = &JasperObserversKey;
+/** The key under which the effect view keeps its JasperCornerObserver alive. */
+static const void *JasperObserverKey = &JasperObserverKey;
 
 /** A stretchable rounded-rectangle mask for a window whose corners have {@code radius} points. */
 static NSImage *JasperCornerMask(CGFloat radius) {
@@ -89,32 +90,43 @@ static void JasperRefreshMask(NSVisualEffectView *effect, NSWindow *window) {
 }
 
 /**
- * Recomputes the effect view's mask whenever its window enters or leaves full screen or changes screen. Both are
- * captured weakly; the tokens stay on the effect view until JasperApplyEffect removes it.
+ * Recomputes the effect view's mask whenever its window enters or leaves full screen or changes screen. The effect view
+ * keeps it alive (an associated object), so it lives exactly as long as the view, which dies with its window; it holds
+ * both weakly and stops observing when it is released.
  */
-static void JasperObserveCorners(NSVisualEffectView *effect, NSWindow *window) {
-    __weak NSVisualEffectView *weakEffect = effect;
-    __weak NSWindow *weakWindow = window;
-    NSMutableArray *tokens = [NSMutableArray array];
-    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
-    for (NSNotificationName name in @[NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification,
-                                      NSWindowDidChangeScreenNotification]) {
-        [tokens addObject:[center addObserverForName:name object:window queue:[NSOperationQueue mainQueue]
-                                          usingBlock:^(NSNotification *note) {
-            NSVisualEffectView *strongEffect = weakEffect;
-            NSWindow *strongWindow = weakWindow;
-            if (strongEffect != nil && strongWindow != nil) JasperRefreshMask(strongEffect, strongWindow);
-        }]];
-    }
-    objc_setAssociatedObject(effect, JasperObserversKey, tokens, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+@interface JasperCornerObserver : NSObject
+@property (weak) NSVisualEffectView *effect;
+@property (weak) NSWindow *window;
+@end
+
+@implementation JasperCornerObserver
+- (void)refresh:(NSNotification *)note {
+    NSVisualEffectView *effect = self.effect;
+    NSWindow *window = self.window;
+    if (effect != nil && window != nil) JasperRefreshMask(effect, window);
 }
 
-/** Removes the effect view and the observers JasperObserveCorners registered for it. */
+- (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
+@end
+
+/** Attaches a JasperCornerObserver for {@code window} to {@code effect}. */
+static void JasperObserveCorners(NSVisualEffectView *effect, NSWindow *window) {
+    JasperCornerObserver *observer = [JasperCornerObserver new];
+    observer.effect = effect;
+    observer.window = window;
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    for (NSNotificationName name in @[NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification,
+                                      NSWindowDidChangeScreenNotification])
+        [center addObserver:observer selector:@selector(refresh:) name:name object:window];
+    objc_setAssociatedObject(effect, JasperObserverKey, observer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+/** Removes the effect view and stops its JasperCornerObserver. */
 static void JasperRemoveEffect(NSVisualEffectView *effect) {
     if (effect == nil) return;
-    NSArray *tokens = objc_getAssociatedObject(effect, JasperObserversKey);
-    for (id token in tokens) [[NSNotificationCenter defaultCenter] removeObserver:token];
-    objc_setAssociatedObject(effect, JasperObserversKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    JasperCornerObserver *observer = objc_getAssociatedObject(effect, JasperObserverKey);
+    if (observer != nil) [[NSNotificationCenter defaultCenter] removeObserver:observer];
+    objc_setAssociatedObject(effect, JasperObserverKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [effect removeFromSuperview];
 }
 

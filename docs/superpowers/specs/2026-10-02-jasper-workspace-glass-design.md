@@ -65,6 +65,8 @@ opacity = 0.95   # 0.10–1.00; absent means 1.0
 blur = 0.5       # 0.0–1.0, Terminal.app's scale; absent means 0
 ```
 
+*Superseded by the 2026-10-02 amendment: `blur` is a boolean (`blur = true`; absent means false).*
+
 Values outside the range are errors with the file's line, like other theme diagnostics. Both values are inherited
 through `extends` (child wins), written by `ThemeTomlWriter`, and carried on `GeneratedTheme` so the resolved
 workspace theme exposes them. The 284 bundled themes do not set the table, so they stay opaque and the converter's
@@ -75,7 +77,8 @@ drift test is unchanged. Only the **workspace** theme's values matter; a chrome 
 The Appearance page gains a **Workspace** section:
 
 - **Opacity** — `ui.workspace.opacity`, a percentage 10–100, with "Use theme's value" (unset).
-- **Blur** — `ui.workspace.blur`, a percentage 0–100, with "Use theme's value" (unset).
+- **Blur** — `ui.workspace.blur`, a percentage 0–100, with "Use theme's value" (unset). *Superseded by the
+  amendment: a choice of `"theme"` (shown as "Use theme's value"), `"on"` or `"off"`.*
 - A **Choose workspace theme…** button that navigates to `themes#workspace`.
 
 `config.toml` stores percentages (`opacity = 95`); theme files store fractions, as Terminal.app does. Unset defers to
@@ -83,7 +86,8 @@ the theme, following the `ui.font.size` pattern (a default outside the range plu
 out-of-range value falls back to unset with the usual settings warning. Changes apply live to every open window, like
 a theme switch.
 
-**Effective values:** `opacity = setting ?? workspaceTheme.opacity ?? 1.0`, `blur = setting ?? workspaceTheme.blur ?? 0`.
+**Effective values:** `opacity = setting ?? workspaceTheme.opacity ?? 1.0`, `blur = setting ?? workspaceTheme.blur ?? false`
+(boolean since the amendment; `"theme"` is the unset setting).
 
 ### What is translucent
 
@@ -105,7 +109,7 @@ keeps blur constant (user decision, 2026-10-02).
 ### The Clear themes
 
 Two hand-authored bundled native themes, `Clear Dark` and `Clear Light` (catalog 284 → 286), with the colours above,
-`[workspace]` 0.95/0.5 and 0.93/0.5, accents from each profile's bright blue (`#67B5ED`, `#49A2E1`), and `source`
+`[workspace]` 0.95/0.5 and 0.93/0.5 (since the amendment: 0.95 and 0.93, both `blur = true`), accents from each profile's bright blue (`#67B5ED`, `#49A2E1`), and `source`
 naming macOS Terminal.app's profile. Clear Dark sets no cursor colour, so it uses the generator's default. Bold colour
 and font are not ported (Jasper has no per-theme bold colour or font). They are not produced by the converter and are
 not in `tools/themes/sources.json`.
@@ -116,8 +120,9 @@ not in `tools/themes/sources.json`.
 
 One per terminal window. When the effective opacity is below 1.0 on macOS it applies the spike's sequence (transparent
 `Component.background`, `WindowPeer.setOpaque(false)`, peer background, non-opaque root pane, layered pane and the
-`MacTitleBar` wrapper) and sets the blur radius through the native bridge. When opacity returns to 1.0 it restores the
-opaque peer, the original background and blur 0, so the window behaves exactly as today. At 1.0 no JDK internals are
+`MacTitleBar` wrapper) and sets the blur radius through the native bridge (*superseded by the amendment: it turns the
+effect-view blur on or off, `WindowGlass.Blur` `NONE`/`DARK`/`LIGHT`*). When opacity returns to 1.0 it restores the
+opaque peer, the original background and no blur, so the window behaves exactly as today. At 1.0 no JDK internals are
 touched, even when a blur is set. It applies once the peer exists and re-applies when the peer is recreated
 (displayability changes, as `MacTitleBar` already handles).
 
@@ -133,7 +138,8 @@ All reflective and peer access is confined to `WindowGlass`.
 `MacGlass.m`: JAWT gives the frame's layer; the owning `NSWindow` is the one whose content view hosts it; the blur call
 runs on the AppKit main thread (`dispatch_async` to the main queue, never synchronously, so the EDT cannot deadlock
 against AppKit). Blur maps linearly from 0–1 to a radius of 0–40 px (Clear's 0.5 → 20 px); the constant is tuned during
-the GUI check.
+the GUI check. *Superseded by the amendment: there is no radius; the bridge adds or removes an `NSVisualEffectView`
+behind the content view (`setEffect(window, material, light)`).*
 
 The build mirrors `gradle/mac-notifications.gradle`: clang, ad-hoc codesign, a native test (`MacGlassTest.m`) that
 `check` runs on macOS, bundling into `Contents/app/`, and architecture/signature verification in `packaging.gradle`.
@@ -194,12 +200,14 @@ inactive-dim overlay and visual bell keep their alpha on top. At 1.0 the paint p
 - `WindowGlass`: decision logic through an injected peer/bridge seam — non-macOS, inaccessible internals, missing
   library, and 1.0 touching no internals; each failure reports 1.0 and logs once.
 - Editor: `EditorTheme` alpha/opacity rules; an SDK testkit contract case for `workspaceOpacity()`.
-- Native: `MacGlassTest.m` — radius mapping and clamping, nil window is a no-op.
+- Native: `MacGlassTest.m` — radius mapping and clamping, nil window is a no-op. *Superseded by the amendment: the
+  window lookup by layer, the corner mask, the appearance names and the effect view's add/refresh/remove lifetime.*
 - Architecture gates, doclint and source hygiene.
 
 ### GUI checks (user-run; the agent does not launch Jasper)
 
-Clear Dark next to Terminal.app's; blur radius at 0.5; live opacity and blur changes; splits, editor tabs, hidden-rail
+Clear Dark next to Terminal.app's; blur radius at 0.5 (*superseded by the amendment: Clear Dark's `hudWindow` versus
+Clear Light's light `underWindowBackground`, and the corners in and out of full screen*); live opacity and blur changes; splits, editor tabs, hidden-rail
 mode, native fullscreen; switching back to an opaque theme; a packaged build (`Contents/app/libjasper-glass.dylib`).
 
 ### Documentation
@@ -231,8 +239,11 @@ corner radius; the user compared materials and chose `hudWindow`.
 - Theme format: `[workspace] blur` is a boolean (`blur = true`); Clear Dark and Clear Light set `blur = true` and keep
   their opacities.
 - Setting: `ui.workspace.blur` is `"theme"` (the default: follow the workspace theme), `"on"` or `"off"`.
-- The CoreGraphics radius path is removed (the native call, its symbol lookups and the radius scale); the blur uses
-  only public AppKit. The two JDK internals for translucency are unchanged.
+- The CoreGraphics radius path is removed (the native call, its symbol lookups and the radius scale): there is no
+  private CoreGraphics call. The corner radius comes from AppKit's private `_cornerRadius` when the window answers it,
+  else 10 pt. The two JDK internals for translucency are unchanged.
 - The effect view's corner mask follows the window: it is refreshed when the window enters or leaves full screen
-  (square corners, no mask, in full screen) and when it changes screen.
+  (square corners, no mask, in full screen) and when it changes screen. The observer is an object the effect view
+  keeps alive, so it lives and dies with the view (and so with the window).
+- The Blur row shows the `"theme"` token as "Use theme's value", like Opacity.
 - No migration: nothing had been released.

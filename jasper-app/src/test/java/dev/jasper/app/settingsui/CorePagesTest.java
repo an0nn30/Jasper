@@ -33,6 +33,18 @@ class CorePagesTest {
         assertThat(appearance.settings()).containsSubsequence(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
     }
 
+    @Test void theBlurRowNamesTheThemeChoiceLikeOpacity() {
+        var spec = CorePages.specs(() -> List.of("Jasper Dark"), system).getFirst();
+        var page = spec.build(context);
+        page.component();
+        int index = spec.settings().indexOf(CoreSettings.UI_WORKSPACE_BLUR);
+        assertThat(page.rows()).hasSameSizeAs(spec.settings());
+        @SuppressWarnings("unchecked") var box = (javax.swing.JComboBox<String>) page.rows().get(index).editor().component();
+        var items = new ArrayList<String>();
+        for (int i = 0; i < box.getItemCount(); i++) items.add(box.getItemAt(i));
+        assertThat(items).containsExactly("Use theme's value", "On", "Off");
+    }
+
     @Test void theTreeIsTheApprovedOne() {
         var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins, CorePagesTest::themes).apply(context);
         assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "themes", "window", "notifications",

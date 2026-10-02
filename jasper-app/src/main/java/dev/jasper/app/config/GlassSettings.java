@@ -18,7 +18,7 @@ public record GlassSettings(float opacityPercent, WorkspaceBlur blurChoice) {
 
     public GlassSettings {
         if (opacityPercent != UNSET_OPACITY && !(opacityPercent >= 10f && opacityPercent <= 100f))
-            throw new IllegalArgumentException("Opacity must be 10–100 percent.");
+            throw new IllegalArgumentException("Opacity must be 10\u2013100 percent.");
         Objects.requireNonNull(blurChoice, "blurChoice");
     }
 

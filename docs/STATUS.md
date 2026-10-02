@@ -22,7 +22,9 @@
   public `NSVisualEffectView` masked to the window's corners: on/off, `hudWindow` for dark workspace themes and a light
   `underWindowBackground` for light ones; theme `blur` is a boolean and the CoreGraphics path is gone (spec amendment
   2026-10-02). `GlassSettings`' blur component is `blurChoice` (a `WorkspaceBlur`), so `blur()` can stay the
-  `Optional<Boolean>` that `GlassLevels.resolve` reads.
+  `Optional<Boolean>` that `GlassLevels.resolve` reads. Review follow-ups: the corner-mask observer is a
+  `JasperCornerObserver` the effect view keeps alive, so its lifetime follows the view (and the window); the Blur row
+  shows "Use theme's value" for `"theme"`.
   `./gradlew check --continue`: BUILD SUCCESSFUL; 8,028 tests, 0 failures, 0 errors, 6 skipped across all modules
   (jasper-app 1,805, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins 5,538). Not
   done: plan 2 (editor glass, SDK 0.12.1); GUI checks (user-run): Clear Dark beside Terminal.app's, the Clear Dark
