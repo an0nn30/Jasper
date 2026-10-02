@@ -25,14 +25,18 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.platform.SystemFonts;
+import dev.jasper.app.startup.StartupTrace;
+import dev.jasper.app.startup.WindowTrace;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
+import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.app.workspace.TerminalWindow;
 import dev.jasper.app.workspace.WindowCallbacks;
 import dev.jasper.app.workspace.WorkspaceActivity;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.rendering.FontSet;
 import dev.jasper.terminal.session.SessionLaunchOptions;
+import dev.jasper.terminal.view.TerminalView;
 
 import dev.jasper.terminal.session.TerminalSession;
 import java.awt.Component;
@@ -73,6 +77,11 @@ public final class JasperApplication {
     private final ConfigurationController configuration;
     private boolean quitting;
     private boolean resident;
+    private volatile StartupTrace trace = StartupTrace.current();
+    private int windowsOpened;
+    /** The output watch of every local session this application started, until its first terminal claims it. */
+    private final java.util.Map<TerminalSession, SessionOutput> outputs =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
     private java.util.function.BinaryOperator<Runnable> residentIndicator = (open, quit) -> () -> { };
     private Runnable removeIndicator;
@@ -218,7 +227,7 @@ public final class JasperApplication {
         // Registered whether or not residency is on, because a window that is merely minimized
         // should come back the same way.
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
-            reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise());
+            reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise("reopen"));
             Desktop.getDesktop().addAppEventListener(reopenListener);
         }
         if (supports(Desktop.Action.APP_PREFERENCES)) {
@@ -265,23 +274,31 @@ public final class JasperApplication {
         return timer::stop;
     }
 
+    /** Tests replace the process-wide trace. EDT. */
+    void trace(StartupTrace value) { trace = java.util.Objects.requireNonNull(value, "value"); }
+
+    /** The first plain window of a process is its cold start; later plain windows come from a menu or shortcut. */
+    static String windowTrigger(int windowsOpened) { return windowsOpened == 0 ? "cold" : "menu"; }
+
     /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
-    public TerminalWindow newWindow() { return openWindow(null, false); }
+    public TerminalWindow newWindow() { return openWindow(null, false, windowTrigger(windowsOpened)); }
 
     /** A window whose tab starts in {@code directory}; null opens a detached window with no tab. */
-    public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null); }
+    public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null, "menu"); }
 
-    private TerminalWindow openWindow(Path directory, boolean detached) {
+    private TerminalWindow openWindow(Path directory, boolean detached, String trigger) {
         contributions.content().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
         });
         if (quitting) return null;
+        WindowTrace windowTrace = trace.window(trigger);
+        windowsOpened++;
         boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
-            (path, settings) -> track(startSession(path, settings)), shellIntegrationDir, shellProfiles::resolve,
+            (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
             () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem);
         TerminalWindow window = new TerminalWindow(new WindowCallbacks(
             requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quit,
@@ -292,6 +309,7 @@ public final class JasperApplication {
         window.content().connectContributions(contributions, uiState);
         window.content().connectTerminals(terminals, window::toFront);
         window.content().onToggleBuddy = this::toggleBuddy;
+        window.content().onFirstTerminal(pane -> timeFirstTerminal(pane, windowTrace));
         window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
         window.content().activity(event -> {
@@ -313,6 +331,8 @@ public final class JasperApplication {
             }
         });
         windows.add(window); window.show();
+        windowTrace.mark(WindowTrace.Milestone.SHOWN);
+        trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
         return window;
     }
 
@@ -338,7 +358,7 @@ public final class JasperApplication {
 
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
-            removeIndicator = residentIndicator.apply(this::openOrRaise, this::quit);
+            removeIndicator = residentIndicator.apply(() -> openOrRaise("menu"), this::quit);
         } else if (!show && removeIndicator != null) {
             Runnable remove = removeIndicator;
             removeIndicator = null;
@@ -375,18 +395,18 @@ public final class JasperApplication {
 
     /**
      * The handoff, the macOS reopen event and the resident indicator share this: raise what is open, or open the
-     * first window where a new shell starts.
+     * first window where a new shell starts. {@code trigger} names the caller for start-up timing.
      */
-    public void openOrRaise() {
+    public void openOrRaise(String trigger) {
         if (quitting || stopped) return;
-        if (windows.isEmpty()) newWindow();
+        if (windows.isEmpty()) openWindow(null, false, trigger);
         else raiseTerminal();
     }
 
-    /** As {@link #openOrRaise()}, opening the first window in {@code directory}. */
-    public void openOrRaise(Path directory) {
+    /** As {@link #openOrRaise(String)}, opening the first window in {@code directory}. */
+    public void openOrRaise(Path directory, String trigger) {
         if (quitting || stopped) return;
-        if (windows.isEmpty()) newWindow(directory);
+        if (windows.isEmpty()) openWindow(directory, directory == null, trigger);
         else raiseTerminal();
     }
 
@@ -652,6 +672,33 @@ public final class JasperApplication {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
             throw new UncheckedIOException(failure);
         }
+    }
+
+    /** Marks the first spawn and watches the session's first output from right after its start. Any thread. */
+    private TerminalSession watchOutput(TerminalSession session) {
+        trace.mark(StartupTrace.Milestone.SHELL_SPAWNED);
+        outputs.put(session, SessionOutput.watch(session, () -> trace.mark(StartupTrace.Milestone.SHELL_OUTPUT)));
+        return session;
+    }
+
+    /** First paint, then the first paint after output: the window is usable. EDT. */
+    private void timeFirstTerminal(TerminalPane pane, WindowTrace windowTrace) {
+        TerminalView view = pane.view();
+        view.afterNextPaint(() -> {
+            windowTrace.mark(WindowTrace.Milestone.FIRST_PAINT);
+            trace.mark(StartupTrace.Milestone.FIRST_PAINT);
+        });
+        view.repaint();
+        SessionOutput output = outputs.remove(pane.session());
+        if (output == null) return; // A provider's connection or a supplied test launcher: no output timing.
+        output.whenSeen(() -> SwingUtilities.invokeLater(() -> {
+            if (pane.view() != view) return;
+            view.afterNextPaint(() -> {
+                windowTrace.mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+                trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+            });
+            view.repaint();
+        }));
     }
 
     /** Remembers a shell so shutdown can wait for it to leave before terminating the JVM. */

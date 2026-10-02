@@ -11,6 +11,7 @@ import dev.jasper.app.platform.LoginItem;
 import dev.jasper.app.platform.ResidentTray;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
+import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.bootstrap.StartupResources;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -26,6 +27,7 @@ public final class ApplicationBootstrap {
     private ApplicationBootstrap() {}
 
     public static void main(String[] args) {
+        StartupTrace.current().mark(StartupTrace.Milestone.MAIN_ENTERED);
         int result = start(args, System.out, System.err, ApplicationBootstrap::prepareDesktop);
         if (result != 0) System.exit(result);
     }
@@ -74,6 +76,7 @@ public final class ApplicationBootstrap {
                                      UnexpectedExceptions exceptions, Thread shutdown, AtomicReference<HandoffSocket> endpoint) {
         ConfigService service = startup.service(); AppArguments options = startup.options();
         try {
+            StartupTrace.current().mark(StartupTrace.Milestone.TOOLKIT_READY);
             boolean resident = service.initialState().snapshot().backgroundEnabled();
             Path home = Path.of(System.getProperty("user.home"));
             String appPath = System.getProperty("jpackage.app-path");
@@ -95,13 +98,21 @@ public final class ApplicationBootstrap {
                     endpoint.set(bound);
                     return bound;
                 }, application -> {
-                    if (!options.background()) { application.newWindow(); return; }
+                    if (!options.background()) {
+                        long window = System.nanoTime();
+                        application.newWindow();
+                        StartupTrace.current().phase("first window", window);
+                        return;
+                    }
                     if (!application.resident()) {
                         LOG.log(System.Logger.Level.WARNING, standalone
                             ? "Started with --background, but a --config, --safe-mode, --plugin-dir or --standalone launch is always standalone and cannot be resident; exiting"
                             : "Started with --background but the handoff endpoint is unavailable; exiting");
                         application.quitNow();
-                    } else application.warmUp();
+                    } else {
+                        application.warmUp();
+                        StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP);
+                    }
                 });
         } catch (RuntimeException | Error failure) {
             // Also covers failure before composition took ownership (for example initial role resolution).
@@ -113,6 +124,7 @@ public final class ApplicationBootstrap {
 
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
                                                        AppArguments options, java.util.List<dev.jasper.app.appearance.ThemeCatalog.Problem> themeProblems) {
+        long began = System.nanoTime();
         var acquired = new StartupResources();
         try {
             ApplicationIcon.installTaskbarIcon();
@@ -131,6 +143,7 @@ public final class ApplicationBootstrap {
             // Shown only once startup settles residency, and only on Windows.
             application.residentIndicator(ResidentTray::install);
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
+            StartupTrace.current().phase("application", began);
             acquired.transfer();
             return application;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }
@@ -224,9 +237,14 @@ public final class ApplicationBootstrap {
         // not settle a second icon into the Dock on its way out.
         if (handsOff(options, dirs)) return 0;
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
+        long upgrade = System.nanoTime();
         var problems = dev.jasper.app.application.ThemeUpgrade.prepare(file, os.startsWith("Mac"));
+        StartupTrace.current().phase("theme upgrade", upgrade);
         var acquired = new StartupResources();
+        long read = System.nanoTime();
         ConfigService service = acquired.own(new ConfigService(file, os.startsWith("Mac")));
+        StartupTrace.current().phase("config", read);
+        StartupTrace.current().mark(StartupTrace.Milestone.CONFIG_LOADED);
         try {
             launch.accept(new Startup(service, options, problems));
             acquired.transfer();
@@ -292,7 +310,7 @@ public final class ApplicationBootstrap {
                 SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;
             }
-            SwingUtilities.invokeLater(application::openOrRaise);
+            SwingUtilities.invokeLater(() -> application.openOrRaise("handoff"));
             return LaunchRequest.Response.OK;
         };
     }

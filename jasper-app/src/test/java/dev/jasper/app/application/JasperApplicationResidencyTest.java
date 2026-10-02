@@ -119,11 +119,11 @@ class JasperApplicationResidencyTest {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
         edt(application::quit);
-        // Only that a late request is harmless: with no windows open this reaches newWindow, which
+        // Only that a late request is harmless: with no windows open this reaches openWindow, which
         // has its own quitting guard. The branch that openOrRaise's own guard protects -- raising an
         // existing window during shutdown -- needs a live window and cannot be covered headlessly.
         // It is on the manual checklist instead.
-        edt(() -> application.openOrRaise(DesktopTestSupport.HOME));
+        edt(() -> application.openOrRaise(DesktopTestSupport.HOME, "handoff"));
         edt(() -> { });
     }
 
