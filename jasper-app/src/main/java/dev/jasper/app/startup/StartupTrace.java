@@ -1,5 +1,6 @@
 package dev.jasper.app.startup;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -7,6 +8,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -79,6 +81,7 @@ public final class StartupTrace {
     private final Map<Milestone, List<Runnable>> waiting = new EnumMap<>(Milestone.class); // guarded by this
     private final Deque<WindowTrace> windows = new ArrayDeque<>(); // guarded by windowsLock
     private final Object windowsLock = new Object();
+    private final Object fileLock = new Object();
     private final AtomicBoolean settling = new AtomicBoolean();
     private volatile boolean settled;
     private volatile JvmStatus jvm;
@@ -184,18 +187,55 @@ public final class StartupTrace {
         synchronized (windowsLock) { return List.copyOf(windows); }
     }
 
-    /** Idempotent: logs the start-up line once, on a background thread. */
+    /** Idempotent: logs the start-up line once and writes the trace file, on a background thread. */
     public void settle() {
         if (!settling.compareAndSet(false, true)) return;
         environment.background().execute(() -> {
             JvmStatus status = status();
             environment.log().accept(line(status));
             settled = true;
+            writeFile();
         });
     }
 
     void windowCompleted(WindowTrace trace) {
-        environment.background().execute(() -> environment.log().accept(trace.line()));
+        environment.background().execute(() -> {
+            environment.log().accept(trace.line());
+            writeFile();
+        });
+    }
+
+    /** The trace file's content; see the start-up benchmark for its reader. */
+    Map<String, Object> document(JvmStatus status) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("schema", 1);
+        root.put("pid", environment.pid());
+        root.put("processStart", environment.processStart().toString());
+        Map<String, Object> vm = new LinkedHashMap<>();
+        vm.put("aotCache", status.aotCache());
+        vm.put("cds", status.cds());
+        root.put("jvm", vm);
+        root.put("kind", kind());
+        root.put("settled", settled);
+        Map<String, Object> milestones = new LinkedHashMap<>();
+        for (Milestone milestone : Milestone.values()) millis(milestone).ifPresent(at -> milestones.put(milestone.name(), round(at)));
+        root.put("milestones", milestones);
+        Map<String, Object> durations = new LinkedHashMap<>();
+        phaseMillis().forEach((name, millis) -> durations.put(name, round(millis)));
+        root.put("phases", durations);
+        root.put("windows", windows().stream().map(WindowTrace::document).toList());
+        return root;
+    }
+
+    private void writeFile() {
+        Path file = environment.traceFile();
+        if (file == null) return;
+        synchronized (fileLock) {
+            try { StartupTraceFile.write(file, document(status())); }
+            catch (IOException | RuntimeException failure) {
+                environment.log().accept("Could not write the start-up trace " + file + ": " + failure.getMessage());
+            }
+        }
     }
 
     long nanos() { return environment.nanos().getAsLong(); }
