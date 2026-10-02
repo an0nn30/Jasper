@@ -17,15 +17,15 @@
   cancels it, only a left release drops, popup-trigger presses are ignored, and a left press during a drag means the
   release was lost, so the drag is cancelled and the new press starts over; `DockDragTest` grew by 4 cases, and a lint
   fix was made); Task 6, the drag returns home and the source group keeps its step (`DockDrag` targets the lifted stripe
-  button's home, its old square, slot and index, until the cursor first leaves it, and a resize forgets it; during a
-  drag the lifted button's group keeps its step at the group's end and the gap takes it when the target is in that
-  group, so later groups do not slide up; three `ToolStripeDragTest` values moved one step; final counts `DockDragTest`
-  17 cases, `ToolStripeDragTest` 8); Tasks 1, 2 and 3 none in code. Planning decisions are listed in the plan.
-  `./gradlew check --continue`: 8,038 tests, 1 failure, 0 errors, 6 skipped; the one failure is
-  `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
-  "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite
-  load (it did not fail in this run and passes when run alone). No GUI launched; GUI checks for the user are the plan's
-  last section.
+  button's home, its old square, slot and index, until the cursor first leaves that square grown by the drag threshold
+  and one more pixel on every side, and a resize forgets it; during a drag the lifted button's group keeps its step at
+  the group's end and the gap takes it when the target is in that group, so later groups do not slide up; three
+  `ToolStripeDragTest` values moved one step; final counts `DockDragTest` 17 cases, `ToolStripeDragTest` 8); Tasks 1, 2
+  and 3 none in code. Planning decisions are listed in the plan. `./gradlew check --continue`: 8,038 tests, 1 failure, 0
+  errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac
+  only (its `java.io.tmpdir` contains "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed`
+  (Remote) is flaky under full-suite load (it did not fail in this run and passes when run alone). No GUI launched; GUI
+  checks for the user are the plan's last section.
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.

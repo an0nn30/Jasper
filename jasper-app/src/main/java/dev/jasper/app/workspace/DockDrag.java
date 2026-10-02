@@ -29,16 +29,17 @@ import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 
 /**
- * One window's dock drag: press on a stripe button or a tool window header and move more than 5px. It uses plain
- * mouse events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
+ * One window's dock drag: press on a stripe button or a tool window header and move more than 5px. It uses plain mouse
+ * events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
  * synthetic events. While it runs, both stripes show all three groups with the dragged button lifted out, the target
  * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}; the real
- * layout does not change. Until the cursor first leaves a stripe button's old place, that place is its own target, so
- * pressing, moving a few pixels and releasing on the spot changes nothing even where the drag layout shifts the
- * stripe; after that the resolver decides from what the stripes show. Releasing the left button over a target hands
- * the drop to {@link #onDrop}; releasing it anywhere else, Esc, {@link #cancel} or another press (a right or middle
- * click, or a left press after a lost release) ends the drag without one. A window resize while dragging forgets the
- * old place and resolves the target again. EDT only.
+ * layout does not change. Until the cursor first leaves a stripe button's old place, its square grown by the drag
+ * threshold and one more pixel on every side, that place is its own target, so pressing, moving a few pixels and
+ * releasing on the spot changes nothing even near the button's edge, where the drag layout shifts the stripe; after
+ * that the resolver decides from what the stripes show. Releasing the left button over a target hands the drop to
+ * {@link #onDrop}; releasing it anywhere else, Esc, {@link #cancel} or another press (a right or middle click, or a
+ * left press after a lost release) ends the drag without one. A window resize while dragging forgets the old place and
+ * resolves the target again. EDT only.
  */
 final class DockDrag {
     /** How far, in logical pixels, a press must move before it becomes a drag. */
@@ -63,8 +64,8 @@ final class DockDrag {
     private Point last;
     private Optional<DockDropResolver.Target> target = Optional.empty();
     /**
-     * A dragged stripe button's old place in root coordinates, its slot and its index there. Null for a header drag,
-     * once the cursor has left it and after a resize.
+     * A dragged stripe button's old square in root coordinates, its slot and its index there. Null for a header drag,
+     * once the cursor has left the square grown by the drag threshold, and after a resize.
      */
     private Rectangle home;
     private Slot homeSlot;
@@ -172,7 +173,7 @@ final class DockDrag {
         for (ToolStripe stripe : stripes)
             if (stripe.isVisible()) for (DockDropResolver.Group group : stripe.dropGroups()) groups.add(inRoot(stripe, group));
         Rectangle workspace = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), root);
-        if (home != null && !home.contains(at)) forgetHome();
+        if (home != null && !nearHome(at)) forgetHome();
         target = home != null ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex))
             : DockDropResolver.resolve(at, groups, workspace);
         for (ToolStripe stripe : stripes)
@@ -208,6 +209,18 @@ final class DockDrag {
             parent.remove(overlay);
             parent.repaint();
         }
+    }
+
+    /**
+     * True within the home square grown by the threshold and one more pixel on every side. A drag starts only past the
+     * threshold, so its first event already lies that far from the press; with {@link Rectangle#contains}'s open right
+     * and bottom edges the grown square reaches exactly that far past the button's last pixel on all four sides.
+     */
+    private boolean nearHome(Point at) {
+        int reach = UIScale.scale(THRESHOLD) + 1;
+        Rectangle around = new Rectangle(home);
+        around.grow(reach, reach);
+        return around.contains(at);
     }
 
     private void forgetHome() {

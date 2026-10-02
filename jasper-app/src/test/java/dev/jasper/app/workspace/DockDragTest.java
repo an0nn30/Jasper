@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
@@ -123,6 +124,62 @@ class DockDragTest {
             for (Point point : points) mouse(source, MouseEvent.MOUSE_DRAGGED, point);
             return source;
         }
+
+        /**
+         * Presses on b at the point, drags straight out by the distance (the first drag event), comes back and
+         * releases on the press point. Returns the target the drag had back on the press point, just before the release.
+         */
+        DockDropResolver.Target wobble(Point press, int dx, int dy) {
+            var source = button(left, "b");
+            mouse(source, MouseEvent.MOUSE_PRESSED, press);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx, press.y + dy));
+            assertThat(drag.active()).as("the first event past the threshold starts the drag").isTrue();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, press);
+            DockDropResolver.Target back = drag.target().orElseThrow();
+            mouse(source, MouseEvent.MOUSE_RELEASED, press);
+            assertThat(drag.active()).isFalse();
+            return back;
+        }
+
+        /** b's square, in the content's coordinates. */
+        Rectangle squareOfB() { return SwingUtilities.convertRectangle(left, button(left, "b").getBounds(), content); }
+    }
+
+    /** The first drag event is at least the threshold and one more pixel from the press. */
+    private static int firstDragEvent() { return UIScale.scale(DockDrag.THRESHOLD) + 1; }
+
+    @Test void aWobbleOutOfTheLastRowAndBackStaysHome() {
+        var w = new Window();
+        Rectangle square = w.squareOfB();
+        // b's last pixel row: once b is lifted, c slides up into b's square, and this row is below c's middle.
+        Point press = new Point((int) square.getCenterX(), square.y + square.height - 1);
+        assertThat(w.wobble(press, 0, firstDragEvent())).as("still home").isEqualTo(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 1));
+        assertThat(w.state.ids(Slot.LEFT_TOP)).as("nothing moved").containsExactly("a", "b", "c");
+    }
+
+    @Test void aWobbleOutOfTheLastColumnAndBackStaysHome() {
+        var w = new Window();
+        Rectangle square = w.squareOfB();
+        // b's last pixel column, in its lower half; the wobble goes past the stripe's edge into the workspace.
+        Point press = new Point(square.x + square.width - 1, (int) square.getCenterY() + 4);
+        assertThat(w.wobble(press, firstDragEvent(), 0)).as("still home").isEqualTo(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 1));
+        assertThat(w.state.ids(Slot.LEFT_TOP)).as("nothing moved").containsExactly("a", "b", "c");
+    }
+
+    @Test void oneMorePixelOutLeavesHomeAndComingBackIsResolvedFromTheStripe() {
+        int out = firstDragEvent() + 1;
+        var down = new Window();
+        Rectangle square = down.squareOfB();
+        Point lastRow = new Point((int) square.getCenterX(), square.y + square.height - 1);
+        assertThat(down.wobble(lastRow, 0, out)).as("c slid up into b's square, and the press point is below its middle")
+            .isEqualTo(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
+        assertThat(down.state.ids(Slot.LEFT_TOP)).containsExactly("a", "c", "b");
+
+        var right = new Window();
+        square = right.squareOfB();
+        Point lastColumn = new Point(square.x + square.width - 1, (int) square.getCenterY() + 4);
+        assertThat(right.wobble(lastColumn, out, 0)).isEqualTo(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
+        assertThat(right.state.ids(Slot.LEFT_TOP)).containsExactly("a", "c", "b");
     }
 
     @Test void aPressBecomesADragOnlyPastFivePixelsAndTheOverlayComesAndGoes() {
