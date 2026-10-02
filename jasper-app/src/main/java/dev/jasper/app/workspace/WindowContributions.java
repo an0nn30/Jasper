@@ -6,6 +6,7 @@ import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.contributions.PanelSite;
+import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
@@ -76,6 +77,8 @@ final class WindowContributions implements AutoCloseable {
         }
         owner.area().onMove = this::movePanel;
         owner.area().onHide = this::hidePanel;
+        owner.dockDrag().onDrop = this::dropped;
+        owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
         dock.addListener(docked);
         panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
@@ -155,6 +158,22 @@ final class WindowContributions implements AutoCloseable {
 
     private void hidePanel(String id) { if (panels.containsKey(id)) dock.hide(id); }
 
+    /**
+     * A drop from the dock drag. Over a stripe the window moves and keeps its visibility; over the workspace it moves
+     * and shows, and the slot's previously showing window hides but stays on its stripe. A workspace drop on the
+     * window's own slot keeps its place in the group.
+     */
+    private void dropped(String id, DockDropResolver.Target target) {
+        if (!panels.containsKey(id)) return;
+        Slot slot = target.slot();
+        if (target.onStripe()) {
+            dock.move(id, slot, target.index().getAsInt());
+            return;
+        }
+        List<String> ids = dock.ids(slot);
+        dock.moveAndShow(id, slot, ids.contains(id) ? ids.indexOf(id) : ids.size());
+    }
+
     /** From a Move to menu: the end of the target slot's group, keeping visibility. */
     private void movePanel(String id, Slot slot) {
         if (!panels.containsKey(id) || dock.slot(id).filter(slot::equals).isPresent()) return;
@@ -212,6 +231,8 @@ final class WindowContributions implements AutoCloseable {
      * shown panels hear it, so a window that takes focus when it shows keeps it when it replaces another.
      */
     private void docked(DockState.Change change) {
+        // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
+        owner.dockDrag().cancel();
         for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
@@ -271,6 +292,7 @@ final class WindowContributions implements AutoCloseable {
     }
 
     private void renderStripes() {
+        owner.dockDrag().cancel();
         List<ToolStripe.Button> left = new ArrayList<>(), right = new ArrayList<>();
         for (Slot slot : Slot.values())
             for (String id : dock.ids(slot)) {
@@ -352,6 +374,9 @@ final class WindowContributions implements AutoCloseable {
         listening.close();
         listening = null;
         // Closing the window is not hiding its panels, and every change was saved as it happened: just let go of the dock.
+        owner.dockDrag().cancel();
+        owner.dockDrag().onDrop = (id, target) -> { };
+        owner.dockDrag().icons = id -> null;
         dock.removeListener(docked);
         commands.values().forEach(Subscription::close);
         commands.clear();

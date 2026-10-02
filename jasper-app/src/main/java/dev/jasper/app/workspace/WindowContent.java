@@ -81,6 +81,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final DockState dock = new DockState();
     private final ToolWindowArea area;
     private final ToolStripe leftStripe = new ToolStripe(Side.LEFT), rightStripe = new ToolStripe(Side.RIGHT);
+    /** Drags a tool window from its stripe button or its header to another slot. */
+    private final DockDrag dockDrag;
     private UiState uiState = UiState.inMemory();
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
@@ -208,6 +210,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         rightStripe.setVisible(false);
         var body = new JPanel(new BorderLayout());
         body.add(leftStripe, BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(rightStripe, BorderLayout.EAST);
+        dockDrag = new DockDrag(this, dock, area, leftStripe, rightStripe);
+        leftStripe.dragSource = dockDrag::install;
+        rightStripe.dragSource = dockDrag::install;
+        area.dragSource = dockDrag::install;
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
@@ -647,6 +653,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     DockState dock() { return dock; }
     ToolStripe leftStripe() { return leftStripe; }
     ToolStripe rightStripe() { return rightStripe; }
+    DockDrag dockDrag() { return dockDrag; }
     boolean railVisible() { return uiState.railVisible(); }
 
     void setRailVisible(boolean value) {
@@ -1100,6 +1107,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
+        dockDrag.cancel();
         paletteKeys.close();
         if (contributed != null) { contributed.close(); contributed = null; }
         commandPalette.close(); windowCommands.close(); commands.close();
