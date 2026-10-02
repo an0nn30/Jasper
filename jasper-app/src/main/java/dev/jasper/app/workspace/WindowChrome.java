@@ -31,7 +31,7 @@ final class WindowChrome {
     private final WindowStatusBar status = new WindowStatusBar();
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
     private final JMenu uiThemes = new JMenu("UI Theme");
-    private final JMenu workspaceThemes = new JMenu("Workspace Theme");
+    private final JMenu workspaceThemes = new JMenu("Workspace Scheme");
     private dev.jasper.app.appearance.ThemeCatalog.Snapshot displayedThemes;
     private String displayedUi, displayedWorkspace;
     private final MenuListener themeMenuListener = new MenuListener() {

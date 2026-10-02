@@ -20,7 +20,7 @@ final class ThemeImportView extends JPanel {
         var text = new StringBuilder();
         for (var item : plan.items()) {
             var row = new JPanel(new BorderLayout(8,4));
-            row.add(ThemePicker.literal(item.conversion().document().name() + " — " + item.conversion().sourceEntry()),BorderLayout.CENTER);
+            row.add(literal(item.conversion().document().name() + " — " + item.conversion().sourceEntry()),BorderLayout.CENTER);
             var choice = new JComboBox<>(item.target().isPresent() ? ThemeImporter.ConflictChoice.values()
                 : new ThemeImporter.ConflictChoice[]{ThemeImporter.ConflictChoice.KEEP_BOTH,ThemeImporter.ConflictChoice.SKIP});
             choice.setSelectedItem(item.target().isPresent() ? ThemeImporter.ConflictChoice.SKIP : ThemeImporter.ConflictChoice.KEEP_BOTH);
@@ -37,5 +37,6 @@ final class ThemeImportView extends JPanel {
         var buttons=new JPanel(new FlowLayout(FlowLayout.TRAILING));var back=new JButton("Cancel");buttons.add(back);buttons.add(commit);add(buttons,BorderLayout.SOUTH);
         commit.setEnabled(!plan.items().isEmpty());commit.addActionListener(e -> {commit.setEnabled(false);accept.accept(choices());});back.addActionListener(e -> cancel.run());
     }
+    private static JLabel literal(String text) { var label = new JLabel(); label.putClientProperty("html.disable", Boolean.TRUE); label.setText(text); return label; }
     Map<String,ThemeImporter.ConflictChoice> choices(){var values=new LinkedHashMap<String,ThemeImporter.ConflictChoice>();decisions.forEach((id,box)->values.put(id,(ThemeImporter.ConflictChoice)box.getSelectedItem()));return Map.copyOf(values);}
 }

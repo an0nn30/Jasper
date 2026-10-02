@@ -465,24 +465,17 @@ public final class JasperApplication {
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
+            var themeChoices = new dev.jasper.app.settingsui.ThemeChoices(() -> themeCatalog.latest().names(), context -> {
+                var imports = new dev.jasper.app.themesui.ThemeImport(context, configuration.state().file().toAbsolutePath().getParent(), auxiliary,
+                    () -> configuration.reload().thenApply(ignored -> null),
+                    java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
+                        var thread = new Thread(runnable, "jasper-theme-import"); thread.setDaemon(true); return thread;
+                    }));
+                return new dev.jasper.app.settingsui.ThemeChoices.Import(imports::start, imports::close);
+            });
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(),
-                    system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
+                dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
-                        context -> new dev.jasper.app.themesui.ThemesPage(context, themeCatalog::latest,
-                            () -> configuration.snapshot().viewOptions(configuration.snapshot().font().size(), themes.current().palette()),
-                            new dev.jasper.app.themesui.ThemeActions(context, configuration.state().file().toAbsolutePath().getParent(), auxiliary,
-                                () -> configuration.reload().thenApply(ignored -> null), path -> {
-                                    if (!java.awt.Desktop.isDesktopSupported() || !java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN))
-                                        throw new IllegalStateException("Opening folders is unavailable on this desktop.");
-                                    try { java.awt.Desktop.getDesktop().open(path.toFile()); }
-                                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
-                                }, path -> java.awt.Desktop.isDesktopSupported()
-                                    && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.MOVE_TO_TRASH)
-                                    && java.awt.Desktop.getDesktop().moveToTrash(path.toFile()),
-                                java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
-                                    var thread = new Thread(runnable, "jasper-theme-actions"); thread.setDaemon(true); return thread;
-                                }))),
                         context -> plugins.settingsPages(context))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));

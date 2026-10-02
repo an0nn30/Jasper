@@ -401,23 +401,23 @@ and icons use the active theme and bundled catalog. `shortcutHelpPreview` render
 expanded and editing states in both themes and larger UI type without opening a window.
 
 
-### Maintaining the Themes page
+### Maintaining the theme dropdowns and Import theme…
 
-`themesui.ThemesPage` owns the two draft-bound pickers, local `ThemePreview` and page-scoped `ThemeActions` worker.
-`settingsui.CorePages` receives its factory from application wiring, so it has no dependency on themesui. The two
-canonical theme settings are deliberately absent from schema rows; the setting-coverage test counts their explicit
-page ownership. Preview generation runs on EDT against private effective defaults; it never installs a LAF.
+The Appearance page's Theme and Workspace scheme rows are ordinary schema rows (`Editors.theme` and
+`Editors.workspaceScheme`, one `Editors.ThemePick` each). `settingsui.ThemeChoices` carries the catalog's names and a
+per-page import factory from application wiring, so settingsui has no dependency on themesui. A pick re-reads the
+names on each page refresh (`ValueEditor.refresh`); a saved name the catalog lacks stays listed as "(not found)" and
+keeps its spelling. Only the Theme row has the gear; its page disposes the row, which closes the import.
 
-All file/conversion/hash/desktop work runs on the serial action worker. Dialogs and reload requests run on EDT;
-completion waits for catalog refresh before updating a live page. A closed page suppresses UI callbacks while a
-running confirmed write still refreshes application state. Removal eligibility is checked off EDT and the eventual
-operation captures/rechecks its own frozen intent. Never replace a failed trash operation with silent deletion.
+`themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;
+completion waits for the catalog refresh before reporting. A closed import suppresses UI callbacks while a running
+confirmed write still refreshes application state. Copying, editing and removing themes are file edits in the
+`themes` folder; there is no UI for them.
 
 The configuration worker's companion scan hashes native content every second and publishes catalog-only changes.
 `WindowContent` receives the latest snapshot supplier from `ConfigurationController`; menu models rebuild on opening
 only when names or requested choices change. Menu listeners and catalogs are released with the window. Keep the three
 legacy terminal-color command IDs mapped to explicit Jasper names; canonical Light/Dark user names are literal.
 
-Headless checks: ThemesPageTest, ThemePreviewTest, ThemeActionsTest, ThemesWorkflowTest, WindowThemeMenuTest and
-JasperApplicationThemesTest. The user-run native checklist is in the Plan 5 implementation plan; do not launch the GUI
-or native Trash from an unattended agent.
+Headless checks: AppearancePageTest, ThemeImportTest, ThemeImportViewTest, WindowThemeMenuTest and
+JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.

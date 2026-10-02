@@ -2,6 +2,21 @@
 
 ## Current state — 2026-10-02
 
+- **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
+  worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
+  - **On top:** macOS raised the window Settings blocks in front of it. Every modal dialog now floats above Jasper's
+    windows while Jasper is active (`windows.FloatWhileActive`) and drops to the normal level while another
+    application is. Blocking is unchanged: only the opening window.
+  - **Appearance:** Theme and Workspace scheme dropdowns (`Editors.ThemePick`), with a gear beside Theme whose only
+    item is Import theme… (`themesui.ThemeImport`). They are staged until Apply/OK and re-read the catalog on refresh;
+    a missing saved name shows as "(not found)". Font & Colors links to Appearance; View › Themes… opens it.
+    "Workspace theme" is "Workspace scheme" in the UI and docs; the key `ui.theme.workspace` is unchanged.
+  - **Removed:** the Themes page, its pickers, preview, sample terminal and syntax sample, Duplicate, Remove, Open
+    themes folder and About, and the now-unused `ThemeDuplicate` and `ThemeFiles` duplicate/removal operations.
+    The notices still ship (now checked by `PackagedResourcesTest`). The theme-system spec §7 carries a superseded banner.
+  - Not done: GUI check (Settings over its window and other windows, switching apps, the dropdowns, the gear and an
+    import), merge, push.
+
 - **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
   chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
   and hid its detail. They are gone, so the hint bar always shows the selected row's detail and verbs. Typed prefixes,

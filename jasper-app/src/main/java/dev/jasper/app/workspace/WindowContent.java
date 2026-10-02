@@ -487,7 +487,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             chrome.refreshTheme();
         });
     }
-    void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("themes"); }
+    void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("appearance"); }
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         saveSettings = null; openSettingsAt = null; configurationState = null;

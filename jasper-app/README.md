@@ -84,4 +84,4 @@ The app ships 284 native TOML themes and reads user TOMLs from `themes/` beside 
 and Terminal > Font & Colors share the catalog. `themeimport` owns offline conversion, locked generation, safe
 import operations and legacy-file recovery; `application.ThemeUpgrade` runs before ConfigService. The old stores
 are retired. See [themes](../docs/themes.md), [maintenance](../docs/app-maintenance.md#themes) and
-[third-party notices](../THIRD-PARTY-THEMES.md). Plan 5 adds the Themes page and live file reload.
+[third-party notices](../THIRD-PARTY-THEMES.md). Theme files reload live; Settings › Appearance imports them.
