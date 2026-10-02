@@ -83,6 +83,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final ThemeController themes;
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
+    private JComponent cornerLayer;
+    private JRootPane cornerRoot;
+    private final ComponentAdapter cornerRelayout = new ComponentAdapter() {
+        @Override public void componentResized(ComponentEvent event) { layoutCornerLayer(); }
+        @Override public void componentMoved(ComponentEvent event) { layoutCornerLayer(); }
+    };
+    private final java.beans.PropertyChangeListener cornerResized = event -> layoutCornerLayer();
     private final Map<KeyStroke, String> contentBindings = new HashMap<>();
     private final Map<Component, dev.jasper.app.lifecycle.Subscription> contentListeners = new IdentityHashMap<>();
     Runnable onMinimumSizeChanged = () -> {};
@@ -293,6 +300,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         });
         syncContentBindings();
         commandPalette.install(root);
+        installCornerLayer(root);
         syncPaletteDispatcher();
     }
 
@@ -427,6 +435,49 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         });
         rootKeys.clear();
         bindingRoot = null;
+    }
+
+    /**
+     * The application's notification card layer: kept flush with the bottom-right corner of the content area (inside
+     * the rail, above the status bar, over any side or bottom panel) on the root's palette layer, at its preferred size.
+     * Once per window; removed at close.
+     */
+    public void mountCornerLayer(JComponent layer) {
+        if (closed || cornerLayer != null) return;
+        cornerLayer = Objects.requireNonNull(layer, "layer");
+        layer.addPropertyChangeListener("preferredSize", cornerResized);
+        if (bindingRoot != null) installCornerLayer(bindingRoot);
+    }
+
+    private void installCornerLayer(JRootPane root) {
+        if (cornerLayer == null || cornerRoot == root) return;
+        uninstallCornerLayer();
+        cornerRoot = root;
+        root.getLayeredPane().add(cornerLayer, JLayeredPane.PALETTE_LAYER);
+        root.getLayeredPane().addComponentListener(cornerRelayout);
+        regions.addComponentListener(cornerRelayout);
+        layoutCornerLayer();
+    }
+
+    private void uninstallCornerLayer() {
+        if (cornerRoot == null) return;
+        cornerRoot.getLayeredPane().removeComponentListener(cornerRelayout);
+        regions.removeComponentListener(cornerRelayout);
+        cornerRoot.getLayeredPane().remove(cornerLayer);
+        cornerRoot.repaint();
+        cornerRoot = null;
+    }
+
+    void layoutCornerLayer() {
+        if (cornerRoot == null || cornerLayer == null) return;
+        JLayeredPane pane = cornerRoot.getLayeredPane();
+        if (!SwingUtilities.isDescendingFrom(regions, pane)) { cornerLayer.setBounds(0, 0, 0, 0); return; }
+        Rectangle area = SwingUtilities.convertRectangle(regions.getParent(), regions.getBounds(), pane);
+        Dimension size = cornerLayer.getPreferredSize();
+        int width = Math.min(size.width, area.width), height = Math.min(size.height, area.height);
+        cornerLayer.setBounds(area.x + area.width - width, area.y + area.height - height, width, height);
+        cornerLayer.revalidate();
+        cornerLayer.repaint();
     }
 
     void setBindings(KeyBindings replacement) {
@@ -1119,6 +1170,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
         if (windowTabs != null) windowTabs.close();
+        uninstallCornerLayer();
+        if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
         Runnable closeTabs = () -> {
             for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }
