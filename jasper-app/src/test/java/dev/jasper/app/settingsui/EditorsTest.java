@@ -186,36 +186,6 @@ class EditorsTest {
         assertThat(editor.value()).isEqualTo("/bin/zsh");
     }
 
-    @Test void theThemeComboEndsInGetMoreThemesWhichNavigatesWithoutEditing() {
-        var navigated = new ArrayList<String>();
-        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
-        var names = new ArrayList<>(List.of("Jasper Dark", "IntelliJ Light"));
-        var themes = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
-        var editor = build(Editors.theme(() -> List.copyOf(names)), CoreSettings.UI_THEME_NAME, themes);
-        var edits = new int[1];
-        editor.show("Jasper Dark");
-        editor.onEdit(() -> edits[0]++);
-        @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.component();
-        assertThat(box.getItemAt(box.getItemCount() - 1)).isEqualTo("Get More Themes\u2026");
-        box.setSelectedIndex(box.getItemCount() - 1);
-        assertThat(navigated).containsExactly("themes.intellij#marketplace");
-        assertThat(editor.value()).isEqualTo("Jasper Dark");
-        assertThat(edits[0]).isZero();
-
-        draft.stage(CoreSettings.THEMES_MARKETPLACE_ENABLED, Optional.of(false));
-        names.add("Dracula");
-        ((Editors.ActionCombo) editor).reload();
-        assertThat(box.getItemCount()).isEqualTo(4);
-        assertThat(box.getItemAt(2)).isEqualTo("Dracula");
-        assertThat(box.getItemAt(3)).isEqualTo("Manage Themes\u2026");
-        assertThat(editor.value()).isEqualTo("Jasper Dark");
-        box.setSelectedIndex(3);
-        assertThat(navigated).containsExactly("themes.intellij#marketplace", "themes.intellij#installed");
-        assertThat(edits[0]).isZero();
-        box.setSelectedIndex(2);
-        assertThat(editor.value()).isEqualTo("Dracula");
-        assertThat(edits[0]).isPositive();
-    }
 
     @Test void onlyClicksEnterAndProgrammaticChoicesNavigateFromTheActionEntry() {
         var source = new javax.swing.JPanel();
@@ -233,51 +203,7 @@ class EditorsTest {
         return new java.awt.event.KeyEvent(source, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, code, java.awt.event.KeyEvent.CHAR_UNDEFINED);
     }
 
-    @Test void enterOnTypedActionTextNavigatesAndKeepsTheChosenTheme() {
-        var navigated = new ArrayList<String>();
-        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
-        var themes = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
-        var editor = build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, themes);
-        editor.show("Jasper Dark");
-        @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.component();
-        var field = (JTextField) box.getEditor().getEditorComponent();
-        field.setText("Get More Themes\u2026");
-        field.postActionEvent();
-        assertThat(navigated).containsExactly("themes.intellij#marketplace");
-        assertThat(editor.value()).isEqualTo("Jasper Dark");
-        assertThat(box.getSelectedItem()).isEqualTo("Jasper Dark");
-    }
 
-    @Test void enterOnTheHighlightedActionEntryOfTheOpenListNavigates() {
-        var navigated = new ArrayList<String>();
-        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
-        var themes = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
-        var combo = (Editors.ActionCombo) build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, themes);
-        combo.show("Jasper Dark");
-        var edits = new int[1];
-        combo.onEdit(() -> edits[0]++);
-        @SuppressWarnings("unchecked") var box = (JComboBox<String>) combo.component();
-        // A look-and-feel update gives the combo a new editor field; Enter must be bound on that one too.
-        javax.swing.SwingUtilities.updateComponentTreeUI(box);
-        var field = (JTextField) box.getEditor().getEditorComponent();
-        Object bound = field.getInputMap().get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0));
-        assertThat(field.getActionMap().get(bound)).as("Enter is bound on the current editor").isNotNull();
-        var enter = new java.awt.event.ActionEvent(field, java.awt.event.ActionEvent.ACTION_PERFORMED, "");
-
-        combo.highlight(box.getItemCount() - 1);
-        combo.enter(enter, false);
-        assertThat(navigated).as("with the list closed Enter accepts the text as usual").isEmpty();
-        assertThat(combo.value()).isEqualTo("Jasper Dark");
-        edits[0] = 0;
-        combo.enter(enter, true);
-        assertThat(navigated).containsExactly("themes.intellij#marketplace");
-        assertThat(combo.value()).isEqualTo("Jasper Dark");
-        assertThat(edits[0]).isZero();
-
-        combo.highlight(1);
-        combo.enter(enter, true);
-        assertThat(navigated).as("Enter on a theme row does not navigate").containsExactly("themes.intellij#marketplace");
-    }
 
     private static Editors.TerminalColorsEditor terminalColors(String config, List<String> navigated) {
         var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values());
@@ -290,7 +216,7 @@ class EditorsTest {
         var editor = terminalColors("", navigated);
         @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.choice.component();
         assertThat(java.util.stream.IntStream.range(0, box.getItemCount()).mapToObj(box::getItemAt))
-            .as("Match is the checkbox, not a choice").containsExactly("Jasper Light", "Jasper Dark", "Dracula", "Nord", "More Terminal Themes\u2026");
+            .as("Match is the checkbox, not a choice").containsExactly("Jasper Light", "Jasper Dark", "Dracula", "Nord");
         assertThat(editor.follow.getText()).isEqualTo("Workspace theme follows the UI theme");
 
         editor.show("match");
@@ -320,9 +246,7 @@ class EditorsTest {
         editor.show("DARK");
         assertThat(editor.value()).isEqualTo("DARK");
 
-        box.setSelectedIndex(4);
-        assertThat(navigated).containsExactly("themes.alacritty");
-        assertThat(editor.value()).as("the action is never the value").isEqualTo("DARK");
+        assertThat(navigated).isEmpty();
     }
 
     @Test void unTickingStartsFromTheSavedSeparateChoice() {

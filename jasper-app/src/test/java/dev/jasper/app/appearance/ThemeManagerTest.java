@@ -136,11 +136,10 @@ class ThemeManagerTest {
     @Test void keysFlatLafSkipsAreRestoredWithoutReplacingItsOwn() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            var resolved = new ThemeLoader(Map.of("fixture.json", """
+            var resolved = dev.jasper.app.themeimport.LegacyThemeTestSupport.load("fixture.json", """
                 {"name": "Fixture", "ui": {"SearchEverywhere.Header.background": "#123456",
-                  "EditorTabs.hoverBackground": "#00000019", "ComboBox.background": "#010101"}}""")::get, Map.of())
-                .load("fixture.json");
-            assertThat(ThemeManager.install(resolved, Color.WHITE)).isTrue();
+                  "EditorTabs.hoverBackground": "#00000019", "ComboBox.background": "#010101"}}""");
+            assertThat(ThemeManager.install(resolved.json(), resolved.colors(), Color.WHITE)).isTrue();
             assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019"));
             // FlatLaf reads IntelliJ's combo keys its own way; its value stands.
             assertThat(hex(UIManager.getColor("ComboBox.background"))).isNotEqualTo("#010101");
@@ -173,7 +172,7 @@ class ThemeManagerTest {
     }
 
     @Test void everyBuiltInThemeGeneratesUnderItsOwnName() {
-        assertThat(ThemeManager.builtIns()).containsExactly(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
+        assertThat(ThemeManager.builtIns()).hasSize(284).contains(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
         for (Theme theme : ThemeManager.builtIns()) {
             GeneratedTheme generated = ThemeManager.generated(theme);
             assertThat(generated.name()).isEqualTo(theme.name());
@@ -189,18 +188,18 @@ class ThemeManagerTest {
         assertThat(Theme.INTELLIJ_LIGHT.palette()).isNotEqualTo(Palette.jasperLight());
         // IntelliJ Light's scheme takes its console background from its parent, Default: CONSOLE_BACKGROUND_KEY ffffff.
         assertThat(Theme.INTELLIJ_LIGHT.palette().background()).isEqualTo(new Color(0xffffff));
-        assertThat(Theme.INTELLIJ_LIGHT.palette()).isEqualTo(EditorScheme.named("IntelliJ Light", "IntelliJ Light", false).palette());
+        assertThat(Theme.INTELLIJ_LIGHT.palette()).isEqualTo(dev.jasper.app.themeimport.LegacyThemeTestSupport.palette("IntelliJ Light", false));
     }
 
     @Test void theVendoredIntellijThemesLoadWithoutWarnings() {
         for (String file : List.of("intellij/Light.theme.json", "intellij/darcula.theme.json"))
-            assertThat(ThemeManager.loadBuiltIn(file).warnings()).as(file).isEmpty();
+            assertThat(dev.jasper.app.themeimport.LegacyThemeTestSupport.bundled(file).warnings()).as(file).isEmpty();
     }
 
     @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeFixtures.plugin(home.resolve("themes/fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+            ThemeFixtures.nativePlugin(home.resolve("themes/fixture.toml"), "Fixture Dark", true, "#123456", "101820");
             Theme theme = ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Fixture Dark").orElseThrow();
             assertThat(ThemeManager.install(theme)).isTrue();
             assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Fixture Dark");

@@ -16,9 +16,9 @@ import org.tomlj.TomlPosition;
 import org.tomlj.TomlTable;
 
 /** Reads a Jasper theme file. Every problem is a {@link ThemeFileException} naming the file and line. */
-final class ThemeToml {
+public final class ThemeToml {
     private static final Set<String> TOP = Set.of("name", "dark", "extends", "author", "license", "source", "commit",
-        "ui_complete", "colors", "tokens", "syntax", "ui");
+        "ui_complete", "colors", "tokens", "syntax", "ui", "icons");
     private static final List<String> METADATA = List.of("author", "license", "source", "commit");
     private static final Set<String> STYLE_FIELDS = Set.of("color", "bold", "italic");
     private static final Pattern COLOR = Pattern.compile("#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?");
@@ -35,7 +35,8 @@ final class ThemeToml {
         return new Color((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, alpha);
     }
 
-    static ThemeDocument parse(String text, String origin) {
+    /** Parses native data, reporting invalid values with their source line. */
+    public static ThemeDocument parse(String text, String origin) {
         TomlParseResult toml = Toml.parse(text);
         if (toml.hasErrors()) {
             var error = toml.errors().getFirst();
@@ -85,7 +86,7 @@ final class ThemeToml {
         if (uiTable != null) file.flatten(List.of("ui"), "", uiTable, ui);
         return new ThemeDocument(origin, name.strip(), file.bool(List.of("dark")), parent.map(String::strip),
             parent.isPresent() ? file.line(List.of("extends")) : 0, file.bool(List.of("ui_complete")), metadata, seeds,
-            ansi, tokens, syntax, ui, Map.of());
+            ansi, tokens, syntax, ui, file.icons());
     }
 
     /** Typed reads from one parsed file, each failure naming the key's line. */
@@ -157,6 +158,33 @@ final class ThemeToml {
             }
         }
 
+        Map<String, Object> icons() {
+            TomlTable table = table(List.of("icons"));
+            if (table == null) return Map.of();
+            var result = new LinkedHashMap<String, Object>();
+            int[] count = {0};
+            for (String key : table.keySet())
+                result.put(key, iconValue(List.of("icons", key), table.get(List.of(key)), 1, count));
+            return result;
+        }
+
+        private Object iconValue(List<String> at, Object value, int depth, int[] count) {
+            if (depth > 32) throw error(at, "icon data exceeds maximum nesting of 32");
+            if (++count[0] > 100_000) throw error(at, "icon data exceeds 100000 values");
+            if (value instanceof TomlTable table) {
+                var result = new LinkedHashMap<String, Object>();
+                for (String key : table.keySet())
+                    result.put(key, iconValue(with(at, key), table.get(List.of(key)), depth + 1, count));
+                return result;
+            }
+            if (value instanceof org.tomlj.TomlArray array) {
+                var result = new ArrayList<Object>();
+                for (int i = 0; i < array.size(); i++) result.add(iconValue(at, array.get(i), depth + 1, count));
+                return result;
+            }
+            return scalar(at, label(at), value);
+        }
+
         private Object scalar(List<String> at, String name, Object value) {
             if (value instanceof String text) {
                 String stripped = text.strip();
@@ -164,6 +192,8 @@ final class ThemeToml {
                     throw error(at, "\"" + name + "\" names a Java class; themes cannot load classes");
                 return text;
             }
+            if (value instanceof Double number && !Double.isFinite(number))
+                throw error(at, "\"" + name + "\" must be finite");
             if (value instanceof Long || value instanceof Double || value instanceof Boolean) return value;
             throw error(at, "\"" + name + "\" must be a string, number or boolean");
         }

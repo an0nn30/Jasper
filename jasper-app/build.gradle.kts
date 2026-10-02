@@ -173,3 +173,18 @@ tasks.register<JavaExec>("shortcutHelpPreview") {
     jvmArgs("-Djava.awt.headless=true")
     args(layout.buildDirectory.dir("reports/shortcut-help").get().asFile.absolutePath)
 }
+
+// Offline catalog generation: compile classes and dependencies, without a processResources cycle.
+tasks.register<JavaExec>("convertThemes") {
+    group = "themes"
+    description = "Regenerates native themes from the checked-in source lock (offline)."
+    dependsOn(tasks.compileJava)
+    classpath = files(sourceSets.main.get().output.classesDirs, sourceSets.main.get().resources.srcDirs,
+        configurations.runtimeClasspath)
+    mainClass = "dev.jasper.app.themeimport.ConvertThemes"
+    jvmArgs("-Djava.awt.headless=true")
+    args("--manifest", rootProject.file("tools/themes/sources.json"),
+        "--sources", rootProject.file("third_party/themes"),
+        "--output", file("src/main/resources/dev/jasper/app/themes"),
+        "--notices", rootProject.file("THIRD-PARTY-THEMES.md"))
+}

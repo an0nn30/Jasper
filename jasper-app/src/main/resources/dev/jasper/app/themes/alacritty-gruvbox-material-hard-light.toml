@@ -1,0 +1,33 @@
+"name" = "Gruvbox Material Hard Light"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#f9f5d7"
+"foreground" = "#654735"
+"accent" = "#45707a"
+"cursor" = "#654735"
+"selection" = "#cdc1a6"
+
+[colors.normal]
+"black" = "#654735"
+"red" = "#c14a4a"
+"green" = "#6c782e"
+"yellow" = "#b47109"
+"blue" = "#45707a"
+"magenta" = "#945e80"
+"cyan" = "#4c7a5d"
+"white" = "#f2e5bc"
+
+[colors.bright]
+"black" = "#654735"
+"red" = "#c14a4a"
+"green" = "#6c782e"
+"yellow" = "#b47109"
+"blue" = "#45707a"
+"magenta" = "#945e80"
+"cyan" = "#4c7a5d"
+"white" = "#f2e5bc"

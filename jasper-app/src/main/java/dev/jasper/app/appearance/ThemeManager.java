@@ -26,32 +26,14 @@ import javax.swing.plaf.ColorUIResource;
  */
 public final class ThemeManager {
     private static final String BASE = "dev/jasper/app/themes/";
-    /**
-     * Each theme a {@code parentTheme} may name, with its file under {@link #BASE}. IntelliJ's themes are
-     * keyed by the id IntelliJ registers them under, which is what a {@code parentTheme} names; the classic
-     * IntelliJ Light is also reachable by name.
-     */
-    private static final Map<String, String> FILES = Map.ofEntries(
-        Map.entry("IntelliJ Light", "intellij/Light.theme.json"),
-        Map.entry("JetBrainsLightTheme", "intellij/Light.theme.json"),
-        Map.entry("IntelliJ", "intellij/intellijlaf.theme.json"),
-        Map.entry("Darcula", "intellij/darcula.theme.json"),
-        Map.entry("ExperimentalDark", "intellij/expUI/expUI_dark.theme.json"),
-        Map.entry("ExperimentalLight", "intellij/expUI/expUI_light.theme.json"),
-        Map.entry("ExperimentalLightWithLightHeader", "intellij/expUI/expUI_light_with_light_header.theme.json"),
-        Map.entry("Islands Dark", "intellij/islands/ManyIslandsDark.theme.json"),
-        Map.entry("Islands Light", "intellij/islands/ManyIslandsLight.theme.json"),
-        Map.entry("Islands Darcula", "intellij/islands/ManyIslandsDarcula.theme.json"),
-        Map.entry("JetBrainsHighContrastTheme", "intellij/islands/HighContrast.theme.json"));
     /** Theme-independent application defaults: form typography, input geometry and the split divider. Every theme gets them. */
     public static final Map<String, String> APP_DEFAULTS = appDefaults();
-    private static final ThemeLoader LOADER = new ThemeLoader(ThemeManager::read, FILES);
     private static final Map<Theme, GeneratedTheme> GENERATED = new HashMap<>();
 
     private ThemeManager() {}
 
     /** The bundled themes: Jasper's own, then IntelliJ's. */
-    public static List<Theme> builtIns() { return List.of(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA); }
+    public static List<Theme> builtIns() { return BuiltInThemes.all(); }
 
     /** {@code theme}'s generated values; EDT only (the cache is unsynchronized). */
     public static GeneratedTheme generated(Theme theme) {
@@ -66,14 +48,6 @@ public final class ThemeManager {
         GENERATED.keySet().removeIf(theme -> !(theme.source() instanceof Theme.Bundled) && !themes.contains(theme));
     }
 
-    /** A theme file Jasper ships, resolved; touches no Swing state. */
-    static ThemeLoader.Resolved loadBuiltIn(String file) { return LOADER.load(file); }
-
-    /** A plugin's theme file, resolved against the parent themes Jasper ships; touches no Swing state. */
-    static ThemeLoader.Resolved loadArchive(String entry, String json) {
-        return new ThemeLoader(file -> file.equals(entry) ? json : read(file), FILES).load(entry);
-    }
-
     /** Installs {@code theme} as the look and feel; false when FlatLaf could not set it up. */
     public static boolean install(Theme theme) {
         requireEdt();
@@ -83,22 +57,20 @@ public final class ThemeManager {
     /** Installs a generated theme through the same path as any IntelliJ theme; false when FlatLaf could not set it up. */
     static boolean install(GeneratedTheme theme) {
         requireEdt();
-        var resolved = new ThemeLoader.Resolved(theme.name(), theme.dark(), theme.author(),
-            ThemeLoader.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons()),
-            ThemeLoader.explicitColors(theme.uiKeys()), List.of(), theme.uiKeys(), theme.icons(), Map.of());
-        return install(resolved, theme.terminal().background());
+        return install(FlatLafThemeData.json(theme.name(), theme.dark(), theme.author(), theme.uiKeys(), theme.icons()),
+            FlatLafThemeData.explicitColors(theme.uiKeys()), theme.terminal().background());
     }
 
-    static boolean install(ThemeLoader.Resolved resolved, Color terminalBackground) {
+    static boolean install(String json, Map<String, Color> colors, Color terminalBackground) {
         requireEdt();
         FlatLaf laf;
-        try { laf = IntelliJTheme.createLaf(new ByteArrayInputStream(resolved.json().getBytes(StandardCharsets.UTF_8))); }
+        try { laf = IntelliJTheme.createLaf(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         laf.setExtraDefaults(APP_DEFAULTS);
         if (!FlatLaf.setup(laf)) return false;
         UIDefaults defaults = UIManager.getLookAndFeelDefaults();
         var extra = new LinkedHashMap<>(APP_DEFAULTS);
-        resolved.colors().forEach((key, color) -> {
+        colors.forEach((key, color) -> {
             if (defaults.get(key) != null) return;
             defaults.put(key, new ColorUIResource(color));
             extra.put(key, UiTemplate.hex(color));

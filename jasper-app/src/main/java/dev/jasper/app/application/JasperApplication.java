@@ -67,7 +67,6 @@ public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     private final ThemeController themes;
     private final ThemeCatalog themeCatalog;
-    private final dev.jasper.app.terminalthemes.TerminalThemeCatalog terminalThemes;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
@@ -104,7 +103,6 @@ public final class JasperApplication {
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
     private PluginManager pluginManager;
-    private dev.jasper.app.themestore.ThemeStore themeStore;
     private ResidentControl residentControl = ResidentControl.NONE;
     private boolean replacementHandsOff;
     private boolean standaloneNotice;
@@ -129,6 +127,9 @@ public final class JasperApplication {
     private final TerminalRegistry terminals = new TerminalRegistry();
 
     TerminalRegistry terminals() { return terminals; }
+
+    private volatile List<ThemeCatalog.Problem> migrationProblems = List.of();
+    private List<ThemeCatalog.Problem> startupConfigProblems = List.of();
 
     public JasperApplication() { this(null); }
 
@@ -159,10 +160,14 @@ public final class JasperApplication {
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, List.of());
+    }
+    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, List<ThemeCatalog.Problem> startupThemeProblems) {
+        migrationProblems = List.copyOf(startupThemeProblems);
+        if (service != null) startupConfigProblems = startupThemeProblems.stream().filter(problem -> problem.file().equals(service.initialState().file())).toList();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
-        terminalThemes = service == null ? dev.jasper.app.terminalthemes.TerminalThemeCatalog.bundledOnly()
-            : dev.jasper.app.terminalthemes.TerminalThemeCatalog.beside(service.initialState().file());
         if (service != null) scanThemes(service);
         Theme saved = themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK);
         ThemeController created;
@@ -183,7 +188,7 @@ public final class JasperApplication {
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, terminalThemes);
+        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
         // A supplied launcher (the benchmark, tests) never starts a detected profile, so reg.exe and wsl.exe stay
@@ -227,7 +232,11 @@ public final class JasperApplication {
      * 10 s, so the first window shows the saved theme. Later scans run with each configuration read.
      */
     private void scanThemes(ConfigService service) {
-        try { service.watchWith(() -> { scanQuietly("IntelliJ themes", themeCatalog::scan); scanQuietly("terminal themes", terminalThemes::scan); })
+        try { service.watchWith(() -> { scanQuietly("native themes", themeCatalog::scan);
+            var refreshed = new java.util.LinkedHashSet<>(startupConfigProblems);
+            refreshed.addAll(ThemeUpgrade.diagnostics(service.initialState().file()));
+            migrationProblems = List.copyOf(refreshed);
+        })
             .get(10, java.util.concurrent.TimeUnit.SECONDS); }
         catch (ExecutionException | TimeoutException failure) {
             LOG.log(System.Logger.Level.WARNING, "The themes folder could not be read at start-up", failure);
@@ -454,11 +463,10 @@ public final class JasperApplication {
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), () -> terminalThemes.latest().names(),
+                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(),
                     system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
-                        context -> plugins.settingsPages(context), (context, header) -> themeStore().page(context, header),
-                        context -> Optional.of(new dev.jasper.app.terminalthemes.AlacrittyThemesPage(context, alacrittyHooks())))),
+                        context -> plugins.settingsPages(context))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
@@ -497,19 +505,6 @@ public final class JasperApplication {
             configuration.openConfigFile().whenComplete((file, failure) -> {
                 if (failure != null) SwingUtilities.invokeLater(() -> notice(failure.getMessage()));
             });
-        }
-
-        /** What the Alacritty Themes page needs: the catalog, the reload that rescans it, and the sample terminal's options. */
-        private dev.jasper.app.terminalthemes.AlacrittyThemesPage.Hooks alacrittyHooks() {
-            var editor = new dev.jasper.app.platform.ConfigEditor();
-            return new dev.jasper.app.terminalthemes.AlacrittyThemesPage.Hooks(terminalThemes, () -> configuration.reload(),
-                folder -> CompletableFuture.runAsync(() -> editor.reveal(folder))
-                    .whenComplete((ignored, failure) -> {
-                        if (failure != null) SwingUtilities.invokeLater(() -> notice("Could not reveal " + folder));
-                    }),
-                dev.jasper.app.terminalthemes.AlacrittyThemesPage::ask,
-                () -> { var snapshot = configuration.snapshot(); return snapshot.viewOptions(snapshot.fontSize(), themes.current().palette()); },
-                SwingUtilities::invokeLater);
         }
 
         private void revealConfigFile() {
@@ -762,15 +757,7 @@ public final class JasperApplication {
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
 
     /** The IntelliJ Themes page's store, created the first time Settings builds that page. */
-    private dev.jasper.app.themestore.ThemeStore themeStore() {
-        if (themeStore == null) {
-            var editor = new dev.jasper.app.platform.ConfigEditor();
-            themeStore = dev.jasper.app.themestore.ThemeStore.create(themeCatalog, new dev.jasper.app.themestore.ThemeStore.Hooks(
-                () -> configuration.reload(), this::browse,
-                folder -> CompletableFuture.runAsync(() -> editor.reveal(folder)), dev.jasper.app.themestore.ThemeStore::ask));
-        }
-        return themeStore;
-    }
+
 
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
@@ -833,7 +820,6 @@ public final class JasperApplication {
         if (auxiliary != null) auxiliary.close();
         uiState.save();
         if (pluginTheme != null) pluginTheme.close();
-        if (themeStore != null) themeStore.close();
         notifications.close();
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();

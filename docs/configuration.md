@@ -29,7 +29,7 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
 The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
-Desk Buddy, System Settings), Themes (IntelliJ Themes, Alacritty Themes), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
+Desk Buddy, System Settings), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
 the search field filters the tree and highlights matching settings on the page.
 Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
 ("Ubuntu (WSL 1)"); ↻ detects them again. Program and Arguments apply only to Custom.
@@ -44,8 +44,8 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
-Themes › IntelliJ Themes installs, updates and uninstalls theme plugins at once (see [Themes](themes.md)); only its
-Browse the JetBrains Marketplace checkbox waits for Apply.
+Appearance and Terminal › Font & Colors list the same native theme catalog. The old stores are retired; see
+[Themes](themes.md) for the offline collection and automatic legacy upgrade.
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
@@ -119,10 +119,6 @@ family = "system"
 name = "Jasper Dark"
 workspace = "match"
 
-[themes.marketplace]
-# Search the JetBrains Marketplace from Settings > Themes; false keeps Jasper offline.
-enabled = true
-
 [keybindings]
 # Optional action overrides; see examples below.
 ```
@@ -163,7 +159,6 @@ enabled = true
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
-| `themes.marketplace.enabled` | `true` | Boolean; `false` hides Settings › Themes › IntelliJ Themes' Marketplace tab and stops its update checks | Live |
 | `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
@@ -705,19 +700,18 @@ The workspace setting changes terminal panes, tabs, find controls, dividers, zon
 and Editor syntax in all windows without restarting Editor or discarding edits. Even two themes
 with the same light/dark variant produce a workspace update. A missing workspace theme warns and
 temporarily matches the chrome; its requested name stays saved for repair and reload.
-General plugin pane controls are styled by the next theme deliverable.
+General hosted plugin pane controls also follow the workspace theme.
 
 In Settings › Terminal › Font & Colors, the workspace match checkbox follows the UI theme. Clearing
-it enables the native and Alacritty theme choices (including Jasper Light and Jasper Dark). View → Terminal Colors continues to save this
+it enables the native theme choices (including Jasper Light and Jasper Dark). View → Terminal Colors continues to save this
 workspace choice while the menu is retained. A blank value warns and uses `"match"`; a non-string
 value rejects the configuration.
 
 ### Alacritty themes
 
-Settings › Themes › Alacritty Themes lists the bundled and installed terminal themes, previews each in a sample
-terminal and installs `.toml` theme files into the `terminal-themes` folder beside `config.toml`. Choosing one sets
-`ui.theme.workspace` to its name. The format, the folder and the problems Jasper reports are described in
-[Themes](themes.md#terminal-themes).
+Alacritty palettes are converted into native themes. Existing `terminal-themes/` files migrate once at startup;
+the old store is removed. Select converted palettes in Settings › Terminal › Font & Colors. See
+[Themes](themes.md#converted-terminal-palettes). `themes.marketplace.enabled` is ignored for compatibility.
 
 ### Interface typography
 

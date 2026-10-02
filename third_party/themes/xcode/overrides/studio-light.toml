@@ -1,0 +1,26 @@
+# Jasper-authored terminal palette matched to the upstream editor colors.
+name = "Studio Light"
+extends = "Xcode Light"
+[colors]
+background = "#ffffff"
+foreground = "#000000"
+cursor = "#000000"
+selection = "#a4cdff"
+[colors.normal]
+black = "#000000"
+red = "#c41a16"
+green = "#326d74"
+yellow = "#9c5d27"
+blue = "#0b4f79"
+magenta = "#6c36a9"
+cyan = "#1c6c73"
+white = "#d6d6d6"
+[colors.bright]
+black = "#6a737d"
+red = "#d12f1b"
+green = "#3d858c"
+yellow = "#b87939"
+blue = "#256c9d"
+magenta = "#8858bd"
+cyan = "#398b92"
+white = "#ffffff"

@@ -1,0 +1,33 @@
+"name" = "Meliora"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#1c1917"
+"foreground" = "#d6d0cd"
+"accent" = "#9e96b6"
+"cursor" = "#d6d0cd"
+"selection" = "#2a2522"
+
+[colors.normal]
+"black" = "#2a2421"
+"red" = "#d49191"
+"green" = "#b6b696"
+"yellow" = "#c4b392"
+"blue" = "#9e96b6"
+"magenta" = "#b696b1"
+"cyan" = "#98acc8"
+"white" = "#ddd9d6"
+
+[colors.bright]
+"black" = "#2e2622"
+"red" = "#d89393"
+"green" = "#b9b99b"
+"yellow" = "#c8b692"
+"blue" = "#a299b9"
+"magenta" = "#b997b4"
+"cyan" = "#9bb0ca"
+"white" = "#e1dbd9"

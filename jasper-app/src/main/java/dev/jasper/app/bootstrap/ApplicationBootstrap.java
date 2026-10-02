@@ -30,7 +30,11 @@ public final class ApplicationBootstrap {
         if (result != 0) System.exit(result);
     }
 
-    private static void prepareDesktop(ConfigService service, AppArguments options) {
+    record Startup(ConfigService service, AppArguments options, java.util.List<dev.jasper.app.appearance.ThemeCatalog.Problem> themeProblems) {
+        Startup { themeProblems = java.util.List.copyOf(themeProblems); }
+    }
+    private static void prepareDesktop(Startup startup) {
+        ConfigService service = startup.service(); AppArguments options = startup.options();
         var acquired = new StartupResources();
         acquired.own(service);
         try {
@@ -51,7 +55,7 @@ public final class ApplicationBootstrap {
                 service.initialState().snapshot().nativeDecorations()).configure();
             // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
             JasperApplication.preparePlugins(dirs);
-            SwingUtilities.invokeLater(() -> startDesktop(service, options, dirs, log, exceptions, shutdown, endpoint));
+            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint));
             // The posted EDT composition owns service; the process hook owns logging and the endpoint.
             acquired.transfer();
         } catch (RuntimeException | Error failure) {
@@ -66,8 +70,9 @@ public final class ApplicationBootstrap {
         System.setProperty("apple.laf.useScreenMenuBar", "true");
     }
 
-    private static void startDesktop(ConfigService service, AppArguments options, AppDirs dirs, AppLog log,
+    private static void startDesktop(Startup startup, AppDirs dirs, AppLog log,
                                      UnexpectedExceptions exceptions, Thread shutdown, AtomicReference<HandoffSocket> endpoint) {
+        ConfigService service = startup.service(); AppArguments options = startup.options();
         try {
             boolean resident = service.initialState().snapshot().backgroundEnabled();
             Path home = Path.of(System.getProperty("user.home"));
@@ -80,7 +85,7 @@ public final class ApplicationBootstrap {
                 service.close(); System.exit(0); return;
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
-                history -> createApplication(service, history, dirs, options), application -> {
+                history -> createApplication(service, history, dirs, options, startup.themeProblems()), application -> {
                     if (!standalone)
                         application.loginItems(loginItemReconciler(enabled -> reconcileLoginItem(enabled, appPath, home)));
                     if (!residentRole(options, resident)) return null;
@@ -107,7 +112,7 @@ public final class ApplicationBootstrap {
     }
 
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
-                                                       AppArguments options) {
+                                                       AppArguments options, java.util.List<dev.jasper.app.appearance.ThemeCatalog.Problem> themeProblems) {
         var acquired = new StartupResources();
         try {
             ApplicationIcon.installTaskbarIcon();
@@ -118,7 +123,7 @@ public final class ApplicationBootstrap {
                     "Shell integration scripts could not be installed; integration is off", failure);
             }
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
-                () -> System.exit(0), integrationDir);
+                () -> System.exit(0), integrationDir, themeProblems);
             Path source = HandoffSocket.codeSource();
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
@@ -204,6 +209,9 @@ public final class ApplicationBootstrap {
     /** Startup boundary: parsing, the handoff attempt and the first read finish before the desktop callback runs. */
     static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error,
                      java.util.function.BiConsumer<ConfigService, AppArguments> launch) {
+        return start(args, out, error, startup -> launch.accept(startup.service(), startup.options()));
+    }
+    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, Consumer<Startup> launch) {
         AppArguments options;
         try { options = AppArguments.parse(args, Path.of(System.getProperty("user.dir"))); }
         catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
@@ -216,10 +224,11 @@ public final class ApplicationBootstrap {
         // not settle a second icon into the Dock on its way out.
         if (handsOff(options, dirs)) return 0;
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
+        var problems = dev.jasper.app.application.ThemeUpgrade.prepare(file, os.startsWith("Mac"));
         var acquired = new StartupResources();
         ConfigService service = acquired.own(new ConfigService(file, os.startsWith("Mac")));
         try {
-            launch.accept(service, options);
+            launch.accept(new Startup(service, options, problems));
             acquired.transfer();
             return 0;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }

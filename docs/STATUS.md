@@ -2,6 +2,37 @@
 
 ## Current state — 2026-10-01
 
+- **Theme system Plan 4 complete, independently reviewed and merged locally** (2026-10-01):
+  [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)
+  completes all seven tasks on `codex/theme-system-plans` in `.worktrees/theme-system`. Full `./gradlew check`
+  passes **7,930 tests, zero failures/errors, six skips**, including all four architecture gates, packaged resources,
+  JavaDoc and compiled documentation examples. Java hygiene scans 1,637 source files cleanly; authored diff whitespace passes.
+  The lower final test count reflects retired store/runtime-legacy tests; converter/security/installation parity and
+  native fallback/reload coverage remain. Local merge includes the hidden-rail framing fix; merged verification pending. No GUI or push.
+  The catalog contains **284 native themes from 12 sources/413 hashed inputs**; exact pins, licenses, exclusions and
+  renames are in `tools/themes/sources.json`, SOURCE.md and THIRD-PARTY-THEMES.md. Largest theme: 97,426 bytes;
+  256 KiB cap unchanged. `[icons]` is now a documented native format table. All generation/testing is offline.
+  Safe import/file services preserve originals, freeze decisions, allocate batch names and reject stale replacements.
+  Migration journals intent/output/movement, stages all output before moving local parents, preserves failed originals
+  and persistent warnings, and rewrites only theme config keys before ConfigService construction. Config intent prevents
+  repeated chained renames after interruption; comments and numbered backups are retained. Runtime reads only native
+  TOML. Both old stores are removed; Appearance, Font & Colors and View choices remain operational.
+  Recorded choices include unknown-parent fallback warnings; verified inverse token mappings/FlatLaf post-JSON
+  precedence; explicit classic Darcula scheme and One Dark Modern packaging associations; Frappe → Frappé alias;
+  excluded extra Islands variants; publication/marker cleanup failures do not negate already committed success.
+  Task 7 also fixes positive-line/zero-column theme diagnostics that interrupted malformed-native reloads.
+  Final independent review found four Important issues; one inline TDD fix pass resolves all four. Native parent
+  references follow renamed legacy parents through journaled comment-preserving edits with original backups and
+  crash/stale-file checks (explicit exception to the plan's no-native-rewrite rule). Native imports resolve declared
+  names in local filename order before bundles, with bounded sibling scans. The journal accepts 16×64 providers
+  and validates serialized intent before publication; migration hashes honor format limits before/during reads.
+  The 18 added regression cases include 66-provider ZIP recovery and sparse oversized inputs. Final full check:
+  **7,930/0/0/6**, all architecture gates and 1,637-source hygiene pass; authored diff whitespace clean.
+  Deferred minor: CoreSettings theme help still mentions runtime theme plugins; update with Plan 5 Import UI.
+  No second review or desktop visual acceptance. User-only acceptance checklist:
+  [themes](themes.md#native-acceptance-for-this-upgrade-user-run). **Next: Plan 5**, the Themes page, staged preview,
+  Import/Duplicate/Open/Remove UI and live file reload on the completed APIs.
+
 - **Hidden-rail terminal framing** (2026-10-01, user visually accepted): the terminal/tab column
   now fills its available workspace with square corners whenever the rail is hidden or empty. Showing
   the rail restores the rounded frame, exterior spacing and lower corner spacer; plugin panel hosts
@@ -11,6 +42,7 @@
   `./gradlew check` passed: **7,898 tests, zero failures/errors, six skips** (app 1,678).
   Changed-Java source hygiene and `git diff --check` pass. The user approved the appearance and
   authorized merging to `main` and pushing. No agent-launched GUI or benchmark. Check log: `/tmp/rail-edge-check.log`.
+s
 
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)

@@ -1,0 +1,33 @@
+"name" = "Chicago95"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#000000"
+"foreground" = "#c0c7c8"
+"accent" = "#4d4dc2"
+"cursor" = "#c0c7c8"
+"selection" = "#3a3c3c"
+
+[colors.normal]
+"black" = "#000000"
+"red" = "#a80000"
+"green" = "#00a800"
+"yellow" = "#a85400"
+"blue" = "#0000a8"
+"magenta" = "#a800a8"
+"cyan" = "#00a8a8"
+"white" = "#a8a8a8"
+
+[colors.bright]
+"black" = "#545454"
+"red" = "#fc5454"
+"green" = "#54fc54"
+"yellow" = "#fcfc54"
+"blue" = "#5454fc"
+"magenta" = "#fc54fc"
+"cyan" = "#54fcfc"
+"white" = "#ffffff"

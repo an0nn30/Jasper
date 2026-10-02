@@ -1,0 +1,5419 @@
+{
+  "version": 1,
+  "reserved": [
+    {
+      "id": "jasper-dark",
+      "name": "Jasper Dark"
+    },
+    {
+      "id": "jasper-light",
+      "name": "Jasper Light"
+    }
+  ],
+  "sources": [
+    {
+      "id": "intellij",
+      "repository": "https://github.com/JetBrains/intellij-community",
+      "commit": "f7377708b654b73b206da40bb382ecb4d44e8f12",
+      "license": "Apache-2.0",
+      "licenseFile": "LICENSE.txt",
+      "author": "JetBrains",
+      "kind": "intellij",
+      "assets": [
+        {
+          "path": "DefaultColorSchemesManager.xml",
+          "upstream": "platform/platform-resources/src/DefaultColorSchemesManager.xml",
+          "sha256": "e8eef86e79a25de2ab827c6535280019c1428afe7ff4688af94a7a50e3c9ea08",
+          "jarPaths": [
+            "DefaultColorSchemesManager.xml"
+          ]
+        },
+        {
+          "path": "LICENSE.txt",
+          "upstream": "LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "local": true,
+          "localSource": "jasper-app/src/main/resources/dev/jasper/app/themeimport/intellij/LICENSE.txt"
+        },
+        {
+          "path": "Light.theme.json",
+          "upstream": "platform/platform-resources/src/themes/Light.theme.json",
+          "sha256": "429151594b8a013938c3c66dd3a5121702182c028ad87ae1e68bc4243cc1c68d",
+          "jarPaths": [
+            "Light.theme.json"
+          ]
+        },
+        {
+          "path": "Light.xml",
+          "upstream": "platform/platform-resources/src/themes/Light.xml",
+          "sha256": "ea2af41e12491f0681b4b5b3dcafe84245a2b56805f8d991b65df73c1a4b2dbb",
+          "jarPaths": [
+            "Light.xml"
+          ]
+        },
+        {
+          "path": "NOTICE.txt",
+          "upstream": "NOTICE.txt",
+          "sha256": "2262ebb5abcd81ca9d05581c37ad2ebbb9d431115fce1b23a5812b414415ebff",
+          "local": true,
+          "localSource": "jasper-app/src/main/resources/dev/jasper/app/themeimport/intellij/NOTICE.txt"
+        },
+        {
+          "path": "darcula.theme.json",
+          "upstream": "platform/platform-resources/src/themes/darcula.theme.json",
+          "sha256": "858efbd6afdb12f26b4757c4ff7b1bccb8bdefc286797fa6344769496b6c59cb",
+          "jarPaths": [
+            "darcula.theme.json"
+          ]
+        },
+        {
+          "path": "expUI/expUI_darculaContrastScheme.xml",
+          "upstream": "platform/platform-resources/src/themes/expUI/expUI_darculaContrastScheme.xml",
+          "sha256": "a33973beeaadcaa00adb29d75ad937a3350a9b6361f9a5f353a66fcecb81232d",
+          "jarPaths": [
+            "expUI/expUI_darculaContrastScheme.xml"
+          ]
+        },
+        {
+          "path": "expUI/expUI_dark.theme.json",
+          "upstream": "platform/platform-resources/src/themes/expUI/expUI_dark.theme.json",
+          "sha256": "aeb714d70acebca4b37a3c5e7926294bfcd22f33dd6658f05eec367c55c376d1",
+          "jarPaths": [
+            "expUI/expUI_dark.theme.json"
+          ]
+        },
+        {
+          "path": "expUI/expUI_darkScheme.xml",
+          "upstream": "platform/platform-resources/src/themes/expUI/expUI_darkScheme.xml",
+          "sha256": "4777f0d8a7feac1e265c3cd74b96a6b74286844a0904c4a8cd2084bcbec7c87c",
+          "jarPaths": [
+            "expUI/expUI_darkScheme.xml"
+          ]
+        },
+        {
+          "path": "expUI/expUI_light.theme.json",
+          "upstream": "platform/platform-resources/src/themes/expUI/expUI_light.theme.json",
+          "sha256": "230fa169774a00145002fb6804283d8cc47f7c60812b90aae97d5625e6a7ebbb",
+          "jarPaths": [
+            "expUI/expUI_light.theme.json"
+          ]
+        },
+        {
+          "path": "expUI/expUI_lightScheme.xml",
+          "upstream": "platform/platform-resources/src/themes/expUI/expUI_lightScheme.xml",
+          "sha256": "4a8d24f993e3001204979eaf714c97ad74d53074932249290890ef53d354adaa",
+          "jarPaths": [
+            "expUI/expUI_lightScheme.xml"
+          ]
+        },
+        {
+          "path": "expUI/expUI_light_with_light_header.theme.json",
+          "upstream": "platform/platform-resources/src/themes/expUI/expUI_light_with_light_header.theme.json",
+          "sha256": "6c699a4b0826be6f53cb40c3fd0bf767429e70e5434d4119957e69eb48a8efe5",
+          "jarPaths": [
+            "expUI/expUI_light_with_light_header.theme.json"
+          ]
+        },
+        {
+          "path": "intellijlaf.theme.json",
+          "upstream": "platform/platform-resources/src/themes/intellijlaf.theme.json",
+          "sha256": "4450e2a85381b7b644c73bc9ec21f898aa55b184fc80f109a43ae9ff67af21ba",
+          "jarPaths": [
+            "intellijlaf.theme.json"
+          ]
+        },
+        {
+          "path": "islands/HighContrast.theme.json",
+          "upstream": "platform/platform-resources/src/themes/islands/HighContrast.theme.json",
+          "sha256": "9337b64932cd06ecf63647c70a11a5c5454e10176abb9c3f69e927cd696418c3",
+          "jarPaths": [
+            "islands/HighContrast.theme.json"
+          ]
+        },
+        {
+          "path": "islands/IslandSchemeDark.xml",
+          "upstream": "platform/platform-resources/src/themes/islands/IslandSchemeDark.xml",
+          "sha256": "d8c9a27c9f349e3616cfb18f0bbcebef0ac25cea88d3f946aaf117335ff08cab",
+          "jarPaths": [
+            "islands/IslandSchemeDark.xml"
+          ]
+        },
+        {
+          "path": "islands/ManyIslandsDarcula.theme.json",
+          "upstream": "platform/platform-resources/src/themes/islands/ManyIslandsDarcula.theme.json",
+          "sha256": "f486326da9133aa5ad8b73e1568ce5ffd9fa1f1dc2cc0f3a895b88f960bf7b75",
+          "jarPaths": [
+            "islands/ManyIslandsDarcula.theme.json"
+          ]
+        },
+        {
+          "path": "islands/ManyIslandsDark.theme.json",
+          "upstream": "platform/platform-resources/src/themes/islands/ManyIslandsDark.theme.json",
+          "sha256": "5c16ff76a0cd12154517c0b8fde9da7a849a7fd7f96bef71470e34c3c98e4aa3",
+          "jarPaths": [
+            "islands/ManyIslandsDark.theme.json"
+          ]
+        },
+        {
+          "path": "islands/ManyIslandsLight.theme.json",
+          "upstream": "platform/platform-resources/src/themes/islands/ManyIslandsLight.theme.json",
+          "sha256": "1fa3268e023862b0357b52cd5a6e8ccd288be6dbce5dda9da4f654829ef14acd",
+          "jarPaths": [
+            "islands/ManyIslandsLight.theme.json"
+          ]
+        },
+        {
+          "path": "islands/highContrastScheme.xml",
+          "upstream": "platform/platform-resources/src/themes/islands/highContrastScheme.xml",
+          "sha256": "3a125a2b71ea750bcd8c0e7970b341b5def460706d027edc560b3e1cf786f25d",
+          "jarPaths": [
+            "islands/highContrastScheme.xml"
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "entry": "Light.theme.json",
+          "name": "IntelliJ Light",
+          "aliases": [
+            "IntelliJ Light"
+          ],
+          "id": "intellij-light"
+        },
+        {
+          "entry": "darcula.theme.json",
+          "name": "Darcula",
+          "aliases": [
+            "Darcula"
+          ],
+          "id": "darcula",
+          "scheme": "Darcula"
+        },
+        {
+          "entry": "expUI/expUI_dark.theme.json",
+          "name": "Dark",
+          "aliases": [
+            "Dark"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        },
+        {
+          "entry": "expUI/expUI_light.theme.json",
+          "name": "Light",
+          "aliases": [
+            "Light"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        },
+        {
+          "entry": "expUI/expUI_light_with_light_header.theme.json",
+          "name": "Light with Light Header",
+          "aliases": [
+            "Light with Light Header"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        },
+        {
+          "entry": "intellijlaf.theme.json",
+          "name": "IntelliJ",
+          "aliases": [
+            "IntelliJ"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        },
+        {
+          "entry": "islands/HighContrast.theme.json",
+          "name": "High Contrast",
+          "aliases": [
+            "High Contrast"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        },
+        {
+          "entry": "islands/ManyIslandsDarcula.theme.json",
+          "name": "Islands Darcula",
+          "aliases": [
+            "Islands Darcula"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        },
+        {
+          "entry": "islands/ManyIslandsDark.theme.json",
+          "name": "Islands Dark",
+          "aliases": [
+            "Islands Dark"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        },
+        {
+          "entry": "islands/ManyIslandsLight.theme.json",
+          "name": "Islands Light",
+          "aliases": [
+            "Islands Light"
+          ],
+          "exclude": "Importer parent only; approved catalog includes the two classic themes."
+        }
+      ]
+    },
+    {
+      "id": "alacritty",
+      "repository": "https://github.com/alacritty/alacritty-theme",
+      "commit": "ab88d5a80d676b5dc6157e91aba8067f2078dc94",
+      "license": "Apache-2.0",
+      "licenseFile": "LICENSE",
+      "author": "Alacritty theme contributors",
+      "kind": "alacritty",
+      "assets": [
+        {
+          "path": "Cobalt2.toml",
+          "upstream": "themes/Cobalt2.toml",
+          "sha256": "73df6c020f540ac75b61cc84f4170ad3d5347b7f047d5ac93d99432a381182fc"
+        },
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "55713aa5d21868b2aca6da5d6fff02369569811cb035f1ab19bf8ffdd670780f"
+        },
+        {
+          "path": "Mariana.toml",
+          "upstream": "themes/Mariana.toml",
+          "sha256": "f42263ac5a89927da8548051e31a8a3c0e95e339614082020437ebcd4250df07"
+        },
+        {
+          "path": "acme.toml",
+          "upstream": "themes/acme.toml",
+          "sha256": "4543aacc7a67a047bb0fc0a6b4089b0f51e01f7eae6a59076564f19bd2f44ed5"
+        },
+        {
+          "path": "afterglow.toml",
+          "upstream": "themes/afterglow.toml",
+          "sha256": "4f96a34fb9af8cf9a691a1cf56e83fe093e6222536e7db2963475fe110893ba6"
+        },
+        {
+          "path": "alabaster.toml",
+          "upstream": "themes/alabaster.toml",
+          "sha256": "d697064d10f1223a47c0d71ddc0d9b51ce8c17c9d245faf499be609ea496a02b"
+        },
+        {
+          "path": "alabaster_dark.toml",
+          "upstream": "themes/alabaster_dark.toml",
+          "sha256": "c67e422af84ecb548813082cae3c1020403560fbd9a51c5d22759a09be7a5a38"
+        },
+        {
+          "path": "alacritty_0_12.toml",
+          "upstream": "themes/alacritty_0_12.toml",
+          "sha256": "edafbf2e1d046043a60f221cb39ba50f40e75f7d1f30e845926fcd76041a1fa3"
+        },
+        {
+          "path": "argonaut.toml",
+          "upstream": "themes/argonaut.toml",
+          "sha256": "5de47608d88ed02fb67d92cd7eeb23903937f4756d77733e3c5ae9f77e4db78f"
+        },
+        {
+          "path": "ashes_dark.toml",
+          "upstream": "themes/ashes_dark.toml",
+          "sha256": "9ed8db01c7cf7d81abc150a316062faf4c3ddabcbb49efc3b63d252afd74e83a"
+        },
+        {
+          "path": "ashes_light.toml",
+          "upstream": "themes/ashes_light.toml",
+          "sha256": "277f4bdffb44309ebfbfac8f21f99f7b52fcc0c824a55920a1993bca6817907a"
+        },
+        {
+          "path": "aura.toml",
+          "upstream": "themes/aura.toml",
+          "sha256": "58d4469d74d412af2b0ce9e36ee5d3e372b747081ca2aa78c0b06969705d83a5"
+        },
+        {
+          "path": "autumn.toml",
+          "upstream": "themes/autumn.toml",
+          "sha256": "eac5fe51dfde4c1ee41e9448e2eefb59ffc1bbb47f99c78bfa3c4f1bbd2273f1"
+        },
+        {
+          "path": "ayu_dark.toml",
+          "upstream": "themes/ayu_dark.toml",
+          "sha256": "8c8ac3e757ea27667e69e4b3c3abdb6fd9c87a2a32cd9e9bf28e8702f3f9058d"
+        },
+        {
+          "path": "ayu_light.toml",
+          "upstream": "themes/ayu_light.toml",
+          "sha256": "00a6c3fe08c9255af933216e672a44d37767f93c0e4c79313d95ef70e55db546"
+        },
+        {
+          "path": "ayu_mirage.toml",
+          "upstream": "themes/ayu_mirage.toml",
+          "sha256": "f3d35b2fb7d41b698aeee1b2b68a986b707f3b46a4693c7185ec96b34edd4616"
+        },
+        {
+          "path": "azu.toml",
+          "upstream": "themes/azu.toml",
+          "sha256": "696a5a480b32d1300706d13977ba2c02edfbdddd4a74e497c19b94917a442432"
+        },
+        {
+          "path": "baitong.toml",
+          "upstream": "themes/baitong.toml",
+          "sha256": "6ab80cdb7cd079ee2f5b25e94343e92f1bf7aeaf8f33bef2e9e2797d3a9075ed"
+        },
+        {
+          "path": "base16_default_dark.toml",
+          "upstream": "themes/base16_default_dark.toml",
+          "sha256": "22a56728d13ca51d478b800ba645150de5fd86c17467baf74fe3fa1ba8afbf1c"
+        },
+        {
+          "path": "blood_moon.toml",
+          "upstream": "themes/blood_moon.toml",
+          "sha256": "3cd3a3be05a2a78cb967d184da9a13c1335dafe055c1a28d7b52b72d9df64c5b"
+        },
+        {
+          "path": "bluish.toml",
+          "upstream": "themes/bluish.toml",
+          "sha256": "e6a4cbd0d4617272e737b8cb366f3f62891e559d210fdad0c20fcb4f4936f20c"
+        },
+        {
+          "path": "breeze.toml",
+          "upstream": "themes/breeze.toml",
+          "sha256": "993e3f30c36f1724a426c619d1ab0cc49b14d2137a5cf4b2afdf49d0145365ca"
+        },
+        {
+          "path": "campbell.toml",
+          "upstream": "themes/campbell.toml",
+          "sha256": "50b2cfafca25632fedc2ddecc91a2df7e5b9911b8f4197bfcbf8f852f8889b84"
+        },
+        {
+          "path": "carbonfox.toml",
+          "upstream": "themes/carbonfox.toml",
+          "sha256": "08b28f7371fb8c423ad2da3acc5e054d8d8953c0fd26e9383f70c1fb56920bb6"
+        },
+        {
+          "path": "catppuccin.toml",
+          "upstream": "themes/catppuccin.toml",
+          "sha256": "6b48ce804f03613162d37be8932ee7558d3854e77df3f135a1b0c63530e2efc7"
+        },
+        {
+          "path": "catppuccin_frappe.toml",
+          "upstream": "themes/catppuccin_frappe.toml",
+          "sha256": "a2eb592ddeebb4d1d26e7a3b27ef42df65e1769f7ac5044e8ebd1413ef6e5419"
+        },
+        {
+          "path": "catppuccin_latte.toml",
+          "upstream": "themes/catppuccin_latte.toml",
+          "sha256": "b2ba3b546355d125da683bd7ff23504416b042bbb9b6b67eecae75c9c78fd01f"
+        },
+        {
+          "path": "catppuccin_macchiato.toml",
+          "upstream": "themes/catppuccin_macchiato.toml",
+          "sha256": "1a2621451c4c80eb86b11a02ca7712a80476ecf4788c851a500ee00cadbb1b92"
+        },
+        {
+          "path": "catppuccin_mocha.toml",
+          "upstream": "themes/catppuccin_mocha.toml",
+          "sha256": "1d8c9a41cd23e159a7c82d97902af33dbc67059ee64ca191bcdc5c9bb583636f"
+        },
+        {
+          "path": "challenger_deep.toml",
+          "upstream": "themes/challenger_deep.toml",
+          "sha256": "f7ad55742b79f935a522dac8fadfd3e48243d1b8bb47b81441d4be90eb4a48ea"
+        },
+        {
+          "path": "chicago95.toml",
+          "upstream": "themes/chicago95.toml",
+          "sha256": "de958868a84ea375e604e7f333ecde8abcfd7a2cc829c25d4b4ece447613fecb"
+        },
+        {
+          "path": "citylights.toml",
+          "upstream": "themes/citylights.toml",
+          "sha256": "aae040612d8f5ed18d549e6175d32eb5e2655dc74f0627c06af2a1643d44d3d2"
+        },
+        {
+          "path": "cyber_punk_neon.toml",
+          "upstream": "themes/cyber_punk_neon.toml",
+          "sha256": "da62147a9c338e40ccb88f2459ca46dca0aa76f96cb3277439ed60d42d863278"
+        },
+        {
+          "path": "dark_pastels.toml",
+          "upstream": "themes/dark_pastels.toml",
+          "sha256": "55971b2cafa4d551c1666b11ad853fe4e5e46058def443605da84fe93c4d2f0d"
+        },
+        {
+          "path": "dark_plus.toml",
+          "upstream": "themes/dark_plus.toml",
+          "sha256": "21b20a61ac0760b005d442c508a5643cb3014f56d911b9ac7fb2831146050635"
+        },
+        {
+          "path": "dark_pride.toml",
+          "upstream": "themes/dark_pride.toml",
+          "sha256": "542ab3200b62436be293521de0ffb73a0063389310f587fa9ff4e4156d724814"
+        },
+        {
+          "path": "dawnfox.toml",
+          "upstream": "themes/dawnfox.toml",
+          "sha256": "d947e2f87e5534184dac5c78e52d8f762e593c579b65992b36576f656fad900f"
+        },
+        {
+          "path": "dayfox.toml",
+          "upstream": "themes/dayfox.toml",
+          "sha256": "5465cd78dfbc8d5d315727af1eeff1cffa0f5d2ca4f66caf82d7bb593205da8c"
+        },
+        {
+          "path": "deep_space.toml",
+          "upstream": "themes/deep_space.toml",
+          "sha256": "2b703eec4cfda4c13bf4ab441729bf0f80eb48a3178b9889ed41369ee1464269"
+        },
+        {
+          "path": "doom_one.toml",
+          "upstream": "themes/doom_one.toml",
+          "sha256": "1043a1acba2bf6dafbbb55627932b30a930b563e4bd4295bf76523650be72317"
+        },
+        {
+          "path": "dracula.toml",
+          "upstream": "themes/dracula.toml",
+          "sha256": "857391b70d2b889515de619c1c012bab0ff254c4da8135d9aec5c76de6655a17"
+        },
+        {
+          "path": "dracula_plus.toml",
+          "upstream": "themes/dracula_plus.toml",
+          "sha256": "e4e46242945bf9a330063cebda5c7dc1444916945085036a9fd9a3c518b9869a"
+        },
+        {
+          "path": "duskfox.toml",
+          "upstream": "themes/duskfox.toml",
+          "sha256": "482435febea5dd336f99e63a025fad32d5b4206699d77ffa865288afc39c14a2"
+        },
+        {
+          "path": "enfocado_dark.toml",
+          "upstream": "themes/enfocado_dark.toml",
+          "sha256": "82d62af90ff81bffee498c9b151149ae815e7f72dc7a2c466d6da4caa4148c83"
+        },
+        {
+          "path": "enfocado_light.toml",
+          "upstream": "themes/enfocado_light.toml",
+          "sha256": "af8bed4d8a145a115e41aa61ccabfd27a08afa5e2fa43bc9a4c65a4b011801b2"
+        },
+        {
+          "path": "everforest_dark.toml",
+          "upstream": "themes/everforest_dark.toml",
+          "sha256": "6f4e4e38396dd2013e80a843c5d2d531a63b1e891e063982d8fd6214da7a339a"
+        },
+        {
+          "path": "everforest_dark_hard.toml",
+          "upstream": "themes/everforest_dark_hard.toml",
+          "sha256": "59b2a7a527e359d15b48edc31dbaf0ab3a3e8b539dde043316a06eb85f197026"
+        },
+        {
+          "path": "everforest_dark_medium.toml",
+          "upstream": "themes/everforest_dark_medium.toml",
+          "sha256": "0b6f445b955a8d3972136e47ead1a83ba4985b553e69f6bb9ef293bbf2e5ad27"
+        },
+        {
+          "path": "everforest_dark_soft.toml",
+          "upstream": "themes/everforest_dark_soft.toml",
+          "sha256": "bdf7356ff5bcb08a82c3802878f2d20b69af450ccf3f76fa82d631a5fe37a96a"
+        },
+        {
+          "path": "everforest_light.toml",
+          "upstream": "themes/everforest_light.toml",
+          "sha256": "cd97ce84d5a91d13362f697fffd967900f74b03bc5012e0b60fd3031bb1c9ee3"
+        },
+        {
+          "path": "everforest_light_hard.toml",
+          "upstream": "themes/everforest_light_hard.toml",
+          "sha256": "eed9ff30ad5a49208c7cc13ccc3665a721a2e1bde3128b9302d7ed453b1bf20f"
+        },
+        {
+          "path": "everforest_light_medium.toml",
+          "upstream": "themes/everforest_light_medium.toml",
+          "sha256": "05ef2850e241cf57bd721c99f40469a37ce057ed7cdf5446baf12032968fa7a1"
+        },
+        {
+          "path": "everforest_light_soft.toml",
+          "upstream": "themes/everforest_light_soft.toml",
+          "sha256": "8d2295a04268806d9459ab208b6ee253dd12c6a08d11ec40a522a3ab65d02a2b"
+        },
+        {
+          "path": "falcon.toml",
+          "upstream": "themes/falcon.toml",
+          "sha256": "eb1b059027ea1bb3e48e17dbf8a0000e78197b35fbb0da0b6038fa79ac6109ba"
+        },
+        {
+          "path": "flat_remix.toml",
+          "upstream": "themes/flat_remix.toml",
+          "sha256": "a1ae4ab616a94eae97136cf2402e94c8d6785b436fc15d2c92db5ebc8822f1ec"
+        },
+        {
+          "path": "flexoki-light.toml",
+          "upstream": "themes/flexoki-light.toml",
+          "sha256": "c1d1689aafe139c394109d6e261c2965958e1f21ba21d92a7579aff6241eea01"
+        },
+        {
+          "path": "flexoki.toml",
+          "upstream": "themes/flexoki.toml",
+          "sha256": "39a44a56518c4fe0f64919a353ed1fc354d06de23d1bf384c51459ae9860a5fa"
+        },
+        {
+          "path": "ganbaru.toml",
+          "upstream": "themes/ganbaru.toml",
+          "sha256": "74e1f91e22e00509cf03c7151f0651618bc92f1560029177f720e274d00025bf"
+        },
+        {
+          "path": "ganbaru_matcha.toml",
+          "upstream": "themes/ganbaru_matcha.toml",
+          "sha256": "6bf8c77d7f6bc3ee2a6c18b60aa0766fbfc016dcdfd88781da5a6b0b9179a499"
+        },
+        {
+          "path": "github_dark.toml",
+          "upstream": "themes/github_dark.toml",
+          "sha256": "a5ef98ad83693ba63158e1620890e58a803e2d23ef08f881f22f50bf70dae5d6"
+        },
+        {
+          "path": "github_dark_colorblind.toml",
+          "upstream": "themes/github_dark_colorblind.toml",
+          "sha256": "ca74aeed86891370de900e8c4869c872f84ca5bfb244c081f1834c67c899fb82"
+        },
+        {
+          "path": "github_dark_default.toml",
+          "upstream": "themes/github_dark_default.toml",
+          "sha256": "ca74aeed86891370de900e8c4869c872f84ca5bfb244c081f1834c67c899fb82"
+        },
+        {
+          "path": "github_dark_dimmed.toml",
+          "upstream": "themes/github_dark_dimmed.toml",
+          "sha256": "03e9eaf7f2054537e25ad41be3c7c20c1ded80cca4f5177ca4b802ac839d50d9"
+        },
+        {
+          "path": "github_dark_high_contrast.toml",
+          "upstream": "themes/github_dark_high_contrast.toml",
+          "sha256": "2da8cc38e31b4aa2167c846c18251810092b04a05e46e3088d11450c1d58367c"
+        },
+        {
+          "path": "github_dark_tritanopia.toml",
+          "upstream": "themes/github_dark_tritanopia.toml",
+          "sha256": "04b5abbfbb34402a8690e1f2fd5a98d01a58f44c300b8215c9e06d908f7cd85f"
+        },
+        {
+          "path": "github_light.toml",
+          "upstream": "themes/github_light.toml",
+          "sha256": "b7c2acd58a0cb63c9137abacf40f2d88334622c49c21595388bcd06c3d603aff"
+        },
+        {
+          "path": "github_light_colorblind.toml",
+          "upstream": "themes/github_light_colorblind.toml",
+          "sha256": "e8bbd633008d70baa3c80a5e345e9280d217d8c5df619675b1b50f1a2bb8e5c1"
+        },
+        {
+          "path": "github_light_default.toml",
+          "upstream": "themes/github_light_default.toml",
+          "sha256": "e8bbd633008d70baa3c80a5e345e9280d217d8c5df619675b1b50f1a2bb8e5c1"
+        },
+        {
+          "path": "github_light_high_contrast.toml",
+          "upstream": "themes/github_light_high_contrast.toml",
+          "sha256": "9893d2b9f2365fa34d1fbae2a7808ddd160b9e609b53958c324e0a20b2216327"
+        },
+        {
+          "path": "github_light_tritanopia.toml",
+          "upstream": "themes/github_light_tritanopia.toml",
+          "sha256": "be75af7e181073107ebef2548520397ef915c84abf71eedc9b61c5f34f5cab08"
+        },
+        {
+          "path": "gnome_terminal.toml",
+          "upstream": "themes/gnome_terminal.toml",
+          "sha256": "36451ac6455dbf75e1b08aa30be529950f8978231f56e61e23d28c4e5989dcfd"
+        },
+        {
+          "path": "google.toml",
+          "upstream": "themes/google.toml",
+          "sha256": "911f728334da03fcc63db0ddfc0de25ba01df837d1fa8e1f75acf9d92453facb"
+        },
+        {
+          "path": "gotham.toml",
+          "upstream": "themes/gotham.toml",
+          "sha256": "dbc7455100e77323908a1b26696e444487a6e25e84ef754fc8f74969e952b092"
+        },
+        {
+          "path": "gruber_darker.toml",
+          "upstream": "themes/gruber_darker.toml",
+          "sha256": "2f311d3d937730d30e84a24006e5646b900bc0f10e006c990e96d98df4f3fc09"
+        },
+        {
+          "path": "gruvbox_dark.toml",
+          "upstream": "themes/gruvbox_dark.toml",
+          "sha256": "85da5eac732cb89ba0a1d334232b9e255e901f4978d3e5eb5512a71d14116ea7"
+        },
+        {
+          "path": "gruvbox_light.toml",
+          "upstream": "themes/gruvbox_light.toml",
+          "sha256": "ee3c1cb05ce8ee655eea45192d7628954cbda562ad4cc3b5f4a38c40cd776586"
+        },
+        {
+          "path": "gruvbox_material.toml",
+          "upstream": "themes/gruvbox_material.toml",
+          "sha256": "7faa1ec181e04c4b647e33029793b227fc14b86ed78c9911f6d33b1cacb5d9e3"
+        },
+        {
+          "path": "gruvbox_material_hard_dark.toml",
+          "upstream": "themes/gruvbox_material_hard_dark.toml",
+          "sha256": "89b94578fa0c85ed88f0bb2576181fc0f91ecaea1a12c181f7c25b3b298b2491"
+        },
+        {
+          "path": "gruvbox_material_hard_light.toml",
+          "upstream": "themes/gruvbox_material_hard_light.toml",
+          "sha256": "ab35cf7b7dff60fa5fcdc88b12eccadcebe6ea44198da5904593b4e78a677010"
+        },
+        {
+          "path": "gruvbox_material_medium_dark.toml",
+          "upstream": "themes/gruvbox_material_medium_dark.toml",
+          "sha256": "d821b449c3a5b2148b6e872ad88e8338a49fa0c54f68d11da7907276a704d2f0"
+        },
+        {
+          "path": "gruvbox_material_medium_light.toml",
+          "upstream": "themes/gruvbox_material_medium_light.toml",
+          "sha256": "3523bb4c3093a55d417a7486b3ab5981a1b54feda6aca4ac07699e2b0d8a2b5f"
+        },
+        {
+          "path": "gruvbox_material_soft_dark.toml",
+          "upstream": "themes/gruvbox_material_soft_dark.toml",
+          "sha256": "ec855de19de58e303ce413e89a080c0f6892c8a9aaa215e6ea8c231c57367875"
+        },
+        {
+          "path": "hardhacker.toml",
+          "upstream": "themes/hardhacker.toml",
+          "sha256": "e109350691c94253486859ffab1e89e9f3e78c4d8b0e068544fe227a9f4fd8d3"
+        },
+        {
+          "path": "hatsunemiku.toml",
+          "upstream": "themes/hatsunemiku.toml",
+          "sha256": "2c792f9845286cea6a0a909e794e328765c32c4614d7ee03daf965771c681cdd"
+        },
+        {
+          "path": "high_contrast.toml",
+          "upstream": "themes/high_contrast.toml",
+          "sha256": "3dc175f97c0bd63190334b72ced192411071c1b513e614cd1c45de442bc8f170"
+        },
+        {
+          "path": "horizon_dark.toml",
+          "upstream": "themes/horizon_dark.toml",
+          "sha256": "8d3c56182177858cf96ac4113cb1be1ef6956f369e8d1d5fba9eaec611b91868"
+        },
+        {
+          "path": "hyper.toml",
+          "upstream": "themes/hyper.toml",
+          "sha256": "c9455b2c98878aba9b9c5c652f66920c5084d15b61d326598a5ff3b2928b42d1"
+        },
+        {
+          "path": "iceberg.toml",
+          "upstream": "themes/iceberg.toml",
+          "sha256": "205d1d79288283d354a340a66d63a93c656699c55868262bb440db1431be0a19"
+        },
+        {
+          "path": "inferno.toml",
+          "upstream": "themes/inferno.toml",
+          "sha256": "246fe0322b1694571974a5dbb7f2d3c3d2e67fee10f3d9acb748b9ac1d4069ba"
+        },
+        {
+          "path": "iris.toml",
+          "upstream": "themes/iris.toml",
+          "sha256": "6fd83768bb01c6db1aad45ff47232b5309d3f47e501548831049b2cbfd6a60e0"
+        },
+        {
+          "path": "iterm.toml",
+          "upstream": "themes/iterm.toml",
+          "sha256": "8425fcfae19229e867a07f119b81656a753e9e214bc3b0a3fed4a6376fe40563"
+        },
+        {
+          "path": "iterm_solardark.toml",
+          "upstream": "themes/iterm_solardark.toml",
+          "sha256": "084abb1284c01733dba594364fb9a9c0a5b88e97a29640f61e198652177e6dd3"
+        },
+        {
+          "path": "kanagawa_dragon.toml",
+          "upstream": "themes/kanagawa_dragon.toml",
+          "sha256": "c02c7bf9f3e513076d652667424d11ba253298ff15b735174074a25aff7f13cc"
+        },
+        {
+          "path": "kanagawa_wave.toml",
+          "upstream": "themes/kanagawa_wave.toml",
+          "sha256": "821eb7ef70ee603bb41e670620e5ba9783c409cb4ecbae362d9df9e976b05ab7"
+        },
+        {
+          "path": "kimbie_dark.toml",
+          "upstream": "themes/kimbie_dark.toml",
+          "sha256": "3dfbc24b384818871ac3a9b5d6a095d7a7736336b73e898d7f46be35d7c835d7"
+        },
+        {
+          "path": "kimbie_light.toml",
+          "upstream": "themes/kimbie_light.toml",
+          "sha256": "9efef61dce5fce036fda980110fff2ff81f7db87f031499dbe736ad3344653d5"
+        },
+        {
+          "path": "kitty.toml",
+          "upstream": "themes/kitty.toml",
+          "sha256": "b0c152b07f339689333a10d4cc362e7f42524553f23de602a8613f38ff20605f"
+        },
+        {
+          "path": "konsole_linux.toml",
+          "upstream": "themes/konsole_linux.toml",
+          "sha256": "11de8fb8dca3d232678f8f7c0c9dc9e7edc0b1a96f9dec925bc3a666f3e2a709"
+        },
+        {
+          "path": "linux.toml",
+          "upstream": "themes/linux.toml",
+          "sha256": "b189f75de3326250dac2cb1a44d52a2311ff5e072e7f89fa0d5b299d7e67027f"
+        },
+        {
+          "path": "low_contrast.toml",
+          "upstream": "themes/low_contrast.toml",
+          "sha256": "45fcad877642b6a925688ee786fbe3aa4695b285f5abe72fa6699f71fc98cdd1"
+        },
+        {
+          "path": "marine_dark.toml",
+          "upstream": "themes/marine_dark.toml",
+          "sha256": "19c43775fb42ccb26fc69e1feca014c9f8127df73fb5b53df3d1075228214ff3"
+        },
+        {
+          "path": "material_theme.toml",
+          "upstream": "themes/material_theme.toml",
+          "sha256": "65aa4994067c6b2bf35d3d5f05675ba451f764e31313bf5cf9ed2d7100c81e2d"
+        },
+        {
+          "path": "material_theme_mod.toml",
+          "upstream": "themes/material_theme_mod.toml",
+          "sha256": "1334e289a275b273302cc6e1c511cd223dd3f6e61fe6edf9cbd232219ae75fe2"
+        },
+        {
+          "path": "meliora.toml",
+          "upstream": "themes/meliora.toml",
+          "sha256": "3c7b32df50eb6be7a0364cf898c57eb0a3d95b59372903e9a14e7d76e5e546e0"
+        },
+        {
+          "path": "miasma.toml",
+          "upstream": "themes/miasma.toml",
+          "sha256": "70f4853c23798ea7504cb3ea270e364bac86459f98afaf1145c366114c9869b3"
+        },
+        {
+          "path": "midnight_haze.toml",
+          "upstream": "themes/midnight_haze.toml",
+          "sha256": "32f049a2345121f98057fa3f2829a3da0f4549a96e1603a3e6471f19aa1355e0"
+        },
+        {
+          "path": "modus_operandi.toml",
+          "upstream": "themes/modus_operandi.toml",
+          "sha256": "035bc0a6c30de04e1fde8b4c41c03e23886347703296c2bb5655a5c0d41376d9"
+        },
+        {
+          "path": "modus_vivendi.toml",
+          "upstream": "themes/modus_vivendi.toml",
+          "sha256": "bb352a2896a63019c73e2395652a2a6a866510e36d836d49a485c4a5e06b3c30"
+        },
+        {
+          "path": "monokai.toml",
+          "upstream": "themes/monokai.toml",
+          "sha256": "5d1cd4dd3aedfe393dcccd456055ac08161afeb0de209343368c1d9f91a966ba"
+        },
+        {
+          "path": "monokai_charcoal.toml",
+          "upstream": "themes/monokai_charcoal.toml",
+          "sha256": "eb83cc1f060600c5143d3d50e439bc575bbc6cee2f0d038dc5ed8774e0dd7579"
+        },
+        {
+          "path": "monokai_pro.toml",
+          "upstream": "themes/monokai_pro.toml",
+          "sha256": "e6af9c5a9592fea8ced569c7a51fb5709d268df97905e722e8d72394d13f299c"
+        },
+        {
+          "path": "moonfly.toml",
+          "upstream": "themes/moonfly.toml",
+          "sha256": "a8790e282683748c638dd47527598f0f093457c44f56b3ea905b526272dbe048"
+        },
+        {
+          "path": "moonlight_ii_vscode.toml",
+          "upstream": "themes/moonlight_ii_vscode.toml",
+          "sha256": "fc64bed116c49c061168ea73cd212fa2684e2ec75ea6d4ed8f81397209b8d4e6"
+        },
+        {
+          "path": "msx.toml",
+          "upstream": "themes/msx.toml",
+          "sha256": "79c597ee8c3a9b8489f98d637f9d1d24b3a43d31e95fe5e4a64edd9aace12e9e"
+        },
+        {
+          "path": "night_owl.toml",
+          "upstream": "themes/night_owl.toml",
+          "sha256": "81c21dcf41eacaf617d8df3ad57c670da8306389d9730a7e20305d47e47f80fe"
+        },
+        {
+          "path": "night_owlish_light.toml",
+          "upstream": "themes/night_owlish_light.toml",
+          "sha256": "c5f9a485a46a0a43ef57cffaecf7e42f64f742f8434e61b6560f8b916978c78b"
+        },
+        {
+          "path": "nightfly.toml",
+          "upstream": "themes/nightfly.toml",
+          "sha256": "b77edc7f0e3dc899cc14ca01a230d61e72883c463d0cf15285b455ffaeb1eb6a"
+        },
+        {
+          "path": "nightfox.toml",
+          "upstream": "themes/nightfox.toml",
+          "sha256": "f48985c9e876d0d4f396c896250d76b1dc32ac52e1f3e769f30226b2ec3a5add"
+        },
+        {
+          "path": "noctis_lux.toml",
+          "upstream": "themes/noctis_lux.toml",
+          "sha256": "7b72964d0652df7db98488a08cd5c2d4e4969035f27dddab70007800b3b4254f"
+        },
+        {
+          "path": "nord.toml",
+          "upstream": "themes/nord.toml",
+          "sha256": "0ca4154de46f4d9e3e4d8523d5f074c722e89b6459426cb4bc21ef4b9872f1b6"
+        },
+        {
+          "path": "nord_light.toml",
+          "upstream": "themes/nord_light.toml",
+          "sha256": "fe89bfcf1f803bb85cd1287633a2a18f5d274e49a2f8c779b34e1540f2bac3ef"
+        },
+        {
+          "path": "nordfox.toml",
+          "upstream": "themes/nordfox.toml",
+          "sha256": "664200877c4fad2fafef62e4a8c34797e198e209b908eea10fd5bee623beac01"
+        },
+        {
+          "path": "nordic.toml",
+          "upstream": "themes/nordic.toml",
+          "sha256": "0ec86001cf38afc3076385fe3ff2321e0ba5537a4450b17bae6290e63879c812"
+        },
+        {
+          "path": "nvim_dark.toml",
+          "upstream": "themes/nvim_dark.toml",
+          "sha256": "e90703ac44ec4aefafa6e26ba4745c180d310a08d46cee2edd8bf61fa4ca5e99"
+        },
+        {
+          "path": "oceanic_next.toml",
+          "upstream": "themes/oceanic_next.toml",
+          "sha256": "43d23b10f0bb2eb969b75a8d0d798f87113d36c45b6e73930125c5c9a8a8461c"
+        },
+        {
+          "path": "omni.toml",
+          "upstream": "themes/omni.toml",
+          "sha256": "8108c9b298e38ce3702c6884d8ec12a7fb8bd38b144a587a9eb7c34d7bb2cd83"
+        },
+        {
+          "path": "one_dark.toml",
+          "upstream": "themes/one_dark.toml",
+          "sha256": "f28996a755f8944f88972cf3850432077b8aa43e7fb39cc5511897598961c5a3"
+        },
+        {
+          "path": "one_light.toml",
+          "upstream": "themes/one_light.toml",
+          "sha256": "94cf6b9bbc380545b3024a62db9f8592bed2fdcd91b316ff7577b1fa76c54aac"
+        },
+        {
+          "path": "oxocarbon.toml",
+          "upstream": "themes/oxocarbon.toml",
+          "sha256": "01c4693cfa9898f1777eb3f18ab8ba636bb5e9decba6f6768ac9d598c241377d"
+        },
+        {
+          "path": "palenight.toml",
+          "upstream": "themes/palenight.toml",
+          "sha256": "676e736d0f2c488a28e05c8a3fc287268300bd7dbf733b63dc742af799511378"
+        },
+        {
+          "path": "panda.toml",
+          "upstream": "themes/panda.toml",
+          "sha256": "1b0896d54756d13d2e38d5e27bf24ae35669fff669b751c01c8d83b1ece2e056"
+        },
+        {
+          "path": "papercolor_dark.toml",
+          "upstream": "themes/papercolor_dark.toml",
+          "sha256": "7c46425221c0b31a3bab224c135a1309a24497a587b6dd25f91a55541e4b3b75"
+        },
+        {
+          "path": "papercolor_light.toml",
+          "upstream": "themes/papercolor_light.toml",
+          "sha256": "f52b0dcba4a25e1c2d6406db906586f07a40a40a21410bdc0ebc1173b908c1dc"
+        },
+        {
+          "path": "papertheme.toml",
+          "upstream": "themes/papertheme.toml",
+          "sha256": "720575b7050aad92a93de7ea1ab527e2af18e79839ce9e138f10e273b64f333f"
+        },
+        {
+          "path": "pastel_dark.toml",
+          "upstream": "themes/pastel_dark.toml",
+          "sha256": "ed2e5faac0435d2fe3a1ea99a1ec5db8b53b7ba6720b37cf7d271d2cdc217df0"
+        },
+        {
+          "path": "pencil_dark.toml",
+          "upstream": "themes/pencil_dark.toml",
+          "sha256": "93ca554c90b3ea9c06bc2d44fae5db63d4ed5e99715578e35ae98cec8412b877"
+        },
+        {
+          "path": "pencil_light.toml",
+          "upstream": "themes/pencil_light.toml",
+          "sha256": "af5b756e2b781b91ccdb7c12d7b9681934aa09010da8441c6a1c96726e755a36"
+        },
+        {
+          "path": "pink_cat_boo.toml",
+          "upstream": "themes/pink_cat_boo.toml",
+          "sha256": "170f6d59ca386337aa29f92c4364013a196663e686cd48bbc42520aa4a1f3c04"
+        },
+        {
+          "path": "rainbow.toml",
+          "upstream": "themes/rainbow.toml",
+          "sha256": "69531955dfd6dd1efbbe23b2f1456a86f33f6a6e286d9d99e81b8f6f3836fb89"
+        },
+        {
+          "path": "remedy_dark.toml",
+          "upstream": "themes/remedy_dark.toml",
+          "sha256": "2bf1767ae2d374eae6d0c8fb4f5c5c62ea2c3f0d0d34813d428d3b88a601bc55"
+        },
+        {
+          "path": "rigel.toml",
+          "upstream": "themes/rigel.toml",
+          "sha256": "df8d846a74de409fa4fb085e172ccde1cbd05e11dbe6e8600d02d3a6a22c951b"
+        },
+        {
+          "path": "rose_pine.toml",
+          "upstream": "themes/rose_pine.toml",
+          "sha256": "34bd8f47327e084b8e6759e87f6bac7675a81f1f372d0ba05d8f871dcb9e3dff"
+        },
+        {
+          "path": "rose_pine_dawn.toml",
+          "upstream": "themes/rose_pine_dawn.toml",
+          "sha256": "3c988327595b1ed0d9dfb3f4c5777c3bb4acf7cc50219ae1e64cfd744e802bdf"
+        },
+        {
+          "path": "rose_pine_moon.toml",
+          "upstream": "themes/rose_pine_moon.toml",
+          "sha256": "797229f45aab1d48df5b72b9655547364062ea04fc7f6d13062c0010cb446c2d"
+        },
+        {
+          "path": "seashells.toml",
+          "upstream": "themes/seashells.toml",
+          "sha256": "b9d99f16fcf01b89c79d8351c720e8c0ac6946002137e5dea03d4f2dff6e2b6d"
+        },
+        {
+          "path": "selenized_dark.toml",
+          "upstream": "themes/selenized_dark.toml",
+          "sha256": "150abedf3b946492ab26af3d93b77d16fff9af7563d766717cb596916343f5bc"
+        },
+        {
+          "path": "selenized_light.toml",
+          "upstream": "themes/selenized_light.toml",
+          "sha256": "c0c06c9a4e27a45cb89b74630044d4dc112a36debdf0fb3f5d104cb591cc6c04"
+        },
+        {
+          "path": "seoul256-light.toml",
+          "upstream": "themes/seoul256-light.toml",
+          "sha256": "5baafadd77981ce341923f5b28046bce04165571e4cca729e13b513458ef6d1a"
+        },
+        {
+          "path": "smoooooth.toml",
+          "upstream": "themes/smoooooth.toml",
+          "sha256": "9e3e54c48f8fe880237683efbf8849548353aa0c497de018974b1bf1023303da"
+        },
+        {
+          "path": "snazzy.toml",
+          "upstream": "themes/snazzy.toml",
+          "sha256": "2fd05b57ccc4d5175d56e4bf4a05f2bf074c0b29c770b82dca255678b7362b42"
+        },
+        {
+          "path": "solarized_dark.toml",
+          "upstream": "themes/solarized_dark.toml",
+          "sha256": "6c8704addff6b5e153cce82241ae10e6be7104634cb6d1cd2da4f3234ef10f92"
+        },
+        {
+          "path": "solarized_light.toml",
+          "upstream": "themes/solarized_light.toml",
+          "sha256": "953aabefdd3892e8361eaa326bf652aeb4d1e7cf506f722101fc727896cabca0"
+        },
+        {
+          "path": "solarized_osaka.toml",
+          "upstream": "themes/solarized_osaka.toml",
+          "sha256": "115164e15acc5fa2ef710a123adcc67f1f73d3b839e6471da346e8ec0f32b5a0"
+        },
+        {
+          "path": "solarized_osaka_day.toml",
+          "upstream": "themes/solarized_osaka_day.toml",
+          "sha256": "723b75c0b422b1964ab3c0b4628b96a3eae994722ef84069b56e92374a376ef5"
+        },
+        {
+          "path": "sonokai.toml",
+          "upstream": "themes/sonokai.toml",
+          "sha256": "bf7365838b6465b0936c931cffba85a1afc4751489188d8826dc2ac84aab90ba"
+        },
+        {
+          "path": "spacegray.toml",
+          "upstream": "themes/spacegray.toml",
+          "sha256": "30ed32fff25646b0d789346182ef3a1fb4180dbd62891b1b3c8359b74784b81c"
+        },
+        {
+          "path": "synthwave_84.toml",
+          "upstream": "themes/synthwave_84.toml",
+          "sha256": "173f84fb4f8a65e54e2384d36bead9942fe513c397f7da7edab8ca639c17008e"
+        },
+        {
+          "path": "taerminal.toml",
+          "upstream": "themes/taerminal.toml",
+          "sha256": "42bf4597888dac93476a8403ea1cfcbbca073cace2649201640f752f99cecd77"
+        },
+        {
+          "path": "tango_dark.toml",
+          "upstream": "themes/tango_dark.toml",
+          "sha256": "a83873e37863aa2b714810fdcc63f6d897fec766e3dc9818454f6fe8a22ddc89"
+        },
+        {
+          "path": "tender.toml",
+          "upstream": "themes/tender.toml",
+          "sha256": "e44a45a6fed6318e1f0a4ae1ee83b03c0f5b4e4e8939c95feb713fa4d4b62481"
+        },
+        {
+          "path": "terafox.toml",
+          "upstream": "themes/terafox.toml",
+          "sha256": "b0dbb00b59a36c6fa2fd9c04b3bbc098d1b176507fdcbc1861a9f8032672f246"
+        },
+        {
+          "path": "terminal_app.toml",
+          "upstream": "themes/terminal_app.toml",
+          "sha256": "f59fcd5dc6e9352111271c07feae69f3aab5825e8087287c95e4caa565bf2b69"
+        },
+        {
+          "path": "thelovelace.toml",
+          "upstream": "themes/thelovelace.toml",
+          "sha256": "cf94413e4fb97245879c9d32137a66b83011014471812689028db07b170ad09e"
+        },
+        {
+          "path": "tokyo_night.toml",
+          "upstream": "themes/tokyo_night.toml",
+          "sha256": "23f7e38786e4273456f2fb964674a5aecff286b0d86138486905f670b8749ccd"
+        },
+        {
+          "path": "tokyo_night_enhanced.toml",
+          "upstream": "themes/tokyo_night_enhanced.toml",
+          "sha256": "c6aa0fa26092dd752d7a2aa14911ecc20939518c3cc32b0f4fd899f49bd7deab"
+        },
+        {
+          "path": "tokyo_night_light.toml",
+          "upstream": "themes/tokyo_night_light.toml",
+          "sha256": "e87d9bd7cca384006204f3b1cf683f3fac25240a7acce1dc14afadf46cb29660"
+        },
+        {
+          "path": "tokyo_night_storm.toml",
+          "upstream": "themes/tokyo_night_storm.toml",
+          "sha256": "38c1ddeee62453852250cff2134356c5a7f4032ed473cb8c94bf59e80c15e435"
+        },
+        {
+          "path": "tomorrow.toml",
+          "upstream": "themes/tomorrow.toml",
+          "sha256": "f27e885492241f68756d9916883bfbc3116cde2fb50c04e9bc7f90bc21ae87cf"
+        },
+        {
+          "path": "tomorrow_night.toml",
+          "upstream": "themes/tomorrow_night.toml",
+          "sha256": "6d88fe3f713179256c8633cf5d7ded84aea8141c5b78be624e79b4365970b602"
+        },
+        {
+          "path": "tomorrow_night_blue.toml",
+          "upstream": "themes/tomorrow_night_blue.toml",
+          "sha256": "386314172bf80de53bab9797d8ab84af5d8bdeb84474822b9f152456f580443e"
+        },
+        {
+          "path": "tomorrow_night_bright.toml",
+          "upstream": "themes/tomorrow_night_bright.toml",
+          "sha256": "4c66e93b4ab6fa68cbda142a767b53897bc336c72636551f5a4d991ef6c5a095"
+        },
+        {
+          "path": "tomorrow_night_eighties.toml",
+          "upstream": "themes/tomorrow_night_eighties.toml",
+          "sha256": "9c064fa432360eff35d88969bc8c647b060281596268c46c835d8ea0124532de"
+        },
+        {
+          "path": "ubuntu.toml",
+          "upstream": "themes/ubuntu.toml",
+          "sha256": "973a48be8a615ac7f0f77e0c1dbb66ebbf9a7fc62c53d93c0d963d40086211a3"
+        },
+        {
+          "path": "vesper.toml",
+          "upstream": "themes/vesper.toml",
+          "sha256": "06de3ab087ab4f54641a65dd521788f2dbf28d6a24202dbf8b8ddbf836c9fff2"
+        },
+        {
+          "path": "vscode.toml",
+          "upstream": "themes/vscode.toml",
+          "sha256": "59bf81ccec32712861881cbc2da05560c75e6bdf0a908be677577d29780315ed"
+        },
+        {
+          "path": "wombat.toml",
+          "upstream": "themes/wombat.toml",
+          "sha256": "183b9439a27c91a3fd95a6d158520b4ffe2b831304897aa784264eb969b7c2dd"
+        },
+        {
+          "path": "xterm.toml",
+          "upstream": "themes/xterm.toml",
+          "sha256": "3cdff0f8d7e98a5deb5117d6fb9de4efb3329d8bc9cbb3b5763706d32980ebee"
+        },
+        {
+          "path": "zenburn.toml",
+          "upstream": "themes/zenburn.toml",
+          "sha256": "ac4db6589afb2126351aa90cb0cdd66cf62de5d274b903057cfcc815615c25ba"
+        }
+      ],
+      "variants": [
+        {
+          "entry": "Cobalt2.toml",
+          "name": "Cobalt2",
+          "id": "alacritty-cobalt2",
+          "aliases": [
+            "Cobalt2"
+          ]
+        },
+        {
+          "entry": "Mariana.toml",
+          "name": "Mariana",
+          "id": "alacritty-mariana",
+          "aliases": [
+            "Mariana"
+          ]
+        },
+        {
+          "entry": "acme.toml",
+          "name": "Acme",
+          "id": "alacritty-acme",
+          "aliases": [
+            "Acme"
+          ]
+        },
+        {
+          "entry": "afterglow.toml",
+          "name": "Afterglow",
+          "id": "alacritty-afterglow",
+          "aliases": [
+            "Afterglow"
+          ]
+        },
+        {
+          "entry": "alabaster.toml",
+          "name": "Alabaster",
+          "id": "alacritty-alabaster",
+          "aliases": [
+            "Alabaster"
+          ]
+        },
+        {
+          "entry": "alabaster_dark.toml",
+          "name": "Alabaster Dark",
+          "id": "alacritty-alabaster-dark",
+          "aliases": [
+            "Alabaster Dark"
+          ]
+        },
+        {
+          "entry": "alacritty_0_12.toml",
+          "name": "Alacritty 0 12",
+          "id": "alacritty-alacritty-0-12",
+          "aliases": [
+            "Alacritty 0 12"
+          ]
+        },
+        {
+          "entry": "argonaut.toml",
+          "name": "Argonaut",
+          "id": "alacritty-argonaut",
+          "aliases": [
+            "Argonaut"
+          ]
+        },
+        {
+          "entry": "ashes_dark.toml",
+          "name": "Ashes Dark",
+          "id": "alacritty-ashes-dark",
+          "aliases": [
+            "Ashes Dark"
+          ]
+        },
+        {
+          "entry": "ashes_light.toml",
+          "name": "Ashes Light",
+          "id": "alacritty-ashes-light",
+          "aliases": [
+            "Ashes Light"
+          ]
+        },
+        {
+          "entry": "aura.toml",
+          "name": "Aura",
+          "id": "alacritty-aura",
+          "aliases": [
+            "Aura"
+          ]
+        },
+        {
+          "entry": "autumn.toml",
+          "name": "Autumn",
+          "id": "alacritty-autumn",
+          "aliases": [
+            "Autumn"
+          ]
+        },
+        {
+          "entry": "ayu_dark.toml",
+          "name": "Ayu Dark",
+          "id": "alacritty-ayu-dark",
+          "aliases": [
+            "Ayu Dark"
+          ]
+        },
+        {
+          "entry": "ayu_light.toml",
+          "name": "Ayu Light",
+          "id": "alacritty-ayu-light",
+          "aliases": [
+            "Ayu Light"
+          ]
+        },
+        {
+          "entry": "ayu_mirage.toml",
+          "name": "Ayu Mirage",
+          "id": "alacritty-ayu-mirage",
+          "aliases": [
+            "Ayu Mirage"
+          ]
+        },
+        {
+          "entry": "azu.toml",
+          "name": "Azu",
+          "id": "alacritty-azu",
+          "aliases": [
+            "Azu"
+          ]
+        },
+        {
+          "entry": "baitong.toml",
+          "name": "Baitong",
+          "id": "alacritty-baitong",
+          "aliases": [
+            "Baitong"
+          ]
+        },
+        {
+          "entry": "base16_default_dark.toml",
+          "name": "Base16 Default Dark",
+          "id": "alacritty-base16-default-dark",
+          "aliases": [
+            "Base16 Default Dark"
+          ]
+        },
+        {
+          "entry": "blood_moon.toml",
+          "name": "Blood Moon",
+          "id": "alacritty-blood-moon",
+          "aliases": [
+            "Blood Moon"
+          ]
+        },
+        {
+          "entry": "bluish.toml",
+          "name": "Bluish",
+          "id": "alacritty-bluish",
+          "aliases": [
+            "Bluish"
+          ]
+        },
+        {
+          "entry": "breeze.toml",
+          "name": "Breeze",
+          "id": "alacritty-breeze",
+          "aliases": [
+            "Breeze"
+          ]
+        },
+        {
+          "entry": "campbell.toml",
+          "name": "Campbell",
+          "id": "alacritty-campbell",
+          "aliases": [
+            "Campbell"
+          ]
+        },
+        {
+          "entry": "carbonfox.toml",
+          "name": "Carbonfox",
+          "id": "alacritty-carbonfox",
+          "aliases": [
+            "Carbonfox"
+          ]
+        },
+        {
+          "entry": "catppuccin.toml",
+          "name": "Catppuccin",
+          "id": "alacritty-catppuccin",
+          "aliases": [
+            "Catppuccin"
+          ]
+        },
+        {
+          "entry": "catppuccin_frappe.toml",
+          "name": "Catppuccin Frappe",
+          "aliases": [
+            "Catppuccin Frappe"
+          ],
+          "exclude": "Equivalent spelling of the canonical Catppuccin Frappé IntelliJ-family theme.",
+          "replacement": "Catppuccin Frappé"
+        },
+        {
+          "entry": "catppuccin_latte.toml",
+          "name": "Catppuccin Latte",
+          "aliases": [
+            "Catppuccin Latte"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "Catppuccin Latte"
+        },
+        {
+          "entry": "catppuccin_macchiato.toml",
+          "name": "Catppuccin Macchiato",
+          "aliases": [
+            "Catppuccin Macchiato"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "Catppuccin Macchiato"
+        },
+        {
+          "entry": "catppuccin_mocha.toml",
+          "name": "Catppuccin Mocha",
+          "aliases": [
+            "Catppuccin Mocha"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "Catppuccin Mocha"
+        },
+        {
+          "entry": "challenger_deep.toml",
+          "name": "Challenger Deep",
+          "id": "alacritty-challenger-deep",
+          "aliases": [
+            "Challenger Deep"
+          ]
+        },
+        {
+          "entry": "chicago95.toml",
+          "name": "Chicago95",
+          "id": "alacritty-chicago95",
+          "aliases": [
+            "Chicago95"
+          ]
+        },
+        {
+          "entry": "citylights.toml",
+          "name": "Citylights",
+          "id": "alacritty-citylights",
+          "aliases": [
+            "Citylights"
+          ]
+        },
+        {
+          "entry": "cyber_punk_neon.toml",
+          "name": "Cyber Punk Neon",
+          "id": "alacritty-cyber-punk-neon",
+          "aliases": [
+            "Cyber Punk Neon"
+          ]
+        },
+        {
+          "entry": "dark_pastels.toml",
+          "name": "Dark Pastels",
+          "id": "alacritty-dark-pastels",
+          "aliases": [
+            "Dark Pastels"
+          ]
+        },
+        {
+          "entry": "dark_plus.toml",
+          "name": "Dark Plus",
+          "id": "alacritty-dark-plus",
+          "aliases": [
+            "Dark Plus"
+          ]
+        },
+        {
+          "entry": "dark_pride.toml",
+          "name": "Dark Pride",
+          "id": "alacritty-dark-pride",
+          "aliases": [
+            "Dark Pride"
+          ]
+        },
+        {
+          "entry": "dawnfox.toml",
+          "name": "Dawnfox",
+          "id": "alacritty-dawnfox",
+          "aliases": [
+            "Dawnfox"
+          ]
+        },
+        {
+          "entry": "dayfox.toml",
+          "name": "Dayfox",
+          "id": "alacritty-dayfox",
+          "aliases": [
+            "Dayfox"
+          ]
+        },
+        {
+          "entry": "deep_space.toml",
+          "name": "Deep Space",
+          "id": "alacritty-deep-space",
+          "aliases": [
+            "Deep Space"
+          ]
+        },
+        {
+          "entry": "doom_one.toml",
+          "name": "Doom One",
+          "id": "alacritty-doom-one",
+          "aliases": [
+            "Doom One"
+          ]
+        },
+        {
+          "entry": "dracula.toml",
+          "name": "Dracula",
+          "aliases": [
+            "Dracula"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "Dracula"
+        },
+        {
+          "entry": "dracula_plus.toml",
+          "name": "Dracula Plus",
+          "id": "alacritty-dracula-plus",
+          "aliases": [
+            "Dracula Plus"
+          ]
+        },
+        {
+          "entry": "duskfox.toml",
+          "name": "Duskfox",
+          "id": "alacritty-duskfox",
+          "aliases": [
+            "Duskfox"
+          ]
+        },
+        {
+          "entry": "enfocado_dark.toml",
+          "name": "Enfocado Dark",
+          "id": "alacritty-enfocado-dark",
+          "aliases": [
+            "Enfocado Dark"
+          ]
+        },
+        {
+          "entry": "enfocado_light.toml",
+          "name": "Enfocado Light",
+          "id": "alacritty-enfocado-light",
+          "aliases": [
+            "Enfocado Light"
+          ]
+        },
+        {
+          "entry": "everforest_dark.toml",
+          "name": "Everforest Dark",
+          "id": "alacritty-everforest-dark",
+          "aliases": [
+            "Everforest Dark"
+          ]
+        },
+        {
+          "entry": "everforest_dark_hard.toml",
+          "name": "Everforest Dark Hard",
+          "id": "alacritty-everforest-dark-hard",
+          "aliases": [
+            "Everforest Dark Hard"
+          ]
+        },
+        {
+          "entry": "everforest_dark_medium.toml",
+          "name": "Everforest Dark Medium",
+          "id": "alacritty-everforest-dark-medium",
+          "aliases": [
+            "Everforest Dark Medium"
+          ]
+        },
+        {
+          "entry": "everforest_dark_soft.toml",
+          "name": "Everforest Dark Soft",
+          "id": "alacritty-everforest-dark-soft",
+          "aliases": [
+            "Everforest Dark Soft"
+          ]
+        },
+        {
+          "entry": "everforest_light.toml",
+          "name": "Everforest Light",
+          "id": "alacritty-everforest-light",
+          "aliases": [
+            "Everforest Light"
+          ]
+        },
+        {
+          "entry": "everforest_light_hard.toml",
+          "name": "Everforest Light Hard",
+          "id": "alacritty-everforest-light-hard",
+          "aliases": [
+            "Everforest Light Hard"
+          ]
+        },
+        {
+          "entry": "everforest_light_medium.toml",
+          "name": "Everforest Light Medium",
+          "id": "alacritty-everforest-light-medium",
+          "aliases": [
+            "Everforest Light Medium"
+          ]
+        },
+        {
+          "entry": "everforest_light_soft.toml",
+          "name": "Everforest Light Soft",
+          "id": "alacritty-everforest-light-soft",
+          "aliases": [
+            "Everforest Light Soft"
+          ]
+        },
+        {
+          "entry": "falcon.toml",
+          "name": "Falcon",
+          "id": "alacritty-falcon",
+          "aliases": [
+            "Falcon"
+          ]
+        },
+        {
+          "entry": "flat_remix.toml",
+          "name": "Flat Remix",
+          "id": "alacritty-flat-remix",
+          "aliases": [
+            "Flat Remix"
+          ]
+        },
+        {
+          "entry": "flexoki-light.toml",
+          "name": "Flexoki Light",
+          "id": "alacritty-flexoki-light",
+          "aliases": [
+            "Flexoki Light"
+          ]
+        },
+        {
+          "entry": "flexoki.toml",
+          "name": "Flexoki",
+          "id": "alacritty-flexoki",
+          "aliases": [
+            "Flexoki"
+          ]
+        },
+        {
+          "entry": "ganbaru.toml",
+          "name": "Ganbaru",
+          "id": "alacritty-ganbaru",
+          "aliases": [
+            "Ganbaru"
+          ]
+        },
+        {
+          "entry": "ganbaru_matcha.toml",
+          "name": "Ganbaru Matcha",
+          "id": "alacritty-ganbaru-matcha",
+          "aliases": [
+            "Ganbaru Matcha"
+          ]
+        },
+        {
+          "entry": "github_dark.toml",
+          "name": "Github Dark",
+          "id": "alacritty-github-dark",
+          "aliases": [
+            "Github Dark"
+          ]
+        },
+        {
+          "entry": "github_dark_colorblind.toml",
+          "name": "Github Dark Colorblind",
+          "id": "alacritty-github-dark-colorblind",
+          "aliases": [
+            "Github Dark Colorblind"
+          ]
+        },
+        {
+          "entry": "github_dark_default.toml",
+          "name": "Github Dark Default",
+          "id": "alacritty-github-dark-default",
+          "aliases": [
+            "Github Dark Default"
+          ]
+        },
+        {
+          "entry": "github_dark_dimmed.toml",
+          "name": "Github Dark Dimmed",
+          "id": "alacritty-github-dark-dimmed",
+          "aliases": [
+            "Github Dark Dimmed"
+          ]
+        },
+        {
+          "entry": "github_dark_high_contrast.toml",
+          "name": "Github Dark High Contrast",
+          "id": "alacritty-github-dark-high-contrast",
+          "aliases": [
+            "Github Dark High Contrast"
+          ]
+        },
+        {
+          "entry": "github_dark_tritanopia.toml",
+          "name": "Github Dark Tritanopia",
+          "id": "alacritty-github-dark-tritanopia",
+          "aliases": [
+            "Github Dark Tritanopia"
+          ]
+        },
+        {
+          "entry": "github_light.toml",
+          "name": "Github Light",
+          "id": "alacritty-github-light",
+          "aliases": [
+            "Github Light"
+          ]
+        },
+        {
+          "entry": "github_light_colorblind.toml",
+          "name": "Github Light Colorblind",
+          "id": "alacritty-github-light-colorblind",
+          "aliases": [
+            "Github Light Colorblind"
+          ]
+        },
+        {
+          "entry": "github_light_default.toml",
+          "name": "Github Light Default",
+          "id": "alacritty-github-light-default",
+          "aliases": [
+            "Github Light Default"
+          ]
+        },
+        {
+          "entry": "github_light_high_contrast.toml",
+          "name": "Github Light High Contrast",
+          "id": "alacritty-github-light-high-contrast",
+          "aliases": [
+            "Github Light High Contrast"
+          ]
+        },
+        {
+          "entry": "github_light_tritanopia.toml",
+          "name": "Github Light Tritanopia",
+          "id": "alacritty-github-light-tritanopia",
+          "aliases": [
+            "Github Light Tritanopia"
+          ]
+        },
+        {
+          "entry": "gnome_terminal.toml",
+          "name": "Gnome Terminal",
+          "id": "alacritty-gnome-terminal",
+          "aliases": [
+            "Gnome Terminal"
+          ]
+        },
+        {
+          "entry": "google.toml",
+          "name": "Google",
+          "id": "alacritty-google",
+          "aliases": [
+            "Google"
+          ]
+        },
+        {
+          "entry": "gotham.toml",
+          "name": "Gotham",
+          "id": "alacritty-gotham",
+          "aliases": [
+            "Gotham"
+          ]
+        },
+        {
+          "entry": "gruber_darker.toml",
+          "name": "Gruber Darker",
+          "id": "alacritty-gruber-darker",
+          "aliases": [
+            "Gruber Darker"
+          ]
+        },
+        {
+          "entry": "gruvbox_dark.toml",
+          "name": "Gruvbox Dark",
+          "id": "alacritty-gruvbox-dark",
+          "aliases": [
+            "Gruvbox Dark"
+          ]
+        },
+        {
+          "entry": "gruvbox_light.toml",
+          "name": "Gruvbox Light",
+          "id": "alacritty-gruvbox-light",
+          "aliases": [
+            "Gruvbox Light"
+          ]
+        },
+        {
+          "entry": "gruvbox_material.toml",
+          "name": "Gruvbox Material",
+          "id": "alacritty-gruvbox-material",
+          "aliases": [
+            "Gruvbox Material"
+          ]
+        },
+        {
+          "entry": "gruvbox_material_hard_dark.toml",
+          "name": "Gruvbox Material Hard Dark",
+          "id": "alacritty-gruvbox-material-hard-dark",
+          "aliases": [
+            "Gruvbox Material Hard Dark"
+          ]
+        },
+        {
+          "entry": "gruvbox_material_hard_light.toml",
+          "name": "Gruvbox Material Hard Light",
+          "id": "alacritty-gruvbox-material-hard-light",
+          "aliases": [
+            "Gruvbox Material Hard Light"
+          ]
+        },
+        {
+          "entry": "gruvbox_material_medium_dark.toml",
+          "name": "Gruvbox Material Medium Dark",
+          "id": "alacritty-gruvbox-material-medium-dark",
+          "aliases": [
+            "Gruvbox Material Medium Dark"
+          ]
+        },
+        {
+          "entry": "gruvbox_material_medium_light.toml",
+          "name": "Gruvbox Material Medium Light",
+          "id": "alacritty-gruvbox-material-medium-light",
+          "aliases": [
+            "Gruvbox Material Medium Light"
+          ]
+        },
+        {
+          "entry": "gruvbox_material_soft_dark.toml",
+          "name": "Gruvbox Material Soft Dark",
+          "id": "alacritty-gruvbox-material-soft-dark",
+          "aliases": [
+            "Gruvbox Material Soft Dark"
+          ]
+        },
+        {
+          "entry": "hardhacker.toml",
+          "name": "Hardhacker",
+          "id": "alacritty-hardhacker",
+          "aliases": [
+            "Hardhacker"
+          ]
+        },
+        {
+          "entry": "hatsunemiku.toml",
+          "name": "Hatsunemiku",
+          "id": "alacritty-hatsunemiku",
+          "aliases": [
+            "Hatsunemiku"
+          ]
+        },
+        {
+          "entry": "high_contrast.toml",
+          "name": "High Contrast",
+          "id": "alacritty-high-contrast",
+          "aliases": [
+            "High Contrast"
+          ]
+        },
+        {
+          "entry": "horizon_dark.toml",
+          "name": "Horizon Dark",
+          "id": "alacritty-horizon-dark",
+          "aliases": [
+            "Horizon Dark"
+          ]
+        },
+        {
+          "entry": "hyper.toml",
+          "name": "Hyper",
+          "id": "alacritty-hyper",
+          "aliases": [
+            "Hyper"
+          ]
+        },
+        {
+          "entry": "iceberg.toml",
+          "name": "Iceberg",
+          "id": "alacritty-iceberg",
+          "aliases": [
+            "Iceberg"
+          ]
+        },
+        {
+          "entry": "inferno.toml",
+          "name": "Inferno",
+          "id": "alacritty-inferno",
+          "aliases": [
+            "Inferno"
+          ]
+        },
+        {
+          "entry": "iris.toml",
+          "name": "Iris",
+          "id": "alacritty-iris",
+          "aliases": [
+            "Iris"
+          ]
+        },
+        {
+          "entry": "iterm.toml",
+          "name": "Iterm",
+          "id": "alacritty-iterm",
+          "aliases": [
+            "Iterm"
+          ]
+        },
+        {
+          "entry": "iterm_solardark.toml",
+          "name": "Iterm Solardark",
+          "id": "alacritty-iterm-solardark",
+          "aliases": [
+            "Iterm Solardark"
+          ]
+        },
+        {
+          "entry": "kanagawa_dragon.toml",
+          "name": "Kanagawa Dragon",
+          "id": "alacritty-kanagawa-dragon",
+          "aliases": [
+            "Kanagawa Dragon"
+          ]
+        },
+        {
+          "entry": "kanagawa_wave.toml",
+          "name": "Kanagawa Wave",
+          "id": "alacritty-kanagawa-wave",
+          "aliases": [
+            "Kanagawa Wave"
+          ]
+        },
+        {
+          "entry": "kimbie_dark.toml",
+          "name": "Kimbie Dark",
+          "id": "alacritty-kimbie-dark",
+          "aliases": [
+            "Kimbie Dark"
+          ]
+        },
+        {
+          "entry": "kimbie_light.toml",
+          "name": "Kimbie Light",
+          "id": "alacritty-kimbie-light",
+          "aliases": [
+            "Kimbie Light"
+          ]
+        },
+        {
+          "entry": "kitty.toml",
+          "name": "Kitty",
+          "id": "alacritty-kitty",
+          "aliases": [
+            "Kitty"
+          ]
+        },
+        {
+          "entry": "konsole_linux.toml",
+          "name": "Konsole Linux",
+          "id": "alacritty-konsole-linux",
+          "aliases": [
+            "Konsole Linux"
+          ]
+        },
+        {
+          "entry": "linux.toml",
+          "name": "Linux",
+          "id": "alacritty-linux",
+          "aliases": [
+            "Linux"
+          ]
+        },
+        {
+          "entry": "low_contrast.toml",
+          "name": "Low Contrast",
+          "id": "alacritty-low-contrast",
+          "aliases": [
+            "Low Contrast"
+          ]
+        },
+        {
+          "entry": "marine_dark.toml",
+          "name": "Marine Dark",
+          "id": "alacritty-marine-dark",
+          "aliases": [
+            "Marine Dark"
+          ]
+        },
+        {
+          "entry": "material_theme.toml",
+          "name": "Material Theme",
+          "id": "alacritty-material-theme",
+          "aliases": [
+            "Material Theme"
+          ]
+        },
+        {
+          "entry": "material_theme_mod.toml",
+          "name": "Material Theme Mod",
+          "id": "alacritty-material-theme-mod",
+          "aliases": [
+            "Material Theme Mod"
+          ]
+        },
+        {
+          "entry": "meliora.toml",
+          "name": "Meliora",
+          "id": "alacritty-meliora",
+          "aliases": [
+            "Meliora"
+          ]
+        },
+        {
+          "entry": "miasma.toml",
+          "name": "Miasma",
+          "id": "alacritty-miasma",
+          "aliases": [
+            "Miasma"
+          ]
+        },
+        {
+          "entry": "midnight_haze.toml",
+          "name": "Midnight Haze",
+          "id": "alacritty-midnight-haze",
+          "aliases": [
+            "Midnight Haze"
+          ]
+        },
+        {
+          "entry": "modus_operandi.toml",
+          "name": "Modus Operandi",
+          "id": "alacritty-modus-operandi",
+          "aliases": [
+            "Modus Operandi"
+          ]
+        },
+        {
+          "entry": "modus_vivendi.toml",
+          "name": "Modus Vivendi",
+          "id": "alacritty-modus-vivendi",
+          "aliases": [
+            "Modus Vivendi"
+          ]
+        },
+        {
+          "entry": "monokai.toml",
+          "name": "Monokai",
+          "id": "alacritty-monokai",
+          "aliases": [
+            "Monokai"
+          ]
+        },
+        {
+          "entry": "monokai_charcoal.toml",
+          "name": "Monokai Charcoal",
+          "id": "alacritty-monokai-charcoal",
+          "aliases": [
+            "Monokai Charcoal"
+          ]
+        },
+        {
+          "entry": "monokai_pro.toml",
+          "name": "Monokai Pro",
+          "id": "alacritty-monokai-pro",
+          "aliases": [
+            "Monokai Pro"
+          ]
+        },
+        {
+          "entry": "moonfly.toml",
+          "name": "Moonfly",
+          "id": "alacritty-moonfly",
+          "aliases": [
+            "Moonfly"
+          ]
+        },
+        {
+          "entry": "moonlight_ii_vscode.toml",
+          "name": "Moonlight Ii Vscode",
+          "id": "alacritty-moonlight-ii-vscode",
+          "aliases": [
+            "Moonlight Ii Vscode"
+          ]
+        },
+        {
+          "entry": "msx.toml",
+          "name": "Msx",
+          "id": "alacritty-msx",
+          "aliases": [
+            "Msx"
+          ]
+        },
+        {
+          "entry": "night_owl.toml",
+          "name": "Night Owl",
+          "id": "alacritty-night-owl",
+          "aliases": [
+            "Night Owl"
+          ]
+        },
+        {
+          "entry": "night_owlish_light.toml",
+          "name": "Night Owlish Light",
+          "id": "alacritty-night-owlish-light",
+          "aliases": [
+            "Night Owlish Light"
+          ]
+        },
+        {
+          "entry": "nightfly.toml",
+          "name": "Nightfly",
+          "id": "alacritty-nightfly",
+          "aliases": [
+            "Nightfly"
+          ]
+        },
+        {
+          "entry": "nightfox.toml",
+          "name": "Nightfox",
+          "id": "alacritty-nightfox",
+          "aliases": [
+            "Nightfox"
+          ]
+        },
+        {
+          "entry": "noctis_lux.toml",
+          "name": "Noctis Lux",
+          "id": "alacritty-noctis-lux",
+          "aliases": [
+            "Noctis Lux"
+          ]
+        },
+        {
+          "entry": "nord.toml",
+          "name": "Nord",
+          "aliases": [
+            "Nord"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "Nord"
+        },
+        {
+          "entry": "nord_light.toml",
+          "name": "Nord Light",
+          "id": "alacritty-nord-light",
+          "aliases": [
+            "Nord Light"
+          ]
+        },
+        {
+          "entry": "nordfox.toml",
+          "name": "Nordfox",
+          "id": "alacritty-nordfox",
+          "aliases": [
+            "Nordfox"
+          ]
+        },
+        {
+          "entry": "nordic.toml",
+          "name": "Nordic",
+          "id": "alacritty-nordic",
+          "aliases": [
+            "Nordic"
+          ]
+        },
+        {
+          "entry": "nvim_dark.toml",
+          "name": "Nvim Dark",
+          "id": "alacritty-nvim-dark",
+          "aliases": [
+            "Nvim Dark"
+          ]
+        },
+        {
+          "entry": "oceanic_next.toml",
+          "name": "Oceanic Next",
+          "id": "alacritty-oceanic-next",
+          "aliases": [
+            "Oceanic Next"
+          ]
+        },
+        {
+          "entry": "omni.toml",
+          "name": "Omni",
+          "id": "alacritty-omni",
+          "aliases": [
+            "Omni"
+          ]
+        },
+        {
+          "entry": "one_dark.toml",
+          "name": "One Dark",
+          "aliases": [
+            "One Dark"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "One Dark"
+        },
+        {
+          "entry": "one_light.toml",
+          "name": "One Light",
+          "id": "alacritty-one-light",
+          "aliases": [
+            "One Light"
+          ]
+        },
+        {
+          "entry": "oxocarbon.toml",
+          "name": "Oxocarbon",
+          "id": "alacritty-oxocarbon",
+          "aliases": [
+            "Oxocarbon"
+          ]
+        },
+        {
+          "entry": "palenight.toml",
+          "name": "Palenight",
+          "id": "alacritty-palenight",
+          "aliases": [
+            "Palenight"
+          ]
+        },
+        {
+          "entry": "panda.toml",
+          "name": "Panda",
+          "id": "alacritty-panda",
+          "aliases": [
+            "Panda"
+          ]
+        },
+        {
+          "entry": "papercolor_dark.toml",
+          "name": "Papercolor Dark",
+          "id": "alacritty-papercolor-dark",
+          "aliases": [
+            "Papercolor Dark"
+          ]
+        },
+        {
+          "entry": "papercolor_light.toml",
+          "name": "Papercolor Light",
+          "id": "alacritty-papercolor-light",
+          "aliases": [
+            "Papercolor Light"
+          ]
+        },
+        {
+          "entry": "papertheme.toml",
+          "name": "Papertheme",
+          "id": "alacritty-papertheme",
+          "aliases": [
+            "Papertheme"
+          ]
+        },
+        {
+          "entry": "pastel_dark.toml",
+          "name": "Pastel Dark",
+          "id": "alacritty-pastel-dark",
+          "aliases": [
+            "Pastel Dark"
+          ]
+        },
+        {
+          "entry": "pencil_dark.toml",
+          "name": "Pencil Dark",
+          "id": "alacritty-pencil-dark",
+          "aliases": [
+            "Pencil Dark"
+          ]
+        },
+        {
+          "entry": "pencil_light.toml",
+          "name": "Pencil Light",
+          "id": "alacritty-pencil-light",
+          "aliases": [
+            "Pencil Light"
+          ]
+        },
+        {
+          "entry": "pink_cat_boo.toml",
+          "name": "Pink Cat Boo",
+          "id": "alacritty-pink-cat-boo",
+          "aliases": [
+            "Pink Cat Boo"
+          ]
+        },
+        {
+          "entry": "rainbow.toml",
+          "name": "Rainbow",
+          "id": "alacritty-rainbow",
+          "aliases": [
+            "Rainbow"
+          ]
+        },
+        {
+          "entry": "remedy_dark.toml",
+          "name": "Remedy Dark",
+          "id": "alacritty-remedy-dark",
+          "aliases": [
+            "Remedy Dark"
+          ]
+        },
+        {
+          "entry": "rigel.toml",
+          "name": "Rigel",
+          "id": "alacritty-rigel",
+          "aliases": [
+            "Rigel"
+          ]
+        },
+        {
+          "entry": "rose_pine.toml",
+          "name": "Rose Pine",
+          "id": "alacritty-rose-pine",
+          "aliases": [
+            "Rose Pine"
+          ]
+        },
+        {
+          "entry": "rose_pine_dawn.toml",
+          "name": "Rose Pine Dawn",
+          "id": "alacritty-rose-pine-dawn",
+          "aliases": [
+            "Rose Pine Dawn"
+          ]
+        },
+        {
+          "entry": "rose_pine_moon.toml",
+          "name": "Rose Pine Moon",
+          "id": "alacritty-rose-pine-moon",
+          "aliases": [
+            "Rose Pine Moon"
+          ]
+        },
+        {
+          "entry": "seashells.toml",
+          "name": "Seashells",
+          "id": "alacritty-seashells",
+          "aliases": [
+            "Seashells"
+          ]
+        },
+        {
+          "entry": "selenized_dark.toml",
+          "name": "Selenized Dark",
+          "id": "alacritty-selenized-dark",
+          "aliases": [
+            "Selenized Dark"
+          ]
+        },
+        {
+          "entry": "selenized_light.toml",
+          "name": "Selenized Light",
+          "id": "alacritty-selenized-light",
+          "aliases": [
+            "Selenized Light"
+          ]
+        },
+        {
+          "entry": "seoul256-light.toml",
+          "name": "Seoul256 Light",
+          "id": "alacritty-seoul256-light",
+          "aliases": [
+            "Seoul256 Light"
+          ]
+        },
+        {
+          "entry": "smoooooth.toml",
+          "name": "Smoooooth",
+          "id": "alacritty-smoooooth",
+          "aliases": [
+            "Smoooooth"
+          ]
+        },
+        {
+          "entry": "snazzy.toml",
+          "name": "Snazzy",
+          "id": "alacritty-snazzy",
+          "aliases": [
+            "Snazzy"
+          ]
+        },
+        {
+          "entry": "solarized_dark.toml",
+          "name": "Solarized Dark",
+          "aliases": [
+            "Solarized Dark"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "Solarized Dark"
+        },
+        {
+          "entry": "solarized_light.toml",
+          "name": "Solarized Light",
+          "aliases": [
+            "Solarized Light"
+          ],
+          "exclude": "IntelliJ-family native theme has the same normalized name.",
+          "replacement": "Solarized Light"
+        },
+        {
+          "entry": "solarized_osaka.toml",
+          "name": "Solarized Osaka",
+          "id": "alacritty-solarized-osaka",
+          "aliases": [
+            "Solarized Osaka"
+          ]
+        },
+        {
+          "entry": "solarized_osaka_day.toml",
+          "name": "Solarized Osaka Day",
+          "id": "alacritty-solarized-osaka-day",
+          "aliases": [
+            "Solarized Osaka Day"
+          ]
+        },
+        {
+          "entry": "sonokai.toml",
+          "name": "Sonokai",
+          "id": "alacritty-sonokai",
+          "aliases": [
+            "Sonokai"
+          ]
+        },
+        {
+          "entry": "spacegray.toml",
+          "name": "Spacegray",
+          "id": "alacritty-spacegray",
+          "aliases": [
+            "Spacegray"
+          ]
+        },
+        {
+          "entry": "synthwave_84.toml",
+          "name": "Synthwave 84",
+          "id": "alacritty-synthwave-84",
+          "aliases": [
+            "Synthwave 84"
+          ]
+        },
+        {
+          "entry": "taerminal.toml",
+          "name": "Taerminal",
+          "id": "alacritty-taerminal",
+          "aliases": [
+            "Taerminal"
+          ]
+        },
+        {
+          "entry": "tango_dark.toml",
+          "name": "Tango Dark",
+          "id": "alacritty-tango-dark",
+          "aliases": [
+            "Tango Dark"
+          ]
+        },
+        {
+          "entry": "tender.toml",
+          "name": "Tender",
+          "id": "alacritty-tender",
+          "aliases": [
+            "Tender"
+          ]
+        },
+        {
+          "entry": "terafox.toml",
+          "name": "Terafox",
+          "id": "alacritty-terafox",
+          "aliases": [
+            "Terafox"
+          ]
+        },
+        {
+          "entry": "terminal_app.toml",
+          "name": "Terminal App",
+          "id": "alacritty-terminal-app",
+          "aliases": [
+            "Terminal App"
+          ]
+        },
+        {
+          "entry": "thelovelace.toml",
+          "name": "Thelovelace",
+          "id": "alacritty-thelovelace",
+          "aliases": [
+            "Thelovelace"
+          ]
+        },
+        {
+          "entry": "tokyo_night.toml",
+          "name": "Tokyo Night",
+          "id": "alacritty-tokyo-night",
+          "aliases": [
+            "Tokyo Night"
+          ]
+        },
+        {
+          "entry": "tokyo_night_enhanced.toml",
+          "name": "Tokyo Night Enhanced",
+          "id": "alacritty-tokyo-night-enhanced",
+          "aliases": [
+            "Tokyo Night Enhanced"
+          ]
+        },
+        {
+          "entry": "tokyo_night_light.toml",
+          "name": "Tokyo Night Light",
+          "id": "alacritty-tokyo-night-light",
+          "aliases": [
+            "Tokyo Night Light"
+          ]
+        },
+        {
+          "entry": "tokyo_night_storm.toml",
+          "name": "Tokyo Night Storm",
+          "id": "alacritty-tokyo-night-storm",
+          "aliases": [
+            "Tokyo Night Storm"
+          ]
+        },
+        {
+          "entry": "tomorrow.toml",
+          "name": "Tomorrow",
+          "id": "alacritty-tomorrow",
+          "aliases": [
+            "Tomorrow"
+          ]
+        },
+        {
+          "entry": "tomorrow_night.toml",
+          "name": "Tomorrow Night",
+          "id": "alacritty-tomorrow-night",
+          "aliases": [
+            "Tomorrow Night"
+          ]
+        },
+        {
+          "entry": "tomorrow_night_blue.toml",
+          "name": "Tomorrow Night Blue",
+          "id": "alacritty-tomorrow-night-blue",
+          "aliases": [
+            "Tomorrow Night Blue"
+          ]
+        },
+        {
+          "entry": "tomorrow_night_bright.toml",
+          "name": "Tomorrow Night Bright",
+          "id": "alacritty-tomorrow-night-bright",
+          "aliases": [
+            "Tomorrow Night Bright"
+          ]
+        },
+        {
+          "entry": "tomorrow_night_eighties.toml",
+          "name": "Tomorrow Night Eighties",
+          "id": "alacritty-tomorrow-night-eighties",
+          "aliases": [
+            "Tomorrow Night Eighties"
+          ]
+        },
+        {
+          "entry": "ubuntu.toml",
+          "name": "Ubuntu",
+          "id": "alacritty-ubuntu",
+          "aliases": [
+            "Ubuntu"
+          ]
+        },
+        {
+          "entry": "vesper.toml",
+          "name": "Vesper",
+          "id": "alacritty-vesper",
+          "aliases": [
+            "Vesper"
+          ]
+        },
+        {
+          "entry": "vscode.toml",
+          "name": "Vscode",
+          "id": "alacritty-vscode",
+          "aliases": [
+            "Vscode"
+          ]
+        },
+        {
+          "entry": "wombat.toml",
+          "name": "Wombat",
+          "id": "alacritty-wombat",
+          "aliases": [
+            "Wombat"
+          ]
+        },
+        {
+          "entry": "xterm.toml",
+          "name": "Xterm",
+          "id": "alacritty-xterm",
+          "aliases": [
+            "Xterm"
+          ]
+        },
+        {
+          "entry": "zenburn.toml",
+          "name": "Zenburn",
+          "id": "alacritty-zenburn",
+          "aliases": [
+            "Zenburn"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "catppuccin",
+      "repository": "https://github.com/catppuccin/jetbrains",
+      "commit": "71b78a50557d87af64ec75bb1b1bdfa17f416ed8",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "264b1899f50472042b4ac1c4befc6279e2a8bde9b62cc743fbb560b861cfcd1f"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "28c38c8a0cf024e86b0425bbe44d30ef15d0538467b8d26902eb1126810fced4"
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "bf3d260fbbd5a19259b100833b22f30e5f3a95e6a9c4caec29b95962d36f9a41",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "Catppuccin.Theme-3.6.1.jar",
+          "upstream": "Catppuccin.Theme-3.6.1.jar",
+          "url": "https://github.com/catppuccin/jetbrains/releases/download/v3.6.1/Catppuccin.Theme-3.6.1.jar",
+          "sha256": "3a1104e0db53ff5ba216c94c9e730a85c7ac2847f4e5fe82d91b99dc91045fff"
+        }
+      ],
+      "release": {
+        "tag": "v3.6.1",
+        "asset": "Catppuccin.Theme-3.6.1.jar",
+        "url": "https://github.com/catppuccin/jetbrains/releases/download/v3.6.1/Catppuccin.Theme-3.6.1.jar",
+        "sha256": "3a1104e0db53ff5ba216c94c9e730a85c7ac2847f4e5fe82d91b99dc91045fff"
+      },
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "kind": "release",
+      "author": "Catppuccin",
+      "variants": [
+        {
+          "entry": "themes/latte.theme.json",
+          "name": "Catppuccin Latte",
+          "aliases": [
+            "Catppuccin Latte"
+          ],
+          "id": "catppuccin-latte"
+        },
+        {
+          "entry": "themes/frappe.theme.json",
+          "name": "Catppuccin Frappé",
+          "aliases": [
+            "Catppuccin Frappé",
+            "Catppuccin Frappe"
+          ],
+          "id": "catppuccin-frappe"
+        },
+        {
+          "entry": "themes/macchiato.theme.json",
+          "name": "Catppuccin Macchiato",
+          "aliases": [
+            "Catppuccin Macchiato"
+          ],
+          "id": "catppuccin-macchiato"
+        },
+        {
+          "entry": "themes/mocha.theme.json",
+          "name": "Catppuccin Mocha",
+          "aliases": [
+            "Catppuccin Mocha"
+          ],
+          "id": "catppuccin-mocha"
+        },
+        {
+          "entry": "themes/latte-islands.theme.json",
+          "name": "Islands Catppuccin Latte",
+          "aliases": [
+            "Islands Catppuccin Latte"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        },
+        {
+          "entry": "themes/frappe-islands.theme.json",
+          "name": "Islands Catppuccin Frappé",
+          "aliases": [
+            "Islands Catppuccin Frappé"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        },
+        {
+          "entry": "themes/macchiato-islands.theme.json",
+          "name": "Islands Catppuccin Macchiato",
+          "aliases": [
+            "Islands Catppuccin Macchiato"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        },
+        {
+          "entry": "themes/mocha-islands.theme.json",
+          "name": "Islands Catppuccin Mocha",
+          "aliases": [
+            "Islands Catppuccin Mocha"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        }
+      ]
+    },
+    {
+      "id": "dracula",
+      "repository": "https://github.com/dracula/jetbrains",
+      "commit": "718eb13e3b9879b4ed8f4a89a9eed3823c946efa",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "831b4fc7bf7009fa1ad49af359b3efee3fd6542c148e7836e4fc5586e9c85a8a"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "4a820a4ade89f90f8af9f0e63fb338b5f857e6fb3790533cf1555d81307fffd9"
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "e59ca49af89e3666ec75420d5b7daef510a8524411189bd59eda606a49f953b4",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/Dracula.theme.json",
+          "upstream": "src/main/resources/themes/Dracula.theme.json",
+          "sha256": "d465aa3a61d902f5c4e2a3a4f47aa5995fa20277c73a75e2c61bc65056655960",
+          "jarPaths": [
+            "themes/Dracula.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/Dracula.xml",
+          "upstream": "src/main/resources/themes/Dracula.xml",
+          "sha256": "77dd1851b32f2bd804ecee4c2c4182f8df97e39f38edd705c82823a5e26b83f4",
+          "jarPaths": [
+            "themes/Dracula.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/DraculaAlucard.theme.json",
+          "upstream": "src/main/resources/themes/DraculaAlucard.theme.json",
+          "sha256": "abe1ebdc3e6169252f7c40507218884a60e1cc333d6ab260bd81c5a193418acd",
+          "jarPaths": [
+            "themes/DraculaAlucard.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/DraculaAlucard.xml",
+          "upstream": "src/main/resources/themes/DraculaAlucard.xml",
+          "sha256": "9f4a576322087b715e91e43cec9879d42aa14cdd14c6b44487ff26891447ed9a",
+          "jarPaths": [
+            "themes/DraculaAlucard.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/DraculaColorful.theme.json",
+          "upstream": "src/main/resources/themes/DraculaColorful.theme.json",
+          "sha256": "9291024b68235c9ed54d740c7c342d69be69d62697dd459ffcebaa323c222b98",
+          "jarPaths": [
+            "themes/DraculaColorful.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/DraculaColorful.xml",
+          "upstream": "src/main/resources/themes/DraculaColorful.xml",
+          "sha256": "c9fe7d753ec7cfa662ece0dd1be24fc4a9bb65e21e60a18e0c83e705d60473b7",
+          "jarPaths": [
+            "themes/DraculaColorful.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/IslandsDracula.theme.json",
+          "upstream": "src/main/resources/themes/IslandsDracula.theme.json",
+          "sha256": "e77bf84df2cbc0b9cb5ac4380d01652051fd953d1b526169eaffbe992fa61251",
+          "jarPaths": [
+            "themes/IslandsDracula.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/IslandsDraculaAlucard.theme.json",
+          "upstream": "src/main/resources/themes/IslandsDraculaAlucard.theme.json",
+          "sha256": "c9a4e172921566a3035672cf4e64fd8410415603db7a7de1f954593150c69705",
+          "jarPaths": [
+            "themes/IslandsDraculaAlucard.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/IslandsDraculaColorful.theme.json",
+          "upstream": "src/main/resources/themes/IslandsDraculaColorful.theme.json",
+          "sha256": "3e670899f7728df5c3fb25c8b7e83439f7e87afce08d7620e9c50cec0b6a0df1",
+          "jarPaths": [
+            "themes/IslandsDraculaColorful.theme.json"
+          ]
+        }
+      ],
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "kind": "intellij",
+      "plugin": "src/main/resources/META-INF/plugin.xml",
+      "author": "Dracula Official",
+      "variants": [
+        {
+          "entry": "themes/Dracula.theme.json",
+          "name": "Dracula",
+          "aliases": [
+            "Dracula"
+          ],
+          "id": "dracula-dracula"
+        },
+        {
+          "entry": "themes/DraculaColorful.theme.json",
+          "name": "Dracula Colorful",
+          "aliases": [
+            "Dracula Colorful"
+          ],
+          "id": "dracula-dracula-colorful"
+        },
+        {
+          "entry": "themes/DraculaAlucard.theme.json",
+          "name": "Alucard",
+          "aliases": [
+            "Dracula Alucard"
+          ],
+          "id": "dracula-alucard"
+        },
+        {
+          "entry": "themes/IslandsDracula.theme.json",
+          "name": "Islands Dracula",
+          "aliases": [
+            "Islands Dracula"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        },
+        {
+          "entry": "themes/IslandsDraculaColorful.theme.json",
+          "name": "Islands Dracula Colorful",
+          "aliases": [
+            "Islands Dracula Colorful"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        },
+        {
+          "entry": "themes/IslandsDraculaAlucard.theme.json",
+          "name": "Islands Dracula Alucard",
+          "aliases": [
+            "Islands Dracula Alucard"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        }
+      ]
+    },
+    {
+      "id": "gruvbox",
+      "repository": "https://github.com/lonre/gruvbox-intellij-theme",
+      "commit": "715762987c6f91735ad4b08d5cf852ab49b2215a",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "c2fc5ac02ef173af89b093dfea555e88fd1ff86b2e0b010fdfbe34e078378b96"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "c6c99f4672c4d56c038a283efc1befef1c1d12a434e7cca7738081933c27e90a"
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "64f6f5aae48eea8076cfabeae9628328da6512420c17857f0141b7f1a4319916",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_dark_hard.theme.json",
+          "upstream": "src/main/resources/gruvbox_dark_hard.theme.json",
+          "sha256": "b3d0a09b3b9360eb19f5fc19aa8b45aee1771563ecde0870194a202a417853d0",
+          "jarPaths": [
+            "gruvbox_dark_hard.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_dark_hard.xml",
+          "upstream": "src/main/resources/gruvbox_dark_hard.xml",
+          "sha256": "2b0bd1e6ebc1f21e3a7f1b8a27cec4f2863aaa1669016001192d0796b1aff5a1",
+          "jarPaths": [
+            "gruvbox_dark_hard.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_dark_medium.theme.json",
+          "upstream": "src/main/resources/gruvbox_dark_medium.theme.json",
+          "sha256": "a81231e8daa61dd161a25789a4a4d62286fc9c51620f9e2a7afd0f05a26f4072",
+          "jarPaths": [
+            "gruvbox_dark_medium.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_dark_medium.xml",
+          "upstream": "src/main/resources/gruvbox_dark_medium.xml",
+          "sha256": "4553ae865b94e5318a1176672442b87daeac11d1909ad535e43da4bb306ff3b9",
+          "jarPaths": [
+            "gruvbox_dark_medium.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_dark_soft.theme.json",
+          "upstream": "src/main/resources/gruvbox_dark_soft.theme.json",
+          "sha256": "a8a196e86ac307daf19c8341d7745be8fa80f0dee05ae5e0f4e725537988f9d0",
+          "jarPaths": [
+            "gruvbox_dark_soft.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_dark_soft.xml",
+          "upstream": "src/main/resources/gruvbox_dark_soft.xml",
+          "sha256": "5998d2581d51d01efdf4e2b153a0b17c2c7cf7735016e9d1fd368f2956b3a4b5",
+          "jarPaths": [
+            "gruvbox_dark_soft.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_light_hard.theme.json",
+          "upstream": "src/main/resources/gruvbox_light_hard.theme.json",
+          "sha256": "9848f3ad734fd84b2974e640806d188bded71a13fcb63b0fb9f1cc5d518c20f7",
+          "jarPaths": [
+            "gruvbox_light_hard.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_light_hard.xml",
+          "upstream": "src/main/resources/gruvbox_light_hard.xml",
+          "sha256": "5b4b8f87d3bed547ebec174069c95bea10ae47e72aa3cc309979160a9e3721f1",
+          "jarPaths": [
+            "gruvbox_light_hard.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_light_medium.theme.json",
+          "upstream": "src/main/resources/gruvbox_light_medium.theme.json",
+          "sha256": "283afd2d4085b983a4c05b2c8ca82c3b8f20a1f5a46a9863c3a55040e6c7d9bd",
+          "jarPaths": [
+            "gruvbox_light_medium.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_light_medium.xml",
+          "upstream": "src/main/resources/gruvbox_light_medium.xml",
+          "sha256": "1f55b17bdee3cee676e86ae686260d82033fc67eb9f039ad9e8e3b7da4f6b3cf",
+          "jarPaths": [
+            "gruvbox_light_medium.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_light_soft.theme.json",
+          "upstream": "src/main/resources/gruvbox_light_soft.theme.json",
+          "sha256": "299011835e4794dd1e1b596ed5c25eab3f88569006bcde1fe651812c6d221cd4",
+          "jarPaths": [
+            "gruvbox_light_soft.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/gruvbox_light_soft.xml",
+          "upstream": "src/main/resources/gruvbox_light_soft.xml",
+          "sha256": "aba2c31d3749da6788647c6af0d6f280bb05aec7eb8c8201a08bc9d08b89a273",
+          "jarPaths": [
+            "gruvbox_light_soft.xml"
+          ]
+        }
+      ],
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "kind": "intellij",
+      "plugin": "src/main/resources/META-INF/plugin.xml",
+      "author": "Lonre Wang",
+      "variants": [
+        {
+          "entry": "gruvbox_dark_medium.theme.json",
+          "name": "Gruvbox Dark Medium",
+          "aliases": [
+            "Gruvbox Islands Dark Medium"
+          ],
+          "id": "gruvbox-dark-medium"
+        },
+        {
+          "entry": "gruvbox_dark_soft.theme.json",
+          "name": "Gruvbox Dark Soft",
+          "aliases": [
+            "Gruvbox Islands Dark Soft"
+          ],
+          "id": "gruvbox-dark-soft"
+        },
+        {
+          "entry": "gruvbox_dark_hard.theme.json",
+          "name": "Gruvbox Dark Hard",
+          "aliases": [
+            "Gruvbox Islands Dark Hard"
+          ],
+          "id": "gruvbox-dark-hard"
+        },
+        {
+          "entry": "gruvbox_light_medium.theme.json",
+          "name": "Gruvbox Light Medium",
+          "aliases": [
+            "Gruvbox Islands Light Medium"
+          ],
+          "id": "gruvbox-light-medium"
+        },
+        {
+          "entry": "gruvbox_light_soft.theme.json",
+          "name": "Gruvbox Light Soft",
+          "aliases": [
+            "Gruvbox Islands Light Soft"
+          ],
+          "id": "gruvbox-light-soft"
+        },
+        {
+          "entry": "gruvbox_light_hard.theme.json",
+          "name": "Gruvbox Light Hard",
+          "aliases": [
+            "Gruvbox Islands Light Hard"
+          ],
+          "id": "gruvbox-light-hard"
+        }
+      ]
+    },
+    {
+      "id": "material-lite",
+      "repository": "https://github.com/AtomMaterialUI/material-theme-ui-lite",
+      "commit": "177403842fdea09d38e0c30a9f2d4e655456ef3d",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "f6fbe3f0b0001760371f130b0df04946fadc4d45278d6643e1a3635c842f8216"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "d45a6e0328442da18c3cd81dcabb2aa490710aadd95baf307a085548b47ed164"
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "9c2a8c012be9c6998d7ecf36bc6aae4973f1a4ba7387dd98cfdbdf9d01c9f266",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Arc Dark.xml",
+          "upstream": "src/main/resources/colors/Arc Dark.xml",
+          "sha256": "b4934307b084b388e499ac3c6d8f2901e449ebd42d2ede0ccd1454a6715d94bc",
+          "jarPaths": [
+            "colors/Arc Dark.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Atom One Dark.xml",
+          "upstream": "src/main/resources/colors/Atom One Dark.xml",
+          "sha256": "572525f6e9f81353709dea7b28945d4ca2b9ded350751841510b14c5cb697219",
+          "jarPaths": [
+            "colors/Atom One Dark.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Atom One Light.xml",
+          "upstream": "src/main/resources/colors/Atom One Light.xml",
+          "sha256": "fbc159e601e62eb79aea5ec8e475f8924be634429ff593edfc2236f663cf3074",
+          "jarPaths": [
+            "colors/Atom One Light.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Dracula.xml",
+          "upstream": "src/main/resources/colors/Dracula.xml",
+          "sha256": "7aae0b39119a0500149512aaddb829e76506e28fb50b73a67db882e1d6543b67",
+          "jarPaths": [
+            "colors/Dracula.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/GitHub Dark.xml",
+          "upstream": "src/main/resources/colors/GitHub Dark.xml",
+          "sha256": "d8236c7f6f201d930373d8b6cab46d1fa1d52a6392059cb2dc078883ce04d7d6",
+          "jarPaths": [
+            "colors/GitHub Dark.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/GitHub.xml",
+          "upstream": "src/main/resources/colors/GitHub.xml",
+          "sha256": "d4da325b4cc5ffa0e155632ee0ea37cace6ef7d440799cb0c7e793a77209fcff",
+          "jarPaths": [
+            "colors/GitHub.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Light Owl.xml",
+          "upstream": "src/main/resources/colors/Light Owl.xml",
+          "sha256": "b4e52831717fd09c50e8c19da0bc9448377a43f19ec633c9a709fbea3e5f3af6",
+          "jarPaths": [
+            "colors/Light Owl.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Darker.xml",
+          "upstream": "src/main/resources/colors/Material Darker.xml",
+          "sha256": "01c8d2685977aaf54c9c79c6115ac7f0ae981fd1ea0f553993294f117b34baf3",
+          "jarPaths": [
+            "colors/Material Darker.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Deep Ocean.xml",
+          "upstream": "src/main/resources/colors/Material Deep Ocean.xml",
+          "sha256": "2bee33288a0de759d88a910703c325a8003c585ce11eaab1debe66e90c2b6c62",
+          "jarPaths": [
+            "colors/Material Deep Ocean.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Forest.xml",
+          "upstream": "src/main/resources/colors/Material Forest.xml",
+          "sha256": "429a927dbf494142325800a1e50e642f961bbdd91af6eee46ff98370d2563ac0",
+          "jarPaths": [
+            "colors/Material Forest.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Lighter.xml",
+          "upstream": "src/main/resources/colors/Material Lighter.xml",
+          "sha256": "bf0c39152248f055b72eed3d0e06b7e5a44de3e74db8561200dedebd5cf4813f",
+          "jarPaths": [
+            "colors/Material Lighter.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Oceanic.xml",
+          "upstream": "src/main/resources/colors/Material Oceanic.xml",
+          "sha256": "f1b0196d413e8844a6ed8da984783c41ebbe391402f5a37580c73fbeac5277cd",
+          "jarPaths": [
+            "colors/Material Oceanic.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Palenight.xml",
+          "upstream": "src/main/resources/colors/Material Palenight.xml",
+          "sha256": "aafbf723d2ce214bd080912ddf7702638dbf42b0294e7732d5bf0696204eeb82",
+          "jarPaths": [
+            "colors/Material Palenight.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Sandy Beach.xml",
+          "upstream": "src/main/resources/colors/Material Sandy Beach.xml",
+          "sha256": "a17a0a7f6a3a798aea96b941be2e15acd6ef96dcc4000420a526915c2374c6c8",
+          "jarPaths": [
+            "colors/Material Sandy Beach.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Sky Blue.xml",
+          "upstream": "src/main/resources/colors/Material Sky Blue.xml",
+          "sha256": "c1a2acb3e705d9f2399c35127d9eaf8840a737d0d85b4d40ea4516462c95eac4",
+          "jarPaths": [
+            "colors/Material Sky Blue.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Space.xml",
+          "upstream": "src/main/resources/colors/Material Space.xml",
+          "sha256": "962e7d892732ac432d7497049493adb8d71f85ec85ccbf544d38f6101042267d",
+          "jarPaths": [
+            "colors/Material Space.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Material Volcano.xml",
+          "upstream": "src/main/resources/colors/Material Volcano.xml",
+          "sha256": "63a55fdb03eadaf5d474cec27c59a9175241a33df97914eb50c83ea6f857d88c",
+          "jarPaths": [
+            "colors/Material Volcano.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Monokai Pro.xml",
+          "upstream": "src/main/resources/colors/Monokai Pro.xml",
+          "sha256": "95dd0f101f58b27e3cc3e51003ff10f82d5bd993cdb2a455569e151c75aa2779",
+          "jarPaths": [
+            "colors/Monokai Pro.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Moonlight.xml",
+          "upstream": "src/main/resources/colors/Moonlight.xml",
+          "sha256": "653240e9dc14fa76d47e3a419308a1c37eb6bb91cf8f40f5987aaff16c241052",
+          "jarPaths": [
+            "colors/Moonlight.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Night Owl.xml",
+          "upstream": "src/main/resources/colors/Night Owl.xml",
+          "sha256": "cba0ca951cdbe9f21f40e8d260137a9451bca3f36fd860e58c5cb3c110ca542c",
+          "jarPaths": [
+            "colors/Night Owl.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Solarized Dark.xml",
+          "upstream": "src/main/resources/colors/Solarized Dark.xml",
+          "sha256": "6dc2da33a95847cf9ac785ad34f9c8e0583a1eb4f0b59fcf3e921aed283b716b",
+          "jarPaths": [
+            "colors/Solarized Dark.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Solarized Light.xml",
+          "upstream": "src/main/resources/colors/Solarized Light.xml",
+          "sha256": "13435d2e31317ff40d0011a1575c031e2550e96a0c7578de79ea4339a02a8505",
+          "jarPaths": [
+            "colors/Solarized Light.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/colors/Synthwave.xml",
+          "upstream": "src/main/resources/colors/Synthwave.xml",
+          "sha256": "25f1161b2529d6659b43a308bcdb1ef14c898280018a56a3a01e6ef509f1028d",
+          "jarPaths": [
+            "colors/Synthwave.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/template.theme.json",
+          "upstream": "src/main/resources/template.theme.json",
+          "sha256": "64fc8d0106d9ca6783eb4137f72502507006a7c5ebc8244bd777f10db4ce38a6",
+          "jarPaths": [
+            "template.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/test.theme.json",
+          "upstream": "src/main/resources/test.theme.json",
+          "sha256": "a0e4ed6a6dbef7fa51e4b82af1727520b6047a6569be6cd9823882da84df5007",
+          "jarPaths": [
+            "test.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Arc Dark Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Arc Dark Compact.theme.json",
+          "sha256": "82818d61d5eb4acb9f129c753a5a5ccbbaf2138983027df8f1901d7e092a8a85",
+          "jarPaths": [
+            "themes/compact/Arc Dark Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Atom One Dark Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Atom One Dark Compact.theme.json",
+          "sha256": "3f99eef0bf9f6462bfa2b610b45c4d17c0f5218b9881234a125235fb48012d81",
+          "jarPaths": [
+            "themes/compact/Atom One Dark Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Atom One Light Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Atom One Light Compact.theme.json",
+          "sha256": "b7d6bba35b85fa9f86e711488ca1cf1f643da2f7e97d4f96008358100770c0ed",
+          "jarPaths": [
+            "themes/compact/Atom One Light Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Dracula Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Dracula Compact.theme.json",
+          "sha256": "c5527e46dfa5c1d39a3deab5a7a9cda2bf9c0c31404661d8320e6822652947d8",
+          "jarPaths": [
+            "themes/compact/Dracula Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/GitHub Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/GitHub Compact.theme.json",
+          "sha256": "c736d7b7b504e92de72aee251c79d83e1eb17bf9f3ffdf07abc9636ad4adc23f",
+          "jarPaths": [
+            "themes/compact/GitHub Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/GitHub Dark Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/GitHub Dark Compact.theme.json",
+          "sha256": "179e8c27a9e985d5f28d2427dae4a04b2f83b67855e1d79f29ce766ff0a122f8",
+          "jarPaths": [
+            "themes/compact/GitHub Dark Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Light Owl Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Light Owl Compact.theme.json",
+          "sha256": "9408abc8b2529b6cccb66fff700a83bd2fce737cc0761d28968a830124b1a56b",
+          "jarPaths": [
+            "themes/compact/Light Owl Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Darker Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Darker Compact.theme.json",
+          "sha256": "e499fdbe3f19db9c22b21bd057d9b87030d17d20a888f15fe67c7d6d8eec9db9",
+          "jarPaths": [
+            "themes/compact/Material Darker Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Deep Ocean Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Deep Ocean Compact.theme.json",
+          "sha256": "b735464472181fa5bc8753ed8ab66cc954f46660f8467c5d7dfb6da9b32174c7",
+          "jarPaths": [
+            "themes/compact/Material Deep Ocean Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Forest Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Forest Compact.theme.json",
+          "sha256": "1b2b55835888ae268e93a76d310332fd7deebe84093f5a617947442df74d553e",
+          "jarPaths": [
+            "themes/compact/Material Forest Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Lighter Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Lighter Compact.theme.json",
+          "sha256": "ecb050794c9557fa4b72aa3a127cfdae9186cc294b92299c92a348e1d90b0a45",
+          "jarPaths": [
+            "themes/compact/Material Lighter Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Oceanic Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Oceanic Compact.theme.json",
+          "sha256": "7e136cfdb5c4dd6a383b25eaee03b2b7671303a49b57420fad28b0f67380e5aa",
+          "jarPaths": [
+            "themes/compact/Material Oceanic Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Palenight Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Palenight Compact.theme.json",
+          "sha256": "a407dd3ef8e718c1913c1b1bbd30411283b1bd9d6e1551a79df4716feee73e6c",
+          "jarPaths": [
+            "themes/compact/Material Palenight Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Sandy Beach Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Sandy Beach Compact.theme.json",
+          "sha256": "08457e909ca9fe3eb0358c530548cc5676fcbb09883c49e5fcecff49b71e777b",
+          "jarPaths": [
+            "themes/compact/Material Sandy Beach Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Sky Blue Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Sky Blue Compact.theme.json",
+          "sha256": "dbfb199d6683e864c4ac5b30b9ba8828158d5a329efd46a3bc5494eca78497cf",
+          "jarPaths": [
+            "themes/compact/Material Sky Blue Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Space Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Space Compact.theme.json",
+          "sha256": "6c976facd61e8e339b967f789283a8bdafbcb081e811a0020bae2717edf26e1a",
+          "jarPaths": [
+            "themes/compact/Material Space Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Material Volcano Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Material Volcano Compact.theme.json",
+          "sha256": "e11520600e839c8695d67e6bf22e632b3d38a71887f2f2317b6fc0b9456fe2e1",
+          "jarPaths": [
+            "themes/compact/Material Volcano Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Monokai Pro Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Monokai Pro Compact.theme.json",
+          "sha256": "7302005e47825c4d4ebe6e378b4f2bf1c4fc269d0fa0ffa3a6cd2834334af342",
+          "jarPaths": [
+            "themes/compact/Monokai Pro Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Moonlight Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Moonlight Compact.theme.json",
+          "sha256": "71b59944144c05cd41eb4ac0c8898d7a5dc05e9c7bca4795f3d2170108256c69",
+          "jarPaths": [
+            "themes/compact/Moonlight Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Night Owl Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Night Owl Compact.theme.json",
+          "sha256": "10d57aa44506349df1623382a73d3716937d9feef973df49c1aa608769afca9c",
+          "jarPaths": [
+            "themes/compact/Night Owl Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Solarized Dark Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Solarized Dark Compact.theme.json",
+          "sha256": "5ed65e9dd68a01cb9a16523548cb640622a053405b539d90878c0200a9809456",
+          "jarPaths": [
+            "themes/compact/Solarized Dark Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/Solarized Light Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/Solarized Light Compact.theme.json",
+          "sha256": "876fe33fec74efd880e84a58f471236b9f104afcd38bf3a33647b8d20025b35c",
+          "jarPaths": [
+            "themes/compact/Solarized Light Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compact/SynthWave '84 Compact.theme.json",
+          "upstream": "src/main/resources/themes/compact/SynthWave '84 Compact.theme.json",
+          "sha256": "21063da6530df6d6c1fd707f22717f33977c42880f56a167216adb19417c6606",
+          "jarPaths": [
+            "themes/compact/SynthWave '84 Compact.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Arc Dark Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Arc Dark Compact Contrast.theme.json",
+          "sha256": "e8cf999eb01d414d53031e94643721431496c6322fdf2a32ad76a9f49d86581c",
+          "jarPaths": [
+            "themes/compactContrast/Arc Dark Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Atom One Dark Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Atom One Dark Compact Contrast.theme.json",
+          "sha256": "265f3e52c397279d56bd1469f66f4bc0f01a24cb5f089fca9b359a85080c5ad9",
+          "jarPaths": [
+            "themes/compactContrast/Atom One Dark Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Atom One Light Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Atom One Light Compact Contrast.theme.json",
+          "sha256": "73ae121d58ae530c0032579024f3537c98c0012cc490a1e539f8632f2109d06e",
+          "jarPaths": [
+            "themes/compactContrast/Atom One Light Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Dracula Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Dracula Compact Contrast.theme.json",
+          "sha256": "bfd55fd069003fbb2da9d91bacc359677e8dd578e7cd9a030c86dfa770df85f0",
+          "jarPaths": [
+            "themes/compactContrast/Dracula Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/GitHub Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/GitHub Compact Contrast.theme.json",
+          "sha256": "0d542d94418e80a493253d503abc94b7d8d1670143d0128dfe70e8b127d78df2",
+          "jarPaths": [
+            "themes/compactContrast/GitHub Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/GitHub Dark Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/GitHub Dark Compact Contrast.theme.json",
+          "sha256": "90b735ad4e10eeb7e269ccdbc7487989a4ab52e33011ab921aab67dd1e338b6b",
+          "jarPaths": [
+            "themes/compactContrast/GitHub Dark Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Light Owl Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Light Owl Compact Contrast.theme.json",
+          "sha256": "f3a4001169c6ba2b5d18d14260abc6197dcca7d581fdf463a33435bae2b2bf8b",
+          "jarPaths": [
+            "themes/compactContrast/Light Owl Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Darker Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Darker Compact Contrast.theme.json",
+          "sha256": "9eff523fd585e99dc894902192cc3a85932f4a470658035961ddeee75997241e",
+          "jarPaths": [
+            "themes/compactContrast/Material Darker Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Deep Ocean Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Deep Ocean Compact Contrast.theme.json",
+          "sha256": "5d50d9f75724f7d24c329dfc245f45c6dc2aa7e77d517b705ba087b62c388da8",
+          "jarPaths": [
+            "themes/compactContrast/Material Deep Ocean Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Forest Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Forest Compact Contrast.theme.json",
+          "sha256": "f9c9aa3edb78155aa2bf5cbe6e819f72d9f3fffd4b50582d6791b84246390677",
+          "jarPaths": [
+            "themes/compactContrast/Material Forest Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Lighter Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Lighter Compact Contrast.theme.json",
+          "sha256": "b4fc17c7f2b48fe8fac6f94b5d99ce6d2cebcd4474eeacf7689a73b7cba60034",
+          "jarPaths": [
+            "themes/compactContrast/Material Lighter Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Oceanic Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Oceanic Compact Contrast.theme.json",
+          "sha256": "76d3a6f7cee9572bd8d438023761b5028c036257dd0862d2a1e78d2c4052f2ef",
+          "jarPaths": [
+            "themes/compactContrast/Material Oceanic Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Palenight Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Palenight Compact Contrast.theme.json",
+          "sha256": "915a34436564afe43c33769b2e666b8ca2fb35d3fc3ae2fd1a3cd31c8d67ffa5",
+          "jarPaths": [
+            "themes/compactContrast/Material Palenight Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Sandy Beach Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Sandy Beach Compact Contrast.theme.json",
+          "sha256": "11ec5c0af45ec147abe9b2ed9f3d50165ac7c1e0920ac373416c79887e83f74f",
+          "jarPaths": [
+            "themes/compactContrast/Material Sandy Beach Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Sky Blue Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Sky Blue Compact Contrast.theme.json",
+          "sha256": "d9aa2b6e9b622745ed08d46587d93c8f8cdf3de7d61b1e374b405c585744e858",
+          "jarPaths": [
+            "themes/compactContrast/Material Sky Blue Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Space Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Space Compact Contrast.theme.json",
+          "sha256": "a729306d79da7ed2cb9232c166abadc5d83b02a38fabb4958e28dc56e3c50e23",
+          "jarPaths": [
+            "themes/compactContrast/Material Space Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Material Volcano Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Material Volcano Compact Contrast.theme.json",
+          "sha256": "962e6b792418b19ff6f539093a765552c720eef29627509fb7e2a3aaebc25bcd",
+          "jarPaths": [
+            "themes/compactContrast/Material Volcano Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Monokai Pro Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Monokai Pro Compact Contrast.theme.json",
+          "sha256": "9624aa4f24232f1abdff92005b7971d45ba92a6c5a5f389f5660ee9c62d68fdb",
+          "jarPaths": [
+            "themes/compactContrast/Monokai Pro Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Moonlight Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Moonlight Compact Contrast.theme.json",
+          "sha256": "92e8cade5424f12be2ccb0030ca3461a54221065d2ce4892720587668d3834a7",
+          "jarPaths": [
+            "themes/compactContrast/Moonlight Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Night Owl Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Night Owl Compact Contrast.theme.json",
+          "sha256": "30bd3cb38b9f9a1f6c638497b1d194f7c1cd2990e4991e6196f275dca0b13880",
+          "jarPaths": [
+            "themes/compactContrast/Night Owl Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Solarized Dark Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Solarized Dark Compact Contrast.theme.json",
+          "sha256": "ee2728cabaed1ed8d7b0024a11aba472d71b14c2a7ee7fd5d81d755f29e9fb76",
+          "jarPaths": [
+            "themes/compactContrast/Solarized Dark Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/Solarized Light Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/Solarized Light Compact Contrast.theme.json",
+          "sha256": "a334e05999da39de0f65ea7845dca53c56d1ba6e6d26b7c44f42e1e088ab6538",
+          "jarPaths": [
+            "themes/compactContrast/Solarized Light Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/compactContrast/SynthWave '84 Compact Contrast.theme.json",
+          "upstream": "src/main/resources/themes/compactContrast/SynthWave '84 Compact Contrast.theme.json",
+          "sha256": "880783c8c7a040e9207e4a79bb85ab474159f5200d690bcaff056d58d8e739fe",
+          "jarPaths": [
+            "themes/compactContrast/SynthWave '84 Compact Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Arc Dark Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Arc Dark Contrast.theme.json",
+          "sha256": "b346d86c252295aa8c2886d19bde583fb10e4e7938837429371d279ddd289001",
+          "jarPaths": [
+            "themes/contrast/Arc Dark Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Atom One Dark Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Atom One Dark Contrast.theme.json",
+          "sha256": "e42f451db6f0bcb825cca89056d376689b4f5bc2c002b44f466a331d97c24b17",
+          "jarPaths": [
+            "themes/contrast/Atom One Dark Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Atom One Light Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Atom One Light Contrast.theme.json",
+          "sha256": "cdc4b53fde3641326d00511947a28d0b9b004b78b93148133de10584774d1a11",
+          "jarPaths": [
+            "themes/contrast/Atom One Light Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Dracula Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Dracula Contrast.theme.json",
+          "sha256": "4c8fd22df6722d47c0bdb77dd117ebd12b69c00e8e0cb2191ba5afb1daee9eb4",
+          "jarPaths": [
+            "themes/contrast/Dracula Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/GitHub Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/GitHub Contrast.theme.json",
+          "sha256": "79ea7c6ed02182c5e1ee665accb5969a474a913996f1fd7faa782ce468570bac",
+          "jarPaths": [
+            "themes/contrast/GitHub Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/GitHub Dark Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/GitHub Dark Contrast.theme.json",
+          "sha256": "f4096913c5b4dde8cbd4f88143b6b4afc0c0eead60af565f6f9b751acf6c9391",
+          "jarPaths": [
+            "themes/contrast/GitHub Dark Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Light Owl Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Light Owl Contrast.theme.json",
+          "sha256": "c7fc9d35b6bd03a2e6b7486c2b2c47eb1398b4b9ce4a78e1d45a8fed5f62671e",
+          "jarPaths": [
+            "themes/contrast/Light Owl Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Darker Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Darker Contrast.theme.json",
+          "sha256": "475715a8b7e3066bda55486edc8cf84ab03ee378fcaa2eaeb92425dd132455e0",
+          "jarPaths": [
+            "themes/contrast/Material Darker Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Deep Ocean Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Deep Ocean Contrast.theme.json",
+          "sha256": "97d2b7ddd64f890fd3d68a1d126ba756c633e8e45c5d2a41417166fc8814469a",
+          "jarPaths": [
+            "themes/contrast/Material Deep Ocean Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Forest Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Forest Contrast.theme.json",
+          "sha256": "58c155a0c25cc5aa66bb5d6b24d7bd407a9c6b26f764d6ccec97b0a3ab697e5c",
+          "jarPaths": [
+            "themes/contrast/Material Forest Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Lighter Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Lighter Contrast.theme.json",
+          "sha256": "31610b86d402ceec4de77344d1550452fb86174153afb9b8b66f1e852e75c2c5",
+          "jarPaths": [
+            "themes/contrast/Material Lighter Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Oceanic Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Oceanic Contrast.theme.json",
+          "sha256": "3d539e7ca2aae520e0253ff921b01fe21b4896ababcba6f5048ddf630b9512b0",
+          "jarPaths": [
+            "themes/contrast/Material Oceanic Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Palenight Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Palenight Contrast.theme.json",
+          "sha256": "f2cae36c35f451efc21c8f84f0b8606e4419fa67d13dfa9cdbe36b0bc707d730",
+          "jarPaths": [
+            "themes/contrast/Material Palenight Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Sandy Beach Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Sandy Beach Contrast.theme.json",
+          "sha256": "a6225b351a6fdb03af9d843282ddc6c297c9dca0284c9d1ad4d62248db208d75",
+          "jarPaths": [
+            "themes/contrast/Material Sandy Beach Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Sky Blue Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Sky Blue Contrast.theme.json",
+          "sha256": "09ba95edb149d4a10216795a85b64e1b778cc0781269c70ddb3a46aa2832f168",
+          "jarPaths": [
+            "themes/contrast/Material Sky Blue Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Space Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Space Contrast.theme.json",
+          "sha256": "e7515af8c3fea896de4d288ccc8c3fb8cb77f63e7c1ee592d9c7885a5567b888",
+          "jarPaths": [
+            "themes/contrast/Material Space Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Material Volcano Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Material Volcano Contrast.theme.json",
+          "sha256": "f6a587e4f855147a3c0746a3c9c1431f2e01608152f8126ae7866e58c46ec570",
+          "jarPaths": [
+            "themes/contrast/Material Volcano Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Monokai Pro Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Monokai Pro Contrast.theme.json",
+          "sha256": "a230a9a320735cb55aaf84d03c371689d597cd9767dbad95f18da9a0443ab8fc",
+          "jarPaths": [
+            "themes/contrast/Monokai Pro Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Moonlight Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Moonlight Contrast.theme.json",
+          "sha256": "06fa81ff9d09e1d10b8e74d4f25ce8bad35a8a9de8ffb8332695806167257650",
+          "jarPaths": [
+            "themes/contrast/Moonlight Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Night Owl Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Night Owl Contrast.theme.json",
+          "sha256": "2d87e0c4e2521668bbe60f0ce30d9f573c59ec29c5b604f507bc8b6f4ec2b617",
+          "jarPaths": [
+            "themes/contrast/Night Owl Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Solarized Dark Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Solarized Dark Contrast.theme.json",
+          "sha256": "d43316b4a387fc561dc1d02c9baeb0e4cd691cb3667ed0bd7ccd533d8953b90d",
+          "jarPaths": [
+            "themes/contrast/Solarized Dark Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/Solarized Light Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/Solarized Light Contrast.theme.json",
+          "sha256": "a2ffc3cfb6439ef045ee1e4a4d56514042a31e135188a0dd49e871e4c23b9f13",
+          "jarPaths": [
+            "themes/contrast/Solarized Light Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/contrast/SynthWave '84 Contrast.theme.json",
+          "upstream": "src/main/resources/themes/contrast/SynthWave '84 Contrast.theme.json",
+          "sha256": "4909673af6673b44d0f5649f6d8a116ca3f6aafa2be0e8bab97956da28cc3291",
+          "jarPaths": [
+            "themes/contrast/SynthWave '84 Contrast.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Arc Dark.theme.json",
+          "upstream": "src/main/resources/themes/regular/Arc Dark.theme.json",
+          "sha256": "37e32678fdb63b6af052e1ecc202b13cb5576a3db35675ef5fe7f35f2dd405ca",
+          "jarPaths": [
+            "themes/regular/Arc Dark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Atom One Dark.theme.json",
+          "upstream": "src/main/resources/themes/regular/Atom One Dark.theme.json",
+          "sha256": "a2e45012a7e218096d1675b19b3f7cedd23a1cca7ff5b0934dd3cfbbadad0833",
+          "jarPaths": [
+            "themes/regular/Atom One Dark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Atom One Light.theme.json",
+          "upstream": "src/main/resources/themes/regular/Atom One Light.theme.json",
+          "sha256": "92c73ffeef3864de2d06451d6d9c957e8fd371f72c4d18b40f272b057bcc0003",
+          "jarPaths": [
+            "themes/regular/Atom One Light.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Dracula.theme.json",
+          "upstream": "src/main/resources/themes/regular/Dracula.theme.json",
+          "sha256": "7c695fe226462e53aaed864f0a34ade97f596853f5abdfa97fb15efc47343ca8",
+          "jarPaths": [
+            "themes/regular/Dracula.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/GitHub Dark.theme.json",
+          "upstream": "src/main/resources/themes/regular/GitHub Dark.theme.json",
+          "sha256": "ecda542026602d31acec58769f1592ab69cbdb6fbc04607aee473b04e80b3a13",
+          "jarPaths": [
+            "themes/regular/GitHub Dark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/GitHub.theme.json",
+          "upstream": "src/main/resources/themes/regular/GitHub.theme.json",
+          "sha256": "3c2193b801b901c72204bb6cd4908eab8f60fa90eea1e8e8610b9fa8fe47cafb",
+          "jarPaths": [
+            "themes/regular/GitHub.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Light Owl.theme.json",
+          "upstream": "src/main/resources/themes/regular/Light Owl.theme.json",
+          "sha256": "7044fc0842dc598a7e2e90c611e8a1b0ed268ec9c2747b54c976ac52db666261",
+          "jarPaths": [
+            "themes/regular/Light Owl.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Darker.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Darker.theme.json",
+          "sha256": "751ec69e6c63266077f9507c12c56fc90b1a459937c5a360bb2a8b1cee707852",
+          "jarPaths": [
+            "themes/regular/Material Darker.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Deep Ocean.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Deep Ocean.theme.json",
+          "sha256": "d5d2a1ada12105d7751cc26e947489a5c436778b08e39b95c3b7aafa947fd70c",
+          "jarPaths": [
+            "themes/regular/Material Deep Ocean.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Forest.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Forest.theme.json",
+          "sha256": "29a6e75db0b0107b1f7d0ce2ef7cede27442cac738cbbbb6df9a729d94926159",
+          "jarPaths": [
+            "themes/regular/Material Forest.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Lighter.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Lighter.theme.json",
+          "sha256": "554d9eff13b20ca46495e2ce006574c64eeed3f43042ec62e70cfad0e81151e5",
+          "jarPaths": [
+            "themes/regular/Material Lighter.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Oceanic.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Oceanic.theme.json",
+          "sha256": "82795b8719ea2953c674abd0625395638aca3b832113653b33da6e3adaed9275",
+          "jarPaths": [
+            "themes/regular/Material Oceanic.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Palenight.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Palenight.theme.json",
+          "sha256": "63b0584d2d0190c4baf5a18088a9f6b40389c54dbcb496868e06314a7abb773f",
+          "jarPaths": [
+            "themes/regular/Material Palenight.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Sandy Beach.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Sandy Beach.theme.json",
+          "sha256": "aa1cc04182b4684440a734ea225f6be9dae1d2fd826c76f63969aabb570965dd",
+          "jarPaths": [
+            "themes/regular/Material Sandy Beach.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Sky Blue.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Sky Blue.theme.json",
+          "sha256": "7d64cd295b6ba2d980112831e0f3aa4f120621582112de813a4ba249f551e576",
+          "jarPaths": [
+            "themes/regular/Material Sky Blue.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Space.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Space.theme.json",
+          "sha256": "d3474b58d80cc73ab57cb165e35efb501db6162dace1ec905b29ee86886cf965",
+          "jarPaths": [
+            "themes/regular/Material Space.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Material Volcano.theme.json",
+          "upstream": "src/main/resources/themes/regular/Material Volcano.theme.json",
+          "sha256": "40ee03375afa86f92999a63a17c38882cd1a7a42c123412ed37d1b6e6e3a32cf",
+          "jarPaths": [
+            "themes/regular/Material Volcano.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Monokai Pro.theme.json",
+          "upstream": "src/main/resources/themes/regular/Monokai Pro.theme.json",
+          "sha256": "0699a58666cd0d20e139ca8eab1b80528c2dbf783b0bb7e7306bed752ee02930",
+          "jarPaths": [
+            "themes/regular/Monokai Pro.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Moonlight.theme.json",
+          "upstream": "src/main/resources/themes/regular/Moonlight.theme.json",
+          "sha256": "66453592047645f0f097718d3533915056917bbf33b499f03e2b3661d7b467cb",
+          "jarPaths": [
+            "themes/regular/Moonlight.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Night Owl.theme.json",
+          "upstream": "src/main/resources/themes/regular/Night Owl.theme.json",
+          "sha256": "e43367f0e9fec73941d2930a5fb1a9934f34cf95abf036a17aa3f449a863998c",
+          "jarPaths": [
+            "themes/regular/Night Owl.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Solarized Dark.theme.json",
+          "upstream": "src/main/resources/themes/regular/Solarized Dark.theme.json",
+          "sha256": "6275aed232b9410df0e5f53840d920dce61281ccc2219883df8afedddd267d0f",
+          "jarPaths": [
+            "themes/regular/Solarized Dark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/Solarized Light.theme.json",
+          "upstream": "src/main/resources/themes/regular/Solarized Light.theme.json",
+          "sha256": "86745d921a615e0586061b438f19dc4145343176774536d80fb56559b2d52714",
+          "jarPaths": [
+            "themes/regular/Solarized Light.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/regular/SynthWave '84.theme.json",
+          "upstream": "src/main/resources/themes/regular/SynthWave '84.theme.json",
+          "sha256": "f99ed0414decb87edf57e63a2e23b26a5871d2a52815f204184d0ab87ff02577",
+          "jarPaths": [
+            "themes/regular/SynthWave '84.theme.json"
+          ]
+        }
+      ],
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "kind": "intellij",
+      "plugin": "src/main/resources/META-INF/plugin.xml",
+      "author": "AtomMaterial",
+      "variants": [
+        {
+          "entry": "themes/regular/Material Oceanic.theme.json",
+          "name": "Material Oceanic",
+          "aliases": [
+            "Material Oceanic"
+          ],
+          "id": "material-lite-oceanic"
+        },
+        {
+          "entry": "themes/regular/Material Darker.theme.json",
+          "name": "Material Darker",
+          "aliases": [
+            "Material Darker"
+          ],
+          "id": "material-lite-darker"
+        },
+        {
+          "entry": "themes/regular/Material Lighter.theme.json",
+          "name": "Material Lighter",
+          "aliases": [
+            "Material Lighter"
+          ],
+          "id": "material-lite-lighter"
+        },
+        {
+          "entry": "themes/regular/Material Palenight.theme.json",
+          "name": "Material Palenight",
+          "aliases": [
+            "Material Palenight"
+          ],
+          "id": "material-lite-palenight"
+        },
+        {
+          "entry": "themes/regular/Material Deep Ocean.theme.json",
+          "name": "Material Deep Ocean",
+          "aliases": [
+            "Material Deep Ocean"
+          ],
+          "id": "material-lite-deep-ocean"
+        },
+        {
+          "entry": "themes/regular/Material Forest.theme.json",
+          "name": "Material Forest",
+          "aliases": [
+            "Material Forest"
+          ],
+          "id": "material-lite-forest"
+        },
+        {
+          "entry": "themes/regular/Material Sky Blue.theme.json",
+          "name": "Material Sky Blue",
+          "aliases": [
+            "Material Sky Blue"
+          ],
+          "id": "material-lite-sky-blue"
+        },
+        {
+          "entry": "themes/regular/Material Sandy Beach.theme.json",
+          "name": "Material Sandy Beach",
+          "aliases": [
+            "Material Sandy Beach"
+          ],
+          "id": "material-lite-sandy-beach"
+        },
+        {
+          "entry": "themes/regular/Material Volcano.theme.json",
+          "name": "Material Volcano",
+          "aliases": [
+            "Material Volcano"
+          ],
+          "id": "material-lite-volcano"
+        },
+        {
+          "entry": "themes/regular/Material Space.theme.json",
+          "name": "Material Space",
+          "aliases": [
+            "Material Space"
+          ],
+          "id": "material-lite-space"
+        },
+        {
+          "entry": "themes/regular/Dracula.theme.json",
+          "name": "Material Crimson",
+          "aliases": [
+            "Dracula"
+          ],
+          "id": "material-lite-crimson"
+        },
+        {
+          "entry": "themes/regular/Monokai Pro.theme.json",
+          "name": "Monokai Pro",
+          "aliases": [
+            "Monokai Pro"
+          ],
+          "exclude": "Monokai Pro excluded by approved license scope."
+        },
+        {
+          "entry": "themes/regular/Arc Dark.theme.json",
+          "name": "Material Slate",
+          "aliases": [
+            "Arc Dark"
+          ],
+          "id": "material-lite-slate"
+        },
+        {
+          "entry": "themes/regular/Atom One Dark.theme.json",
+          "name": "Material Carbon Dark",
+          "aliases": [
+            "Atom One Dark"
+          ],
+          "id": "material-lite-carbon-dark"
+        },
+        {
+          "entry": "themes/regular/Atom One Light.theme.json",
+          "name": "Material Carbon Light",
+          "aliases": [
+            "Atom One Light"
+          ],
+          "id": "material-lite-carbon-light"
+        },
+        {
+          "entry": "themes/regular/Solarized Dark.theme.json",
+          "name": "Material Sand Dark",
+          "aliases": [
+            "Solarized Dark"
+          ],
+          "id": "material-lite-sand-dark"
+        },
+        {
+          "entry": "themes/regular/Solarized Light.theme.json",
+          "name": "Material Sand Light",
+          "aliases": [
+            "Solarized Light"
+          ],
+          "id": "material-lite-sand-light"
+        },
+        {
+          "entry": "themes/regular/GitHub.theme.json",
+          "name": "Material Forge Light",
+          "aliases": [
+            "GitHub"
+          ],
+          "id": "material-lite-forge-light"
+        },
+        {
+          "entry": "themes/regular/GitHub Dark.theme.json",
+          "name": "Material Forge Dark",
+          "aliases": [
+            "GitHub Dark"
+          ],
+          "id": "material-lite-forge-dark"
+        },
+        {
+          "entry": "themes/regular/Night Owl.theme.json",
+          "name": "Material Nocturne",
+          "aliases": [
+            "Night Owl"
+          ],
+          "id": "material-lite-nocturne"
+        },
+        {
+          "entry": "themes/regular/Light Owl.theme.json",
+          "name": "Material Daybreak",
+          "aliases": [
+            "Light Owl"
+          ],
+          "id": "material-lite-daybreak"
+        },
+        {
+          "entry": "themes/regular/Moonlight.theme.json",
+          "name": "Material Moon",
+          "aliases": [
+            "Moonlight"
+          ],
+          "id": "material-lite-moon"
+        },
+        {
+          "entry": "themes/regular/SynthWave '84.theme.json",
+          "name": "Material Neon",
+          "aliases": [
+            "SynthWave '84"
+          ],
+          "id": "material-lite-neon"
+        },
+        {
+          "entry": "themes/compact/Material Oceanic Compact.theme.json",
+          "name": "Material Oceanic Compact",
+          "aliases": [
+            "Material Oceanic Compact"
+          ],
+          "id": "material-lite-oceanic-compact"
+        },
+        {
+          "entry": "themes/compact/Material Darker Compact.theme.json",
+          "name": "Material Darker Compact",
+          "aliases": [
+            "Material Darker Compact"
+          ],
+          "id": "material-lite-darker-compact"
+        },
+        {
+          "entry": "themes/compact/Material Lighter Compact.theme.json",
+          "name": "Material Lighter Compact",
+          "aliases": [
+            "Material Lighter Compact"
+          ],
+          "id": "material-lite-lighter-compact"
+        },
+        {
+          "entry": "themes/compact/Material Palenight Compact.theme.json",
+          "name": "Material Palenight Compact",
+          "aliases": [
+            "Material Palenight Compact"
+          ],
+          "id": "material-lite-palenight-compact"
+        },
+        {
+          "entry": "themes/compact/Material Deep Ocean Compact.theme.json",
+          "name": "Material Deep Ocean Compact",
+          "aliases": [
+            "Material Deep Ocean Compact"
+          ],
+          "id": "material-lite-deep-ocean-compact"
+        },
+        {
+          "entry": "themes/compact/Material Forest Compact.theme.json",
+          "name": "Material Forest Compact",
+          "aliases": [
+            "Material Forest Compact"
+          ],
+          "id": "material-lite-forest-compact"
+        },
+        {
+          "entry": "themes/compact/Material Sky Blue Compact.theme.json",
+          "name": "Material Sky Blue Compact",
+          "aliases": [
+            "Material Sky Blue Compact"
+          ],
+          "id": "material-lite-sky-blue-compact"
+        },
+        {
+          "entry": "themes/compact/Material Sandy Beach Compact.theme.json",
+          "name": "Material Sandy Beach Compact",
+          "aliases": [
+            "Material Sandy Beach Compact"
+          ],
+          "id": "material-lite-sandy-beach-compact"
+        },
+        {
+          "entry": "themes/compact/Material Volcano Compact.theme.json",
+          "name": "Material Volcano Compact",
+          "aliases": [
+            "Material Volcano Compact"
+          ],
+          "id": "material-lite-volcano-compact"
+        },
+        {
+          "entry": "themes/compact/Material Space Compact.theme.json",
+          "name": "Material Space Compact",
+          "aliases": [
+            "Material Space Compact"
+          ],
+          "id": "material-lite-space-compact"
+        },
+        {
+          "entry": "themes/compact/Dracula Compact.theme.json",
+          "name": "Material Crimson Compact",
+          "aliases": [
+            "Dracula Compact"
+          ],
+          "id": "material-lite-crimson-compact"
+        },
+        {
+          "entry": "themes/compact/Monokai Pro Compact.theme.json",
+          "name": "Monokai Pro Compact",
+          "aliases": [
+            "Monokai Pro Compact"
+          ],
+          "exclude": "Monokai Pro excluded by approved license scope."
+        },
+        {
+          "entry": "themes/compact/Arc Dark Compact.theme.json",
+          "name": "Material Slate Compact",
+          "aliases": [
+            "Arc Dark Compact"
+          ],
+          "id": "material-lite-slate-compact"
+        },
+        {
+          "entry": "themes/compact/Atom One Dark Compact.theme.json",
+          "name": "Material Carbon Dark Compact",
+          "aliases": [
+            "Atom One Dark Compact"
+          ],
+          "id": "material-lite-carbon-dark-compact"
+        },
+        {
+          "entry": "themes/compact/Atom One Light Compact.theme.json",
+          "name": "Material Carbon Light Compact",
+          "aliases": [
+            "Atom One Light Compact"
+          ],
+          "id": "material-lite-carbon-light-compact"
+        },
+        {
+          "entry": "themes/compact/Solarized Dark Compact.theme.json",
+          "name": "Material Sand Dark Compact",
+          "aliases": [
+            "Solarized Dark Compact"
+          ],
+          "id": "material-lite-sand-dark-compact"
+        },
+        {
+          "entry": "themes/compact/Solarized Light Compact.theme.json",
+          "name": "Material Sand Light Compact",
+          "aliases": [
+            "Solarized Light Compact"
+          ],
+          "id": "material-lite-sand-light-compact"
+        },
+        {
+          "entry": "themes/compact/GitHub Compact.theme.json",
+          "name": "Material Forge Light Compact",
+          "aliases": [
+            "GitHub Compact"
+          ],
+          "id": "material-lite-forge-light-compact"
+        },
+        {
+          "entry": "themes/compact/GitHub Dark Compact.theme.json",
+          "name": "Material Forge Dark Compact",
+          "aliases": [
+            "GitHub Dark Compact"
+          ],
+          "id": "material-lite-forge-dark-compact"
+        },
+        {
+          "entry": "themes/compact/Night Owl Compact.theme.json",
+          "name": "Material Nocturne Compact",
+          "aliases": [
+            "Night Owl Compact"
+          ],
+          "id": "material-lite-nocturne-compact"
+        },
+        {
+          "entry": "themes/compact/Light Owl Compact.theme.json",
+          "name": "Material Daybreak Compact",
+          "aliases": [
+            "Light Owl Compact"
+          ],
+          "id": "material-lite-daybreak-compact"
+        },
+        {
+          "entry": "themes/compact/Moonlight Compact.theme.json",
+          "name": "Material Moon Compact",
+          "aliases": [
+            "Moonlight Compact"
+          ],
+          "id": "material-lite-moon-compact"
+        },
+        {
+          "entry": "themes/compact/SynthWave '84 Compact.theme.json",
+          "name": "Material Neon Compact",
+          "aliases": [
+            "SynthWave '84 Compact"
+          ],
+          "id": "material-lite-neon-compact"
+        },
+        {
+          "entry": "themes/contrast/Material Oceanic Contrast.theme.json",
+          "name": "Material Oceanic Contrast",
+          "aliases": [
+            "Material Oceanic Contrast"
+          ],
+          "id": "material-lite-oceanic-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Darker Contrast.theme.json",
+          "name": "Material Darker Contrast",
+          "aliases": [
+            "Material Darker Contrast"
+          ],
+          "id": "material-lite-darker-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Lighter Contrast.theme.json",
+          "name": "Material Lighter Contrast",
+          "aliases": [
+            "Material Lighter Contrast"
+          ],
+          "id": "material-lite-lighter-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Palenight Contrast.theme.json",
+          "name": "Material Palenight Contrast",
+          "aliases": [
+            "Material Palenight Contrast"
+          ],
+          "id": "material-lite-palenight-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Deep Ocean Contrast.theme.json",
+          "name": "Material Deep Ocean Contrast",
+          "aliases": [
+            "Material Deep Ocean Contrast"
+          ],
+          "id": "material-lite-deep-ocean-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Forest Contrast.theme.json",
+          "name": "Material Forest Contrast",
+          "aliases": [
+            "Material Forest Contrast"
+          ],
+          "id": "material-lite-forest-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Sky Blue Contrast.theme.json",
+          "name": "Material Sky Blue Contrast",
+          "aliases": [
+            "Material Sky Blue Contrast"
+          ],
+          "id": "material-lite-sky-blue-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Sandy Beach Contrast.theme.json",
+          "name": "Material Sandy Beach Contrast",
+          "aliases": [
+            "Material Sandy Beach Contrast"
+          ],
+          "id": "material-lite-sandy-beach-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Volcano Contrast.theme.json",
+          "name": "Material Volcano Contrast",
+          "aliases": [
+            "Material Volcano Contrast"
+          ],
+          "id": "material-lite-volcano-contrast"
+        },
+        {
+          "entry": "themes/contrast/Material Space Contrast.theme.json",
+          "name": "Material Space Contrast",
+          "aliases": [
+            "Material Space Contrast"
+          ],
+          "id": "material-lite-space-contrast"
+        },
+        {
+          "entry": "themes/contrast/Dracula Contrast.theme.json",
+          "name": "Material Crimson Contrast",
+          "aliases": [
+            "Dracula Contrast"
+          ],
+          "id": "material-lite-crimson-contrast"
+        },
+        {
+          "entry": "themes/contrast/Monokai Pro Contrast.theme.json",
+          "name": "Monokai Pro Contrast",
+          "aliases": [
+            "Monokai Pro Contrast"
+          ],
+          "exclude": "Monokai Pro excluded by approved license scope."
+        },
+        {
+          "entry": "themes/contrast/Arc Dark Contrast.theme.json",
+          "name": "Material Slate Contrast",
+          "aliases": [
+            "Arc Dark Contrast"
+          ],
+          "id": "material-lite-slate-contrast"
+        },
+        {
+          "entry": "themes/contrast/Atom One Dark Contrast.theme.json",
+          "name": "Material Carbon Dark Contrast",
+          "aliases": [
+            "Atom One Dark Contrast"
+          ],
+          "id": "material-lite-carbon-dark-contrast"
+        },
+        {
+          "entry": "themes/contrast/Atom One Light Contrast.theme.json",
+          "name": "Material Carbon Light Contrast",
+          "aliases": [
+            "Atom One Light Contrast"
+          ],
+          "id": "material-lite-carbon-light-contrast"
+        },
+        {
+          "entry": "themes/contrast/Solarized Dark Contrast.theme.json",
+          "name": "Material Sand Dark Contrast",
+          "aliases": [
+            "Solarized Dark Contrast"
+          ],
+          "id": "material-lite-sand-dark-contrast"
+        },
+        {
+          "entry": "themes/contrast/Solarized Light Contrast.theme.json",
+          "name": "Material Sand Light Contrast",
+          "aliases": [
+            "Solarized Light Contrast"
+          ],
+          "id": "material-lite-sand-light-contrast"
+        },
+        {
+          "entry": "themes/contrast/GitHub Contrast.theme.json",
+          "name": "Material Forge Light Contrast",
+          "aliases": [
+            "GitHub Contrast"
+          ],
+          "id": "material-lite-forge-light-contrast"
+        },
+        {
+          "entry": "themes/contrast/GitHub Dark Contrast.theme.json",
+          "name": "Material Forge Dark Contrast",
+          "aliases": [
+            "GitHub Dark Contrast"
+          ],
+          "id": "material-lite-forge-dark-contrast"
+        },
+        {
+          "entry": "themes/contrast/Night Owl Contrast.theme.json",
+          "name": "Material Nocturne Contrast",
+          "aliases": [
+            "Night Owl Contrast"
+          ],
+          "id": "material-lite-nocturne-contrast"
+        },
+        {
+          "entry": "themes/contrast/Light Owl Contrast.theme.json",
+          "name": "Material Daybreak Contrast",
+          "aliases": [
+            "Light Owl Contrast"
+          ],
+          "id": "material-lite-daybreak-contrast"
+        },
+        {
+          "entry": "themes/contrast/Moonlight Contrast.theme.json",
+          "name": "Material Moon Contrast",
+          "aliases": [
+            "Moonlight Contrast"
+          ],
+          "id": "material-lite-moon-contrast"
+        },
+        {
+          "entry": "themes/contrast/SynthWave '84 Contrast.theme.json",
+          "name": "Material Neon Contrast",
+          "aliases": [
+            "SynthWave '84 Contrast"
+          ],
+          "id": "material-lite-neon-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Oceanic Compact Contrast.theme.json",
+          "name": "Material Oceanic Compact Contrast",
+          "aliases": [
+            "Material Oceanic Compact Contrast"
+          ],
+          "id": "material-lite-oceanic-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Darker Compact Contrast.theme.json",
+          "name": "Material Darker Compact Contrast",
+          "aliases": [
+            "Material Darker Compact Contrast"
+          ],
+          "id": "material-lite-darker-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Lighter Compact Contrast.theme.json",
+          "name": "Material Lighter Compact Contrast",
+          "aliases": [
+            "Material Lighter Compact Contrast"
+          ],
+          "id": "material-lite-lighter-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Palenight Compact Contrast.theme.json",
+          "name": "Material Palenight Compact Contrast",
+          "aliases": [
+            "Material Palenight Compact Contrast"
+          ],
+          "id": "material-lite-palenight-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Deep Ocean Compact Contrast.theme.json",
+          "name": "Material Deep Ocean Compact Contrast",
+          "aliases": [
+            "Material Deep Ocean Compact Contrast"
+          ],
+          "id": "material-lite-deep-ocean-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Forest Compact Contrast.theme.json",
+          "name": "Material Forest Compact Contrast",
+          "aliases": [
+            "Material Forest Compact Contrast"
+          ],
+          "id": "material-lite-forest-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Sky Blue Compact Contrast.theme.json",
+          "name": "Material Sky Blue Compact Contrast",
+          "aliases": [
+            "Material Sky Blue Compact Contrast"
+          ],
+          "id": "material-lite-sky-blue-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Sandy Beach Compact Contrast.theme.json",
+          "name": "Material Sandy Beach Compact Contrast",
+          "aliases": [
+            "Material Sandy Beach Compact Contrast"
+          ],
+          "id": "material-lite-sandy-beach-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Volcano Compact Contrast.theme.json",
+          "name": "Material Volcano Compact Contrast",
+          "aliases": [
+            "Material Volcano Compact Contrast"
+          ],
+          "id": "material-lite-volcano-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Material Space Compact Contrast.theme.json",
+          "name": "Material Space Compact Contrast",
+          "aliases": [
+            "Material Space Compact Contrast"
+          ],
+          "id": "material-lite-space-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Dracula Compact Contrast.theme.json",
+          "name": "Material Crimson Compact Contrast",
+          "aliases": [
+            "Dracula Compact Contrast"
+          ],
+          "id": "material-lite-crimson-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Monokai Pro Compact Contrast.theme.json",
+          "name": "Monokai Pro Compact Contrast",
+          "aliases": [
+            "Monokai Pro Compact Contrast"
+          ],
+          "exclude": "Monokai Pro excluded by approved license scope."
+        },
+        {
+          "entry": "themes/compactContrast/Arc Dark Compact Contrast.theme.json",
+          "name": "Material Slate Compact Contrast",
+          "aliases": [
+            "Arc Dark Compact Contrast"
+          ],
+          "id": "material-lite-slate-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Atom One Dark Compact Contrast.theme.json",
+          "name": "Material Carbon Dark Compact Contrast",
+          "aliases": [
+            "Atom One Dark Compact Contrast"
+          ],
+          "id": "material-lite-carbon-dark-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Atom One Light Compact Contrast.theme.json",
+          "name": "Material Carbon Light Compact Contrast",
+          "aliases": [
+            "Atom One Light Compact Contrast"
+          ],
+          "id": "material-lite-carbon-light-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Solarized Dark Compact Contrast.theme.json",
+          "name": "Material Sand Dark Compact Contrast",
+          "aliases": [
+            "Solarized Dark Compact Contrast"
+          ],
+          "id": "material-lite-sand-dark-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Solarized Light Compact Contrast.theme.json",
+          "name": "Material Sand Light Compact Contrast",
+          "aliases": [
+            "Solarized Light Compact Contrast"
+          ],
+          "id": "material-lite-sand-light-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/GitHub Compact Contrast.theme.json",
+          "name": "Material Forge Light Compact Contrast",
+          "aliases": [
+            "GitHub Compact Contrast"
+          ],
+          "id": "material-lite-forge-light-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/GitHub Dark Compact Contrast.theme.json",
+          "name": "Material Forge Dark Compact Contrast",
+          "aliases": [
+            "GitHub Dark Compact Contrast"
+          ],
+          "id": "material-lite-forge-dark-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Night Owl Compact Contrast.theme.json",
+          "name": "Material Nocturne Compact Contrast",
+          "aliases": [
+            "Night Owl Compact Contrast"
+          ],
+          "id": "material-lite-nocturne-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Light Owl Compact Contrast.theme.json",
+          "name": "Material Daybreak Compact Contrast",
+          "aliases": [
+            "Light Owl Compact Contrast"
+          ],
+          "id": "material-lite-daybreak-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/Moonlight Compact Contrast.theme.json",
+          "name": "Material Moon Compact Contrast",
+          "aliases": [
+            "Moonlight Compact Contrast"
+          ],
+          "id": "material-lite-moon-compact-contrast"
+        },
+        {
+          "entry": "themes/compactContrast/SynthWave '84 Compact Contrast.theme.json",
+          "name": "Material Neon Compact Contrast",
+          "aliases": [
+            "SynthWave '84 Compact Contrast"
+          ],
+          "id": "material-lite-neon-compact-contrast"
+        }
+      ]
+    },
+    {
+      "id": "nord",
+      "repository": "https://github.com/nordtheme/jetbrains",
+      "commit": "770a9eaedbf701ed8617ba6359988bb45c89bc6b",
+      "assets": [
+        {
+          "path": "license",
+          "upstream": "license",
+          "sha256": "25ac8188d670bd2ad2ce2f4f55ab88573010ee9f7a4502543cb1eea1e2274f8a"
+        },
+        {
+          "path": "readme.md",
+          "upstream": "readme.md",
+          "sha256": "2c56dd995f5825913deb18e5d2dc2e78b79a3f43c5b591ea42c8c978cfea1108"
+        },
+        {
+          "path": "resources/META-INF/plugin.xml",
+          "upstream": "resources/META-INF/plugin.xml",
+          "sha256": "c5550887726f726bb54d15d5cc0f3221d56875f021ac7eee165e8703bc5fbe0b",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "resources/themes/nord.xml",
+          "upstream": "resources/themes/nord.xml",
+          "sha256": "563178308b1fc0ad286d6742c0b8ae169656c83a96dc642ac490375feb54c0aa",
+          "jarPaths": [
+            "themes/nord.xml"
+          ]
+        },
+        {
+          "path": "src/nord.theme.json",
+          "upstream": "src/nord.theme.json",
+          "sha256": "4e148f5b6a6bc90d5a24680e652202bfcaba2e79a4f3d7c3b28b89b5af187a6f",
+          "jarPaths": [
+            "nord.theme.json"
+          ]
+        }
+      ],
+      "license": "MIT",
+      "licenseFile": "license",
+      "kind": "intellij",
+      "plugin": "resources/META-INF/plugin.xml",
+      "author": "Sven Greb",
+      "variants": [
+        {
+          "entry": "nord.theme.json",
+          "name": "Nord",
+          "aliases": [
+            "Nord"
+          ],
+          "id": "nord-nord"
+        }
+      ]
+    },
+    {
+      "id": "one-dark",
+      "repository": "https://github.com/one-dark/jetbrains-one-dark-theme",
+      "commit": "1bd06dbd827bd78c97b9662c19e5c1fd64469ec9",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "bf90c7f56ebcd13bcf382a75a742777e213f5d27d3ed06dbffc7e32373811d34"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "26a035a2b440d5a5952246ab887e22921ed100cf1c2491cb7a2fe4b2e35fe54e"
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "6cc456b4febe5dfd4d8c7fb51bb4cbb27468a794094015e3c20172f69ac08855",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/one_dark.theme.json",
+          "upstream": "src/main/resources/one_dark.theme.json",
+          "sha256": "1ca2e68834f2951c991a44cc04834557d83d0fe917f140eb7a831359486f0f65",
+          "jarPaths": [
+            "one_dark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/one_dark.xml",
+          "upstream": "src/main/resources/one_dark.xml",
+          "sha256": "224d2c255ed139b9e28f5018522a29a0156c4c272f2a551d7870293108dc3c88",
+          "jarPaths": [
+            "one_dark.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/one_dark_islands.theme.json",
+          "upstream": "src/main/resources/one_dark_islands.theme.json",
+          "sha256": "575c478287aae3c04d4c8810cc53d760a873e24adeb6d36578a8d76d9a652ac6",
+          "jarPaths": [
+            "one_dark_islands.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/one_dark_islands_vivid.theme.json",
+          "upstream": "src/main/resources/one_dark_islands_vivid.theme.json",
+          "sha256": "b0905d5c3672326e2172f99bf67d9fa74a7326717cc5feb53c9a6d1b08686823",
+          "jarPaths": [
+            "one_dark_islands_vivid.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/one_dark_vivid.theme.json",
+          "upstream": "src/main/resources/one_dark_vivid.theme.json",
+          "sha256": "4436336124429ccbaf2f38f29651f8b1ca4ec518b4060a6e9ca6ee0ec4cf6f8b",
+          "jarPaths": [
+            "one_dark_vivid.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/one_dark_vivid.xml",
+          "upstream": "src/main/resources/one_dark_vivid.xml",
+          "sha256": "fc40f572e710bb22320628d4dbf86aedbeb1de00171f22abc0b31106968150fe",
+          "jarPaths": [
+            "one_dark_vivid.xml"
+          ]
+        }
+      ],
+      "license": "ISC",
+      "licenseFile": "LICENSE",
+      "kind": "intellij",
+      "plugin": "src/main/resources/META-INF/plugin.xml",
+      "author": "Mark Skelton",
+      "variants": [
+        {
+          "entry": "one_dark.theme.json",
+          "name": "One Dark",
+          "aliases": [
+            "One Dark"
+          ],
+          "id": "one-dark-default"
+        },
+        {
+          "entry": "one_dark_islands.theme.json",
+          "name": "One Dark Islands",
+          "aliases": [
+            "One Dark Islands"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        },
+        {
+          "entry": "one_dark_vivid.theme.json",
+          "name": "One Dark Vivid",
+          "aliases": [
+            "One Dark Vivid"
+          ],
+          "id": "one-dark-vivid"
+        },
+        {
+          "entry": "one_dark_islands_vivid.theme.json",
+          "name": "One Dark Vivid Islands",
+          "aliases": [
+            "One Dark Vivid Islands"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        }
+      ]
+    },
+    {
+      "id": "one-dark-modern",
+      "repository": "https://github.com/cweijan/idea-one-dark-modern-theme",
+      "commit": "01e3ff0a6e75d92f37a1fd980fba4c57c5264113",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "a87d7ff10c415ecdd811d34cd204443615575e232c3c8f7f54c38447ee38db8a"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "7f13298015355b6ae35c48f55da468f1370bf685fca67dff8eafd013e349cbd0"
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "55acfd9b888d05d6ccf38935edc2d0e3220c5bc74c06218aaa1dd04cf39d1f3d",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/color_toolwindow_icons.xml",
+          "upstream": "src/main/resources/color_toolwindow_icons.xml",
+          "sha256": "f585eaabcd4a6ea441428a38a72360b7f1ee649a19a882763540f6397162b801",
+          "jarPaths": [
+            "color_toolwindow_icons.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/theme/one_dark_modern.theme.json",
+          "upstream": "src/main/resources/theme/one_dark_modern.theme.json",
+          "sha256": "ba1518f09eec3219bb1a39a4098586c98a012dc659bf90975fd3bf539c39cd0f",
+          "jarPaths": [
+            "theme/one_dark_modern.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/theme/one_dark_modern.xml",
+          "upstream": "src/main/resources/theme/one_dark_modern.xml",
+          "sha256": "50bcd6789ede1b40b5ac7458e86d3d9a60392f8b3f307e945cf4bb3ec6a6391a",
+          "jarPaths": [
+            "theme/one_dark_modern.xml",
+            "one_dark_modern.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/theme/vscode-onedark-modern.json",
+          "upstream": "src/main/resources/theme/vscode-onedark-modern.json",
+          "sha256": "df2ad6ab85aae8fb4ac263744bdb7eb48bcb5ba8d6c5861617c01f72073d114b",
+          "jarPaths": [
+            "theme/vscode-onedark-modern.json"
+          ]
+        }
+      ],
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "kind": "intellij",
+      "plugin": "src/main/resources/META-INF/plugin.xml",
+      "packagingNotes": [
+        "Expose theme/one_dark_modern.xml at the upstream JSON-declared /one_dark_modern.xml; bytes unchanged."
+      ],
+      "author": "cweijan",
+      "variants": [
+        {
+          "entry": "theme/one_dark_modern.theme.json",
+          "name": "One Dark Modern",
+          "aliases": [
+            "One Dark Modern"
+          ],
+          "id": "one-dark-modern-one-dark-modern"
+        }
+      ]
+    },
+    {
+      "id": "solarized",
+      "repository": "https://github.com/snowe2010/solarized-jetbrains",
+      "commit": "d5ebef72eff882773428f1f82d317ae6849840ae",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "fa106fdaf3b6480b678763e61d7097316511df6697362b68e21f55c5bee00910"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "58f66ef5f0f3d7cc7eaa678bd55d9750b1ec8a207e4873b09206ffd6237c2f81"
+        },
+        {
+          "path": "resources/META-INF/plugin.xml",
+          "upstream": "resources/META-INF/plugin.xml",
+          "sha256": "917b50390ef77cce18783f5904f344ae9fdc850190284a39a5dbc55d31f28c21",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "resources/themes/solarizedDark.xml",
+          "upstream": "resources/themes/solarizedDark.xml",
+          "sha256": "d140845ff75022d77638068b1401b03f73fe0115ab802eaeb4b83b35e7af75f7",
+          "jarPaths": [
+            "themes/solarizedDark.xml"
+          ]
+        },
+        {
+          "path": "resources/themes/solarizedLight.xml",
+          "upstream": "resources/themes/solarizedLight.xml",
+          "sha256": "4a9d5196280f0fe7aa5939c444158fcdaa2d0adc504aec9bc977a3072b2fc20c",
+          "jarPaths": [
+            "themes/solarizedLight.xml"
+          ]
+        },
+        {
+          "path": "src/solarized_dark_theme.theme.json",
+          "upstream": "src/solarized_dark_theme.theme.json",
+          "sha256": "098d8005c290e4af5cae0ec7dfd602ad8a44688698d1e6f1c31a48f39a3452f6",
+          "jarPaths": [
+            "solarized_dark_theme.theme.json"
+          ]
+        },
+        {
+          "path": "src/solarized_light_theme.theme.json",
+          "upstream": "src/solarized_light_theme.theme.json",
+          "sha256": "2aba9e4b87270d19f5f5f7a0d3ca3e7e9c145d34f6fbcd41ed0e472c60f7c6d2",
+          "jarPaths": [
+            "solarized_light_theme.theme.json"
+          ]
+        }
+      ],
+      "license": "MIT",
+      "licenseFile": "LICENSE",
+      "kind": "intellij",
+      "plugin": "resources/META-INF/plugin.xml",
+      "author": "Tyler Thrailkill",
+      "variants": [
+        {
+          "entry": "solarized_dark_theme.theme.json",
+          "name": "Solarized Dark",
+          "aliases": [
+            "Solarized Dark"
+          ],
+          "id": "solarized-solarized-dark"
+        },
+        {
+          "entry": "solarized_light_theme.theme.json",
+          "name": "Solarized Light",
+          "aliases": [
+            "Solarized Light"
+          ],
+          "id": "solarized-solarized-light"
+        }
+      ]
+    },
+    {
+      "id": "vscode",
+      "repository": "https://github.com/dinbtechit/vscode-theme",
+      "commit": "3704464217ce81fe3742b9c2407de0ba34482d5e",
+      "assets": [
+        {
+          "path": "LICENSE.md",
+          "upstream": "LICENSE.md",
+          "sha256": "122d3cf96924a747934be52cd35bd8e34306f0cb22cf64027d99791bbcd221d3"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "8a0db4fe34d9f034c5993bf2bf2bd34f58c550589a5e4397963320d31365b900"
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-clion.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-clion.xml",
+          "sha256": "4d08a41963d93214cacb72653e47853795c8fbbf8033ef6ec20d19bd0f3f0d5a",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-clion.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-csharp.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-csharp.xml",
+          "sha256": "9913c5a0babe64367ba72a86b2f0f6dd36a5be48f1f028de7562cd4e1619ba11",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-csharp.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-dart.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-dart.xml",
+          "sha256": "6dac3bfa4a4d38b884c6d1dddde7b362ca3efad809d7b6f6a5162a04a47cef19",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-dart.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-fsharp.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-fsharp.xml",
+          "sha256": "1d1f9ffa501817848ae44a45c6189de59d7a6834bd0f7bed09312eeaea60217a",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-fsharp.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-go.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-go.xml",
+          "sha256": "875ca0e78c1505017c00bf910d7322f62a9a90953224eba62f782da6334191fc",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-go.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-hcl.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-hcl.xml",
+          "sha256": "f285554fa4bf49fd814b2300d9f370945dd98ca2f8b5781bfdd7133a59dc94b1",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-hcl.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-java.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-java.xml",
+          "sha256": "38a343c24f46d8b44b35defea401a86cc4048b4f8e2540fbdd01945a12e3fdd7",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-java.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-javascript.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-javascript.xml",
+          "sha256": "7f798ab50daaad97cc9dc62a653ce515aa9fe47b1ded04c985e8eed11ed3f8ce",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-javascript.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-kotlin.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-kotlin.xml",
+          "sha256": "5f756338a512caf4c189c97741feae6b9a77d0b4853ccc2e067074eff60728ff",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-kotlin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-php.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-php.xml",
+          "sha256": "c4c8c6b2fccecd4aec3097fd13be7c800e4f3d3e31f8860c30cde40291b26e9f",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-php.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-python-community.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-python-community.xml",
+          "sha256": "afcbf475f796068d26c4970e09613af250e5506a88d2cd053bfdb1c55b540abb",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-python-community.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-python.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-python.xml",
+          "sha256": "eb69a6457fefe6bd3bc8e24a2d1652e090f6f9635e80d49acb9291aa154ca161",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-python.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-rust.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-rust.xml",
+          "sha256": "42979cc9a73f550977e15bdc4b8db26669da6c48a59747b9706ea8380332bea8",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-rust.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-sh.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-sh.xml",
+          "sha256": "5743850af0ac35fe81e97426771cbe12bba4b2cd60c55d5009fb2538e2737413",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-sh.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/lang-config/dinbtechit-typescript.xml",
+          "upstream": "src/main/resources/META-INF/lang-config/dinbtechit-typescript.xml",
+          "sha256": "46f4d1371b74d467f0ec0d4155ee61ce5b62f808df95238337a491a59560e234",
+          "jarPaths": [
+            "META-INF/lang-config/dinbtechit-typescript.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "464ef531852a70c3e87254f124e93bfc1c034e723f9f21ffb0196d537bbb8a12",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/vscode_dark.theme.json",
+          "upstream": "src/main/resources/themes/vscode_dark.theme.json",
+          "sha256": "c52fd9b6940904c67ff27dda683114cfb30c34446d9ba7031ffa98d6370e82fa",
+          "jarPaths": [
+            "themes/vscode_dark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/vscode_dark.xml",
+          "upstream": "src/main/resources/themes/vscode_dark.xml",
+          "sha256": "e265f891179338736db4ddeefba2fa5505dee93097d70482d02729e6b49895ed",
+          "jarPaths": [
+            "themes/vscode_dark.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/vscode_dark_brighter.xml",
+          "upstream": "src/main/resources/themes/vscode_dark_brighter.xml",
+          "sha256": "444f46855ef445c2252cec497bc594d9115f1971298421072713f1592a277f25",
+          "jarPaths": [
+            "themes/vscode_dark_brighter.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/vscode_dark_modern.theme.json",
+          "upstream": "src/main/resources/themes/vscode_dark_modern.theme.json",
+          "sha256": "cb59b1b4fa5b1b8f49a049b1ddbf7f51187be3eb73ce2cbaf3a870b1166221a5",
+          "jarPaths": [
+            "themes/vscode_dark_modern.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/vscode_light.theme.json",
+          "upstream": "src/main/resources/themes/vscode_light.theme.json",
+          "sha256": "99e28939a70ba07f89abf3ba89e1f333c804bb370b2808bda71a38a2e702a272",
+          "jarPaths": [
+            "themes/vscode_light.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/themes/vscode_light_modern.xml",
+          "upstream": "src/main/resources/themes/vscode_light_modern.xml",
+          "sha256": "01675308e61afd4f2a35dbae51cc965188549cdf55026ba7a869c1b5cc1d75ce",
+          "jarPaths": [
+            "themes/vscode_light_modern.xml"
+          ]
+        },
+        {
+          "path": "src/test/testData/rename/foo.xml",
+          "upstream": "src/test/testData/rename/foo.xml",
+          "sha256": "d31a740a43163418a2904325cc6370ff6ac79fadb402c3a5c9732c08d863fc1d",
+          "jarPaths": [
+            "test/testData/rename/foo.xml"
+          ]
+        },
+        {
+          "path": "src/test/testData/rename/foo_after.xml",
+          "upstream": "src/test/testData/rename/foo_after.xml",
+          "sha256": "1fa35fe92daca9785fba8885e1a9b9be29e792ec99974322b5dad425a8444780",
+          "jarPaths": [
+            "test/testData/rename/foo_after.xml"
+          ]
+        }
+      ],
+      "license": "BSD-2-Clause",
+      "licenseFile": "LICENSE.md",
+      "kind": "intellij",
+      "plugin": "src/main/resources/META-INF/plugin.xml",
+      "author": "dinbtechit",
+      "variants": [
+        {
+          "entry": "themes/vscode_dark_modern.theme.json",
+          "name": "Code Dark Modern",
+          "aliases": [
+            "VSCode Dark Modern"
+          ],
+          "id": "vscode-dark-modern"
+        },
+        {
+          "entry": "themes/vscode_dark.theme.json",
+          "name": "Code Dark",
+          "aliases": [
+            "VSCode Dark"
+          ],
+          "id": "vscode-dark"
+        },
+        {
+          "entry": "themes/vscode_light.theme.json",
+          "name": "Code Light",
+          "aliases": [
+            "VSCode Light Modern"
+          ],
+          "id": "vscode-light"
+        }
+      ]
+    },
+    {
+      "id": "xcode",
+      "repository": "https://github.com/WhiteVermouth/XcodeTheme",
+      "commit": "872a6123d8b37df525649c66ea99d16f27ea23fb",
+      "assets": [
+        {
+          "path": "LICENSE",
+          "upstream": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        {
+          "path": "README.md",
+          "upstream": "README.md",
+          "sha256": "457a66293156de471faa4c083e5f0bc9c0f9db4feeabf7f47a6eb0608ed8d7a9"
+        },
+        {
+          "path": "src/main/resources/IslandsXcodeDark.theme.json",
+          "upstream": "src/main/resources/IslandsXcodeDark.theme.json",
+          "sha256": "b0497f81f2ba9b8a0c0ec83781583381b4245c276d70f10f082fbc8b9de741de",
+          "jarPaths": [
+            "IslandsXcodeDark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/IslandsXcodeLight.theme.json",
+          "upstream": "src/main/resources/IslandsXcodeLight.theme.json",
+          "sha256": "caab1a3e36de7fe1a1a793084030ac57527626f3c23f67b8e951991c93ff60d9",
+          "jarPaths": [
+            "IslandsXcodeLight.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/META-INF/plugin.xml",
+          "upstream": "src/main/resources/META-INF/plugin.xml",
+          "sha256": "a916d50be8fbe79de9a902a156d5dba6eb8ecdbb2baf04bf3cee46997ce1b6a5",
+          "jarPaths": [
+            "META-INF/plugin.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/XcodeDark.theme.json",
+          "upstream": "src/main/resources/XcodeDark.theme.json",
+          "sha256": "57df5cf0fa3142110de4a3ce17bb1f1bb89003d265fb2a91ec9600ccf18216f6",
+          "jarPaths": [
+            "XcodeDark.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/XcodeDark.xml",
+          "upstream": "src/main/resources/XcodeDark.xml",
+          "sha256": "f9ecf3e536a60a8e1c8c511b404b2fd3eef5dcd668f27af45b342243b042fe4a",
+          "jarPaths": [
+            "XcodeDark.xml"
+          ]
+        },
+        {
+          "path": "src/main/resources/XcodeLight.theme.json",
+          "upstream": "src/main/resources/XcodeLight.theme.json",
+          "sha256": "daaedd0e6db1cdcb1aeaceedc4600dd032899e2d732c4db7be5731963a038e4c",
+          "jarPaths": [
+            "XcodeLight.theme.json"
+          ]
+        },
+        {
+          "path": "src/main/resources/XcodeLight.xml",
+          "upstream": "src/main/resources/XcodeLight.xml",
+          "sha256": "2c428e70d593297fcb2cfb7a09af3cacad89b4a68bae38cb64add6d38f7a3fb6",
+          "jarPaths": [
+            "XcodeLight.xml"
+          ]
+        },
+        {
+          "path": "overrides/studio-light.toml",
+          "upstream": "Jasper-authored terminal palette",
+          "local": true,
+          "sha256": "01d3b41203b93efbb533940426266c1769957a02133f1ed0eb00b99b6afc9d26",
+          "localSource": "third_party/themes/xcode/overrides/studio-light.toml"
+        },
+        {
+          "path": "overrides/studio-dark.toml",
+          "upstream": "Jasper-authored terminal palette",
+          "local": true,
+          "sha256": "5f4cc94854ca344d9ddc138d37e0f79707bff458e3ac33371e6f64a7816cfccd",
+          "localSource": "third_party/themes/xcode/overrides/studio-dark.toml"
+        }
+      ],
+      "license": "Apache-2.0",
+      "licenseFile": "LICENSE",
+      "kind": "intellij",
+      "plugin": "src/main/resources/META-INF/plugin.xml",
+      "author": "Zihan Ma",
+      "variants": [
+        {
+          "entry": "XcodeLight.theme.json",
+          "name": "Studio Light",
+          "aliases": [
+            "Xcode Light"
+          ],
+          "id": "xcode-light",
+          "override": "overrides/studio-light.toml"
+        },
+        {
+          "entry": "XcodeDark.theme.json",
+          "name": "Studio Dark",
+          "aliases": [
+            "Xcode Dark"
+          ],
+          "id": "xcode-dark",
+          "override": "overrides/studio-dark.toml"
+        },
+        {
+          "entry": "IslandsXcodeLight.theme.json",
+          "name": "Islands Xcode Light",
+          "aliases": [
+            "Islands Xcode Light"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        },
+        {
+          "entry": "IslandsXcodeDark.theme.json",
+          "name": "Islands Xcode Dark",
+          "aliases": [
+            "Islands Xcode Dark"
+          ],
+          "exclude": "Islands variant is outside the approved classic variant set."
+        }
+      ]
+    }
+  ]
+}

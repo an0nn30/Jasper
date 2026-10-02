@@ -1,0 +1,33 @@
+"name" = "Omni"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#191622"
+"foreground" = "#e1e1e6"
+"accent" = "#bd93f9"
+"cursor" = "#f8f8f2"
+"selection" = "#55535d"
+
+[colors.normal]
+"black" = "#000000"
+"red" = "#ff5555"
+"green" = "#50fa7b"
+"yellow" = "#effa78"
+"blue" = "#bd93f9"
+"magenta" = "#ff79c6"
+"cyan" = "#8d79ba"
+"white" = "#bfbfbf"
+
+[colors.bright]
+"black" = "#4d4d4d"
+"red" = "#ff6e67"
+"green" = "#5af78e"
+"yellow" = "#eaf08d"
+"blue" = "#caa9fa"
+"magenta" = "#ff92d0"
+"cyan" = "#aa91e3"
+"white" = "#e6e6e6"

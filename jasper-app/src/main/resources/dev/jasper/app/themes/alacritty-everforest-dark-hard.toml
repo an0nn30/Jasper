@@ -1,0 +1,33 @@
+"name" = "Everforest Dark Hard"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#272e33"
+"foreground" = "#d3c6aa"
+"accent" = "#7fbbb3"
+"cursor" = "#d3c6aa"
+"selection" = "#4c3743"
+
+[colors.normal]
+"black" = "#414b50"
+"red" = "#e67e80"
+"green" = "#a7c080"
+"yellow" = "#dbbc7f"
+"blue" = "#7fbbb3"
+"magenta" = "#d699b6"
+"cyan" = "#83c092"
+"white" = "#d3c6aa"
+
+[colors.bright]
+"black" = "#414b50"
+"red" = "#e67e80"
+"green" = "#a7c080"
+"yellow" = "#dbbc7f"
+"blue" = "#7fbbb3"
+"magenta" = "#d699b6"
+"cyan" = "#83c092"
+"white" = "#d3c6aa"

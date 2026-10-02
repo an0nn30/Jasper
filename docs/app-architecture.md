@@ -139,7 +139,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
-| `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated and group pages, editors and the core page tree; the application supplies the Keymap, Plugins, IntelliJ Themes and Alacritty Themes pages (`CorePages.Pages`). SettingsDialog owns each opening's pages and disposes them on close. |
+| `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated and group pages, editors and the core page tree; the application supplies the Keymap, Plugins and plugin tool pages (`CorePages.Pages`). SettingsDialog owns each opening's pages and disposes them on close. |
 | `settings` | Pure declarative settings machinery: setting kinds, descriptors, the schema, loaded values and the comment-preserving TomlDocument editor. No Jasper dependencies; caller chooses thread. SchemaReader reads any settings file against its schema. |
 | `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
@@ -154,8 +154,8 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
-| `themestore` | Settings › Themes › IntelliJ Themes: the blocking Marketplace client (Jasper's only network client, https JetBrains hosts only, capped bodies), the synchronized installer that owns writes to the themes folder and `.sources.toml`, and the page. Application owns the ThemeStore (a virtual-thread worker and the HTTP client) and closes it at shutdown; SettingsDialog owns each page. Futures complete on the EDT. |
-| `terminalthemes` | Terminal colour themes in Alacritty's format: the bundled alacritty-theme collection (resources with `index.txt`), the user's `terminal-themes` folder, the parser, file installs and Settings › Themes › Alacritty Themes with its sample terminal. Application owns the TerminalThemeCatalog (scanned with each configuration read); SettingsDialog owns each page, which closes its sample session on disposal. |
+| `themeimport` | Offline bounded conversion, deterministic vendoring, frozen import plans and locked file operations. Startup owns resumable legacy migration; no config/application dependency. |
+| `themesui` | Canned terminal preview for the forthcoming Themes page; EDT owner closes its fake transport and view. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
@@ -215,38 +215,32 @@ keeps them. Every theme is generated from a Jasper theme document (`ThemeToml` �
 `ThemeGenerator`): the cursor, selection and bright colours (background, foreground, accent and the eight normal
 colours are required), the 48 tokens and the syntax roles are derived with contrast floors, and
 `UiTemplate` maps tokens onto FlatLaf, IntelliJ and `Jasper.*` keys under the theme's own `[ui]` keys. The generated
-keys install through the IntelliJ path above. The built-ins are `Theme.DARK` (`themes/jasper-dark.toml`),
+keys install through the IntelliJ path above. The four classic singleton built-ins are `Theme.DARK` (`themes/jasper-dark.toml`),
 `Theme.JASPER_LIGHT` (`themes/jasper-light.toml`), and `Theme.INTELLIJ_LIGHT` and `Theme.DARCULA`, converted from the
 vendored IntelliJ files by `IntellijConversion` as `ui_complete` documents (their own keys install unchanged).
 Side panels paint `ToolWindow.background` through `ToolWindowSurface`; the rail stays chrome.
 
-Installed themes come from `ThemeCatalog`, which lists the theme files and plugins in the `themes` folder beside
-`config.toml`, then the built-ins. The pieces:
-- **Reading:** `ThemeArchive` reads a Marketplace plugin (a `.jar`, or a `.zip` of `lib/*.jar`) in place, with
-  caps. Its `META-INF/plugin.xml` names each theme through `themeProvider`, and a theme names its
-  editor scheme.
-- **Terminal palette:** `EditorScheme` turns the scheme's console colours into the theme's terminal palette,
-  with the schemes IntelliJ bundles (`themes/intellij/`: Default and Darcula, the New UI and Islands schemes)
-  as parents. The themes IntelliJ bundles, classic, New UI and Islands, are vendored there too as the
-  `parentTheme`s a plugin theme may name (by IntelliJ's theme id); only IntelliJ Light and Darcula are also offered as themes.
-- **Untrusted XML:** `SafeXml` parses plugin XML with DOCTYPE and external entities disabled.
-- **Theme files:** `.toml` files in the folder are Jasper themes; `extends` may name any theme in the folder or built in.
-- **Installing:** a `Theme` records its source (bundled, a theme file, or an archive) and its resolved document, so
-  `ThemeManager` installs an installed theme the same way as a built-in one.
-- **Scanning and resolving:** `ConfigService.watchWith` runs the catalog's scan on the configuration worker at start-up and
-  after each read. `ConfigurationController` resolves `ui.theme.name` against the latest scan and
-  shows the catalog's problems as configuration warnings. It resolves a named `terminal.colors` choice against the
-  `TerminalThemeCatalog`'s latest scan the same way (an unknown name is a warning and the terminal uses `match`) and
-  shows that catalog's file problems too. Each catalog's scan is guarded on its own, so one failing does not skip the
-  other.
+Native themes come from `ThemeCatalog`: user TOML files beside the actual config, then the indexed offline
+collection. `Theme.Source` permits only `Bundled` and `UserFile`. The index loads lazily and reuses the four classic
+singletons. Native inheritance, filename precedence, per-file diagnostics and unchanged-instance reuse remain.
 
-Installed theme plugins live in the `themes` folder that `ThemeCatalog` scans. `themestore.ThemeInstaller` writes
-that folder: it validates every archive with `ThemeCatalog.inspect` (the same loading a scan does) before moving or
-copying it in, then asks the configuration service to reload, which rescans the catalog. Downloads and disk copies
-are written under `themes/.downloads` and moved into place with one atomic replace, so a scan never sees half a
-file; the installer installs, replaces and deletes only `.jar` and `.zip` files directly in the folder, whatever
-`.sources.toml` records.
+`themeimport` owns the shared bounded converters (`ThemeConverter`, `ThemeArchive`, `ThemeLoader`, `EditorScheme`,
+`SafeXml`), deterministic offline generation, safe file/import operations and resumable migration. It depends on
+appearance, never config/application. JSON/XML parent resources live under `themeimport/intellij/`; XML forbids
+DOCTYPE/external entities. `ThemeTomlWriter` preserves ordered UI and icon data and syntax styles without choosing
+an OS or installing a LAF. Only the in-memory FlatLaf adapter supplies JSON at runtime.
 
+`application.ThemeUpgrade` joins `themeimport.ThemeMigration` and `config.ThemeSelectionMigration` before
+`ConfigService` construction, after help and resident handoff. A bounded journal persists original identity/hash,
+output intent/progress, old-slot owners and exact config before/after values. All output is staged before originals
+move, preserving local-parent dependencies across crashes. Atomic no-clobber publication and identity checks retain
+foreign/edited files. Config intent prevents repeated chained renames after a post-write crash; completion follows
+successful config handling. Recoverable source failures remain diagnostics after the completion marker.
+
+The configuration worker rescans the native catalog and refreshes migration diagnostics without conversion.
+`ConfigurationController` retains those separately from transient warnings; chrome and workspace both resolve in
+the same native catalog. Settings keeps Appearance and Font & Colors, with `match`, until the Plan 5 Themes page.
+`themesui.SampleTerminal` is the reusable canned preview and never launches a shell.
 
 ## Hosted workspace styling
 

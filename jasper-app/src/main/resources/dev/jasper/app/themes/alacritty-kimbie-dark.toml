@@ -1,0 +1,33 @@
+"name" = "Kimbie Dark"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#221a0f"
+"foreground" = "#d3af86"
+"accent" = "#5d90cd"
+"cursor" = "#d3af86"
+"selection" = "#574733"
+
+[colors.normal]
+"black" = "#221a0f"
+"red" = "#c87e5a"
+"green" = "#879a6b"
+"yellow" = "#e4b581"
+"blue" = "#5d90cd"
+"magenta" = "#c792ea"
+"cyan" = "#6bbab2"
+"white" = "#d3af86"
+
+[colors.bright]
+"black" = "#7d6f48"
+"red" = "#c87e5a"
+"green" = "#879a6b"
+"yellow" = "#e4b581"
+"blue" = "#5d90cd"
+"magenta" = "#c792ea"
+"cyan" = "#6bbab2"
+"white" = "#f2cca8"

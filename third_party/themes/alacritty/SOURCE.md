@@ -1,0 +1,196 @@
+# alacritty theme inputs
+
+Source: https://github.com/alacritty/alacritty-theme
+
+Commit: `ab88d5a80d676b5dc6157e91aba8067f2078dc94`
+
+License: Apache-2.0 (`LICENSE`). Exact upstream bytes and hashes are recorded in assets.tsv.
+
+Original author fields are preserved. If absent, use upstream vendor credit: Alacritty theme contributors.
+
+- `Cobalt2.toml`: Cobalt2 (`alacritty-cobalt2`); old names: Cobalt2
+- `Mariana.toml`: Mariana (`alacritty-mariana`); old names: Mariana
+- `acme.toml`: Acme (`alacritty-acme`); old names: Acme
+- `afterglow.toml`: Afterglow (`alacritty-afterglow`); old names: Afterglow
+- `alabaster.toml`: Alabaster (`alacritty-alabaster`); old names: Alabaster
+- `alabaster_dark.toml`: Alabaster Dark (`alacritty-alabaster-dark`); old names: Alabaster Dark
+- `alacritty_0_12.toml`: Alacritty 0 12 (`alacritty-alacritty-0-12`); old names: Alacritty 0 12
+- `argonaut.toml`: Argonaut (`alacritty-argonaut`); old names: Argonaut
+- `ashes_dark.toml`: Ashes Dark (`alacritty-ashes-dark`); old names: Ashes Dark
+- `ashes_light.toml`: Ashes Light (`alacritty-ashes-light`); old names: Ashes Light
+- `aura.toml`: Aura (`alacritty-aura`); old names: Aura
+- `autumn.toml`: Autumn (`alacritty-autumn`); old names: Autumn
+- `ayu_dark.toml`: Ayu Dark (`alacritty-ayu-dark`); old names: Ayu Dark
+- `ayu_light.toml`: Ayu Light (`alacritty-ayu-light`); old names: Ayu Light
+- `ayu_mirage.toml`: Ayu Mirage (`alacritty-ayu-mirage`); old names: Ayu Mirage
+- `azu.toml`: Azu (`alacritty-azu`); old names: Azu
+- `baitong.toml`: Baitong (`alacritty-baitong`); old names: Baitong
+- `base16_default_dark.toml`: Base16 Default Dark (`alacritty-base16-default-dark`); old names: Base16 Default Dark
+- `blood_moon.toml`: Blood Moon (`alacritty-blood-moon`); old names: Blood Moon
+- `bluish.toml`: Bluish (`alacritty-bluish`); old names: Bluish
+- `breeze.toml`: Breeze (`alacritty-breeze`); old names: Breeze
+- `campbell.toml`: Campbell (`alacritty-campbell`); old names: Campbell
+- `carbonfox.toml`: Carbonfox (`alacritty-carbonfox`); old names: Carbonfox
+- `catppuccin.toml`: Catppuccin (`alacritty-catppuccin`); old names: Catppuccin
+- `catppuccin_frappe.toml`: excluded — equivalent spelling of canonical Catppuccin Frappé; the old name is retained as an alias.
+- `catppuccin_latte.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `catppuccin_macchiato.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `catppuccin_mocha.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `challenger_deep.toml`: Challenger Deep (`alacritty-challenger-deep`); old names: Challenger Deep
+- `chicago95.toml`: Chicago95 (`alacritty-chicago95`); old names: Chicago95
+- `citylights.toml`: Citylights (`alacritty-citylights`); old names: Citylights
+- `cyber_punk_neon.toml`: Cyber Punk Neon (`alacritty-cyber-punk-neon`); old names: Cyber Punk Neon
+- `dark_pastels.toml`: Dark Pastels (`alacritty-dark-pastels`); old names: Dark Pastels
+- `dark_plus.toml`: Dark Plus (`alacritty-dark-plus`); old names: Dark Plus
+- `dark_pride.toml`: Dark Pride (`alacritty-dark-pride`); old names: Dark Pride
+- `dawnfox.toml`: Dawnfox (`alacritty-dawnfox`); old names: Dawnfox
+- `dayfox.toml`: Dayfox (`alacritty-dayfox`); old names: Dayfox
+- `deep_space.toml`: Deep Space (`alacritty-deep-space`); old names: Deep Space
+- `doom_one.toml`: Doom One (`alacritty-doom-one`); old names: Doom One
+- `dracula.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `dracula_plus.toml`: Dracula Plus (`alacritty-dracula-plus`); old names: Dracula Plus
+- `duskfox.toml`: Duskfox (`alacritty-duskfox`); old names: Duskfox
+- `enfocado_dark.toml`: Enfocado Dark (`alacritty-enfocado-dark`); old names: Enfocado Dark
+- `enfocado_light.toml`: Enfocado Light (`alacritty-enfocado-light`); old names: Enfocado Light
+- `everforest_dark.toml`: Everforest Dark (`alacritty-everforest-dark`); old names: Everforest Dark
+- `everforest_dark_hard.toml`: Everforest Dark Hard (`alacritty-everforest-dark-hard`); old names: Everforest Dark Hard
+- `everforest_dark_medium.toml`: Everforest Dark Medium (`alacritty-everforest-dark-medium`); old names: Everforest Dark Medium
+- `everforest_dark_soft.toml`: Everforest Dark Soft (`alacritty-everforest-dark-soft`); old names: Everforest Dark Soft
+- `everforest_light.toml`: Everforest Light (`alacritty-everforest-light`); old names: Everforest Light
+- `everforest_light_hard.toml`: Everforest Light Hard (`alacritty-everforest-light-hard`); old names: Everforest Light Hard
+- `everforest_light_medium.toml`: Everforest Light Medium (`alacritty-everforest-light-medium`); old names: Everforest Light Medium
+- `everforest_light_soft.toml`: Everforest Light Soft (`alacritty-everforest-light-soft`); old names: Everforest Light Soft
+- `falcon.toml`: Falcon (`alacritty-falcon`); old names: Falcon
+- `flat_remix.toml`: Flat Remix (`alacritty-flat-remix`); old names: Flat Remix
+- `flexoki-light.toml`: Flexoki Light (`alacritty-flexoki-light`); old names: Flexoki Light
+- `flexoki.toml`: Flexoki (`alacritty-flexoki`); old names: Flexoki
+- `ganbaru.toml`: Ganbaru (`alacritty-ganbaru`); old names: Ganbaru
+- `ganbaru_matcha.toml`: Ganbaru Matcha (`alacritty-ganbaru-matcha`); old names: Ganbaru Matcha
+- `github_dark.toml`: Github Dark (`alacritty-github-dark`); old names: Github Dark
+- `github_dark_colorblind.toml`: Github Dark Colorblind (`alacritty-github-dark-colorblind`); old names: Github Dark Colorblind
+- `github_dark_default.toml`: Github Dark Default (`alacritty-github-dark-default`); old names: Github Dark Default
+- `github_dark_dimmed.toml`: Github Dark Dimmed (`alacritty-github-dark-dimmed`); old names: Github Dark Dimmed
+- `github_dark_high_contrast.toml`: Github Dark High Contrast (`alacritty-github-dark-high-contrast`); old names: Github Dark High Contrast
+- `github_dark_tritanopia.toml`: Github Dark Tritanopia (`alacritty-github-dark-tritanopia`); old names: Github Dark Tritanopia
+- `github_light.toml`: Github Light (`alacritty-github-light`); old names: Github Light
+- `github_light_colorblind.toml`: Github Light Colorblind (`alacritty-github-light-colorblind`); old names: Github Light Colorblind
+- `github_light_default.toml`: Github Light Default (`alacritty-github-light-default`); old names: Github Light Default
+- `github_light_high_contrast.toml`: Github Light High Contrast (`alacritty-github-light-high-contrast`); old names: Github Light High Contrast
+- `github_light_tritanopia.toml`: Github Light Tritanopia (`alacritty-github-light-tritanopia`); old names: Github Light Tritanopia
+- `gnome_terminal.toml`: Gnome Terminal (`alacritty-gnome-terminal`); old names: Gnome Terminal
+- `google.toml`: Google (`alacritty-google`); old names: Google
+- `gotham.toml`: Gotham (`alacritty-gotham`); old names: Gotham
+- `gruber_darker.toml`: Gruber Darker (`alacritty-gruber-darker`); old names: Gruber Darker
+- `gruvbox_dark.toml`: Gruvbox Dark (`alacritty-gruvbox-dark`); old names: Gruvbox Dark
+- `gruvbox_light.toml`: Gruvbox Light (`alacritty-gruvbox-light`); old names: Gruvbox Light
+- `gruvbox_material.toml`: Gruvbox Material (`alacritty-gruvbox-material`); old names: Gruvbox Material
+- `gruvbox_material_hard_dark.toml`: Gruvbox Material Hard Dark (`alacritty-gruvbox-material-hard-dark`); old names: Gruvbox Material Hard Dark
+- `gruvbox_material_hard_light.toml`: Gruvbox Material Hard Light (`alacritty-gruvbox-material-hard-light`); old names: Gruvbox Material Hard Light
+- `gruvbox_material_medium_dark.toml`: Gruvbox Material Medium Dark (`alacritty-gruvbox-material-medium-dark`); old names: Gruvbox Material Medium Dark
+- `gruvbox_material_medium_light.toml`: Gruvbox Material Medium Light (`alacritty-gruvbox-material-medium-light`); old names: Gruvbox Material Medium Light
+- `gruvbox_material_soft_dark.toml`: Gruvbox Material Soft Dark (`alacritty-gruvbox-material-soft-dark`); old names: Gruvbox Material Soft Dark
+- `hardhacker.toml`: Hardhacker (`alacritty-hardhacker`); old names: Hardhacker
+- `hatsunemiku.toml`: Hatsunemiku (`alacritty-hatsunemiku`); old names: Hatsunemiku
+- `high_contrast.toml`: High Contrast (`alacritty-high-contrast`); old names: High Contrast
+- `horizon_dark.toml`: Horizon Dark (`alacritty-horizon-dark`); old names: Horizon Dark
+- `hyper.toml`: Hyper (`alacritty-hyper`); old names: Hyper
+- `iceberg.toml`: Iceberg (`alacritty-iceberg`); old names: Iceberg
+- `inferno.toml`: Inferno (`alacritty-inferno`); old names: Inferno
+- `iris.toml`: Iris (`alacritty-iris`); old names: Iris
+- `iterm.toml`: Iterm (`alacritty-iterm`); old names: Iterm
+- `iterm_solardark.toml`: Iterm Solardark (`alacritty-iterm-solardark`); old names: Iterm Solardark
+- `kanagawa_dragon.toml`: Kanagawa Dragon (`alacritty-kanagawa-dragon`); old names: Kanagawa Dragon
+- `kanagawa_wave.toml`: Kanagawa Wave (`alacritty-kanagawa-wave`); old names: Kanagawa Wave
+- `kimbie_dark.toml`: Kimbie Dark (`alacritty-kimbie-dark`); old names: Kimbie Dark
+- `kimbie_light.toml`: Kimbie Light (`alacritty-kimbie-light`); old names: Kimbie Light
+- `kitty.toml`: Kitty (`alacritty-kitty`); old names: Kitty
+- `konsole_linux.toml`: Konsole Linux (`alacritty-konsole-linux`); old names: Konsole Linux
+- `linux.toml`: Linux (`alacritty-linux`); old names: Linux
+- `low_contrast.toml`: Low Contrast (`alacritty-low-contrast`); old names: Low Contrast
+- `marine_dark.toml`: Marine Dark (`alacritty-marine-dark`); old names: Marine Dark
+- `material_theme.toml`: Material Theme (`alacritty-material-theme`); old names: Material Theme
+- `material_theme_mod.toml`: Material Theme Mod (`alacritty-material-theme-mod`); old names: Material Theme Mod
+- `meliora.toml`: Meliora (`alacritty-meliora`); old names: Meliora
+- `miasma.toml`: Miasma (`alacritty-miasma`); old names: Miasma
+- `midnight_haze.toml`: Midnight Haze (`alacritty-midnight-haze`); old names: Midnight Haze
+- `modus_operandi.toml`: Modus Operandi (`alacritty-modus-operandi`); old names: Modus Operandi
+- `modus_vivendi.toml`: Modus Vivendi (`alacritty-modus-vivendi`); old names: Modus Vivendi
+- `monokai.toml`: Monokai (`alacritty-monokai`); old names: Monokai
+- `monokai_charcoal.toml`: Monokai Charcoal (`alacritty-monokai-charcoal`); old names: Monokai Charcoal
+- `monokai_pro.toml`: Monokai Pro (`alacritty-monokai-pro`); old names: Monokai Pro
+- `moonfly.toml`: Moonfly (`alacritty-moonfly`); old names: Moonfly
+- `moonlight_ii_vscode.toml`: Moonlight Ii Vscode (`alacritty-moonlight-ii-vscode`); old names: Moonlight Ii Vscode
+- `msx.toml`: Msx (`alacritty-msx`); old names: Msx
+- `night_owl.toml`: Night Owl (`alacritty-night-owl`); old names: Night Owl
+- `night_owlish_light.toml`: Night Owlish Light (`alacritty-night-owlish-light`); old names: Night Owlish Light
+- `nightfly.toml`: Nightfly (`alacritty-nightfly`); old names: Nightfly
+- `nightfox.toml`: Nightfox (`alacritty-nightfox`); old names: Nightfox
+- `noctis_lux.toml`: Noctis Lux (`alacritty-noctis-lux`); old names: Noctis Lux
+- `nord.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `nord_light.toml`: Nord Light (`alacritty-nord-light`); old names: Nord Light
+- `nordfox.toml`: Nordfox (`alacritty-nordfox`); old names: Nordfox
+- `nordic.toml`: Nordic (`alacritty-nordic`); old names: Nordic
+- `nvim_dark.toml`: Nvim Dark (`alacritty-nvim-dark`); old names: Nvim Dark
+- `oceanic_next.toml`: Oceanic Next (`alacritty-oceanic-next`); old names: Oceanic Next
+- `omni.toml`: Omni (`alacritty-omni`); old names: Omni
+- `one_dark.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `one_light.toml`: One Light (`alacritty-one-light`); old names: One Light
+- `oxocarbon.toml`: Oxocarbon (`alacritty-oxocarbon`); old names: Oxocarbon
+- `palenight.toml`: Palenight (`alacritty-palenight`); old names: Palenight
+- `panda.toml`: Panda (`alacritty-panda`); old names: Panda
+- `papercolor_dark.toml`: Papercolor Dark (`alacritty-papercolor-dark`); old names: Papercolor Dark
+- `papercolor_light.toml`: Papercolor Light (`alacritty-papercolor-light`); old names: Papercolor Light
+- `papertheme.toml`: Papertheme (`alacritty-papertheme`); old names: Papertheme
+- `pastel_dark.toml`: Pastel Dark (`alacritty-pastel-dark`); old names: Pastel Dark
+- `pencil_dark.toml`: Pencil Dark (`alacritty-pencil-dark`); old names: Pencil Dark
+- `pencil_light.toml`: Pencil Light (`alacritty-pencil-light`); old names: Pencil Light
+- `pink_cat_boo.toml`: Pink Cat Boo (`alacritty-pink-cat-boo`); old names: Pink Cat Boo
+- `rainbow.toml`: Rainbow (`alacritty-rainbow`); old names: Rainbow
+- `remedy_dark.toml`: Remedy Dark (`alacritty-remedy-dark`); old names: Remedy Dark
+- `rigel.toml`: Rigel (`alacritty-rigel`); old names: Rigel
+- `rose_pine.toml`: Rose Pine (`alacritty-rose-pine`); old names: Rose Pine
+- `rose_pine_dawn.toml`: Rose Pine Dawn (`alacritty-rose-pine-dawn`); old names: Rose Pine Dawn
+- `rose_pine_moon.toml`: Rose Pine Moon (`alacritty-rose-pine-moon`); old names: Rose Pine Moon
+- `seashells.toml`: Seashells (`alacritty-seashells`); old names: Seashells
+- `selenized_dark.toml`: Selenized Dark (`alacritty-selenized-dark`); old names: Selenized Dark
+- `selenized_light.toml`: Selenized Light (`alacritty-selenized-light`); old names: Selenized Light
+- `seoul256-light.toml`: Seoul256 Light (`alacritty-seoul256-light`); old names: Seoul256 Light
+- `smoooooth.toml`: Smoooooth (`alacritty-smoooooth`); old names: Smoooooth
+- `snazzy.toml`: Snazzy (`alacritty-snazzy`); old names: Snazzy
+- `solarized_dark.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `solarized_light.toml`: excluded — IntelliJ-family native theme has the same normalized name.
+- `solarized_osaka.toml`: Solarized Osaka (`alacritty-solarized-osaka`); old names: Solarized Osaka
+- `solarized_osaka_day.toml`: Solarized Osaka Day (`alacritty-solarized-osaka-day`); old names: Solarized Osaka Day
+- `sonokai.toml`: Sonokai (`alacritty-sonokai`); old names: Sonokai
+- `spacegray.toml`: Spacegray (`alacritty-spacegray`); old names: Spacegray
+- `synthwave_84.toml`: Synthwave 84 (`alacritty-synthwave-84`); old names: Synthwave 84
+- `taerminal.toml`: Taerminal (`alacritty-taerminal`); old names: Taerminal
+- `tango_dark.toml`: Tango Dark (`alacritty-tango-dark`); old names: Tango Dark
+- `tender.toml`: Tender (`alacritty-tender`); old names: Tender
+- `terafox.toml`: Terafox (`alacritty-terafox`); old names: Terafox
+- `terminal_app.toml`: Terminal App (`alacritty-terminal-app`); old names: Terminal App
+- `thelovelace.toml`: Thelovelace (`alacritty-thelovelace`); old names: Thelovelace
+- `tokyo_night.toml`: Tokyo Night (`alacritty-tokyo-night`); old names: Tokyo Night
+- `tokyo_night_enhanced.toml`: Tokyo Night Enhanced (`alacritty-tokyo-night-enhanced`); old names: Tokyo Night Enhanced
+- `tokyo_night_light.toml`: Tokyo Night Light (`alacritty-tokyo-night-light`); old names: Tokyo Night Light
+- `tokyo_night_storm.toml`: Tokyo Night Storm (`alacritty-tokyo-night-storm`); old names: Tokyo Night Storm
+- `tomorrow.toml`: Tomorrow (`alacritty-tomorrow`); old names: Tomorrow
+- `tomorrow_night.toml`: Tomorrow Night (`alacritty-tomorrow-night`); old names: Tomorrow Night
+- `tomorrow_night_blue.toml`: Tomorrow Night Blue (`alacritty-tomorrow-night-blue`); old names: Tomorrow Night Blue
+- `tomorrow_night_bright.toml`: Tomorrow Night Bright (`alacritty-tomorrow-night-bright`); old names: Tomorrow Night Bright
+- `tomorrow_night_eighties.toml`: Tomorrow Night Eighties (`alacritty-tomorrow-night-eighties`); old names: Tomorrow Night Eighties
+- `ubuntu.toml`: Ubuntu (`alacritty-ubuntu`); old names: Ubuntu
+- `vesper.toml`: Vesper (`alacritty-vesper`); old names: Vesper
+- `vscode.toml`: Vscode (`alacritty-vscode`); old names: Vscode
+- `wombat.toml`: Wombat (`alacritty-wombat`); old names: Wombat
+- `xterm.toml`: Xterm (`alacritty-xterm`); old names: Xterm
+- `zenburn.toml`: Zenburn (`alacritty-zenburn`); old names: Zenburn
+
+## Prior provenance
+
+# Alacritty themes
+
+The `*.toml` files are the `themes/` folder of [alacritty/alacritty-theme](https://github.com/alacritty/alacritty-theme)
+at commit `ab88d5a80d676b5dc6157e91aba8067f2078dc94` (2026-09-11), unchanged, under the Apache License 2.0 in
+`LICENSE`. `index.txt` lists them, because resources cannot be listed from a jar; regenerate it after updating the files
+(`ls *.toml | LC_ALL=C sort > index.txt`).

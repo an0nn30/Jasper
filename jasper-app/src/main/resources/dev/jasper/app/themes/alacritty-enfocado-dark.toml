@@ -1,0 +1,33 @@
+"name" = "Enfocado Dark"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#181818"
+"foreground" = "#b9b9b9"
+"accent" = "#368aeb"
+"cursor" = "#b9b9b9"
+"selection" = "#484848"
+
+[colors.normal]
+"black" = "#3b3b3b"
+"red" = "#ed4a46"
+"green" = "#70b433"
+"yellow" = "#dbb32d"
+"blue" = "#368aeb"
+"magenta" = "#eb6eb7"
+"cyan" = "#3fc5b7"
+"white" = "#b9b9b9"
+
+[colors.bright]
+"black" = "#777777"
+"red" = "#ff5e56"
+"green" = "#83c746"
+"yellow" = "#efc541"
+"blue" = "#4f9cfe"
+"magenta" = "#ff81ca"
+"cyan" = "#56d8c9"
+"white" = "#dedede"

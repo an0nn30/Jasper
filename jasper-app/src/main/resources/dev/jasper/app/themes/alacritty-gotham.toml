@@ -1,0 +1,33 @@
+"name" = "Gotham"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#0a0f14"
+"foreground" = "#98d1ce"
+"accent" = "#3c6e7c"
+"cursor" = "#98d1ce"
+"selection" = "#35494c"
+
+[colors.normal]
+"black" = "#0a0f14"
+"red" = "#c33027"
+"green" = "#26a98b"
+"yellow" = "#edb54b"
+"blue" = "#195465"
+"magenta" = "#4e5165"
+"cyan" = "#33859d"
+"white" = "#98d1ce"
+
+[colors.bright]
+"black" = "#10151b"
+"red" = "#d26939"
+"green" = "#081f2d"
+"yellow" = "#245361"
+"blue" = "#093748"
+"magenta" = "#888ba5"
+"cyan" = "#599caa"
+"white" = "#d3ebe9"

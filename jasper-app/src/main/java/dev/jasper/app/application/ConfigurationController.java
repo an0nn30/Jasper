@@ -11,7 +11,6 @@ import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.WorkspaceThemeChoice;
-import dev.jasper.app.terminalthemes.TerminalThemeCatalog;
 import dev.jasper.app.config.SettingsEdit;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.platform.ConfigEditor;
@@ -32,7 +31,6 @@ final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
     private final ConfigService service;
     private final ThemeCatalog catalog;
-    private final TerminalThemeCatalog terminalThemes;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
     private ConfigService.State state;
@@ -43,6 +41,8 @@ final class ConfigurationController implements AutoCloseable {
     private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
     /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
     private List<ConfigDiagnostic> themeProblems = List.of();
+    private List<ConfigDiagnostic> migrationProblems = List.of();
+    private final java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource;
     private Predicate<String> pluginSettingsExist = id -> false;
     private final List<Consumer<ConfigService.State>> stateListeners = new java.util.ArrayList<>();
     private java.util.function.BiConsumer<WindowContent, String> settingsOpener;
@@ -53,6 +53,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         var merged = new java.util.ArrayList<>(state.diagnostics());
         merged.addAll(themeProblems);
+        merged.addAll(migrationProblems);
         merged.addAll(reported);
         pluginReports.values().forEach(merged::addAll);
         var removable = state.deadTables().stream()
@@ -87,21 +88,16 @@ final class ConfigurationController implements AutoCloseable {
     }
 
     ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog) {
-        this(themes, service, catalog, TerminalThemeCatalog.bundledOnly(), new ConfigEditor()::open);
+        this(themes, service, catalog, new ConfigEditor()::open, List::of);
     }
-
     ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, Consumer<Path> editor) {
-        this(themes, service, catalog, TerminalThemeCatalog.bundledOnly(), editor);
+        this(themes, service, catalog, editor, List::of);
     }
-
-    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, TerminalThemeCatalog terminalThemes) {
-        this(themes, service, catalog, terminalThemes, new ConfigEditor()::open);
-    }
-
-    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, TerminalThemeCatalog terminalThemes,
-                            Consumer<Path> editor) {
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog,
+                            Consumer<Path> editor, java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource) {
+        this.migrationSource = migrationSource;
         requireEdt();
-        this.themes = themes; this.service = service; this.catalog = catalog; this.terminalThemes = terminalThemes; this.editor = editor;
+        this.themes = themes; this.service = service; this.catalog = catalog; this.editor = editor;
         appearance = themes.subscribe((resolved, refresh) -> lastChromeDark = resolved.chrome().dark());
         state = service.initialState();
         try { configureThemes(state); }
@@ -249,10 +245,12 @@ final class ConfigurationController implements AutoCloseable {
      * built-in of the last applied darkness; missing workspace matches chrome without changing the request.
      */
     private void configureThemes(ConfigService.State next) {
+        migrationProblems = migrationSource.get().stream().distinct().map(problem -> new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING,
+            problem.file(), problem.line(), problem.line() == 0 ? 0 : 1, "", problem.message())).toList();
         ThemeCatalog.Snapshot available = catalog.latest();
         var problems = new java.util.ArrayList<ConfigDiagnostic>();
         for (ThemeCatalog.Problem problem : available.problems())
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), problem.line(), 0, "", problem.message()));
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), problem.line(), problem.line() == 0 ? 0 : 1, "", problem.message()));
         String name = next.snapshot().theme();
         Theme theme = available.find(name).orElse(null);
         if (theme == null) {
@@ -260,23 +258,9 @@ final class ConfigurationController implements AutoCloseable {
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
                 "Unknown theme \"" + name + "\"; using " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
         }
-        TerminalThemeCatalog.Snapshot terminal = terminalThemes.latest();
-        for (TerminalThemeCatalog.Problem problem : terminal.problems())
-            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), 0, 0, "", problem.message()));
         WorkspaceThemeChoice choice = next.snapshot().workspaceTheme();
         Theme workspace = null;
-        if (!choice.matchesChrome()) {
-            workspace = available.find(choice.name()).orElse(null);
-            var legacy = terminal.find(choice.name()).orElse(null);
-            if (workspace != null && legacy != null) {
-                String source = legacy.file().map(Path::toString).orElse("the bundled Alacritty collection");
-                problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, legacy.file().orElse(next.file()),
-                    0, 0, "ui.theme.workspace", "Alacritty theme \"" + legacy.name() + "\" from " + source
-                        + " is shadowed; using native theme \"" + workspace.name() + "\"."));
-            } else if (legacy != null) {
-                workspace = terminalThemes.converted(legacy);
-            }
-        }
+        if (!choice.matchesChrome()) workspace = available.find(choice.name()).orElse(null);
         if (!choice.matchesChrome() && workspace == null)
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
                 "Unknown workspace theme \"" + choice.name() + "\"; matching the chrome theme."));

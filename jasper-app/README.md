@@ -77,3 +77,11 @@ the maintenance guide lists each route.
 A new resource must be tested from the produced jar. FlatLaf and shell-integration
 resource paths remain under `dev/jasper/app/`; moving a Java class can still require
 updating reflective class names in `.properties` files.
+
+## Native theme engine
+
+The app ships 284 native TOML themes and reads user TOMLs from `themes/` beside the selected config. Appearance
+and Terminal > Font & Colors share the catalog. `themeimport` owns offline conversion, locked generation, safe
+import operations and legacy-file recovery; `application.ThemeUpgrade` runs before ConfigService. The old stores
+are retired. See [themes](../docs/themes.md), [maintenance](../docs/app-maintenance.md#themes) and
+[third-party notices](../THIRD-PARTY-THEMES.md). Plan 5 adds the Themes page and live file reload.

@@ -1,0 +1,33 @@
+"name" = "Papercolor Light"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#eeeeee"
+"foreground" = "#444444"
+"accent" = "#0087af"
+"cursor" = "#444444"
+"selection" = "#bbbbbb"
+
+[colors.normal]
+"black" = "#eeeeee"
+"red" = "#af0000"
+"green" = "#008700"
+"yellow" = "#5f8700"
+"blue" = "#0087af"
+"magenta" = "#878787"
+"cyan" = "#005f87"
+"white" = "#444444"
+
+[colors.bright]
+"black" = "#bcbcbc"
+"red" = "#d70000"
+"green" = "#d70087"
+"yellow" = "#8700af"
+"blue" = "#d75f00"
+"magenta" = "#d75f00"
+"cyan" = "#005faf"
+"white" = "#005f87"

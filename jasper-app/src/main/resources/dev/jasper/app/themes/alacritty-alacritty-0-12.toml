@@ -1,0 +1,33 @@
+"name" = "Alacritty 0 12"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#1d1f21"
+"foreground" = "#c5c8c6"
+"accent" = "#81a2be"
+"cursor" = "#c5c8c6"
+"selection" = "#4f5253"
+
+[colors.normal]
+"black" = "#1d1f21"
+"red" = "#cc6666"
+"green" = "#b5bd68"
+"yellow" = "#f0c674"
+"blue" = "#81a2be"
+"magenta" = "#b294bb"
+"cyan" = "#8abeb7"
+"white" = "#c5c8c6"
+
+[colors.bright]
+"black" = "#666666"
+"red" = "#d54e53"
+"green" = "#b9ca4a"
+"yellow" = "#e7c547"
+"blue" = "#7aa6da"
+"magenta" = "#c397d8"
+"cyan" = "#70c0b1"
+"white" = "#eaeaea"

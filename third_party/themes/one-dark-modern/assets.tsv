@@ -1,0 +1,8 @@
+resource	source	sha256
+LICENSE	LICENSE	a87d7ff10c415ecdd811d34cd204443615575e232c3c8f7f54c38447ee38db8a
+README.md	README.md	7f13298015355b6ae35c48f55da468f1370bf685fca67dff8eafd013e349cbd0
+src/main/resources/META-INF/plugin.xml	src/main/resources/META-INF/plugin.xml	55acfd9b888d05d6ccf38935edc2d0e3220c5bc74c06218aaa1dd04cf39d1f3d
+src/main/resources/color_toolwindow_icons.xml	src/main/resources/color_toolwindow_icons.xml	f585eaabcd4a6ea441428a38a72360b7f1ee649a19a882763540f6397162b801
+src/main/resources/theme/one_dark_modern.theme.json	src/main/resources/theme/one_dark_modern.theme.json	ba1518f09eec3219bb1a39a4098586c98a012dc659bf90975fd3bf539c39cd0f
+src/main/resources/theme/one_dark_modern.xml	src/main/resources/theme/one_dark_modern.xml	50bcd6789ede1b40b5ac7458e86d3d9a60392f8b3f307e945cf4bb3ec6a6391a
+src/main/resources/theme/vscode-onedark-modern.json	src/main/resources/theme/vscode-onedark-modern.json	df2ad6ab85aae8fb4ac263744bdb7eb48bcb5ba8d6c5861617c01f72073d114b

@@ -1,0 +1,33 @@
+"name" = "Modus Vivendi"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#000000"
+"foreground" = "#ffffff"
+"accent" = "#2fafff"
+"cursor" = "#ffffff"
+"selection" = "#4d4d4d"
+
+[colors.normal]
+"black" = "#000000"
+"red" = "#ff5f59"
+"green" = "#44bc44"
+"yellow" = "#d0bc00"
+"blue" = "#2fafff"
+"magenta" = "#feacd0"
+"cyan" = "#00d3d0"
+"white" = "#989898"
+
+[colors.bright]
+"black" = "#595959"
+"red" = "#ff5f5f"
+"green" = "#44df44"
+"yellow" = "#efef00"
+"blue" = "#338fff"
+"magenta" = "#ff66ff"
+"cyan" = "#00eff0"
+"white" = "#ffffff"

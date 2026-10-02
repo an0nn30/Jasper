@@ -38,4 +38,19 @@ class ConfigurationReportTest {
             });
         } finally { worker.shutdownNow(); }
     }
+    @Test void migrationWarningsSurviveReloadWithoutDuplicationAndRefreshSeparately() throws Exception {
+        Path file = dir.resolve("config.toml"); Files.writeString(file, "");
+        var warning = new ThemeCatalog.Problem(dir.resolve("themes/bad.jar"), "Failed conversion");
+        var warnings = new java.util.concurrent.atomic.AtomicReference<java.util.List<ThemeCatalog.Problem>>(java.util.List.of(warning, warning));
+        try (var service = new ConfigService(file, true)) {
+            edt(() -> {
+                var controller = new ConfigurationController(new ThemeController(theme -> true), service, ThemeCatalog.builtIn(),
+                    path -> {}, warnings::get);
+                controller.accept(service.initialState()); controller.accept(service.initialState());
+                assertThat(controller.shown().diagnostics()).singleElement().satisfies(p -> assertThat(p.message()).isEqualTo("Failed conversion"));
+                warnings.set(java.util.List.of()); controller.accept(service.initialState());
+                assertThat(controller.shown().diagnostics()).isEmpty(); controller.close();
+            });
+        }
+    }
 }

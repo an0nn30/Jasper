@@ -1,0 +1,33 @@
+"name" = "Rose Pine Dawn"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#faf4ed"
+"foreground" = "#575279"
+"accent" = "#56949f"
+"cursor" = "#cecacd"
+"selection" = "#dfdad9"
+
+[colors.normal]
+"black" = "#f2e9e1"
+"red" = "#b4637a"
+"green" = "#286983"
+"yellow" = "#ea9d34"
+"blue" = "#56949f"
+"magenta" = "#907aa9"
+"cyan" = "#d7827e"
+"white" = "#575279"
+
+[colors.bright]
+"black" = "#9893a5"
+"red" = "#b4637a"
+"green" = "#286983"
+"yellow" = "#ea9d34"
+"blue" = "#56949f"
+"magenta" = "#907aa9"
+"cyan" = "#d7827e"
+"white" = "#575279"

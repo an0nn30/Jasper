@@ -67,14 +67,13 @@ class SettingsDialogTest {
         var revealed = new ArrayList<String>();
         var dialog = new SettingsDialog(windows, context -> CorePages.pages(() -> List.of("Jasper Dark"),
                 new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
-                page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), page -> List.of(),
-                (page, header) -> new Revealing(header, revealed)).apply(context), hooks());
+                page -> fake, page -> new Revealing(new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), revealed), page -> List.of()).apply(context), hooks());
         edt(() -> {
             dialog.open(null, "appearance");
-            dialog.select("themes.intellij#marketplace");
-            assertThat(dialog.currentPage()).isEqualTo("themes.intellij");
-            dialog.select("themes.intellij#installed");
-            assertThat(revealed).containsExactly("reveal marketplace", "selected", "reveal installed", "selected");
+            dialog.select("plugins#available");
+            assertThat(dialog.currentPage()).isEqualTo("plugins");
+            dialog.select("plugins#installed");
+            assertThat(revealed).containsExactly("reveal available", "selected", "reveal installed", "selected");
             dialog.back();
             assertThat(dialog.currentPage()).isEqualTo("appearance");
         });

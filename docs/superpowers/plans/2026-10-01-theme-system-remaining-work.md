@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 is implemented, independently approved, merged to local `main` and verified there (not pushed); Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 is implemented, independently approved, merged to local `main` and verified there (not pushed); Plan 4 is implemented inline and independently reviewed; all four Important findings are fixed. One minor settings-help wording issue is deferred to Plan 5. Plan 5 remains the next deliverable. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -33,7 +33,7 @@ acceptance has not been performed.
 |---|---|---|---|
 | 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Implemented, headless-verified and independently reviewed: terminal, tabs, dividers, find, icons, Editor and SDK 0.12.0; GUI acceptance pending | Merged plan 1 |
 | 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Implemented and independently reviewed; user visual acceptance pending: hosted Swing panes adopt workspace colors with plugin-owned styles and cleanup | Plan 2 |
-| 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Offline native catalog, reproducible conversion, safe upgrade; old stores removed | Plans 2–3 |
+| 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Implemented inline: 284-theme offline native catalog, conversion/import services, recoverable startup upgrade and retired stores; final review in progress | Plans 2–3 (merged) |
 | 5 | [Themes page and live reload](2026-10-01-theme-system-5-page-reload.md) | Complete user flow: browse, stage, preview, import, duplicate, remove and edit/reload | Plan 4 |
 
 Execute sequentially. These are separate runnable deliverables, not four concurrent branches with guessed APIs.
@@ -101,9 +101,9 @@ These are proposed implementation details for review, not changes to the product
 | Design sections | Owning tasks |
 |---|---|
 | 1: two zones/settings/one LAF | 2.1–2.5; 3.1–3.3 |
-| 2: native location/index/identity | Existing plan 1; 4.1, 4.3–4.5 |
+| 2: native location/index/identity | Existing plan 1; 4.1, 4.3–4.5, 4.7 |
 | 2.1–2.2: tokens/syntax | Existing plan 1 deviations; 2.2, 2.6–2.7; 4.2 |
-| 2.3: diagnostics/fallback | Existing parser/resolver; 2.3; 4.4–4.5; 5.1, 5.4 |
+| 2.3: diagnostics/fallback | Existing parser/resolver; 2.3; 4.4–4.7; 5.1, 5.4 |
 | 3: generator/install/rollback | Existing generator; 2.2–2.3; retain parity in 4.1–4.3 |
 | 4: built-ins and legacy light default | Existing native themes; 2.1; 4.3 |
 | 5.1: two generated slots, identity for match | 2.2–2.3 |
@@ -115,8 +115,8 @@ These are proposed implementation details for review, not changes to the product
 | 6.1: both converters, syntax/tokens/UI preservation | 2.2 transitional conversion; 4.1–4.2 |
 | 6.2: locked sources, all upstreams, renames/licenses/index/drift | 4.3 |
 | 6.3: runtime import/report/name conflicts | 4.4; 5.3 UI |
-| 6.4: file and config migration/failures/marker | 2.1; 4.5 |
-| 6.5: remove stores/runtime sources/resource relocation | 4.1, 4.6 |
+| 6.4: file and config migration/failures/marker | 2.1; 4.5–4.6 |
+| 6.5: remove stores/runtime sources/resource relocation | 4.2–4.3, 4.7 |
 | 7: filters, pickers, swatches and staged preview | 5.1–5.2 |
 | 7: Import/Duplicate/Open/Remove/About | 4.4; 5.3 |
 | 7: live watch/errors/search/navigation/View menu | 5.1, 5.4–5.5 |
@@ -127,8 +127,8 @@ These are proposed implementation details for review, not changes to the product
 
 - `appearance` owns native documents/generation/install and the runtime catalog, depending on config/lifecycle and
   terminal config as today. It does not depend on the importer or the Settings UI.
-- `themeimport` depends on native appearance values and terminal config, owns legacy parsing, writer/import/migration
-  work, and never depends on settingsui or application. Composition injects transitional sources until plan 4 removes them.
+- `themeimport` depends on native appearance values and terminal config, owns legacy parsing, conversion/import/migration
+  work (the native writer stays in appearance), and never depends on settingsui or application. Composition injects transitional sources until plan 4 removes them.
 - `themesui` depends on appearance, themeimport, settingsui, config, lifecycle, platform/windows and supported terminal
   packages. `SampleTerminal` moves here. `settingsui` receives its factory from application and never imports themesui.
 - `workspace` owns zone lifecycle and styling. `platform` reads JDK client properties for zone darkness; it does not
@@ -174,3 +174,28 @@ Final unified fix gate: `./gradlew check` passed 7,897 tests, zero failures/erro
 99 focused tests passed. All four architecture gates, 1,636-file Java hygiene and branch whitespace checks pass.
 Explicit module/plugin XML counts and logs are recorded in the Plan 3 execution notes and
 `/tmp/p3-final-{check,counts,hygiene,diff-check}.log`. Focused independent re-review approved all five findings with no new breakage; no findings remain open. Local integration is complete and verified on `main`: `./gradlew check` passed 7,897 tests, zero failures/errors and six skips (3m42s; `/tmp/moray-plan3-main-check.log`). Not pushed; user visual acceptance remains pending.
+
+## Plan 4 planning revision (2026-10-01)
+
+The six-task outline is replaced by seven sequential review gates against `c8365dd1`: writer/runtime adapter,
+shared converter extraction, source lock/generation, import publication, filesystem migration, startup/config
+integration, and store retirement. The extra boundary separates filesystem recovery from startup/config recovery.
+The temporary catalog reader now returns per-file themes **and problems**, preserving file-order precedence.
+FlatLaf JSON emission stays in appearance; SafeXml and legacy input readers move to themeimport. Export must not
+freeze the current OS's UI choice into explicit workspace tokens. Bootstrap upgrades before the first ConfigService
+snapshot, and config edit intent prevents a crash from applying chained renames twice.
+
+`[icons]` remains a proposed format amendment in the draft until the plan is approved/implemented. The existing
+Alacritty full pin is available in local SOURCE.md (`ab88d5a80d676b5dc6157e91aba8067f2078dc94`); no new fetch is
+needed to identify it. All additional upstream variants/pins/licenses must still be verified in Task 3. Plan 5 will
+consume the explicit importer/file/writer contracts and relocated SampleTerminal. No implementation or new Gradle
+verification was performed during this planning revision.
+
+## Plan 4 implementation (2026-10-01)
+
+All seven tasks are implemented: native writer/icon format, shared bounded conversion, 12 sources/413 locked assets,
+284 native themes, frozen safe import/file APIs, resumable filesystem migration, pre-service config handshake, and
+native-only runtime. Originals and failures survive upgrade; current selectors remain until Plan 5. The complete
+variant/pin/license/rename accounting is in `tools/themes/sources.json`, per-source SOURCE.md and THIRD-PARTY-THEMES.md.
+The largest native file is 97,426 bytes (256 KiB cap unchanged). Final gate/review results are recorded in STATUS
+and the Plan 4 banner. User GUI acceptance is pending; no GUI, merge or push was performed.
