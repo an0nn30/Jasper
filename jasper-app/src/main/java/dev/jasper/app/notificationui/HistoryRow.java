@@ -18,12 +18,14 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 
 /** One history entry: icon, title (bold while unread) and count, full content, group and time, actions, remove. EDT only. */
 final class HistoryRow extends JPanel {
     private Notification notification;
     private final WrappedText title;
+    private WrappedText content;
     private final JLabel count = new JLabel();
     private final JLabel meta = new JLabel();
     private final JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
@@ -53,7 +55,7 @@ final class HistoryRow extends JPanel {
         titleRow.add(count, BorderLayout.EAST);
         body.add(titleRow);
         if (!notification.request().content().isEmpty()) {
-            var content = new WrappedText(notification.request().content(), "Label.foreground", false);
+            content = new WrappedText(notification.request().content(), "Label.foreground", false);
             content.setAlignmentX(LEFT_ALIGNMENT);
             body.add(Box.createVerticalStrut(UIScale.scale(2)));
             body.add(content);
@@ -104,6 +106,9 @@ final class HistoryRow extends JPanel {
     }
 
     String titleText() { return title.getText(); }
+    Color titleColor() { return title.getForeground(); }
+    /** The content text, or null when the notification has none. */
+    JTextArea contentArea() { return content; }
     boolean titleBold() { return title.getFont().isBold(); }
     String metaText() { return meta.getText(); }
     String countText() { return count.getText(); }

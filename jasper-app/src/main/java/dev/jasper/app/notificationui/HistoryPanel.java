@@ -8,10 +8,12 @@ import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.notifications.NotificationGroup;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Rectangle;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -30,10 +32,13 @@ import javax.swing.SwingConstants;
 
 /**
  * The Notifications panel's view in one window (spec section 4): New and Earlier sections over the shared center,
- * newest first, with Clear All. Showing it in a focused window marks everything read; what was unread stays under New
- * until the panel hides. EDT only; stops listening when its site closes.
+ * newest first, with Clear All. New lists every unread entry and every entry the panel read by looking, until the panel
+ * hides; Earlier lists the rest. Showing it in a focused window marks everything read. EDT only; stops listening when
+ * its site closes.
  */
 public final class HistoryPanel extends JPanel {
+    private static final String NEW = "New";
+    private static final String EARLIER = "Earlier";
     private final NotificationCenter center;
     private final Set<UUID> fresh = new LinkedHashSet<>();
     private final Rows rows = new Rows();
@@ -85,9 +90,30 @@ public final class HistoryPanel extends JPanel {
         readIfLooking();
     }
 
-    List<UUID> newSection() { return center.history().stream().map(Notification::id).filter(fresh::contains).toList(); }
+    /** The ids shown under New, in display order. */
+    List<UUID> newSection() { return displayed(NEW); }
 
-    List<UUID> earlierSection() { return center.history().stream().map(Notification::id).filter(id -> !fresh.contains(id)).toList(); }
+    /** The ids shown under Earlier, in display order. */
+    List<UUID> earlierSection() { return displayed(EARLIER); }
+
+    /** The section headings shown, top to bottom. */
+    List<String> sectionHeadings() {
+        var names = new ArrayList<String>();
+        for (Component child : rows.getComponents()) if (child instanceof JLabel heading && child != empty) names.add(heading.getText());
+        return names;
+    }
+
+    /** What is on screen: each row belongs to the heading above it. */
+    private List<UUID> displayed(String section) {
+        var ids = new ArrayList<UUID>();
+        String current = null;
+        for (Component child : rows.getComponents()) {
+            if (child instanceof HistoryRow row) {
+                if (section.equals(current)) ids.add(row.notification().id());
+            } else if (child instanceof JLabel heading && child != empty) current = heading.getText();
+        }
+        return ids;
+    }
 
     boolean showingEmpty() { return empty.getParent() == rows; }
 
@@ -127,6 +153,9 @@ public final class HistoryPanel extends JPanel {
         switch (change) {
             case NotificationCenter.Change.Upserted upserted -> {
                 Notification entry = upserted.notification();
+                HistoryRow earlier = shown.get(entry.id());
+                // Read elsewhere while listed under New: it stays there until the panel hides.
+                if (visible && entry.read() && earlier != null && !earlier.notification().read()) fresh.add(entry.id());
                 if (!entry.read() && visible && focused) {
                     fresh.add(entry.id());
                     center.markRead(entry.id());
@@ -153,12 +182,14 @@ public final class HistoryPanel extends JPanel {
         shown.clear();
         List<Notification> all = center.history();
         if (all.isEmpty()) rows.add(empty);
-        section("New", all.stream().filter(entry -> fresh.contains(entry.id())).toList());
-        section("Earlier", all.stream().filter(entry -> !fresh.contains(entry.id())).toList());
+        section(NEW, all.stream().filter(this::isNew).toList());
+        section(EARLIER, all.stream().filter(entry -> !isNew(entry)).toList());
         clearAll.setEnabled(!all.isEmpty());
         rows.revalidate();
         rows.repaint();
     }
+
+    private boolean isNew(Notification entry) { return fresh.contains(entry.id()) || !entry.read(); }
 
     private void section(String name, List<Notification> entries) {
         if (entries.isEmpty()) return;
