@@ -2,9 +2,10 @@
 
 ## Current state — 2026-10-02
 
-- **Workspace glass, plan 1 (foundation)** (branch `claude/workspace-glass`, user request 2026-10-02):
+- **Workspace glass, plans 1 (foundation) and 2 (editor)** (branch `claude/workspace-glass`, user request 2026-10-02):
   [spec](superpowers/specs/2026-10-02-jasper-workspace-glass-design.md),
-  [plan](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md). Themes gain `[workspace] opacity/blur`; Settings
+  [plan 1](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md),
+  [plan 2](superpowers/plans/2026-10-02-workspace-glass-2-editor.md). Themes gain `[workspace] opacity/blur`; Settings
   › Appearance › Workspace overrides them (`ui.workspace.opacity` in percent, `ui.workspace.blur`
   `"theme"`/`"on"`/`"off"`); bundled Clear Dark (0.95, blur on) and Clear Light (0.93, blur on) are ported from
   Terminal.app (catalog 286). On macOS, `WindowGlass` makes the window translucent through two JDK internals (new
@@ -25,9 +26,20 @@
   `Optional<Boolean>` that `GlassLevels.resolve` reads. Review follow-ups: the corner-mask observer is a
   `JasperCornerObserver` the effect view keeps alive, so its lifetime follows the view (and the window); the Blur row
   shows "Use theme's value" for `"theme"`.
-  `./gradlew check --continue`: BUILD SUCCESSFUL; 8,029 tests, 0 failures, 0 errors, 6 skipped across all modules
-  (jasper-app 1,806, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins 5,538). Not
-  done: plan 2 (editor glass, SDK 0.12.1); GUI checks (user-run): Clear Dark beside Terminal.app's, the Clear Dark
+  Plan 2 (editor glass) is done: SDK 0.12.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0; `onWorkspaceChanged`
+  also reports it, including a component entering or leaving a translucent window), answered by the app's `GlassSource`
+  and `WindowContent.setGlassListener`; Editor 0.7.0 paints its text and gutter backgrounds once each in a `GlassSurface`
+  and makes the area, viewports and gutter non-opaque (the current-line band takes the opacity's alpha; selection, caret,
+  find/Vim bars, banner and loading state stay solid). Deviation: the spec's no-argument `workspaceOpacity()` became
+  `workspaceOpacity(Component)` because opacity is per window and content moves between windows. Rulings: the gutter
+  border is cleared in glass mode (it was an opaque stripe); `EditorTabTest` primes RSyntaxTextArea 3.6.0 font metrics by
+  reflection (headless, no peer). `./gradlew check --continue`: BUILD SUCCESSFUL; 8,039 tests, 0 failures, 0 errors, 6
+  skipped across all modules (jasper-app 1,812, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit
+  85, plugins 5,541). A first run failed once in `TerminalAppIntegrationTest` `rowResetRejectsACompletedSearchAlreadyQueued
+  AheadOfReconciliation[3 reflow]` (jasper-terminal is untouched by this branch; it passed three isolated reruns and the
+  second full check): a timing flake under load, not investigated further. GUI checks (user-run) for plan 2: an editor tab
+  in Clear Dark and Clear Light, a split of terminal and editor tabs, moving an editor tab to a separate window and back,
+  opacity changes live, and the current-line and selection look. Plan 1 GUI checks: Clear Dark beside Terminal.app's, the Clear Dark
   (`hudWindow`) versus Clear Light (light `underWindowBackground`) material, rounded corners without slivers and square
   full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, hidden-rail mode,
   native fullscreen, switching back to an opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a

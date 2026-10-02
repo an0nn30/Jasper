@@ -119,3 +119,18 @@ own tokens. For renderers shared with sidebars, `WorkspacePalette.current(compon
 zone on every call. `current()` reads workspace defaults. Unmarked components and popups use chrome colors.
 Custom hosts implementing the older `Appearance` methods remain source compatible: new methods have defaults,
 using ordinary Swing colors when no host semantic defaults exist and plain-text syntax with italic comments.
+
+## Workspace opacity (SDK 0.12.1)
+
+`Appearance.workspaceOpacity(Component)` returns how opaque the workspace is behind a component: 1.0 in an ordinary
+window (and the default for hosts that do not implement it), less than 1.0 in a translucent ("glass") window. Opacity
+belongs to the window, so ask about the component you paint and ask again after it moves; call it on the UI thread
+(a null component throws `NullPointerException`). `onWorkspaceChanged` also reports changes of it, including a
+component entering or leaving a translucent window, and an opacity change alone fires it.
+
+A surface that follows the glass paints its own background once, with that alpha, using `AlphaComposite.Src` and
+unantialiased rectangles (antialiased translucent fills fall back to software rendering and make typing and resizing
+lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
+carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
+announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
+outside a translucent window. Plugins that use it declare `sdk = ">=0.12.1, <0.13"`.

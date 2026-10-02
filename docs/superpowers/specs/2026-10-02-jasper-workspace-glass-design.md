@@ -1,6 +1,6 @@
 # Jasper workspace glass: opacity, blur and the Clear themes
 
-**Status:** Design approved in chat by the user on 2026-10-02, section by section. Plan 1 (foundation) executed on claude/workspace-glass; plan 2 (editor) not written. Plan 1 deviations are listed in the plan and docs/STATUS.md. Amended 2026-10-02: blur moves to a public NSVisualEffectView and becomes on/off (see the amendment at the end).
+**Status:** Design approved in chat by the user on 2026-10-02, section by section. Plans 1 (foundation) and 2 (editor) executed on claude/workspace-glass. Plan 1 deviations are listed in the plan and docs/STATUS.md. Amended 2026-10-02: blur moves to a public NSVisualEffectView and becomes on/off (see the amendment at the end).
 
 ## Purpose
 
@@ -247,3 +247,10 @@ corner radius; the user compared materials and chose `hudWindow`.
   keeps alive, so it lives and dies with the view (and so with the window).
 - The Blur row shows the `"theme"` token as "Use theme's value", like Opacity.
 - No migration: nothing had been released.
+
+## Amendment 2026-10-02: workspaceOpacity takes a component
+
+Plan 2 shipped `Appearance.workspaceOpacity(java.awt.Component)` (SDK 0.12.1), not the no-argument `workspaceOpacity()` of
+the SDK section: opacity is per window and content moves between windows, so the answer depends on the component. The
+default is still 1.0, a component outside a translucent window reports 1.0, and `onWorkspaceChanged` reports changes
+(including a component entering or leaving a translucent window).

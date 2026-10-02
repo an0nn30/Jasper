@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-10-02 on `claude/workspace-glass` (base `fcba0f46`); not started.
+**Status:** Executed 2026-10-02 on `claude/workspace-glass` (base `fcba0f46`): SDK 0.12.1 and Editor 0.7.0. Deviation: the SDK method is `workspaceOpacity(Component)` (see the spec's 2026-10-02 workspaceOpacity amendment).
 
 **Goal:** In a translucent ("glass") Jasper window, the editor plugin's text area and gutter are translucent like the terminal, through a new SDK 0.12.1 method that reports the opacity in effect behind a plugin component.
 

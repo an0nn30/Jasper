@@ -190,6 +190,12 @@ failure leaves an opaque window.
   `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
   `TerminalView` fill the default background with alpha using the `Src` composite, replacing the host's fill. Anything
   new inside the terminal surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
+- **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.12.1). The answer comes from
+  `dev.jasper.app.plugins.GlassSource`, which `JasperApplication` builds from its windows: `owns(component)` finds the
+  window and `content().backgroundOpacity()` is the value in effect (1.0 for a component outside a translucent window).
+  `WindowContent.setGlassListener` notifies it on a real opacity change and when hosted content mounts or unmounts while
+  the window is translucent, and `HostedUi` turns that into an `onWorkspaceChanged` event. The Editor plugin paints
+  its text and gutter backgrounds once each from this value; see the SDK README for the painting rule.
 
 ```sh
 ./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest" --tests "*ClearThemesTest"
