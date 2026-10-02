@@ -33,7 +33,7 @@ final class WorkspaceRegions extends JPanel {
 
         private final boolean toolWindow;
         private boolean rounded = true;
-        private boolean clear;
+        private float opacity = 1f;
 
         Host() { this(true); }
         Host(boolean toolWindow) {
@@ -65,9 +65,14 @@ final class WorkspaceRegions extends JPanel {
                 g.setColor(UIManager.getColor("Jasper.titleBackground"));
                 g.fillRect(0, 0, getWidth(), getHeight());
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                if (clear) {
-                    // A translucent window: leave the surface empty, so the panes inside paint the only glass.
-                    g.setComposite(java.awt.AlphaComposite.Clear);
+                if (opacity < 1f) {
+                    // A translucent window: the surface is glass of the terminal background, replacing what lies
+                    // beneath. Panes replace it again with the same fill, so every pixel gets exactly one alpha
+                    // fill, and a strip no pane covers (the lower arc) is glass rather than a hole.
+                    var background = getBackground();
+                    g.setComposite(java.awt.AlphaComposite.Src);
+                    g.setColor(new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
+                        Math.round(255 * opacity)));
                     g.fill(surface());
                 } else {
                     // The terminal column (tab strip included) is one surface in the terminal palette, so every
@@ -141,10 +146,13 @@ final class WorkspaceRegions extends JPanel {
     /** The terminal palette background of the whole center, including the tab strip and any lower arc. */
     void setTerminalBackground(java.awt.Color background) { center.setBackground(background); }
 
-    /** In a translucent window the center surface is cleared; what it holds paints the glass. */
-    void setGlass(boolean glass) {
-        if (center.clear == glass) return;
-        center.clear = glass;
+    /**
+     * The opacity in effect for the center surface, 1 being opaque. Below 1 the surface is filled with the terminal
+     * background at that opacity, the same fill the panes inside paint over it.
+     */
+    void setGlass(float opacity) {
+        if (center.opacity == opacity) return;
+        center.opacity = opacity;
         center.repaint();
     }
 

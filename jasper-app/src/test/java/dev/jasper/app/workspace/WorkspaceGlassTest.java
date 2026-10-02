@@ -37,7 +37,7 @@ class WorkspaceGlassTest {
         return new Color(image.getRGB(point.x, point.y), true).getAlpha();
     }
 
-    @Test void theWorkspaceHostClearsOnlyItsSurfaceWhenGlassIsOn() throws Exception {
+    @Test void theWorkspaceHostFillsOnlyItsSurfaceWithGlassWhenGlassIsOn() throws Exception {
         edt(() -> {
             var deck = new JPanel();
             deck.setOpaque(false);
@@ -49,13 +49,69 @@ class WorkspaceGlassTest {
             LayoutTestSupport.layoutTree(regions);
             assertThat(alpha(render(regions), regions, deck, 300, 200)).isEqualTo(255);
 
-            regions.setGlass(true);
+            regions.setGlass(0.5f);
             var glass = render(regions);
-            assertThat(alpha(glass, regions, deck, 300, 200)).as("inside the rounded surface").isZero();
+            assertThat(alpha(glass, regions, deck, 300, 200)).as("inside the rounded surface").isEqualTo(128);
             assertThat(alpha(glass, regions, regions, 997, 300)).as("the right gutter is chrome").isEqualTo(255);
 
-            regions.setGlass(false);
+            regions.setGlass(1f);
             assertThat(alpha(render(regions), regions, deck, 300, 200)).isEqualTo(255);
+        });
+    }
+
+    /** A deck that paints like a translucent terminal pane: one Src fill of the background at that opacity. */
+    private static JPanel translucentDeck(Color background, float opacity) {
+        var deck = new JPanel() {
+            @Override protected void paintComponent(java.awt.Graphics graphics) {
+                var g = (java.awt.Graphics2D) graphics.create();
+                try {
+                    g.setComposite(java.awt.AlphaComposite.Src);
+                    g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(),
+                        Math.round(255 * opacity)));
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                } finally { g.dispose(); }
+            }
+        };
+        deck.setOpaque(false);
+        return deck;
+    }
+
+    @Test void everySurfacePixelIsGlassWithTheRailVisible() throws Exception {
+        edt(() -> {
+            var background = new Color(0x212734);
+            var deck = translucentDeck(background, 0.5f);
+            var regions = new WorkspaceRegions(deck);
+            regions.setRailVisible(true);
+            regions.setTerminalBackground(background);
+            regions.setSize(1000, 600);
+            LayoutTestSupport.layoutTree(regions);
+            LayoutTestSupport.layoutTree(regions);
+            var host = (JComponent) deck.getParent();
+            var insets = host.getInsets();
+            int arc = com.formdev.flatlaf.util.UIScale.scale(16);
+            var surface = new java.awt.geom.RoundRectangle2D.Double(insets.left, insets.top,
+                host.getWidth() - insets.left - insets.right, host.getHeight() - insets.top - insets.bottom, arc, arc);
+
+            regions.setGlass(0.5f);
+            var image = render(regions);
+            int inside = 0;
+            var wrongSurface = new ArrayList<String>();
+            var wrongGutter = new ArrayList<String>();
+            var wrongEdge = new ArrayList<String>();
+            for (int y = 0; y < host.getHeight(); y++) for (int x = 0; x < host.getWidth(); x++) {
+                int alpha = alpha(image, regions, host, x, y);
+                String pixel = "(" + x + ", " + y + ") = " + alpha;
+                if (surface.contains(x, y, 1, 1)) {
+                    inside++;
+                    if (alpha != 128) wrongSurface.add(pixel);
+                } else if (!surface.intersects(x, y, 1, 1)) {
+                    if (alpha != 255) wrongGutter.add(pixel);
+                } else if (alpha < 128) wrongEdge.add(pixel);
+            }
+            assertThat(inside).isPositive();
+            assertThat(wrongSurface).as("surface pixels with another alpha than one glass fill").isEmpty();
+            assertThat(wrongGutter).as("gutter pixels that are not solid").isEmpty();
+            assertThat(wrongEdge).as("rounded-edge pixels below the glass alpha").isEmpty();
         });
     }
 

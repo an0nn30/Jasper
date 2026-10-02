@@ -1055,15 +1055,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The opacity actually in effect for this window, 1 being opaque. The terminal surface is cleared and each pane
-     * paints its own glass; chrome, tab strips and dividers stay solid.
+     * The opacity actually in effect for this window, 1 being opaque. The terminal surface and each pane paint the
+     * terminal background at that opacity, each replacing what lies beneath; chrome, tab strips and dividers stay
+     * solid.
      */
     void applyBackgroundOpacity(double opacity) {
         float value = (float) opacity;
         if (closed || value == backgroundOpacity) return;
         backgroundOpacity = value;
         boolean glass = value < 1f;
-        regions.setGlass(glass);
+        regions.setGlass(value);
         tabs.setOpaque(!glass);
         for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
         repaint();
