@@ -204,15 +204,19 @@ final class WindowContributions implements AutoCloseable {
         return index;
     }
 
-    /** The one place a dock change takes effect: build what now shows, lay out, render the stripes, tell the panels, save. */
+    /**
+     * The one place a dock change takes effect: build what now shows, lay out, render the stripes, tell the hidden
+     * panels, return focus to the terminal if something hid, tell the shown panels, save. Focus returns before the
+     * shown panels hear it, so a window that takes focus when it shows keeps it when it replaces another.
+     */
     private void docked(DockState.Change change) {
         for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
-        for (String id : change.shown()) notifyVisibility(id, true);
         // Hiding a window by any route returns focus to the terminal.
         if (!change.hidden().isEmpty()) owner.focusSelected();
+        for (String id : change.shown()) notifyVisibility(id, true);
         persist();
     }
 
@@ -223,7 +227,10 @@ final class WindowContributions implements AutoCloseable {
         panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id));
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
-        catch (RuntimeException failure) { /* The contributor's adapter has logged it; the window only needs a placeholder. */ }
+        catch (RuntimeException failure) {
+            // A plugin's adapter turns its own failures into null, so an exception reaching here came from no adapter.
+            LOG.log(System.Logger.Level.WARNING, "The panel " + id + " could not be built; showing a placeholder.", failure);
+        }
         panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
         owner.area().setContent(id, panel.entry.title(), panel.component);
     }

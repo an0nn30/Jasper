@@ -24,6 +24,7 @@ import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
@@ -210,6 +211,66 @@ class WindowPanelsTest {
             assertThat(owner.area().content(Slot.RIGHT_TOP)).isNull();
             assertThat(owner.rightStripe().buttons()).isEmpty();
             assertThat(events).containsExactly("closed");
+        });
+    }
+
+    @Test void aThrowingFactoryShowsAPlaceholderAndLogsAWarningNamingThePanel() throws Exception {
+        var logger = java.util.logging.Logger.getLogger(WindowContributions.class.getName());
+        var previousLevel = logger.getLevel();
+        boolean previousUseParentHandlers = logger.getUseParentHandlers();
+        List<java.util.logging.LogRecord> records = new java.util.concurrent.CopyOnWriteArrayList<>();
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        logger.setLevel(java.util.logging.Level.ALL);
+        logger.setUseParentHandlers(false);
+        logger.addHandler(handler);
+        try {
+            edt(() -> {
+                var model = new Contributions();
+                WindowContent owner = window();
+                owner.connectContributions(model, UiState.inMemory());
+                model.addPanel("dev.x.boom", "Boom", new ImageIcon(), Slot.RIGHT_TOP, site -> { throw new IllegalStateException("boom"); });
+                toggle(model, owner, "dev.x.boom");
+                assertThat(owner.area().content(Slot.RIGHT_TOP)).isInstanceOfSatisfying(JLabel.class,
+                    placeholder -> assertThat(placeholder.getText()).contains("could not be loaded"));
+                assertThat(owner.dock().visible("dev.x.boom")).as("the placeholder is a window like any other").isTrue();
+            });
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previousLevel);
+            logger.setUseParentHandlers(previousUseParentHandlers);
+        }
+        assertThat(records).singleElement().satisfies(record -> {
+            assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+            assertThat(record.getMessage()).contains("dev.x.boom");
+            assertThat(record.getThrown()).isInstanceOf(IllegalStateException.class).hasMessage("boom");
+        });
+    }
+
+    @Test void focusReturnsToTheTerminalBeforeAReplacingWindowHearsItShows() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            // The selected tab is hosted content, so focusing the selection runs this instead of focusing a terminal.
+            var doc = model.content().open("dev.x", "doc", "Doc", owner.id(), new JPanel());
+            doc.focusTarget(() -> events.add("focus"));
+            for (String name : List.of("a", "b"))
+                model.addPanel("dev.x." + name, name.toUpperCase(java.util.Locale.ROOT), new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add(name + ":" + visible));
+                    return new JLabel(name);
+                });
+            toggle(model, owner, "dev.x.a");
+            events.clear();
+            toggle(model, owner, "dev.x.b");
+            assertThat(events).as("a window that takes focus when shown keeps it").containsExactly("a:false", "focus", "b:true");
+            events.clear();
+            toggle(model, owner, "dev.x.b");
+            assertThat(events).containsExactly("b:false", "focus");
         });
     }
 
@@ -455,10 +516,11 @@ class WindowPanelsTest {
                 return new JLabel("hosts");
             });
             toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.rightStripe().buttons()).as("a Bottom Right window stands on the right stripe").hasSize(1);
             owner.close();
             assertThat(state.panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.BOTTOM_RIGHT, 0, true));
             assertThat(events).as("closing is not hiding").containsExactly("visible:true", "closed");
-            assertThat(owner.leftStripe().buttons()).isEmpty();
+            assertThat(owner.rightStripe().buttons()).as("closing clears the stripe").isEmpty();
         });
     }
 }
