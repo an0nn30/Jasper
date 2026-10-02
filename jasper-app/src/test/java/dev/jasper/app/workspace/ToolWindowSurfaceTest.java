@@ -2,7 +2,9 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Side;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -16,7 +18,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowSurfaceTest {
-    @Test void panelRegionsPaintTheToolWindowColourWhileControlsKeepTheirOwn() throws Exception {
+    private static ToolWindowArea showing(Slot slot, JComponent content, int size) {
+        var area = new ToolWindowArea(new JPanel(), new DockState());
+        DockTestSupport.show(area, slot, content, size);
+        return area;
+    }
+
+    @Test void toolWindowsPaintTheToolWindowColourWhileControlsKeepTheirOwn() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
             ThemeTestSupport.install(Theme.INTELLIJ_LIGHT);
@@ -27,13 +35,13 @@ class ToolWindowSurfaceTest {
             var fixed = new JPanel(); fixed.setBackground(Color.MAGENTA);
             inner.add(field);
             content.add(inner, BorderLayout.NORTH); content.add(scroll); content.add(fixed, BorderLayout.SOUTH);
-            var regions = new WorkspaceRegions(new JPanel());
-            regions.show(PanelRegion.LEFT, content, 250);
+            var area = showing(Slot.LEFT_TOP, content, 250);
 
             Color surface = UIManager.getColor("ToolWindow.background");
             assertThat(surface).isEqualTo(Color.WHITE);
             assertThat(UIManager.getColor("Panel.background")).isNotEqualTo(surface);
-            assertThat(content.getParent().getBackground()).as("region host").isEqualTo(surface);
+            assertThat(content.getParent().getBackground()).as("tool window frame").isEqualTo(surface);
+            assertThat(area.headerOf(Slot.LEFT_TOP).getBackground()).as("the header has no bar colour").isEqualTo(surface);
             assertThat(content.getBackground()).isEqualTo(surface);
             assertThat(inner.getBackground()).isEqualTo(surface);
             assertThat(scroll.getViewport().getBackground()).isEqualTo(surface);
@@ -44,26 +52,26 @@ class ToolWindowSurfaceTest {
             assertThat(later.getBackground()).as("added after the panel opened").isEqualTo(surface);
 
             ThemeTestSupport.install(Theme.DARK);
-            SwingUtilities.updateComponentTreeUI(regions);
-            regions.refreshTheme();
+            SwingUtilities.updateComponentTreeUI(area);
+            area.refreshTheme();
             Color dark = UIManager.getColor("ToolWindow.background");
             assertThat(dark).isEqualTo(new Color(0x191c20));
-            for (var component : List.of(content, inner, later)) assertThat(component.getBackground()).isEqualTo(dark);
+            for (var component : List.<JComponent>of(content, inner, later, area.headerOf(Slot.LEFT_TOP)))
+                assertThat(component.getBackground()).isEqualTo(dark);
             assertThat(fixed.getBackground()).isEqualTo(Color.MAGENTA);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    @Test void roundedHostsClipOpaquePluginContentInEveryRegionAndTheme() throws Exception {
+    @Test void roundedFramesClipOpaquePluginContentInEverySlotAndTheme() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
             for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 ThemeTestSupport.install(theme);
-                for (var region : PanelRegion.values()) {
+                for (var slot : Slot.values()) {
                     var plugin = new JPanel(); plugin.setBackground(Color.MAGENTA);
-                    var regions = new WorkspaceRegions(new JPanel()); regions.show(region, plugin, 240);
-                    regions.setSize(700, 500);
-                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(regions);
-                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(regions);
+                    var area = showing(slot, plugin, 240);
+                    area.setSize(700, 500);
+                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(area);
                     var host = (JComponent) plugin.getParent();
                     var image = new java.awt.image.BufferedImage(host.getWidth(), host.getHeight(), 2);
                     var graphics = image.createGraphics();
@@ -85,34 +93,34 @@ class ToolWindowSurfaceTest {
         var terminal = new JTextArea("\n  ~ / projects / jasper\n\n  $ ");
         terminal.setBackground(theme.palette().background()); terminal.setForeground(theme.palette().foreground());
         terminal.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 14));
-        var regions = new WorkspaceRegions(terminal);
+        var area = new ToolWindowArea(terminal, new DockState());
+        area.setStripesVisible(true);
         var plugin = new JPanel(new BorderLayout(0, 8));
-        plugin.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        var heading = new JPanel(new BorderLayout(0, 10));
-        var title = new JLabel("Sessions"); title.setFont(title.getFont().deriveFont(java.awt.Font.BOLD, 14));
-        heading.add(title, BorderLayout.NORTH);
+        plugin.setBorder(BorderFactory.createEmptyBorder(0, 12, 12, 12));
+        // The header carries the title now, so the panel starts with its search field.
         var search = new JTextField(); search.putClientProperty("JTextField.placeholderText", "Search hosts…");
-        heading.add(search, BorderLayout.SOUTH); plugin.add(heading, BorderLayout.NORTH);
+        plugin.add(search, BorderLayout.NORTH);
         var list = new JList<>(new String[]{"Local terminal", "staging-01", "production"}); list.setSelectedIndex(1);
         list.setFixedCellHeight(30); var scroll = new JScrollPane(list); scroll.setBorder(BorderFactory.createEmptyBorder());
-        plugin.add(scroll); regions.show(PanelRegion.LEFT, plugin, 270);
+        plugin.add(scroll); DockTestSupport.show(area, Slot.LEFT_TOP, plugin, 270);
         var bottom = new JPanel(new BorderLayout()); bottom.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        bottom.add(new JLabel("Transfers"), BorderLayout.NORTH); bottom.add(new JLabel("No active transfers", SwingConstants.CENTER));
-        regions.show(PanelRegion.BOTTOM, bottom, 140);
-        var rail = new WindowRail(); rail.setRailWidth(36);
-        rail.render(List.of(new WindowRail.PanelButton("sessions", "Sessions", dev.jasper.app.platform.AppIcons.named("SERVER"), PanelRegion.LEFT, true),
-            new WindowRail.PanelButton("vault", "Vault", dev.jasper.app.platform.AppIcons.named("LOCK"), PanelRegion.LEFT, false)), List.of());
-        rail.refreshTheme();
-        assertThat(rail.buttons().getFirst().getSelectedIcon()).as("rail retains the original theme-aware icon").isNull();
-        var root = new JPanel(new BorderLayout()); root.add(rail, BorderLayout.WEST); root.add(regions);
+        bottom.add(new JLabel("No active transfers", SwingConstants.CENTER));
+        DockTestSupport.show(area, Slot.BOTTOM_LEFT, bottom, 140);
+        var stripe = new ToolStripe(Side.LEFT); stripe.setRailWidth(36);
+        stripe.render(List.of(new ToolStripe.Button("sessions", "Sessions", dev.jasper.app.platform.AppIcons.named("SERVER"), Slot.LEFT_TOP, true),
+            new ToolStripe.Button("vault", "Vault", dev.jasper.app.platform.AppIcons.named("LOCK"), Slot.LEFT_TOP, false),
+            new ToolStripe.Button("transfers", "Transfers", dev.jasper.app.platform.AppIcons.named("FOLDER"), Slot.BOTTOM_LEFT, true)), List.of());
+        stripe.refreshTheme();
+        var right = new ToolStripe(Side.RIGHT); right.setRailWidth(36); right.refreshTheme();
+        assertThat(stripe.buttons().getFirst().getSelectedIcon()).as("the stripe retains the original theme-aware icon").isNull();
+        var root = new JPanel(new BorderLayout()); root.add(stripe, BorderLayout.WEST); root.add(area); root.add(right, BorderLayout.EAST);
         root.setSize(820, 480);
         dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root);
-        dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root);
-        var selectedButton = rail.buttons().getFirst();
+        var selectedButton = stripe.buttons().getFirst();
         var buttonImage = new java.awt.image.BufferedImage(selectedButton.getWidth(), selectedButton.getHeight(), 2);
         var bg = buttonImage.createGraphics(); selectedButton.paint(bg); bg.dispose();
         assertThat(new Color(buttonImage.getRGB(4, selectedButton.getHeight() / 2)))
-            .as("rail uses the active theme's neutral toolbar selection")
+            .as("the stripe uses the active theme's neutral toolbar selection")
             .isEqualTo(UIManager.getColor("ToggleButton.toolbar.selectedBackground"));
         var image = new java.awt.image.BufferedImage(1640, 960, 2); var g = image.createGraphics();
         try { g.scale(2, 2); root.printAll(g); } finally { g.dispose(); }
@@ -130,7 +138,7 @@ class ToolWindowSurfaceTest {
             var combo = new JComboBox<>(new String[]{"Password", "Key"});
             var content = new JPanel();
             content.add(new JScrollPane(list)); content.add(new JScrollPane(table)); content.add(new JScrollPane(tree)); content.add(combo);
-            new WorkspaceRegions(new JPanel()).show(PanelRegion.LEFT, content, 250);
+            showing(Slot.LEFT_TOP, content, 250);
             assertThat(content.getBackground()).isEqualTo(UIManager.getColor("ToolWindow.background"));
 
             // A renderer painted with the owner's selection colour, as the Remote plugin's host rows are.

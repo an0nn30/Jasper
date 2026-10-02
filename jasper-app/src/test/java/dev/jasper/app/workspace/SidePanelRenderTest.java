@@ -2,7 +2,8 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.BorderLayout;
@@ -19,8 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Screenshot parity for a side panel: a headless render of a panel shaped like the SSH hosts panel
- * (search field, buttons, a list with a selected row) shows the theme's own colours.
+ * Screenshot parity for a side panel: a headless render of a tool window shaped like the Sessions panel
+ * (header, search field, buttons, a list with a selected row) shows the theme's own colours.
  */
 @ExtendWith(EdtTestExtension.class)
 class SidePanelRenderTest {
@@ -62,43 +63,45 @@ class SidePanelRenderTest {
         try {
             ThemeTestSupport.install(Theme.INTELLIJ_LIGHT);
             var panel = new HostsLike();
-            var regions = new WorkspaceRegions(new JPanel());
-            regions.show(PanelRegion.LEFT, panel.root, 280);
-            assertThemeColours(regions, panel, Theme.INTELLIJ_LIGHT);
+            var area = new ToolWindowArea(new JPanel(), new DockState());
+            DockTestSupport.show(area, Slot.LEFT_TOP, panel.root, 280);
+            assertThemeColours(area, panel, Theme.INTELLIJ_LIGHT);
 
             ThemeTestSupport.install(Theme.DARK);
-            SwingUtilities.updateComponentTreeUI(regions);
-            regions.refreshTheme();
-            assertThemeColours(regions, panel, Theme.DARK);
+            SwingUtilities.updateComponentTreeUI(area);
+            area.refreshTheme();
+            assertThemeColours(area, panel, Theme.DARK);
         } finally { UIManager.setLookAndFeel(original); }
     }
 
-    private static void assertThemeColours(WorkspaceRegions regions, HostsLike panel, Theme theme) {
-        regions.setSize(900, 400);
-        // Twice: a split learns its size in the first pass.
-        LayoutTestSupport.layoutTree(regions);
-        LayoutTestSupport.layoutTree(regions);
-        var image = new BufferedImage(regions.getWidth(), regions.getHeight(), BufferedImage.TYPE_INT_ARGB);
+    private static void assertThemeColours(ToolWindowArea area, HostsLike panel, Theme theme) {
+        area.setSize(900, 400);
+        LayoutTestSupport.layoutTree(area);
+        var image = new BufferedImage(area.getWidth(), area.getHeight(), BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();
-        try { regions.paint(graphics); } finally { graphics.dispose(); }
+        try { area.paint(graphics); } finally { graphics.dispose(); }
         String name = theme.name() + " ";
         int gutter = com.formdev.flatlaf.util.UIScale.scale(6);
+        var header = area.headerOf(Slot.LEFT_TOP);
         assertThat(panel.root.getX()).as(name + "retains its gutter after theme changes").isEqualTo(gutter);
-        assertThat(panel.root.getY()).isEqualTo(gutter);
+        assertThat(header.getY()).isEqualTo(gutter);
+        assertThat(panel.root.getY()).as(name + "content sits under the header").isEqualTo(gutter + header.getHeight());
+        assertThat(pixel(image, area, header, header.getWidth() / 2, header.getHeight() / 2)).as(name + "header has no bar colour")
+            .isEqualTo(UIManager.getColor("ToolWindow.background"));
 
-        assertThat(pixel(image, regions, panel.header, 12, 2)).as(name + "panel").isEqualTo(UIManager.getColor("ToolWindow.background"));
+        assertThat(pixel(image, area, panel.header, 12, 2)).as(name + "panel").isEqualTo(UIManager.getColor("ToolWindow.background"));
         var field = panel.search;
-        assertThat(pixel(image, regions, field, field.getWidth() - 10, field.getHeight() / 2)).as(name + "search field")
+        assertThat(pixel(image, area, field, field.getWidth() - 10, field.getHeight() / 2)).as(name + "search field")
             .isEqualTo(UIManager.getColor("TextField.background"));
         for (var button : new JButton[]{panel.connect, panel.add})
-            assertThat(pixel(image, regions, button, button.getWidth() / 2, 4)).as(name + button.getText())
+            assertThat(pixel(image, area, button, button.getWidth() / 2, 4)).as(name + button.getText())
                 .isEqualTo(UIManager.getColor("Button.background"));
-        assertThat(pixel(image, regions, panel.list, row(panel.list, 1))).as(name + "selected row")
+        assertThat(pixel(image, area, panel.list, row(panel.list, 1))).as(name + "selected row")
             .isEqualTo(UIManager.getColor("List.selectionBackground"));
         var selected = panel.list.getCellBounds(1, 1);
-        assertThat(pixel(image, regions, panel.list, selected.width - 5, selected.y))
+        assertThat(pixel(image, area, panel.list, selected.width - 5, selected.y))
             .as(name + "rounded composite renderer corner").isEqualTo(panel.list.getBackground());
-        assertThat(pixel(image, regions, panel.list, row(panel.list, 0))).as(name + "unselected row")
+        assertThat(pixel(image, area, panel.list, row(panel.list, 0))).as(name + "unselected row")
             .isEqualTo(UIManager.getColor("List.background"));
     }
 
