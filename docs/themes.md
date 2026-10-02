@@ -1,7 +1,7 @@
 # Themes
 
 Jasper's themes are Jasper theme files: TOML that colours the app, workspace, terminal palette and editor syntax.
-Jasper ships **284 native themes**, including Jasper Light/Dark, IntelliJ Light/Darcula, Dracula,
+Jasper ships **286 native themes**, including Jasper Light/Dark, Clear Dark/Light (ported from Terminal.app), IntelliJ Light/Darcula, Dracula,
 Catppuccin, Solarized, Nord, Gruvbox, One Dark, Material Lite, Code, Studio and converted Alacritty palettes.
 The complete offline collection, pinned sources, licenses, exclusions and explicit renames are in
 [third-party theme notices](../THIRD-PARTY-THEMES.md). No Marketplace network client remains.

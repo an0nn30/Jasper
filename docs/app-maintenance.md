@@ -189,12 +189,13 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Edit Jasper Light/Dark seed and token TOMLs under `jasper-app/src/main/resources/dev/jasper/app/themes/`;
+Edit the hand-written Jasper Light/Dark and Clear Dark/Light TOMLs under
+`jasper-app/src/main/resources/dev/jasper/app/themes/` (`ConvertThemes` copies these four unchanged);
 change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 256 KiB native cap remains.
 
 `tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
 refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
-assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 284 native files, index, legacy
+assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 286 native files, index, legacy
 aliases and third-party notices entirely offline. Normal build/test never fetches. Do not normalize upstream bytes.
 Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
 colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
