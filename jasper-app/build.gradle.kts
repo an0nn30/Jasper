@@ -16,8 +16,8 @@ dependencies {
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }
 
-// Workspace glass: AWT refuses translucency on a decorated frame, so WindowGlass reaches the peer directly.
-// Workspace glass exists only on macOS, so only a macOS build host opens those JDK internals.
+// Workspace glass (macOS only): AWT refuses translucency on a decorated frame, so WindowGlass reaches the peer
+// directly; only a macOS build host opens those JDK internals.
 val glassJvmArgs = if (System.getProperty("os.name").lowercase().startsWith("mac"))
     listOf("--add-opens=java.desktop/java.awt=ALL-UNNAMED", "--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED")
 else emptyList()

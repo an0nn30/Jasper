@@ -99,7 +99,7 @@ only where something is translucent. Detached tool windows and dialogs are never
 
 ### Platforms
 
-macOS only. On other platforms the two rows are disabled with "Requires macOS"; saved values are kept and ignored.
+macOS only. On other platforms the two rows are hidden and saved values are kept and silently ignored; no glass classes are constructed, no native library is loaded and the launcher opens no JDK internals (user decision, 2026-10-02, superseding "disabled with Requires macOS").
 
 ### Inactive windows
 
