@@ -8,7 +8,7 @@
   Six tasks cover serialized theme polling, safe Duplicate/Remove, searchable staged pickers, local two-zone preview,
   owner-scoped import/file dialogs and final navigation/acceptance. Selection stays staged; confirmed file actions
   happen immediately. Plan 4's stale help text is included in Task 6. Preserve the user's inline execution preference
-  after approval. Task 1 now reloads native changes independently of config, including equal-metadata parent edits and descendant refresh, with unchanged-object reuse. Full check passes **7,939/0/0/6**. The existing bounded startup EDT wait is retained (plan correction); new runtime work remains asynchronous. No GUI or push.
+  after approval. Task 1 now reloads native changes independently of config, including equal-metadata parent edits and descendant refresh, with unchanged-object reuse. Task 2 adds inherited commented copies and frozen removal intents; stale bytes, identities and symlinks are refused. Full check passes **7,950/0/0/6**. The existing bounded startup EDT wait is retained (plan correction); new runtime work remains asynchronous. No GUI or push.
 
 - **Theme system Plan 4 complete, independently reviewed and merged locally** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)

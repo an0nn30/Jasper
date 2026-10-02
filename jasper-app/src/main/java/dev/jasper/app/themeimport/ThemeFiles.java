@@ -39,6 +39,76 @@ public final class ThemeFiles {
         this.home = Objects.requireNonNull(home).toAbsolutePath().normalize(); this.fault = Objects.requireNonNull(fault);
     }
 
+    /** Frozen expected state for removal, revalidated immediately before either destructive operation. */
+    public record Removal(Path path, String sha256, String fileKey) {}
+    /** Creates an inherited copy only while the selected parent and requested name remain current. */
+    public Path duplicate(dev.jasper.app.appearance.Theme original, dev.jasper.app.appearance.GeneratedTheme effective, String name) throws IOException {
+        worker();
+        final byte[] bytes;
+        try { bytes = ThemeDuplicate.text(original, effective, name).getBytes(java.nio.charset.StandardCharsets.UTF_8); }
+        catch (RuntimeException invalid) { throw new IOException(invalid.getMessage(), invalid); }
+        if (bytes.length > ThemeCatalog.MAX_THEME_FILE) throw new IOException("Theme exceeds native file limit");
+        var document = ThemeToml.parse(new String(bytes, java.nio.charset.StandardCharsets.UTF_8), "duplicate");
+        return locked(() -> {
+            Path directory = directory();
+            var catalog = ThemeCatalog.beside(home.resolve("config.toml"));
+            checkDuplicate(catalog.scan(), original, document);
+            Removal parent = original.source() instanceof dev.jasper.app.appearance.Theme.UserFile user ? prepareRemoval(user.file()) : null;
+            Path target = unoccupied(directory, fileId(document.name()));
+            publishIn(directory, target, bytes, null, fault, this::directory, () -> {
+                if (parent != null) validateRemoval(parent);
+                checkDuplicate(catalog.scan(), original, document);
+                return null;
+            });
+            return target;
+        });
+    }
+
+    private static void checkDuplicate(ThemeCatalog.Snapshot catalog, dev.jasper.app.appearance.Theme original, ThemeDocument copy) throws IOException {
+        if (catalog.find(copy.name()).isPresent()) throw new IOException("A theme named " + copy.name() + " already exists");
+        var current = catalog.find(original.name());
+        if (current.isEmpty() || !current.get().source().equals(original.source())) throw new IOException("Original theme changed; select it again before duplicating");
+        try {
+            ThemeResolver.resolve(copy, name -> catalog.themes().stream().filter(theme -> theme.name().strip().equalsIgnoreCase(name.strip()))
+                .map(theme -> theme.source().document()).toList());
+        } catch (RuntimeException invalid) { throw new IOException("Cannot resolve duplicated theme", invalid); }
+    }
+
+    /** Captures a canonical user file's bytes and identity before a removal confirmation. */
+    public Removal prepareRemoval(Path requested) throws IOException {
+        worker();
+        return locked(() -> {
+            Path checked = target(requested); String key = identity(checked).toString(); String hash = hash(checked);
+            if (!key.equals(identity(target(checked)).toString())) throw new IOException("Theme changed while preparing removal");
+            return new Removal(checked, hash, key);
+        });
+    }
+
+    /** Tries the supplied platform trash operation; false never authorizes permanent deletion. */
+    public boolean trash(Removal intent, java.util.function.Predicate<Path> moveToTrash) throws IOException {
+        worker(); Objects.requireNonNull(moveToTrash);
+        return locked(() -> {
+            Path checked = validateRemoval(intent);
+            try { return moveToTrash.test(checked) && !Files.exists(checked, LinkOption.NOFOLLOW_LINKS); }
+            catch (RuntimeException failure) { throw new IOException("Could not move theme to trash: " + failure.getMessage(), failure); }
+        });
+    }
+
+    /** Permanently removes the same confirmed file; callers must obtain explicit deletion confirmation. */
+    public void delete(Removal intent) throws IOException {
+        worker();
+        locked(() -> { Files.delete(validateRemoval(intent)); return null; });
+    }
+
+    private Path validateRemoval(Removal intent) throws IOException {
+        Objects.requireNonNull(intent, "intent");
+        Path checked = target(intent.path());
+        if (!checked.equals(intent.path()) || !identity(checked).toString().equals(intent.fileKey())) throw new IOException("Theme file identity changed; review removal again");
+        requireHash(checked, intent.sha256());
+        if (!identity(target(checked)).toString().equals(intent.fileKey())) throw new IOException("Theme changed before removal");
+        return checked;
+    }
+
     /** Creates a new direct-child native file with a safe, unoccupied ASCII filename. */
     public Path create(ThemeDocument document) throws IOException {
         worker();
@@ -207,6 +277,11 @@ public final class ThemeFiles {
 
     private static void publishIn(Path directory, Path target, byte[] bytes, Callable<Void> replacementCheck,
                                   BiConsumer<String, Path> fault, Callable<Path> guard) throws IOException {
+        publishIn(directory, target, bytes, replacementCheck, fault, guard, null);
+    }
+
+    private static void publishIn(Path directory, Path target, byte[] bytes, Callable<Void> replacementCheck,
+                                  BiConsumer<String, Path> fault, Callable<Path> guard, Callable<Void> creationCheck) throws IOException {
         Object directoryKey = identity(directory);
         var handle = Files.newDirectoryStream(directory);
         Path temporary = null; Object temporaryKey = null;
@@ -224,6 +299,7 @@ public final class ThemeFiles {
                 throw new IOException("Themes directory changed during publication");
             if (!Files.isRegularFile(temporary, LinkOption.NOFOLLOW_LINKS) || !Objects.equals(temporaryKey, identity(temporary)))
                 throw new IOException("Theme temporary changed during publication");
+            if (creationCheck != null) call(creationCheck);
             if (replacementCheck == null) {
                 // Hard-link is an atomic no-replace primitive; unsupported filesystems fail without a fallback move.
                 Files.createLink(target, temporary);

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), especially §§2.3, 6.3, 7–9. Read it together with this plan, [Plan 4](2026-10-01-theme-system-4-conversion-migration.md), and [STATUS](../../STATUS.md).
 
-**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Tasks 2–6 remain.
+**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Tasks 3–6 remain.
 
 **Execution ruling:** Task 1 preserves the pre-existing bounded startup scan wait on EDT; the original plan incorrectly described its caller as off EDT. No new runtime EDT waits are introduced. Cost: existing initial scan latency remains; a bootstrap handoff change is separate work.
 
@@ -157,7 +157,7 @@ git commit -m "feat(themes): reload native changes without config edits" -m "Co-
 - Produces on ThemeFiles: `public Path duplicate(Theme original, GeneratedTheme effective, String name) throws IOException`; `public Removal prepareRemoval(Path target) throws IOException`; `public boolean trash(Removal intent, Predicate<Path> moveToTrash) throws IOException`; `public void delete(Removal intent) throws IOException`.
 - Produces: `public record ThemeFiles.Removal(Path path, String sha256, String fileKey)`. This is an expected-state value, never authority by itself: each operation validates canonical direct-child `.toml`, regular/no symlink, matching hash and stable identity under the shared lock.
 
-- [ ] **Step 1: Write failing tests.** Generate effective values on EDT using ThemeManager.generated, then perform file calls on the test worker. For every Seed and Token require exactly one commented assignment; include all 16 ANSI entries as commented normal/bright tables. Verify active values contain only name and extends, inheritance resolves to the original and Unicode/quotes/newlines in names round-trip. Core assertions:
+- [x] **Step 1: Write failing tests.** Generate effective values on EDT using ThemeManager.generated, then perform file calls on the test worker. For every Seed and Token require exactly one commented assignment; include all 16 ANSI entries as commented normal/bright tables. Verify active values contain only name and extends, inheritance resolves to the original and Unicode/quotes/newlines in names round-trip. Core assertions:
 
 ```java
 String text = ThemeDuplicate.text(Theme.DARK, effectiveDark, "My \"Night\" Theme");
@@ -174,7 +174,7 @@ assertThat(ThemeResolver.resolve(copy, name -> List.of(Theme.DARK.source().docum
 
 Add tests `duplicateRejectsTakenDisplayNameAndChangedParent`, `duplicateNeverOverwritesOccupiedFilename`, `removalRejectsBundledOutsideAndSymlinkTargets`, `removalRechecksHashAndFileIdentity`, `failedTrashDoesNotDelete`, `explicitDeleteUsesSameFrozenIntent`. A fake trash predicate records its argument and moves to a temp trash directory; never invoke the real desktop. After preparing intent, swap in equal bytes under a different inode and assert refusal as well as the ordinary changed-byte case. Assert EDT calls fail consistently with existing ThemeFiles methods.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ThemeDuplicateTest' --tests '*ThemeRemovalTest' --tests '*ThemeFilesTest'
@@ -182,14 +182,14 @@ Add tests `duplicateRejectsTakenDisplayNameAndChangedParent`, `duplicateNeverOve
 
 Expected: new APIs missing; existing create cannot publish an unresolved inherited template.
 
-- [ ] **Step 3: Implement safe file operations.** ThemeDuplicate emits a header from ThemeTomlWriter (use its escaping via a minimal ThemeDocument), followed by commented `[colors]`, `[colors.normal]`, `[colors.bright]` and `[tokens]` sections. Comment every table header as well as its assignments. Seeds use effective terminal background/foreground/cursor/selection and effective ACCENT; token comments use effective.tokens, ANSI comments use effective.terminal. No syntax/UI/icon flattening: the active extends preserves these. Do not activate commented defaults.
+- [x] **Step 3: Implement safe file operations.** ThemeDuplicate emits a header from ThemeTomlWriter (use its escaping via a minimal ThemeDocument), followed by commented `[colors]`, `[colors.normal]`, `[colors.bright]` and `[tokens]` sections. Comment every table header as well as its assignments. Seeds use effective terminal background/foreground/cursor/selection and effective ACCENT; token comments use effective.tokens, ANSI comments use effective.terminal. No syntax/UI/icon flattening: the active extends preserves these. Do not activate commented defaults.
 
 `duplicate` locks, rescans, refuses any display-name collision (including bundled), verifies the original still resolves to the supplied source/document, parses the candidate text, resolves it against current catalog documents, enforces the unchanged size cap, then uses the existing no-clobber publisher and safe filename allocation. This dedicated path allows validated inheritance without weakening `create`/`replace`'s standalone import contract. Check source identity/document consistency again immediately before publication; a removed/changed parent requires retry.
 
 `prepareRemoval` returns a frozen fingerprint/identity. `trash` validates it immediately before invoking the supplied desktop function under the lock; returns false if unsupported/unsuccessful and verifies the source is gone before reporting success. It never calls delete. `delete` is only the explicit-confirmation path and rechecks the same intent before removal. Keep the documented Java filesystem compare/delete race limitation; reject every observed symlink/path swap and never follow links. No config writes or automatic name substitution.
 
-- [ ] **Step 4: Run GREEN.** Repeat Step 2 and existing `*ThemeImporterTest`, `*ThemeMigrationTest`; all pass with original import/migration semantics intact.
-- [ ] **Step 5: Commit.**
+- [x] **Step 4: Run GREEN.** Repeat Step 2 and existing `*ThemeImporterTest`, `*ThemeMigrationTest`; all pass with original import/migration semantics intact.
+- [x] **Step 5: Commit.**
 
 ```bash
 git add jasper-app/src
