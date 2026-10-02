@@ -171,15 +171,20 @@ failure leaves an opaque window.
   `Component.background` and calls `WindowPeer.setOpaque(false)`. The launcher passes
   `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED`;
   `packaging.gradle` refuses a `Jasper.cfg` without them. After a JBR upgrade, check that a Clear theme is still
-  translucent; if the internals changed, `WindowGlass` logs one warning and windows stay opaque.
+  translucent; if the internals changed, `WindowGlass` logs one warning and windows stay opaque. A notified opaque
+  window background (FlatLaf sets the frame's a turn after a UI-theme switch, and AWT then makes the peer opaque) is
+  watched through `WindowGlass.Platform.watch`: `WindowGlass` reports opaque at once and re-applies on the next turn,
+  and `MacGlass` restores that newer background later.
 - **Blur** is `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by `gradle/mac-glass.gradle`).
-  It finds the `NSWindow` through JAWT's layer and calls the private `CGSSetWindowBackgroundBlurRadius` on the main
-  thread, never waiting for it. `./gradlew :jasper-app:run` passes `-Djasper.glassLibrary`; a packaged app loads it
-  from `Contents/app/`. Tune the radius with `WindowGlass.MAX_BLUR_RADIUS` (0-1 maps linearly onto 0-40).
-- **Painting**: the window peer is the only non-opaque ancestor. `WorkspaceRegions`' center host clears its rounded
-  surface; `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
-  `TerminalView` fill the default background with alpha using the `Src` composite. Anything new inside the terminal
-  surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
+  It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it, and calls the private
+  `CGSSetWindowBackgroundBlurRadius` on the main thread, never waiting for it. `./gradlew :jasper-app:run` passes
+  `-Djasper.glassLibrary`; a packaged app loads it from `Contents/app/`. Tune the radius with
+  `WindowGlass.MAX_BLUR_RADIUS` (0-1 maps linearly onto 0-40).
+- **Painting**: the window peer is the only non-opaque ancestor. `WorkspaceRegions`' center host fills its rounded
+  surface with the terminal background at the opacity in effect (`Src`), so a strip no pane covers is glass too;
+  `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
+  `TerminalView` fill the default background with alpha using the `Src` composite, replacing the host's fill. Anything
+  new inside the terminal surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
 
 ```sh
 ./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest" --tests "*ClearThemesTest"

@@ -13,12 +13,16 @@
   hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no `TerminalOptions` field), and it takes
   a `float`; `WindowGlass` follows the root pane. Rulings made during execution: `ClearThemesTest` runs under
   `EdtTestExtension`; the Workspace section keeps its own "Choose workspace theme…" button (Terminal › Font & Colors
-  has one too). `./gradlew check --continue`: BUILD SUCCESSFUL; 8,015 tests, 0 failures, 0 errors, 6 skipped across
-  all modules (jasper-app 1,792, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins
-  5,538).
+  has one too). The final review's fix wave makes a window translucent again after a UI-theme switch's deferred
+  opaque frame background (restoring the newer background later), fills the whole terminal surface with one glass
+  fill instead of clearing it (the lower-arc strip was a hole), and finds the blurred `NSWindow` through any layer
+  ancestor.
+  `./gradlew check --continue`: BUILD SUCCESSFUL; 8,023 tests, 0 failures, 0 errors, 6 skipped across all modules
+  (jasper-app 1,800, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins 5,538).
   Not done: plan 2 (editor glass, SDK 0.12.1); GUI checks (user-run): Clear Dark beside Terminal.app's, the blur
   radius at 0.5, live opacity/blur changes, splits, hidden-rail mode, native fullscreen, switching back to an
-  opaque theme, a packaged build loading `Contents/app/libjasper-glass.dylib`, and Settings rows disabled off macOS.
+  opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a packaged build loading
+  `Contents/app/libjasper-glass.dylib`, and Settings rows disabled off macOS.
 - **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
   user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
   failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
