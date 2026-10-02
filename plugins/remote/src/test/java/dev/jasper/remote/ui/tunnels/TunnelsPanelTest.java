@@ -212,4 +212,17 @@ class TunnelsPanelTest {
         var row = (JComponent) panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(1), 1, false, false);
         assertThat(row.getToolTipText()).isEqualTo("db, localhost:5432 → db.internal:5432, via prod · 0 conns · ↓0 B ↑0 B · 0 s");
     }
+
+    @Test void theToolWindowHeaderCarriesTheTitle() {
+        assertThat(texts(panel)).as("Jasper's header shows Tunnels").doesNotContain("Tunnels");
+    }
+
+    private static List<String> texts(java.awt.Container root) {
+        List<String> found = new ArrayList<>();
+        for (java.awt.Component child : root.getComponents()) {
+            if (child instanceof javax.swing.JLabel label) found.add(label.getText());
+            if (child instanceof java.awt.Container nested) found.addAll(texts(nested));
+        }
+        return found;
+    }
 }

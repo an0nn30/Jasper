@@ -48,7 +48,7 @@ public final class SftpUi implements AutoCloseable {
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
         this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
-        context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT).withToggleActionId(TOGGLE),this::create);
+        context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
     }
     private JComponent create(PanelHost host) {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();

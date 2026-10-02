@@ -90,11 +90,9 @@ public final class FileServersPanel extends JPanel {
         super(new BorderLayout(0, 6));
         this.actions = actions; this.log = log; this.home = home; this.firewall = firewallHint; this.zone = zone;
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        var title = label("File Servers");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
+        // The tool window header carries the title.
         var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        header.add(title);
         header.add(Box.createHorizontalGlue());
         add.setToolTipText("New file server");
         header.add(add);
