@@ -28,7 +28,8 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
-The tree on the left groups them as Appearance & Behavior (Appearance, Themes, Window, Notifications, Command Palette,
+It blocks only the window it was opened from, and stays in front of every Jasper window while Jasper is the active
+application; other windows remain usable. The tree on the left groups them as Appearance & Behavior (Appearance, Themes, Window, Notifications, Command Palette,
 Desk Buddy, System Settings), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
 the search field filters the tree and highlights matching settings on the page.
 Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
