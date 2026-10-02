@@ -1,8 +1,8 @@
 # Jasper notifications
 
-**Status:** Design approved in chat by the user on 2026-10-02, section by section. Written spec awaiting user
-review; no plan written yet. Branch `claude/notifications` (worktree `.worktrees/notifications`), cut from main
-`e91512f6`.
+**Status:** Design approved in chat by the user on 2026-10-02, section by section; the written spec was approved the
+same day. [Plan 1 (core)](../plans/2026-10-02-notifications-1-core.md) is written and awaiting review. Branch
+`claude/notifications` (worktree `.worktrees/notifications`), cut from main `e91512f6`.
 
 **Replaces, once implemented:** the modal `JOptionPane` defaults of `WindowContent.onError` / `onInfo`, the SDK's
 `Notices` (`PluginContext.notices()`), `CommandNotifier`'s private OS sink, and Buddy's finished-card history
