@@ -302,8 +302,9 @@ public final class JasperApplication {
             launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
         if (configuration != null) configuration.register(window.content());
         window.content().connectContributions(contributions, uiState);
-        window.content().onError = notificationViews::error;
-        window.content().onInfo = notificationViews::info;
+        UUID windowId = window.content().id();
+        window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
+        window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
         notificationViews.attach(window.content());
         window.content().connectTerminals(terminals, window::toFront);
         window.content().onToggleBuddy = this::toggleBuddy;

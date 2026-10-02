@@ -90,10 +90,15 @@ final class NotificationsFeature implements AutoCloseable {
         center.focusReturned();
     }
 
-    /** A window or application error: a title and details, which may be missing. */
-    void error(String title, String details) { post(Severity.ERROR, title, details); }
+    /** An application error: a title and details, which may be missing; its card shows in the window used last. */
+    void error(String title, String details) { post(Severity.ERROR, title, details, null); }
 
-    void info(String title, String details) { post(Severity.INFO, title, details); }
+    void info(String title, String details) { post(Severity.INFO, title, details, null); }
+
+    /** A window's own error: its card shows in that window, or in the window used last once it is gone. */
+    void error(String title, String details, UUID window) { post(Severity.ERROR, title, details, window); }
+
+    void info(String title, String details, UUID window) { post(Severity.INFO, title, details, window); }
 
     CardLayer layer(UUID windowId) {
         Attached attached = windows.get(windowId);
@@ -108,8 +113,9 @@ final class NotificationsFeature implements AutoCloseable {
         windows.clear();
     }
 
-    private void post(Severity severity, String title, String details) {
-        center.submit(NotificationRequest.of(GENERAL.id(), severity, title).withContent(details == null ? "" : details));
+    private void post(Severity severity, String title, String details, UUID window) {
+        var request = NotificationRequest.of(GENERAL.id(), severity, title).withContent(details == null ? "" : details);
+        center.submit(window == null ? request : request.withTarget(window));
     }
 
     private boolean focused(UUID windowId) {

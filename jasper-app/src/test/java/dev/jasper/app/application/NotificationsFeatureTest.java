@@ -80,6 +80,21 @@ class NotificationsFeatureTest {
         assertThat(feature.layer(first.id()).showing()).hasSize(1);
     }
 
+    @Test void aWindowsOwnMessagesShowInThatWindowEvenWhenAnotherWasUsedLast() {
+        var feature = new NotificationsFeature(center, contributions);
+        var first = window();
+        var second = window();
+        feature.attach(first);
+        feature.attach(second);
+        feature.activated(second);
+        feature.error("From first", "", first.id());
+        assertThat(feature.layer(first.id()).showing()).hasSize(1);
+        assertThat(feature.layer(second.id()).showing()).isEmpty();
+        feature.info("Also from first", "", first.id());
+        assertThat(feature.layer(first.id()).showing()).hasSize(2);
+        assertThat(feature.layer(second.id()).showing()).isEmpty();
+    }
+
     @Test void aClosedWindowsCardsGoAndLaterOnesFindAnotherWindow() {
         var feature = new NotificationsFeature(center, contributions);
         var first = window();
