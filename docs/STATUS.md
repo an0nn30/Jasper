@@ -1,6 +1,13 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-01
+## Current state — 2026-10-02
+
+- **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
+  chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
+  and hid its detail. They are gone, so the hint bar always shows the selected row's detail and verbs. Typed prefixes,
+  scope shortcuts and the query-field chip are unchanged. `WindowContent.scopeShortcut` became `paletteShortcut`,
+  because the title search field is its only remaining caller. Merged into local main 2026-10-02; not pushed.
+  Not done: GUI check, push.
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
@@ -491,6 +498,7 @@ s
   most 50. SDK 0.9.2 adds `ScopeSpec.withInRecents`; History opts out (`sdk = ">=0.9.2, <0.10"`) and scopes out of
   All are out too. Each hint pill shows the key that selects its scope (`>` for Commands, else the scope's own
   shortcut). Merged into local main 2026-09-29; not pushed. Not done: GUI check of the pills and lists, push.
+  The pills were removed on 2026-10-02 (see above).
 - **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
   `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
   - **Centring:** the search field is always centred on the window, and the sides give way first.

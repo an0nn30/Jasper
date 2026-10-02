@@ -59,7 +59,7 @@ final class WindowChrome {
         toolbar.setBorder(BorderFactory.createEmptyBorder());
         search = new TitleSearchField(() -> owner.action(ActionId.COMMAND_PALETTE).actionPerformed(
             new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
-            () -> owner.scopeShortcut(dev.jasper.app.palette.PaletteScope.ALL_ID));
+            owner::paletteShortcut);
         header = new WindowHeader(search, toolbar);
         header.setOpaque(true);
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.

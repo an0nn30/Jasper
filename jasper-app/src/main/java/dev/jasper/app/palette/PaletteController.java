@@ -7,7 +7,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import javax.swing.SwingUtilities;
 
 /**
@@ -25,7 +24,6 @@ public final class PaletteController implements AutoCloseable {
     private final boolean macOs;
     private final CommandPalette palette;
     private final Runnable layout, dismissed, updateActions;
-    private final Function<String, String> shortcut;
     private final BooleanSupplier batching;
     private final Consumer<String> reportError, reopen;
     private final Subscription scopesListener;
@@ -42,11 +40,10 @@ public final class PaletteController implements AutoCloseable {
     private long generation;
 
     public PaletteController(ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
-                      Runnable layout, Runnable dismissed,
-                      Function<String, String> shortcut, BooleanSupplier batching, Runnable updateActions,
+                      Runnable layout, Runnable dismissed, BooleanSupplier batching, Runnable updateActions,
                       Consumer<String> reportError, Consumer<String> reopen) {
         this.scopes = scopes; this.history = java.util.Objects.requireNonNull(history); this.macOs = macOs; this.layout = layout; this.dismissed = dismissed;
-        this.shortcut = shortcut; this.batching = batching; this.updateActions = updateActions;
+        this.batching = batching; this.updateActions = updateActions;
         this.reportError = reportError; this.reopen = reopen;
         context = new PaletteContext(macOs, PaletteTarget.none());
         palette = new CommandPalette(macOs, this::queryChanged, this::execute, this::prefix, scope -> selectTab(scope.id()));
@@ -119,7 +116,6 @@ public final class PaletteController implements AutoCloseable {
 
     private void showChip() {
         palette.setChip(active == null ? null : active.label(), active == null ? null : active.icon());
-        palette.setScopeHints(active == null ? modeScopes() : List.of(), shortcut);
         palette.setPlaceholder(active == null ? "Search everything" : active.placeholder());
     }
 
