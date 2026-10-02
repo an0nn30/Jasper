@@ -817,7 +817,7 @@ class NotificationCenterTest {
         assertThat(center.find(id).orElseThrow().expired()).isTrue();
     }
 
-    @Test void activateRunsOnlyADefaultAction() {
+    @Test void activateReadsTheEntryAndRunsItsDefaultActionWhenThereIsOne() {
         var center = center();
         var ran = new ArrayList<String>();
         UUID withDefault = center.post(request(CARDS, "go").withActivate(() -> ran.add("go"))).orElseThrow();
@@ -826,7 +826,7 @@ class NotificationCenterTest {
         center.activate(plain);
         assertThat(ran).containsExactly("go");
         assertThat(center.find(withDefault).orElseThrow().read()).isTrue();
-        assertThat(center.find(plain).orElseThrow().read()).isFalse();
+        assertThat(center.find(plain).orElseThrow().read()).as("clicking the body marks it read").isTrue();
     }
 
     @Test void removeAndClear() {
@@ -1103,13 +1103,13 @@ public final class NotificationCenter {
         if (action.expires()) expire(id);
     }
 
-    /** Runs the entry's default action, when it has one, and marks it read. */
+    /** A click on the body: the entry is read, and its default action runs when it has one (spec section 2). */
     public void activate(UUID id) {
         requireEdt();
         Notification entry = history.get(id);
-        if (entry == null || entry.expired() || entry.request().activate().isEmpty()) return;
+        if (entry == null || entry.expired()) return;
         markRead(id);
-        contained(entry.request().activate().get(), "A notification's default action failed");
+        entry.request().activate().ifPresent(task -> contained(task, "A notification's default action failed"));
     }
 
     /** Jasper is focused again: cards that waited show now, in the order they were posted. */
@@ -1634,7 +1634,7 @@ class NotificationCardTest {
         assertThat(center.find(card.notification().id()).orElseThrow().expired()).isTrue();
     }
 
-    @Test void clickingTheBodyRunsOnlyADefaultAction() {
+    @Test void clickingTheBodyReadsItAndRunsADefaultActionWhenThereIsOne() {
         var ran = new ArrayList<String>();
         var withDefault = new NotificationCard(center, posted(titled("Default").withActivate(() -> ran.add("activated"))), false);
         click(withDefault);
@@ -1642,7 +1642,8 @@ class NotificationCardTest {
         assertThat(center.find(withDefault.notification().id()).orElseThrow().read()).isTrue();
         var plain = new NotificationCard(center, posted(titled("Plain")), false);
         click(plain);
-        assertThat(center.find(plain.notification().id()).orElseThrow().read()).isFalse();
+        assertThat(center.find(plain.notification().id()).orElseThrow().read()).as("spec section 2: clicking the body marks it read").isTrue();
+        assertThat(ran).containsExactly("activated");
     }
 
     @Test void closeShowsOnHoverForAutoHidingCardsAndAlwaysForStickyOnes() {
@@ -4456,7 +4457,7 @@ A notification appears as a card in the bottom-right corner of the window you us
 - up to five lines of details (the full text is in the Notifications panel);
 - links for what you can do next; more than three are under **More ▾**.
 
-Click a card's body to go where it points, when it points somewhere. Close it with `✕`. At most three cards show at
+Clicking a card's body goes where it points, when it points somewhere, and closes the card. Close it with `✕`. At most three cards show at
 once; the newest is at the bottom. Cards never take the keyboard from your terminal, and clicks beside them reach
 the terminal as usual. Nothing animates.
 
