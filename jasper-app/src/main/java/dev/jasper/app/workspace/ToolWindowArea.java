@@ -181,6 +181,8 @@ final class ToolWindowArea extends JPanel {
     private boolean stripesVisible, statusVisible, headerVisible;
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
     Consumer<String> onHide = id -> { };
+    /** Hears of each header a sync creates (and its title label), so that a drag can start from it. */
+    BiConsumer<JComponent, String> dragSource = (component, id) -> { };
 
     ToolWindowArea(JComponent terminalColumn, DockState state) {
         super(null);
@@ -247,7 +249,10 @@ final class ToolWindowArea extends JPanel {
             if (wanted != null && host == null) {
                 host = new Host(true);
                 host.content = wanted.component();
-                host.add(header(id, wanted.title()), BorderLayout.NORTH);
+                ToolWindowHeader header = header(id, wanted.title());
+                host.add(header, BorderLayout.NORTH);
+                dragSource.accept(header, id);
+                dragSource.accept(header.titleLabel(), id);
                 host.add(wanted.component(), BorderLayout.CENTER);
                 ToolWindowSurface.apply(host);
                 hosts.put(slot, host);
@@ -330,5 +335,6 @@ final class ToolWindowArea extends JPanel {
         return new Dimension(width, height);
     }
 
-    private static DockGeometry.Metrics metrics() { return DockGeometry.Metrics.at(UIScale.getUserScaleFactor()); }
+    /** The dock metrics at the current UI scale; the drag's preview uses the same. */
+    static DockGeometry.Metrics metrics() { return DockGeometry.Metrics.at(UIScale.getUserScaleFactor()); }
 }
