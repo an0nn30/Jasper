@@ -4,6 +4,7 @@ import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Slot;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.KeyEventDispatcher;
@@ -32,9 +33,11 @@ import javax.swing.SwingUtilities;
  * mouse events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
  * synthetic events. While it runs, both stripes show all three groups with the dragged button lifted out, the target
  * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}; the real
- * layout does not change. Releasing the left button over a target hands the drop to {@link #onDrop}; releasing it
- * anywhere else, Esc, {@link #cancel} or another press (a right or middle click, or a left press after a lost release)
- * ends the drag without one. A window resize while dragging resolves the target again. EDT only.
+ * layout does not change. A stripe button's old place stays its own target, so releasing it where it was changes
+ * nothing even when lifting it out left that place outside its group. Releasing the left button over a target hands
+ * the drop to {@link #onDrop}; releasing it anywhere else, Esc, {@link #cancel} or another press (a right or middle
+ * click, or a left press after a lost release) ends the drag without one. A window resize while dragging resolves the
+ * target again. EDT only.
  */
 final class DockDrag {
     /** How far, in logical pixels, a press must move before it becomes a drag. */
@@ -58,6 +61,10 @@ final class DockDrag {
     private String dragging;
     private Point last;
     private Optional<DockDropResolver.Target> target = Optional.empty();
+    /** A dragged stripe button's old place in root coordinates, its slot and its index there; null for a header drag. */
+    private Rectangle home;
+    private Slot homeSlot;
+    private int homeIndex;
 
     /**
      * @param root the window content that holds the stripes and the area; drag coordinates are in its space
@@ -136,6 +143,12 @@ final class DockDrag {
 
     private void start() {
         dragging = pressedId;
+        // Where a stripe button was, from the normal layout, before beginDrag lifts it out of it.
+        if (stripes.stream().anyMatch(stripe -> SwingUtilities.isDescendingFrom(source, stripe)) && state.slot(dragging).isPresent()) {
+            home = SwingUtilities.convertRectangle(source.getParent(), source.getBounds(), root);
+            homeSlot = state.slot(dragging).get();
+            homeIndex = state.ids(homeSlot).indexOf(dragging);
+        }
         // The button saw a press; releasing it after a drag must not also toggle the window.
         if (source instanceof AbstractButton button) {
             button.getModel().setArmed(false);
@@ -154,7 +167,9 @@ final class DockDrag {
         for (ToolStripe stripe : stripes)
             if (stripe.isVisible()) for (DockDropResolver.Group group : stripe.dropGroups()) groups.add(inRoot(stripe, group));
         Rectangle workspace = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), root);
-        target = DockDropResolver.resolve(at, groups, workspace);
+        target = home != null && home.contains(at)
+            ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex))
+            : DockDropResolver.resolve(at, groups, workspace);
         for (ToolStripe stripe : stripes)
             stripe.showGap(target.filter(DockDropResolver.Target::onStripe).map(DockDropResolver.Target::slot).orElse(null),
                 target.map(where -> where.index().orElse(0)).orElse(0));
@@ -178,6 +193,8 @@ final class DockDrag {
         pressedId = null;
         source = null;
         target = Optional.empty();
+        home = null;
+        homeSlot = null;
         if (!wasActive) return;
         KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(escape);
         for (ToolStripe stripe : stripes) stripe.endDrag();

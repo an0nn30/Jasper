@@ -146,6 +146,33 @@ class DockDragTest {
         assertThat(w.state.ids(Slot.LEFT_TOP)).as("dropping where it was changes nothing").containsExactly("a", "b", "c");
     }
 
+    @Test void releasingWhereTheLastButtonOfAGroupWasChangesNothing() {
+        var w = new Window();
+        w.state.show("c");
+        w.shown.clear();
+        var source = w.button(w.left, "c");
+        Point home = w.center(source);
+        Rectangle homeBounds = source.getBounds();
+        List<DockDropResolver.Target> dropped = new ArrayList<>();
+        var apply = w.drag.onDrop;
+        w.drag.onDrop = (id, target) -> { dropped.add(target); apply.accept(id, target); };
+        w.dragTo(source, w.cell(1, 1));
+        assertThat(w.drag.target()).as("away from home").hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_BOTTOM));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, home);
+        assertThat(w.left.dropGroups().get(0).bounds().contains(SwingUtilities.convertPoint(w.content, home, w.left)))
+            .as("lifted out, its old place lies below the top group, in the second group's drop space").isFalse();
+        assertThat(w.drag.target()).as("but it is still its own place").hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
+        assertThat(w.left.gapBounds()).as("the gap opens where the button was").hasValue(homeBounds);
+        w.mouse(source, MouseEvent.MOUSE_RELEASED, home);
+        assertThat(w.drag.active()).isFalse();
+        assertThat(dropped).as("the drop is the home target, which moves nothing").containsExactly(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
+        assertThat(w.state.ids(Slot.LEFT_TOP)).containsExactly("a", "b", "c");
+        assertThat(w.state.ids(Slot.LEFT_BOTTOM)).isEmpty();
+        assertThat(w.state.active(Slot.LEFT_TOP)).hasValue("c");
+        assertThat(w.state.visible("c")).isTrue();
+        assertThat(w.shown).isEmpty();
+    }
+
     @Test void aStripeDropMovesTheWindowAndKeepsItsVisibility() {
         var w = new Window();
         w.state.show("a");
