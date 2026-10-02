@@ -44,7 +44,7 @@ final class IntellijConversion {
         resolved.namedColors().forEach((name, value) -> ui.put(PALETTE + name, value));
         resolved.ui().forEach((key, value) -> { ui.remove(key); ui.put(key, value); });
         return new ThemeDocument(origin, resolved.name(), Optional.of(resolved.dark()), Optional.empty(), 0,
-            Optional.of(true), Map.of("author", resolved.author()), seeds, ansi, WorkspaceTokenKeys.explicitTokens(ui), Map.of(), ui, resolved.icons());
+            Optional.of(true), Map.of("author", resolved.author()), seeds, ansi, WorkspaceTokenKeys.explicitTokens(ui, resolved.name(), resolved.author(), resolved.dark()), Map.of(), ui, resolved.icons());
     }
     private static Color independentColor(Object value) {
         if (value instanceof Map<?, ?> map) value = map.get("os.default");

@@ -1,0 +1,33 @@
+"name" = "Horizon Dark"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#1c1e26"
+"foreground" = "#e0e0e0"
+"accent" = "#26bbd9"
+"cursor" = "#e0e0e0"
+"selection" = "#57585e"
+
+[colors.normal]
+"black" = "#16161c"
+"red" = "#e95678"
+"green" = "#29d398"
+"yellow" = "#fab795"
+"blue" = "#26bbd9"
+"magenta" = "#ee64ac"
+"cyan" = "#59e1e3"
+"white" = "#d5d8da"
+
+[colors.bright]
+"black" = "#5b5858"
+"red" = "#ec6a88"
+"green" = "#3fdaa4"
+"yellow" = "#fbc3a7"
+"blue" = "#3fc4de"
+"magenta" = "#f075b5"
+"cyan" = "#6be4e6"
+"white" = "#d5d8da"

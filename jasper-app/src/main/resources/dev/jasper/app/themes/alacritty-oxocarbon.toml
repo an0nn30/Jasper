@@ -1,0 +1,33 @@
+"name" = "Oxocarbon"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#1b1b1b"
+"foreground" = "#ffffff"
+"accent" = "#33b1ff"
+"cursor" = "#78a9ff"
+"selection" = "#5f5f5f"
+
+[colors.normal]
+"black" = "#161616"
+"red" = "#ee5396"
+"green" = "#42be65"
+"yellow" = "#ff7eb6"
+"blue" = "#33b1ff"
+"magenta" = "#be95ff"
+"cyan" = "#3ddbd9"
+"white" = "#ffffff"
+
+[colors.bright]
+"black" = "#525252"
+"red" = "#ee5396"
+"green" = "#42be65"
+"yellow" = "#ff7eb6"
+"blue" = "#33b1ff"
+"magenta" = "#be95ff"
+"cyan" = "#3ddbd9"
+"white" = "#ffffff"

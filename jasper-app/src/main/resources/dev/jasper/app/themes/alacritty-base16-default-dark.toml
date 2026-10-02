@@ -1,0 +1,33 @@
+"name" = "Base16 Default Dark"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#181818"
+"foreground" = "#d8d8d8"
+"accent" = "#7cafc2"
+"cursor" = "#d8d8d8"
+"selection" = "#525252"
+
+[colors.normal]
+"black" = "#181818"
+"red" = "#ab4642"
+"green" = "#a1b56c"
+"yellow" = "#f7ca88"
+"blue" = "#7cafc2"
+"magenta" = "#ba8baf"
+"cyan" = "#86c1b9"
+"white" = "#d8d8d8"
+
+[colors.bright]
+"black" = "#585858"
+"red" = "#ab4642"
+"green" = "#a1b56c"
+"yellow" = "#f7ca88"
+"blue" = "#7cafc2"
+"magenta" = "#ba8baf"
+"cyan" = "#86c1b9"
+"white" = "#f8f8f8"

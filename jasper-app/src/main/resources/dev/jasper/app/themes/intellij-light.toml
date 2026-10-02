@@ -2,6 +2,9 @@
 "dark" = false
 "ui_complete" = true
 "author" = "JetBrains"
+"license" = "Apache-2.0"
+"source" = "https://github.com/JetBrains/intellij-community"
+"commit" = "f7377708b654b73b206da40bb382ecb4d44e8f12"
 
 [colors]
 "background" = "#ffffff"
@@ -49,6 +52,7 @@
 "tab_bar" = "#f2f2f2"
 "input_background" = "#ffffff"
 "button_background" = "#ffffff"
+"button_border" = "#c4c4c4"
 "button_text" = "#000000"
 "button_default" = "#528cc7"
 "scrollbar_thumb" = "#73737333"

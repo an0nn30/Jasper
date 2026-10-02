@@ -18,7 +18,13 @@
   Full `./gradlew check`: **7,918 tests, zero failures/errors, six skips**. Decisions: preserve unknown-parent fallback
   warnings; infer only equivalent UI keys and omit tokens that would invent Jasper aliases or freeze per-OS values.
   Raw forward-template inversion changed five effective colors; original UI/private materialization preserves them.
-  No GUI, merge or push. Next: Task 3 pinned offline catalog. Plan 5 adds the Themes page, preview/file actions and live reload.
+  Task 3 is complete (`./gradlew --offline check`: **7,926 tests, zero failures/errors, six skips**): 12 sources/413 hashed inputs, 284 native themes, explicit
+  variant/license/rename accounting, verified Catppuccin 3.6.1 release/source pin, deterministic offline generator.
+  Largest theme 97,426 bytes; 256 KiB cap unchanged. Full catalog parses and installed/workspace color parity passes.
+  Decisions: recorded One Dark Modern scheme packaging alias; preserved Darcula named-scheme association;
+  Frappe → Frappé alias; excluded extra Islands variants; real FlatLaf gradient/alias precedence and post-JSON
+  adjustments supersede raw inverse-token guesses. Exact accounting is in sources.json/SOURCE.md/THIRD-PARTY-THEMES.md.
+  No GUI, merge or push. Next: Task 4 safe import publication. Plan 5 adds the Themes page, preview/file actions and live reload.
 
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)

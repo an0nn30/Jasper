@@ -90,24 +90,66 @@ public final class WorkspaceTokenKeys {
                 case LINK -> keys.add("Link.activeForeground");
                 default -> { }
             }
-            var candidates = new java.util.ArrayList<>(keys);
-            // A wildcard matching an absent canonical key must not outrank an authored alternate key.
-            candidates.sort(java.util.Comparator.comparing(key -> !resolvedUi.containsKey(key)));
-            for (String key : candidates) {
-                Object supplied = null;
-                for (var entry : resolvedUi.entrySet()) {
-                    String source = entry.getKey();
-                    if (source.equals(key) || (source.startsWith("*.") && !key.startsWith("@")
-                            && !key.endsWith(".hoverBackground") && !key.endsWith(".pressedBackground")
-                            && key.endsWith(source.substring(1))))
-                        supplied = entry.getValue();
-                }
-                // Even an os.default value cannot be frozen as a token: explicit tokens outrank effective workspace defaults.
-                if (supplied instanceof Map<?, ?>) break;
+            String start = switch (token) {
+                case BUTTON_BACKGROUND -> "Button.startBackground";
+                case BUTTON_DEFAULT -> "Button.default.startBackground";
+                case BUTTON_BORDER -> "Button.startBorderColor";
+                default -> null;
+            };
+            boolean gradient = start != null && resolvedUi.containsKey(start)
+                && resolvedUi.containsKey(start.replace(".start", ".end"));
+            if (gradient) { keys.clear(); keys.add(start); }
+            // FlatLaf maps legacy aliases to the same effective key in authored insertion order.
+            // Button start/end pairs have their separate post-JSON precedence above.
+            Object supplied = null;
+            for (var entry : resolvedUi.entrySet()) {
+                String source = entry.getKey();
+                if (keys.contains(source) || (source.startsWith("*.")
+                        && !KEYS.get(token).endsWith(".hoverBackground") && !KEYS.get(token).endsWith(".pressedBackground")
+                        && keys.stream().anyMatch(key -> key.endsWith(source.substring(1)))))
+                    supplied = entry.getValue();
+            }
+            // Explicit native tokens outrank effective defaults, so OS-dependent input must remain only in UI.
+            if (!(supplied instanceof Map<?, ?>)) {
                 Color color = FlatLafThemeData.color(supplied);
-                if (color != null) { result.put(token, color); break; }
+                if (color != null) result.put(token, color);
             }
         }
         return Map.copyOf(result);
+    }
+
+    /** Omits tokens whose effective color FlatLaf adjusts after applying the authored JSON. No LAF is installed. */
+    public static Map<Token, Color> explicitTokens(Map<String, Object> ui, String name, String author, boolean dark) {
+        var result = new EnumMap<Token, Color>(Token.class); result.putAll(explicitTokens(ui));
+        String normalizedName = name.replace(' ', '_'), normalizedAuthor = author.replace(' ', '_');
+        var prefixes = java.util.List.of("{*}", dark ? "{*-dark}" : "{*-light}", "{author-" + normalizedAuthor + "}",
+            "{" + normalizedName + "}", "{" + normalizedName + "---" + normalizedAuthor + "}");
+        for (String raw : PostJson.KEYS) {
+            String key = raw;
+            if ((!dark && key.startsWith("[dark]")) || (dark && key.startsWith("[light]"))) continue;
+            while (key.startsWith("[") && key.contains("]")) key = key.substring(key.indexOf(']') + 1);
+            for (String prefix : prefixes) if (key.startsWith(prefix)) {
+                String adjusted = key.substring(prefix.length());
+                if ((!dark && adjusted.startsWith("[dark]")) || (dark && adjusted.startsWith("[light]"))) break;
+                while (adjusted.startsWith("[") && adjusted.contains("]")) adjusted = adjusted.substring(adjusted.indexOf(']') + 1);
+                String affected = adjusted;
+                result.keySet().removeIf(token -> affected.equals(KEYS.get(token))
+                    || (affected.startsWith("*.") && KEYS.get(token).endsWith(affected.substring(1))));
+                break;
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static final class PostJson {
+        static final java.util.Set<String> KEYS = read();
+        private static java.util.Set<String> read() {
+            // Read the pinned dependency's data instead of reproducing its author/theme-specific color formulas.
+            try (var input = com.formdev.flatlaf.IntelliJTheme.class.getResourceAsStream("IntelliJTheme$ThemeLaf.properties")) {
+                if (input == null) throw new IllegalStateException("Missing FlatLaf IntelliJ theme defaults");
+                var properties = new java.util.Properties(); properties.load(input);
+                return java.util.Set.copyOf(properties.stringPropertyNames());
+            } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        }
     }
 }

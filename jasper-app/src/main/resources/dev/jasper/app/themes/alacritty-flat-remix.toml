@@ -1,0 +1,33 @@
+"name" = "Flat Remix"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#272a34"
+"foreground" = "#ffffff"
+"accent" = "#277fff"
+"cursor" = "#ffffff"
+"selection" = "#686a71"
+
+[colors.normal]
+"black" = "#1f2229"
+"red" = "#ec0101"
+"green" = "#47d4b9"
+"yellow" = "#ff8a18"
+"blue" = "#277fff"
+"magenta" = "#d71655"
+"cyan" = "#05a1f7"
+"white" = "#ffffff"
+
+[colors.bright]
+"black" = "#1f2229"
+"red" = "#d41919"
+"green" = "#5ebdab"
+"yellow" = "#fea44c"
+"blue" = "#367bf0"
+"magenta" = "#bf2e5d"
+"cyan" = "#49aee6"
+"white" = "#ffffff"

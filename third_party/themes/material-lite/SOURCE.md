@@ -1,0 +1,102 @@
+# material-lite theme inputs
+
+Source: https://github.com/AtomMaterialUI/material-theme-ui-lite
+
+Commit: `177403842fdea09d38e0c30a9f2d4e655456ef3d`
+
+License: MIT (`LICENSE`). Exact upstream bytes and hashes are recorded in assets.tsv.
+
+Original author fields are preserved. If absent, use upstream vendor credit: AtomMaterial.
+
+- `themes/regular/Material Oceanic.theme.json`: Material Oceanic (`material-lite-oceanic`); old names: Material Oceanic
+- `themes/regular/Material Darker.theme.json`: Material Darker (`material-lite-darker`); old names: Material Darker
+- `themes/regular/Material Lighter.theme.json`: Material Lighter (`material-lite-lighter`); old names: Material Lighter
+- `themes/regular/Material Palenight.theme.json`: Material Palenight (`material-lite-palenight`); old names: Material Palenight
+- `themes/regular/Material Deep Ocean.theme.json`: Material Deep Ocean (`material-lite-deep-ocean`); old names: Material Deep Ocean
+- `themes/regular/Material Forest.theme.json`: Material Forest (`material-lite-forest`); old names: Material Forest
+- `themes/regular/Material Sky Blue.theme.json`: Material Sky Blue (`material-lite-sky-blue`); old names: Material Sky Blue
+- `themes/regular/Material Sandy Beach.theme.json`: Material Sandy Beach (`material-lite-sandy-beach`); old names: Material Sandy Beach
+- `themes/regular/Material Volcano.theme.json`: Material Volcano (`material-lite-volcano`); old names: Material Volcano
+- `themes/regular/Material Space.theme.json`: Material Space (`material-lite-space`); old names: Material Space
+- `themes/regular/Dracula.theme.json`: Material Crimson (`material-lite-crimson`); old names: Dracula
+- `themes/regular/Monokai Pro.theme.json`: excluded — Monokai Pro excluded by approved license scope.
+- `themes/regular/Arc Dark.theme.json`: Material Slate (`material-lite-slate`); old names: Arc Dark
+- `themes/regular/Atom One Dark.theme.json`: Material Carbon Dark (`material-lite-carbon-dark`); old names: Atom One Dark
+- `themes/regular/Atom One Light.theme.json`: Material Carbon Light (`material-lite-carbon-light`); old names: Atom One Light
+- `themes/regular/Solarized Dark.theme.json`: Material Sand Dark (`material-lite-sand-dark`); old names: Solarized Dark
+- `themes/regular/Solarized Light.theme.json`: Material Sand Light (`material-lite-sand-light`); old names: Solarized Light
+- `themes/regular/GitHub.theme.json`: Material Forge Light (`material-lite-forge-light`); old names: GitHub
+- `themes/regular/GitHub Dark.theme.json`: Material Forge Dark (`material-lite-forge-dark`); old names: GitHub Dark
+- `themes/regular/Night Owl.theme.json`: Material Nocturne (`material-lite-nocturne`); old names: Night Owl
+- `themes/regular/Light Owl.theme.json`: Material Daybreak (`material-lite-daybreak`); old names: Light Owl
+- `themes/regular/Moonlight.theme.json`: Material Moon (`material-lite-moon`); old names: Moonlight
+- `themes/regular/SynthWave '84.theme.json`: Material Neon (`material-lite-neon`); old names: SynthWave '84
+- `themes/compact/Material Oceanic Compact.theme.json`: Material Oceanic Compact (`material-lite-oceanic-compact`); old names: Material Oceanic Compact
+- `themes/compact/Material Darker Compact.theme.json`: Material Darker Compact (`material-lite-darker-compact`); old names: Material Darker Compact
+- `themes/compact/Material Lighter Compact.theme.json`: Material Lighter Compact (`material-lite-lighter-compact`); old names: Material Lighter Compact
+- `themes/compact/Material Palenight Compact.theme.json`: Material Palenight Compact (`material-lite-palenight-compact`); old names: Material Palenight Compact
+- `themes/compact/Material Deep Ocean Compact.theme.json`: Material Deep Ocean Compact (`material-lite-deep-ocean-compact`); old names: Material Deep Ocean Compact
+- `themes/compact/Material Forest Compact.theme.json`: Material Forest Compact (`material-lite-forest-compact`); old names: Material Forest Compact
+- `themes/compact/Material Sky Blue Compact.theme.json`: Material Sky Blue Compact (`material-lite-sky-blue-compact`); old names: Material Sky Blue Compact
+- `themes/compact/Material Sandy Beach Compact.theme.json`: Material Sandy Beach Compact (`material-lite-sandy-beach-compact`); old names: Material Sandy Beach Compact
+- `themes/compact/Material Volcano Compact.theme.json`: Material Volcano Compact (`material-lite-volcano-compact`); old names: Material Volcano Compact
+- `themes/compact/Material Space Compact.theme.json`: Material Space Compact (`material-lite-space-compact`); old names: Material Space Compact
+- `themes/compact/Dracula Compact.theme.json`: Material Crimson Compact (`material-lite-crimson-compact`); old names: Dracula Compact
+- `themes/compact/Monokai Pro Compact.theme.json`: excluded — Monokai Pro excluded by approved license scope.
+- `themes/compact/Arc Dark Compact.theme.json`: Material Slate Compact (`material-lite-slate-compact`); old names: Arc Dark Compact
+- `themes/compact/Atom One Dark Compact.theme.json`: Material Carbon Dark Compact (`material-lite-carbon-dark-compact`); old names: Atom One Dark Compact
+- `themes/compact/Atom One Light Compact.theme.json`: Material Carbon Light Compact (`material-lite-carbon-light-compact`); old names: Atom One Light Compact
+- `themes/compact/Solarized Dark Compact.theme.json`: Material Sand Dark Compact (`material-lite-sand-dark-compact`); old names: Solarized Dark Compact
+- `themes/compact/Solarized Light Compact.theme.json`: Material Sand Light Compact (`material-lite-sand-light-compact`); old names: Solarized Light Compact
+- `themes/compact/GitHub Compact.theme.json`: Material Forge Light Compact (`material-lite-forge-light-compact`); old names: GitHub Compact
+- `themes/compact/GitHub Dark Compact.theme.json`: Material Forge Dark Compact (`material-lite-forge-dark-compact`); old names: GitHub Dark Compact
+- `themes/compact/Night Owl Compact.theme.json`: Material Nocturne Compact (`material-lite-nocturne-compact`); old names: Night Owl Compact
+- `themes/compact/Light Owl Compact.theme.json`: Material Daybreak Compact (`material-lite-daybreak-compact`); old names: Light Owl Compact
+- `themes/compact/Moonlight Compact.theme.json`: Material Moon Compact (`material-lite-moon-compact`); old names: Moonlight Compact
+- `themes/compact/SynthWave '84 Compact.theme.json`: Material Neon Compact (`material-lite-neon-compact`); old names: SynthWave '84 Compact
+- `themes/contrast/Material Oceanic Contrast.theme.json`: Material Oceanic Contrast (`material-lite-oceanic-contrast`); old names: Material Oceanic Contrast
+- `themes/contrast/Material Darker Contrast.theme.json`: Material Darker Contrast (`material-lite-darker-contrast`); old names: Material Darker Contrast
+- `themes/contrast/Material Lighter Contrast.theme.json`: Material Lighter Contrast (`material-lite-lighter-contrast`); old names: Material Lighter Contrast
+- `themes/contrast/Material Palenight Contrast.theme.json`: Material Palenight Contrast (`material-lite-palenight-contrast`); old names: Material Palenight Contrast
+- `themes/contrast/Material Deep Ocean Contrast.theme.json`: Material Deep Ocean Contrast (`material-lite-deep-ocean-contrast`); old names: Material Deep Ocean Contrast
+- `themes/contrast/Material Forest Contrast.theme.json`: Material Forest Contrast (`material-lite-forest-contrast`); old names: Material Forest Contrast
+- `themes/contrast/Material Sky Blue Contrast.theme.json`: Material Sky Blue Contrast (`material-lite-sky-blue-contrast`); old names: Material Sky Blue Contrast
+- `themes/contrast/Material Sandy Beach Contrast.theme.json`: Material Sandy Beach Contrast (`material-lite-sandy-beach-contrast`); old names: Material Sandy Beach Contrast
+- `themes/contrast/Material Volcano Contrast.theme.json`: Material Volcano Contrast (`material-lite-volcano-contrast`); old names: Material Volcano Contrast
+- `themes/contrast/Material Space Contrast.theme.json`: Material Space Contrast (`material-lite-space-contrast`); old names: Material Space Contrast
+- `themes/contrast/Dracula Contrast.theme.json`: Material Crimson Contrast (`material-lite-crimson-contrast`); old names: Dracula Contrast
+- `themes/contrast/Monokai Pro Contrast.theme.json`: excluded — Monokai Pro excluded by approved license scope.
+- `themes/contrast/Arc Dark Contrast.theme.json`: Material Slate Contrast (`material-lite-slate-contrast`); old names: Arc Dark Contrast
+- `themes/contrast/Atom One Dark Contrast.theme.json`: Material Carbon Dark Contrast (`material-lite-carbon-dark-contrast`); old names: Atom One Dark Contrast
+- `themes/contrast/Atom One Light Contrast.theme.json`: Material Carbon Light Contrast (`material-lite-carbon-light-contrast`); old names: Atom One Light Contrast
+- `themes/contrast/Solarized Dark Contrast.theme.json`: Material Sand Dark Contrast (`material-lite-sand-dark-contrast`); old names: Solarized Dark Contrast
+- `themes/contrast/Solarized Light Contrast.theme.json`: Material Sand Light Contrast (`material-lite-sand-light-contrast`); old names: Solarized Light Contrast
+- `themes/contrast/GitHub Contrast.theme.json`: Material Forge Light Contrast (`material-lite-forge-light-contrast`); old names: GitHub Contrast
+- `themes/contrast/GitHub Dark Contrast.theme.json`: Material Forge Dark Contrast (`material-lite-forge-dark-contrast`); old names: GitHub Dark Contrast
+- `themes/contrast/Night Owl Contrast.theme.json`: Material Nocturne Contrast (`material-lite-nocturne-contrast`); old names: Night Owl Contrast
+- `themes/contrast/Light Owl Contrast.theme.json`: Material Daybreak Contrast (`material-lite-daybreak-contrast`); old names: Light Owl Contrast
+- `themes/contrast/Moonlight Contrast.theme.json`: Material Moon Contrast (`material-lite-moon-contrast`); old names: Moonlight Contrast
+- `themes/contrast/SynthWave '84 Contrast.theme.json`: Material Neon Contrast (`material-lite-neon-contrast`); old names: SynthWave '84 Contrast
+- `themes/compactContrast/Material Oceanic Compact Contrast.theme.json`: Material Oceanic Compact Contrast (`material-lite-oceanic-compact-contrast`); old names: Material Oceanic Compact Contrast
+- `themes/compactContrast/Material Darker Compact Contrast.theme.json`: Material Darker Compact Contrast (`material-lite-darker-compact-contrast`); old names: Material Darker Compact Contrast
+- `themes/compactContrast/Material Lighter Compact Contrast.theme.json`: Material Lighter Compact Contrast (`material-lite-lighter-compact-contrast`); old names: Material Lighter Compact Contrast
+- `themes/compactContrast/Material Palenight Compact Contrast.theme.json`: Material Palenight Compact Contrast (`material-lite-palenight-compact-contrast`); old names: Material Palenight Compact Contrast
+- `themes/compactContrast/Material Deep Ocean Compact Contrast.theme.json`: Material Deep Ocean Compact Contrast (`material-lite-deep-ocean-compact-contrast`); old names: Material Deep Ocean Compact Contrast
+- `themes/compactContrast/Material Forest Compact Contrast.theme.json`: Material Forest Compact Contrast (`material-lite-forest-compact-contrast`); old names: Material Forest Compact Contrast
+- `themes/compactContrast/Material Sky Blue Compact Contrast.theme.json`: Material Sky Blue Compact Contrast (`material-lite-sky-blue-compact-contrast`); old names: Material Sky Blue Compact Contrast
+- `themes/compactContrast/Material Sandy Beach Compact Contrast.theme.json`: Material Sandy Beach Compact Contrast (`material-lite-sandy-beach-compact-contrast`); old names: Material Sandy Beach Compact Contrast
+- `themes/compactContrast/Material Volcano Compact Contrast.theme.json`: Material Volcano Compact Contrast (`material-lite-volcano-compact-contrast`); old names: Material Volcano Compact Contrast
+- `themes/compactContrast/Material Space Compact Contrast.theme.json`: Material Space Compact Contrast (`material-lite-space-compact-contrast`); old names: Material Space Compact Contrast
+- `themes/compactContrast/Dracula Compact Contrast.theme.json`: Material Crimson Compact Contrast (`material-lite-crimson-compact-contrast`); old names: Dracula Compact Contrast
+- `themes/compactContrast/Monokai Pro Compact Contrast.theme.json`: excluded — Monokai Pro excluded by approved license scope.
+- `themes/compactContrast/Arc Dark Compact Contrast.theme.json`: Material Slate Compact Contrast (`material-lite-slate-compact-contrast`); old names: Arc Dark Compact Contrast
+- `themes/compactContrast/Atom One Dark Compact Contrast.theme.json`: Material Carbon Dark Compact Contrast (`material-lite-carbon-dark-compact-contrast`); old names: Atom One Dark Compact Contrast
+- `themes/compactContrast/Atom One Light Compact Contrast.theme.json`: Material Carbon Light Compact Contrast (`material-lite-carbon-light-compact-contrast`); old names: Atom One Light Compact Contrast
+- `themes/compactContrast/Solarized Dark Compact Contrast.theme.json`: Material Sand Dark Compact Contrast (`material-lite-sand-dark-compact-contrast`); old names: Solarized Dark Compact Contrast
+- `themes/compactContrast/Solarized Light Compact Contrast.theme.json`: Material Sand Light Compact Contrast (`material-lite-sand-light-compact-contrast`); old names: Solarized Light Compact Contrast
+- `themes/compactContrast/GitHub Compact Contrast.theme.json`: Material Forge Light Compact Contrast (`material-lite-forge-light-compact-contrast`); old names: GitHub Compact Contrast
+- `themes/compactContrast/GitHub Dark Compact Contrast.theme.json`: Material Forge Dark Compact Contrast (`material-lite-forge-dark-compact-contrast`); old names: GitHub Dark Compact Contrast
+- `themes/compactContrast/Night Owl Compact Contrast.theme.json`: Material Nocturne Compact Contrast (`material-lite-nocturne-compact-contrast`); old names: Night Owl Compact Contrast
+- `themes/compactContrast/Light Owl Compact Contrast.theme.json`: Material Daybreak Compact Contrast (`material-lite-daybreak-compact-contrast`); old names: Light Owl Compact Contrast
+- `themes/compactContrast/Moonlight Compact Contrast.theme.json`: Material Moon Compact Contrast (`material-lite-moon-compact-contrast`); old names: Moonlight Compact Contrast
+- `themes/compactContrast/SynthWave '84 Compact Contrast.theme.json`: Material Neon Compact Contrast (`material-lite-neon-compact-contrast`); old names: SynthWave '84 Compact Contrast

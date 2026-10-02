@@ -40,6 +40,21 @@ forward template fan-out is not reversible. Unauthored Jasper chrome aliases and
 so retained UI/private materialization preserve appearance. Five full-suite effective-color mismatches proved this
 necessary. Cost: a smaller exported token section; authored UI and effective appearance remain covered by parity.
 
+Task 3 catalog/tooling is complete. Final `./gradlew --offline check` passed **7,926 tests, zero failures/errors, six skips**; the subsequent notices-only trailing-blank cleanup passed the complete drift/provenance/catalog test class. Twelve pinned sources and 413 hashed inputs produce
+284 native themes: Jasper 2, IntelliJ 2, Alacritty 168, One Dark 2, Dracula 3, Solarized 2, Catppuccin 4,
+Material Lite 88, Code 3, Nord 1, Gruvbox 6, One Dark Modern 1 and Studio 2. Catppuccin 3.6.1's release JAR digest
+and source tag commit are verified. Full variant accounting, licenses, renames and exclusions are in
+`tools/themes/sources.json`, per-source `SOURCE.md`/`assets.tsv` and `THIRD-PARTY-THEMES.md`. Material's Monokai Pro
+variants and out-of-scope Islands variants are explicitly excluded; current Gruvbox's six are retained under approved
+names. Alacritty Frappe aliases canonical Frappé. The largest native file is 97,426 bytes, so no limit increase is needed.
+Decisions: One Dark Modern's unchanged scheme bytes get an explicit packaging alias correcting its broken declared
+path; Darcula's lock explicitly preserves its prior named editor-scheme association. Root-relative scheme paths are
+supported alongside sibling paths inside bounded archives. Inversion honors actual start/end button precedence and
+ordered mapped aliases; tokens affected by FlatLaf's post-JSON author/theme adjustments are omitted using its pinned
+properties data. Whole-catalog headless installed/workspace parity failed across 12 keys before these fixes and now
+passes. The golden's only change is the correctly inferred gradient button border. Costs: fewer explicit exported
+tokens (effective UI preserved); packaging aliases and extra catalog variants remain reversible manifest decisions.
+
 ## Global Constraints
 
 - Native files live at `<home>/themes/<id>.toml`; bundled resources at `dev/jasper/app/themes/<id>.toml`, with `index.txt`.
@@ -312,7 +327,7 @@ manifest shared in shape with Python. Each source has repository, full commit, l
 optional release artifact URL/hash, provider paths, canonical output IDs/names, excluded variants/reasons and aliases.
 Manifest entries, not filesystem traversal or network discovery, determine the release catalog.
 
-- [ ] **Step 1: Write coverage, drift, uniqueness and provenance tests.** Tests regenerate into `@TempDir`, compare
+- [x] **Step 1: Write coverage, drift, uniqueness and provenance tests.** Tests regenerate into `@TempDir`, compare
 all output bytes plus index/notices against checked-in files, reject extra/missing output files, require complete
 provider-to-variant accounting, unique normalized names and IDs, and reparse every generated theme through the catalog.
 Use small malformed manifests to test duplicate IDs, path escape, bad asset hash and unrecorded variant. Assert:
@@ -329,9 +344,9 @@ assertThat(Files.isRegularFile(licenseFile)).isTrue();
 
 `generatedNames` comes from all manifest outputs including Jasper's two reserved names; metadata checks exclude
 Jasper's own themes. Verify SHA-256 of every listed upstream asset/license/notice and the Catppuccin release artifact.
-- [ ] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*BundledThemeConversionTest'`; expect missing manifest,
+- [x] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*BundledThemeConversionTest'`; expect missing manifest,
 generator or ungenerated variants, not a network lookup.
-- [ ] **Step 3: Freeze inputs, then implement generation.** Acquire using the explicit maintainer script only. Existing
+- [x] **Step 3: Freeze inputs, then implement generation.** Acquire using the explicit maintainer script only. Existing
 local SOURCE.md provides both complete pins below; do not re-resolve the Alacritty short SHA to a newer revision.
 
 | Source ID / upstream | Required variants and acquisition decision |
@@ -369,7 +384,7 @@ licenses/notices for generated bundles and importer parents in the packaged dist
 larger than 256 KiB, increase the shared native limit to 4 MiB (the existing entry cap), test both limits and document
 measured maximum/decision; do not trim theme data to meet a size cap.
 
-- [ ] **Step 4: Run GREEN and reproducibility gates.**
+- [x] **Step 4: Run GREEN and reproducibility gates.**
 
 ```bash
 ./gradlew :jasper-app:convertThemes
@@ -382,7 +397,7 @@ Record output hashes after the first generation; the second must match exactly. 
 already cached from preceding tasks. Verify a dry-run task graph has no cycle and package resources include notices.
 Record actual source/variant/output counts, all renamed/excluded names and any deviation; independent review checks
 the manifest against spec §6.2 rather than accepting only a total count.
-- [ ] **Step 5: Commit the reviewed catalog and tooling.**
+- [x] **Step 5: Commit the reviewed catalog and tooling.**
 
 ```bash
 git add tools/themes third_party/themes jasper-app/build.gradle.kts jasper-app/src THIRD-PARTY-THEMES.md

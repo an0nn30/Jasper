@@ -1,0 +1,33 @@
+"name" = "Synthwave 84"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#262335"
+"foreground" = "#ffffff"
+"accent" = "#03edf9"
+"cursor" = "#ffffff"
+"selection" = "#676572"
+
+[colors.normal]
+"black" = "#262335"
+"red" = "#fe4450"
+"green" = "#72f1b8"
+"yellow" = "#f3e70f"
+"blue" = "#03edf9"
+"magenta" = "#ff7edb"
+"cyan" = "#03edf9"
+"white" = "#ffffff"
+
+[colors.bright]
+"black" = "#614d85"
+"red" = "#fe4450"
+"green" = "#72f1b8"
+"yellow" = "#fede5d"
+"blue" = "#03edf9"
+"magenta" = "#ff7edb"
+"cyan" = "#03edf9"
+"white" = "#ffffff"

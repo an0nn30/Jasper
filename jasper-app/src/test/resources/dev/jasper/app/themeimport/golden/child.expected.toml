@@ -45,6 +45,7 @@
 "text_selection_text" = "#dedede"
 "tab_bar" = "#223344"
 "button_background" = "#4c5052"
+"button_border" = "#5e6060"
 "button_text" = "#bbbbbb"
 "button_default" = "#365880"
 

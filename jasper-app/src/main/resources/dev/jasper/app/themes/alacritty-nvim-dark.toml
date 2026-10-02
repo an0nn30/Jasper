@@ -1,0 +1,33 @@
+"name" = "Nvim Dark"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#14161b"
+"foreground" = "#e0e2ea"
+"accent" = "#95c5e5"
+"cursor" = "#e0e2ea"
+"selection" = "#4f5258"
+
+[colors.normal]
+"black" = "#2c2e33"
+"red" = "#e5adb9"
+"green" = "#a2dfc0"
+"yellow" = "#e3ca85"
+"blue" = "#95c5e5"
+"magenta" = "#e5b6e6"
+"cyan" = "#7edfde"
+"white" = "#c4c6cd"
+
+[colors.bright]
+"black" = "#4f5258"
+"red" = "#ffc0b9"
+"green" = "#b4f6c0"
+"yellow" = "#fce094"
+"blue" = "#a6dbff"
+"magenta" = "#ffcaff"
+"cyan" = "#8cf8f7"
+"white" = "#9b9ea4"

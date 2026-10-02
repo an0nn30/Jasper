@@ -1,0 +1,33 @@
+"name" = "Cyber Punk Neon"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#000b1e"
+"foreground" = "#0abdc6"
+"accent" = "#416596"
+"cursor" = "#0abdc6"
+"selection" = "#034050"
+
+[colors.normal]
+"black" = "#123e7c"
+"red" = "#ff0000"
+"green" = "#d300c4"
+"yellow" = "#f57800"
+"blue" = "#123e7c"
+"magenta" = "#711c91"
+"cyan" = "#0abdc6"
+"white" = "#d7d7d5"
+
+[colors.bright]
+"black" = "#1c61c2"
+"red" = "#ff0000"
+"green" = "#d300c4"
+"yellow" = "#f57800"
+"blue" = "#00ff00"
+"magenta" = "#711c91"
+"cyan" = "#0abdc6"
+"white" = "#d7d7d5"

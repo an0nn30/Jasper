@@ -250,6 +250,8 @@ final class ThemeArchive {
                     pending.add(new Pending(candidate.label(), json, null, null));
                 } else {
                     wantedSchemeEntries.add(schemeEntry);
+                    String fromRoot = entry(scheme, "");
+                    if (fromRoot != null) wantedSchemeEntries.add(fromRoot);
                     pending.add(new Pending(candidate.label(), json, schemeEntry, null));
                 }
             }
@@ -265,18 +267,24 @@ final class ThemeArchive {
                     themeParents(jar, theme), Map.of()));
                 continue;
             }
-            String schemeLabel = jar.label() + "!/" + theme.schemeEntry();
+            String schemeEntry = theme.schemeEntry();
+            if (!schemeBatch.bytes().containsKey(schemeEntry) && !schemeBatch.tooLarge().contains(schemeEntry)) {
+                String fromRoot = entry(editorScheme(theme.json()), "");
+                if (fromRoot != null && (schemeBatch.bytes().containsKey(fromRoot) || schemeBatch.tooLarge().contains(fromRoot)))
+                    schemeEntry = fromRoot;
+            }
+            String schemeLabel = jar.label() + "!/" + schemeEntry;
             byte[] schemeXml;
-            if (schemeBatch.tooLarge().contains(theme.schemeEntry())) {
+            if (schemeBatch.tooLarge().contains(schemeEntry)) {
                 problems.add(schemeLabel + " is larger than 4 MiB; the terminal uses Jasper's palette");
                 schemeXml = null;
             } else {
-                schemeXml = schemeBatch.bytes().get(theme.schemeEntry());
+                schemeXml = schemeBatch.bytes().get(schemeEntry);
                 if (schemeXml == null)
                     problems.add(schemeLabel + " is named by " + theme.label() + " but missing; the terminal uses Jasper's palette");
             }
             themes.add(new Found(theme.label(), theme.json(), schemeXml, null, schemeLabel,
-                themeParents(jar, theme), schemeParents(jar, theme.schemeEntry(), schemeXml)));
+                themeParents(jar, theme), schemeParents(jar, schemeEntry, schemeXml)));
             } catch (RuntimeException failure) {
                 problems.add(theme.label() + ": cannot resolve parent data: "
                     + (failure instanceof TooLarge ? "parent is larger than 4 MiB" : failure.getMessage()));

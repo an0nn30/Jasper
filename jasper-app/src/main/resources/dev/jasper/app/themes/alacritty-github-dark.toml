@@ -1,0 +1,33 @@
+"name" = "Github Dark"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#24292e"
+"foreground" = "#d1d5da"
+"accent" = "#2188ff"
+"cursor" = "#d1d5da"
+"selection" = "#585d62"
+
+[colors.normal]
+"black" = "#586069"
+"red" = "#ea4a5a"
+"green" = "#34d058"
+"yellow" = "#ffea7f"
+"blue" = "#2188ff"
+"magenta" = "#b392f0"
+"cyan" = "#39c5cf"
+"white" = "#d1d5da"
+
+[colors.bright]
+"black" = "#959da5"
+"red" = "#f97583"
+"green" = "#85e89d"
+"yellow" = "#ffea7f"
+"blue" = "#79b8ff"
+"magenta" = "#b392f0"
+"cyan" = "#56d4dd"
+"white" = "#fafbfc"

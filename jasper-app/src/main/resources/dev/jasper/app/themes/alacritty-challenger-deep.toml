@@ -1,0 +1,33 @@
+"name" = "Challenger Deep"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#1e1c31"
+"foreground" = "#cbe1e7"
+"accent" = "#65b2ff"
+"cursor" = "#fbfcfc"
+"selection" = "#525768"
+
+[colors.normal]
+"black" = "#141228"
+"red" = "#ff5458"
+"green" = "#62d196"
+"yellow" = "#ffb378"
+"blue" = "#65b2ff"
+"magenta" = "#906cff"
+"cyan" = "#63f2f1"
+"white" = "#a6b3cc"
+
+[colors.bright]
+"black" = "#565575"
+"red" = "#ff8080"
+"green" = "#95ffa4"
+"yellow" = "#ffe9aa"
+"blue" = "#91ddff"
+"magenta" = "#c991e1"
+"cyan" = "#aaffe4"
+"white" = "#cbe3e7"

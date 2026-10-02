@@ -1,0 +1,33 @@
+"name" = "Monokai Charcoal"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#000000"
+"foreground" = "#ffffff"
+"accent" = "#9d65ff"
+"cursor" = "#ffffff"
+"selection" = "#4d4d4d"
+
+[colors.normal]
+"black" = "#1a1a1a"
+"red" = "#f4005f"
+"green" = "#98e024"
+"yellow" = "#fa8419"
+"blue" = "#9d65ff"
+"magenta" = "#f4005f"
+"cyan" = "#58d1eb"
+"white" = "#c4c5b5"
+
+[colors.bright]
+"black" = "#625e4c"
+"red" = "#f4005f"
+"green" = "#98e024"
+"yellow" = "#e0d561"
+"blue" = "#9d65ff"
+"magenta" = "#f4005f"
+"cyan" = "#58d1eb"
+"white" = "#f6f6ef"

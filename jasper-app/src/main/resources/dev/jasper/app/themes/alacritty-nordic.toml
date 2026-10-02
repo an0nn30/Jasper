@@ -1,0 +1,33 @@
+"name" = "Nordic"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#242933"
+"foreground" = "#bbbdaf"
+"accent" = "#8fb4d8"
+"cursor" = "#bbbdaf"
+"selection" = "#f0dfaf"
+
+[colors.normal]
+"black" = "#191c1d"
+"red" = "#bd6062"
+"green" = "#a3d6a9"
+"yellow" = "#f0dfaf"
+"blue" = "#8fb4d8"
+"magenta" = "#c7a9d9"
+"cyan" = "#b6d7a8"
+"white" = "#bdc5bd"
+
+[colors.bright]
+"black" = "#727c7c"
+"red" = "#d18faf"
+"green" = "#b7ceb0"
+"yellow" = "#bcbcbc"
+"blue" = "#e0cf9f"
+"magenta" = "#c7a9d9"
+"cyan" = "#bbda97"
+"white" = "#bdc5bd"

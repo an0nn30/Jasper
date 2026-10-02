@@ -1,0 +1,33 @@
+"name" = "Autumn"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#232323"
+"foreground" = "#f3f2cc"
+"accent" = "#86c1b9"
+"cursor" = "#f3f2cc"
+"selection" = "#616156"
+
+[colors.normal]
+"black" = "#212121"
+"red" = "#f05e48"
+"green" = "#99be70"
+"yellow" = "#fad566"
+"blue" = "#86c1b9"
+"magenta" = "#cfba8b"
+"cyan" = "#72a59e"
+"white" = "#c8c8c8"
+
+[colors.bright]
+"black" = "#404040"
+"red" = "#f05e48"
+"green" = "#99be70"
+"yellow" = "#ffff9f"
+"blue" = "#86c1b9"
+"magenta" = "#cfba8b"
+"cyan" = "#72a59e"
+"white" = "#e8e8e8"

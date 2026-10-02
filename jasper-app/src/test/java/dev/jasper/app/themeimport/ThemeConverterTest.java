@@ -127,6 +127,16 @@ class ThemeConverterTest {
         assertThat(result.sourceEntry()).isEqualTo("themes/child.theme.json");
     }
 
+    @Test void archiveSchemesMayUseRootRelativePathsWithoutALeadingSlash() {
+        Path archive = home.resolve("root-relative.jar");
+        dev.jasper.app.appearance.ThemeFixtures.jar(archive, dev.jasper.app.appearance.ThemeFixtures.entries(
+            "META-INF/plugin.xml", dev.jasper.app.appearance.ThemeFixtures.pluginXml("Root", "themes/test.theme.json"),
+            "themes/test.theme.json", "{\"name\":\"Root\",\"editorScheme\":\"colors/test.xml\"}",
+            "colors/test.xml", dev.jasper.app.appearance.ThemeFixtures.scheme("Root", "Darcula", "123456", "654321")));
+        var result = ThemeConverter.convert(archive).getFirst();
+        assertThat(result.document().seeds()).containsEntry(Seed.BACKGROUND, new Color(0x123456));
+    }
+
     @Test void rejectsInvalidParentsAndBoundedSidecars() throws Exception {
         for (String json : List.of("{\"name\":\"Bad\",\"editorScheme\":\"../secret.xml\"}",
                 "{\"name\":\"Bad\",\"colors\":{\"a\":\"b\",\"b\":\"a\"}}")) {

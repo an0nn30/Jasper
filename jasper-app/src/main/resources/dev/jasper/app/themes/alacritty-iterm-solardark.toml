@@ -1,0 +1,33 @@
+"name" = "Iterm Solardark"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#002833"
+"foreground" = "#a5abb6"
+"accent" = "#268ad2"
+"cursor" = "#f86100"
+"selection" = "#324f5a"
+
+[colors.normal]
+"black" = "#003440"
+"red" = "#dc312e"
+"green" = "#7cc67f"
+"yellow" = "#b58900"
+"blue" = "#268ad2"
+"magenta" = "#d33582"
+"cyan" = "#2aa197"
+"white" = "#eee8d5"
+
+[colors.bright]
+"black" = "#00779a"
+"red" = "#f9314b"
+"green" = "#5bee96"
+"yellow" = "#c08f34"
+"blue" = "#109fd2"
+"magenta" = "#e9679f"
+"cyan" = "#00bdae"
+"white" = "#fdf6e3"

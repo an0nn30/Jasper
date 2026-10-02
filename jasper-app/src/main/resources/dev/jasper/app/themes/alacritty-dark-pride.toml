@@ -1,0 +1,33 @@
+"name" = "Dark Pride"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#0d0d1b"
+"foreground" = "#ccccce"
+"accent" = "#95569b"
+"cursor" = "#ff0017"
+"selection" = "#464651"
+
+[colors.normal]
+"black" = "#282828"
+"red" = "#ca1444"
+"green" = "#789aba"
+"yellow" = "#b3879f"
+"blue" = "#95569b"
+"magenta" = "#cb6fa1"
+"cyan" = "#fb6e93"
+"white" = "#cf98c1"
+
+[colors.bright]
+"black" = "#98218e"
+"red" = "#cb515d"
+"green" = "#5a87b1"
+"yellow" = "#9c61ab"
+"blue" = "#9a77b1"
+"magenta" = "#f2a297"
+"cyan" = "#f4436f"
+"white" = "#ebdbb2"

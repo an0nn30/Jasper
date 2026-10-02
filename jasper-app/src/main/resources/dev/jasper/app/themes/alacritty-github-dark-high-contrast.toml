@@ -1,0 +1,33 @@
+"name" = "Github Dark High Contrast"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#0a0c10"
+"foreground" = "#f0f3f6"
+"accent" = "#71b7ff"
+"cursor" = "#f0f3f6"
+"selection" = "#4f5155"
+
+[colors.normal]
+"black" = "#7a828e"
+"red" = "#ff9492"
+"green" = "#26cd4d"
+"yellow" = "#f0b72f"
+"blue" = "#71b7ff"
+"magenta" = "#cb9eff"
+"cyan" = "#39c5cf"
+"white" = "#d9dee3"
+
+[colors.bright]
+"black" = "#9ea7b3"
+"red" = "#ffb1af"
+"green" = "#4ae168"
+"yellow" = "#f7c843"
+"blue" = "#91cbff"
+"magenta" = "#cb9eff"
+"cyan" = "#39c5cf"
+"white" = "#d9dee3"

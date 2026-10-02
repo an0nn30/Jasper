@@ -1,0 +1,33 @@
+"name" = "Seoul256 Light"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#dadada"
+"foreground" = "#4e4e4e"
+"accent" = "#007173"
+"cursor" = "#4e4e4e"
+"selection" = "#bcdede"
+
+[colors.normal]
+"black" = "#4e4e4e"
+"red" = "#af005f"
+"green" = "#5f875f"
+"yellow" = "#af5f00"
+"blue" = "#007173"
+"magenta" = "#870087"
+"cyan" = "#008787"
+"white" = "#e4e4e4"
+
+[colors.bright]
+"black" = "#626262"
+"red" = "#d70087"
+"green" = "#87af87"
+"yellow" = "#dfbc72"
+"blue" = "#5fafd7"
+"magenta" = "#af5fff"
+"cyan" = "#00afaf"
+"white" = "#ffffff"

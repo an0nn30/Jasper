@@ -1,0 +1,33 @@
+"name" = "Github Dark Tritanopia"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#0d1117"
+"foreground" = "#c9d1d9"
+"accent" = "#58a6ff"
+"cursor" = "#c9d1d9"
+"selection" = "#454b51"
+
+[colors.normal]
+"black" = "#484f58"
+"red" = "#ff7b72"
+"green" = "#58a6ff"
+"yellow" = "#d29922"
+"blue" = "#58a6ff"
+"magenta" = "#bc8cff"
+"cyan" = "#39c5cf"
+"white" = "#b1bac4"
+
+[colors.bright]
+"black" = "#6e7681"
+"red" = "#ffa198"
+"green" = "#79c0ff"
+"yellow" = "#e3b341"
+"blue" = "#79c0ff"
+"magenta" = "#bc8cff"
+"cyan" = "#39c5cf"
+"white" = "#b1bac4"

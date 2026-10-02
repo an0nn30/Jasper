@@ -1,0 +1,33 @@
+"name" = "Zenburn"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#3a3a3a"
+"foreground" = "#dcdccc"
+"accent" = "#7c8894"
+"cursor" = "#dcdccc"
+"selection" = "#6b6b66"
+
+[colors.normal]
+"black" = "#1e2320"
+"red" = "#d78787"
+"green" = "#60b48a"
+"yellow" = "#dfaf8f"
+"blue" = "#506070"
+"magenta" = "#dc8cc3"
+"cyan" = "#8cd0d3"
+"white" = "#dcdccc"
+
+[colors.bright]
+"black" = "#709080"
+"red" = "#dca3a3"
+"green" = "#c3bf9f"
+"yellow" = "#f0dfaf"
+"blue" = "#94bff3"
+"magenta" = "#ec93d3"
+"cyan" = "#93e0e3"
+"white" = "#ffffff"

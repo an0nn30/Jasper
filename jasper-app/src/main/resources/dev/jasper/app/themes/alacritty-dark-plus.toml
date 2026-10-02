@@ -1,0 +1,33 @@
+"name" = "Dark Plus"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#1f1f1f"
+"foreground" = "#cccccc"
+"accent" = "#569cd6"
+"cursor" = "#cccccc"
+"selection" = "#535353"
+
+[colors.normal]
+"black" = "#000000"
+"red" = "#d6181b"
+"green" = "#6a9955"
+"yellow" = "#e4d201"
+"blue" = "#569cd6"
+"magenta" = "#bc3fbc"
+"cyan" = "#4ec9b0"
+"white" = "#e5e5e5"
+
+[colors.bright]
+"black" = "#666666"
+"red" = "#ce9178"
+"green" = "#b5cea8"
+"yellow" = "#dcdcaa"
+"blue" = "#9cdcfe"
+"magenta" = "#d670d6"
+"cyan" = "#9cdcfe"
+"white" = "#e5e5e5"

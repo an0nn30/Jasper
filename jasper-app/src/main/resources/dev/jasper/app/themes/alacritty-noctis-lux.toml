@@ -1,0 +1,33 @@
+"name" = "Noctis Lux"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#fef8ec"
+"foreground" = "#005661"
+"accent" = "#0094f0"
+"cursor" = "#005661"
+"selection" = "#b2c7c2"
+
+[colors.normal]
+"black" = "#003b42"
+"red" = "#e34e1c"
+"green" = "#00b368"
+"yellow" = "#f49725"
+"blue" = "#0094f0"
+"magenta" = "#ff5792"
+"cyan" = "#00bdd6"
+"white" = "#8ca6a6"
+
+[colors.bright]
+"black" = "#004d57"
+"red" = "#ff4000"
+"green" = "#00d17a"
+"yellow" = "#ff8c00"
+"blue" = "#0fa3ff"
+"magenta" = "#ff6b9f"
+"cyan" = "#00cbe6"
+"white" = "#bbc3c4"

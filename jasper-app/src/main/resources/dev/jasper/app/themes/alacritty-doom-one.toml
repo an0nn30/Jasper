@@ -1,0 +1,33 @@
+"name" = "Doom One"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#282c34"
+"foreground" = "#bbc2cf"
+"accent" = "#51afef"
+"cursor" = "#bbc2cf"
+"selection" = "#545963"
+
+[colors.normal]
+"black" = "#282c34"
+"red" = "#ff6c6b"
+"green" = "#98be65"
+"yellow" = "#ecbe7b"
+"blue" = "#51afef"
+"magenta" = "#c678dd"
+"cyan" = "#46d9ff"
+"white" = "#bbc2cf"
+
+[colors.bright]
+"black" = "#282c34"
+"red" = "#ff6c6b"
+"green" = "#98be65"
+"yellow" = "#ecbe7b"
+"blue" = "#51afef"
+"magenta" = "#c678dd"
+"cyan" = "#46d9ff"
+"white" = "#bbc2cf"

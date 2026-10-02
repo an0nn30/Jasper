@@ -1,0 +1,33 @@
+"name" = "Github Light High Contrast"
+"ui_complete" = false
+"author" = "Alacritty theme contributors"
+"license" = "Apache-2.0"
+"source" = "https://github.com/alacritty/alacritty-theme"
+"commit" = "ab88d5a80d676b5dc6157e91aba8067f2078dc94"
+
+[colors]
+"background" = "#ffffff"
+"foreground" = "#010409"
+"accent" = "#0349b4"
+"cursor" = "#0e1116"
+"selection" = "#b3b4b5"
+
+[colors.normal]
+"black" = "#0e1116"
+"red" = "#a0111f"
+"green" = "#024c1a"
+"yellow" = "#3f2200"
+"blue" = "#0349b4"
+"magenta" = "#622cbc"
+"cyan" = "#1b7c83"
+"white" = "#66707b"
+
+[colors.bright]
+"black" = "#4b535d"
+"red" = "#86061d"
+"green" = "#055d20"
+"yellow" = "#4e2c00"
+"blue" = "#1168e3"
+"magenta" = "#622cbc"
+"cyan" = "#1b7c83"
+"white" = "#66707b"

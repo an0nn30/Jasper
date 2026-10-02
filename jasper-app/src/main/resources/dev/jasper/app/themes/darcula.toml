@@ -2,32 +2,35 @@
 "dark" = true
 "ui_complete" = true
 "author" = "JetBrains"
+"license" = "Apache-2.0"
+"source" = "https://github.com/JetBrains/intellij-community"
+"commit" = "f7377708b654b73b206da40bb382ecb4d44e8f12"
 
 [colors]
-"background" = "#282a36"
-"foreground" = "#f8f8f2"
+"background" = "#2b2b2b"
+"foreground" = "#bbbbbb"
 "accent" = "#3d6185"
-"cursor" = "#f8f8f2"
-"selection" = "#44475a"
+"cursor" = "#bbbbbb"
+"selection" = "#214283"
 
 [colors.normal]
-"black" = "#21222c"
-"red" = "#ff5555"
-"green" = "#50fa7b"
-"yellow" = "#f1fa8c"
-"blue" = "#bd93f9"
-"magenta" = "#ff79c6"
-"cyan" = "#8be9fd"
-"white" = "#f8f8f2"
+"black" = "#000000"
+"red" = "#f0524f"
+"green" = "#5c962c"
+"yellow" = "#a68a0d"
+"blue" = "#3993d4"
+"magenta" = "#a771bf"
+"cyan" = "#00a3a3"
+"white" = "#808080"
 
 [colors.bright]
-"black" = "#6272a4"
-"red" = "#ff6e6e"
-"green" = "#69ff94"
-"yellow" = "#ffffa5"
-"blue" = "#d6acff"
-"magenta" = "#ff92df"
-"cyan" = "#a4ffff"
+"black" = "#595959"
+"red" = "#ff4050"
+"green" = "#4fc414"
+"yellow" = "#e5bf00"
+"blue" = "#1fb0ff"
+"magenta" = "#ed7eed"
+"cyan" = "#00e5e5"
 "white" = "#ffffff"
 
 [tokens]
@@ -45,8 +48,23 @@
 "tab_bar" = "#3c3f41"
 "input_background" = "#45494a"
 "button_background" = "#4c5052"
+"button_border" = "#5e6060"
 "button_text" = "#bbbbbb"
 "button_default" = "#365880"
+
+[syntax]
+"keyword" = { color = "#cc7832", bold = true, italic = false }
+"function" = { color = "#ffc66d", bold = false, italic = false }
+"variable" = { color = "#a9b7c6", bold = false, italic = false }
+"constant" = { color = "#9876aa", bold = false, italic = true }
+"number" = { color = "#6897bb", bold = false, italic = false }
+"string" = { color = "#6a8759", bold = true, italic = false }
+"comment" = { color = "#808080", bold = false, italic = true }
+"doc_comment" = { color = "#629755", bold = false, italic = true }
+"annotation" = { color = "#bbb529", bold = false, italic = false }
+"punctuation" = { color = "#cc7832", bold = false, italic = false }
+"tag" = { color = "#e8bf6a", bold = false, italic = false }
+"attribute" = { color = "#bababa", bold = false, italic = false }
 
 [ui]
 "*.background" = "#3C3F41"
