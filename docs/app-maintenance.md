@@ -144,8 +144,9 @@ Application code never opens a message dialog to tell the user something; it pos
 
 - Window code calls `WindowContent.onError` / `onInfo` with a fixed title and the details; the application posts them
   to `jasper.general`. Never put user data in the title: it is what a window logs when nothing receives the message.
-- Application code calls `NotificationsFeature.error` / `info`, or `NotificationCenter.post` with a
-  `NotificationRequest` for another group, actions or a default action. Declare a group with
+- Application code calls `NotificationsFeature.error` / `info`, or posts a `NotificationRequest` for another group,
+  actions or a default action. `NotificationCenter.submit` is the any-thread entry point (at once on the EDT,
+  otherwise through the UI executor); `NotificationCenter.post` is EDT-only and throws elsewhere. Declare a group with
   `NotificationCenter.register` before posting to it; posts to an undeclared group are dropped and logged.
 - Text is plain and bounded: titles are one line (cut at 200 characters), details at most 4,000. Pass exception
   messages as details, never as titles.

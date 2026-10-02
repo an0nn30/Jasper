@@ -31,6 +31,18 @@ elsewhere, and merging main removes the need.
    section 7 "the poster's window, else the terminal window used last"; headless app-level wiring tests were added
    (`58ca9237`, `34d624fd`).
 
+Final-review fixes (after the plan's tasks):
+
+7. `JasperApplication.presence()` reports `NO_WINDOW` until an open terminal window has been activated at least once
+   (reset when the last window closes), through the pure `presence(windowsOpen, activatedSinceOpen,
+   jasperWindowActive)`: a failure raised while the first window opens is queued ahead of the native activation event
+   and was classed background, so its card never showed (`d2bd488f`).
+8. `NotificationCenter.post` drops a repeat's id from the waiting set when its outcome is a card, so `focusReturned()`
+   cannot request that card a second time (`08a2c9ff`).
+9. `CardLayer` renders each card's shadow once into an image keyed by card size, arc, margin, colour with alpha and
+   device scale, and draws it on later paints, instead of twelve antialiased rings per card on every repaint
+   (`498e4d61`).
+
 **Goal:** Replace every modal message dialog with an in-memory notification center whose notifications appear as
 themed cards in the window's bottom-right corner and in a built-in Notifications rail panel with an unread badge.
 

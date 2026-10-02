@@ -19,7 +19,17 @@
   - the Notifications panel: New/Earlier, Clear All, row ✕, theme switch while open;
   - auto-hide pausing while the window is in the background and while hovering a card (including while its More menu is open);
   - a broken `config.toml` at startup shows a sticky Configuration card with Show Problems / Open config.toml;
-  - a broken shell profile at startup leaves the window open with the failure in the pane and an error card.
+  - a broken shell profile at startup leaves the window open with the failure in the pane and an error card; at cold
+    start this also checks the final-review fix for a card raised before the first window's activation (the card must
+    show once the window is active, not only sit in history);
+  - busy terminal output (for example `yes` or a large `cat`) scrolling under a sticky card stays smooth, and the
+    card's shadow looks as before on a Retina display.
+
+  Final whole-branch review fixes, all applied on the branch (`d2bd488f`, `08a2c9ff`, `498e4d61`): a card raised
+  before a new window's first activation waits instead of landing in history only; a coalesced repeat that shows its
+  card no longer stays waiting for focus; each card's shadow is rendered once and cached instead of twelve rings on
+  every repaint. `./gradlew check` after the fixes (same short temp path): **8,084 tests, 0 failures, 0 errors, 6
+  skips** (8 new tests; the 8,076 above is the count before them).
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
