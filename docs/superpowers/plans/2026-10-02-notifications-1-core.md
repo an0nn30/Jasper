@@ -3,8 +3,9 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Status:** Implemented on branch `claude/notifications` (worktree `.worktrees/notifications`, cut from main
-`e91512f6`); `./gradlew check` green (8,076 tests, 0 failures, 0 errors, 6 skips); awaiting the final
-whole-branch review and the user's GUI checks (listed in [STATUS](../../STATUS.md)). The editor plugin's
+`e91512f6`); every task and the final whole-branch review passed, with the final review's fixes (items 7–9 below)
+re-reviewed clean; `./gradlew check` green after them (8,084 tests, 0 failures, 0 errors, 6 skips). Awaiting the user's
+GUI checks (listed in [STATUS](../../STATUS.md)) and the merge decision. The editor plugin's
 `ExFilesTest` fails on a temp path containing `zz` (main fixed it in `185a5f8e`); the check ran with `java.io.tmpdir`
 elsewhere, and merging main removes the need.
 
@@ -42,6 +43,32 @@ Final-review fixes (after the plan's tasks):
 9. `CardLayer` renders each card's shadow once into an image keyed by card size, arc, margin, colour with alpha and
    device scale, and draws it on later paints, instead of twelve antialiased rings per card on every repaint
    (`498e4d61`).
+
+**Deferred findings** (from the task and final reviews; none blocks merge — each is listed with the plan that makes it
+matter):
+
+- Plan 3 (SDK boundary): titles or labels made only of NBSP or zero-width characters pass the model's blank check;
+  group names and owners are neither normalized nor bounded; poster icons are not fitted to 16 px; bidi controls such
+  as U+202E are not stripped.
+- Plan 4 (higher post rates): coalescing keeps the first request's actions, default action and target; the history
+  panel rebuilds every row on each post while visible (about 30 ms at 500 entries, headless) and twice when opened with
+  unread entries; every unread-count change rebuilds every window's rail (dropping an open tooltip or Move-to popup).
+- Behaviour: a theme failure on config reload targets the first-registered window and duplicates the configuration
+  notice; pending cards flush only when a terminal window is activated (Settings or a plugin window counts as focused
+  but does not flush); detach falls back to the oldest window; the configuration notice goes stale after a partial fix
+  (by spec); the More popup is outside the card tree (hovering it resumes the countdown, theme change does not restyle
+  it); visible action links are not re-fitted after a font or scale change while a card shows.
+- Accessibility: the history panel's ✕ and action links are not keyboard-reachable (only Clear All).
+- Robustness and polish: an `Error` thrown by a center listener leaves queued changes for the next emit; trim emits
+  `Removed` before the new entry's `Upserted`; `TextBlock` uses the label font unchanged for plain text (a bold
+  `Label.font` look and feel shows card content bold); `TextBlock.wrap` collapses runs of spaces; the detached "No
+  notifications" label and the panel's bold header font are not refreshed on theme change; the empty state is
+  left-aligned; `CardLayer` has dead "chip with no cards" branches and refreshes on every center change; `WindowFocus`
+  never reports false when its component leaves a window; `BadgedIcon` falls back to red silently.
+- Tests: expected WARNING logs reach test stderr instead of being captured; gaps around throwing listeners, the exact
+  60 s window, card geometry, link-versus-body clicks, the ChromeKeys middle fallbacks, a terminal failure beside a
+  hosted tab, two-owner theme failure, and the presence flag's wiring in `windowActivated` / `windowClosed` (needs real
+  windows); `CardLayerTest` restores `Popup.dropShadowColor` with `UIManager.put(before)` rather than `put(key, null)`.
 
 **Goal:** Replace every modal message dialog with an in-memory notification center whose notifications appear as
 themed cards in the window's bottom-right corner and in a built-in Notifications rail panel with an unread badge.
