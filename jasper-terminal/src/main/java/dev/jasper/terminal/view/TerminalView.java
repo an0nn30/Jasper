@@ -85,6 +85,7 @@ public final class TerminalView extends JComponent {
     private Supplier<String> clipboardReader = DesktopServices::readClipboard;
     private Consumer<String> clipboardWriter = DesktopServices::writeClipboard;
     private Consumer<String> linkOpener = DesktopServices::openBrowser;
+    private final java.util.List<Runnable> afterPaint = new java.util.ArrayList<>();
 
     /** Constructs an EDT-owned view without taking ownership of session shutdown; options and session must be nonnull. */
     public TerminalView(TerminalSession session, TerminalOptions options) {
@@ -404,6 +405,12 @@ public final class TerminalView extends JComponent {
         this.onCloseRequest = action;
     }
 
+    /** Runs {@code action} on the EDT once, after the next completed paint of this view. EDT only. */
+    public void afterNextPaint(Runnable action) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("afterNextPaint requires the EDT");
+        afterPaint.add(java.util.Objects.requireNonNull(action, "action"));
+    }
+
     /** Captures rows under the buffer lock, then paints detached runs and overlays on EDT. */
     @Override
     protected void paintComponent(Graphics g) {
@@ -428,6 +435,11 @@ public final class TerminalView extends JComponent {
             int alpha = Math.round(255 * inactiveDim);
             g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(), alpha));
             g.fillRect(0, 0, getWidth(), getHeight());
+        }
+        if (!afterPaint.isEmpty()) {
+            var ready = java.util.List.copyOf(afterPaint);
+            afterPaint.clear();
+            for (Runnable action : ready) SwingUtilities.invokeLater(action);
         }
     }
 
