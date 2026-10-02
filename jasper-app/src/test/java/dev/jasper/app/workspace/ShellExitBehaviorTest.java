@@ -20,6 +20,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.*;
@@ -35,6 +36,9 @@ class ShellExitBehaviorTest {
     @TempDir Path directory;
     final Queue<Runnable> pending = new ArrayDeque<>();
     final AtomicInteger empty = new AtomicInteger();
+    final AtomicInteger launches = new AtomicInteger();
+    /** How many launches succeed before a failing launcher starts failing. */
+    int launchesBeforeFailure;
     final List<String> failures = new ArrayList<>();
     final List<TerminalSession> sessions = new ArrayList<>();
     ConfigService service;
@@ -205,12 +209,32 @@ class ShellExitBehaviorTest {
         edt(() -> assertThat(empty).hasValue(closes ? 1 : 0));
     }
 
-    @Test void launchFailureStillReportsErrorAndClosesFailedPane() throws Exception {
+    /** Closing the window's only pane would close the window and, by default, quit before anyone read the error. */
+    @Test void launchFailureInTheWindowsOnlyPaneReportsErrorAndKeepsItOpen() throws Exception {
         start("keep_open", false, true); deliver();
         edt(() -> {
             assertThat(failures).singleElement().asString().contains("controlled launch failure");
-            assertThat(empty).hasValue(1);
-            assertThat(owner.tabStrip().getTabCount()).isZero();
+            assertThat(empty).hasValue(0);
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(owner.currentTab().panes()).hasSize(1);
+            var label = (JLabel) owner.currentPane().getComponent(0);
+            assertThat(label.getText()).startsWith("Could not start terminal: ").contains("controlled launch failure");
+        });
+    }
+
+    @Test void launchFailureInASecondTabReportsErrorAndClosesFailedPaneKeepingTheWindow() throws Exception {
+        launchesBeforeFailure = 1;
+        start("keep_open", false, true); deliver();
+        TerminalTab first = owner.currentTab();
+        edt(() -> owner.newTab(directory));
+        deliver();
+        edt(() -> {
+            assertThat(failures).singleElement().asString().contains("controlled launch failure");
+            assertThat(empty).hasValue(0);
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(owner.currentTab()).isSameAs(first);
+            assertThat(first.panes()).hasSize(1);
+            assertThat(first.focusedPane().running()).isTrue();
         });
     }
 
@@ -229,7 +253,7 @@ class ShellExitBehaviorTest {
             ThemeController themes = new ThemeController();
             controller = new ConfigurationTestSupport(themes, service);
             ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
-                if (launchFailure) throw new IllegalStateException("controlled launch failure");
+                if (launchFailure && launches.incrementAndGet() > launchesBeforeFailure) throw new IllegalStateException("controlled launch failure");
                 try {
                     var session = TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c", earlyExit
                         ? "printf 'READY\\n'; exit 0" : "stty -echo; printf 'READY\\n'; read code; exit \"$code\"")).environment(System.getenv()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build());

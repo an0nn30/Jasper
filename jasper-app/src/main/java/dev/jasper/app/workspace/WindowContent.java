@@ -776,6 +776,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         };
         tab.onEmpty = () -> closeTab(tab);
         tab.onError = message -> onError.accept("Could not start the terminal", message);
+        tab.lastInWindow = () -> tabs.getTabCount() == 1;
         tab.configure = pane -> configurePane(tab, pane);
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
