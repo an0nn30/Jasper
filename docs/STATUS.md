@@ -27,6 +27,12 @@
   isolation in the trace and session output, a once-only trace-file error, `trackOutput` instead of a weak map, strict
   "incomplete" runs and guaranteed Jasper cleanup in the benchmark), listed in the plan's status banner.
   `./gradlew check`: 7,990/0/0/6. Next: Plan 2 (JVM and packaging). Not done: a recorded `startupBench` run (user-run).
+  Carried forward from the final review: the first `StartupTrace.current()` in `main` costs ~4–5 ms net
+  (`ProcessHandle.info`, a virtual-thread cap timer; move them off `main` in Plan 2 or 3A); a resident's first plain
+  window is labelled `cold`, and a window's request time is taken on the EDT rather than at reopen/handoff receipt
+  (fix with Plan 4's triggers); per-plugin phases may push the start-up line past `AppLog`'s 512-character record cap
+  (Plan 3B); no test drives `watchOutput`→`timeFirstTerminal` end to end; the diagnostics example's phase numbers
+  contradict "phases overlap" and the benchmark doc's cleanup sentence is loose (docs pass).
 
 - **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
   worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
