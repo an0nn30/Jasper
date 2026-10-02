@@ -580,6 +580,8 @@ git add jasper-app/src/main/java/dev/jasper/app/themeimport jasper-app/src/test/
 git commit -m "feat(themes): migrate legacy files with resumable recovery" -m "Co-Authored-By: Codex <noreply@openai.com>"
 ```
 
+**Task 6 complete:** pre-service upgrade and journaled config intent preserve aliases, comments and backups; startup warnings remain distinct from transient catalog problems. Crash recovery uses ConfigLoader canonicalization before reconstructing rename maps (unknown/multiple legacy aliases cannot change precedence). Full check passed 7,982 tests / zero failures/errors / six skips.
+
 ## Task 6: Integrate upgrade before startup configuration and retain diagnostics
 
 **Files:** Create `config/ThemeSelectionMigration.java`, `application/ThemeUpgrade.java`; modify
@@ -621,7 +623,7 @@ Runnable terminate, Path shellIntegrationDir, List<ThemeCatalog.Problem> startup
 Old test/benchmark constructors delegate with an empty list. ConfigurationController holds these problems separately
 from transient per-scan problems.
 
-- [ ] **Step 1: Write config/startup tests.** Start with comments, unrelated plugin tables, aliases and pre-existing
+- [x] **Step 1: Write config/startup tests.** Start with comments, unrelated plugin tables, aliases and pre-existing
 backups; verify exact preserved text outside changed keys. Parameterize canonical versus alias paths and names
 `light`, `dark`, `Light`, `match`, unknown requested names. Canonical values always win; only aliases transform.
 If a selection's legacy source lost a name collision, assert the selected converted source retains its palette and
@@ -645,14 +647,14 @@ into A 3. Test config changed while upgrade runs, rejected config, failed backup
 config file (do not create one), and a different config override sharing the same home. Bootstrap's injected launch callback asserts migrated files/config are already visible
 in `service.initialState()` before application/theme/plugin construction. The help and successful resident-handoff
 paths perform no migration. No test constructs a native window or starts a shell.
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ThemeSelectionMigrationTest' --tests '*ThemeUpgradeTest' --tests '*ApplicationBootstrapTest' --tests '*ConfigMigrationTest'
 ```
 
 Expected: missing upgrade ordering/config rewrite behavior.
-- [ ] **Step 3: Implement pre-service upgrade and exact config recovery.** In ApplicationBootstrap.start, after
+- [x] **Step 3: Implement pre-service upgrade and exact config recovery.** In ApplicationBootstrap.start, after
 `handsOff` and resolution of the actual config override, call ThemeUpgrade.prepare before `new ConfigService`.
 Migration home is the absolute config file's parent, matching ThemeCatalog.beside, not blindly AppDirs.home. This runs
 on the startup worker/caller before EDT composition. Thread the returned problems into application creation and
@@ -681,9 +683,9 @@ configuration companion scan, then publish the replacement diagnostic list on ED
 If MigrationReport.completed is true, return diagnostics without replaying the saved rename maps.
 Call `complete` only after the required config operation succeeded or was unnecessary. A per-source conversion failure
 is a completed pass with persistent diagnostics; a config/journal infrastructure failure is retryable and unmarked.
-- [ ] **Step 4: Run GREEN.** Repeat Step 2, migration crash tests and `./gradlew check`; independently review startup
+- [x] **Step 4: Run GREEN.** Repeat Step 2, migration crash tests and `./gradlew check`; independently review startup
 order and recovery after config write. Verify the original startup regression tests stay green.
-- [ ] **Step 5: Commit after review.**
+- [x] **Step 5: Commit after review.**
 
 ```bash
 git add jasper-app/src

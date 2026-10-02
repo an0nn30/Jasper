@@ -31,6 +31,27 @@ public final class ThemeMigration {
             outputs = List.copyOf(outputs); originals = List.copyOf(originals); problems = List.copyOf(problems);
         }
     }
+    public record ConfigIntent(String configFileName, String expectedSha256, String desiredSha256,
+                               Map<String, String> before, Map<String, String> after) {
+        public ConfigIntent { before = Map.copyOf(before); after = Map.copyOf(after); }
+    }
+    public java.util.Optional<ConfigIntent> configIntent() {
+        try { return files.locked(() -> { var state = journal().read(); return state == null ? java.util.Optional.empty() : java.util.Optional.ofNullable(state.configIntent()); }); }
+        catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    }
+    public void recordConfigIntent(String generation, ConfigIntent intent) throws IOException {
+        files.locked(() -> {
+            MigrationJournal.validateIntent(intent);
+            var journal = journal(); var state = journal.read();
+            if (state == null || !state.generation().equals(generation) || Files.exists(journal.resolve("themes/legacy/.migrated"), LinkOption.NOFOLLOW_LINKS))
+                throw new IOException("Migration is no longer pending");
+            var previous = state.configIntent();
+            if (previous != null && (!previous.configFileName().equals(intent.configFileName()) || !previous.before().equals(intent.before()) || !previous.after().equals(intent.after())))
+                throw new IOException("Pending configuration intent conflicts with this edit");
+            journal.write(new MigrationJournal.State(state.generation(), state.sources(), state.workspaceAliases(), intent));
+            return null;
+        });
+    }
     private record Input(String relative, String hash, String key, ThemeConverter.Batch batch) {}
     private record Candidate(ThemeDocument document, String source, String provider, boolean nativeFile) {}
     private record Owner(String source, String provider) {}
@@ -189,7 +210,7 @@ public final class ThemeMigration {
             sources.add(new MigrationJournal.Source(input.relative(), input.hash(), input.key(), destination, complete, false, false, outputs, problems));
             staged.put(input.relative(), bytes);
         }
-        return new Planned(new MigrationJournal.State(generation, sources, aliases), staged);
+        return new Planned(new MigrationJournal.State(generation, sources, aliases, null), staged);
     }
 
     private void stage(Context context, int index, Map<String, Map<String, byte[]>> plannedBytes) throws IOException {

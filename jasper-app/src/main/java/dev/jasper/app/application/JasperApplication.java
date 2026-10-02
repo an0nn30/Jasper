@@ -130,6 +130,9 @@ public final class JasperApplication {
 
     TerminalRegistry terminals() { return terminals; }
 
+    private volatile List<ThemeCatalog.Problem> migrationProblems = List.of();
+    private List<ThemeCatalog.Problem> startupConfigProblems = List.of();
+
     public JasperApplication() { this(null); }
 
     public JasperApplication(ConfigService service) { this(service, null); }
@@ -159,6 +162,12 @@ public final class JasperApplication {
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, List.of());
+    }
+    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, List<ThemeCatalog.Problem> startupThemeProblems) {
+        migrationProblems = List.copyOf(startupThemeProblems);
+        if (service != null) startupConfigProblems = startupThemeProblems.stream().filter(problem -> problem.file().equals(service.initialState().file())).toList();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         themeCatalog = service == null ? ThemeCatalog.builtIn() : dev.jasper.app.themeimport.LegacyThemeReader.catalog(service.initialState().file());
         terminalThemes = service == null ? dev.jasper.app.terminalthemes.TerminalThemeCatalog.bundledOnly()
@@ -183,7 +192,7 @@ public final class JasperApplication {
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, terminalThemes);
+        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, terminalThemes, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
         // A supplied launcher (the benchmark, tests) never starts a detected profile, so reg.exe and wsl.exe stay
@@ -227,7 +236,11 @@ public final class JasperApplication {
      * 10 s, so the first window shows the saved theme. Later scans run with each configuration read.
      */
     private void scanThemes(ConfigService service) {
-        try { service.watchWith(() -> { scanQuietly("IntelliJ themes", themeCatalog::scan); scanQuietly("terminal themes", terminalThemes::scan); })
+        try { service.watchWith(() -> { scanQuietly("IntelliJ themes", themeCatalog::scan); scanQuietly("terminal themes", terminalThemes::scan);
+            var refreshed = new java.util.LinkedHashSet<>(startupConfigProblems);
+            refreshed.addAll(ThemeUpgrade.diagnostics(service.initialState().file()));
+            migrationProblems = List.copyOf(refreshed);
+        })
             .get(10, java.util.concurrent.TimeUnit.SECONDS); }
         catch (ExecutionException | TimeoutException failure) {
             LOG.log(System.Logger.Level.WARNING, "The themes folder could not be read at start-up", failure);

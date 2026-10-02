@@ -43,6 +43,8 @@ final class ConfigurationController implements AutoCloseable {
     private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
     /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
     private List<ConfigDiagnostic> themeProblems = List.of();
+    private List<ConfigDiagnostic> migrationProblems = List.of();
+    private final java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource;
     private Predicate<String> pluginSettingsExist = id -> false;
     private final List<Consumer<ConfigService.State>> stateListeners = new java.util.ArrayList<>();
     private java.util.function.BiConsumer<WindowContent, String> settingsOpener;
@@ -53,6 +55,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         var merged = new java.util.ArrayList<>(state.diagnostics());
         merged.addAll(themeProblems);
+        merged.addAll(migrationProblems);
         merged.addAll(reported);
         pluginReports.values().forEach(merged::addAll);
         var removable = state.deadTables().stream()
@@ -100,6 +103,11 @@ final class ConfigurationController implements AutoCloseable {
 
     ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, TerminalThemeCatalog terminalThemes,
                             Consumer<Path> editor) {
+        this(themes, service, catalog, terminalThemes, editor, List::of);
+    }
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, TerminalThemeCatalog terminalThemes,
+                            Consumer<Path> editor, java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource) {
+        this.migrationSource = migrationSource;
         requireEdt();
         this.themes = themes; this.service = service; this.catalog = catalog; this.terminalThemes = terminalThemes; this.editor = editor;
         appearance = themes.subscribe((resolved, refresh) -> lastChromeDark = resolved.chrome().dark());
@@ -249,6 +257,8 @@ final class ConfigurationController implements AutoCloseable {
      * built-in of the last applied darkness; missing workspace matches chrome without changing the request.
      */
     private void configureThemes(ConfigService.State next) {
+        migrationProblems = migrationSource.get().stream().distinct().map(problem -> new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING,
+            problem.file(), problem.line(), 0, "", problem.message())).toList();
         ThemeCatalog.Snapshot available = catalog.latest();
         var problems = new java.util.ArrayList<ConfigDiagnostic>();
         for (ThemeCatalog.Problem problem : available.problems())

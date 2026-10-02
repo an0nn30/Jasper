@@ -25,9 +25,9 @@ final class MigrationJournal {
             return new Source(path, hash, fileKey, legacy, convertible, relocated, stopped, values, diagnostics);
         }
     }
-    record State(String generation, List<Source> sources, java.util.Map<String, String> workspaceAliases) {
+    record State(String generation, List<Source> sources, java.util.Map<String, String> workspaceAliases, ThemeMigration.ConfigIntent configIntent) {
         State { sources = List.copyOf(sources); workspaceAliases = java.util.Map.copyOf(workspaceAliases); }
-        State replacing(int index, Source source) { var next = new ArrayList<>(sources); next.set(index, source); return new State(generation, next, workspaceAliases); }
+        State replacing(int index, Source source) { var next = new ArrayList<>(sources); next.set(index, source); return new State(generation, next, workspaceAliases, configIntent); }
     }
     private final Path home;
     private final Path file;
@@ -81,7 +81,15 @@ final class MigrationJournal {
                 if (!key.equals(ThemeImporter.key(key))) throw new IOException("Unnormalized workspace alias");
                 aliases.put(key, required(aliasTable, key));
             }
-            return new State(generation, sources, aliases);
+            ThemeMigration.ConfigIntent intent = null;
+            var config = toml.getTable("config_intent");
+            if (config != null) {
+                String filename = required(config, "file"), expected = required(config, "expected"), desired = required(config, "desired");
+                hash(expected); hash(desired);
+                intent = new ThemeMigration.ConfigIntent(filename, expected, desired, values(config.getTable("before")), values(config.getTable("after")));
+                validateIntent(intent);
+            }
+            return new State(generation, sources, aliases, intent);
         } catch (RuntimeException invalid) { throw new IOException("Invalid migration journal: " + invalid.getMessage(), invalid); }
     }
 
@@ -104,10 +112,32 @@ final class MigrationJournal {
                 text.append("published = ").append(output.published()).append('\n'); value(text, "chrome_key", output.chromeKey()); value(text, "workspace_key", output.workspaceKey());
             }
         }
+        if (state.configIntent() != null) {
+            var intent = state.configIntent(); validateIntent(intent);
+            text.append("\n[config_intent]\n"); value(text, "file", intent.configFileName());
+            value(text, "expected", intent.expectedSha256()); value(text, "desired", intent.desiredSha256());
+            text.append("\n[config_intent.before]\n"); new java.util.TreeMap<>(intent.before()).forEach((key, val) -> value(text, quoted(key), val));
+            text.append("\n[config_intent.after]\n"); new java.util.TreeMap<>(intent.after()).forEach((key, val) -> value(text, quoted(key), val));
+        }
         byte[] bytes = text.toString().getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_BYTES) throw new IOException("Migration journal is larger than 4 MiB");
         atomic(file, bytes, expectedHash);
         expectedHash = ThemeSources.hash(bytes);
+    }
+
+    static void validateIntent(ThemeMigration.ConfigIntent intent) throws IOException {
+        String filename = intent.configFileName();
+        if (filename.isBlank() || filename.equals(".") || filename.equals("..") || filename.contains("/") || filename.contains("\\") || filename.indexOf(0) >= 0)
+            throw new IOException("Invalid migration config filename");
+        hash(intent.expectedSha256()); hash(intent.desiredSha256());
+        var allowed = java.util.Set.of("ui.theme.name", "ui.theme.workspace", "ui.theme.variant", "ui.theme.terminal", "terminal.colors");
+        if (!allowed.containsAll(intent.before().keySet()) || !allowed.containsAll(intent.after().keySet())) throw new IOException("Invalid config intent keys");
+    }
+    private static java.util.Map<String, String> values(TomlTable table) throws IOException {
+        if (table == null) throw new IOException("Missing config intent values");
+        var values = new java.util.LinkedHashMap<String, String>();
+        for (String key : table.keySet()) values.put(key, string(table, key));
+        return values;
     }
 
     Path resolve(String relative) throws IOException {
