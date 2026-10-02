@@ -10,7 +10,7 @@
   `"theme"`/`"on"`/`"off"`); bundled Clear Dark (0.95, blur on) and Clear Light (0.93, blur on) are ported from
   Terminal.app (catalog 286). On macOS, `WindowGlass` makes the window translucent through two JDK internals (new
   launcher flags) and blurs behind it through `libjasper-glass.dylib`; terminal panes paint their default background
-  with alpha inside a cleared surface, and any failure keeps the window opaque. Deviations from the spec: ancestors stay
+  with alpha inside a cleared surface, and any failure keeps the window opaque; the whole path is macOS-only (rows hidden in Settings, no `WindowGlass`, no launcher flags, `GlassSource.NONE` elsewhere; the keys are silently ignored). Deviations from the spec: ancestors stay
   opaque and the workspace host clears a hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no
   `TerminalOptions` field), and it takes a `float`; `WindowGlass` follows the root pane. Rulings made during execution:
   `ClearThemesTest` runs under `EdtTestExtension`; the Workspace section keeps its own "Choose workspace theme…" button

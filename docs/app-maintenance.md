@@ -167,6 +167,11 @@ result to the window's `WindowGlass` after every theme or configuration change. 
 opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting never reads the raw settings, so any
 failure leaves an opaque window.
 
+- **macOS only.** Elsewhere the Opacity and Blur rows are hidden in Settings (`CorePages`, `shownWhen`), the keys stay
+  valid and are silently ignored, `TerminalWindow` constructs no `WindowGlass` (so neither it nor `MacGlass` is ever
+  loaded), `JasperApplication` gives plugins `GlassSource.NONE` and installs no glass listener, and the launcher
+  (`applicationDefaultJvmArgs`, `Jasper.cfg`) carries no `--add-opens`/`--add-exports`; `packaging.gradle` requires
+  them on a macOS host and requires them absent on others.
 - **Translucency** needs two JDK internals (AWT refuses alpha on a decorated frame): `MacGlass` sets
   `Component.background` and calls `WindowPeer.setOpaque(false)`. The launcher passes
   `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED`;

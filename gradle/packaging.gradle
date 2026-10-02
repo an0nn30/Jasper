@@ -302,11 +302,14 @@ def verifyPackage = tasks.register('verifyPackage') {
         }
         String cfg = config.getText('UTF-8')
         if (!cfg.contains("app.mainclass=${app.mainClass.get()}")) throw new GradleException('Package verification failed: wrong main class in Jasper.cfg')
-        if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Jasper')
-                || !cfg.contains('--add-opens=java.desktop/java.awt=ALL-UNNAMED')
-                || !cfg.contains('--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED')) {
+        if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Jasper')) {
             throw new GradleException('Package verification failed: required JVM options are missing from Jasper.cfg')
         }
+        // Workspace glass is macOS-only: only the macOS launcher opens the JDK internals it reaches into.
+        boolean glassOptions = cfg.contains('--add-opens=java.desktop/java.awt=ALL-UNNAMED') && cfg.contains('--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED')
+        boolean anyGlassOption = cfg.contains('--add-opens=java.desktop/java.awt=ALL-UNNAMED') || cfg.contains('--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED')
+        if (context.host.os == 'macos' && !glassOptions) throw new GradleException('Package verification failed: the workspace glass JVM options are missing from Jasper.cfg')
+        if (context.host.os != 'macos' && anyGlassOption) throw new GradleException('Package verification failed: Jasper.cfg opens JDK internals for workspace glass, which exists only on macOS')
         String normalizedCfg = cfg.replace('\\', '/')
         configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
             if (!normalizedCfg.contains("\$APPDIR/${dependency.name}")) throw new GradleException("Package verification failed: classpath omits ${dependency.name}")

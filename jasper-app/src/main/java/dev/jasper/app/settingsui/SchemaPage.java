@@ -129,6 +129,7 @@ public final class SchemaPage implements SettingsPage {
                 String.join(" ", terms)));
         }
 
+        Setting<T> setting() { return setting; }
         ValueEditor<T> editor() { return editor; }
         JButton reset() { return reset; }
         WrappingText error() { return error; }

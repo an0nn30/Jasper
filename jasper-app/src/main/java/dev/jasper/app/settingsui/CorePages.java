@@ -16,10 +16,6 @@ import java.util.function.Supplier;
 public final class CorePages {
     /** The page shown when Settings opens for the first time. */
     public static final String DEFAULT_PAGE = "appearance";
-    /** Workspace glass needs macOS; elsewhere the rows stay visible but disabled. */
-    private static final boolean GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
-    private static final String GLASS_NOTE = GLASS ? "" : "Requires macOS.";
-
     private CorePages() { }
 
     /**
@@ -63,15 +59,20 @@ public final class CorePages {
     }
     /** Schema pages with links into the supplied Themes page. */
     public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate) {
+        return specs(themeNames, system, shells, navigate, com.formdev.flatlaf.util.SystemInfo.isMacOS);
+    }
+
+    /** Schema pages; {@code glass} is whether workspace glass exists here (macOS only), which decides its Settings rows. */
+    static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
                 .action(() -> "Choose and preview application colors.", new SchemaPage.Button("Choose UI theme…", () -> navigate.accept("themes#ui"), () -> true))
                 .section("Workspace")
-                .action(() -> "Translucent terminal and editor backgrounds; a workspace theme may set its own.",
+                .action(() -> glass ? "Translucent terminal and editor backgrounds; a workspace theme may set its own." : "Colours for the terminal and editor.",
                     new SchemaPage.Button("Choose workspace theme…", () -> navigate.accept("themes#workspace"), () -> true))
-                .row(UI_WORKSPACE_OPACITY, Editors.optionalNumber("Use theme's value", 1, "%")).note(GLASS_NOTE).enabledWhen(draft -> GLASS)
-                .row(UI_WORKSPACE_BLUR, Editors.choice(Map.of("theme", "Use theme's value"))).note(GLASS_NOTE).enabledWhen(draft -> GLASS)
+                .row(UI_WORKSPACE_OPACITY, Editors.optionalNumber("Use theme's value", 1, "%")).shownWhen(glass)
+                .row(UI_WORKSPACE_BLUR, Editors.choice(Map.of("theme", "Use theme's value"))).shownWhen(glass)
                 .section("Interface font")
                 .row(UI_FONT_FAMILY, Editors.font(false))
                 .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt")),

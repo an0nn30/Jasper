@@ -33,8 +33,63 @@ class CorePagesTest {
         assertThat(appearance.settings()).containsSubsequence(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
     }
 
+    private static SchemaPage.Spec appearance(boolean glass) {
+        return CorePages.specs(() -> List.of("Jasper Dark"), system(), ShellChoices.NONE, id -> { }, glass).getFirst();
+    }
+
+    private static CorePages.SystemActions system() {
+        return new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> true);
+    }
+
+    private static List<Setting<?>> builtSettings(SchemaPage page) {
+        return page.rows().stream().<Setting<?>>map(SchemaPage.Row::setting).toList();
+    }
+
+    @Test void offMacOsTheGlassRowsAreHiddenButStillOnThePage() {
+        var spec = appearance(false);
+        assertThat(spec.settings()).contains(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
+        var page = spec.build(context);
+        page.component();
+        assertThat(builtSettings(page)).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR)
+            .contains(CoreSettings.UI_FONT_FAMILY, CoreSettings.UI_FONT_SIZE);
+        assertThat(page.searchTerms()).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
+        assertThat(page.actionButtons()).extracting(javax.swing.JButton::getText).containsExactly("Choose UI theme…", "Choose workspace theme…");
+        page.dispose();
+    }
+
+    @Test void onMacOsTheGlassRowsAreShownAndEnabledWithoutANote() {
+        var page = appearance(true).build(context);
+        page.component();
+        assertThat(builtSettings(page)).contains(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
+        for (var row : page.rows()) {
+            if (row.setting() != CoreSettings.UI_WORKSPACE_OPACITY && row.setting() != CoreSettings.UI_WORKSPACE_BLUR) continue;
+            assertThat(row.editor().component().isEnabled()).as(row.setting().label()).isTrue();
+        }
+        assertThat(page.searchTerms()).contains(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
+        page.dispose();
+    }
+
+    @Test void theWorkspaceSectionTextFollowsThePlatform() {
+        assertThat(actionText(appearance(true))).contains("Translucent terminal and editor backgrounds; a workspace theme may set its own.");
+        assertThat(actionText(appearance(false))).contains("Colours for the terminal and editor.").doesNotContain("Translucent");
+    }
+
+    private static List<String> actionText(SchemaPage.Spec spec) {
+        var page = spec.build(new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
+            id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
+        var texts = new ArrayList<String>();
+        collectLabels(page.component(), texts);
+        page.dispose();
+        return texts;
+    }
+
+    private static void collectLabels(java.awt.Component component, List<String> out) {
+        if (component instanceof javax.swing.JLabel label && label.getText() != null) out.add(label.getText());
+        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) collectLabels(child, out);
+    }
+
     @Test void theBlurRowNamesTheThemeChoiceLikeOpacity() {
-        var spec = CorePages.specs(() -> List.of("Jasper Dark"), system).getFirst();
+        var spec = appearance(true);
         var page = spec.build(context);
         page.component();
         int index = spec.settings().indexOf(CoreSettings.UI_WORKSPACE_BLUR);
