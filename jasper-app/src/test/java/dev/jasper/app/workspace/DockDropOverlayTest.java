@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
 import java.awt.Point;
@@ -17,10 +19,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DockDropOverlayTest {
     private static final String[] KEYS = {"DragAndDrop.areaBackground", "DragAndDrop.borderColor", "Component.accentColor"};
     private final Map<String, Object> saved = new java.util.HashMap<>();
+    private javax.swing.LookAndFeel originalLookAndFeel;
 
-    DockDropOverlayTest() { for (String key : KEYS) saved.put(key, UIManager.get(key)); }
+    DockDropOverlayTest() { for (String key : KEYS) saved.put(key, UIManager.getLookAndFeelDefaults().get(key)); }
 
-    @AfterEach void restore() { saved.forEach(UIManager::put); }
+    @AfterEach void restore() {
+        for (String key : KEYS) {
+            UIManager.put(key, null);
+            Object lfValue = saved.get(key);
+            if (lfValue != null) UIManager.getLookAndFeelDefaults().put(key, lfValue);
+            else UIManager.getLookAndFeelDefaults().remove(key);
+        }
+        if (originalLookAndFeel != null) {
+            try { UIManager.setLookAndFeel(originalLookAndFeel); } catch (Exception e) { }
+        }
+    }
+
+    private static void noThemeColours() {
+        for (String key : KEYS) {
+            UIManager.put(key, null);
+            UIManager.getLookAndFeelDefaults().remove(key);
+        }
+    }
 
     private static BufferedImage paint(DockDropOverlay overlay) {
         overlay.setSize(400, 300);
@@ -39,7 +59,7 @@ class DockDropOverlayTest {
     }
 
     @Test void theHighlightAndThePlaceholderLandExactlyInTheirRectangles() {
-        for (String key : KEYS) UIManager.put(key, null);
+        noThemeColours();
         UIManager.put("Component.accentColor", new Color(0x2f, 0x80, 0xed));
         var overlay = new DockDropOverlay();
         overlay.show(new Rectangle(50, 40, 200, 100), new Rectangle(10, 160, 22, 22), null, null);
@@ -57,11 +77,13 @@ class DockDropOverlayTest {
     }
 
     @Test void theThemesOwnDragColoursWin() {
+        originalLookAndFeel = UIManager.getLookAndFeel();
+        ThemeTestSupport.install(Theme.DARK);
         UIManager.put("DragAndDrop.areaBackground", new Color(10, 20, 30, 40));
         UIManager.put("DragAndDrop.borderColor", new Color(200, 100, 50, 255));
         assertThat(DockDropOverlay.fill()).isEqualTo(new Color(10, 20, 30, 40));
         assertThat(DockDropOverlay.border()).isEqualTo(new Color(200, 100, 50, 255));
-        for (String key : KEYS) UIManager.put(key, null);
+        noThemeColours();
         assertThat(DockDropOverlay.fill()).as("no accent either: IntelliJ's blue").isEqualTo(new Color(0x35, 0x74, 0xf0, 64));
     }
 
