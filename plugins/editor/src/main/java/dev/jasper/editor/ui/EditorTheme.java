@@ -5,7 +5,10 @@ import dev.jasper.sdk.ui.SyntaxPalette;
 import dev.jasper.sdk.ui.SyntaxRole;
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.event.ContainerAdapter;
+import java.awt.event.ContainerEvent;
 import java.util.Map;
+import javax.swing.JComponent;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.Style;
 import org.fife.ui.rsyntaxtextarea.SyntaxScheme;
@@ -16,6 +19,7 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 /** Applies workspace editor surfaces and semantic syntax without replacing an editor's document. */
 public final class EditorTheme {
     private static final Color CLEAR = new Color(0, 0, 0, 0);
+    private static final String FOLLOWS_GUTTER = "jasper.editor.gutterOpacityFollower";
 
     /** Applies the current workspace palettes to an editor and its gutter, fully opaque. */
     public void apply(RSyntaxTextArea area, RTextScrollPane scroll, EditorPalette editor, SyntaxPalette syntax) {
@@ -69,10 +73,25 @@ public final class EditorTheme {
         gutter.setOpaque(!glass);
         gutter.setBackground(gutterBackground);
         // Line numbers and fold indicators fill with the gutter background themselves; clear, they leave the glass.
-        for (var child : gutter.getComponents()) if (child instanceof javax.swing.JComponent component) component.setOpaque(!glass);
+        for (var child : gutter.getComponents()) if (child instanceof JComponent component) component.setOpaque(!glass);
+        followGutterOpacity(gutter);
         gutter.setBorderColor(glass ? CLEAR : fixed(editor.gutter()));
         gutter.setFoldBackground(gutterBackground);
         gutter.setLineNumberColor(fixed(editor.lineNumbers()));
+    }
+
+    /*
+     * RSyntaxTextArea detaches and reattaches the same line-number list when line numbers are toggled (Vim's
+     * :set nonumber), so a child that was away during an opacity change takes the gutter's opacity when it returns.
+     */
+    private static void followGutterOpacity(Gutter gutter) {
+        if (gutter.getClientProperty(FOLLOWS_GUTTER) != null) return;
+        gutter.putClientProperty(FOLLOWS_GUTTER, Boolean.TRUE);
+        gutter.addContainerListener(new ContainerAdapter() {
+            @Override public void componentAdded(ContainerEvent event) {
+                if (event.getChild() instanceof JComponent child) child.setOpaque(gutter.isOpaque());
+            }
+        });
     }
 
     private static Color translucent(Color color, double opacity) {
