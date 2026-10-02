@@ -241,7 +241,7 @@ class ShellExitBehaviorTest {
             owner = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {
                 assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); empty.incrementAndGet();
             }, themes);
-            owner.onError = failures::add;
+            owner.onError = (title, message) -> failures.add(message);
             controller.register(owner);
         });
     }

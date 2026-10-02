@@ -545,14 +545,14 @@ public final class JasperApplication {
         void info(String message) {
             TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
             if (target == null) LOG.log(System.Logger.Level.INFO, message);
-            else target.content().onInfo.accept(message);
+            else target.content().onInfo.accept("Jasper", message);
         }
 
         /** A plugin's error notice: the window the user used last, or the log when there is none. */
         void notice(String message) {
             TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
             if (target == null) LOG.log(System.Logger.Level.WARNING, "Plugin notice with no window: " + message);
-            else target.content().onError.accept(message);
+            else target.content().onError.accept("Jasper", message);
         }
 
     /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */

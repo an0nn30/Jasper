@@ -39,6 +39,7 @@ import dev.jasper.app.terminals.SessionRequest;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(WindowContent.class.getName());
     private final ShellLauncher launcher;
     private final Consumer<Path> newWindow;
     private final Runnable quit;
@@ -115,9 +116,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
     Consumer<String> onTitle = title -> {};
-    public Consumer<String> onError = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.ERROR_MESSAGE);
-    /** Shows a plain informational message, such as the result of Migrate Config. */
-    public Consumer<String> onInfo = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.INFORMATION_MESSAGE);
+    /** An error to tell the user about, as a title and details; the application posts it as a notification. */
+    public java.util.function.BiConsumer<String, String> onError = WindowContent::unheard;
+    /** Information to tell the user, such as the result of Migrate Config; the application posts it as a notification. */
+    public java.util.function.BiConsumer<String, String> onInfo = WindowContent::unheard;
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     public Runnable onToggleBuddy = () -> {};
     public java.util.function.BooleanSupplier buddyEnabled = () -> false;
@@ -581,6 +583,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         };
     }
 
+    /** Opens the status bar's configuration details, as clicking its configuration button does. */
+    public void showConfigurationDetails() {
+        if (!closed) status().onConfigurationDetails.run();
+    }
+
+    /** A message before the application connected a receiver: logged by its fixed title, never shown in a dialog. */
+    private static void unheard(String title, String details) {
+        LOG.log(System.Logger.Level.WARNING, "A window message had no receiver: " + title);
+    }
+
     public void applyConfiguration(ConfigSnapshot next, boolean macOs) { workspaceConfiguration.apply(next, macOs); }
     float configuredFontSize() { return workspaceConfiguration.configuredFontSize(); }
     boolean closed() { return closed; }
@@ -763,7 +775,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             update();
         };
         tab.onEmpty = () -> closeTab(tab);
-        tab.onError = message -> onError.accept(message);
+        tab.onError = message -> onError.accept("Could not start the terminal", message);
         tab.configure = pane -> configurePane(tab, pane);
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
@@ -974,7 +986,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void selectTheme(Theme theme) {
         if (closed) return;
         try { themes.configure(theme); }
-        catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
+        catch (ThemeController.InstallationFailure failure) { onError.accept("Could not apply the theme", failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
@@ -1019,7 +1031,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var save = saveSettings;
         var state = configurationState;
         if (save == null || state == null) { locally.run(); return; }
-        if (state.rejected()) { revertChoices(); onError.accept(REJECTED_CHOICE); return; }
+        if (state.rejected()) { revertChoices(); onError.accept("Settings not saved", REJECTED_CHOICE); return; }
         java.util.concurrent.CompletableFuture<?> result;
         try { result = save.apply(dev.jasper.app.config.SettingsEdit.of(setting, value, state.values())); }
         catch (RuntimeException failure) { result = java.util.concurrent.CompletableFuture.failedFuture(failure); }
@@ -1030,7 +1042,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 revertChoices();
                 Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
                     ? failure.getCause() : failure;
-                onError.accept(cause.getMessage());
+                onError.accept("Settings not saved", cause.getMessage());
             });
         });
     }
@@ -1183,7 +1195,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         refreshTabs();
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
-        onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
+        onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();
         anyWindowActive = () -> false;

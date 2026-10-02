@@ -187,6 +187,8 @@ class WorkspaceThemeTest {
             var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
             owner[0] = content(new dev.jasper.app.launch.ShellLauncher(pending::add,
                 path -> { throw new IllegalStateException("expected launch failure"); }, "fixture"), themes);
+            // A pane closes once its failure is reported; a receiver that refuses the report keeps the failed pane to inspect.
+            owner[0].onError = (title, details) -> { throw new IllegalStateException("keep the failed pane"); };
             themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
         });
         pending.remove().run();

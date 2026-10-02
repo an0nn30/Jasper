@@ -201,7 +201,7 @@ final class BenchmarkRun implements AutoCloseable {
             previousRepaintManager = RepaintManager.currentManager(null); RepaintManager.setCurrentManager(rendering);
             application = new JasperApplication(null, launcher);
             window = application.newWindow(directory);
-            window.content().onError = message -> samplingFailure = new IllegalStateException(message);
+            window.content().onError = (title, message) -> samplingFailure = new IllegalStateException(title + ": " + message);
             window.resize(new Dimension(1100, 850));
             return null;
         });
@@ -305,7 +305,7 @@ final class BenchmarkRun implements AutoCloseable {
             retireChildrenExcept(retained);
             TerminalWindow temporaryWindow = edt(() -> {
                 TerminalWindow created = application.newWindow(directory);
-                created.content().onError = message -> samplingFailure = new IllegalStateException(message);
+                created.content().onError = (title, message) -> samplingFailure = new IllegalStateException(title + ": " + message);
                 return created;
             });
             ready(temporaryWindow, 1); drain(temporaryWindow);
