@@ -11,6 +11,7 @@ import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.ComponentEvent;
@@ -28,13 +29,48 @@ import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** The dock drag gesture against a window built like WindowContent's: header, stripes beside the area, status bar. */
 @ExtendWith(EdtTestExtension.class)
 class DockDragTest {
+    /** Every fixture a test built, so that no drag outlives its test. */
+    private final List<Window> windows = new ArrayList<>();
+    /** Stands in for the global focus manager during each test: it records the Esc dispatchers the drags add. */
+    private CommandPaletteShortcutsTest.RecordingFocusManager keys;
+    private KeyboardFocusManager previousKeys;
+
+    @BeforeEach void recordKeyDispatchers() throws Exception {
+        edt(() -> {
+            previousKeys = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
+        });
+    }
+
+    /** A running drag's Esc dispatcher would eat the next Esc of a later test in this JVM. */
+    @AfterEach void noDragOutlivesItsTest() throws Exception {
+        edt(() -> {
+            try {
+                for (Window window : windows) window.drag.cancel();
+                assertThat(keys.dispatchers).as("no Esc dispatcher is left behind").isEmpty();
+            } finally {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(previousKeys);
+            }
+        });
+    }
+
+    private Window window() {
+        var window = new Window();
+        windows.add(window);
+        return window;
+    }
+
     /** A window with a, b, c in the left top group and d in the right top group. Built on the EDT, in each test. */
     private static final class Window {
         final DockState state = new DockState();
@@ -149,7 +185,7 @@ class DockDragTest {
     private static int firstDragEvent() { return UIScale.scale(DockDrag.THRESHOLD) + 1; }
 
     @Test void aWobbleOutOfTheLastRowAndBackStaysHome() {
-        var w = new Window();
+        var w = window();
         Rectangle square = w.squareOfB();
         // b's last pixel row: once b is lifted, c slides up into b's square, and this row is below c's middle.
         Point press = new Point((int) square.getCenterX(), square.y + square.height - 1);
@@ -158,7 +194,7 @@ class DockDragTest {
     }
 
     @Test void aWobbleOutOfTheLastColumnAndBackStaysHome() {
-        var w = new Window();
+        var w = window();
         Rectangle square = w.squareOfB();
         // b's last pixel column, in its lower half; the wobble goes past the stripe's edge into the workspace.
         Point press = new Point(square.x + square.width - 1, (int) square.getCenterY() + 4);
@@ -168,14 +204,14 @@ class DockDragTest {
 
     @Test void oneMorePixelOutLeavesHomeAndComingBackIsResolvedFromTheStripe() {
         int out = firstDragEvent() + 1;
-        var down = new Window();
+        var down = window();
         Rectangle square = down.squareOfB();
         Point lastRow = new Point((int) square.getCenterX(), square.y + square.height - 1);
         assertThat(down.wobble(lastRow, 0, out)).as("c slid up into b's square, and the press point is below its middle")
             .isEqualTo(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
         assertThat(down.state.ids(Slot.LEFT_TOP)).containsExactly("a", "c", "b");
 
-        var right = new Window();
+        var right = window();
         square = right.squareOfB();
         Point lastColumn = new Point(square.x + square.width - 1, (int) square.getCenterY() + 4);
         assertThat(right.wobble(lastColumn, out, 0)).isEqualTo(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 2));
@@ -183,7 +219,7 @@ class DockDragTest {
     }
 
     @Test void aPressBecomesADragOnlyPastFivePixelsAndTheOverlayComesAndGoes() {
-        var w = new Window();
+        var w = window();
         var source = w.button(w.left, "b");
         Point start = w.center(source);
         w.mouse(source, MouseEvent.MOUSE_PRESSED, start);
@@ -204,7 +240,7 @@ class DockDragTest {
     }
 
     @Test void releasingWhereTheLastButtonOfAGroupWasChangesNothing() {
-        var w = new Window();
+        var w = window();
         w.state.show("c");
         w.shown.clear();
         var source = w.button(w.left, "c");
@@ -231,7 +267,7 @@ class DockDragTest {
     }
 
     @Test void theSecondGroupStaysReachableWhenTheLastTopButtonIsLifted() {
-        var w = new Window();
+        var w = window();
         w.state.move("d", Slot.LEFT_BOTTOM, 0);
         Point upperHalfOfD = w.center(w.button(w.left, "d"));
         upperHalfOfD.translate(0, -5);
@@ -250,7 +286,7 @@ class DockDragTest {
     }
 
     @Test void theHomeOnlyAppliesUntilTheCursorLeavesIt() {
-        var w = new Window();
+        var w = window();
         var source = w.button(w.left, "b");
         Point home = w.center(source);
         Point lowerInHome = new Point(home.x, home.y + 6);
@@ -265,7 +301,7 @@ class DockDragTest {
     }
 
     @Test void aResizeAfterTheDragStartsClearsTheHome() {
-        var w = new Window();
+        var w = window();
         var source = w.button(w.left, "b");
         Point home = w.center(source);
         w.dragTo(source, new Point(home.x, home.y + 6));
@@ -278,7 +314,7 @@ class DockDragTest {
     }
 
     @Test void aStripeDropMovesTheWindowAndKeepsItsVisibility() {
-        var w = new Window();
+        var w = window();
         w.state.show("a");
         w.shown.clear();
         Point belowD = w.center(w.button(w.right, "d"));
@@ -293,7 +329,7 @@ class DockDragTest {
     }
 
     @Test void aWorkspaceDropMovesTheWindowAndShowsIt() {
-        var w = new Window();
+        var w = window();
         Point bottomRight = w.cell(2, 1);
         var source = w.dragTo(w.button(w.left, "b"), bottomRight);
         assertThat(w.drag.target()).hasValue(DockDropResolver.Target.workspace(Slot.BOTTOM_RIGHT));
@@ -305,7 +341,7 @@ class DockDragTest {
     }
 
     @Test void aWindowReordersWithinItsStripe() {
-        var w = new Window();
+        var w = window();
         Point aboveA = w.center(w.button(w.left, "a"));
         aboveA.translate(0, -8);
         var source = w.dragTo(w.button(w.left, "c"), aboveA);
@@ -315,7 +351,7 @@ class DockDragTest {
     }
 
     @Test void theHeaderStartsTheSameDrag() {
-        var w = new Window();
+        var w = window();
         w.state.show("a");
         w.shown.clear();
         Point rightTop = w.cell(0, 1);
@@ -328,7 +364,7 @@ class DockDragTest {
     }
 
     @Test void theGuidesShowWhereTheWindowWouldLandWithoutMovingTheRealLayout() {
-        var w = new Window();
+        var w = window();
         w.dragTo(w.button(w.left, "b"), w.cell(2, 0));
         Rectangle area = new Rectangle(0, 0, w.area.getWidth(), w.area.getHeight());
         Rectangle expected = SwingUtilities.convertRectangle(w.area,
@@ -347,7 +383,7 @@ class DockDragTest {
     }
 
     @Test void escapeOrAReleaseWithoutATargetCancels() {
-        var w = new Window();
+        var w = window();
         var source = w.dragTo(w.button(w.left, "b"), w.cell(1, 1));
         assertThat(w.drag.dispatchKeyEvent(new KeyEvent(w.content, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0,
             KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).as("the drag owns Esc").isTrue();
@@ -366,7 +402,7 @@ class DockDragTest {
     }
 
     @Test void resizingTheWindowMidDragResolvesTheTargetAgain() {
-        var w = new Window();
+        var w = window();
         Point point = new Point(1100, 50);
         w.dragTo(w.button(w.left, "b"), point);
         assertThat(w.drag.target()).hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_TOP));
@@ -377,7 +413,7 @@ class DockDragTest {
     }
 
     @Test void aDockChangeOrCancelEndsTheDragAndAPendingPress() {
-        var w = new Window();
+        var w = window();
         w.dragTo(w.button(w.left, "b"), w.cell(0, 1));
         w.state.show("c");
         assertThat(w.drag.active()).as("any dock change ends the drag").isFalse();
@@ -403,7 +439,7 @@ class DockDragTest {
 
     @Test void aMiddleOrRightPressMidDragCancelsItAndNothingDrops() {
         for (int button : new int[] {MouseEvent.BUTTON3, MouseEvent.BUTTON2}) {
-            var w = new Window();
+            var w = window();
             List<String> drops = new ArrayList<>();
             var apply = w.drag.onDrop;
             w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
@@ -427,7 +463,7 @@ class DockDragTest {
     }
 
     @Test void onlyALeftReleaseEndsTheDragWithADrop() {
-        var w = new Window();
+        var w = window();
         List<String> drops = new ArrayList<>();
         var apply = w.drag.onDrop;
         w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
@@ -444,7 +480,7 @@ class DockDragTest {
     }
 
     @Test void aLeftPressWithThePopupFlagNeverStartsADrag() {
-        var w = new Window();
+        var w = window();
         w.state.show("a");
         // The header's title, not a stripe button: a button's own popup menu cannot open in a headless window.
         var source = w.area.headerOf(Slot.LEFT_TOP).titleLabel();
@@ -456,7 +492,7 @@ class DockDragTest {
     }
 
     @Test void aLeftPressMidDragMeansTheReleaseWasLostAndStartsOver() {
-        var w = new Window();
+        var w = window();
         List<String> drops = new ArrayList<>();
         var apply = w.drag.onDrop;
         w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };

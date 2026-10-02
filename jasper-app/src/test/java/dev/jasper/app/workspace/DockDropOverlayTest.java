@@ -10,29 +10,39 @@ import java.awt.image.BufferedImage;
 import java.util.Map;
 import javax.swing.ImageIcon;
 import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class DockDropOverlayTest {
     private static final String[] KEYS = {"DragAndDrop.areaBackground", "DragAndDrop.borderColor", "Component.accentColor"};
     private final Map<String, Object> saved = new java.util.HashMap<>();
+    /** Set by a test that installs another look and feel. */
     private javax.swing.LookAndFeel originalLookAndFeel;
 
-    DockDropOverlayTest() { for (String key : KEYS) saved.put(key, UIManager.getLookAndFeelDefaults().get(key)); }
+    @BeforeEach void save() throws Exception {
+        edt(() -> { for (String key : KEYS) saved.put(key, UIManager.getLookAndFeelDefaults().get(key)); });
+    }
 
-    @AfterEach void restore() {
-        for (String key : KEYS) {
-            UIManager.put(key, null);
-            Object lfValue = saved.get(key);
-            if (lfValue != null) UIManager.getLookAndFeelDefaults().put(key, lfValue);
-            else UIManager.getLookAndFeelDefaults().remove(key);
-        }
-        if (originalLookAndFeel != null) {
-            try { UIManager.setLookAndFeel(originalLookAndFeel); } catch (Exception e) { }
-        }
+    /** The look and feel first, since installing it rebuilds its defaults; then the three keys at both levels. */
+    @AfterEach void restore() throws Exception {
+        edt(() -> {
+            if (originalLookAndFeel != null) {
+                try { UIManager.setLookAndFeel(originalLookAndFeel); }
+                catch (UnsupportedLookAndFeelException e) { throw new AssertionError(e); }
+            }
+            for (String key : KEYS) {
+                Object lfValue = saved.get(key);
+                if (lfValue != null) UIManager.getLookAndFeelDefaults().put(key, lfValue);
+                else UIManager.getLookAndFeelDefaults().remove(key);
+                UIManager.put(key, null);
+            }
+        });
     }
 
     private static void noThemeColours() {
