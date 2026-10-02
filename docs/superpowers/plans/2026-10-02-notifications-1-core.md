@@ -2,8 +2,34 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-10-02; awaiting user review. Not started. Branch `claude/notifications`
-(worktree `.worktrees/notifications`, cut from main `e91512f6`).
+**Status:** Implemented on branch `claude/notifications` (worktree `.worktrees/notifications`, cut from main
+`e91512f6`); `./gradlew check` green (8,076 tests, 0 failures, 0 errors, 6 skips); awaiting the final
+whole-branch review and the user's GUI checks (listed in [STATUS](../../STATUS.md)). The editor plugin's
+`ExFilesTest` fails on a temp path containing `zz` (main fixed it in `185a5f8e`); the check ran with `java.io.tmpdir`
+elsewhere, and merging main removes the need.
+
+**Execution deviations** (the plan text below was amended where noted):
+
+1. Task 3: `NotificationCenter.activate(id)` marks every unexpired entry read and runs its default action only when
+   present, since the spec says a body click marks it read (`a259123b`, `24d65f14`; plan text for Tasks 3, 5 and 11
+   amended in `36f46e9c`).
+2. Task 5: every component that shows notification text is built empty, given `html.disable`, then `setText`, because
+   setting the property after construction left HTML views in place; the card picks its visible action links by
+   measured width (up to three, fewer beside `More ▾`) so wide labels never push `More ▾` out of the row
+   (`f25ff87b`, `de35fd85`).
+3. Task 7: added a test pinning the corner layer's resize listeners and their removal (`660f6f17`, test only).
+4. Task 8: `WrappedText` derives `Font.PLAIN` / `Font.BOLD` explicitly (Metal's `Label.font` is bold); New lists every
+   unread entry plus entries read by looking until the panel hides, so an unfocused window's unread rows sit under New,
+   and an entry read elsewhere while the panel shows stays under New until it hides; section accessors read the
+   displayed rows, and wrap and theme-rebuild tests were added (`ca783db3`, `9f4d9bb0`; guide text amended in
+   `32ba66c1`).
+5. Task 9: after a failed shell launch the window's only pane stays open showing its failure, because without the old
+   blocking dialog closing that pane closed the window and, by default, Jasper before the error could be seen; any
+   other failed pane still closes (`e6cfec3d`, `c9e13b76`; spec section 7 amended in `fc670a51`).
+6. Task 10: `windowClosed` guards `detach` against the null window existing tests pass; window errors and info target
+   the posting window (`NotificationsFeature.error` / `info(title, details, windowId)` with `withTarget`), per spec
+   section 7 "the poster's window, else the terminal window used last"; headless app-level wiring tests were added
+   (`58ca9237`, `34d624fd`).
 
 **Goal:** Replace every modal message dialog with an in-memory notification center whose notifications appear as
 themed cards in the window's bottom-right corner and in a built-in Notifications rail panel with an unread badge.

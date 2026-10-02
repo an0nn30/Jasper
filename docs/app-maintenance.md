@@ -137,6 +137,23 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*CommandNotifierTest" --tests "*WorkspaceActivityTest" :jasper-buddy:test --tests "*BuddyDeckTest" --tests "*BuddyCompanionTest"
 ```
 
+## Posting a notification
+
+Application code never opens a message dialog to tell the user something; it posts a notification
+([guide](notifications.md), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+
+- Window code calls `WindowContent.onError` / `onInfo` with a fixed title and the details; the application posts them
+  to `jasper.general`. Never put user data in the title: it is what a window logs when nothing receives the message.
+- Application code calls `NotificationsFeature.error` / `info`, or `NotificationCenter.post` with a
+  `NotificationRequest` for another group, actions or a default action. Declare a group with
+  `NotificationCenter.register` before posting to it; posts to an undeclared group are dropped and logged.
+- Text is plain and bounded: titles are one line (cut at 200 characters), details at most 4,000. Pass exception
+  messages as details, never as titles.
+- Contextual feedback (a Settings field error, a palette error row, a plugin's inline row) stays where it is, and
+  confirmation or input prompts stay dialogs: notifications are for things that happen elsewhere or later.
+- Cards, the panel and the badge read `Jasper.notification.*` and `Jasper.railBadge*` colours derived in `ChromeKeys`;
+  a theme's own `Notification.*` keys win.
+
 ## Platform integration
 
 Place OS behavior in [MacTitleBar](../jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java)-style adapters or the existing platform package. Supply narrow JDK callbacks and values rather than WindowContent/JasperApplication back-references. Register cleanup immediately using [StartupResources](../jasper-app/src/main/java/dev/jasper/app/bootstrap/StartupResources.java) during startup, then transfer it to the long-lived owner only after wiring succeeds. Keep handoff before AWT; distinguish unsupported capability from failed startup. Tests inject boundary callbacks and do not open a real desktop window.

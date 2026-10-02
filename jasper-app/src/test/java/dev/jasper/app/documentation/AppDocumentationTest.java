@@ -14,7 +14,7 @@ class AppDocumentationTest {
     private static final List<Path> GUIDES = List.of(
         "README.md", "AGENTS.md", "jasper-app/README.md", "jasper-buddy/README.md",
         "docs/README.md", "docs/STATUS.md", "docs/app-architecture.md", "docs/app-maintenance.md",
-        "docs/buddy-architecture.md", "docs/buddy-maintenance.md", "docs/configuration.md",
+        "docs/buddy-architecture.md", "docs/buddy-maintenance.md", "docs/configuration.md", "docs/notifications.md",
         "docs/command-palette.md", "docs/diagnostics.md", "docs/packaging.md", "docs/benchmarks.md",
         "docs/rebranding.md", "docs/terminal-readiness.md", "docs/terminal-refactor-verification.md",
         "docs/app-refactor-verification.md", "docs/documentation-audit.md",

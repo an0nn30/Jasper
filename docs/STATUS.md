@@ -2,6 +2,25 @@
 
 ## Current state — 2026-10-01
 
+- **Notifications plan 1: core, implemented and verified; awaiting the final whole-branch review and the user's GUI checks** (2026-10-02; branch `claude/notifications`, spec
+  `docs/superpowers/specs/2026-10-02-jasper-notifications-design.md`, plan
+  `docs/superpowers/plans/2026-10-02-notifications-1-core.md`, [guide](notifications.md)): an EDT `NotificationCenter` (in-memory history of 500,
+  60 s coalescing, read/expired state, waiting cards), per-window card stacks in the content corner, the built-in
+  Notifications rail panel with an unread badge, and the `jasper.general` / `jasper.config` producers. Window errors
+  and info, plugin `Notices` and configuration problems no longer open dialogs. Recorded interpretations are in the
+  plan's "Spec interpretations" section; the six deviations made during execution are in its status banner. `./gradlew check`: **8,076 tests, 0 failures, 0 errors, 6 skips**
+  (all four architecture gates, doclint and compiled examples included; source hygiene over the 58 changed Java files
+  and `git diff --check` clean). On this Mac `plugins/editor`'s `ExFilesTest.bufferSelectsATabByNumberOrName` fails when
+  the temp folder's path contains `zz` (as `$TMPDIR` does here); main already fixes it (`185a5f8e`), the branch base does
+  not, so the check was run with `java.io.tmpdir` pointed at a short path without `zz` (some tests also depend on the temp path's length and text); merging main removes the need. No GUI was launched
+  and nothing was pushed. GUI checks for the user:
+  - cards in light and dark themes, their shadow, and the badge dot on a normal and a selected/hovered rail button;
+  - several windows: a card appears in the window that raised it; clicks beside a card reach the terminal; Dismiss Cards;
+  - the Notifications panel: New/Earlier, Clear All, row ✕, theme switch while open;
+  - auto-hide pausing while the window is in the background and while hovering a card (including while its More menu is open);
+  - a broken `config.toml` at startup shows a sticky Configuration card with Show Problems / Open config.toml;
+  - a broken shell profile at startup leaves the window open with the failure in the pane and an error card.
+
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
   against local merge `cc0429f5`, on `codex/theme-system-plan5` in the reused `.worktrees/theme-system` worktree.
