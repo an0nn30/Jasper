@@ -143,6 +143,19 @@ public final class DockGeometry {
     }
 
     /**
+     * Where a window would land if it moved to the target slot and showed there: the drop preview. It lays out a copy
+     * of the state, so the real layout does not change, and it uses {@link #compute}, so preview and layout agree. A
+     * window already in the target slot keeps its place there. Empty when the window is not docked.
+     */
+    public static Optional<Rectangle> landing(Rectangle bounds, DockState state, String id, Slot target, Metrics metrics) {
+        DockState whatIf = state.copy();
+        if (whatIf.slot(id).isEmpty()) return Optional.empty();
+        List<String> ids = whatIf.ids(target);
+        whatIf.moveAndShow(id, target, ids.contains(id) ? ids.indexOf(id) : ids.size());
+        return compute(bounds, whatIf, metrics).slot(target);
+    }
+
+    /**
      * Applies dragging a divider: its leading edge moves to position, kept within the divider's range. A width or
      * height is stored unscaled; a ratio is the first slot's share of the split.
      */

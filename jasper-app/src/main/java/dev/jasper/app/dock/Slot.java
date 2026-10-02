@@ -43,6 +43,16 @@ public enum Slot {
     /** The name menus show, such as "Left Top". */
     public String displayName() { return displayName; }
 
+    /** The slot a stripe group shows: the left stripe's top, second and foot groups, or the right stripe's. */
+    public static Slot on(Side stripe, Group group) {
+        if (stripe == Side.BOTTOM) throw new IllegalArgumentException("A stripe stands on the left or the right");
+        return switch (group) {
+            case TOP -> of(stripe, false);
+            case SECOND -> of(stripe, true);
+            case FOOT -> of(Side.BOTTOM, stripe == Side.RIGHT);
+        };
+    }
+
     /** The slot for a side and split flag. */
     public static Slot of(Side side, boolean split) {
         return switch (side) {

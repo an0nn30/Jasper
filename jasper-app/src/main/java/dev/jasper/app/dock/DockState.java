@@ -159,6 +159,33 @@ public final class DockState {
         fire(new Change(true, true, previous == null ? List.of() : List.of(previous), List.of()));
     }
 
+    /**
+     * Moves the window and shows it, in one change: a drop on the workspace. The window the target slot was showing
+     * hides but stays on its stripe. A window that already shows in that place changes nothing.
+     *
+     * @param index position among the target slot's other windows, clamped; within one slot, its new position
+     */
+    public void moveAndShow(String id, Slot target, int index) {
+        Objects.requireNonNull(target, "target");
+        Optional<Slot> from = slot(id);
+        if (from.isEmpty()) return;
+        boolean wasVisible = visible(id);
+        List<String> source = order.get(from.get());
+        List<String> ids = order.get(target);
+        boolean sameSlot = from.get() == target;
+        int clamped = Math.clamp(index, 0, sameSlot ? ids.size() - 1 : ids.size());
+        boolean moved = !(sameSlot && clamped == source.indexOf(id));
+        if (!moved && wasVisible) return;
+        if (moved) {
+            source.remove(id);
+            ids.add(clamped, id);
+        }
+        if (wasVisible) active.remove(from.get(), id);
+        String previous = active.put(target, id);
+        fire(new Change(true, true, previous == null || previous.equals(id) ? List.of() : List.of(previous),
+            wasVisible ? List.of() : List.of(id)));
+    }
+
     /** Sets a side's size, clamped to {@link #MIN_SIZE}..{@link #MAX_SIZE} unscaled pixels. */
     public void resize(Side side, int pixels) {
         int value = Math.clamp(pixels, MIN_SIZE, MAX_SIZE);
