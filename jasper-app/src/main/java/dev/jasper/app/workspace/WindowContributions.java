@@ -49,6 +49,8 @@ final class WindowContributions implements AutoCloseable {
         final PanelEntry entry;
         PanelSite site;
         JComponent component;
+        /** What the panel last heard: a nested change can overtake a notification, which then must not be sent. */
+        boolean notified;
         PanelInstance(PanelEntry entry) { this.entry = entry; }
     }
 
@@ -235,9 +237,12 @@ final class WindowContributions implements AutoCloseable {
         owner.area().setContent(id, panel.entry.title(), panel.component);
     }
 
+    /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
     private void notifyVisibility(String id, boolean visible) {
         PanelInstance panel = panels.get(id);
-        if (panel != null && panel.site != null) panel.site.notifyVisibility(visible);
+        if (panel == null || panel.site == null || dock.visible(id) != visible || panel.notified == visible) return;
+        panel.notified = visible;
+        panel.site.notifyVisibility(visible);
     }
 
     /**

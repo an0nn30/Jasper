@@ -274,6 +274,53 @@ class WindowPanelsTest {
         });
     }
 
+    @Test void aFactoryThatHidesItsOwnWindowHearsNothing() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            List<PanelSite> sites = new ArrayList<>();
+            model.addPanel("dev.x.shy", "Shy", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                sites.add(site);
+                site.onVisibility(visible -> events.add("shy:" + visible));
+                site.hide();
+                return new JLabel("shy");
+            });
+            toggle(model, owner, "dev.x.shy");
+            assertThat(events).as("it never showed").isEmpty();
+            assertThat(sites).singleElement().satisfies(site -> assertThat(site.visible()).isFalse());
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+        });
+    }
+
+    @Test void aWindowThatShowsItselfAgainWhenReplacedHearsOnlyWhatIsTrue() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            List<String> events = new ArrayList<>();
+            var once = new java.util.concurrent.atomic.AtomicBoolean(true);
+            model.addPanel("dev.x.a", "A", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                site.onVisibility(visible -> {
+                    events.add("a:" + visible);
+                    if (!visible && once.getAndSet(false)) site.show();
+                });
+                return new JLabel("a");
+            });
+            model.addPanel("dev.x.b", "B", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                site.onVisibility(visible -> events.add("b:" + visible));
+                return new JLabel("b");
+            });
+            toggle(model, owner, "dev.x.a");
+            events.clear();
+            toggle(model, owner, "dev.x.b");
+            assertThat(events).as("the replaced window took its slot back before the other heard it shows").containsExactly("a:false", "a:true");
+            assertThat(owner.dock().visible("dev.x.a")).isTrue();
+            assertThat(owner.dock().visible("dev.x.b")).isFalse();
+        });
+    }
+
     @Test void railActionsAndTheRailToggleCommandHideAndShowBothStripes() throws Exception {
         edt(() -> {
             var model = new Contributions();
