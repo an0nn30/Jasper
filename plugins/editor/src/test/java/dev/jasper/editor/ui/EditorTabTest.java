@@ -58,6 +58,7 @@ class EditorTabTest {
     }
 
     /** Without a peer RSyntaxTextArea cannot take its first font metrics from its own graphics, so gives it one. */
+    // Pins private members of RSyntaxTextArea 3.6.0 (refreshFontMetrics, metricsNeverRefreshed).
     private static void measure(EditorTab tab) {
         try {
             var image = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
@@ -95,6 +96,11 @@ class EditorTabTest {
             int gutter = image.getRGB(inGutter.x, inGutter.y);
             assertThat(gutter >>> 24).isEqualTo(128);
             assertThat(gutter & 0xFFFFFF).isEqualTo(EditorThemeTest.EDITOR.gutter().getRGB() & 0xFFFFFF);
+            // The gutter's border line at its right edge must be glass too, not a solid stripe.
+            var inEdge = javax.swing.SwingUtilities.convertPoint(header, header.getWidth() - 1, header.getHeight() - 20, tab);
+            int edge = image.getRGB(inEdge.x, inEdge.y);
+            assertThat(edge >>> 24).isEqualTo(128);
+            assertThat(edge & 0xFFFFFF).isEqualTo(EditorThemeTest.EDITOR.gutter().getRGB() & 0xFFFFFF);
 
             tab.apply(settings, new EditorTheme(), EditorThemeTest.EDITOR, syntax, 1.0);
             layOut(tab);

@@ -70,7 +70,7 @@ public final class EditorTheme {
         gutter.setBackground(gutterBackground);
         // Line numbers and fold indicators fill with the gutter background themselves; clear, they leave the glass.
         for (var child : gutter.getComponents()) if (child instanceof javax.swing.JComponent component) component.setOpaque(!glass);
-        gutter.setBorderColor(fixed(editor.gutter()));
+        gutter.setBorderColor(glass ? CLEAR : fixed(editor.gutter()));
         gutter.setFoldBackground(gutterBackground);
         gutter.setLineNumberColor(fixed(editor.lineNumbers()));
     }
