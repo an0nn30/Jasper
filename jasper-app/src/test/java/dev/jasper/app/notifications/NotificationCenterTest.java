@@ -190,7 +190,7 @@ class NotificationCenterTest {
         assertThat(center.find(id).orElseThrow().expired()).isTrue();
     }
 
-    @Test void activateRunsOnlyADefaultAction() {
+    @Test void activateReadsTheEntryAndRunsItsDefaultActionWhenThereIsOne() {
         var center = center();
         var ran = new ArrayList<String>();
         UUID withDefault = center.post(request(CARDS, "go").withActivate(() -> ran.add("go"))).orElseThrow();
@@ -199,7 +199,7 @@ class NotificationCenterTest {
         center.activate(plain);
         assertThat(ran).containsExactly("go");
         assertThat(center.find(withDefault).orElseThrow().read()).isTrue();
-        assertThat(center.find(plain).orElseThrow().read()).isFalse();
+        assertThat(center.find(plain).orElseThrow().read()).as("clicking the body marks it read").isTrue();
     }
 
     @Test void removeAndClear() {

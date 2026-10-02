@@ -198,13 +198,13 @@ public final class NotificationCenter {
         if (action.expires()) expire(id);
     }
 
-    /** Runs the entry's default action, when it has one, and marks it read. */
+    /** A click on the body: the entry is read, and its default action runs when it has one (spec section 2). */
     public void activate(UUID id) {
         requireEdt();
         Notification entry = history.get(id);
-        if (entry == null || entry.expired() || entry.request().activate().isEmpty()) return;
+        if (entry == null || entry.expired()) return;
         markRead(id);
-        contained(entry.request().activate().get(), "A notification's default action failed");
+        entry.request().activate().ifPresent(task -> contained(task, "A notification's default action failed"));
     }
 
     /** Jasper is focused again: cards that waited show now, in the order they were posted. */
