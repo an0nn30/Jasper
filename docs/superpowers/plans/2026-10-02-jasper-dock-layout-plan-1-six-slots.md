@@ -5764,8 +5764,8 @@ version 1 migration more than once.
 
 1. **First launch on your existing state:** the panels that were open are open in the same place and width
    (Sessions on the left). `ui-state.toml` now starts with `version = 2` and still has your `[windows]` and
-   `[chooser]` sections. If you had opened or moved SFTP before, expect it in Left Top beside Sessions, not under
-   it: a saved place wins over the new default. Move to › Left Bottom once puts it under Sessions for good.
+   `[chooser]` sections. If you had opened or moved SFTP before, expect it in Left Top with Sessions, so opening
+   one hides the other, not under it: a saved place wins over the new default. Move to › Left Bottom once puts it under Sessions for good.
 2. **Look against IntelliJ:** a stripe on each side; the left one lists Sessions, Tunnels, File Servers and Sample on
    top (in the order the plugins register them), then (on a fresh state, or after Move to › Left Bottom on SFTP once)
    a short grey separator and SFTP, then the rail actions behind their own separator; the right stripe is empty but

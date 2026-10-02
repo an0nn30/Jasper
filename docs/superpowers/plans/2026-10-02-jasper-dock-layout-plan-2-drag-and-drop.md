@@ -22,7 +22,10 @@ dependencies. No SDK change.
 **Prerequisite:** [Plan 1, six slots](2026-10-02-jasper-dock-layout-plan-1-six-slots.md), executed on this branch.
 Every task here edits plan 1's code.
 
-**Status:** Written 2026-10-02 on `claude/dock-layout`. Not executed. Waiting for the user's review.
+**Status:** Written 2026-10-02 on `claude/dock-layout` and approved by the user the same day. Before execution its
+text was aligned with plan 1 as executed (commits `400dcba5` through `5cd22948`): the dock test counts in Tasks 1 and 2
+(plan 1 ends with 29 dock tests, not 25), `ToolWindowAreaTest`'s count in Task 3 (9, not 8) and Task 6's `close()`
+anchor (plan 1's final review removed the save on close and reworded that comment). Executing.
 
 **Execution:** As plan 1: superpowers:subagent-driven-development, one implementer and one reviewer per task, then
 one whole-branch review. Record deviations in this banner and in `docs/STATUS.md`.
@@ -302,7 +305,7 @@ for path, text in changed.items():
 - [ ] **Step 4: Run the tests to make sure they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.dock.*'`
-Expected: PASS, 30 tests (plan 1's 25 and these 5).
+Expected: PASS, 34 tests (plan 1's 29 and these 5).
 
 - [ ] **Step 5: Commit**
 
@@ -505,7 +508,7 @@ public final class DockDropResolver {
 - [ ] **Step 4: Run the tests and the gate**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.dock.*'` and `./gradlew verifyApplicationArchitecture`
-Expected: PASS, 35 tests; the gate accepts `java.awt.Point` and `java.awt.Rectangle`.
+Expected: PASS, 39 tests; the gate accepts `java.awt.Point` and `java.awt.Rectangle`.
 
 - [ ] **Step 5: Commit**
 
@@ -1058,7 +1061,7 @@ print("updated", path)
 - [ ] **Step 4: Run the stripe and area tests**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.ToolStripe*' --tests 'dev.jasper.app.workspace.ToolWindowAreaTest'`
-Expected: PASS (`ToolStripeDragTest` 7, `ToolStripeTest` 5, `ToolWindowAreaTest` 8).
+Expected: PASS (`ToolStripeDragTest` 7, `ToolStripeTest` 5, `ToolWindowAreaTest` 9).
 
 - [ ] **Step 5: Commit**
 
@@ -2119,8 +2122,8 @@ import dev.jasper.app.dock.DockState;
         List<ToolStripe.Button> left""", """    private void renderStripes() {
         owner.dockDrag().cancel();
         List<ToolStripe.Button> left"""),
-        ("""        // Closing the window is not hiding its panels: save them as they are, then let go of the dock.
-        dock.removeListener(docked);""", """        // Closing the window is not hiding its panels: save them as they are, then let go of the dock.
+        ("""        // Closing the window is not hiding its panels, and every change was saved as it happened: just let go of the dock.
+        dock.removeListener(docked);""", """        // Closing the window is not hiding its panels, and every change was saved as it happened: just let go of the dock.
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };
         owner.dockDrag().icons = id -> null;
