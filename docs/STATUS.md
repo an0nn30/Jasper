@@ -1,6 +1,83 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-01
+## Current state — 2026-10-02
+
+- **No FlatLaf SEVERE at start-up with Nord** (branch `fix/theme-lazy-border`, user report 2026-10-02): Nord sets
+  `TableHeader.cellBorder` to a colour. Resolving workspace values asked the private, never-installed FlatLaf defaults
+  `get(key) == null` for every explicit colour key, which built FlatLaf's lazy `FlatTableHeaderBorder`; its constructor
+  reads `TableHeader.cellMargins` from the installed look, missing before any theme is installed, and FlatLaf logged
+  the NPE. `FlatLafThemeData.defines` checks the table without building values (then `get` for keys FlatLaf serves
+  elsewhere); WorkspaceValues and ThemeManager.install use it. Full check **7,967/0/0/6**; merged into local main
+  2026-10-02 (fast-forward), not pushed. Separate, not fixed here:
+  Darcula and four other converted themes keep IntelliJ named-colour values such as `"panel"`, which FlatLaf logs as
+  "Failed to parse" (`TitlePane.background`, `NewUiOnboarding.Dialog.background`).
+
+- **Theme dropdowns search as you type** (branch `claude/theme-search`, worktree `.claude/worktrees/settings-appearance`,
+  design approved in chat 2026-10-02): both Appearance dropdowns (`Editors.ThemePick`) are a `settingsui.SearchCombo`.
+  Typing in the open or focused dropdown shows an IntelliJ-style search bar at the top of the list and keeps the
+  names holding every word; Same as UI theme stays pinned; "No matching themes" is an unpickable row. Up/Down/Enter/
+  Escape/Backspace/Home/End work while searching, Enter picks without reaching OK (and picks nothing when nothing
+  matched), Space opens the list, and the combo never picks by first letter, even after a theme change rebuilds its
+  look and feel (an independent review found that and the Home/End leak; both fixed with tests). Rows are padded as
+  FlatLaf pads its own combo popup (the user saw text outside the highlight; fixed in `a1d3022f`). Full check
+  **7,966/0/0/6**; merged into local main 2026-10-02 (fast-forward), not pushed. Not done: grouped sections (not
+  requested), GUI check (hover/click, the × button, typing on a closed dropdown), push.
+
+- **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
+  worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
+  - **On top:** macOS raised the window Settings blocks in front of it. Every modal dialog now floats above Jasper's
+    windows while Jasper is active (`windows.FloatWhileActive`) and drops to the normal level while another
+    application is. Blocking is unchanged: only the opening window.
+  - **Appearance:** Theme and Workspace scheme dropdowns (`Editors.ThemePick`), with a gear beside Theme whose only
+    item is Import theme… (`themesui.ThemeImport`). They are staged until Apply/OK and re-read the catalog on refresh;
+    a missing saved name shows as "(not found)". Font & Colors links to Appearance; View › Themes… opens it.
+    "Workspace theme" is "Workspace scheme" in the UI and docs; the key `ui.theme.workspace` is unchanged.
+  - **Removed:** the Themes page, its pickers, preview, sample terminal and syntax sample, Duplicate, Remove, Open
+    themes folder and About, and the now-unused `ThemeDuplicate` and `ThemeFiles` duplicate/removal operations.
+    The notices still ship (now checked by `PackagedResourcesTest`). The theme-system spec §7 carries a superseded banner.
+  - Merged into local main 2026-10-02 after merging main (`c4211cf1`) into the branch; not pushed. Merged-tree
+    `./gradlew check`: **7,954/0/0/6**. Not done: GUI check (Settings over its window and other windows, switching apps, the
+    dropdowns, the gear and an import), push.
+
+- **Built-in theme catalog no longer stalls start-up** (branch `claude/theme-catalog-edt`, user request in chat
+  2026-10-02): building the application parsed all 284 bundled theme files on the EDT (`ThemeCatalog`'s built-in
+  snapshot), about 1.5 s cold, nearly all of it tomlj reading the converted themes' `[ui]` and `[icons]` tables (96% of
+  the 9.4 MB). This is the start-up side of the cold-JVM cost behind the contended-endpoint test below, which now
+  warms up outside its window; before that warm-up landed, this change alone made the test pass cold (5 of 5). A
+  bundled theme's name, darkness and palette now come from its file up to the first `[ui]` or `[icons]` table
+  (`ThemeTomlWriter` writes them last); `Theme.Bundled` parses the whole file on its first `document()` call, once, and
+  bundled themes are equal by file. The native scan and the importer match bundled `extends` parents by name before
+  reading their documents. A cold catalog load takes about 250 ms; parsing in parallel was measured and rejected
+  (1.7x). `BuiltInThemesTest` checks every bundled theme against its whole file. Full check after rebasing on `e0e61461`: **7,975/0/0/6**. Not done: GUI
+  check, push.
+
+- **`:b` name test no longer depends on the temp folder** (merged into main as `f1c1acd3` and pushed, 2026-10-02):
+  `ExFilesTest.bufferSelectsATabByNumberOrName` failed on the dev Mac, whose `java.io.tmpdir` holds "zz", because `:b`
+  matches whole paths, as Vim 9.1 does (checked with `/usr/bin/vim`). The test's buffers now live under a fixed `/work`
+  folder. Open: `ExFiles.match` tries exact, ends-with, starts-with, contains and stops at the first level with any
+  match; Vim tries contains, starts-with, ends-with, exact and stops at the first with exactly one. With buffers `xab`
+  and `abab`, Vim's `:b ab` selects `abab` where Jasper reports E93.
+
+- **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
+  user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
+  failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
+  (about 900 classes, mostly `Theme`'s built-in TOML parse through tomlj/ANTLR, plus FlatLaf/font setup), the same with
+  or without the child-held lock, with zero samples in `FileChannel.lock`; later compositions take under 10 ms with
+  the lock held. The cold case also never exercised the contended path: the child released the lock before shutdown
+  ran. The test now composes and quits once uncontended before the lock child starts; the 1 s budget is unchanged.
+  A temporary mutation (shutdown actions run on the EDT) still fails both cases. 10 isolated class runs and 5
+  method-only runs pass. `./gradlew check --continue`: **7,971 tests, 1 failure, 6 skips**. The failure is a separate,
+  pre-existing, machine-dependent assertion, `ExFilesTest.bufferSelectsATabByNumberOrName` (`:b zz` expects no match,
+  but this Mac's temp folder `/var/folders/d0/…psfzzxc…/T/` contains "zz"); it passes with a `java.io.tmpdir` without
+  "zz", and was previously hidden because `:jasper-app:test` failed first. It was fixed separately on main
+  (`185a5f8e`). Merged into main (`5729a684`) and pushed 2026-10-02.
+
+- **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
+  chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
+  and hid its detail. They are gone, so the hint bar always shows the selected row's detail and verbs. Typed prefixes,
+  scope shortcuts and the query-field chip are unchanged. `WindowContent.scopeShortcut` became `paletteShortcut`,
+  because the title search field is its only remaining caller. Merged into main 2026-10-02 and pushed with `5729a684`.
+  Not done: GUI check.
 
 - **Notifications plan 1: core, implemented and verified; awaiting the final whole-branch review and the user's GUI checks** (2026-10-02; branch `claude/notifications`, spec
   `docs/superpowers/specs/2026-10-02-jasper-notifications-design.md`, plan
@@ -520,6 +597,7 @@ s
   most 50. SDK 0.9.2 adds `ScopeSpec.withInRecents`; History opts out (`sdk = ">=0.9.2, <0.10"`) and scopes out of
   All are out too. Each hint pill shows the key that selects its scope (`>` for Commands, else the scope's own
   shortcut). Merged into local main 2026-09-29; not pushed. Not done: GUI check of the pills and lists, push.
+  The pills were removed on 2026-10-02 (see above).
 - **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
   `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
   - **Centring:** the search field is always centred on the window, and the sides give way first.

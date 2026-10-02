@@ -14,6 +14,15 @@ public final class FlatLafThemeData {
     private FlatLafThemeData() {}
 
     /**
+     * Whether {@code defaults} define {@code key}, without building a lazily created value: a border or icon built here
+     * reads the installed look and feel, which for never-installed defaults is another theme's or none (at start-up).
+     * Keys outside the table still go through {@code get}, which FlatLaf also answers from its getters and Metal.
+     */
+    static boolean defines(javax.swing.UIDefaults defaults, String key) {
+        return defaults.containsKey(key) || defaults.get(key) != null;
+    }
+
+    /**
      * The colour of every explicit key, applied in order. A {@code *.suffix} wildcard recolours the keys
      * recorded so far with that suffix, the way IntelliJ applies it to the defaults present at that point.
      */

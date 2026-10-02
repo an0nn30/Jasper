@@ -34,7 +34,7 @@ final class WindowCommandPalette implements AutoCloseable {
         this.history = history;
         this.owner = owner; this.defaultScopeId = defaultScopeId;
         controller = new PaletteController(scopes, history, macOs, this::layoutOverlay, this::restoreAndHide,
-            owner::scopeShortcut, owner::updatingActions, owner::updateActions,
+            owner::updatingActions, owner::updateActions,
             message -> owner.onError.accept("Command failed", message), this::open);
         palette = controller.component();
         palette.setFocusCycleRoot(true);

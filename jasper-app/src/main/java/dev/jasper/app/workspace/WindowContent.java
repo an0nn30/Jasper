@@ -540,7 +540,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             chrome.refreshTheme();
         });
     }
-    void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("themes"); }
+    void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("appearance"); }
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         saveSettings = null; openSettingsAt = null; configurationState = null;
@@ -610,12 +610,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void dispatchCommand(Command command) {
         command.action().actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, command.id()));
     }
-    /** The shortcut that opens a scope's chip (or the palette, for {@code ALL_ID}), for the mode list; null when none. */
-    String scopeShortcut(String scopeId) {
-        if (PaletteScope.ALL_ID.equals(scopeId))
-            return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
-        return scopes.find(scopeId).flatMap(PaletteScope::shortcutActionId).flatMap(bindings::strokeFor)
-            .map(stroke -> CommandsScope.shortcutText(stroke, macOs)).orElse(null);
+    /** The shortcut that opens the palette, shown in the title search field. */
+    String paletteShortcut() {
+        return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
     }
     String tabShortcut(int index) {
         if (index < 0 || index >= 9) return "";

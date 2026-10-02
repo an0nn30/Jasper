@@ -280,7 +280,7 @@ final class ConfigurationController implements AutoCloseable {
         if (!choice.matchesChrome()) workspace = available.find(choice.name()).orElse(null);
         if (!choice.matchesChrome() && workspace == null)
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
-                "Unknown workspace theme \"" + choice.name() + "\"; matching the chrome theme."));
+                "Unknown workspace scheme \"" + choice.name() + "\"; matching the chrome theme."));
         var retained = new java.util.ArrayList<>(available.themes());
         retained.addAll(themes.activeThemes());
         retained.add(theme);

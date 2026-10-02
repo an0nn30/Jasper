@@ -111,31 +111,6 @@ class CommandPaletteTest {
         });
     }
 
-    @Test void scopeHintsSitAlongTheBottomAndAClickReportsTheirScope() throws Exception {
-        SwingUtilities.invokeAndWait(() -> {
-            var events = new ArrayList<String>();
-            var palette = palette(events);
-            var quiet = scope("test.quiet", "Quiet", false, List.of(new PaletteVerb("run", "Run")));
-            palette.setScopeHints(List.of(COMMANDS, HISTORY, quiet), id -> id.equals("test.history") ? "\u2318R" : null);
-            assertThat(palette.scopeHintTexts()).containsExactly("> commands", "history >", "quiet >");
-            assertThat(palette.scopeHintKeys()).as("Commands is typed; a scope without a shortcut shows none")
-                .containsExactly(">", "\u2318R", "");
-            var withKey = (Component) java.util.Arrays.stream(palette.hintBar().getComponents()).filter(c -> c instanceof javax.swing.JPanel)
-                .flatMap(panel -> java.util.Arrays.stream(((Container) panel).getComponents())).filter(c -> c instanceof JLabel label && "history >".equals(label.getText()))
-                .findFirst().orElseThrow();
-            var without = (Component) java.util.Arrays.stream(palette.hintBar().getComponents()).filter(c -> c instanceof javax.swing.JPanel)
-                .flatMap(panel -> java.util.Arrays.stream(((Container) panel).getComponents())).filter(c -> c instanceof JLabel label && "quiet >".equals(label.getText()))
-                .findFirst().orElseThrow();
-            assertThat(withKey.getPreferredSize().width).as("room for the key cap")
-                .isGreaterThan(without.getPreferredSize().width + (withKey.getFontMetrics(withKey.getFont()).stringWidth("history >") - without.getFontMetrics(without.getFont()).stringWidth("quiet >")));
-            assertThat(labels(palette.hintBar())).extracting(JLabel::getText).contains("> commands", "history >");
-            palette.clickScopeHint("history >");
-            assertThat(events).containsExactly("chip:test.history");
-            palette.setScopeHints(List.of());
-            assertThat(palette.scopeHintTexts()).isEmpty();
-            assertThat(palette.scopeHintKeys()).isEmpty();
-        });
-    }
     @Test void allGroupsRowsUnderHeadersAndSelectionSkipsThem() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var palette = palette(new ArrayList<>());
@@ -556,7 +531,6 @@ class CommandPaletteTest {
                     new ThemeController(choice);
                     var card = palette(new ArrayList<>());
                     card.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "new_tab"), item(COMMANDS, "settings")), null, null);
-                    card.setScopeHints(List.of(COMMANDS, HISTORY), id -> id.equals("test.history") ? "\u2318R" : null);
                     var host = new javax.swing.JPanel(new java.awt.GridBagLayout()); host.add(card);
                     for (int scale : new int[]{1, 2}) saveRender(host, choice.name() + "-palette-" + scale, scale);
                     card.showStep("Connect", List.of(new PaletteStep.Field("host", "Host", "example.org"), new PaletteStep.Field("user", "Username", "dustin")));

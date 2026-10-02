@@ -31,7 +31,7 @@ final class WindowChrome {
     private final WindowStatusBar status = new WindowStatusBar();
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
     private final JMenu uiThemes = new JMenu("UI Theme");
-    private final JMenu workspaceThemes = new JMenu("Workspace Theme");
+    private final JMenu workspaceThemes = new JMenu("Workspace Scheme");
     private dev.jasper.app.appearance.ThemeCatalog.Snapshot displayedThemes;
     private String displayedUi, displayedWorkspace;
     private final MenuListener themeMenuListener = new MenuListener() {
@@ -59,7 +59,7 @@ final class WindowChrome {
         toolbar.setBorder(BorderFactory.createEmptyBorder());
         search = new TitleSearchField(() -> owner.action(ActionId.COMMAND_PALETTE).actionPerformed(
             new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
-            () -> owner.scopeShortcut(dev.jasper.app.palette.PaletteScope.ALL_ID));
+            owner::paletteShortcut);
         header = new WindowHeader(search, toolbar);
         header.setOpaque(true);
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.

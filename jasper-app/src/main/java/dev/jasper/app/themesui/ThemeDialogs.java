@@ -24,25 +24,14 @@ final class ThemeDialogs implements AutoCloseable {
         surface.onClosed(()->{open.remove(surface);if(answered.compareAndSet(false,true))cancel.run();});
         surface.setContent(contents.apply(accept,reject));surface.show();
     }
-    void confirm(String title,String message,String label,Runnable yes,Runnable cancel){
-        view(title,(accept,reject)->panel(message,null,label,()->{accept.run();yes.run();},reject),cancel);
-    }
-    void name(String proposed,Predicate<String> valid,Consumer<String> acceptName,Runnable cancel){
-        view("Duplicate theme",(accept,reject)->{
-            var field=new JTextField(proposed,32);field.getAccessibleContext().setAccessibleName("New theme name");
-            var error=ThemePicker.literal(" ");var input=new JPanel(new BorderLayout(0,6));input.add(field);input.add(error,BorderLayout.SOUTH);
-            return panel("Choose a unique theme name. The copy inherits from the original.",input,"Duplicate",()->{
-                String name=field.getText().strip();if(!valid.test(name)){error.setText("Enter a unique name other than match.");return;}accept.run();acceptName.accept(name);
-            },reject);
-        },cancel);
-    }
-    void message(String title,String text){view(title,(accept,reject)->panel(text,null,"Close",accept,reject),()->{});}
-    private static JPanel panel(String text,JComponent input,String label,Runnable accept,Runnable cancel){
+    /** Shows literal {@code text} with a Close button. */
+    void message(String title,String text){view(title,(accept,reject)->panel(text,accept),()->{});}
+    private static JPanel panel(String text,Runnable close){
         var panel=new JPanel(new BorderLayout(8,12));panel.setBorder(BorderFactory.createEmptyBorder(16,16,12,16));
         var body=new JTextArea(text);body.setEditable(false);body.setLineWrap(true);body.setWrapStyleWord(true);body.setColumns(52);body.setRows(Math.min(20,Math.max(3,text.split("\n").length)));
-        panel.add(new JScrollPane(body),BorderLayout.CENTER);if(input!=null)panel.add(input,BorderLayout.NORTH);
-        var buttons=new JPanel(new FlowLayout(FlowLayout.TRAILING));var back=new JButton("Cancel");var ok=new JButton(label);buttons.add(back);buttons.add(ok);panel.add(buttons,BorderLayout.SOUTH);
-        back.addActionListener(e->cancel.run());ok.addActionListener(e->accept.run());return panel;
+        panel.add(new JScrollPane(body),BorderLayout.CENTER);
+        var buttons=new JPanel(new FlowLayout(FlowLayout.TRAILING));var ok=new JButton("Close");buttons.add(ok);panel.add(buttons,BorderLayout.SOUTH);
+        ok.addActionListener(e->close.run());return panel;
     }
     @Override public void close(){for(var surface:List.copyOf(open))surface.close();}
 }

@@ -156,7 +156,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
 | `themeimport` | Offline bounded conversion, deterministic vendoring, frozen import plans and locked file operations. Startup owns resumable legacy migration; no config/application dependency. |
-| `themesui` | Canned terminal preview for the forthcoming Themes page; EDT owner closes its fake transport and view. |
+| `themesui` | The Appearance page's Import theme…: a serial import worker and its dialogs over Settings. The Appearance page owns each ThemeImport and closes it when disposed. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
@@ -240,8 +240,7 @@ successful config handling. Recoverable source failures remain diagnostics after
 
 The configuration worker rescans the native catalog and refreshes migration diagnostics without conversion.
 `ConfigurationController` retains those separately from transient warnings; chrome and workspace both resolve in
-the same native catalog. Settings keeps Appearance and Font & Colors, with `match`, until the Plan 5 Themes page.
-`themesui.SampleTerminal` is the reusable canned preview and never launches a shell.
+the same native catalog. Settings › Appearance offers both as dropdowns, with `match` as Same as UI theme.
 
 ## Hosted workspace styling
 

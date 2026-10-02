@@ -1,5 +1,5 @@
 /**
- * Staged native theme choices and canned previews; Settings owns and closes the EDT view and its fake terminal transport.
- * <p>Allowed outgoing Jasper dependencies: dev.jasper.app.appearance, dev.jasper.app.config, dev.jasper.app.settingsui, dev.jasper.app.lifecycle, dev.jasper.app.themeimport, dev.jasper.app.windows, dev.jasper.terminal.config, dev.jasper.terminal.session, dev.jasper.terminal.view.
+ * The Appearance page's Import theme…: a serial import worker and its dialogs over Settings; the page closes each import.
+ * <p>Allowed outgoing Jasper dependencies: dev.jasper.app.settingsui, dev.jasper.app.themeimport, dev.jasper.app.windows.
  */
 package dev.jasper.app.themesui;

@@ -108,9 +108,10 @@ public final class ThemeCatalog {
             if (entry.getValue().document() != null) documents.add(entry.getValue().document());
             entry.getValue().themes().forEach(theme -> documents.add(theme.source().document()));
         }
-        ThemeManager.builtIns().forEach(theme -> documents.add(theme.source().document()));
-        Function<String, List<ThemeDocument>> candidates =
-            name -> documents.stream().filter(document -> key(document.name()).equals(key(name))).toList();
+        // A built-in theme is matched by name before its document is read, which parses its whole file.
+        Function<String, List<ThemeDocument>> candidates = name -> Stream.concat(
+            documents.stream().filter(document -> key(document.name()).equals(key(name))),
+            ThemeManager.builtIns().stream().filter(theme -> key(theme.name()).equals(key(name))).map(theme -> theme.source().document())).toList();
         var installed = new ArrayList<Theme>();
         var owners = new HashMap<String, Path>();
         var nextUserThemes = new HashMap<Path, Theme>();

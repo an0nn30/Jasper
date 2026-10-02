@@ -4,11 +4,28 @@ package dev.jasper.app.appearance;
 final class BuiltInThemes {
     private BuiltInThemes() {}
 
-    /** A Jasper theme file Jasper ships; it must stand alone. */
+    private static final java.util.regex.Pattern UI_OR_ICONS = java.util.regex.Pattern.compile("(?m)^\\[(?:ui|icons)[\\].]");
+
+    /**
+     * A Jasper theme file Jasper ships; it must stand alone. Its name, darkness and palette come from its head, so the
+     * catalog does not parse every [ui] table at start-up; the whole file is parsed when the document is first read.
+     */
     static Theme toml(String id, String file) {
+        GeneratedTheme summary = ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(head(read(file)), file)));
+        return new Theme(id, summary.name(), summary.dark(), summary.terminal(),
+            new Theme.Bundled(file, () -> ThemeResolver.resolve(ThemeToml.parse(read(file), file))));
+    }
+
+    /** {@code text} up to its first [ui] or [icons] table; {@link ThemeTomlWriter} writes them last. */
+    static String head(String text) {
+        var table = UI_OR_ICONS.matcher(text);
+        return table.find() ? text.substring(0, table.start()) : text;
+    }
+
+    private static String read(String file) {
         String text = ThemeManager.read(file);
         if (text == null) throw new IllegalStateException("Missing bundled theme " + file);
-        return Theme.of(id, new Theme.Bundled(file, ThemeResolver.resolve(ThemeToml.parse(text, file))));
+        return text;
     }
 
     static java.util.List<Theme> all() { return Indexed.THEMES; }

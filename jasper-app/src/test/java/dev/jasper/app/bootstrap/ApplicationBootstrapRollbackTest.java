@@ -6,6 +6,7 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.workspace.DesktopTestSupport;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.concurrent.CountDownLatch;
@@ -68,6 +69,7 @@ class ApplicationBootstrapRollbackTest {
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
     void contendedEndpointCannotBlockEdtOrBoundedTermination(boolean presentationFails) throws Exception {
+        warmUpComposition();
         var service = new ConfigService(dir.resolve("config.toml"), true);
         var history = new CommandHistory();
         var terminated = new CountDownLatch(1);
@@ -98,4 +100,17 @@ class ApplicationBootstrapRollbackTest {
         }
     }
 
+    /**
+     * The first application in a JVM spends well over the EDT budget on first-use class loading and
+     * built-in theme parsing (measured 1.6 s cold, under 10 ms warm, with or without the lock held).
+     * One uncontended composition before the lock child starts keeps that out of the measured window.
+     */
+    private void warmUpComposition() throws Exception {
+        var service = new ConfigService(Files.createDirectory(dir.resolve("warm-up")).resolve("config.toml"), true);
+        var terminated = new CountDownLatch(1);
+        DesktopTestSupport.edt(() -> ApplicationBootstrap.compose(service, CommandHistory::new,
+            owned -> new JasperApplication(service, null, owned, null, terminated::countDown),
+            app -> null, app -> { }).quit());
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).as("warm-up application terminated").isTrue();
+    }
 }

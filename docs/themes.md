@@ -17,10 +17,10 @@ workspace = "match" # or "Jasper Dark", another native theme
 ```
 
 The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
-every window at once, keeping shells, scrollback and splits. Settings › Appearance & Behavior › Themes has independent UI and Workspace pickers. Each supports a name search,
-All/Dark/Light and All/Bundled/Mine filters, effective color swatches and keyboard selection. **Same as UI theme**
-is always the first workspace choice, even under a filter. Appearance and Terminal › Font & Colors link to these pickers. The
-workspace choice switches independently, including between two dark themes. The pane tab strip, find controls,
+every window at once, keeping shells, scrollback and splits. Settings › Appearance & Behavior › Appearance has two
+dropdowns: **Theme** (the UI theme) and **Workspace scheme**, whose first entry, **Same as UI theme**, is `match`.
+Terminal › Font & Colors links to them. The workspace scheme switches independently, including between two dark
+themes. The pane tab strip, find controls,
 split dividers, terminal palette, zone-aware icons and Editor syntax follow it. Menus, sidebars and dialogs follow
 the UI theme. Ordinary controls in hosted center plugin panes also follow the workspace, including lists, tables,
 trees, selections, headers, combo dropdowns, scrollbars, disabled controls and progress track/fill colors. A workspace
@@ -39,34 +39,29 @@ detaching, reopening and closing its pane; check Vim error/bell feedback and ban
 GitHub Dark or another complete imported theme. These checks require the native GUI and are not claimed by headless
 test results.
 
-## Settings and file actions
+## Settings and importing
 
-Theme choices and the two-zone miniature update immediately in Settings; running windows change only on **Apply**
-or **OK**. Cancel discards pending choices. The preview contains canned terminal output and a fixed syntax snippet;
-it never starts a shell or changes the application's look and feel. Missing UI choices preview the safe Jasper theme
-of the last preview's darkness; missing workspace choices follow UI. Requested names remain intact for repair.
-Invalid files appear in diagnostics with a filename and line when available.
+Both dropdowns list every installed theme by name and update when theme files are added, imported, edited or removed.
+Start typing in an open (or focused) dropdown to search: a search bar appears at the top and the list keeps the names
+holding every typed word, ignoring case, so `cat mocha` finds Catppuccin Mocha. **Same as UI theme** stays at the top.
+Up, Down, Home and End move, Enter picks, Backspace edits the search, × clears it and Escape closes the list.
+Running windows change only on **Apply** or **OK**; Cancel discards the choices. A saved name that no installed theme
+has shows as "(not found)" and stays saved for repair; Jasper uses the fallback described in
+[configuration](configuration.md#theme) meanwhile.
 
-**Import**, **Duplicate** and **Remove** change files immediately and survive Cancel. Import accepts local
-`.theme.json`, `.jar`, `.zip` and `.toml` files, then shows providers, conversion warnings and failures. Existing user
-names default to Skip; choose Replace or Keep both explicitly. Decisions use a frozen plan, and changed replacement
-files are refused. Partial reports name only files actually imported. Import does not change the staged selection.
+The gear beside **Theme** offers **Import theme…**. It accepts local `.theme.json`, `.jar`, `.zip` and `.toml` files,
+then shows providers, conversion warnings and failures. Existing user names default to Skip; choose Replace or Keep
+both explicitly. Decisions use a frozen plan, and changed replacement files are refused. The import writes the
+`themes` folder at once, survives Cancel and reports the files it imported; it changes neither choice. Closing
+Settings cancels an import that has not started writing and closes its dialogs; a confirmed write already running may
+finish and refresh the app without reopening Settings.
 
-Duplicate proposes a unique name and writes an `extends` reference plus commented effective colors, ANSI entries
-and tokens. Uncomment only values you want to override; inherited syntax, UI and icons remain live. A successful copy
-selects itself only in the initiating picker, provided that picker's choice has not changed while the copy was running.
+To copy, change or remove a theme, edit its file in the `themes` folder beside `config.toml`; see
+[Writing a theme](#writing-a-theme). Jasper notices the change within a second.
 
-Remove is available only for validated regular user files. Jasper tries Trash after confirmation. If Trash is unavailable
-or fails, a **separate** permanent-deletion confirmation appears; Cancel retains the file. Changed files and symlinks
-are refused. Removal keeps saved/requested theme names so restoring the file recovers the choice.
-
-**Open themes folder** uses the folder beside the active config file, including a `--config` override. **About bundled
-themes** shows packaged license/source notices offline. Closing Settings cancels unstarted work and closes its dialogs;
-a confirmed write already running may finish and refresh the app without reopening Settings.
-
-View › **UI Theme** and **Workspace Theme** offer the current catalog. Large catalogs are grouped into numbered
-submenus of at most 30 themes. View › **Themes…** opens Settings; the command palette also finds it. These View choices
-save immediately, whereas Settings choices stay staged until Apply/OK.
+View › **UI Theme** and **Workspace Scheme** offer the current catalog. Large catalogs are grouped into numbered
+submenus of at most 30 themes. View › **Themes…** opens Settings at Appearance; the command palette also finds it.
+These View choices save immediately, whereas Settings choices stay staged until Apply/OK.
 
 ## Writing a theme
 
@@ -128,9 +123,9 @@ A theme file larger than 256 KiB is skipped with a warning.
 
 ## Adding themes and upgrading existing installations
 
-Native `.toml` files in `themes/` are the runtime format. Place a native file there and reload config to discover it.
-The new Themes page, Import dialog, Duplicate/Open/Remove actions, staged preview and direct file watching arrive in
-Plan 5. The former IntelliJ/Alacritty stores and their navigation actions are removed in this deliverable.
+Native `.toml` files in `themes/` are the runtime format. Place a native file there, or use **Import theme…** in
+Settings › Appearance; Jasper discovers it within a second. The former IntelliJ/Alacritty stores and their navigation
+actions are removed.
 
 Before the initial configuration is loaded, Jasper upgrades legacy files beside the actual selected config:
 
@@ -148,7 +143,7 @@ Before the initial configuration is loaded, Jasper upgrades legacy files beside 
   the journal; changed native files or occupied backups are retained with warnings.
 - Changed originals, edited outputs, corrupt recovery files or conflicting config edits are retained with warnings.
   A completed pass does not silently reconvert failed or newly added legacy files. Removing a failed input clears
-  its warning on config reload. The Import service is available internally; its user dialog is Plan 5.
+  its warning on config reload. **Import theme…** converts the same inputs on demand.
 
 Supported conversion inputs are standalone IntelliJ JSON (including local parents and editor schemes), data-only
 IntelliJ archives (multiple providers and nested plugin layouts), Alacritty TOML and native Jasper TOML. Unknown

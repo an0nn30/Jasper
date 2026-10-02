@@ -3,7 +3,9 @@ package dev.jasper.app.settingsui;
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.TerminalConfig;
+import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settings.SettingKind;
 import java.awt.BorderLayout;
@@ -90,6 +92,23 @@ public final class Editors {
     /** An editable combo of installed font families. */
     public static Factory<String> font(boolean monospaced) {
         return new Factory<>((setting, context) -> new Combo(() -> Fonts.families(monospaced)), List.of());
+    }
+
+    /** The gear menu's one item beside the theme dropdown. */
+    static final String IMPORT_THEME = "Import theme\u2026";
+    /** The workspace scheme entry for {@code match}. */
+    static final String SAME_AS_UI_THEME = "Same as UI theme";
+
+    /** Every installed theme by name, with a gear whose menu offers Import theme\u2026. */
+    public static Factory<String> theme(ThemeChoices themes) {
+        return new Factory<>((setting, context) -> new ThemePick(themes.names(), Map.of(), themes.importer().apply(context)),
+            List.of(IMPORT_THEME));
+    }
+
+    /** "Same as UI theme" ({@code match}), then every installed theme by name. */
+    public static Factory<String> workspaceScheme(ThemeChoices themes) {
+        return new Factory<>((setting, context) -> new ThemePick(themes.names(),
+            Map.of(WorkspaceThemeChoice.MATCH.name(), SAME_AS_UI_THEME), null), List.of(SAME_AS_UI_THEME));
     }
 
     /** A text field with Browse\u2026, for a program path. */
@@ -244,6 +263,117 @@ public final class Editors {
             try { box.setSelectedItem(value); editor().setText(value); } finally { showing = false; }
         }
         @Override public void onEdit(Runnable listener) { listeners.add(listener); }
+    }
+
+    /**
+     * A theme by name: the {@code leading} entries (value to label), then the installed names, read again on each
+     * refresh. The dropdown searches as you type, keeping the leading entries. A saved name the list lacks shows as
+     * "(not found)" until another is chosen; a name matches an entry as the catalog finds themes, ignoring case and
+     * surrounding spaces, and keeps its saved spelling. With an import, a gear beside the dropdown offers Import theme\u2026.
+     */
+    static final class ThemePick implements ValueEditor<String> {
+        final JComboBox<String> box;
+        final JButton gear;
+        final JPopupMenu menu;
+        private final Supplier<List<String>> names;
+        private final Map<String, String> leading;
+        private final ThemeChoices.Import importer;
+        private final List<String> values = new ArrayList<>();
+        private final JComponent component;
+        private final List<Runnable> edits = new ArrayList<>();
+        /** How many entries are choices; any after them is the one missing choice being shown. */
+        private int listed;
+        private String shown = "";
+        /** The value shown or last chosen; Swing reports picking it again, which is no edit. */
+        private String current = "";
+        private boolean showing;
+
+        ThemePick(Supplier<List<String>> names, Map<String, String> leading, ThemeChoices.Import importer) {
+            this.names = names;
+            this.leading = leading;
+            this.importer = importer;
+            box = new SearchCombo(leading.size(), "No matching themes");
+            box.setPrototypeDisplayValue("Catppuccin Macchiato (Material)");
+            box.setMaximumRowCount(20);
+            if (importer == null) {
+                gear = null;
+                menu = null;
+                component = box;
+            } else {
+                menu = new JPopupMenu();
+                var item = new JMenuItem(IMPORT_THEME);
+                item.addActionListener(event -> importer.start().run());
+                menu.add(item);
+                gear = new JButton(AppIcons.icon("settings"));
+                gear.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+                gear.setToolTipText("Theme actions");
+                gear.getAccessibleContext().setAccessibleName("Theme actions");
+                gear.addActionListener(event -> menu.show(gear, 0, gear.getHeight()));
+                component = line(box, gear);
+            }
+            fill();
+            box.addActionListener(event -> {
+                if (showing || value().equals(current)) return;
+                current = value();
+                if (box.getSelectedIndex() >= 0 && box.getSelectedIndex() < listed) dropMissing();
+                for (Runnable listener : List.copyOf(edits)) listener.run();
+            });
+        }
+
+        /** Rebuilds the entries from the current names, keeping the selection. */
+        private void fill() {
+            String keep = value();
+            showing = true;
+            try {
+                box.removeAllItems();
+                values.clear();
+                leading.forEach(this::add);
+                for (String name : names.get()) add(name, name);
+                listed = values.size();
+                select(keep);
+            } finally { showing = false; }
+        }
+
+        private void add(String value, String label) { values.add(value); box.addItem(label); }
+
+        private void select(String value) {
+            dropMissing();
+            int index = -1;
+            for (int i = 0; i < values.size() && index < 0; i++) if (same(values.get(i), value)) index = i;
+            if (index < 0) {
+                add(value, value.isBlank() ? "(none)" : value + " (not found)");
+                index = values.size() - 1;
+            }
+            box.setSelectedIndex(index);
+        }
+
+        private void dropMissing() {
+            boolean was = showing;
+            showing = true;
+            try {
+                while (values.size() > listed) {
+                    values.removeLast();
+                    box.removeItemAt(box.getItemCount() - 1);
+                }
+            } finally { showing = was; }
+        }
+
+        private static boolean same(String listed, String value) { return listed.strip().equalsIgnoreCase(value.strip()); }
+
+        @Override public JComponent component() { return component; }
+        @Override public String value() {
+            int index = box.getSelectedIndex();
+            if (index < 0) return shown;
+            String value = values.get(index);
+            return same(value, shown) ? shown : value;
+        }
+        @Override public void show(String value) {
+            showing = true;
+            try { shown = value; select(value); current = value(); } finally { showing = false; }
+        }
+        @Override public void onEdit(Runnable listener) { edits.add(listener); }
+        @Override public void refresh() { fill(); }
+        @Override public void dispose() { if (importer != null) importer.close().run(); }
     }
 
     static final class Browse implements ValueEditor<String> {
