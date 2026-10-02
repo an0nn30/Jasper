@@ -67,7 +67,9 @@ class PackagedResourcesTest {
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")
-                || n.contains("TestSupport") || n.contains("Preview.class") || n.contains("ControlledSessionChild"));
+                || n.contains("TestSupport") || (n.contains("Preview.class") && !n.equals("dev/jasper/app/themesui/ThemePreview.class"))
+                || n.contains("ControlledSessionChild"));
+            assertThat(jar.getJarEntry("dev/jasper/app/themesui/ThemePreview.class")).isNotNull();
             assertThat(jar.getJarEntry("dev/jasper/app/themes/FlatLaf.properties")).isNull();
             String border = dev.jasper.app.appearance.ThemeManager.APP_DEFAULTS.get("SplitPaneDivider.border");
             assertThat(jar.getJarEntry(border.replace('.', '/') + ".class")).isNotNull();

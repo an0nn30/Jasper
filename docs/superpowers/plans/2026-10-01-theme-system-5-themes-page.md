@@ -10,9 +10,11 @@
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), especially §§2.3, 6.3, 7–9. Read it together with this plan, [Plan 4](2026-10-01-theme-system-4-conversion-migration.md), and [STATUS](../../STATUS.md).
 
-**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Tasks 4–6 remain.
+**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Task 4 is complete (local two-zone preview); full check 7,962/0/0/6. Tasks 5–6 remain.
 
 **Execution ruling:** Task 1 preserves the pre-existing bounded startup scan wait on EDT; the original plan incorrectly described its caller as off EDT. No new runtime EDT waits are introduced. Cost: existing initial scan latency remains; a bootstrap handoff change is separate work.
+
+**Task 4 ruling:** The packaging guard treated every `Preview.class` suffix as a test fixture. Permit the exact production `themesui/ThemePreview.class` and require its presence; all other preview suffixes remain forbidden. Cost: this one production class is exempt from that naming heuristic.
 
 **Workspace / execution:** Reuse `.worktrees/theme-system` on `codex/theme-system-plan5`, based on the verified merge. Preserve the user's inline execution preference if approved: TDD and one commit per task, followed by one independent whole-branch review and the executing-plans fix workflow. Do not start implementation merely because this document exists. Record departures in this banner and STATUS.
 
@@ -256,7 +258,7 @@ git commit -m "feat(themes): add searchable staged theme pickers" -m "Co-Authore
 - Produces: package-private `ThemePreview(TerminalOptions options) implements AutoCloseable`, `JComponent component()`, `void show(ResolvedTheme themes)`, `void close()`.
 - Produces: package-private `SyntaxSample extends JTextPane`, `SyntaxSample()`, `void theme(GeneratedTheme workspace)`; a fixed source string and immutable `Span(int start, int end, SyntaxRole role)` table in the same file.
 
-- [ ] **Step 1: Write failing tests.** Build preview on EDT with UIManager's current LAF/defaults captured. Render it to a BufferedImage headlessly, choosing IntelliJ Light chrome + Dracula workspace, then reverse. Assert sampled interior pixels of named preview regions and syntax document attributes match effective generated values; choose interior coordinates, not font-antialiased edges. Include flags from a fixture whose keyword is both bold and italic.
+- [x] **Step 1: Write failing tests.** Build preview on EDT with UIManager's current LAF/defaults captured. Render it to a BufferedImage headlessly, choosing IntelliJ Light chrome + Dracula workspace, then reverse. Assert sampled interior pixels of named preview regions and syntax document attributes match effective generated values; choose interior coordinates, not font-antialiased edges. Include flags from a fixture whose keyword is both bold and italic.
 
 ```java
 var beforeLaf = UIManager.getLookAndFeel();
@@ -274,7 +276,7 @@ assertThat(sample.closed()).isTrue();
 
 Also assert a `match` preview passes the same GeneratedTheme instance to both zones; staged preview changes do not emit ThemeController subscriptions or change its active choice. Cover an author-adjusted converted theme using the same effective values tested by BundledWorkspaceParityTest. Canned output becomes visible via the existing session test Await helper; no shell/PTY.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ThemePreviewTest' --tests '*SyntaxSampleTest' --tests '*SampleTerminalTest'
@@ -282,7 +284,7 @@ Also assert a `match` preview passes the same GeneratedTheme instance to both zo
 
 Expected: missing preview/snippet implementation.
 
-- [ ] **Step 3: Implement the miniature.** Use locally painted chrome strips and labels: title/search, short sidebar list, status bar; workspace tab strip above the canned terminal and snippet. Token mapping: chrome TITLE_BAR/SIDEBAR/STATUS_BAR/TEXT/BORDER/INPUT_BACKGROUND; workspace TAB_BAR/TAB_ACTIVE/TAB_ACTIVE_TEXT/EDITOR_BACKGROUND/EDITOR_FOREGROUND/EDITOR_SELECTION. The noninteractive fake search field may be painted so it cannot inherit ambient LAF colors. Real JTextPane is read-only/nonfocusable, styled explicitly from SyntaxStyle color/bold/italic; reset all attributes on every theme switch so flags never leak. Use this exact fixed snippet and spans (end offsets exclusive); the default role for all remaining text is VARIABLE. Test each span against its substring and the styled document, so edits to the literal cannot silently misalign colors.
+- [x] **Step 3: Implement the miniature.** Use locally painted chrome strips and labels: title/search, short sidebar list, status bar; workspace tab strip above the canned terminal and snippet. Token mapping: chrome TITLE_BAR/SIDEBAR/STATUS_BAR/TEXT/BORDER/INPUT_BACKGROUND; workspace TAB_BAR/TAB_ACTIVE/TAB_ACTIVE_TEXT/EDITOR_BACKGROUND/EDITOR_FOREGROUND/EDITOR_SELECTION. The noninteractive fake search field may be painted so it cannot inherit ambient LAF colors. Real JTextPane is read-only/nonfocusable, styled explicitly from SyntaxStyle color/bold/italic; reset all attributes on every theme switch so flags never leak. Use this exact fixed snippet and spans (end offsets exclusive); the default role for all remaining text is VARIABLE. Test each span against its substring and the styled document, so edits to the literal cannot silently misalign colors.
 
 ```java
 static final String TEXT = "// Theme preview\nclass Sample {\n    String greet(int count) {\n        return \"Hello\" + 42;\n    }\n}\n";
@@ -303,8 +305,8 @@ Set component names `theme-preview-title`, `theme-preview-sidebar`, `theme-previ
 
 ThemePreview constructs one SampleTerminal lazily when shown, updates only its palette, and closes it from ThemesPage.dispose. No repeated sessions per choice, file operation or paint. Preview resolves staged names through the latest catalog: unknown UI uses the same safe last-preview darkness fallback; unknown workspace follows preview chrome. Explain fallback beside the missing selection and leave draft unchanged. Use the current terminal options supplier for the sample's typography; this plan does not add a live font editor.
 
-- [ ] **Step 4: Run GREEN.** Repeat Step 2 and `*ThemesPageTest`; then verify app architecture. Every preview assertion passes without any global look-and-feel mutation.
-- [ ] **Step 5: Commit.**
+- [x] **Step 4: Run GREEN.** Repeat Step 2 and `*ThemesPageTest`; then verify app architecture. Every preview assertion passes without any global look-and-feel mutation.
+- [x] **Step 5: Commit.**
 
 ```bash
 git add jasper-app/src

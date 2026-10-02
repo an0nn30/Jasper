@@ -1,6 +1,6 @@
 package dev.jasper.app.themesui;
 
-import dev.jasper.app.appearance.ThemeCatalog;
+import dev.jasper.app.appearance.*;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.settingsui.PageContext;
@@ -26,7 +26,8 @@ public final class ThemesPage implements SettingsPage {
     ThemePicker ui;
     ThemePicker workspace;
     final JTextArea diagnostics = new JTextArea();
-    private JPanel previewRegion;
+    ThemePreview preview;
+    private boolean previewDark = true;
 
     public ThemesPage(PageContext context, Supplier<ThemeCatalog.Snapshot> catalog, Supplier<TerminalOptions> terminalOptions) {
         this.context = context; this.catalog = catalog; this.terminalOptions = terminalOptions;
@@ -45,7 +46,7 @@ public final class ThemesPage implements SettingsPage {
         workspace = new ThemePicker(true, name -> context.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of(name)));
         var choices = new JPanel(new GridLayout(0, 1, 0, 12)); choices.add(ui); choices.add(workspace);
         var body = new JPanel(new BorderLayout(0, 12)); body.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
-        body.add(choices, BorderLayout.NORTH); previewRegion = new JPanel(new BorderLayout()); body.add(previewRegion, BorderLayout.CENTER);
+        body.add(choices, BorderLayout.NORTH); preview = new ThemePreview(terminalOptions.get()); body.add(preview.component(), BorderLayout.CENTER);
         diagnostics.setEditable(false); diagnostics.setLineWrap(true); diagnostics.setWrapStyleWord(true); diagnostics.setOpaque(false);
         diagnostics.getAccessibleContext().setAccessibleName("Theme problems"); body.add(diagnostics, BorderLayout.SOUTH);
         component = new JScrollPane(body); refresh(); return component;
@@ -58,6 +59,11 @@ public final class ThemesPage implements SettingsPage {
         var snapshot = catalog.get();
         ui.update(snapshot, context.draft().value(CoreSettings.UI_THEME_NAME));
         workspace.update(snapshot, context.draft().value(CoreSettings.UI_THEME_WORKSPACE));
+        var chromeTheme = snapshot.find(ui.requested()).orElse(previewDark ? Theme.DARK : Theme.JASPER_LIGHT);
+        var chrome = ThemeManager.generated(chromeTheme); previewDark = chrome.dark();
+        var work = workspace.requested().equalsIgnoreCase("match") ? chrome
+            : snapshot.find(workspace.requested()).map(ThemeManager::generated).orElse(chrome);
+        preview.show(new ResolvedTheme(chrome, work));
         diagnostics.setText(String.join("\n", snapshot.problems().stream().map(problem -> problem.file().getFileName()
             + (problem.line() > 0 ? ":" + problem.line() : "") + ": " + problem.message()).toList()));
     }
@@ -67,5 +73,5 @@ public final class ThemesPage implements SettingsPage {
     }
     @Override public void highlight(String query) { if (component != null && !disposed) { ui.highlight(query); workspace.highlight(query); } }
     @Override public String helpAnchor() { return "theme"; }
-    @Override public void dispose() { if (disposed) return; disposed = true; listening.close(); }
+    @Override public void dispose() { if (disposed) return; disposed = true; listening.close(); if (preview != null) preview.close(); }
 }
