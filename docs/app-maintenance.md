@@ -409,6 +409,13 @@ per-page import factory from application wiring, so settingsui has no dependency
 names on each page refresh (`ValueEditor.refresh`); a saved name the catalog lacks stays listed as "(not found)" and
 keeps its spelling. Only the Theme row has the gear; its page disposes the row, which closes the import.
 
+Both picks use `settingsui.SearchCombo`, a `JComboBox` whose look-and-feel UI (a `FlatComboBoxUI` subclass, or Basic
+without FlatLaf) creates its own `ComboPopup`: a non-focusable `JPopupMenu` with a search bar over a filtered list.
+Focus stays on the combo; the popup's key listener, which the UI installs on the combo, routes typed characters into
+the search and handles Up/Down/Enter/Escape/Backspace while the list is open or a search runs. The combo's
+first-letter selection is disabled. The popup's size is fixed when it opens; only the bar's first appearance repacks.
+FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
+
 `themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;
 completion waits for the catalog refresh before reporting. A closed import suppresses UI callbacks while a running
 confirmed write still refreshes application state. Copying, editing and removing themes are file edits in the

@@ -2,6 +2,14 @@
 
 ## Current state — 2026-10-02
 
+- **Theme dropdowns search as you type** (branch `claude/theme-search`, worktree `.claude/worktrees/settings-appearance`,
+  design approved in chat 2026-10-02): both Appearance dropdowns (`Editors.ThemePick`) are a `settingsui.SearchCombo`.
+  Typing in the open or focused dropdown shows an IntelliJ-style search bar at the top of the list and keeps the
+  names holding every word; Same as UI theme stays pinned; "No matching themes" is an unpickable row. Up/Down/Enter/
+  Escape/Backspace work while searching, Enter picks without reaching OK, and the combo no longer jumps by first letter.
+  Not done: grouped sections (not requested), GUI check (the popup's look, hover/click, the × button, typing on a
+  closed dropdown), merge, push.
+
 - **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
   worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
   - **On top:** macOS raised the window Settings blocks in front of it. Every modal dialog now floats above Jasper's

@@ -55,6 +55,19 @@ class AppearancePageTest {
         assertThat(page.modified()).isTrue();
     }
 
+    @Test void bothDropdownsSearchAndEnterStagesTheMatch() {
+        var theme = editor(0);
+        var keys = ((SearchCombo) theme.box).searchPopup().getKeyListener();
+        for (char c : "darc".toCharArray())
+            keys.keyTyped(new java.awt.event.KeyEvent(theme.box, java.awt.event.KeyEvent.KEY_TYPED, 0, 0, java.awt.event.KeyEvent.VK_UNDEFINED, c));
+        assertThat(((SearchCombo) theme.box).searchPopup().shown()).containsExactly("Darcula");
+        keys.keyPressed(new java.awt.event.KeyEvent(theme.box, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, java.awt.event.KeyEvent.CHAR_UNDEFINED));
+        assertThat(draft.value(CoreSettings.UI_THEME_NAME)).isEqualTo("Darcula");
+        var workspace = ((SearchCombo) editor(1).box).searchPopup();
+        workspace.getKeyListener().keyTyped(new java.awt.event.KeyEvent(editor(1).box, java.awt.event.KeyEvent.KEY_TYPED, 0, 0, java.awt.event.KeyEvent.VK_UNDEFINED, 'l'));
+        assertThat(workspace.shown()).as("Same as UI theme stays pinned").containsExactly("Same as UI theme", "Darcula", "Jasper Light");
+    }
+
     @Test void pickingTheEntryAlreadyShownIsNoEdit() {
         var theme = editor(0);
         theme.box.setSelectedItem("Jasper Dark");

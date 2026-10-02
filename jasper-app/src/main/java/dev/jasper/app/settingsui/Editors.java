@@ -267,12 +267,12 @@ public final class Editors {
 
     /**
      * A theme by name: the {@code leading} entries (value to label), then the installed names, read again on each
-     * refresh. A saved name the list lacks shows as "(not found)" until another is chosen; a name matches an entry as the
-     * catalog finds themes, ignoring case and surrounding spaces, and keeps its saved spelling. With an import, a gear
-     * beside the dropdown offers Import theme\u2026.
+     * refresh. The dropdown searches as you type, keeping the leading entries. A saved name the list lacks shows as
+     * "(not found)" until another is chosen; a name matches an entry as the catalog finds themes, ignoring case and
+     * surrounding spaces, and keeps its saved spelling. With an import, a gear beside the dropdown offers Import theme\u2026.
      */
     static final class ThemePick implements ValueEditor<String> {
-        final JComboBox<String> box = new JComboBox<>();
+        final JComboBox<String> box;
         final JButton gear;
         final JPopupMenu menu;
         private final Supplier<List<String>> names;
@@ -292,6 +292,7 @@ public final class Editors {
             this.names = names;
             this.leading = leading;
             this.importer = importer;
+            box = new SearchCombo(leading.size(), "No matching themes");
             box.setPrototypeDisplayValue("Catppuccin Macchiato (Material)");
             box.setMaximumRowCount(20);
             if (importer == null) {
