@@ -24,7 +24,12 @@
   Decisions: recorded One Dark Modern scheme packaging alias; preserved Darcula named-scheme association;
   Frappe → Frappé alias; excluded extra Islands variants; real FlatLaf gradient/alias precedence and post-JSON
   adjustments supersede raw inverse-token guesses. Exact accounting is in sources.json/SOURCE.md/THIRD-PARTY-THEMES.md.
-  No GUI, merge or push. Next: Task 4 safe import publication. Plan 5 adds the Themes page, preview/file actions and live reload.
+  Task 4 is complete (`./gradlew check`: **7,946 tests, zero failures/errors, six skips**): frozen importer plans,
+  batch-wide conflict names, per-provider failures, safe no-clobber creation and expected-hash atomic replacement,
+  cooperating home/process locks. Directory-swap and partial-publication regressions pass. Cleanup failure after a
+  committed publication is logged without losing the reported success; only owned temporary identity is cleaned.
+  External edits observed before publish abort, with no unsupported cross-process compare-and-swap claim.
+  No GUI, merge or push. Next: Task 5 resumable migration. Plan 5 adds the Themes page, preview/file actions and live reload.
 
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)

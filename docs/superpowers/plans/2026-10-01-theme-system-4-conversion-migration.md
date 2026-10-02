@@ -55,6 +55,17 @@ properties data. Whole-catalog headless installed/workspace parity failed across
 passes. The golden's only change is the correctly inferred gradient button border. Costs: fewer explicit exported
 tokens (effective UI preserved); packaging aliases and extra catalog variants remain reversible manifest decisions.
 
+Task 4 is complete: full `./gradlew check` passed **7,946 tests, zero failures/errors, six skips**. Frozen import
+plans preserve per-provider identities, independent choices, source bytes and diagnostics. Whole-selection validation
+precedes publication; user conflicts default to Skip, Keep Both reserves batch-wide display names, and built-in
+shadows stay user files. File publication uses cooperating home/process locks, hard-link creation without replacement,
+expected-hash/identity rechecks and atomic replacement. Regression tests cover stale/new conflicts, partial writes,
+case/device/Unicode filenames, concurrent creators, symlinks, directory swaps, EDT rejection and late provider errors.
+Decision: cleanup errors after successful publication are logged without falsely reporting the committed output as
+failed; cleanup targets only the original temporary's identity (a secure directory handle where supported). Cost:
+an owned hidden temporary may remain after a cleanup failure. Observed external edits fail safely; the API does not
+claim compare-and-swap against arbitrary external editors racing the final rename.
+
 ## Global Constraints
 
 - Native files live at `<home>/themes/<id>.toml`; bundled resources at `dev/jasper/app/themes/<id>.toml`, with `index.txt`.
@@ -434,7 +445,7 @@ Item IDs derive from source/provider identity, never list position/display name.
 means SKIP; conflict-free items import by default. Built-in name overlap is reported as a user override, without
 writing into resources. All native documents in the frozen plan are immutable. The source is not reread at commit.
 
-- [ ] **Step 1: Add filesystem tests with actual temporary files.** Test names/assertions:
+- [x] **Step 1: Add filesystem tests with actual temporary files.** Test names/assertions:
 
 | Test | Required result |
 |---|---|
@@ -462,9 +473,9 @@ writing into resources. All native documents in the frozen plan are immutable. T
 
 Test safe ASCII filenames for Unicode/display names, trailing dots/spaces, reserved device names, case-insensitive
 filesystems and filename occupancy independently of theme-name occupancy. Keep archive cap/bomb/path tests active.
-- [ ] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*ThemeFilesTest' --tests '*ThemeImporterTest'`.
+- [x] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*ThemeFilesTest' --tests '*ThemeImporterTest'`.
 Expected: missing publication/import APIs.
-- [ ] **Step 3: Implement validation and publication.** Reserve names using catalog normalization; suffix ` 2`, ` 3`, …
+- [x] **Step 3: Implement validation and publication.** Reserve names using catalog normalization; suffix ` 2`, ` 3`, …
 using the full selected batch, not each item independently. Sanitize filesystem IDs independently of display names.
 Create validates/reparses output under the catalog byte cap before touching its target. Serialize operations per home;
 use a cooperating process file lock as well as an in-process lock. Journaled migration in Task 5 uses the same lock.
@@ -480,9 +491,9 @@ observed changes before publication, not an impossible cross-process CAS guarant
 validation is all-or-nothing, publication can partly succeed on I/O failure, and the report lists exactly committed
 paths/names. No input file is moved by interactive import. Package-private fault hooks use existing functional types
 and are inactive in production. Plan 5 will compose these operations with dialogs and cancellation.
-- [ ] **Step 4: Run GREEN.** Repeat Step 2 and `./gradlew check`; expect safe conflict behavior and no orphan temps after
+- [x] **Step 4: Run GREEN.** Repeat Step 2 and `./gradlew check`; expect safe conflict behavior and no orphan temps after
 handled failures. Independently review all filesystem paths, current-name revalidation and partial reports.
-- [ ] **Step 5: Commit after review.**
+- [x] **Step 5: Commit after review.**
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/themeimport jasper-app/src/test/java/dev/jasper/app/themeimport
