@@ -218,7 +218,8 @@ final class WindowContributions implements AutoCloseable {
     private void renderRail() {
         List<WindowRail.PanelButton> buttons = new ArrayList<>();
         for (PanelInstance panel : panels.values())
-            buttons.add(new WindowRail.PanelButton(panel.entry.id(), panel.entry.title(), panel.entry.icon(), panel.region, panel.visible));
+            buttons.add(new WindowRail.PanelButton(panel.entry.id(), panel.entry.title(), panel.entry.icon(), panel.region,
+                panel.visible, panel.entry.badge()));
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
         owner.rail().render(buttons, railActions);

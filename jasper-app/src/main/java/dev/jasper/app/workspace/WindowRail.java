@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelRegion;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.Component;
@@ -10,6 +11,7 @@ import java.awt.Dimension;
 import java.awt.Insets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.AbstractButton;
@@ -28,7 +30,11 @@ import javax.swing.UIManager;
  * action buttons. Settings lives in the workspace header. It owns no state; the window re-renders it.
  */
 final class WindowRail extends JPanel {
-    record PanelButton(String id, String title, Icon icon, PanelRegion region, boolean selected) { }
+    record PanelButton(String id, String title, Icon icon, PanelRegion region, boolean selected, Optional<PanelBadge> badge) {
+        PanelButton(String id, String title, Icon icon, PanelRegion region, boolean selected) {
+            this(id, title, icon, region, selected, Optional.empty());
+        }
+    }
 
     Consumer<String> onToggle = id -> { };
     BiConsumer<String, PanelRegion> onMove = (id, region) -> { };
@@ -65,7 +71,12 @@ final class WindowRail extends JPanel {
                 if (previous != null && previous != region) add(new JSeparator());
                 previous = region;
                 var button = new JToggleButton();
-                style(button, panel.icon(), panel.title());
+                style(button, panel.badge().<Icon>map(badge -> new BadgedIcon(panel.icon(), badge.tone())).orElse(panel.icon()),
+                    panel.title());
+                panel.badge().ifPresent(badge -> {
+                    button.setToolTipText(panel.title() + " (" + badge.description() + ")");
+                    button.getAccessibleContext().setAccessibleDescription(badge.description());
+                });
                 button.setSelected(panel.selected());
                 button.addActionListener(event -> onToggle.accept(panel.id()));
                 var menu = new JPopupMenu();

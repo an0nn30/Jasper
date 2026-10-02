@@ -1,8 +1,11 @@
 package dev.jasper.app.contributions;
 
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import javax.swing.Icon;
 import javax.swing.JComponent;
+import javax.swing.SwingUtilities;
 
 /** A contributed panel. Each window asks the factory for its own instance, lazily, on first show. */
 public final class PanelEntry {
@@ -15,6 +18,7 @@ public final class PanelEntry {
     private final String toggleActionId;
     private final boolean namedToggle;
     private boolean closed;
+    private PanelBadge badge;
 
     PanelEntry(Contributions owner, String id, String title, Icon icon, PanelRegion defaultRegion,
                String toggleActionId, boolean namedToggle, Function<PanelSite, JComponent> factory) {
@@ -33,6 +37,18 @@ public final class PanelEntry {
     public boolean namedToggle() { return namedToggle; }
     /** May return null or throw; the window then shows a placeholder. */
     public Function<PanelSite, JComponent> factory() { return factory; }
+
+    /** The rail button's unread mark, if any. */
+    public Optional<PanelBadge> badge() { return Optional.ofNullable(badge); }
+
+    /** Replaces the mark; every window's rail re-renders when it changed. EDT only. */
+    public void setBadge(Optional<PanelBadge> value) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Contributions belong to the EDT");
+        PanelBadge next = value.orElse(null);
+        if (closed || Objects.equals(badge, next)) return;
+        badge = next;
+        owner.changed(Contributions.Kind.RAIL);
+    }
 
     public void close() {
         if (closed) return;

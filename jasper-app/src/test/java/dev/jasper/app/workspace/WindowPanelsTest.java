@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.contributions.PanelRegion;
 import dev.jasper.app.contributions.PanelSite;
@@ -214,6 +215,28 @@ class WindowPanelsTest {
             assertThat(deck.y).as("the terminal sits right under its tabs").isEqualTo(strip.y + strip.height);
             assertThat(bottomBounds.y).as("the bottom panel sits under the terminal").isGreaterThan(deck.y + deck.height);
             assertThat(bottomBounds.x).isEqualTo(deck.x);
+        });
+    }
+
+    @Test void aBadgedPanelShowsADotAndDescribesItsCount() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            var icon = new ImageIcon(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB));
+            PanelEntry notes = model.addPanel("dev.x.notes", "Notes", icon, PanelRegion.RIGHT, site -> new JLabel("notes"));
+            notes.setBadge(Optional.of(new PanelBadge(4, PanelBadge.Tone.ERROR, "4 unread notifications, 1 error")));
+            AbstractButton button = owner.rail().buttons().getFirst();
+            assertThat(button.getToolTipText()).isEqualTo("Notes (4 unread notifications, 1 error)");
+            assertThat(button.getAccessibleContext().getAccessibleName()).isEqualTo("Notes");
+            assertThat(button.getAccessibleContext().getAccessibleDescription()).isEqualTo("4 unread notifications, 1 error");
+            assertThat(button.getIcon()).isInstanceOfSatisfying(BadgedIcon.class, badged -> {
+                assertThat(badged.tone()).isEqualTo(PanelBadge.Tone.ERROR);
+                assertThat(badged.base()).isSameAs(icon);
+            });
+            notes.setBadge(Optional.empty());
+            assertThat(owner.rail().buttons().getFirst().getIcon()).isSameAs(icon);
+            assertThat(owner.rail().buttons().getFirst().getToolTipText()).isEqualTo("Notes");
         });
     }
 

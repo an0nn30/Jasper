@@ -124,4 +124,12 @@ class ChromeKeysTest {
         assertThat(themed.getColor("Jasper.titleSearch.border")).isEqualTo(new Color(0x202020));
         assertThat(themed.getColor("Jasper.titleSearch.hoverBackground")).isEqualTo(new Color(0x303030));
     }
+
+    @Test void railBadgesReadAgainstTheRail() {
+        var defaults = flatLafOnly();
+        ChromeKeys.derive(defaults, TERMINAL);
+        Color rail = defaults.getColor("Jasper.titleBackground");
+        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.railBadgeError"), rail)).isGreaterThanOrEqualTo(3);
+        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.railBadgeAccent"), rail)).isGreaterThanOrEqualTo(3);
+    }
 }
