@@ -32,8 +32,9 @@ import javax.swing.SwingUtilities;
  * mouse events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
  * synthetic events. While it runs, both stripes show all three groups with the dragged button lifted out, the target
  * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}; the real
- * layout does not change. Releasing over a target hands the drop to {@link #onDrop}; releasing anywhere else, Esc or
- * {@link #cancel} ends the drag without one. A window resize while dragging resolves the target again. EDT only.
+ * layout does not change. Releasing the left button over a target hands the drop to {@link #onDrop}; releasing it
+ * anywhere else, Esc, {@link #cancel} or another press (a right or middle click, or a left press after a lost release)
+ * ends the drag without one. A window resize while dragging resolves the target again. EDT only.
  */
 final class DockDrag {
     /** How far, in logical pixels, a press must move before it becomes a drag. */
@@ -105,7 +106,9 @@ final class DockDrag {
     }
 
     private void pressed(JComponent component, String id, MouseEvent event) {
-        if (!SwingUtilities.isLeftMouseButton(event) || active()) return;
+        // Another press while one is pending or dragging is another button, or a left press after a lost release.
+        if (pressedId != null) cancel();
+        if (!SwingUtilities.isLeftMouseButton(event) || event.isPopupTrigger()) return;
         pressedId = id;
         source = component;
         pressedAt = toRoot(component, event.getPoint());
@@ -122,7 +125,7 @@ final class DockDrag {
     }
 
     private void released(JComponent component, MouseEvent event) {
-        if (component != source) return;
+        if (component != source || event.getButton() != MouseEvent.BUTTON1) return;
         if (!active()) { finish(); return; }
         update(toRoot(component, event.getPoint()));
         String id = dragging;

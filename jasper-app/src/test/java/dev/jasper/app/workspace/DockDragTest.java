@@ -106,6 +106,15 @@ class DockDragTest {
             source.dispatchEvent(new MouseEvent(source, id, System.currentTimeMillis(), modifiers, at.x, at.y, 1, false, button));
         }
 
+        /** A press or release of one button, with the left button still held for any other button's events. */
+        void send(JComponent source, int id, int button, boolean popupTrigger, Point inContent) {
+            Point at = SwingUtilities.convertPoint(content, inContent, source);
+            boolean leftRelease = button == MouseEvent.BUTTON1 && id == MouseEvent.MOUSE_RELEASED;
+            int modifiers = (leftRelease ? 0 : InputEvent.BUTTON1_DOWN_MASK)
+                | (button != MouseEvent.BUTTON1 && id == MouseEvent.MOUSE_PRESSED ? InputEvent.getMaskForButton(button) : 0);
+            source.dispatchEvent(new MouseEvent(source, id, System.currentTimeMillis(), modifiers, at.x, at.y, 1, popupTrigger, button));
+        }
+
         /** Press on the source, move past the threshold, then to each point; returns the source for the release. */
         JComponent dragTo(JComponent source, Point... points) {
             Point start = center(source);
@@ -127,7 +136,7 @@ class DockDragTest {
         assertThat(w.drag.active()).isTrue();
         assertThat(w.drag.dragged()).isEqualTo("b");
         assertThat(w.drag.overlay().getParent()).isSameAs(w.rootPane.getLayeredPane());
-        assertThat(w.rootPane.getLayeredPane().getLayer(w.drag.overlay())).isEqualTo(JLayeredPane.DRAG_LAYER);
+        assertThat(JLayeredPane.getLayer(w.drag.overlay())).isEqualTo(JLayeredPane.DRAG_LAYER);
         assertThat(w.left.dragging()).isTrue();
         assertThat(w.right.dragging()).as("both stripes show all their groups").isTrue();
         w.mouse(source, MouseEvent.MOUSE_RELEASED, new Point(start.x + 6, start.y));
@@ -241,11 +250,101 @@ class DockDragTest {
         w.dragTo(w.button(w.left, "b"), w.cell(0, 1));
         w.state.show("c");
         assertThat(w.drag.active()).as("any dock change ends the drag").isFalse();
+        assertThat(w.drag.overlay().getParent()).as("no overlay is left mounted").isNull();
+        assertThat(w.left.dragging()).as("the stripes are back to normal").isFalse();
+        assertThat(w.right.dragging()).isFalse();
         var source = w.button(w.left, "a");
         Point start = w.center(source);
         w.mouse(source, MouseEvent.MOUSE_PRESSED, start);
         w.drag.cancel();
         w.mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(start.x + 40, start.y));
         assertThat(w.drag.active()).as("a cancelled press never becomes a drag").isFalse();
+
+        w.dragTo(w.button(w.left, "b"), w.cell(0, 1));
+        assertThat(w.drag.active()).isTrue();
+        w.drag.cancel();
+        assertThat(w.drag.active()).as("cancel() ends a running drag").isFalse();
+        assertThat(w.drag.overlay().getParent()).as("no overlay is left mounted").isNull();
+        assertThat(w.left.dragging()).isFalse();
+        assertThat(w.right.dragging()).isFalse();
+        assertThat(w.state.slot("b")).as("and nothing moved").hasValue(Slot.LEFT_TOP);
+    }
+
+    @Test void aMiddleOrRightPressMidDragCancelsItAndNothingDrops() {
+        for (int button : new int[] {MouseEvent.BUTTON3, MouseEvent.BUTTON2}) {
+            var w = new Window();
+            List<String> drops = new ArrayList<>();
+            var apply = w.drag.onDrop;
+            w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
+            Point bottomRight = w.cell(2, 1);
+            var source = w.dragTo(w.button(w.left, "b"), bottomRight);
+            assertThat(w.drag.target()).as("a left release here would drop").hasValue(DockDropResolver.Target.workspace(Slot.BOTTOM_RIGHT));
+
+            w.send(source, MouseEvent.MOUSE_PRESSED, button, false, bottomRight);
+            assertThat(w.drag.active()).as("button %s cancels the drag", button).isFalse();
+            assertThat(w.drag.overlay().getParent()).as("the overlay is unmounted").isNull();
+            assertThat(w.left.dragging()).isFalse();
+            assertThat(w.right.dragging()).isFalse();
+            w.send(source, MouseEvent.MOUSE_RELEASED, button, false, bottomRight);
+            w.send(source, MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, false, bottomRight);
+            assertThat(drops).as("nothing dropped").isEmpty();
+            assertThat(w.shown).isEmpty();
+            assertThat(w.state.slot("b")).hasValue(Slot.LEFT_TOP);
+            assertThat(w.state.visible("b")).isFalse();
+            assertThat(w.state.ids(Slot.LEFT_TOP)).containsExactly("a", "b", "c");
+        }
+    }
+
+    @Test void onlyALeftReleaseEndsTheDragWithADrop() {
+        var w = new Window();
+        List<String> drops = new ArrayList<>();
+        var apply = w.drag.onDrop;
+        w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
+        Point bottomRight = w.cell(2, 1);
+        var source = w.dragTo(w.button(w.left, "b"), bottomRight);
+        w.send(source, MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON3, false, bottomRight);
+        w.send(source, MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON2, false, bottomRight);
+        assertThat(w.drag.active()).as("another button's release is ignored").isTrue();
+        assertThat(drops).isEmpty();
+        w.send(source, MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, false, bottomRight);
+        assertThat(w.drag.active()).isFalse();
+        assertThat(drops).containsExactly("b");
+        assertThat(w.state.slot("b")).hasValue(Slot.BOTTOM_RIGHT);
+    }
+
+    @Test void aLeftPressWithThePopupFlagNeverStartsADrag() {
+        var w = new Window();
+        w.state.show("a");
+        // The header's title, not a stripe button: a button's own popup menu cannot open in a headless window.
+        var source = w.area.headerOf(Slot.LEFT_TOP).titleLabel();
+        Point start = w.center(source);
+        w.send(source, MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, true, start);
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(start.x + 40, start.y));
+        assertThat(w.drag.active()).as("ctrl+click on macOS opens the menu, it does not drag").isFalse();
+        assertThat(w.drag.overlay().getParent()).isNull();
+    }
+
+    @Test void aLeftPressMidDragMeansTheReleaseWasLostAndStartsOver() {
+        var w = new Window();
+        List<String> drops = new ArrayList<>();
+        var apply = w.drag.onDrop;
+        w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
+        w.dragTo(w.button(w.left, "b"), w.cell(2, 1));
+        assertThat(w.drag.active()).isTrue();
+
+        var next = w.button(w.left, "a");
+        Point start = w.center(next);
+        w.send(next, MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, false, start);
+        assertThat(w.drag.active()).as("the lost release's drag is cancelled").isFalse();
+        assertThat(w.drag.overlay().getParent()).isNull();
+        assertThat(w.left.dragging()).isFalse();
+        assertThat(w.right.dragging()).isFalse();
+        assertThat(drops).as("with no drop").isEmpty();
+        assertThat(w.state.slot("b")).hasValue(Slot.LEFT_TOP);
+
+        w.mouse(next, MouseEvent.MOUSE_DRAGGED, new Point(start.x + 40, start.y));
+        assertThat(w.drag.dragged()).as("this press is a new pending press").isEqualTo("a");
+        w.mouse(next, MouseEvent.MOUSE_RELEASED, new Point(start.x + 40, start.y));
+        assertThat(w.drag.active()).isFalse();
     }
 }
