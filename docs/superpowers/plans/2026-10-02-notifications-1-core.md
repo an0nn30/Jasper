@@ -4475,8 +4475,8 @@ The Notifications button on the rail opens the panel, which starts on the right;
 **Notifications: Show History** in the command palette does the same. The button shows a dot while anything is
 unread: red when an error is unread. Its tooltip gives the count.
 
-Opening the panel in a focused window marks everything read. What was unread is listed under **New** until you close
-the panel; everything else is under **Earlier**, newest first. Each row shows the full details, the notification's
+Unread notifications are listed under **New**, in bold. Opening the panel in a focused window marks everything read;
+what it read stays under **New** until you close the panel, and everything else is under **Earlier**, newest first. Each row shows the full details, the notification's
 group and time, and its links (disabled once the notification no longer applies). `✕` removes one row; **Clear All**
 removes them all.
 
