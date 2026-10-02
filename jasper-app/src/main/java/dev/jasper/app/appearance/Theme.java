@@ -3,6 +3,7 @@ package dev.jasper.app.appearance;
 import dev.jasper.terminal.config.Palette;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * A theme Jasper can install: its name, darkness and terminal palette, and the resolved Jasper theme document
@@ -15,9 +16,34 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
         ThemeDocument document();
     }
 
-    /** A theme Jasper ships, from {@code file} under {@code dev/jasper/app/themes/}: a Jasper theme or a converted IntelliJ one. */
-    public record Bundled(String file, ThemeDocument document) implements Source {
-        public Bundled { Objects.requireNonNull(file); Objects.requireNonNull(document); }
+    /**
+     * A theme Jasper ships, from {@code file} under {@code dev/jasper/app/themes/}: a Jasper theme or a converted IntelliJ
+     * one. Its document is read on first use, once: nearly all of a converted theme's bytes are [ui] and [icons] tables,
+     * which only installing or previewing it needs. Bundled themes are equal by file, so comparing catalogs reads nothing.
+     */
+    public static final class Bundled implements Source {
+        private final String file;
+        private Supplier<ThemeDocument> read;
+        private ThemeDocument document;
+
+        Bundled(String file, Supplier<ThemeDocument> read) {
+            this.file = Objects.requireNonNull(file);
+            this.read = Objects.requireNonNull(read);
+        }
+
+        public String file() { return file; }
+
+        @Override public synchronized ThemeDocument document() {
+            if (document == null) {
+                document = Objects.requireNonNull(read.get());
+                read = null;
+            }
+            return document;
+        }
+
+        @Override public boolean equals(Object other) { return other instanceof Bundled bundled && file.equals(bundled.file); }
+        @Override public int hashCode() { return file.hashCode(); }
+        @Override public String toString() { return "Bundled[" + file + "]"; }
     }
 
     /** A Jasper theme file in the {@code themes} folder beside {@code config.toml}. */

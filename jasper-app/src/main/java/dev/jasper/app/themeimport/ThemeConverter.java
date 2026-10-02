@@ -163,8 +163,11 @@ public final class ThemeConverter {
             }
         }
         if (!available.contains(document)) available.addFirst(document);
-        ThemeManager.builtIns().forEach(theme -> available.add(theme.source().document()));
-        var flattened = ThemeResolver.resolve(document, name -> available.stream().filter(item -> item.name().strip().equalsIgnoreCase(name.strip())).toList());
+        // A bundled layer is matched by name before its document is read, which parses its whole file.
+        var flattened = ThemeResolver.resolve(document, name -> java.util.stream.Stream.concat(
+            available.stream().filter(item -> item.name().strip().equalsIgnoreCase(name.strip())),
+            ThemeManager.builtIns().stream().filter(theme -> theme.name().strip().equalsIgnoreCase(name.strip()))
+                .map(theme -> theme.source().document())).toList());
         return new ConversionResult(flattened, List.of(), source.getFileName().toString());
     }
 

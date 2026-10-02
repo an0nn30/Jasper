@@ -2,6 +2,25 @@
 
 ## Current state — 2026-10-02
 
+- **Built-in theme catalog no longer stalls start-up** (branch `claude/theme-catalog-edt`, user request in chat
+  2026-10-02): building the application parsed all 284 bundled theme files on the EDT (`ThemeCatalog`'s built-in
+  snapshot), about 1.5 s cold, nearly all of it tomlj reading the converted themes' `[ui]` and `[icons]` tables (96% of
+  the 9.4 MB). This is the start-up side of the cold-JVM cost behind the contended-endpoint test below, which now
+  warms up outside its window; before that warm-up landed, this change alone made the test pass cold (5 of 5). A
+  bundled theme's name, darkness and palette now come from its file up to the first `[ui]` or `[icons]` table
+  (`ThemeTomlWriter` writes them last); `Theme.Bundled` parses the whole file on its first `document()` call, once, and
+  bundled themes are equal by file. The native scan and the importer match bundled `extends` parents by name before
+  reading their documents. A cold catalog load takes about 250 ms; parsing in parallel was measured and rejected
+  (1.7x). `BuiltInThemesTest` checks every bundled theme against its whole file. Full check after rebasing on `e0e61461`: **7,975/0/0/6**. Not done: GUI
+  check, push.
+
+- **`:b` name test no longer depends on the temp folder** (merged into main as `f1c1acd3` and pushed, 2026-10-02):
+  `ExFilesTest.bufferSelectsATabByNumberOrName` failed on the dev Mac, whose `java.io.tmpdir` holds "zz", because `:b`
+  matches whole paths, as Vim 9.1 does (checked with `/usr/bin/vim`). The test's buffers now live under a fixed `/work`
+  folder. Open: `ExFiles.match` tries exact, ends-with, starts-with, contains and stops at the first level with any
+  match; Vim tries contains, starts-with, ends-with, exact and stops at the first with exactly one. With buffers `xab`
+  and `abab`, Vim's `:b ab` selects `abab` where Jasper reports E93.
+
 - **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
   user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
   failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
