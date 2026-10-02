@@ -3,12 +3,15 @@ package dev.jasper.app.platform;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Window;
+import java.beans.PropertyChangeListener;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.WeakHashMap;
 import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.plaf.UIResource;
 
 /**
  * The macOS side of {@link WindowGlass}. AWT refuses a translucent background on a decorated frame, so translucency
@@ -38,20 +41,62 @@ final class MacGlass {
         }
     }
 
+    static Runnable watch(JRootPane root, Runnable reset) {
+        Window window = SwingUtilities.getWindowAncestor(root);
+        return window == null ? () -> {} : watchBackground(window, reset);
+    }
+
+    /**
+     * Glass sets the window background without notifying anyone, so a notified opaque background comes from
+     * elsewhere: FlatLaf, for one, sets the frame background a turn after a look-and-feel switch, and
+     * {@code Window.setBackground} then makes the peer opaque. That background is the one to restore from now on.
+     */
+    static Runnable watchBackground(Component window, Runnable reset) {
+        PropertyChangeListener listener = event -> {
+            if (event.getNewValue() instanceof Color color && color.getAlpha() < 255) return;
+            ORIGINAL.remove(window); // The next translucent() records the new background.
+            reset.run();
+        };
+        window.addPropertyChangeListener("background", listener);
+        return () -> window.removePropertyChangeListener("background", listener);
+    }
+
     static void opaque(JRootPane root) {
         Window window = SwingUtilities.getWindowAncestor(root);
         if (window != null) restore(window);
     }
 
+    /** Each step is tried on its own, background first, so a later failure cannot leave the field transparent. */
     private static void restore(Window window) {
+        Color original = restored(ORIGINAL.remove(window), UIManager.getColor("control"));
+        Object peer = null;
         try {
-            Object peer = peer(window);
-            if (peer != null) Class.forName("java.awt.peer.WindowPeer").getMethod("setOpaque", boolean.class).invoke(peer, true);
-            Color original = ORIGINAL.remove(window);
-            if (original != null && peer != null) background(window, peer, original);
+            peer = peer(window);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
-            // Nothing more can be undone; WindowGlass already reports an opaque window.
+            // Still restore the field below.
         }
+        if (original != null) {
+            try {
+                background(window, peer, original);
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                // Nothing more can be undone here; WindowGlass already reports an opaque window.
+            }
+        }
+        if (peer != null) {
+            try {
+                Class.forName("java.awt.peer.WindowPeer").getMethod("setOpaque", boolean.class).invoke(peer, true);
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                // As above.
+            }
+        }
+    }
+
+    /**
+     * The background to restore. A look-and-feel default recorded before a theme switch is stale, so the current
+     * theme's window colour replaces it.
+     */
+    static Color restored(Color original, Color control) {
+        return original instanceof UIResource && control != null ? control : original;
     }
 
     private static Object peer(Window window) throws ReflectiveOperationException {
@@ -60,12 +105,15 @@ final class MacGlass {
         return field.get(window);
     }
 
-    /** Frame.setBackground refuses alpha on a decorated frame, so the field and the peer are set directly. */
+    /**
+     * Frame.setBackground refuses alpha on a decorated frame, so the field and the peer are set directly, without
+     * notifying {@link #watchBackground} listeners. The field is set first; a missing peer is left alone.
+     */
     private static void background(Window window, Object peer, Color color) throws ReflectiveOperationException {
         Field field = Component.class.getDeclaredField("background");
         field.setAccessible(true);
         field.set(window, color);
-        Class.forName("java.awt.peer.ComponentPeer").getMethod("setBackground", Color.class).invoke(peer, color);
+        if (peer != null) Class.forName("java.awt.peer.ComponentPeer").getMethod("setBackground", Color.class).invoke(peer, color);
     }
 
     static boolean blur(JRootPane root, int radius) {
