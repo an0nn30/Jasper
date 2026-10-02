@@ -8,24 +8,40 @@
   grid; `DockGeometry.landing` previews the landing on a copy of the state; during a drag both stripes show all three
   groups, lift the dragged button and open a gap; `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the
   placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
-  drop moves and keeps visibility; a workspace drop moves and shows (`DockState.moveAndShow`). Any dock change or the
-  window closing cancels a drag. Deviations from the plan text: before execution (`728167c4`) the expected test counts
-  and Task 6's `close()` anchor were aligned with plan 1 as executed; Task 4, `DockDropOverlayTest` is isolated from the
-  installed theme (it saves and restores the look-and-feel-level colours, clears `DragAndDrop.areaBackground`,
-  `DragAndDrop.borderColor` and `Component.accentColor` at both the developer and look-and-feel level, and installs
-  `Theme.DARK` first in `theThemesOwnDragColoursWin`); Task 5, `DockDrag` button rules (a non-left press during a drag
-  cancels it, only a left release drops, popup-trigger presses are ignored, and a left press during a drag means the
-  release was lost, so the drag is cancelled and the new press starts over; `DockDragTest` grew by 4 cases, and a lint
-  fix was made); Task 6, the drag returns home and the source group keeps its step (`DockDrag` targets the lifted stripe
-  button's home, its old square, slot and index, until the cursor first leaves that square grown by the drag threshold
-  and one more pixel on every side, and a resize forgets it; during a drag the lifted button's group keeps its step at
-  the group's end and the gap takes it when the target is in that group, so later groups do not slide up; three
-  `ToolStripeDragTest` values moved one step; final counts `DockDragTest` 17 cases, `ToolStripeDragTest` 8); Tasks 1, 2
-  and 3 none in code. Planning decisions are listed in the plan. `./gradlew check --continue`: 8,038 tests, 1 failure, 0
-  errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac
-  only (its `java.io.tmpdir` contains "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed`
-  (Remote) is flaky under full-suite load (it did not fail in this run and passes when run alone). No GUI launched; GUI
-  checks for the user are the plan's last section.
+  drop moves and keeps visibility; a workspace drop moves and shows (`DockState.moveAndShow`). Any dock change, View ›
+  Rail, or the window closing or being deactivated cancels a drag. Deviations from the plan text: before execution
+  (`728167c4`) the expected test counts and Task 6's `close()` anchor were aligned with plan 1 as executed; Task 4,
+  `DockDropOverlayTest` is isolated from the installed theme (it saves and restores the look-and-feel-level colours,
+  clears `DragAndDrop.areaBackground`, `DragAndDrop.borderColor` and `Component.accentColor` at both the developer and
+  look-and-feel level, and installs `Theme.DARK` first in `theThemesOwnDragColoursWin`); Task 5, `DockDrag` button rules
+  (a non-left press during a drag cancels it, only a left release drops, popup-trigger presses are ignored, and a left
+  press during a drag means the release was lost, so the drag is cancelled and the new press starts over; `DockDragTest`
+  grew by 4 cases, and a lint fix was made); Task 6, the drag returns home and the source group keeps its step
+  (`DockDrag` targets the lifted stripe button's home, its old square, slot and index, until the cursor first leaves
+  that square grown by the drag threshold and one more pixel on every side, and a resize forgets it; during a drag the
+  lifted button's group keeps its step at the group's end and the gap takes it when the target is in that group, so
+  later groups do not slide up; three `ToolStripeDragTest` values moved one step; final counts `DockDragTest` 17 cases,
+  `ToolStripeDragTest` 8); Tasks 1, 2 and 3 none in code; final review: a press near a stripe button's edge that moves
+  just past the drag threshold and back stays home (`DockDrag` leaves home only past the square grown by the threshold
+  and one more pixel on every side; new tests `aWobbleOutOfTheLastRowAndBackStaysHome`,
+  `aWobbleOutOfTheLastColumnAndBackStaysHome` and `oneMorePixelOutLeavesHomeAndComingBackIsResolvedFromTheStripe`); a
+  drag ends when its window is deactivated (a modal dialog opening, another application taking focus), through
+  `WindowContent.setActive(false)`, which `TerminalWindow`'s `windowDeactivated` already calls, rather than through a
+  window listener `DockDrag` adds and removes, since a headless test cannot build a `Window`; for the same reason its
+  Esc dispatcher claims only key events from its own window as told by the root pane, not by
+  `SwingUtilities.getWindowAncestor` (new tests `theWindowDeactivatingMidDragCancelsItAndNothingDrops` and
+  `anEscInAnotherWindowIsLeftToItAndTheDragGoesOn`); View › Rail cancels a running drag (new test
+  `turningTheRailOnOrOffMidDragCancelsIt`); and test cleanup (`DockDragTest` records the Esc dispatchers with its own
+  focus manager, cancels every fixture's drag after each test and checks none is left; `DockDropOverlayTest` saves and
+  restores on the EDT, the look and feel first, and fails when it cannot reinstall it); final counts `DockDragTest` 21
+  cases, `WindowDragTest` 8. Planning decisions are listed in the plan. `./gradlew check --continue`: 8,044 tests, 1
+  failure, 0 errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails
+  on this Mac only (its `java.io.tmpdir` contains "zz") and predates the branch, and
+  `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load (it did not fail in this run and
+  passes when run alone). Open: the GUI checks are pending; any dock change, stripe render or action change (a plugin
+  enabling an action or changing its title) cancels a running drag; on stripes shorter than about 200px the foot can
+  clip by one step during a drag; and the overlay repaints the whole window on each drag event, which may lag on large
+  HiDPI windows (the GUI checks will tell). No GUI launched; GUI checks for the user are the plan's last section.
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.

@@ -108,7 +108,10 @@ final class DockDrag {
 
     DockDropOverlay overlay() { return overlay; }
 
-    /** Ends a drag or a pending press without dropping: Esc, the window closing, a plugin unloading, a dock change. */
+    /**
+     * Ends a drag or a pending press without dropping: Esc, another press, the window closing or losing focus, a plugin
+     * unloading, a dock change, a stripe render, View > Rail.
+     */
     void cancel() { finish(); }
 
     /**

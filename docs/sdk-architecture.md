@@ -95,8 +95,9 @@ saves. `DockDrag` drags a window from its stripe button or its header with plain
 `DockDropResolver` finds the target under the cursor (a stripe group and a position, or a cell of
 the workspace's 3 × 2 grid), the stripes open a gap, and `DockDropOverlay` on the layered pane's
 `DRAG_LAYER` previews the landing with `DockGeometry.landing`, the same function as the layout. A
-stripe drop moves the window and keeps its visibility; a workspace drop moves and shows it. A window with nothing contributed has no stripes and its old layout. Requests to show, hide or toggle a panel travel
-through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
+stripe drop moves the window and keeps its visibility; a workspace drop moves and shows it. A window
+with nothing contributed has no stripes and its old layout. Requests to show, hide or toggle a panel
+travel through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
 window. Every panel gets a View → Tools entry for its toggle action: the application-registered
 `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's own action named by
 `PanelSpec.toggleActionId` (which must already be registered by that plugin), so a plugin action

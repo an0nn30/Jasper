@@ -233,8 +233,9 @@ final class ToolStripe extends JPanel {
 
     /**
      * Square buttons 3 px in from each side and 4 px apart; separators inset 7 px; the foot ends 4 px from the bottom.
-     * During a drag every group shows and the lifted button's step stays empty at the end of its group. With the gap,
-     * the gap takes that step when it opens in the lifted button's group and one more step in any other group.
+     * During a drag every group shows, the lifted button's step stays empty at the end of its group, and an empty group
+     * shows one step of drop space. With the gap, the gap takes the lifted button's step in its group and an empty
+     * group's drop space, so neither grows; in any other group it adds one step.
      */
     private Placement place(boolean withGap) {
         var placement = new Placement();
