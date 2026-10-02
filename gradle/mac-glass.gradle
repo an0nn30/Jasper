@@ -1,5 +1,6 @@
-// The blur behind a translucent window is a private CoreGraphics call; this small bridge finds the window through
-// JAWT. Only macOS builds compile it; elsewhere windows stay opaque and Settings disables the rows.
+// The blur behind a translucent window is a public NSVisualEffectView behind the content view, masked to the window's
+// rounded corners; this small bridge finds the window through JAWT and adds it (no private CoreGraphics call). Only
+// macOS builds compile it; elsewhere windows stay opaque and Settings disables the rows.
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.jvm.toolchain.JavaToolchainService
 
@@ -58,7 +59,7 @@ def compileTests = tasks.register('compileMacGlassTests', Exec) {
 
 def nativeTests = tasks.register('testMacGlass', Exec) {
     group = 'verification'
-    description = 'Checks the macOS glass bridge headlessly: radius bounds and finding a window by its layer.'
+    description = 'Checks the macOS glass bridge headlessly: finding a window by its layer, the corner mask and appearance.'
     dependsOn(compileTests, compileBridge)
     commandLine(testExecutable.get().asFile.absolutePath)
 }

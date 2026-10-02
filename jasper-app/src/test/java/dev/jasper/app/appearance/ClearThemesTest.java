@@ -20,7 +20,7 @@ class ClearThemesTest {
     @Test void clearDarkMatchesTerminalAppsProfile() {
         GeneratedTheme theme = generated("Clear Dark");
         assertThat(theme.dark()).isTrue();
-        assertThat(theme.glass()).isEqualTo(new GlassLevels(0.95, 0.5));
+        assertThat(theme.glass()).isEqualTo(new GlassLevels(0.95, true));
         Palette palette = theme.terminal();
         assertThat(hex(palette.background())).isEqualTo("#212734");
         assertThat(hex(palette.foreground())).isEqualTo("#e6e6e6");
@@ -34,7 +34,7 @@ class ClearThemesTest {
     @Test void clearLightMatchesTerminalAppsProfile() {
         GeneratedTheme theme = generated("Clear Light");
         assertThat(theme.dark()).isFalse();
-        assertThat(theme.glass()).isEqualTo(new GlassLevels(0.93, 0.5));
+        assertThat(theme.glass()).isEqualTo(new GlassLevels(0.93, true));
         Palette palette = theme.terminal();
         assertThat(hex(palette.background())).isEqualTo("#ffffff");
         assertThat(hex(palette.foreground())).isEqualTo("#3a4851");

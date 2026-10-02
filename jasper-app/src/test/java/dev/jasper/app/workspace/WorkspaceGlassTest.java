@@ -5,6 +5,7 @@ import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.GlassSettings;
+import dev.jasper.app.config.WorkspaceBlur;
 import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Color;
@@ -189,16 +190,24 @@ class WorkspaceGlassTest {
             var themes = new ThemeController();
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
             var requests = new ArrayList<GlassLevels>();
-            owner.setGlassRequests(requests::add);
+            var dark = new ArrayList<Boolean>();
+            owner.setGlassRequests((levels, isDark) -> { requests.add(levels); dark.add(isDark); });
             assertThat(requests.getLast()).isEqualTo(GlassLevels.OPAQUE);
 
             var clear = ThemeCatalog.builtIn().scan().find("Clear Dark").orElseThrow();
             themes.configureWorkspace(new WorkspaceThemeChoice("Clear Dark"), clear);
-            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.95, 0.5));
+            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.95, true));
+            assertThat(dark.getLast()).as("Clear Dark is a dark workspace").isTrue();
 
             owner.applyConfiguration(ConfigSnapshot.defaults().toBuilder()
-                .glass(new GlassSettings(80f, GlassSettings.UNSET_BLUR)).build(), true);
-            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.8, 0.5));
+                .glass(new GlassSettings(80f, WorkspaceBlur.OFF)).build(), true);
+            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.8, false));
+            assertThat(dark.getLast()).isTrue();
+
+            var light = ThemeCatalog.builtIn().scan().find("Clear Light").orElseThrow();
+            themes.configureWorkspace(new WorkspaceThemeChoice("Clear Light"), light);
+            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.8, false));
+            assertThat(dark.getLast()).as("Clear Light is a light workspace").isFalse();
         });
     }
 }

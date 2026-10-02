@@ -7,10 +7,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ThemeImporterGlassTest {
     @Test void renamingAnImportedThemeKeepsItsWorkspaceTable() {
-        var document = ThemeToml.parse("name = \"Original\"\nextends = \"Jasper Dark\"\n[workspace]\nopacity = 0.9\nblur = 0.3\n", "original.toml");
+        var document = ThemeToml.parse("name = \"Original\"\nextends = \"Jasper Dark\"\n[workspace]\nopacity = 0.9\nblur = true\n", "original.toml");
         var renamed = ThemeImporter.rename(document, "Renamed");
         assertThat(renamed.name()).isEqualTo("Renamed");
         assertThat(renamed.workspace().opacity()).isEqualTo(Optional.of(0.9));
-        assertThat(renamed.workspace().blur()).isEqualTo(Optional.of(0.3));
+        assertThat(renamed.workspace().blur()).isEqualTo(Optional.of(true));
     }
 }

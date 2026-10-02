@@ -67,7 +67,7 @@ public final class TerminalWindow implements AutoCloseable {
         content.onMinimumSizeChanged = this::updateMinimumSize;
         if (titleBar != null) titleBar.attach(frame);
         glass = new WindowGlass(frame.getRootPane(), WindowGlass.Platform.current(), content::applyBackgroundOpacity);
-        content.setGlassRequests(levels -> glass.request(levels.opacity(), levels.blur()));
+        content.setGlassRequests((levels, dark) -> glass.request(levels.opacity(), levels.blur(), dark));
         frame.addWindowListener(events); frame.pack();
         if (initial != null) {
             updateMinimumSize();

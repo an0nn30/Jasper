@@ -57,7 +57,7 @@ class ConfigTemplateTest {
         expected.add(List.of("version"));
         for (Setting<?> setting : CoreSettings.SCHEMA.settings())
             if (!(setting.kind() instanceof SettingKind.StringMap) && setting != CoreSettings.UI_FONT_SIZE
-                    && setting != CoreSettings.UI_WORKSPACE_OPACITY && setting != CoreSettings.UI_WORKSPACE_BLUR) expected.add(setting.key());
+                    && setting != CoreSettings.UI_WORKSPACE_OPACITY) expected.add(setting.key());
         assertThat(TomlDocument.leaves(text).keySet()).containsExactlyInAnyOrderElementsOf(expected);
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();

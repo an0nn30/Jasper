@@ -34,4 +34,4 @@ white = "#d8e1e7"
 
 [workspace]
 opacity = 0.93
-blur = 0.5
+blur = true

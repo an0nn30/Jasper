@@ -1,6 +1,6 @@
-// Headless: checks the radius bounds and finding a window by the layer JAWT reports, with stand-in windows.
-// Creates no window and never calls the private blur function. Stand-in windows hold real NSViews, so the
-// selectors MacGlass.m sends to id keep AppKit's own signatures.
+// Headless: checks finding a window by the layer JAWT reports, with stand-in windows, and the effect view's mask and
+// appearance. Creates no window. Stand-in windows hold real NSViews, so the selectors MacGlass.m sends to id keep
+// AppKit's own signatures.
 #import "../../main/native/MacGlass.m"
 #include <assert.h>
 
@@ -21,10 +21,6 @@ static TestWindow *WindowWithLayer(CALayer *layer) {
 
 int main(void) {
     @autoreleasepool {
-        assert(JasperClampRadius(-5) == 0);
-        assert(JasperClampRadius(20) == 20);
-        assert(JasperClampRadius(500) == 64);
-
         CALayer *content = [CALayer layer];
         CALayer *metal = [CALayer layer];
         [content addSublayer:metal];
@@ -53,6 +49,14 @@ int main(void) {
         assert(mask.size.width == 33 && mask.size.height == 33);
         assert(mask.capInsets.top == 16 && mask.capInsets.left == 16 && mask.capInsets.bottom == 16 && mask.capInsets.right == 16);
         assert(mask.resizingMode == NSImageResizingModeStretch);
+        // Full screen reports a radius of 0: square corners, no mask.
+        assert(JasperMaskForRadius(0) == nil);
+        assert(JasperMaskForRadius(-1) == nil);
+        assert(JasperMaskForRadius(16).size.width == 33);
+
+        // The material's look follows the workspace theme, not the system appearance.
+        assert([JasperEffectAppearance(JNI_TRUE) isEqualToString:NSAppearanceNameAqua]);
+        assert([JasperEffectAppearance(JNI_FALSE) isEqualToString:NSAppearanceNameDarkAqua]);
     }
     return 0;
 }

@@ -71,7 +71,7 @@ public final class CorePages {
                 .action(() -> "Translucent terminal and editor backgrounds; a workspace theme may set its own.",
                     new SchemaPage.Button("Choose workspace theme…", () -> navigate.accept("themes#workspace"), () -> true))
                 .row(UI_WORKSPACE_OPACITY, Editors.optionalNumber("Use theme's value", 1, "%")).note(GLASS_NOTE).enabledWhen(draft -> GLASS)
-                .row(UI_WORKSPACE_BLUR, Editors.optionalNumber("Use theme's value", 1, "%")).note(GLASS_NOTE).enabledWhen(draft -> GLASS)
+                .row(UI_WORKSPACE_BLUR).note(GLASS_NOTE).enabledWhen(draft -> GLASS)
                 .section("Interface font")
                 .row(UI_FONT_FAMILY, Editors.font(false))
                 .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt")),

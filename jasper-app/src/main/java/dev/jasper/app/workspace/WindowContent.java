@@ -32,6 +32,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
@@ -98,7 +99,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private boolean closed;
     private float backgroundOpacity = 1f;
-    private Consumer<GlassLevels> glassRequests = levels -> {};
+    private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
     private boolean rearranging;
     private WindowTerminals terminals;
     private boolean active = true;
@@ -1040,8 +1041,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
     }
 
-    /** Where this window's requested workspace glass goes; the native window boundary installs it. */
-    void setGlassRequests(Consumer<GlassLevels> requests) {
+    /**
+     * Where this window's requested workspace glass goes, with whether the workspace theme is dark (it picks the blur
+     * material); the native window boundary installs it.
+     */
+    void setGlassRequests(BiConsumer<GlassLevels, Boolean> requests) {
         glassRequests = Objects.requireNonNull(requests);
         requestGlass();
     }
@@ -1050,8 +1054,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void requestGlass() {
         if (closed) return;
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
-        glassRequests.accept(GlassLevels.resolve(configured == null ? GlassSettings.UNSET : configured.glass(),
-            themes.current().workspace().glass()));
+        var workspace = themes.current().workspace();
+        glassRequests.accept(GlassLevels.resolve(configured == null ? GlassSettings.UNSET : configured.glass(), workspace.glass()),
+            workspace.dark());
     }
 
     /**

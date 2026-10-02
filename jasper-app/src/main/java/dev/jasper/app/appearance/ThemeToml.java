@@ -142,7 +142,7 @@ public final class ThemeToml {
                 if (!key.equals("opacity") && !key.equals("blur"))
                     throw error(List.of("workspace", key), "unknown key \"" + key + "\" in [workspace]");
             return new WorkspaceGlass(number(List.of("workspace", "opacity"), GlassLevels.MIN_OPACITY, 1),
-                number(List.of("workspace", "blur"), 0, 1));
+                bool(List.of("workspace", "blur")));
         }
 
         Color color(List<String> path) {

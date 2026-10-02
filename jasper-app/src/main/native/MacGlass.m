@@ -1,22 +1,16 @@
-// Blurs the desktop behind a translucent Jasper window, in one of two ways. setBlur uses the private CoreGraphics call
-// iTerm2, Alacritty and WezTerm use: an adjustable radius, but it blurs the window's whole rectangle, so the square
-// corners outside the window's rounded shape show blurred backdrop. setEffect places a public NSVisualEffectView behind
-// the content instead: Apple's fixed materials, masked to the window's rounded corners. The private symbols and
-// JAWT_GetAWT are looked up at run time, so a missing symbol only disables blur.
+// Blurs the desktop behind a translucent Jasper window with a public NSVisualEffectView placed behind the content view:
+// one of Apple's fixed-strength materials, in the appearance the workspace theme asks for, masked to the window's
+// rounded corners (square in full screen; the mask follows full-screen and screen changes). Only public AppKit is
+// used. JAWT_GetAWT is looked up at run time, so a missing symbol only disables blur.
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
+#import <objc/runtime.h>
 #include <dlfcn.h>
 #include <jni.h>
 #include <jawt.h>
 #include <jawt_md.h>
 
-typedef int32_t JasperConnection;
-typedef JasperConnection (*JasperDefaultConnection)(void);
-typedef int32_t (*JasperSetBlurRadius)(JasperConnection, int32_t, int);
 typedef jboolean (JNICALL *JasperGetAWT)(JNIEnv *, JAWT *);
-
-/** The radius CoreGraphics receives; Java already limits it to 40. */
-static int JasperClampRadius(jint radius) { return radius < 0 ? 0 : radius > 64 ? 64 : (int) radius; }
 
 /**
  * The window whose content view hosts {@code layer}: the view's own layer or any layer beneath it, however deep (a
@@ -56,23 +50,10 @@ static CALayer *JasperLayer(JNIEnv *env, jobject window) {
     return layer;
 }
 
-JNIEXPORT jboolean JNICALL Java_dev_jasper_app_platform_MacGlass_setBlur(JNIEnv *env, jclass type, jobject window, jint radius) {
-    JasperDefaultConnection connection = (JasperDefaultConnection) dlsym(RTLD_DEFAULT, "CGSDefaultConnectionForThread");
-    JasperSetBlurRadius setBlurRadius = (JasperSetBlurRadius) dlsym(RTLD_DEFAULT, "CGSSetWindowBackgroundBlurRadius");
-    if (connection == NULL || setBlurRadius == NULL) return JNI_FALSE;
-    CALayer *layer = JasperLayer(env, window);
-    if (layer == nil) return JNI_FALSE;
-    int clamped = JasperClampRadius(radius);
-    // AppKit belongs to the main thread. Never wait for it here: it may be waiting for the EDT.
-    dispatch_async(dispatch_get_main_queue(), ^{
-        NSWindow *target = JasperWindowForLayer(layer, [NSApp windows]);
-        if (target != nil) setBlurRadius(connection(), (int32_t) [target windowNumber], clamped);
-    });
-    return JNI_TRUE;
-}
-
 /** The identifier of the effect view setEffect adds behind the content view. */
 static NSString *const JasperEffectIdentifier = @"dev.jasper.glass.effect";
+/** The key under which the effect view keeps its notification observer tokens. */
+static const void *JasperObserversKey = &JasperObserversKey;
 
 /** A stretchable rounded-rectangle mask for a window whose corners have {@code radius} points. */
 static NSImage *JasperCornerMask(CGFloat radius) {
@@ -96,14 +77,58 @@ static CGFloat JasperWindowCornerRadius(NSWindow *window) {
     return radius >= 0 && radius <= 64 ? radius : 10;
 }
 
-/** Shows (material >= 0) or removes (material < 0) the effect view behind {@code window}'s content view. */
-static void JasperApplyEffect(NSWindow *window, NSInteger material) {
+/** The effect view's mask for a window whose corners have {@code radius} points; nil (square corners) for none. */
+static NSImage *JasperMaskForRadius(CGFloat radius) { return radius > 0 ? JasperCornerMask(radius) : nil; }
+
+/** The appearance the effect view's material is drawn in: the workspace theme's, not the system's. */
+static NSAppearanceName JasperEffectAppearance(jboolean light) { return light ? NSAppearanceNameAqua : NSAppearanceNameDarkAqua; }
+
+/** Masks {@code effect} to {@code window}'s current corners. */
+static void JasperRefreshMask(NSVisualEffectView *effect, NSWindow *window) {
+    effect.maskImage = JasperMaskForRadius(JasperWindowCornerRadius(window));
+}
+
+/**
+ * Recomputes the effect view's mask whenever its window enters or leaves full screen or changes screen. Both are
+ * captured weakly; the tokens stay on the effect view until JasperApplyEffect removes it.
+ */
+static void JasperObserveCorners(NSVisualEffectView *effect, NSWindow *window) {
+    __weak NSVisualEffectView *weakEffect = effect;
+    __weak NSWindow *weakWindow = window;
+    NSMutableArray *tokens = [NSMutableArray array];
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    for (NSNotificationName name in @[NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification,
+                                      NSWindowDidChangeScreenNotification]) {
+        [tokens addObject:[center addObserverForName:name object:window queue:[NSOperationQueue mainQueue]
+                                          usingBlock:^(NSNotification *note) {
+            NSVisualEffectView *strongEffect = weakEffect;
+            NSWindow *strongWindow = weakWindow;
+            if (strongEffect != nil && strongWindow != nil) JasperRefreshMask(strongEffect, strongWindow);
+        }]];
+    }
+    objc_setAssociatedObject(effect, JasperObserversKey, tokens, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+/** Removes the effect view and the observers JasperObserveCorners registered for it. */
+static void JasperRemoveEffect(NSVisualEffectView *effect) {
+    if (effect == nil) return;
+    NSArray *tokens = objc_getAssociatedObject(effect, JasperObserversKey);
+    for (id token in tokens) [[NSNotificationCenter defaultCenter] removeObserver:token];
+    objc_setAssociatedObject(effect, JasperObserversKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [effect removeFromSuperview];
+}
+
+/**
+ * Shows (material >= 0) or removes (material < 0) the effect view behind {@code window}'s content view, drawn in the
+ * light or the dark appearance.
+ */
+static void JasperApplyEffect(NSWindow *window, NSInteger material, jboolean light) {
     NSView *content = window.contentView, *frame = content.superview;
     if (frame == nil) return;
     NSVisualEffectView *effect = nil;
     for (NSView *view in frame.subviews)
         if ([view.identifier isEqualToString:JasperEffectIdentifier]) effect = (NSVisualEffectView *) view;
-    if (material < 0) { [effect removeFromSuperview]; return; }
+    if (material < 0) { JasperRemoveEffect(effect); return; }
     if (effect == nil) {
         effect = [[NSVisualEffectView alloc] initWithFrame:frame.bounds];
         effect.identifier = JasperEffectIdentifier;
@@ -111,19 +136,23 @@ static void JasperApplyEffect(NSWindow *window, NSInteger material) {
         effect.blendingMode = NSVisualEffectBlendingModeBehindWindow;
         effect.state = NSVisualEffectStateActive;
         [frame addSubview:effect positioned:NSWindowBelow relativeTo:content];
+        JasperObserveCorners(effect, window);
     }
     effect.material = (NSVisualEffectMaterial) material;
-    CGFloat radius = JasperWindowCornerRadius(window);
-    effect.maskImage = radius > 0 ? JasperCornerMask(radius) : nil;
+    effect.appearance = [NSAppearance appearanceNamed:JasperEffectAppearance(light)];
+    JasperRefreshMask(effect, window);
 }
 
-JNIEXPORT jboolean JNICALL Java_dev_jasper_app_platform_MacGlass_setEffect(JNIEnv *env, jclass type, jobject window, jint material) {
+JNIEXPORT jboolean JNICALL Java_dev_jasper_app_platform_MacGlass_setEffect(JNIEnv *env, jclass type, jobject window,
+                                                                          jint material, jboolean light) {
     CALayer *layer = JasperLayer(env, window);
     if (layer == nil) return JNI_FALSE;
     NSInteger value = material;
+    jboolean lightAppearance = light;
+    // AppKit belongs to the main thread. Never wait for it here: it may be waiting for the EDT.
     dispatch_async(dispatch_get_main_queue(), ^{
         NSWindow *target = JasperWindowForLayer(layer, [NSApp windows]);
-        if (target != nil) JasperApplyEffect(target, value);
+        if (target != nil) JasperApplyEffect(target, value, lightAppearance);
     });
     return JNI_TRUE;
 }

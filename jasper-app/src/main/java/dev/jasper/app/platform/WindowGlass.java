@@ -22,9 +22,17 @@ import javax.swing.SwingUtilities;
  * next turn. EDT only; the window's owner closes it before disposing the frame.
  */
 public final class WindowGlass implements AutoCloseable {
-    /** The blur radius, in points, for Terminal.app's full blur of 1; the 0–1 scale maps linearly onto it. */
-    public static final int MAX_BLUR_RADIUS = 40;
     private static final Logger LOG = Logger.getLogger(WindowGlass.class.getName());
+
+    /** The blur behind a translucent window: none, or a material that suits a dark or a light workspace. */
+    public enum Blur {
+        /** No blur: the desktop shows through as it is. */
+        NONE,
+        /** A blur material for a dark workspace theme. */
+        DARK,
+        /** A blur material for a light workspace theme. */
+        LIGHT
+    }
 
     /**
      * What a platform can do to one native window, given its root pane.
@@ -32,15 +40,15 @@ public final class WindowGlass implements AutoCloseable {
      * @param supported whether this platform offers translucent windows at all
      * @param translucent makes the window translucent; false when the runtime refuses
      * @param opaque makes a window that {@code translucent} changed opaque again
-     * @param blur sets the blur radius behind the window; false when the native bridge is unavailable
+     * @param blur sets the blur behind the window; false when the native bridge is unavailable
      * @param watch watches a window {@code translucent} changed for something else making it opaque again (a
      *              look-and-feel switch resets the frame background); runs the given action after each such reset
      *              and returns what stops watching
      */
     public record Platform(boolean supported, Predicate<JRootPane> translucent, Consumer<JRootPane> opaque,
-                           BiPredicate<JRootPane, Integer> blur, BiFunction<JRootPane, Runnable, Runnable> watch) {
+                           BiPredicate<JRootPane, Blur> blur, BiFunction<JRootPane, Runnable, Runnable> watch) {
         /** A platform without translucent windows. */
-        public static final Platform NONE = new Platform(false, root -> false, root -> {}, (root, radius) -> false,
+        public static final Platform NONE = new Platform(false, root -> false, root -> {}, (root, blur) -> false,
             (root, reset) -> () -> {});
 
         public Platform {
@@ -66,10 +74,10 @@ public final class WindowGlass implements AutoCloseable {
     private final HierarchyListener peerChanged = event -> {
         if ((event.getChangeFlags() & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0) displayabilityChanged();
     };
-    private double requestedOpacity = 1, requestedBlur, opacity = 1;
-    private boolean translucent, refused, blurWarned, closed, reapplying;
+    private double requestedOpacity = 1, opacity = 1;
+    private boolean requestedBlur, requestedDark, translucent, refused, blurWarned, closed, reapplying;
     private Runnable unwatch = () -> {};
-    private int appliedRadius;
+    private Blur appliedBlur = Blur.NONE;
 
     /**
      * Follows {@code root}'s window.
@@ -89,13 +97,15 @@ public final class WindowGlass implements AutoCloseable {
      * Asks for these levels; they apply now, or once the window has a native peer.
      *
      * @param opacity 0.1–1, where 1 is opaque
-     * @param blur 0–1, Terminal.app's blur scale
+     * @param blur whether to blur the desktop behind a translucent window
+     * @param dark whether the workspace theme is dark, which picks the blur material
      */
-    public void request(double opacity, double blur) {
+    public void request(double opacity, boolean blur, boolean dark) {
         requireEdt();
         if (closed) return;
         requestedOpacity = Math.max(0.1, Math.min(1, opacity));
-        requestedBlur = Math.max(0, Math.min(1, blur));
+        requestedBlur = blur;
+        requestedDark = dark;
         apply();
     }
 
@@ -106,15 +116,13 @@ public final class WindowGlass implements AutoCloseable {
      */
     public double opacity() { return opacity; }
 
-    static int radius(double blur) { return (int) Math.round(Math.max(0, Math.min(1, blur)) * MAX_BLUR_RADIUS); }
-
     private void displayabilityChanged() {
         if (closed) return;
         if (!root.isDisplayable()) {
             // The native window is gone; a new one starts opaque and unblurred.
             stopWatching();
             translucent = false;
-            appliedRadius = 0;
+            appliedBlur = Blur.NONE;
         }
         apply();
     }
@@ -136,9 +144,9 @@ public final class WindowGlass implements AutoCloseable {
                 platform.opaque().accept(root);
                 translucent = false;
             }
-            int radius = translucent ? radius(requestedBlur) : 0;
-            if (radius != appliedRadius) {
-                if (platform.blur().test(root, radius)) appliedRadius = radius;
+            Blur blur = translucent && requestedBlur ? (requestedDark ? Blur.DARK : Blur.LIGHT) : Blur.NONE;
+            if (blur != appliedBlur) {
+                if (platform.blur().test(root, blur)) appliedBlur = blur;
                 else if (!blurWarned) {
                     blurWarned = true;
                     LOG.warning("The window blur bridge is unavailable; translucent windows are not blurred.");

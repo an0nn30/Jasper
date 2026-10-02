@@ -204,11 +204,11 @@ public final class CoreSettings {
         .example(95f).label("Opacity").keywords("opacity", "transparency", "translucent", "glass", "workspace", "background")
         .description("macOS only, live: the terminal and editor background opacity, 10-100 percent.\n"
             + "Omit to use the workspace theme's value (opaque unless the theme sets one).").build();
-    public static final Setting<Float> UI_WORKSPACE_BLUR = Setting.of("ui.workspace.blur", SettingKind.number(0, 100),
-            GlassSettings.UNSET_BLUR)
-        .example(50f).label("Blur").keywords("blur", "frosted", "glass", "workspace", "background")
-        .description("macOS only, live: how strongly the desktop behind a translucent workspace is blurred, 0-100 percent.\n"
-            + "Omit to use the workspace theme's value.").build();
+    public static final Setting<WorkspaceBlur> UI_WORKSPACE_BLUR = Setting.of("ui.workspace.blur", SettingKind.choice(List.of(
+            Map.entry("theme", WorkspaceBlur.THEME), Map.entry("on", WorkspaceBlur.ON), Map.entry("off", WorkspaceBlur.OFF))),
+            WorkspaceBlur.THEME)
+        .label("Blur").keywords("blur", "frosted", "glass", "workspace", "background")
+        .description("macOS only, live: blur the desktop behind a translucent workspace. \"theme\" follows the workspace theme.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,

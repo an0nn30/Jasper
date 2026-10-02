@@ -33,24 +33,24 @@ class WorkspaceGlassThemeTest {
     }
 
     @Test void theTableSetsOpacityAndBlur() {
-        var document = ThemeToml.parse(BASE + "[workspace]\nopacity = 0.95\nblur = 0.5\n", "glass.toml");
-        assertThat(document.workspace()).isEqualTo(new WorkspaceGlass(Optional.of(0.95), Optional.of(0.5)));
+        var document = ThemeToml.parse(BASE + "[workspace]\nopacity = 0.95\nblur = true\n", "glass.toml");
+        assertThat(document.workspace()).isEqualTo(new WorkspaceGlass(Optional.of(0.95), Optional.of(true)));
         var glass = ThemeGenerator.generate(document).glass();
-        assertThat(glass).isEqualTo(new GlassLevels(0.95, 0.5));
+        assertThat(glass).isEqualTo(new GlassLevels(0.95, true));
         assertThat(glass.translucent()).isTrue();
     }
 
     @Test void wholeNumbersAreAccepted() {
-        var document = ThemeToml.parse(BASE + "[workspace]\nopacity = 1\nblur = 0\n", "glass.toml");
-        assertThat(ThemeGenerator.generate(document).glass()).isEqualTo(new GlassLevels(1, 0));
+        var document = ThemeToml.parse(BASE + "[workspace]\nopacity = 1\nblur = false\n", "glass.toml");
+        assertThat(ThemeGenerator.generate(document).glass()).isEqualTo(new GlassLevels(1, false));
     }
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
         "opacity = 0.05 | \"opacity\" must be from 0.1 to 1",
         "opacity = 1.5 | \"opacity\" must be from 0.1 to 1",
-        "blur = -0.1 | \"blur\" must be from 0 to 1",
-        "blur = 2 | \"blur\" must be from 0 to 1",
+        "blur = 2 | \"blur\" must be true or false",
+        "blur = 'on' | \"blur\" must be true or false",
         "opacity = 'high' | \"opacity\" must be a number",
         "tint = 0.5 | unknown key \"tint\" in [workspace]"})
     void invalidValuesNameTheirLine(String line, String message) {
@@ -62,23 +62,23 @@ class WorkspaceGlassThemeTest {
     }
 
     @Test void aChildInheritsAndOverridesItsParentsValues() {
-        var parent = ThemeToml.parse(BASE + "[workspace]\nopacity = 0.9\nblur = 0.5\n", "parent.toml");
-        var child = ThemeToml.parse("name = \"Child\"\nextends = \"Glass\"\n[workspace]\nblur = 0.2\n", "child.toml");
+        var parent = ThemeToml.parse(BASE + "[workspace]\nopacity = 0.9\nblur = true\n", "parent.toml");
+        var child = ThemeToml.parse("name = \"Child\"\nextends = \"Glass\"\n[workspace]\nblur = false\n", "child.toml");
         var resolved = ThemeResolver.resolve(child, name -> name.equals("Glass") ? List.of(parent) : List.of());
-        assertThat(ThemeGenerator.generate(resolved).glass()).isEqualTo(new GlassLevels(0.9, 0.2));
+        assertThat(ThemeGenerator.generate(resolved).glass()).isEqualTo(new GlassLevels(0.9, false));
     }
 
     @Test void theWriterRoundTripsTheTable() {
-        var document = ThemeToml.parse(BASE + "[workspace]\nopacity = 0.93\nblur = 0.5\n", "glass.toml");
+        var document = ThemeToml.parse(BASE + "[workspace]\nopacity = 0.93\nblur = true\n", "glass.toml");
         String written = ThemeTomlWriter.write(document);
-        assertThat(written).contains("\n[workspace]\n");
+        assertThat(written).contains("\n[workspace]\n", "\n\"blur\" = true\n");
         assertThat(ThemeToml.parse(written, "glass.toml").workspace()).isEqualTo(document.workspace());
         assertThat(ThemeTomlWriter.write(ThemeToml.parse(BASE, "glass.toml"))).doesNotContain("[workspace]");
     }
 
     @Test void levelsRejectValuesOutsideTheirRanges() {
-        assertThatThrownBy(() -> new GlassLevels(0.05, 0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new GlassLevels(1, 1.5)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new GlassLevels(Double.NaN, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GlassLevels(0.05, false)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GlassLevels(1.5, true)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GlassLevels(Double.NaN, false)).isInstanceOf(IllegalArgumentException.class);
     }
 }
