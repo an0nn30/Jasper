@@ -117,6 +117,10 @@ Everything else is derived. A theme can also set:
   `annotation`, `operator`, `punctuation`, `tag`, `attribute`, `regex`, `error`, each a colour or
   `{ color = "#…", bold = true, italic = true }`;
 - `[icons]`: bounded IntelliJ icon color-palette data retained by conversion; no plugin code or external artwork is loaded;
+- `[workspace]`: `opacity` (0.1–1) and `blur` (0–1, Terminal.app's scale). When this theme is the workspace theme on
+  macOS, the terminal and editor default background becomes translucent and the desktop behind it is blurred;
+  Settings › Appearance › Workspace can override both. Absent values are inherited through `extends`, then mean
+  opaque and unblurred. Only the workspace theme's table is used;
 - `[ui]`: raw FlatLaf or IntelliJ keys (`"Button.arc" = 6`), laid over everything else. `[ui]` values that look like a
   Java class name (for example `com.example.Border`) are refused, except FlatLaf's own `com.formdev.flatlaf.` classes,
   and keys ending in `UI` cannot be set.
