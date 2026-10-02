@@ -28,30 +28,16 @@ class CorePagesTest {
     @Test void theTreeIsTheApprovedOne() {
         var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "window", "notifications",
-            "command-palette", "desk-buddy", "system", "keymap", "themes", "themes.intellij", "terminal", "terminal.font",
+            "command-palette", "desk-buddy", "system", "keymap", "terminal", "terminal.font",
             "terminal.cursor", "terminal.shell", "plugins", "tools");
         assertThat(pages).extracting(page -> page.parent().orElse("")).containsExactly("", "appearance-behavior", "appearance-behavior",
-            "appearance-behavior", "appearance-behavior", "appearance-behavior", "appearance-behavior", "", "", "themes", "", "terminal",
+            "appearance-behavior", "appearance-behavior", "appearance-behavior", "appearance-behavior", "", "", "terminal",
             "terminal", "terminal", "", "");
-        assertThat(pages).extracting(SettingsPage::title).contains("Appearance & Behavior", "System Settings", "Font & Colors", "Tools",
-            "Themes", "IntelliJ Themes");
+        assertThat(pages).extracting(SettingsPage::title).contains("Appearance & Behavior", "System Settings", "Font & Colors", "Tools");
         assertThat(pages.getLast().hiddenWhenChildless()).isTrue();
         assertThat(CorePages.DEFAULT_PAGE).isEqualTo("appearance");
     }
 
-    @Test void theIntellijThemesPageWrapsItsSchemaHeaderUnderThemes() {
-        var wrapped = new GroupPage("themes.intellij", "IntelliJ Themes", Optional.of("themes"), false, List::of, context);
-        var headers = new ArrayList<SettingsPage>();
-        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, ShellChoices.NONE, CorePagesTest::keymap, CorePagesTest::plugins,
-            page -> List.of(), (page, header) -> { headers.add(header); return wrapped; }).apply(context);
-        assertThat(pages).contains(wrapped);
-        assertThat(headers).singleElement().satisfies(header -> {
-            assertThat(header.id()).isEqualTo(CorePages.INTELLIJ_THEMES);
-            assertThat(header.parent()).contains(CorePages.THEMES);
-            assertThat(header.helpAnchor()).isEqualTo("intellij-themes");
-            assertThat(header.searchTerms()).anyMatch(term -> term.contains("Marketplace"));
-        });
-    }
 
     @Test void toolsPagesComeLastUnderTools() {
         var extra = new GroupPage("plugin.dev.example", "Example", Optional.of("tools"), false, List::of, context);
@@ -103,15 +89,4 @@ class CorePagesTest {
         page.dispose();
     }
 
-    @Test void theAlacrittyThemesPageFollowsIntellijThemesUnderThemes() {
-        var alacritty = new GroupPage("themes.alacritty", "Alacritty Themes", Optional.of("themes"), false, List::of, context);
-        var pages = CorePages.pages(() -> List.of("Jasper Dark"), () -> List.of("Dracula"), system, ShellChoices.NONE,
-            new CorePages.Pages(CorePagesTest::keymap, CorePagesTest::plugins, page -> List.of(), (page, header) -> header,
-                page -> Optional.of(alacritty))).apply(context);
-        var ids = pages.stream().map(SettingsPage::id).toList();
-        assertThat(ids.indexOf("themes.alacritty")).isEqualTo(ids.indexOf("themes.intellij") + 1);
-        assertThat(CorePages.ALACRITTY_THEMES).isEqualTo("themes.alacritty");
-        var withoutIt = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
-        assertThat(withoutIt).extracting(SettingsPage::id).doesNotContain("themes.alacritty");
-    }
 }

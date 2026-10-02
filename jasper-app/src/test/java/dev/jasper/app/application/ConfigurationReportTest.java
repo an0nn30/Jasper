@@ -45,7 +45,7 @@ class ConfigurationReportTest {
         try (var service = new ConfigService(file, true)) {
             edt(() -> {
                 var controller = new ConfigurationController(new ThemeController(theme -> true), service, ThemeCatalog.builtIn(),
-                    dev.jasper.app.terminalthemes.TerminalThemeCatalog.bundledOnly(), path -> {}, warnings::get);
+                    path -> {}, warnings::get);
                 controller.accept(service.initialState()); controller.accept(service.initialState());
                 assertThat(controller.shown().diagnostics()).singleElement().satisfies(p -> assertThat(p.message()).isEqualTo("Failed conversion"));
                 warnings.set(java.util.List.of()); controller.accept(service.initialState());

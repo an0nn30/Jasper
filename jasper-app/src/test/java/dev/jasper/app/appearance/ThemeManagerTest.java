@@ -172,7 +172,7 @@ class ThemeManagerTest {
     }
 
     @Test void everyBuiltInThemeGeneratesUnderItsOwnName() {
-        assertThat(ThemeManager.builtIns()).containsExactly(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
+        assertThat(ThemeManager.builtIns()).hasSize(284).contains(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
         for (Theme theme : ThemeManager.builtIns()) {
             GeneratedTheme generated = ThemeManager.generated(theme);
             assertThat(generated.name()).isEqualTo(theme.name());
@@ -199,8 +199,8 @@ class ThemeManagerTest {
     @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeFixtures.plugin(home.resolve("themes/fixture.jar"), "Fixture Dark", true, "#123456", "101820");
-            Theme theme = dev.jasper.app.themeimport.LegacyThemeReader.catalog(home.resolve("config.toml")).scan().find("Fixture Dark").orElseThrow();
+            ThemeFixtures.nativePlugin(home.resolve("themes/fixture.toml"), "Fixture Dark", true, "#123456", "101820");
+            Theme theme = ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Fixture Dark").orElseThrow();
             assertThat(ThemeManager.install(theme)).isTrue();
             assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Fixture Dark");
             assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x123456));

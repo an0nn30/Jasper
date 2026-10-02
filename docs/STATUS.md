@@ -2,34 +2,28 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system Plan 4 approved; inline implementation underway** (2026-10-01):
+- **Theme system Plan 4 implemented inline; independent review pending** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)
-  is revised against merged `main@c8365dd1`. Seven sequential tasks cover native serialization/FlatLaf adapter,
-  complete shared conversion, locked offline catalog, safe import/file operations, resumable file migration,
-  pre-ConfigService startup/config integration, then native-only runtime and store removal. Preserve the selected
-  inline workflow chosen by the user, with one final independent review. The approved plan adds `[icons]`
-  persistence; preserves current selectors until Plan 5; corrects the earlier outline's dependency cycle,
-  lost-diagnostic catalog injection, OS-sensitive export and too-late startup migration. Existing local full IntelliJ
-  and Alacritty pins are recorded; new upstream artifacts/licenses remain Task 3 work, not verified by planning.
-  Task 1 is implemented: native serialization, bounded icon data, immutable nested values and runtime FlatLaf adapter.
-  RED regressions and focused GREEN checks passed; full `./gradlew check`: 7,904 tests, zero failures/errors, six skips.
-  Task 2 is complete: shared bounded conversion, local/archive parents, syntax/font flags, per-OS UI, author/icons,
-  complete golden and parity tests; native classics replace runtime parsing. Legacy store/catalog behavior is retained.
-  Full `./gradlew check`: **7,918 tests, zero failures/errors, six skips**. Decisions: preserve unknown-parent fallback
-  warnings; infer only equivalent UI keys and omit tokens that would invent Jasper aliases or freeze per-OS values.
-  Raw forward-template inversion changed five effective colors; original UI/private materialization preserves them.
-  Task 3 is complete (`./gradlew --offline check`: **7,926 tests, zero failures/errors, six skips**): 12 sources/413 hashed inputs, 284 native themes, explicit
-  variant/license/rename accounting, verified Catppuccin 3.6.1 release/source pin, deterministic offline generator.
-  Largest theme 97,426 bytes; 256 KiB cap unchanged. Full catalog parses and installed/workspace color parity passes.
-  Decisions: recorded One Dark Modern scheme packaging alias; preserved Darcula named-scheme association;
-  Frappe → Frappé alias; excluded extra Islands variants; real FlatLaf gradient/alias precedence and post-JSON
-  adjustments supersede raw inverse-token guesses. Exact accounting is in sources.json/SOURCE.md/THIRD-PARTY-THEMES.md.
-  Task 4 is complete (`./gradlew check`: **7,946 tests, zero failures/errors, six skips**): frozen importer plans,
-  batch-wide conflict names, per-provider failures, safe no-clobber creation and expected-hash atomic replacement,
-  cooperating home/process locks. Directory-swap and partial-publication regressions pass. Cleanup failure after a
-  committed publication is logged without losing the reported success; only owned temporary identity is cleaned.
-  External edits observed before publish abort, with no unsupported cross-process compare-and-swap claim.
-  Task 5 is complete: journaled intent/publication/relocation, identity-checked recovery, persisted failures and old-slot ownership. All outputs stage before originals move to preserve local parents across interruptions. Full `./gradlew check`: **7,967 tests, zero failures/errors, six skips**. Generated aliases preserve old Alacritty names. No GUI, merge or push. Task 6 is complete: pre-ConfigService startup ordering, bounded comment-preserving edits/backups, pending intent recovery and persistent refreshable diagnostics. Full `./gradlew check`: **7,982 tests, zero failures/errors, six skips**. Next: Task 7 native-only catalog/store retirement. Plan 5 adds the Themes page, preview/file actions and live reload.
+  completes all seven tasks on `codex/theme-system-plans` in `.worktrees/theme-system`. Full `./gradlew check`
+  passes **7,912 tests, zero failures/errors, six skips**, including all four architecture gates, packaged resources,
+  JavaDoc and compiled documentation examples. Java hygiene scans 1,637 source files cleanly; authored diff whitespace passes.
+  The lower final test count reflects retired store/runtime-legacy tests; converter/security/installation parity and
+  native fallback/reload coverage remain. No GUI, merge or push.
+  The catalog contains **284 native themes from 12 sources/413 hashed inputs**; exact pins, licenses, exclusions and
+  renames are in `tools/themes/sources.json`, SOURCE.md and THIRD-PARTY-THEMES.md. Largest theme: 97,426 bytes;
+  256 KiB cap unchanged. `[icons]` is now a documented native format table. All generation/testing is offline.
+  Safe import/file services preserve originals, freeze decisions, allocate batch names and reject stale replacements.
+  Migration journals intent/output/movement, stages all output before moving local parents, preserves failed originals
+  and persistent warnings, and rewrites only theme config keys before ConfigService construction. Config intent prevents
+  repeated chained renames after interruption; comments and numbered backups are retained. Runtime reads only native
+  TOML. Both old stores are removed; Appearance, Font & Colors and View choices remain operational.
+  Recorded choices include unknown-parent fallback warnings; verified inverse token mappings/FlatLaf post-JSON
+  precedence; explicit classic Darcula scheme and One Dark Modern packaging associations; Frappe → Frappé alias;
+  excluded extra Islands variants; publication/marker cleanup failures do not negate already committed success.
+  Task 7 also fixes positive-line/zero-column theme diagnostics that interrupted malformed-native reloads.
+  Final independent whole-branch review follows the user-approved inline workflow. User-only acceptance checklist:
+  [themes](themes.md#native-acceptance-for-this-upgrade-user-run). **Next: Plan 5**, the Themes page, staged preview,
+  Import/Duplicate/Open/Remove UI and live file reload on the completed APIs.
 
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)

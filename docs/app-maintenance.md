@@ -189,24 +189,24 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-To change Jasper Dark or Jasper Light, edit `jasper-app/src/main/resources/dev/jasper/app/themes/jasper-dark.toml` or
-`jasper-light.toml`: seeds and tokens first, `[ui]` only for a key no token covers. To change what a token colours for
-every theme, edit `UiTemplate`; to change a derivation or floor, `ThemeGenerator`. To refresh the vendored IntelliJ
-themes, change `SHA` in `tools/themes/fetch-intellij-themes.py` and rerun it from the repository
-root, then update the pinned hashes in `IntellijThemesTest`. To add a chrome key, add it to
-`ChromeKeys.KEYS` and `ChromeKeys.derive` with a fallback FlatLaf always defines, and cover it in
-`ChromeKeysTest`. Run `ThemeGeneratorTest`, `ThemeTomlTest`, `JasperLightTest`, `ThemeLoaderTest`,
-`ChromeKeysTest`, `ThemeManagerTest` (IntelliJ Light values and Jasper Dark parity) and `ThemeButtonsTest`, then
-`check`. Light and dark visual acceptance is a user check.
+Edit Jasper Light/Dark seed and token TOMLs under `jasper-app/src/main/resources/dev/jasper/app/themes/`;
+change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 256 KiB native cap remains.
 
-The vendored editor schemes (`DefaultColorSchemesManager.xml` with IntelliJ's Default and Darcula, and
-each bundled scheme file) come from the same commit through the same tool, and their hashes are pinned
-in `IntellijThemesTest` too. The tool's `FILES` lists every `themeProvider` and `bundledColorScheme`
-IntelliJ registers; when a refresh adds or renames one, update `FILES`, `ThemeManager.FILES` (theme ids),
-`EditorScheme.PARENT_FILES` and `SOURCE.md`.
-To support another theme-plugin layout, extend `ThemeArchive` and add a case to
-`ThemeArchiveTest`; `ThemeFixtures` builds plugin jars and Marketplace zips. Run
-`ThemeArchiveTest`, `EditorSchemeTest`, `ThemeCatalogTest` and `InstalledThemesTest`, then `check`.
+`tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
+refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
+assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 284 native files, index, legacy
+aliases and third-party notices entirely offline. Normal build/test never fetches. Do not normalize upstream bytes.
+Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
+colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
+
+Converters/security fixtures live in `themeimport`; native catalog/installation tests live in `appearance`.
+`ThemeMigrationTest`, `MigrationJournalTest`, `ThemeSelectionMigrationTest`, `ThemeUpgradeTest` and
+`NativeThemeUpgradeTest` cover recovery/ownership and startup ordering. Never fix recovery by overwriting a changed
+file or deleting an equal-byte foreign backup. Keep original data and report the conflict. Config migration must
+stay ahead of ConfigService construction and use its actual override directory.
+
+Plan 5 consumes `ThemeFiles`, `ThemeImporter`, `ThemeTomlWriter` and the canned `themesui.SampleTerminal`.
+Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
 ## Maintaining SDK icons
 

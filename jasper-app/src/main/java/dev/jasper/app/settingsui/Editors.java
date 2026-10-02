@@ -94,9 +94,6 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Combo(() -> Fonts.families(monospaced)), List.of());
     }
 
-    static final String MORE_THEMES = "Get More Themes\u2026";
-    static final String MANAGE_THEMES = "Manage Themes\u2026";
-    static final String MORE_TERMINAL_THEMES = "More Terminal Themes\u2026";
     /** Built-in workspace themes: stored value to shown text, in dropdown order. */
     private static final Map<String, String> BUILT_IN_COLORS = builtInColors();
 
@@ -108,21 +105,18 @@ public final class Editors {
         return Collections.unmodifiableMap(names);
     }
 
-    /** An editable combo of theme names ending in Get More Themes\u2026 (Manage Themes\u2026 while the Marketplace is off). */
+    /** Editable native theme names; unknown requested names remain available for repair. */
     public static Factory<String> theme(Supplier<List<String>> names) {
         return new Factory<>((setting, context) -> new ActionCombo(new Choices(names, UnaryOperator.identity(), UnaryOperator.identity(),
-            index -> false,
-            () -> context.draft().value(CoreSettings.THEMES_MARKETPLACE_ENABLED) ? MORE_THEMES : MANAGE_THEMES,
-            label -> context.navigate().accept(CorePages.INTELLIJ_THEMES + (MORE_THEMES.equals(label) ? "#marketplace" : "#installed")))),
-            List.of("Get More Themes", "Marketplace"));
+            index -> false, () -> null, label -> {})), List.of("theme"));
     }
 
     /**
-     * Workspace theme: a checkbox for {@code match}, over separate native and Alacritty choices.
+     * Workspace theme: a checkbox for {@code match}, over native choices.
      */
     public static Factory<String> terminalColors(Supplier<List<String>> themes) {
         return new Factory<>((setting, context) -> new TerminalColorsEditor(themes, context),
-            List.of(TerminalColorsEditor.FOLLOW, "follow couple match", "Alacritty", "More Terminal Themes"));
+            List.of(TerminalColorsEditor.FOLLOW, "follow couple match"));
     }
 
     /**
@@ -313,7 +307,7 @@ public final class Editors {
                     all.addAll(themes.get());
                     return all.stream().distinct().toList();
                 }, Editors::storedColors, Editors::shownColors, index -> index == 2,
-                () -> MORE_TERMINAL_THEMES, label -> context.navigate().accept(CorePages.ALACRITTY_THEMES)));
+                () -> null, label -> {}));
             String saved = context.draft().saved(CoreSettings.UI_THEME_WORKSPACE).map(WorkspaceThemeChoice::parse)
                 .map(WorkspaceThemeChoice::name).orElse("");
             if (separate(saved)) separate = saved;
@@ -414,7 +408,7 @@ public final class Editors {
                 model.removeAllElements();
                 for (String entry : choices.entries().get()) model.addElement(entry);
                 action = choices.actionLabel().get();
-                model.addElement(action);
+                if (action != null) model.addElement(action);
                 model.select(text);
                 editor().setText(text);
             } finally { showing = false; }

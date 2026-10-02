@@ -36,7 +36,7 @@ class InstalledThemesTest {
     private ThemeController start(String text) throws Exception {
         Files.writeString(config(), text);
         service = new ConfigService(config(), false);
-        var catalog = dev.jasper.app.themeimport.LegacyThemeReader.catalog(config());
+        var catalog = ThemeCatalog.beside(config());
         service.watchWith(catalog::scan).get();
         ThemeController[] themes = new ThemeController[1];
         edt(() -> {
@@ -57,7 +57,7 @@ class InstalledThemesTest {
     }
 
     @Test void aThemeInstalledInTheFolderAppliesByNameWithItsConsoleColours() throws Exception {
-        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Dark", true, "#123456", "101820");
         var themes = start("[ui.theme]\nname = 'fixture dark'\n");
         edt(() -> {
             assertThat(themes.current().chrome().name()).isEqualTo("Fixture Dark");
@@ -73,7 +73,7 @@ class InstalledThemesTest {
     }
 
     @Test void anUnknownNameUsesSafeDarkFallbackAndListsWhatIsAvailable() throws Exception {
-        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Dark", true, "#123456", "101820");
         var themes = start("[ui.theme]\nname = 'Fixture Dark'\n");
         reload("[ui.theme]\nname = 'Nope'\n");
         edt(() -> {
@@ -82,16 +82,16 @@ class InstalledThemesTest {
                 assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
                 assertThat(problem.key()).isEqualTo("ui.theme.name");
                 assertThat(problem.message()).contains("\"Nope\"").contains("using Jasper Dark")
-                    .contains("Available: Darcula, Fixture Dark, IntelliJ Light, Jasper Dark, Jasper Light.");
+                    .contains("Available:", "Fixture Dark", "IntelliJ Light", "Jasper Dark", "Jasper Light");
             });
         });
     }
 
     @Test void missingLightChromeAndWorkspaceKeepRequestsAndRecoverAfterRepair() throws Exception {
-        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Light", false, "#f1f2f3", "eeeeee");
+        ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Light", false, "#f1f2f3", "eeeeee");
         var themes = start("ui.theme.name='Fixture Light'\nui.theme.workspace='Darcula'\n");
-        Files.writeString(themes().resolve("fixture.jar"), "broken archive");
-        ThemeFixtures.plugin(themes().resolve("shadow.jar"), "Jasper Light", true, "#123456", "101820");
+        Files.writeString(themes().resolve("fixture.toml"), "broken archive");
+        ThemeFixtures.nativePlugin(themes().resolve("shadow.toml"), "Jasper Light", true, "#123456", "101820");
         reload("ui.theme.name='Fixture Light'\nui.theme.workspace='Missing'\n");
         edt(() -> {
             assertThat(themes.choice()).isSameAs(Theme.JASPER_LIGHT);
@@ -102,12 +102,12 @@ class InstalledThemesTest {
             assertThat(controller.shown().diagnostics()).extracting(ConfigDiagnostic::key)
                 .contains("ui.theme.name", "ui.theme.workspace");
             assertThat(controller.shown().diagnostics()).anySatisfy(problem -> {
-                assertThat(problem.file().getFileName().toString()).isEqualTo("fixture.jar");
-                assertThat(problem.message()).contains("cannot be read");
+                assertThat(problem.file().getFileName().toString()).isEqualTo("fixture.toml");
+                assertThat(problem.message()).contains("Unexpected");
             });
         });
-        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Light", false, "#f1f2f3", "eeeeee");
-        ThemeFixtures.plugin(themes().resolve("workspace.jar"), "Missing", true, "#123456", "101820");
+        ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Light", false, "#f1f2f3", "eeeeee");
+        ThemeFixtures.nativePlugin(themes().resolve("workspace.toml"), "Missing", true, "#123456", "101820");
         reload();
         edt(() -> {
             assertThat(themes.choice().name()).isEqualTo("Fixture Light");
@@ -117,7 +117,7 @@ class InstalledThemesTest {
     }
 
     @Test void canonicalLightIsANativeNameRatherThanTheOldBuiltInAlias() throws Exception {
-        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Light", true, "#123456", "101820");
+        ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Light", true, "#123456", "101820");
         var themes = start("ui.theme.workspace='  Light  '\n");
         edt(() -> {
             assertThat(themes.current().workspace().name()).isEqualTo("Light");
@@ -136,10 +136,10 @@ class InstalledThemesTest {
     }
 
     @Test void aThemeThatFailsToInstallNeverStopsConfigurationAndIsReportedInstead() throws Exception {
-        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Dark", true, "#123456", "101820");
         Files.writeString(config(), "[ui.theme]\nname = 'Fixture Dark'\n");
         service = new ConfigService(config(), false);
-        var catalog = dev.jasper.app.themeimport.LegacyThemeReader.catalog(config());
+        var catalog = ThemeCatalog.beside(config());
         service.watchWith(catalog::scan).get();
         edt(() -> {
             var themes = new ThemeController(theme -> !theme.name().equals("Fixture Dark") && ThemeTestSupport.install(theme));
@@ -156,19 +156,19 @@ class InstalledThemesTest {
     @Test void reloadRescansTheFolderSoThemesCanBeAddedAndRemovedLive() throws Exception {
         var themes = start("[ui.theme]\nname = 'Fixture Dark'\n");
         edt(() -> assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK)));
-        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Dark", true, "#123456", "101820");
         reload();
         edt(() -> {
             assertThat(themes.current().chrome().name()).isEqualTo("Fixture Dark");
             assertThat(controller.shown().diagnostics()).isEmpty();
         });
-        Files.delete(themes().resolve("fixture.jar"));
-        Files.writeString(themes().resolve("broken.jar"), "not a zip");
+        Files.delete(themes().resolve("fixture.toml"));
+        Files.writeString(themes().resolve("broken.toml"), "not a zip");
         reload();
         edt(() -> {
             assertThat(themes.choice()).isSameAs(Theme.DARK);
             assertThat(controller.shown().diagnostics()).extracting(ConfigDiagnostic::message)
-                .anySatisfy(message -> assertThat(message).contains("broken.jar").contains("cannot be read"))
+                .anySatisfy(message -> assertThat(message).contains("broken.toml").contains("Unexpected"))
                 .anySatisfy(message -> assertThat(message).contains("Unknown theme \"Fixture Dark\""));
         });
     }

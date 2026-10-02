@@ -1,6 +1,6 @@
 # Theme system: remaining-work assessment and execution order
 
-**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 is implemented, independently approved, merged to local `main` and verified there (not pushed); Plans 4–5 remain future deliverables. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
+**Status:** Baseline assessment audited against `main@5fc76c7d`. Plan 2 implementation and headless acceptance are complete and independently reviewed, merged to local `main` on 2026-10-01 and verified there; not pushed. User GUI acceptance remains pending. Plan 3 is implemented, independently approved, merged to local `main` and verified there (not pushed); Plan 4 is implemented inline; final verification/review is in progress. Plan 5 remains the next deliverable. Plan 3 includes the startup regression fix and five sequential implementation tasks. The baseline table below records the state before Plan 2.
 
 **Authority:** [Full design](../specs/2026-10-01-jasper-theme-system-design.md), with the recorded plan-1 deviations in
 [plan 1](2026-10-01-theme-system-1-format-generator.md) and `docs/STATUS.md`. Keep those deviations explicit rather
@@ -33,7 +33,7 @@ acceptance has not been performed.
 |---|---|---|---|
 | 2 | [Workspace zone](2026-10-01-theme-system-2-workspace.md) | Implemented, headless-verified and independently reviewed: terminal, tabs, dividers, find, icons, Editor and SDK 0.12.0; GUI acceptance pending | Merged plan 1 |
 | 3 | [Plugin pane restyler](2026-10-01-theme-system-3-plugin-panes.md) | Implemented and independently reviewed; user visual acceptance pending: hosted Swing panes adopt workspace colors with plugin-owned styles and cleanup | Plan 2 |
-| 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Seven-task implementation draft reviewed against merged `c8365dd1`; offline native catalog, conversion, safe upgrade and store removal; not executed | Plans 2–3 (merged) |
+| 4 | [Conversion, vendoring and migration](2026-10-01-theme-system-4-conversion-migration.md) | Implemented inline: 284-theme offline native catalog, conversion/import services, recoverable startup upgrade and retired stores; final review in progress | Plans 2–3 (merged) |
 | 5 | [Themes page and live reload](2026-10-01-theme-system-5-page-reload.md) | Complete user flow: browse, stage, preview, import, duplicate, remove and edit/reload | Plan 4 |
 
 Execute sequentially. These are separate runnable deliverables, not four concurrent branches with guessed APIs.
@@ -190,3 +190,12 @@ Alacritty full pin is available in local SOURCE.md (`ab88d5a80d676b5dc6157e91aba
 needed to identify it. All additional upstream variants/pins/licenses must still be verified in Task 3. Plan 5 will
 consume the explicit importer/file/writer contracts and relocated SampleTerminal. No implementation or new Gradle
 verification was performed during this planning revision.
+
+## Plan 4 implementation (2026-10-01)
+
+All seven tasks are implemented: native writer/icon format, shared bounded conversion, 12 sources/413 locked assets,
+284 native themes, frozen safe import/file APIs, resumable filesystem migration, pre-service config handshake, and
+native-only runtime. Originals and failures survive upgrade; current selectors remain until Plan 5. The complete
+variant/pin/license/rename accounting is in `tools/themes/sources.json`, per-source SOURCE.md and THIRD-PARTY-THEMES.md.
+The largest native file is 97,426 bytes (256 KiB cap unchanged). Final gate/review results are recorded in STATUS
+and the Plan 4 banner. User GUI acceptance is pending; no GUI, merge or push was performed.

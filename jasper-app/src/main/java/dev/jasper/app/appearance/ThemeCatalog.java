@@ -18,7 +18,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
- * Every theme Jasper can install: the Jasper theme files and theme plugins in the {@code themes} folder
+ * Every theme Jasper can install: the native Jasper theme files in the {@code themes} folder
  * beside {@code config.toml}, then the built-in themes. An installed theme takes precedence over a built-in theme of the same name.
  * {@link #scan()} does the file work and may run on any thread; {@link #latest()} may be read anywhere.
  */
@@ -49,19 +49,13 @@ public final class ThemeCatalog {
         }
     }
 
-    /** What an archive would install: its themes' names, and the problems reading it met. */
-    public record Inspection(List<String> themes, List<String> problems) {
-        public Inspection { themes = List.copyOf(themes); problems = List.copyOf(problems); }
-    }
-
     private record Stamp(long size, FileTime modified) {}
     private record Read(Stamp stamp, List<Theme> themes, ThemeDocument document, List<Problem> problems) {}
 
     private static final Snapshot BUILT_IN = new Snapshot(ThemeManager.builtIns(), List.of());
 
     private final Path directory;
-    private final Function<Path, Snapshot> reader;
-    /** Each archive's last read, by path; guarded by this. */
+    /** Each native file's last read, by path; guarded by this. */
     private Map<Path, Read> reads = Map.of();
     /**
      * Each Jasper theme file's theme from the last scan, by path; guarded by this. An unchanged theme keeps its
@@ -70,17 +64,16 @@ public final class ThemeCatalog {
     private Map<Path, Theme> userThemes = Map.of();
     private volatile Snapshot latest = BUILT_IN;
 
-    ThemeCatalog(Path directory, Function<Path, Snapshot> reader) {
+    ThemeCatalog(Path directory) {
         this.directory = directory;
-        this.reader = reader;
     }
 
     /** Only the built-in themes; nothing is ever scanned. */
-    public static ThemeCatalog builtIn() { return new ThemeCatalog(null, null); }
+    public static ThemeCatalog builtIn() { return new ThemeCatalog(null); }
 
     /** The {@code themes} folder in the directory holding {@code configFile}. */
     public static ThemeCatalog beside(Path configFile) {
-        return new ThemeCatalog(configFile.toAbsolutePath().getParent().resolve("themes"), null);
+        return new ThemeCatalog(configFile.toAbsolutePath().getParent().resolve("themes"));
     }
 
     /** The last scan's result; the built-in themes before the first scan. */
@@ -88,11 +81,6 @@ public final class ThemeCatalog {
 
     /** The folder this catalog scans; empty for the built-in catalog. */
     public Optional<Path> directory() { return Optional.ofNullable(directory); }
-
-    /** Transitional per-file legacy source, supplied by application composition. */
-    public static ThemeCatalog beside(Path configFile, Function<Path, Snapshot> legacyReader) {
-        return new ThemeCatalog(configFile.toAbsolutePath().getParent().resolve("themes"), Objects.requireNonNull(legacyReader));
-    }
 
     /** Reads the themes folder, creating it when missing, and re-reads only files whose size or modified time changed. */
     public synchronized Snapshot scan() {
@@ -102,15 +90,10 @@ public final class ThemeCatalog {
         var found = new ArrayList<Map.Entry<Path, Read>>();
         for (Path file : files(problems)) {
             String lower = file.getFileName().toString().toLowerCase(Locale.ROOT);
-            if (reader != null && lower.endsWith(".theme.json")) {
-                problems.add(new Problem(file, "Standalone .theme.json files aren't supported; install the theme plugin's .jar or .zip instead."));
-                continue;
-            }
-            boolean archive = lower.endsWith(".jar") || lower.endsWith(".zip");
-            if ((archive && reader == null) || (!archive && !lower.endsWith(".toml"))) continue;
+            if (!lower.endsWith(".toml")) continue;
             Read read;
             // Nothing one file does may stop the scan: it becomes that file's problem.
-            try { read = read(file, archive); }
+            try { read = read(file); }
             catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
                 problems.add(new Problem(file, file.getFileName() + " cannot be read: " + failure));
                 continue;
@@ -188,7 +171,7 @@ public final class ThemeCatalog {
     }
 
     /** The file's themes or document, from the last read when its size and modified time are unchanged; null when it vanished. */
-    private Read read(Path file, boolean archive) {
+    private Read read(Path file) {
         Stamp stamp;
         try {
             var attributes = Files.readAttributes(file, BasicFileAttributes.class);
@@ -198,10 +181,6 @@ public final class ThemeCatalog {
         }
         Read previous = reads.get(file);
         if (previous != null && previous.stamp().equals(stamp)) return previous;
-        if (archive) {
-            Snapshot loaded = reader.apply(file);
-            return new Read(stamp, loaded.themes(), null, loaded.problems());
-        }
         String name = file.getFileName().toString();
         if (stamp.size() > MAX_THEME_FILE)
             return new Read(stamp, List.of(), null, List.of(new Problem(file, name + " is larger than 256 KiB.")));
@@ -214,6 +193,5 @@ public final class ThemeCatalog {
         }
     }
 
-    /** The archive's themes, loaded and resolved, and every problem met; never throws for a bad archive. */
     private static String key(String name) { return name.strip().toLowerCase(Locale.ROOT); }
 }

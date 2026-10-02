@@ -23,6 +23,8 @@ class JasperApplicationThemesTest {
     @Test void theApplicationStartsInTheInstalledThemeItsConfigurationNames() throws Exception {
         Files.writeString(home.resolve("config.toml"), "ui.theme.name = 'Fixture Dark'\n");
         ThemeFixtures.plugin(home.resolve("themes/fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        var problems = ThemeUpgrade.prepare(home.resolve("config.toml"), false);
+        assertThat(problems).isEmpty();
         var service = new ConfigService(home.resolve("config.toml"), false);
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];

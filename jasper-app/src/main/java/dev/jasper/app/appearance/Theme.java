@@ -10,7 +10,7 @@ import java.util.Objects;
  */
 public record Theme(String id, String name, boolean dark, Palette palette, Source source) {
     /** Where a theme comes from; every source carries the resolved document. */
-    public sealed interface Source permits Bundled, UserFile, Archive, LegacyPalette {
+    public sealed interface Source permits Bundled, UserFile {
         /** The resolved theme document. */
         ThemeDocument document();
     }
@@ -23,16 +23,6 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     /** A Jasper theme file in the {@code themes} folder beside {@code config.toml}. */
     public record UserFile(Path file, ThemeDocument document) implements Source {
         public UserFile { Objects.requireNonNull(file); Objects.requireNonNull(document); }
-    }
-
-    /** A theme an installed IntelliJ plugin provides, converted when the catalog read the archive. */
-    public record Archive(Path archive, String entry, ThemeDocument document) implements Source {
-        public Archive { Objects.requireNonNull(archive); Objects.requireNonNull(entry); Objects.requireNonNull(document); }
-    }
-
-    /** Transitional native representation of a legacy Alacritty palette. */
-    public record LegacyPalette(java.util.Optional<Path> file, ThemeDocument document) implements Source {
-        public LegacyPalette { Objects.requireNonNull(file); Objects.requireNonNull(document); }
     }
 
     /** Jasper's own light theme. */

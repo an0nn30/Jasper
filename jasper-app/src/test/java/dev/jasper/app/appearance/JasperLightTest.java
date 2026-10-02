@@ -21,7 +21,7 @@ class JasperLightTest {
         assertThat(Theme.JASPER_LIGHT).extracting(Theme::id, Theme::name, Theme::dark)
             .containsExactly("jasper-light", "Jasper Light", false);
         assertThat(Theme.JASPER_LIGHT.palette()).isEqualTo(Palette.jasperLight());
-        assertThat(ThemeManager.builtIns()).containsExactly(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
+        assertThat(ThemeManager.builtIns()).contains(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
     }
 
     @Test void itsTextAndStatusColoursMeetJaspersFloors() {

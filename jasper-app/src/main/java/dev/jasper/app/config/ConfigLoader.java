@@ -103,6 +103,7 @@ public final class ConfigLoader {
 
     /** The version key and the tables other readers own. */
     private boolean special(List<String> path, Object value) {
+        if (path.equals(List.of("themes"))) { readRetiredThemes(path, value); return true; }
         if (path.equals(VERSION_KEY)) { readVersion(path, value); return true; }
         if (!path.equals(KEYBINDINGS) && !path.equals(PLUGINS) && !path.equals(PALETTE_SCOPES)) return false;
         if (!(value instanceof TomlTable table)) { typeError(path, "a table"); return true; }
@@ -110,6 +111,17 @@ public final class ConfigLoader {
         else if (path.equals(PLUGINS)) readPlugins(table);
         else readOldScopes(table);
         return true;
+    }
+
+    /** Only the removed Marketplace enabled key is ignored; unknown siblings still get ordinary warnings. */
+    private void readRetiredThemes(List<String> path, Object value) {
+        if (path.equals(List.of("themes", "marketplace", "enabled"))) return;
+        if ((path.equals(List.of("themes")) || path.equals(List.of("themes", "marketplace"))) && value instanceof TomlTable table) {
+            for (String key : table.keySet()) {
+                var child = new java.util.ArrayList<>(path); child.add(key);
+                readRetiredThemes(List.copyOf(child), table.get(List.of(key)));
+            }
+        } else reader.warning(path, "Unknown setting or table; ignored.");
     }
 
     private ConfigDiagnostic diagnostic(SchemaReader.Problem problem) {

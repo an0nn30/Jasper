@@ -120,7 +120,7 @@ public final class CoreSettings {
         .alias("terminal.colors").alias("ui.theme.terminal").label("Workspace theme")
         .keywords("palette", "colours", "color scheme", "theme", "alacritty", "workspace")
         .description("Theme for terminal panes and their workspace controls. \"match\" follows the interface theme;\n"
-            + "otherwise name a native theme or an Alacritty theme. Changes update the workspace live.").build();
+            + "otherwise name a native theme. Changes update the workspace live.").build();
     /** Source compatibility for transitional pages; the schema registers this setting only once. */
     @Deprecated public static final Setting<String> TERMINAL_COLORS = UI_THEME_WORKSPACE;
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
@@ -199,19 +199,13 @@ public final class CoreSettings {
         .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
         .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"IntelliJ Light\",\n"
             + "\"Darcula\", or a theme file or theme plugin in the themes folder beside this file. Switches live across windows.").build();
-    public static final Setting<Boolean> THEMES_MARKETPLACE_ENABLED = Setting.of("themes.marketplace.enabled", SettingKind.bool(), true)
-        .label("Browse the JetBrains Marketplace").keywords("themes", "marketplace", "download", "update", "offline", "intellij")
-        .description("Let Settings > Themes > IntelliJ Themes search plugins.jetbrains.com and check installed themes for\n"
-            + "updates, only while that page is open. Off keeps Jasper from contacting the Marketplace.").build();
-
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_WORKSPACE,
-            THEMES_MARKETPLACE_ENABLED),
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_WORKSPACE),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
             Map.entry(List.of("window"), "Workspace chrome. Heights and widths are logical pixels."),
@@ -224,6 +218,5 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "shell"), "The shell new panes start."),
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
-            Map.entry(List.of("ui", "theme"), "The interface and workspace themes."),
-            Map.entry(List.of("themes", "marketplace"), "IntelliJ themes from the JetBrains Marketplace (Settings > Themes).")));
+            Map.entry(List.of("ui", "theme"), "The interface and workspace themes.")));
 }

@@ -14,11 +14,12 @@ script, Swing/FlatLaf 3.7, headless JUnit/AssertJ. No new runtime dependencies o
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), §§2, 6, 8–9.
 **Companion:** [Requirement coverage and decisions](2026-10-01-theme-system-remaining-work.md).
-**Status:** Approved by the user; inline implementation in progress (2026-10-01). Re-audited against local `main@c8365dd1`,
+**Status:** All seven tasks implemented inline (2026-10-01); full verification passed; independent review pending. Re-audited against local `main@c8365dd1`,
 with Plans 2 and 3 merged and verified. This replaces the earlier six-task outline with seven sequential review gates.
-Only existing local provenance was inspected; the other upstream inputs/licenses have not been acquired or verified.
-Task 3 freezes those inputs. The `[icons]` addition below is an explicit proposed format amendment, reviewed with this
-plan; record it in the spec when implemented. Execution decisions and verification are recorded below.
+All 12 upstream/local sources and 413 hashed assets are locked; 284 native themes are generated offline.
+The `[icons]` format amendment is implemented and recorded in the approved spec. The maximum native theme is
+97,426 bytes, so the 256 KiB cap remains. Variant/exclusion/rename decisions are in the lock and third-party notices.
+Execution decisions and verification are recorded below.
 **Execution:** User chose inline execution after approving the plan: one implementer in this session, TDD/commits
 per task, then one independent whole-branch review. This supersedes the per-task subagent workflow in the draft. Reuse `.worktrees/theme-system` / `codex/theme-system-plans`; do not commit on main. No merge or push is part
 of this planning change. User review received; continue through all tasks without intermediate approval requests.
@@ -692,6 +693,8 @@ git add jasper-app/src
 git commit -m "feat(themes): upgrade selections before application startup" -m "Co-Authored-By: Codex <noreply@openai.com>"
 ```
 
+**Task 7 implementation verified:** full `./gradlew check` passes **7,912 tests / 0 failures / 0 errors / 6 skips**, all four architecture guards, JavaDoc and packaged examples. Java hygiene: 1,637 files; authored diff whitespace clean. Retired store/catalog tests were removed, with parser/security/parity and native reload/fallback coverage retained. Malformed-native reload tests exposed and fixed diagnostic line/column mismatch. Final independent review pending.
+
 ## Task 7: Native-only runtime, retire stores and finish the runnable deliverable
 
 **Files:** Modify `appearance/{Theme,ThemeCatalog,BuiltInThemes,ThemeManager}.java`,
@@ -709,7 +712,7 @@ Tests: `appearance/NativeThemeCatalogTest.java`, `application/NativeThemeUpgrade
 ThemeCatalog scans only native user TOML; all current chrome/workspace choices read that catalog. Plan 5 consumes
 ThemeImporter/ThemeFiles, ThemeTomlWriter and the relocated canned SampleTerminal.
 
-- [ ] **Step 1: Write native-only integration/navigation regressions.** Populate a copied legacy home, run the headless
+- [x] **Step 1: Write native-only integration/navigation regressions.** Populate a copied legacy home, run the headless
 upgrade coordinator then build the catalog/controller through controlled tests; assert chrome/workspace choices keep
 expected generated colors, invalid legacy input remains with a warning, native same-name precedence is stable, and
 marker rerun performs no legacy conversion. Editing an unselected leftover archive after completion cannot change a
@@ -727,14 +730,14 @@ Test legacy Marketplace values true/false/string/table all ignored at that exact
 unknown sibling still warns. Assert removed pages/actions are not registered, both interim pickers use native names,
 workspace has `match`, and every remaining View/settings navigation target exists. Preserve Plan 2 missing-theme
 fallback and startup tests, and Plan 3 workspace/plugin styling tests across an imported light/dark pair.
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*NativeThemeCatalogTest' --tests '*NativeThemeUpgradeTest' --tests '*NativeThemeNavigationTest'
 ```
 
 Expected: legacy sources/pages/schema still present or catalog restricted to four hardcoded entries.
-- [ ] **Step 3: Retire runtime legacy paths.** Read the generated index lazily without circular Theme constant
+- [x] **Step 3: Retire runtime legacy paths.** Read the generated index lazily without circular Theme constant
 initialization; reuse the four existing Theme singleton instances by stable ID where callers rely on them. Remove
 Archive/LegacyPalette source branches, legacy reader injection, terminal catalog polling and store construction.
 Retain only importer JSON/archive/XML resources/readers and the in-memory FlatLaf JSON adapter. Native catalog keeps
@@ -775,7 +778,7 @@ git commit -m "refactor(themes): retire legacy stores after native migration" -m
   incomplete source pin, OS-dependent export risk and migration being placed after the initial config snapshot.
 - Task interfaces must remain the contract between implementer/reviewer contexts. If repository evidence forces a
   change, update downstream signatures/tests and the status banner before continuing; do not silently fork converters.
-- No code was implemented, upstream fetched, GUI launched or Gradle test rerun for this documentation-only revision.
-  Baseline evidence is Plan 3's already recorded 7,897 tests / zero failures/errors / six skips, not a Plan 4 result.
-- Next: user reviews this plan; execute the seven gates using the preserved subagent workflow. Plan 5 then adds the
-  Themes page, staged preview, file actions and live reload on these APIs.
+- The original planning baseline was Plan 3's 7,897 tests. Task sections record actual implementation evidence.
+- User-authorized inline execution supersedes per-task subagents and the draft re-review instruction: one independent
+  whole-branch reviewer, one TDD fix pass, full verification; no second reviewer. No GUI, merge or push was performed.
+- Next deliverable: Plan 5 adds the Themes page, staged preview, file actions and live reload on these APIs.

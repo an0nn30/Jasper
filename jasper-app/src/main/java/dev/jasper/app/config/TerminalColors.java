@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * The saved terminal palette choice, independent of the UI theme: {@link #MATCH} uses the theme's own palette,
- * {@link #LIGHT} and {@link #DARK} Jasper's, and any other name a terminal theme (Settings > Themes > Alacritty Themes).
+ * {@link #LIGHT} and {@link #DARK} Jasper's, and any other name a native workspace theme (Settings > Terminal > Font &amp; Colors).
  *
  * @param name {@code match}, {@code light}, {@code dark}, or a terminal theme's name as written
  */

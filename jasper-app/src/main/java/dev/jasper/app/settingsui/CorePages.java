@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -17,10 +16,6 @@ import java.util.function.Supplier;
 public final class CorePages {
     /** The page shown when Settings opens for the first time. */
     public static final String DEFAULT_PAGE = "appearance";
-    /** The Themes group's id. */
-    public static final String THEMES = "themes";
-    /** The IntelliJ Themes page's id; {@code #marketplace} and {@code #installed} select its tabs. */
-    public static final String INTELLIJ_THEMES = "themes.intellij";
 
     private CorePages() { }
 
@@ -37,8 +32,6 @@ public final class CorePages {
     public record SystemActions(Supplier<Path> file, Runnable openInEditor, Runnable reveal, Runnable reload, Runnable migrate,
                                 BooleanSupplier migratable) { }
 
-    /** The Alacritty Themes page's id. */
-    public static final String ALACRITTY_THEMES = "themes.alacritty";
 
     /**
      * The pages the application supplies.
@@ -46,16 +39,12 @@ public final class CorePages {
      * @param keymap the Keymap page
      * @param plugins the Plugins page
      * @param tools pages under Tools, such as plugins' settings pages
-     * @param intellijThemes the IntelliJ Themes page around its schema header
-     * @param alacrittyThemes the Alacritty Themes page; empty leaves it out
      */
     public record Pages(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins,
-                        Function<PageContext, List<SettingsPage>> tools,
-                        BiFunction<PageContext, SettingsPage, SettingsPage> intellijThemes,
-                        Function<PageContext, Optional<SettingsPage>> alacrittyThemes) {
+                        Function<PageContext, List<SettingsPage>> tools) {
         /** Keymap and Plugins only. */
         public static Pages of(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins) {
-            return new Pages(keymap, plugins, context -> List.of(), (context, header) -> header, context -> Optional.empty());
+            return new Pages(keymap, plugins, context -> List.of());
         }
     }
 
@@ -66,12 +55,6 @@ public final class CorePages {
 
     /** Every schema page's spec, in tree order. */
     public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells) {
-        return specs(themeNames, List::of, system, shells);
-    }
-
-    /** Every schema page's spec, in tree order, with the terminal themes the Terminal colors dropdown lists. */
-    public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, Supplier<List<String>> terminalThemeNames,
-                                              SystemActions system, ShellChoices shells) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
@@ -108,8 +91,6 @@ public final class CorePages {
                     new SchemaPage.Button("Reload from Disk", system.reload(), () -> true))
                 .action(() -> "Rewrite old setting names to the current layout; the original is backed up first.",
                     new SchemaPage.Button("Migrate Config\u2026", system.migrate(), system.migratable())),
-            SchemaPage.page(INTELLIJ_THEMES, "IntelliJ Themes").parent(THEMES).anchor("intellij-themes")
-                .row(THEMES_MARKETPLACE_ENABLED),
             SchemaPage.page("terminal", "Terminal")
                 .row(TERMINAL_SCROLLBACK, Editors.integer("lines"))
                 .row(TERMINAL_BELL)
@@ -127,8 +108,7 @@ public final class CorePages {
                 .row(TERMINAL_FONT_LIGATURES)
                 .row(TERMINAL_FONT_LINE_HEIGHT, Editors.number(0.05, "×"))
                 .section("Colors")
-                .row(UI_THEME_WORKSPACE, Editors.terminalColors(() -> java.util.stream.Stream.concat(
-                    themeNames.get().stream(), terminalThemeNames.get().stream()).distinct().toList())),
+                .row(UI_THEME_WORKSPACE, Editors.terminalColors(themeNames)),
             SchemaPage.page("terminal.cursor", "Cursor").parent("terminal")
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),
@@ -176,26 +156,14 @@ public final class CorePages {
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools) {
-        return pages(themeNames, system, shells, keymap, plugins, tools, (context, header) -> header);
-    }
-
-    /**
-     * The whole tree: as above, with {@code intellijThemes} turning the IntelliJ Themes schema page (its settings) into
-     * the page the tree shows.
-     */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
-                                                                   Function<PageContext, SettingsPage> keymap,
-                                                                   Function<PageContext, SettingsPage> plugins,
-                                                                   Function<PageContext, List<SettingsPage>> tools,
-                                                                   BiFunction<PageContext, SettingsPage, SettingsPage> intellijThemes) {
-        return pages(themeNames, List::of, system, shells, new Pages(keymap, plugins, tools, intellijThemes, context -> Optional.empty()));
+        return pages(themeNames, system, shells, new Pages(keymap, plugins, tools));
     }
 
     /** The whole tree for one dialog, in display order, with the pages the application supplies. */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, Supplier<List<String>> terminalThemeNames,
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames,
                                                                    SystemActions system, ShellChoices shells, Pages supplied) {
         return context -> {
-            var specs = specs(themeNames, terminalThemeNames, system, shells);
+            var specs = specs(themeNames, system, shells);
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();
@@ -203,10 +171,7 @@ public final class CorePages {
                 childrenOf.apply("appearance-behavior"), context));
             for (var spec : specs.subList(0, 6)) all.add(spec.build(context));
             all.add(supplied.keymap().apply(context));
-            all.add(new GroupPage(THEMES, "Themes", Optional.empty(), false, childrenOf.apply(THEMES), context));
-            all.add(supplied.intellijThemes().apply(context, specs.get(6).build(context)));
-            supplied.alacrittyThemes().apply(context).ifPresent(all::add);
-            for (var spec : specs.subList(7, specs.size())) all.add(spec.build(context));
+            for (var spec : specs.subList(6, specs.size())) all.add(spec.build(context));
             all.add(supplied.plugins().apply(context));
             all.add(new GroupPage("tools", "Tools", Optional.empty(), true, childrenOf.apply("tools"), context));
             all.addAll(supplied.tools().apply(context));

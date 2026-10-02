@@ -15,6 +15,17 @@ import java.util.zip.ZipOutputStream;
 public final class ThemeFixtures {
     private ThemeFixtures() {}
 
+    /** A converted native fixture with real archive/scheme provenance for installation tests. */
+    public static Path nativePlugin(Path file, String name, boolean dark, String background, String console) {
+        Path source = file.resolveSibling("." + file.getFileName() + ".jar");
+        plugin(source, name, dark, background, console);
+        try {
+            var converted = dev.jasper.app.themeimport.ThemeConverter.convert(source).getFirst();
+            Files.writeString(file, ThemeTomlWriter.write(converted.document()));
+            Files.delete(source); return file;
+        } catch (IOException failure) { throw new UncheckedIOException(failure); }
+    }
+
     /** A {@code .theme.json} naming its editor scheme ({@code null} for none) and setting {@code Panel.background}. */
     public static String theme(String name, boolean dark, String editorScheme, String panelBackground) {
         return "{\"name\": \"" + name + "\", \"dark\": " + dark + ", \"author\": \"Fixture\""

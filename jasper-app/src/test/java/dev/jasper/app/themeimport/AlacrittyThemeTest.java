@@ -105,15 +105,20 @@ class AlacrittyThemeTest {
         assertThat(AlacrittyTheme.displayName("iterm.toml")).isEqualTo("Iterm");
     }
 
-    @Test void everyBundledThemeIsUsableWithoutWarningsAndHasItsOwnName() {
-        var files = dev.jasper.app.terminalthemes.TerminalThemeTestSupport.bundledFiles();
+    @Test void everyVendoredAlacrittyThemeIsUsableWithoutWarningsAndHasItsOwnName() throws Exception {
+        java.nio.file.Path root = java.nio.file.Path.of(System.getProperty("user.dir")).toAbsolutePath();
+        while (!java.nio.file.Files.exists(root.resolve("tools/themes/sources.json"))) root = root.getParent();
+        var manifest = ThemeSources.read(root.resolve("tools/themes/sources.json"));
+        var source = manifest.sources().stream().filter(value -> value.id().equals("alacritty")).findFirst().orElseThrow();
+        var files = source.assets().stream().filter(asset -> asset.path().endsWith(".toml")).map(ThemeSources.Asset::path).toList();
+        java.nio.file.Path themes = root.resolve("third_party/themes/alacritty");
         assertThat(files).hasSize(177);
         var names = new HashSet<String>();
         for (String file : files) {
-            var result = AlacrittyTheme.read(dev.jasper.app.terminalthemes.TerminalThemeTestSupport.bundledText(file));
+            var result = AlacrittyTheme.read(java.nio.file.Files.readString(themes.resolve(file)));
             assertThat(result.palette()).as(file).isPresent();
             assertThat(result.problems()).as(file).isEmpty();
-            String name = AlacrittyTheme.displayName(file);
+            String name = AlacrittyTheme.displayName(java.nio.file.Path.of(file).getFileName().toString());
             assertThat(names.add(name.toLowerCase(java.util.Locale.ROOT))).as("duplicate name " + name).isTrue();
             assertThat(dev.jasper.app.config.TerminalColors.reserved(name)).as(name).isFalse();
         }

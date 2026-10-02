@@ -55,12 +55,10 @@ class PluginThemeParityTest {
         try {
             jar(home.resolve("themes/vampire.jar"), entries(
                 "META-INF/plugin.xml", pluginXml("Vampire", "/" + ENTRY), ENTRY, json));
-            var snapshot = dev.jasper.app.themeimport.LegacyThemeReader.catalog(home.resolve("config.toml")).scan();
-            assertThat(snapshot.problems()).singleElement().satisfies(problem ->
-                assertThat(problem.message()).contains("no console colours", "Jasper Dark"));
-            Theme theme = snapshot.themes().stream().filter(candidate -> candidate.source() instanceof Theme.Archive)
-                .findFirst().orElseThrow();
-            String label = ((Theme.Archive) theme.source()).entry();
+            var converted = dev.jasper.app.themeimport.ThemeConverter.convert(home.resolve("themes/vampire.jar")).getFirst();
+            assertThat(converted.warnings()).singleElement().asString().contains("no console colours", "Jasper Dark");
+            Theme theme = Theme.of("converted", new Theme.UserFile(home.resolve("vampire.toml"), converted.document()));
+            String label = converted.sourceEntry();
 
             var resolved = dev.jasper.app.themeimport.LegacyThemeTestSupport.load(label, json);
             assertThat(ThemeManager.install(resolved.json(), resolved.colors(), theme.palette().background())).isTrue();

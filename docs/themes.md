@@ -1,9 +1,10 @@
 # Themes
 
 Jasper's themes are Jasper theme files: TOML that colours the app, workspace, terminal palette and editor syntax.
-Four are built in: **Jasper Dark** (the default), **Jasper Light**, and IntelliJ's
-classic **IntelliJ Light** and **Darcula**, converted. Theme plugins from the JetBrains Marketplace can still be
-installed; Jasper converts them when it reads them.
+Jasper ships **284 native themes**, including Jasper Light/Dark, IntelliJ Light/Darcula, Dracula,
+Catppuccin, Solarized, Nord, Gruvbox, One Dark, Material Lite, Code, Studio and converted Alacritty palettes.
+The complete offline collection, pinned sources, licenses, exclusions and explicit renames are in
+[third-party theme notices](../THIRD-PARTY-THEMES.md). No Marketplace network client remains.
 
 ## Choosing a theme
 
@@ -12,12 +13,12 @@ Name the theme in `config.toml`:
 ```toml
 [ui.theme]
 name = "Dracula"
-workspace = "match" # or "Jasper Dark", another native theme, or an Alacritty theme
+workspace = "match" # or "Jasper Dark", another native theme
 ```
 
 The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
 every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and
-installed theme; **Get More Themes…** at the bottom opens Settings › Themes › IntelliJ Themes. The
+user theme. Settings › Terminal › Font & Colors offers the same native collection and a checkbox for `match`. The
 workspace choice switches independently, including between two dark themes. The pane tab strip, find controls,
 split dividers, terminal palette, zone-aware icons and Editor syntax follow it. Menus, sidebars and dialogs follow
 the UI theme. Ordinary controls in hosted center plugin panes also follow the workspace, including lists, tables,
@@ -67,7 +68,7 @@ Everything else is derived. A theme can also set:
 - `extends = "<theme>"`: start from any other theme and change only what you write; a file may even be named like the
   theme it extends ("Jasper Dark" extending "Jasper Dark") to replace it. Invalid candidates are skipped when
   resolving a parent, so a broken file cannot hide a valid theme with that name. `dark` and `ui_complete` are inherited too:
-  a file extending IntelliJ Light, Darcula or a plugin theme inherits `ui_complete = true`, so its `[colors]` and
+  a file extending IntelliJ Light, Darcula or a converted theme inherits `ui_complete = true`, so its `[colors]` and
   `[tokens]` mostly reach only the terminal and Jasper's own chrome (`Jasper.*` keys, which tokens you set
   explicitly reach), not FlatLaf's controls; change those through `[ui]`;
 - `cursor` and `selection` (in `[colors]`) and `[colors.bright]` (otherwise each bright colour is its normal colour
@@ -85,6 +86,7 @@ Everything else is derived. A theme can also set:
 - `[syntax]`: `keyword`, `type`, `function`, `variable`, `constant`, `number`, `string`, `comment`, `doc_comment`,
   `annotation`, `operator`, `punctuation`, `tag`, `attribute`, `regex`, `error`, each a colour or
   `{ color = "#…", bold = true, italic = true }`;
+- `[icons]`: bounded IntelliJ icon color-palette data retained by conversion; no plugin code or external artwork is loaded;
 - `[ui]`: raw FlatLaf or IntelliJ keys (`"Button.arc" = 6`), laid over everything else. `[ui]` values that look like a
   Java class name (for example `com.example.Border`) are refused, except FlatLaf's own `com.formdev.flatlaf.` classes,
   and keys ending in `UI` cannot be set.
@@ -94,50 +96,32 @@ used as written. Colours are `#RRGGBB` or `#RRGGBBAA`. A mistake (an unknown key
 `extends` that names no theme or loops) is a configuration warning naming the file and line, and that theme is skipped.
 A theme file larger than 256 KiB is skipped with a warning.
 
-## Installing a theme
+## Adding themes and upgrading existing installations
 
-Settings › Themes › IntelliJ Themes has two tabs.
+Native `.toml` files in `themes/` are the runtime format. Place a native file there and reload config to discover it.
+The new Themes page, Import dialog, Duplicate/Open/Remove actions, staged preview and direct file watching arrive in
+Plan 5. The former IntelliJ/Alacritty stores and their navigation actions are removed in this deliverable.
 
-- **Marketplace** searches the JetBrains Marketplace's theme plugins (most downloaded first). Select one to read its
-  description, then **Install**. Jasper downloads the latest release, checks that it has a theme Jasper can use, and
-  puts it in the `themes` folder beside `config.toml` (`~/.config/jasper/themes/` on macOS); the banner then offers
-  **Use "…"**, which chooses it on the Appearance page (Apply or OK switches). Paid plugins are not listed; freemium
-  ones are marked. Clicking a link in a description opens it in your browser (http and https only).
-- **Installed** lists the theme plugins in the folder, with **Use** for each theme, **Update to …** when the
-  Marketplace has a newer release of one installed from it, and **Uninstall**. **Install from Disk…** copies a
-  downloaded `.jar` or `.zip` into the folder; **Reveal Folder** shows it.
+Before the initial configuration is loaded, Jasper upgrades legacy files beside the actual selected config:
 
-You can also put a plugin's `.jar` or `.zip`, unchanged, in the folder yourself and choose **Reload config**.
+- Direct `.jar`, `.zip` and `.theme.json` files in `themes/`, plus `.toml` palettes in `terminal-themes/`, are converted
+  to standalone native documents. The converter reads JSON/XML/TOML data; it never loads plugin classes.
+- Existing native files are preserved. Name/file collisions get deterministic suffixes; selected names follow the
+  source that previously won each chrome/workspace slot, including legacy aliases.
+- Fully converted originals move without replacement into `themes/legacy/`. Partially failed archives retain their
+  originals and successful outputs. Failed inputs remain where they were, with persistent config warnings.
+- `themes/legacy/migration.toml` records hashes, output names, ownership and progress. Staged output permits safe
+  resume after interruption. `.migrated` is written only after the config step succeeds. Config edits preserve
+  unrelated text/comments and keep numbered `<config>.v1.bak` backups.
+- Changed originals, edited outputs, corrupt recovery files or conflicting config edits are retained with warnings.
+  A completed pass does not silently reconvert failed or newly added legacy files. Removing a failed input clears
+  its warning on config reload. The Import service is available internally; its user dialog is Plan 5.
 
-Jasper contacts the Marketplace only while that page is open: searches, the selected plugin's details and icons, the
-download, and one update check per Marketplace install each time the Installed tab opens. Requests carry your search
-text and nothing else about you. Uncheck **Browse the JetBrains Marketplace** (`themes.marketplace.enabled = false`)
-to hide the Marketplace tab and stop update checks.
-
-Jasper finds a plugin's themes through its `META-INF/plugin.xml` and reads each theme's `.theme.json` and editor
-colour scheme straight from the file. Nothing is unpacked, and no code in the plugin runs. A plugin whose theme needs
-IntelliJ's code, such as Material Theme UI, is refused with a message. A theme you install takes precedence over a
-built-in theme of the same name. Marketplace installs are named `<plugin id>-<version>`, and `themes/.sources.toml`
-records where each came from.
-
-## What is supported
-
-- Classic-UI theme plugins: the `.theme.json` files a plugin declares with `themeProvider`,
-  including several themes in one plugin.
-- A theme's `parentTheme` when it is one of the themes IntelliJ bundles: the classic `Darcula`,
-  `IntelliJ` and `JetBrainsLightTheme`, the New UI `ExperimentalDark`, `ExperimentalLight` and
-  `ExperimentalLightWithLightHeader`, and `Islands Dark`, `Islands Light`, `Islands Darcula` and
-  `JetBrainsHighContrastTheme`. IntelliJ Light and Darcula are also offered as built-in themes; the rest are vendored as parents only. Any other
-  parent, such as another plugin's theme, is replaced by Darcula or IntelliJ by the theme's darkness,
-  with a warning.
-- The theme's editor colour scheme, for the terminal (below).
-
-Not supported:
-- themes a plugin draws in code, such as Material Theme UI;
-- loose `.theme.json` files;
-- background images;
-- icon recolouring;
-- New UI-only layout keys.
+Supported conversion inputs are standalone IntelliJ JSON (including local parents and editor schemes), data-only
+IntelliJ archives (multiple providers and nested plugin layouts), Alacritty TOML and native Jasper TOML. Unknown
+IntelliJ parents use the documented light/dark fallback with a warning. Code-driven themes, YAML and external
+resources are not supported. Archive/XML limits and disabled external entities apply to every path.
+`themes.marketplace.enabled` is ignored for compatibility; unknown neighboring settings still warn.
 
 ## Workspace and terminal colours
 
@@ -153,36 +137,21 @@ supplies the terminal's console background, text, cursor, selection and 16 ANSI 
 
 Scheme colours are used exactly as the theme author chose them.
 
-## Terminal themes
+## Converted terminal palettes
 
-`ui.theme.workspace` can also name a terminal theme in [Alacritty](https://alacritty.org)'s format. Jasper currently
-converts it in memory to a complete workspace theme. Jasper bundles the
-whole [alacritty-theme](https://github.com/alacritty/alacritty-theme) collection (177 themes, Apache 2.0), and reads
-`.toml` files you put in the `terminal-themes` folder beside `config.toml`; a file of yours wins over a bundled theme of
-the same name. A theme's name comes from its file name: `gruvbox_dark.toml` is "Gruvbox Dark". `match`, `light` and
-`dark` are Jasper's own choices and cannot be theme names.
+The offline catalog includes 168 Alacritty variants after native-family precedence and explicit exclusions; all 177
+upstream inputs remain locked for provenance. For conversion, primary foreground/background are required; normal,
+bright, cursor and selection colors are retained. Missing bright colors use their normal colors; cursor defaults to
+foreground and selection to a blend. Dim/search/hint/indexed colors are ignored. The native file contains a complete
+workspace theme derived from that terminal palette. `terminal-themes/` is no longer scanned at runtime.
 
-Settings › Themes › **Alacritty Themes** lists every theme with its colours and draws a sample terminal in the selected
-one; **Use** chooses it (Apply or OK switches the workspace), **Install from Disk…** checks and copies a theme file in,
-**Reveal Folder** shows the folder, and **Remove…** deletes one of your files. Settings › Terminal › Font & Colors lists
-the themes too, ending in **More Terminal Themes…**.
-
-Jasper reads a theme's `colors.primary` foreground and background (required), `colors.normal` and `colors.bright` (the
-16 ANSI colours), `colors.cursor.cursor` and `colors.selection.background`. A missing bright colour uses the normal one;
-a missing cursor uses the foreground and a missing selection a blend of foreground and background. Other keys (dim
-colours, search, hints, indexed colours) are ignored. A missing normal colour comes from Jasper Dark, or Jasper Light
-when the theme's background is light. An unknown name in `ui.theme.workspace` is a warning and the workspace matches the UI
-theme. The requested name remains saved so repairing or installing that theme can select it on reload.
-
-In the `terminal-themes` folder Jasper reads only `.toml` files; hidden files (a name starting with `.`) and other files
-are ignored, and a file over 64 KiB is skipped. A file that cannot be used, or a colour Jasper ignores, is reported
-under the status bar's **Config warnings**, naming the file.
+An unknown workspace name warns and temporarily follows chrome. The requested name remains saved for repair.
 
 ## When something is wrong
 
 Problems appear under the status bar's **Config warnings**, naming the file:
 - An unknown `ui.theme.name` lists the themes available. At start-up Jasper uses Jasper Dark; on reload it uses the safe built-in for the last successfully applied chrome darkness. The requested name remains saved for a later retry.
-- A file that isn't a readable plugin, or a plugin with no theme files, is reported.
+- A failed legacy conversion is reported from the migration journal.
 - A theme that fails to load, or names a parent theme Jasper doesn't have, is reported.
 - Two installed themes with the same name are reported, and the file that sorts first wins.
 - An unreadable editor scheme is reported, and the terminal then uses Jasper's palette.
@@ -190,5 +159,14 @@ Problems appear under the status bar's **Config warnings**, naming the file:
   UTF-8, takes a reserved name or repeats another file's name is reported and skipped; a colour it cannot read is
   reported and ignored.
 
-No problem stops Jasper from starting. Each plugin is capped at 64 MiB, each file read from it at
+A theme/config migration failure is reported while startup continues. Each plugin is capped at 64 MiB, each file read from it at
 4 MiB, and each jar inside a `.zip` at 32 MiB, with at most 16 such jars read.
+
+
+## Native acceptance for this upgrade (user-run)
+
+Launch against a copied legacy home. Confirm the selected chrome/workspace colors, preserved originals, suffixed
+selection names when needed, and failed-input warnings. Choose Dracula, Catppuccin Mocha, Solarized Light, Gruvbox
+and Code Dark with a different workspace and an open plugin pane. Verify Appearance, Font & Colors, View selections,
+menus/dialogs/tooltips and workspace combo dropdowns. Repeat launch to verify no duplicate outputs. Headless tests
+do not claim this visual acceptance.
