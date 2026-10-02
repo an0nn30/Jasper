@@ -2,6 +2,21 @@
 
 ## Current state — 2026-10-02
 
+- **Start-up speed: designed, measured and planned; not started** (branch `claude/startup-speed`, worktree
+  `.claude/worktrees/startup-speed`, from local `main@91400d29`; user request in chat 2026-10-02).
+  [Spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) approved section by section. Measured Dock click
+  to window on screen: ~3.5 s for the installed pre-`c4211cf1` build, 2.3 s at HEAD, 1.7 s with a JDK 25 AOT cache and
+  no code change; plugins cost ~0.5 s, and FlatLaf/JNA/pty4j/SQLite natives are re-extracted every launch. Targets:
+  resident Dock click ≤ 150 ms, cold ≤ 600 ms. Five plans, executed in this order:
+  [1 Measure](superpowers/plans/2026-10-02-startup-1-measure.md) →
+  [2 JVM and packaging](superpowers/plans/2026-10-02-startup-2-jvm-packaging.md) →
+  [4 Resident by default](superpowers/plans/2026-10-02-startup-4-resident-default.md) →
+  [3A Start-up sequence](superpowers/plans/2026-10-02-startup-3a-sequence.md) →
+  [3B Contribution replay](superpowers/plans/2026-10-02-startup-3b-contribution-replay.md). Plan 1's trace, file,
+  benchmark and session-output tests were compiled and run against the plan's own code; the others were cross-checked
+  against each other's written code. Baseline `./gradlew check`: 7,954/0/0/6. GUI measurement runs need the user's
+  approval per batch. Not done: execution of any plan.
+
 - **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
   worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
   - **On top:** macOS raised the window Settings blocks in front of it. Every modal dialog now floats above Jasper's
