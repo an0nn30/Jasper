@@ -16,6 +16,9 @@ import java.util.function.Supplier;
 public final class CorePages {
     /** The page shown when Settings opens for the first time. */
     public static final String DEFAULT_PAGE = "appearance";
+    /** Workspace glass needs macOS; elsewhere the rows stay visible but disabled. */
+    private static final boolean GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+    private static final String GLASS_NOTE = GLASS ? "" : "Requires macOS.";
 
     private CorePages() { }
 
@@ -64,6 +67,11 @@ public final class CorePages {
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
                 .action(() -> "Choose and preview application colors.", new SchemaPage.Button("Choose UI theme…", () -> navigate.accept("themes#ui"), () -> true))
+                .section("Workspace")
+                .action(() -> "Translucent terminal and editor backgrounds; a workspace theme may set its own.",
+                    new SchemaPage.Button("Choose workspace theme…", () -> navigate.accept("themes#workspace"), () -> true))
+                .row(UI_WORKSPACE_OPACITY, Editors.optionalNumber("Use theme's value", 1, "%")).note(GLASS_NOTE).enabledWhen(draft -> GLASS)
+                .row(UI_WORKSPACE_BLUR, Editors.optionalNumber("Use theme's value", 1, "%")).note(GLASS_NOTE).enabledWhen(draft -> GLASS)
                 .section("Interface font")
                 .row(UI_FONT_FAMILY, Editors.font(false))
                 .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt")),

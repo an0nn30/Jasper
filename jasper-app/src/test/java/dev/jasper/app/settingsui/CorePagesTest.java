@@ -27,6 +27,12 @@ class CorePagesTest {
         assertThat(shown).doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(CoreSettings.SCHEMA.settings());
     }
 
+    @Test void appearanceHasAWorkspaceSectionForOpacityAndBlur() {
+        var appearance = CorePages.specs(() -> List.of("Jasper Dark"), system).getFirst();
+        assertThat(appearance.id()).isEqualTo("appearance");
+        assertThat(appearance.settings()).containsSubsequence(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
+    }
+
     @Test void theTreeIsTheApprovedOne() {
         var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins, CorePagesTest::themes).apply(context);
         assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "themes", "window", "notifications",
@@ -68,7 +74,8 @@ class CorePagesTest {
             if (!List.of("appearance", "terminal.font").contains(spec.id())) continue;
             var page=spec.build(context);page.component();page.actionButtons().forEach(javax.swing.JButton::doClick);page.dispose();
         }
-        assertThat(navigation).containsExactly("themes#ui", "themes#workspace");
+        // Appearance links to both pickers (UI theme, then the Workspace section's button); Terminal > Font links to the workspace one.
+        assertThat(navigation).containsExactly("themes#ui", "themes#workspace", "themes#workspace");
     }
     private static SettingsPage keymap(PageContext context) {
         return new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, context);

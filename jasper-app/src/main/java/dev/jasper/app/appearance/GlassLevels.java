@@ -1,5 +1,7 @@
 package dev.jasper.app.appearance;
 
+import dev.jasper.app.config.GlassSettings;
+
 /**
  * How translucent the workspace is, as fractions: {@code opacity} from {@link #MIN_OPACITY} to 1 (1 is opaque) and
  * {@code blur} from 0 to 1, Terminal.app's scale for how strongly the desktop behind is blurred.
@@ -16,6 +18,17 @@ public record GlassLevels(double opacity, double blur) {
     public GlassLevels {
         if (!(opacity >= MIN_OPACITY && opacity <= 1)) throw new IllegalArgumentException("opacity must be from 0.1 to 1");
         if (!(blur >= 0 && blur <= 1)) throw new IllegalArgumentException("blur must be from 0 to 1");
+    }
+
+    /**
+     * The levels a window asks for: each saved value wins over the workspace theme's.
+     *
+     * @param saved the saved settings
+     * @param theme the workspace theme's levels
+     * @return the effective levels
+     */
+    public static GlassLevels resolve(GlassSettings saved, GlassLevels theme) {
+        return new GlassLevels(saved.opacity().orElse(theme.opacity()), saved.blur().orElse(theme.blur()));
     }
 
     /** Whether anything behind the workspace shows through. */
