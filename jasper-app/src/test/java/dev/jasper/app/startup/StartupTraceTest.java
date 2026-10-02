@@ -165,4 +165,11 @@ class StartupTraceTest {
         assertThat(fixture.log.get(0)).isEqualTo("A start-up trace action failed after output painted: java.lang.IllegalStateException: boom");
         assertThat(fixture.log.get(1)).startsWith("Startup (cold");
     }
+
+    @Test void anInvalidTraceFilePathMeansNoTraceFile() {
+        assertThat(StartupTrace.traceFile("\u0000bad")).isNull();
+        assertThat(StartupTrace.traceFile("  ")).isNull();
+        assertThat(StartupTrace.traceFile(null)).isNull();
+        assertThat(StartupTrace.traceFile("/tmp/trace.json")).isEqualTo(Path.of("/tmp/trace.json"));
+    }
 }

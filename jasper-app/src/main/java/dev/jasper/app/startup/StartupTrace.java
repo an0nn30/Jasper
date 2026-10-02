@@ -104,6 +104,13 @@ public final class StartupTrace {
             null, line -> { }, Runnable::run, () -> JvmStatus.of("", false), (delay, task) -> { }));
     }
 
+    /** The trace file named by the property; null for a blank or malformed value, because tracing must never stop a launch. */
+    static Path traceFile(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return Path.of(value); }
+        catch (java.nio.file.InvalidPathException malformed) { return null; }
+    }
+
     static Environment processEnvironment() {
         long anchor = System.nanoTime();
         Instant now = Instant.now();
@@ -112,7 +119,7 @@ public final class StartupTrace {
         String file = System.getProperty(TRACE_FILE_PROPERTY);
         System.Logger logger = System.getLogger("dev.jasper.app.startup");
         return new Environment(System::nanoTime, anchor, anchorMillis, start, ProcessHandle.current().pid(),
-            file == null || file.isBlank() ? null : Path.of(file),
+            traceFile(file),
             line -> logger.log(System.Logger.Level.INFO, line),
             task -> Thread.ofVirtual().name("jasper-startup-report").start(task),
             JvmStatus::observe,

@@ -79,9 +79,11 @@ public final class JasperApplication {
     private boolean resident;
     private volatile StartupTrace trace = StartupTrace.current();
     private int windowsOpened;
-    /** The output watch of every local session this application started, until its first terminal claims it. */
-    private final java.util.Map<TerminalSession, SessionOutput> outputs =
-        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    /**
+     * The output watch of every local session this application started, until its first terminal claims it or the
+     * session exits. Strongly keyed: a watch holds its session, so a weak key could never clear.
+     */
+    private final java.util.Map<TerminalSession, SessionOutput> outputs = new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
     private java.util.function.BinaryOperator<Runnable> residentIndicator = (open, quit) -> () -> { };
     private Runnable removeIndicator;
@@ -677,9 +679,18 @@ public final class JasperApplication {
     /** Marks the first spawn and watches the session's first output from right after its start. Any thread. */
     private TerminalSession watchOutput(TerminalSession session) {
         trace.mark(StartupTrace.Milestone.SHELL_SPAWNED);
-        outputs.put(session, SessionOutput.watch(session, () -> trace.mark(StartupTrace.Milestone.SHELL_OUTPUT)));
+        trackOutput(session, SessionOutput.watch(session, () -> trace.mark(StartupTrace.Milestone.SHELL_OUTPUT)));
         return session;
     }
+
+    /** Keeps a session's output watch until its first terminal claims it or the session exits. Any thread. */
+    void trackOutput(TerminalSession session, SessionOutput output) {
+        outputs.put(session, output);
+        session.exitFuture().whenComplete((code, failure) -> outputs.remove(session));
+    }
+
+    /** Whether a session's output watch is still held. Any thread. */
+    boolean watchingOutput(TerminalSession session) { return outputs.containsKey(session); }
 
     /** First paint, then the first paint after output: the window is usable. EDT. */
     private void timeFirstTerminal(TerminalPane pane, WindowTrace windowTrace) {
