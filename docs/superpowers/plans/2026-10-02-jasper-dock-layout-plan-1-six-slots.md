@@ -22,19 +22,34 @@ approved by the user section by section). Plan 2 (drag and drop) builds on this 
 
 **Status:** Executed 2026-10-02 on `claude/dock-layout` with subagent-driven development (one implementer and one
 reviewer per task, plus fix rounds), on top of the plan commit `c2ca6dc6` (base `7749e13b`, the spec commit, on top of
-`cc0429f5` "Merge theme system Plan 4"). Commits: `400dcba5` through `4280e97d` (Tasks 1-9) plus the documentation
-commit (Task 10). Deviations from the plan text: Task 2, `DockGeometry` keeps each ratio divider's drag range inside
-`DockState`'s 0.1–0.9 ratio limits (new test `aWideSplitsDividerRangeStaysWithinTheRatioLimits`); Task 5,
+`cc0429f5` "Merge theme system Plan 4"). Commits: `400dcba5` through `4280e97d` (Tasks 1-9), the documentation commit
+`5564edc1` (Task 10), and the final-review fixes `f9b4ac21`, `088e2703`, `1e5c83a9` and `f4ec6b1a` with their
+documentation commit. Deviations from the plan text: Task 2, `DockGeometry` keeps each ratio divider's drag range
+inside `DockState`'s 0.1–0.9 ratio limits (new test `aWideSplitsDividerRangeStaysWithinTheRatioLimits`); Task 5,
 `ToolWindowHeader`'s padding is a compound border around `FlatEmptyBorder` so it survives theme switches, and
 `ToolWindowMenu`'s six Move to items share a `ButtonGroup`; Task 7, a divider press and release without a drag between
-them leaves the state alone (new test `aClickOnASqueezedDividerChangesNothing`); Task 8, `docked()` returns focus to the
-terminal between the hidden and the shown notifications as `hidePanel` did before, a throwing panel factory is logged
-at WARNING, `WindowPanelsTest` has 18 cases rather than 16, the close test checks the right stripe, and a
-`ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3, 4, 6 and 9 none.
-`./gradlew check --continue`: 7,987 tests, 1 failure, 0 errors, 6 skipped; the one failure is
-`ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
-"zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load
-(it passed in this run and passes alone). No GUI launched; the GUI checks are in the section "GUI checks for the user".
+them leaves the state alone (new test `aClickOnASqueezedDividerChangesNothing`); Task 8, `docked()` returns focus to
+the terminal between the hidden and the shown notifications as `hidePanel` did before, a throwing panel factory is
+logged at WARNING, `WindowPanelsTest` has 18 cases rather than 16, the close test checks the right stripe, and a
+`ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3, 4, 6 and 9
+none; final review: `WindowContributions.close()` no longer saves, because every dock change is saved as it happens
+and saving again on close overwrote other windows' later changes (new test
+`closingAWindowKeepsTheChangesAnotherWindowSaved`); `DockGeometry` reserves above the bottom area the larger of the
+terminal's minimum height and two tool window minimums plus a divider when the left or the right side shows both
+halves, in the squeeze and in the bottom divider's range (new tests
+`theBottomAreaGrowsOnlyUntilASplitSidesHalvesReachTheirMinimum`,
+`aShortWindowSqueezesTheBottomAreaBeforeASplitSidesHalves` and `theSplitSidesMinimumScalesWithTheUi`); each panel
+instance keeps a `notified` flag and hears a visibility only while it is still true and not yet told (new tests
+`aFactoryThatHidesItsOwnWindowHearsNothing` and `aWindowThatShowsItselfAgainWhenReplacedHearsOnlyWhatIsTrue`, so
+`WindowPanelsTest` now has 21 cases); a bad `[windows]` entry is skipped alone instead of resetting the whole file
+(new test `aBadWindowEntryFallsBackAlone`; the bad-window case of
+`invalidValuesAreRejectedAndInvalidFilesFallBackToDefaults` now checks that the rest of the file survives); and the
+SFTP wording, here and in `docs/STATUS.md`: SFTP opens under Sessions on a fresh state or after Move to › Left Bottom
+once, because an upgraded state that already places SFTP keeps it in Left Top. `./gradlew check --continue`: 7,994
+tests, 1 failure, 0 errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor),
+which fails on this Mac only (its `java.io.tmpdir` contains "zz") and predates the branch, and
+`ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load (it did not fail in this run and
+passes alone). No GUI launched; the GUI checks are in the section "GUI checks for the user".
 
 **Execution:** The repository's usual shape: superpowers:subagent-driven-development, one implementer and one
 reviewer per task, fix rounds, then one whole-branch review. Record any deviation from the plan text in this banner
@@ -5749,13 +5764,15 @@ version 1 migration more than once.
 
 1. **First launch on your existing state:** the panels that were open are open in the same place and width
    (Sessions on the left). `ui-state.toml` now starts with `version = 2` and still has your `[windows]` and
-   `[chooser]` sections.
-2. **Look against IntelliJ:** a stripe on each side; the left one lists Sessions, Tunnels, File Servers and Sample
-   on top (in the order the plugins register them), a short grey separator, SFTP, then the rail actions behind their
-   own separator; the right stripe is empty but present. Selected buttons are rounded filled squares. Each open tool window has a
-   header: bold title, then ⋮ and — at the right, on the tool window colour with no bar of its own; rounded frames;
-   6px gaps.
-3. **Two halves:** open Sessions and SFTP together; SFTP sits under Sessions. Drag the divider between them.
+   `[chooser]` sections. If you had opened or moved SFTP before, expect it in Left Top beside Sessions, not under
+   it: a saved place wins over the new default. Move to › Left Bottom once puts it under Sessions for good.
+2. **Look against IntelliJ:** a stripe on each side; the left one lists Sessions, Tunnels, File Servers and Sample on
+   top (in the order the plugins register them), then (on a fresh state, or after Move to › Left Bottom on SFTP once)
+   a short grey separator and SFTP, then the rail actions behind their own separator; the right stripe is empty but
+   present. Selected buttons are rounded filled squares. Each open tool window has a header: bold title, then ⋮ and —
+   at the right, on the tool window colour with no bar of its own; rounded frames; 6px gaps.
+3. **Two halves:** on a fresh state, or after Move to › Left Bottom on SFTP once, open Sessions and SFTP together;
+   SFTP sits under Sessions. Drag the divider between them.
 4. **Move to:** right-click a stripe icon and move a panel to each of the six slots in turn; do the same from the
    header's ⋮. The current slot is checked. Moving keeps the panel open; moving onto an open panel hides that one.
 5. **Hide:** — on the header hides the window and typing goes straight to the terminal.

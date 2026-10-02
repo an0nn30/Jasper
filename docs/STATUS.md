@@ -1,30 +1,44 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-01
+## Current state — 2026-10-02
 
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
-  [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from
-  dragging. New JDK-only package `dev.jasper.app.dock` (`Slot`, `Side`, `DockState`, pure `DockGeometry`), enforced
-  by `verifyApplicationArchitecture`. `ToolWindowArea` replaces `WorkspaceRegions` (one rounded frame with a
-  `ToolWindowHeader` per showing slot, a full-width bottom area, its own 6px dividers that preview a drag and save
-  on release); two `ToolStripe`s replace `WindowRail`; six-slot Move to menus on stripe buttons and headers.
+  [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.
+  New JDK-only package `dev.jasper.app.dock` (`Slot`, `Side`, `DockState`, pure `DockGeometry`), enforced by
+  `verifyApplicationArchitecture`. `ToolWindowArea` replaces `WorkspaceRegions` (one rounded frame with a
+  `ToolWindowHeader` per showing slot, a full-width bottom area, its own 6px dividers that preview a drag and save on
+  release); two `ToolStripe`s replace `WindowRail`; six-slot Move to menus on stripe buttons and headers.
   `ui-state.toml` version 2 (`[dock]` sizes and ratios, per-panel slot, order and visibility; per-entry fallback;
-  version 1 migrates on read). SDK 0.13.0 adds `PanelSpec.withSplit()`; all seven manifests require
-  `>=0.13.0, <0.14`; Remote 0.11.0 opens SFTP under Sessions. Sessions, Tunnels and File Servers no longer repeat
-  their title. Deviations from the plan text: Task 2, `DockGeometry` keeps each ratio divider's drag range inside
-  `DockState`'s 0.1–0.9 ratio limits (new test `aWideSplitsDividerRangeStaysWithinTheRatioLimits`); Task 5,
+  version 1 migrates on read). SDK 0.13.0 adds `PanelSpec.withSplit()`; all seven manifests require `>=0.13.0, <0.14`;
+  Remote 0.11.0 opens SFTP under Sessions on a fresh state or after Move to › Left Bottom once (an upgraded state that
+  already places SFTP keeps it in Left Top, since a saved place wins). Sessions, Tunnels and File Servers no longer
+  repeat their title. Deviations from the plan text: Task 2, `DockGeometry` keeps each ratio divider's drag range
+  inside `DockState`'s 0.1–0.9 ratio limits (new test `aWideSplitsDividerRangeStaysWithinTheRatioLimits`); Task 5,
   `ToolWindowHeader`'s padding is a compound border around `FlatEmptyBorder` so it survives theme switches, and
   `ToolWindowMenu`'s six Move to items share a `ButtonGroup`; Task 7, a divider press and release without a drag
   between them leaves the state alone (new test `aClickOnASqueezedDividerChangesNothing`); Task 8, `docked()` returns
   focus to the terminal between the hidden and the shown notifications as `hidePanel` did before, a throwing panel
   factory is logged at WARNING, `WindowPanelsTest` has 18 cases rather than 16, the close test checks the right
   stripe, and a `ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3,
-  4, 6 and 9 none. Planning decisions are listed in the plan. `./gradlew check --continue`: 7,987 tests, 1 failure,
-  0 errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this
-  Mac only (its `java.io.tmpdir` contains "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed`
-  (Remote) is flaky under full-suite load (it passed in this run and passes alone). No GUI launched. GUI checks for the
-  user: the plan's section "GUI checks for the user". Next:
+  4, 6 and 9 none; final review: `WindowContributions.close()` no longer saves, because every dock change is saved as
+  it happens and saving again on close overwrote other windows' later changes (new test
+  `closingAWindowKeepsTheChangesAnotherWindowSaved`); `DockGeometry` reserves above the bottom area the larger of the
+  terminal's minimum height and two tool window minimums plus a divider when the left or the right side shows both
+  halves, in the squeeze and in the bottom divider's range (new tests
+  `theBottomAreaGrowsOnlyUntilASplitSidesHalvesReachTheirMinimum`,
+  `aShortWindowSqueezesTheBottomAreaBeforeASplitSidesHalves` and `theSplitSidesMinimumScalesWithTheUi`); each panel
+  instance keeps a `notified` flag and hears a visibility only while it is still true and not yet told (new tests
+  `aFactoryThatHidesItsOwnWindowHearsNothing` and `aWindowThatShowsItselfAgainWhenReplacedHearsOnlyWhatIsTrue`, so
+  `WindowPanelsTest` now has 21 cases); a bad `[windows]` entry is skipped alone instead of resetting the whole file
+  (new test `aBadWindowEntryFallsBackAlone`; the bad-window case of
+  `invalidValuesAreRejectedAndInvalidFilesFallBackToDefaults` now checks that the rest of the file survives); and the
+  SFTP wording above and in the plan's GUI checks. Planning decisions are listed in the plan.
+  `./gradlew check --continue`: 7,994 tests, 1 failure, 0 errors, 6 skipped; the one failure is
+  `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
+  "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite
+  load (it did not fail in this run and passes alone). No GUI launched. GUI checks for the user: the plan's section
+  "GUI checks for the user". Next:
   [plan 2, drag and drop](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md).
 - **Theme system Plan 4 complete, independently reviewed and merged locally** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)

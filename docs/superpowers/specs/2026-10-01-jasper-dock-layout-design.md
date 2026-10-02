@@ -1,7 +1,7 @@
 # Jasper dock layout: IntelliJ-style tool windows
 
-**Status:** Design approved in chat by the user on 2026-10-01, section by section. Not implemented. Two plans:
-plan 1 (six-slot layout) and plan 2 (drag and drop).
+**Status:** Design approved in chat by the user on 2026-10-01, section by section. Plan 1 (six-slot layout)
+implemented on branch `claude/dock-layout` on 2026-10-02; plan 2 (drag and drop) next.
 
 Replaces: the single left rail (`WindowRail`), the three-region nested-split docking (`WorkspaceRegions`), the
 "one panel per region" rule from the [plugin SDK design](2026-09-21-jasper-plugin-sdk-design.md) ("Rail and

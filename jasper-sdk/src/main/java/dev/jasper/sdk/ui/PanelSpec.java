@@ -47,7 +47,7 @@ public record PanelSpec(String id, String title, Icon icon, Anchor defaultAnchor
 
     /**
      * A panel in its side's first half. Before 0.13.0 this was the canonical constructor; it stays so that plugins
-     * built against earlier SDKs still link.
+     * written for earlier SDKs compile unchanged; they need only the new {@code sdk} range.
      *
      * @param id the panel id
      * @param title the title
