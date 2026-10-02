@@ -274,6 +274,7 @@ class ExFilesTest {
     }
 
     @Test void bufferSelectsATabByNumberOrName() throws Exception {
+        folder = Path.of("/work").toAbsolutePath(); // :b matches the whole path, as Vim does, and a temporary folder's could hold zz
         named("one.txt");
         others();
         onEdt(() -> {
@@ -284,6 +285,8 @@ class ExFilesTest {
             assertThat(editor.message()).isEqualTo("E86: Buffer 9 does not exist");
             type(editor, ":b zz<CR>");
             assertThat(editor.message()).isEqualTo("E94: No matching buffer for zz");
+            type(editor, ":b work<CR>");
+            assertThat(editor.message()).as("the folder counts too").isEqualTo("E93: More than one match for work");
             type(editor, ":b t<CR>");
             assertThat(editor.message()).as("one.txt, two.txt and Untitled 1 all hold a t").isEqualTo("E93: More than one match for t");
         });
