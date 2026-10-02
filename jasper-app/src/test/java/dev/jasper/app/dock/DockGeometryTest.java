@@ -235,4 +235,23 @@ class DockGeometryTest {
         assertThat(layout.slot(Slot.LEFT_TOP).orElseThrow().width).isEqualTo(260);
         assertThat(layout.divider(Handle.LEFT_WIDTH).orElseThrow().bounds().width).isEqualTo(6);
     }
+
+    @Test void aWideSplitsDividerRangeStaysWithinTheRatioLimits() {
+        DockState state = showing(Slot.BOTTOM_LEFT, Slot.BOTTOM_RIGHT);
+        Layout layout = DockGeometry.compute(new Rectangle(0, 0, 1512, 982), state, Metrics.DEFAULT);
+        var split = layout.divider(Handle.BOTTOM_RATIO).orElseThrow();
+        // Row width is 1512 - 6 (gap) = 1506; 0.1 * 1506 = 150.6 → 151; 0.9 * 1506 = 1354.4 → 1355
+        assertThat(split.minimum()).isEqualTo(151);
+        assertThat(split.maximum()).isEqualTo(1355);
+
+        DockGeometry.drag(state, split, split.minimum(), Metrics.DEFAULT);
+        Layout atMin = DockGeometry.compute(new Rectangle(0, 0, 1512, 982), state, Metrics.DEFAULT);
+        var splitAtMin = atMin.divider(Handle.BOTTOM_RATIO).orElseThrow();
+        assertThat(splitAtMin.position()).isEqualTo(splitAtMin.minimum());
+
+        DockGeometry.drag(state, split, split.maximum(), Metrics.DEFAULT);
+        Layout atMax = DockGeometry.compute(new Rectangle(0, 0, 1512, 982), state, Metrics.DEFAULT);
+        var splitAtMax = atMax.divider(Handle.BOTTOM_RATIO).orElseThrow();
+        assertThat(splitAtMax.position()).isEqualTo(splitAtMax.maximum());
+    }
 }

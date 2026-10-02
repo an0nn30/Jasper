@@ -176,7 +176,14 @@ public final class DockGeometry {
         int total = Math.max(0, (row ? area.width : area.height) - gap);
         int part = split(total, state.ratio(first.side()), floor);
         int start = row ? area.x : area.y, bar = start + part;
-        int minimum = total >= 2 * floor ? start + floor : bar, maximum = total >= 2 * floor ? start + total - floor : bar;
+        int minimum, maximum;
+        if (total >= 2 * floor) {
+            minimum = Math.max(start + floor, start + (int) Math.round(total * DockState.MIN_RATIO));
+            maximum = Math.min(start + total - floor, start + (int) Math.round(total * DockState.MAX_RATIO));
+        } else {
+            minimum = bar;
+            maximum = bar;
+        }
         if (row) {
             slots.put(first, new Rectangle(area.x, area.y, part, area.height));
             slots.put(second, new Rectangle(bar + gap, area.y, total - part, area.height));
