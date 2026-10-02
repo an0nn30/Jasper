@@ -657,6 +657,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean railVisible() { return uiState.railVisible(); }
 
     void setRailVisible(boolean value) {
+        // A drag shows its view on the stripes that showed when it began; showing or hiding them ends it.
+        dockDrag.cancel();
         uiState.setRailVisible(value);
         uiState.save();
         syncRailVisibility();

@@ -200,6 +200,30 @@ class WindowDragTest {
         });
     }
 
+    @Test void turningTheRailOnOrOffMidDragCancelsIt() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.sessions", Contributions.PanelRequest.Op.SHOW));
+            f.layout();
+            for (boolean rail : new boolean[] {false, true}) {
+                var title = f.owner.area().headerOf(Slot.LEFT_TOP).titleLabel();
+                f.drag(title, f.cell(0, 1));
+                assertThat(f.owner.dockDrag().active()).isTrue();
+                assertThat(f.owner.leftStripe().dragging()).as("rail %s: the stripes show the drag only while they show", rail)
+                    .isEqualTo(!rail);
+                f.owner.setRailVisible(rail);
+                assertThat(f.owner.dockDrag().active()).as("View > Rail %s ends the drag", rail ? "on" : "off").isFalse();
+                assertThat(f.owner.dockDrag().overlay().getParent()).isNull();
+                assertThat(f.owner.leftStripe().dragging()).isFalse();
+                assertThat(f.owner.rightStripe().dragging()).isFalse();
+                f.mouse(title, MouseEvent.MOUSE_RELEASED, f.cell(0, 1));
+                assertThat(f.owner.dock().slot("dev.x.sessions")).as("nothing dropped").hasValue(Slot.LEFT_TOP);
+                f.layout();
+            }
+            assertThat(f.events).containsExactly("sessions:true");
+        });
+    }
+
     @Test void aRailActionDoesNotDrag() throws Exception {
         edt(() -> {
             var f = new Fixture();
