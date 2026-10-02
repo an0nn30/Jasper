@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Runs the start-up benchmark: each launch goes through LaunchServices ({@code open}), like a Dock click, with the trace
@@ -25,7 +26,7 @@ import java.util.function.Predicate;
 final class StartupRuns {
     /** Process control, injected so the planning code stays testable. */
     record Host(Function<List<String>, Integer> run, LongSupplier epochMillis, Predicate<Long> terminate,
-                Function<Long, Long> residentKiB) {
+                Function<Long, Long> residentKiB, Supplier<List<Long>> jasperPids) {
         static Host system() {
             return new Host(command -> {
                 try { return new ProcessBuilder(command).inheritIO().start().waitFor(); }
@@ -43,7 +44,9 @@ final class StartupRuns {
                     Thread.currentThread().interrupt();
                     return -1L;
                 }
-            });
+            }, () -> ProcessHandle.allProcesses()
+                .filter(p -> p.info().command().map(c -> c.endsWith("/Contents/MacOS/Jasper")).orElse(false))
+                .map(ProcessHandle::pid).toList());
         }
     }
 
@@ -116,46 +119,53 @@ final class StartupRuns {
     }
 
     int run() throws IOException {
-        if (host.run().apply(List.of("pgrep", "-f", "/Contents/MacOS/Jasper")) == 0) {
+        if (!host.jasperPids().get().isEmpty()) {
             System.err.println("A Jasper process is running; quit every Jasper (including a resident one) first.");
             return 3;
         }
         // Short root: the handoff socket lives under the home, and macOS caps socket paths at 104 bytes.
         Path root = Files.createTempDirectory(Path.of("/tmp"), "jsb");
-        Path home = options.realHome() ? null : Files.createDirectories(root.resolve("home"));
-        if (home != null && options.mode().equals("warm")) {
-            Path config = Files.createDirectories(home.resolve(".config/jasper")).resolve("config.toml");
-            Files.writeString(config, "[system]\nrun_in_background = true\n", StandardCharsets.UTF_8);
-        }
-        if (options.realHome()) warnAboutTerminalMultiplexers();
-        List<Map<String, Object>> runs = new ArrayList<>();
-        List<Map<String, Double>> measured = new ArrayList<>();
-        String status = "ok";
-        for (int index = 0; index < options.prime() + options.runs(); index++) {
-            Map<String, Object> result = options.mode().equals("warm") ? warm(root, home, index) : cold(root, home, index);
-            if (index < options.prime()) continue;
-            runs.add(result);
-            if (result.get("fromClick") instanceof Map<?, ?> values && !values.isEmpty()) {
-                Map<String, Double> copy = new LinkedHashMap<>();
-                values.forEach((name, value) -> copy.put(name.toString(), ((Number) value).doubleValue()));
-                measured.add(copy);
-            } else {
-                status = "incomplete";
+        try {
+            Path home = options.realHome() ? null : Files.createDirectories(root.resolve("home"));
+            if (home != null && options.mode().equals("warm")) {
+                Path config = Files.createDirectories(home.resolve(".config/jasper")).resolve("config.toml");
+                Files.writeString(config, "[system]\nrun_in_background = true\n", StandardCharsets.UTF_8);
             }
+            if (options.realHome()) warnAboutTerminalMultiplexers();
+            List<Map<String, Object>> runs = new ArrayList<>();
+            List<Map<String, Double>> measured = new ArrayList<>();
+            String status = "ok";
+            for (int index = 0; index < options.prime() + options.runs(); index++) {
+                Map<String, Object> result = options.mode().equals("warm") ? warm(root, home, index) : cold(root, home, index);
+                if (index < options.prime()) continue;
+                runs.add(result);
+                String outcome = (String) result.get("outcome");
+                if ("ok".equals(outcome)) {
+                    if (result.get("fromClick") instanceof Map<?, ?> values) {
+                        Map<String, Double> copy = new LinkedHashMap<>();
+                        values.forEach((name, value) -> copy.put(name.toString(), ((Number) value).doubleValue()));
+                        measured.add(copy);
+                    }
+                } else {
+                    status = "incomplete";
+                }
+            }
+            Map<String, Object> report = new LinkedHashMap<>();
+            report.put("schema", 1);
+            report.put("benchmark", "startup");
+            report.put("status", status);
+            report.put("revision", options.revision());
+            report.put("mode", options.mode());
+            report.put("app", options.app().toString());
+            report.put("realHome", options.realHome());
+            report.put("runs", runs);
+            report.put("summary", summary(measured));
+            BenchmarkReport.writeJson(options.output(), report);
+            writeCompanion(report);
+            return status.equals("ok") ? 0 : 1;
+        } finally {
+            for (long pid : host.jasperPids().get()) host.terminate().test(pid);
         }
-        Map<String, Object> report = new LinkedHashMap<>();
-        report.put("schema", 1);
-        report.put("benchmark", "startup");
-        report.put("status", status);
-        report.put("revision", options.revision());
-        report.put("mode", options.mode());
-        report.put("app", options.app().toString());
-        report.put("realHome", options.realHome());
-        report.put("runs", runs);
-        report.put("summary", summary(measured));
-        BenchmarkReport.writeJson(options.output(), report);
-        writeCompanion(report);
-        return status.equals("ok") ? 0 : 1;
     }
 
     private Map<String, Object> cold(Path root, Path home, int index) throws IOException {
@@ -187,16 +197,24 @@ final class StartupRuns {
     private Map<String, Object> finish(int index, Map<String, Object> trace, Map<String, Double> fromClick) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("run", index - options.prime() + 1);
-        result.put("outcome", trace == null ? "timeout" : fromClick.isEmpty() ? "incomplete" : "ok");
+        String outcome;
+        if (trace == null) {
+            outcome = "timeout";
+        } else if (fromClick.containsKey("OUTPUT_PAINTED")) {
+            outcome = "ok";
+        } else {
+            outcome = "incomplete";
+        }
         if (trace != null) {
             result.put("kind", trace.get("kind"));
             result.put("jvm", trace.get("jvm"));
             result.put("phases", trace.get("phases"));
             if (trace.get("pid") instanceof Number pid && !host.terminate().test(pid.longValue()))
-                result.put("outcome", "did-not-exit");
+                outcome = "did-not-exit";
         } else {
-            host.run().apply(List.of("pkill", "-KILL", "-f", options.app() + "/Contents/MacOS/Jasper"));
+            for (long pid : host.jasperPids().get()) host.terminate().test(pid);
         }
+        result.put("outcome", outcome);
         result.put("fromClick", fromClick);
         return result;
     }
@@ -225,6 +243,11 @@ final class StartupRuns {
             return true;
         } catch (Exception notYet) {
             process.destroyForcibly();
+            try {
+                process.onExit().get(5, TimeUnit.SECONDS);
+            } catch (Exception ignored) {
+                // Ignore the outcome; process did not exit cleanly
+            }
             return false;
         }
     }

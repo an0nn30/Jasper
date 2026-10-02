@@ -1,15 +1,19 @@
 package dev.jasper.app.benchmark;
 
+import dev.jasper.app.startup.StartupTraceFile;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class StartupBenchTest {
+    @TempDir Path temp;
+
     @Test void optionsDefaultToTenColdRunsWithOnePrimingRunInAnIsolatedHome() {
         var options = StartupBenchOptions.parse(new String[] {"--app", "/A/Jasper.app", "--output", "/r/out.json", "--revision", "r1"});
         assertThat(options).isEqualTo(new StartupBenchOptions(Path.of("/A/Jasper.app"), Path.of("/r/out.json"), "r1",
@@ -53,10 +57,11 @@ class StartupBenchTest {
 
     @Test void refusesWhileAnyJasperIsRunningAndLaunchesNothing() throws Exception {
         List<List<String>> commands = new java.util.ArrayList<>();
-        var host = new StartupRuns.Host(command -> { commands.add(command); return 0; }, () -> 0L, pid -> true, pid -> 0L);
+        var host = new StartupRuns.Host(command -> { commands.add(command); return 0; }, () -> 0L, pid -> true, pid -> 0L,
+            () -> List.of(4242L));
         var options = StartupBenchOptions.parse(new String[] {"--app", "/A.app", "--output", "/tmp/never.json", "--revision", "r"});
         assertThat(new StartupRuns(options, host).run()).isEqualTo(3);
-        assertThat(commands).containsExactly(List.of("pgrep", "-f", "/Contents/MacOS/Jasper"));
+        assertThat(commands).isEmpty();
     }
 
     @Test void residentMemoryComesFromPsOutputInKibibytes() {
@@ -70,6 +75,49 @@ class StartupBenchTest {
         assertThat(summary.get("A")).containsEntry("count", 3).containsEntry("median", 20.0)
             .containsEntry("min", 10.0).containsEntry("max", 30.0);
         assertThat(summary.get("B")).containsEntry("count", 1).containsEntry("median", 1.0);
+    }
+
+    @Test void aColdRunWithoutOutputPaintedIsIncomplete() throws Exception {
+        var output = temp.resolve("output.json");
+        var options = StartupBenchOptions.parse(new String[] {"--app", "/A.app", "--output", output.toString(),
+            "--revision", "r", "--runs", "1", "--prime", "0", "--timeout-seconds", "5"});
+        var host = new StartupRuns.Host(command -> {
+            if (command.contains("open")) {
+                for (String arg : command) {
+                    if (arg.contains("startupTrace=")) {
+                        int idx = arg.indexOf("startupTrace=") + "startupTrace=".length();
+                        String rest = arg.substring(idx);
+                        int spaceIdx = rest.indexOf(" ");
+                        String traceArg = spaceIdx >= 0 ? rest.substring(0, spaceIdx) : rest;
+                        Path path = Path.of(traceArg);
+                        try {
+                            Map<String, Object> document = new LinkedHashMap<>();
+                            document.put("settled", true);
+                            document.put("pid", 777L);
+                            document.put("kind", "cold");
+                            document.put("jvm", "test");
+                            document.put("phases", Map.of());
+                            document.put("processStart", java.time.Instant.now().toString());
+                            document.put("milestones", Map.of("MAIN_ENTERED", 70.0));
+                            document.put("windows", List.of());
+                            StartupTraceFile.write(path, document);
+                        } catch (java.io.IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        break;
+                    }
+                }
+            }
+            return 0;
+        }, System::currentTimeMillis, pid -> true, pid -> -1L, () -> List.of());
+        assertThat(new StartupRuns(options, host).run()).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> report = (Map<String, Object>) StartupTraceFile.read(output);
+        assertThat(report.get("status")).isEqualTo("incomplete");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> runs = (List<Map<String, Object>>) report.get("runs");
+        assertThat(runs).hasSize(1);
+        assertThat(runs.get(0).get("outcome")).isEqualTo("incomplete");
     }
 
     private static String[] join(String[] base, String... more) {
