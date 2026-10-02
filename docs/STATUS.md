@@ -7,7 +7,8 @@
   `get(key) == null` for every explicit colour key, which built FlatLaf's lazy `FlatTableHeaderBorder`; its constructor
   reads `TableHeader.cellMargins` from the installed look, missing before any theme is installed, and FlatLaf logged
   the NPE. `FlatLafThemeData.defines` checks the table without building values (then `get` for keys FlatLaf serves
-  elsewhere); WorkspaceValues and ThemeManager.install use it. Full check **7,967/0/0/6**. Separate, not fixed here:
+  elsewhere); WorkspaceValues and ThemeManager.install use it. Full check **7,967/0/0/6**; merged into local main
+  2026-10-02 (fast-forward), not pushed. Separate, not fixed here:
   Darcula and four other converted themes keep IntelliJ named-colour values such as `"panel"`, which FlatLaf logs as
   "Failed to parse" (`TitlePane.background`, `NewUiOnboarding.Dialog.background`).
 
