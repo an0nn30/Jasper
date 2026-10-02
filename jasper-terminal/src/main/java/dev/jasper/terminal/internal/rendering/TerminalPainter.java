@@ -65,11 +65,15 @@ public final class TerminalPainter {
         if (backgroundOpacity < 1f) {
             Color background = palette.background();
             Composite previous = g.getComposite();
+            Object antialiasing = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+            // An antialiased translucent Src fill takes Java2D's software path, reading the GPU surface back.
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
             g.setComposite(AlphaComposite.Src);
             g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(),
                 Math.round(255 * Math.max(0f, backgroundOpacity))));
             g.fillRect(0, 0, widthPx, heightPx);
             g.setComposite(previous);
+            if (antialiasing != null) g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, antialiasing);
         } else {
             g.setColor(palette.background());
             g.fillRect(0, 0, widthPx, heightPx);

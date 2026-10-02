@@ -516,6 +516,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         var g = (java.awt.Graphics2D) graphics.create();
         try {
             java.awt.Color background = getBackground();
+            // Antialiasing would send this translucent Src fill down Java2D's slow software path (see WorkspaceRegions).
+            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_OFF);
             g.setComposite(java.awt.AlphaComposite.Src);
             g.setColor(new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
                 Math.round(255 * backgroundOpacity)));

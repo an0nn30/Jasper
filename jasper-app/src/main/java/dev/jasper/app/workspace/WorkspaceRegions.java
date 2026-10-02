@@ -62,19 +62,33 @@ final class WorkspaceRegions extends JPanel {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
-                g.setColor(UIManager.getColor("Jasper.titleBackground"));
+                java.awt.Color chrome = UIManager.getColor("Jasper.titleBackground");
+                g.setColor(chrome);
                 g.fillRect(0, 0, getWidth(), getHeight());
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 if (opacity < 1f) {
                     // A translucent window: the surface is glass of the terminal background, replacing what lies
                     // beneath. Panes replace it again with the same fill, so every pixel gets exactly one alpha
-                    // fill, and a strip no pane covers (the lower arc) is glass rather than a hole.
+                    // fill, and a strip no pane covers (the lower arc) is glass rather than a hole. Java2D's Metal
+                    // pipeline renders a translucent Src fill in software, reading the GPU back, unless it is an
+                    // unantialiased rectangle (200 ms instead of 1 ms per frame): fill the bounds as a plain
+                    // rectangle, then round the corners with opaque, antialiased chrome over it.
                     var background = getBackground();
+                    var bounds = surface().getBounds();
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
                     g.setComposite(java.awt.AlphaComposite.Src);
                     g.setColor(new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
                         Math.round(255 * opacity)));
-                    g.fill(surface());
+                    g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                    if (rounded && chrome != null) {
+                        var corners = new java.awt.geom.Area(bounds);
+                        corners.subtract(new java.awt.geom.Area(surface()));
+                        g.setComposite(java.awt.AlphaComposite.SrcOver);
+                        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g.setColor(chrome);
+                        g.fill(corners);
+                    }
                 } else {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     // The terminal column (tab strip included) is one surface in the terminal palette, so every
                     // theme follows the same frame, including its optional rounded corners.
                     g.setColor(getBackground()); g.fill(surface());
