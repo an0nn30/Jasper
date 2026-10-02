@@ -49,7 +49,8 @@ once, because an upgraded state that already places SFTP keeps it in Left Top. `
 tests, 1 failure, 0 errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor),
 which fails on this Mac only (its `java.io.tmpdir` contains "zz") and predates the branch, and
 `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load (it did not fail in this run and
-passes alone). No GUI launched; the GUI checks are in the section "GUI checks for the user".
+passes alone). No GUI launched; the GUI checks are in the section "GUI checks for the user". Plan 2 (drag and
+drop) executed on top of it; see its banner.
 
 **Execution:** The repository's usual shape: superpowers:subagent-driven-development, one implementer and one
 reviewer per task, fix rounds, then one whole-branch review. Record any deviation from the plan text in this banner

@@ -169,8 +169,10 @@ panel's title inside it. If you already have
 an action that toggles the panel, for example to give it a shortcut, register it first and name it
 with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tools and the palette then list your action,
 with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per slot; the user
-can move a panel to any of the six slots from its stripe icon's menu or its header's options menu,
-and Jasper remembers its slot, its place on the stripe and the side's size.
+can drag a panel by its stripe icon or its header to another slot or another place on a stripe, or
+use the Move to menu on either, and Jasper remembers its slot, its place on the stripe and the side's
+size. A drop on a stripe keeps the panel shown or hidden as it was; a drop on the workspace shows it,
+and your `PanelHost.onVisibility` hears only that second kind.
 
 A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS
 title bar, menu bar, theme tracking and remembered bounds are its job; the content is yours.

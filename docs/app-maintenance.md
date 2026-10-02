@@ -299,7 +299,12 @@ while the stripes are visible, matching rounded corners for the terminal/tab col
 the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
-tests first, and keep the drop preview (plan 2) on the same function.
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
+components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
+headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
+button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
+to the pressed component keep arriving. Any dock change or stripe render cancels a running drag.
 Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.

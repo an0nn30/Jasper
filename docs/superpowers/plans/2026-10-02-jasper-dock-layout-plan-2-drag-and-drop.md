@@ -22,10 +22,25 @@ dependencies. No SDK change.
 **Prerequisite:** [Plan 1, six slots](2026-10-02-jasper-dock-layout-plan-1-six-slots.md), executed on this branch.
 Every task here edits plan 1's code.
 
-**Status:** Written 2026-10-02 on `claude/dock-layout` and approved by the user the same day. Before execution its
-text was aligned with plan 1 as executed (commits `400dcba5` through `5cd22948`): the dock test counts in Tasks 1 and 2
-(plan 1 ends with 29 dock tests, not 25), `ToolWindowAreaTest`'s count in Task 3 (9, not 8) and Task 6's `close()`
-anchor (plan 1's final review removed the save on close and reworded that comment). Executing.
+**Status:** Written 2026-10-02, approved by the user the same day and executed the same day on `claude/dock-layout`
+with subagent-driven development (one implementer and one reviewer per task, plus fix rounds), on top of plan 1 as
+executed (commits `400dcba5` through `5cd22948`). Commits: `1be92bbd` through `8ecce382` (Tasks 1-6), and the
+documentation commit (Task 7). Deviations from the plan text: before execution (`728167c4`) the expected test
+counts and Task 6's `close()` anchor were aligned with plan 1 as executed; Task 4, `DockDropOverlayTest` is isolated
+from the installed theme (it saves and restores the look-and-feel-level colours, clears `DragAndDrop.areaBackground`,
+`DragAndDrop.borderColor` and `Component.accentColor` at both the developer and look-and-feel level, and installs
+`Theme.DARK` first in `theThemesOwnDragColoursWin`); Task 5, `DockDrag` button rules (a non-left press during a drag
+cancels it, only a left release drops, popup-trigger presses are ignored, and a left press during a drag means the
+release was lost, so the drag is cancelled and the new press starts over; `DockDragTest` grew by 4 cases, and a lint fix
+was made); Task 6, the drag returns home and the source group keeps its step (`DockDrag` targets the lifted stripe
+button's home, its old square, slot and index, until the cursor first leaves it, and a resize forgets it; during a drag
+the lifted button's group keeps its step at the group's end and the gap takes it when the target is in that group, so
+later groups do not slide up; three `ToolStripeDragTest` values moved one step; final counts `DockDragTest` 17 cases,
+`ToolStripeDragTest` 8); Tasks 1, 2 and 3 none in code. `./gradlew check --continue`: 8,038 tests, 1 failure, 0 errors,
+6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its
+`java.io.tmpdir` contains "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is
+flaky under full-suite load (it did not fail in this run and passes when run alone). No GUI launched; the GUI checks are
+in the section "GUI checks for the user".
 
 **Execution:** As plan 1: superpowers:subagent-driven-development, one implementer and one reviewer per task, then
 one whole-branch review. Record deviations in this banner and in `docs/STATUS.md`.
@@ -2314,6 +2329,10 @@ Run `./gradlew :jasper-app:run` yourself.
    turn a plugin off from another window while dragging one of its panels.
 8. **Look against IntelliJ:** the highlight's fill and border colours in Jasper Dark and Light and an IntelliJ theme
    that defines `DragAndDrop.areaBackground`; the ghost icon; drop space in empty groups.
+9. **Other buttons mid-drag:** right- or middle-click while dragging: the drag cancels, nothing moves, and the
+   button's menu may open.
+10. **macOS Ctrl+click:** on macOS, Ctrl+click on a stripe icon opens its menu. Watch whether it also toggles the
+    window; report it if it does.
 
 ---
 

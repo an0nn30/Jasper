@@ -2,6 +2,30 @@
 
 ## Current state — 2026-10-02
 
+- **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
+  [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe
+  buttons and headers. `DockDropResolver` (pure) resolves a stripe group and position or a cell of the workspace's 3 × 2
+  grid; `DockGeometry.landing` previews the landing on a copy of the state; during a drag both stripes show all three
+  groups, lift the dragged button and open a gap; `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the
+  placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
+  drop moves and keeps visibility; a workspace drop moves and shows (`DockState.moveAndShow`). Any dock change or the
+  window closing cancels a drag. Deviations from the plan text: before execution (`728167c4`) the expected test counts
+  and Task 6's `close()` anchor were aligned with plan 1 as executed; Task 4, `DockDropOverlayTest` is isolated from the
+  installed theme (it saves and restores the look-and-feel-level colours, clears `DragAndDrop.areaBackground`,
+  `DragAndDrop.borderColor` and `Component.accentColor` at both the developer and look-and-feel level, and installs
+  `Theme.DARK` first in `theThemesOwnDragColoursWin`); Task 5, `DockDrag` button rules (a non-left press during a drag
+  cancels it, only a left release drops, popup-trigger presses are ignored, and a left press during a drag means the
+  release was lost, so the drag is cancelled and the new press starts over; `DockDragTest` grew by 4 cases, and a lint
+  fix was made); Task 6, the drag returns home and the source group keeps its step (`DockDrag` targets the lifted stripe
+  button's home, its old square, slot and index, until the cursor first leaves it, and a resize forgets it; during a
+  drag the lifted button's group keeps its step at the group's end and the gap takes it when the target is in that
+  group, so later groups do not slide up; three `ToolStripeDragTest` values moved one step; final counts `DockDragTest`
+  17 cases, `ToolStripeDragTest` 8); Tasks 1, 2 and 3 none in code. Planning decisions are listed in the plan.
+  `./gradlew check --continue`: 8,038 tests, 1 failure, 0 errors, 6 skipped; the one failure is
+  `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
+  "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite
+  load (it did not fail in this run and passes when run alone). No GUI launched; GUI checks for the user are the plan's
+  last section.
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.
@@ -40,8 +64,7 @@
   load (it did not fail in this run and passes alone). Open: the window's minimum height does not yet count a split
   side's two halves, so a window made very short can still squeeze them under 120px. No GUI launched. GUI checks
   for the user: the plan's section
-  "GUI checks for the user". Next:
-  [plan 2, drag and drop](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md).
+  "GUI checks for the user". Plan 2 (drag and drop) was executed on top of it; see the entry above.
 - **Theme system Plan 4 complete, independently reviewed and merged locally** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)
   completes all seven tasks on `codex/theme-system-plans` in `.worktrees/theme-system`. Full `./gradlew check`
