@@ -12,6 +12,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +51,10 @@ public final class CardLayer extends JComponent implements AutoCloseable {
     private final Runnable stopTracking;
     private boolean focused;
     private boolean closed;
+    private int shadowRenders;
+
+    /** What a cached shadow was rendered for: the card's size, the rings, the colour with its alpha, the device scale. */
+    private record ShadowKey(int width, int height, int arc, int margin, float userScale, int argb, double deviceX, double deviceY) {}
 
     private static final class Slot {
         final NotificationCard card;
@@ -56,6 +62,9 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         long started;
         Runnable cancel;
         boolean hovered;
+        /** The card's shadow, rendered once for {@link #shadowKey} and drawn on every paint until that changes. */
+        ShadowKey shadowKey;
+        BufferedImage shadow;
         Slot(NotificationCard card) { this.card = card; }
         UUID id() { return card.notification().id(); }
     }
@@ -123,6 +132,9 @@ public final class CardLayer extends JComponent implements AutoCloseable {
     List<UUID> waitingIds() { return List.copyOf(waiting); }
 
     JButton moreButton() { return more; }
+
+    /** How many card shadows this layer has rendered (cached ones are drawn, not rendered again). */
+    int shadowRenders() { return shadowRenders; }
 
     NotificationCard card(UUID id) {
         Slot slot = slot(id);
@@ -273,23 +285,52 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         }
     }
 
+    /**
+     * Paints each card's shadow from an image rendered once per card (twelve antialiased translucent rings are most of
+     * this layer's cost, and any terminal repaint beneath a card repaints the whole layer). The image is made at the
+     * destination's device scale and drawn back at logical size, so it stays crisp on a HiDPI screen.
+     */
     @Override protected void paintComponent(Graphics graphics) {
         if (slots.isEmpty()) return;
         var g = (Graphics2D) graphics.create();
         try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             Color shadow = UIManager.getColor("Popup.dropShadowColor");
             if (shadow == null) shadow = Color.BLACK;
-            g.setColor(new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), FlatLaf.isLafDark() ? 4 : 2));
-            int arc = UIScale.scale(NotificationCard.ARC);
+            int argb = new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), FlatLaf.isLafDark() ? 4 : 2).getRGB();
+            AffineTransform device = g.getTransform();
+            double deviceX = device.getScaleX() > 0 ? device.getScaleX() : 1, deviceY = device.getScaleY() > 0 ? device.getScaleY() : 1;
+            int arc = UIScale.scale(NotificationCard.ARC), margin = UIScale.scale(MARGIN);
             for (Slot slot : slots) {
                 Rectangle card = slot.card.getBounds();
-                for (int i = MARGIN; i >= 1; i--) {
-                    int grow = UIScale.scale(i);
-                    g.fillRoundRect(card.x - grow, card.y - grow, card.width + grow * 2, card.height + grow * 2, arc + grow, arc + grow);
+                var key = new ShadowKey(card.width, card.height, arc, margin, UIScale.getUserScaleFactor(), argb, deviceX, deviceY);
+                if (!key.equals(slot.shadowKey)) {
+                    slot.shadow = renderShadow(key);
+                    slot.shadowKey = key;
+                    shadowRenders++;
                 }
+                g.drawImage(slot.shadow, card.x - margin, card.y - margin, card.width + margin * 2, card.height + margin * 2, null);
             }
         } finally { g.dispose(); }
+    }
+
+    /** The rings around a card of the key's size, in an image {@code margin} larger on every side, at the key's device scale. */
+    private static BufferedImage renderShadow(ShadowKey key) {
+        int width = key.width() + key.margin() * 2, height = key.height() + key.margin() * 2;
+        var image = new BufferedImage(Math.max(1, (int) Math.ceil(width * key.deviceX())),
+            Math.max(1, (int) Math.ceil(height * key.deviceY())), BufferedImage.TYPE_INT_ARGB_PRE);
+        Graphics2D g = image.createGraphics();
+        try {
+            g.scale(key.deviceX(), key.deviceY());
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(new Color(key.argb(), true));
+            for (int i = MARGIN; i >= 1; i--) {
+                int grow = UIScale.scale(i);
+                g.fillRoundRect(key.margin() - grow, key.margin() - grow, key.width() + grow * 2, key.height() + grow * 2,
+                    key.arc() + grow, key.arc() + grow);
+            }
+        } finally { g.dispose(); }
+        return image;
     }
 
     /** Swing's timer as a plain function: schedule a task, get back the way to cancel it. */
