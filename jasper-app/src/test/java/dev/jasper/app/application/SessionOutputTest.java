@@ -79,6 +79,23 @@ class SessionOutputTest {
         }
     }
 
+    @Test void aThrowingFirstActionNeitherLosesWaitersNorStarvesLaterListeners() throws Exception {
+        var feed = new Feed();
+        try {
+            AtomicInteger waiter = new AtomicInteger();
+            AtomicInteger later = new AtomicInteger();
+            SessionOutput output = SessionOutput.watch(feed.session, () -> { throw new IllegalStateException("boom"); });
+            output.whenSeen(waiter::incrementAndGet);
+            feed.session.addListener(new TerminalSessionListener() {
+                @Override public void screenChanged() { later.incrementAndGet(); }
+            });
+            feed.write("x");
+            await(() -> waiter.get() == 1 && later.get() >= 1);
+        } finally {
+            feed.session.close();
+        }
+    }
+
     private static void await(BooleanSupplier condition) throws InterruptedException {
         long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (!condition.getAsBoolean()) {

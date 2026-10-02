@@ -10,6 +10,7 @@ import java.util.List;
  * the moment between its start returning and this listener attaching, so the first screen change is not missed.
  */
 final class SessionOutput implements TerminalSessionListener {
+    private static final System.Logger LOG = System.getLogger(SessionOutput.class.getName());
     private final TerminalSession session;
     private final Runnable first;
     private final List<Runnable> waiting = new ArrayList<>(); // guarded by this
@@ -36,11 +37,11 @@ final class SessionOutput implements TerminalSessionListener {
             waiting.clear();
         }
         session.removeListener(this);
-        first.run();
-        ready.forEach(Runnable::run);
+        run(first);
+        ready.forEach(SessionOutput::run);
     }
 
-    /** Runs {@code action} once output exists: now if it already does, otherwise on the first screen change. */
+    /** Runs {@code action} once output exists: now, on the caller's thread, if it already does; otherwise on the session's reader thread at the first screen change. Actions that touch Swing must hand off to the EDT themselves. */
     void whenSeen(Runnable action) {
         synchronized (this) {
             if (!seen) {
@@ -48,6 +49,14 @@ final class SessionOutput implements TerminalSessionListener {
                 return;
             }
         }
-        action.run();
+        run(action);
+    }
+
+    private static void run(Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "A start-up timing action failed", failure);
+        }
     }
 }

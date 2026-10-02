@@ -39,6 +39,7 @@ import dev.jasper.app.terminals.SessionRequest;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(WindowContent.class.getName());
     private final ShellLauncher launcher;
     private final Consumer<Path> newWindow;
     private final Runnable quit;
@@ -787,7 +788,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         });
         if (!firstTerminalSeen) {
             firstTerminalSeen = true;
-            firstTerminal.accept(pane);
+            try {
+                firstTerminal.accept(pane);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
+            }
         }
     }
 

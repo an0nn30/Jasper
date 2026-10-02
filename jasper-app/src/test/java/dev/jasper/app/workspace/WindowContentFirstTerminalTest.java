@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -31,5 +31,31 @@ class WindowContentFirstTerminalTest {
         until(() -> second[0].panes().getFirst().view() != null);
         edt(() -> { });
         assertThat(seen).containsExactly(first);
+    }
+
+    @Test void aThrowingObserverDoesNotEscapeIntoThePanesAdoption() throws Exception {
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        List<Throwable> recorded = new ArrayList<>();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> recorded.add(e));
+        try {
+            var pending = new ArrayDeque<Runnable>();
+            List<TerminalPane> observed = new ArrayList<>();
+            WindowContent[] content = new WindowContent[1];
+            edt(() -> {
+                content[0] = DesktopTestSupport.content(DesktopTestSupport.launcher(pending));
+                content[0].onFirstTerminal(pane -> {
+                    observed.add(pane);
+                    throw new IllegalStateException("observer");
+                });
+            });
+            pending.poll().run();
+            until(() -> !observed.isEmpty());
+            until(() -> observed.getFirst().view() != null);
+            edt(() -> { });
+            assertThat(recorded).isEmpty();
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previous);
+            DesktopTestSupport.closeOwners();
+        }
     }
 }
