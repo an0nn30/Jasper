@@ -415,7 +415,10 @@ Focus stays on the combo; the popup's key listener, which the UI installs on the
 the search and handles Up/Down (keypad too), Page Up/Down, Home/End, Enter, Escape and Backspace while the list is
 open or a search runs; every key the combo's own bindings would answer with a pick behind the list must stay handled
 there. `selectWithKeyChar` always returns false, because each look and feel installs a fresh key selection manager.
-The popup's size is fixed when it opens; only the bar's first appearance repacks.
+The popup's size is fixed when it opens; only the bar's first appearance repacks. Its rows have their own renderer,
+padded as FlatLaf pads its own combo popup (`ComboBox.padding` plus the combo's focus width at each side, read at paint
+time), with the combo's `selectionInsets`/`selectionArc` and `popupInsets`; `SearchComboTest` compares the padding
+with a stock FlatLaf combo.
 FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
 
 `themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;

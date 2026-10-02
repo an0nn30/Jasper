@@ -129,6 +129,30 @@ class SearchComboTest {
         assertThat(popup.query()).isEqualTo("@");
     }
 
+    @Test void rowsArePaddedLikeFlatLafsOwnDropdownSoTheHighlightCoversTheText() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var original = javax.swing.UIManager.getLookAndFeel();
+            try {
+                for (var theme : List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.INTELLIJ_LIGHT)) {
+                    dev.jasper.app.appearance.ThemeTestSupport.install(theme);
+                    var stock = new javax.swing.JComboBox<>(new String[]{"Nord"});
+                    var stockList = ((javax.swing.plaf.basic.ComboPopup) stock.getUI().getAccessibleChild(stock, 0)).getList();
+                    var stockRow = (javax.swing.JComponent) stockList.getCellRenderer().getListCellRendererComponent(stockList, "Nord", 0, true, false);
+                    var ours = new SearchCombo(0, "No matching themes");
+                    ours.addItem("Nord");
+                    var list = ours.searchPopup().getList();
+                    ours.searchPopup().show();
+                    var row = (javax.swing.JComponent) list.getCellRenderer().getListCellRendererComponent(list, "Nord", 0, true, false);
+                    assertThat(row.getInsets().left).as(theme.name()).isEqualTo(stockRow.getInsets().left);
+                    assertThat(row.getInsets().right).as(theme.name()).isEqualTo(stockRow.getInsets().right);
+                    assertThat(list.getFont()).as(theme.name()).isEqualTo(ours.getFont());
+                }
+            } finally {
+                try { javax.swing.UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new IllegalStateException(failure); }
+            }
+        });
+    }
+
     @Test void aListChangeWhileSearchingRefilters() {
         popup.show();
         type("gruv");

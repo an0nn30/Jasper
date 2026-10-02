@@ -3,11 +3,15 @@ package dev.jasper.app.settingsui;
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.ui.FlatComboBoxUI;
+import com.formdev.flatlaf.ui.FlatEmptyBorder;
+import com.formdev.flatlaf.ui.FlatUIUtils;
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Insets;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -21,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JComboBox;
 import javax.swing.JList;
@@ -28,7 +33,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
-import javax.swing.ListCellRenderer;
 import javax.swing.ListModel;
 import javax.swing.ListSelectionModel;
 import javax.swing.MenuElement;
@@ -150,7 +154,11 @@ final class SearchCombo extends JComboBox<String> {
             list.setForeground(color("ComboBox.foreground", "List.foreground"));
             list.setSelectionBackground(color("ComboBox.selectionBackground", "List.selectionBackground"));
             list.setSelectionForeground(color("ComboBox.selectionForeground", "List.selectionForeground"));
-            list.setCellRenderer(this::render);
+            list.setFont(combo.getFont());
+            // As FlatLaf's own combo popup: its selection shape, and rows padded like the closed dropdown's text.
+            list.putClientProperty(FlatClientProperties.STYLE, "selectionInsets: " + style(UIManager.getInsets("ComboBox.selectionInsets"))
+                + "; selectionArc: " + UIManager.getInt("ComboBox.selectionArc"));
+            list.setCellRenderer(new Cell());
             var pointer = new MouseAdapter() {
                 @Override public void mouseMoved(MouseEvent event) {
                     int row = list.locationToIndex(event.getPoint());
@@ -164,6 +172,8 @@ final class SearchCombo extends JComboBox<String> {
             list.addMouseListener(pointer);
             list.addMouseMotionListener(pointer);
             scroller.setBorder(BorderFactory.createEmptyBorder());
+            Insets popupInsets = UIManager.getInsets("ComboBox.popupInsets");
+            if (popupInsets != null) scroller.setViewportBorder(new FlatEmptyBorder(popupInsets));
             scroller.setFocusable(false);
             scroller.getVerticalScrollBar().setFocusable(false);
             add(bar, BorderLayout.NORTH);
@@ -180,12 +190,33 @@ final class SearchCombo extends JComboBox<String> {
             });
         }
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        private Component render(JList<?> source, Object value, int row, boolean selected, boolean focused) {
-            ListCellRenderer renderer = combo.getRenderer();
-            Component shown = renderer.getListCellRendererComponent(source, value, row, selected, focused);
-            if (row >= 0 && row < indexes.size() && indexes.get(row) < 0) shown.setForeground(color("Label.disabledForeground", "Label.foreground"));
-            return shown;
+        /**
+         * The combo's text padding, as FlatLaf pads its own popup rows: {@code ComboBox.padding} plus the focus width at
+         * each side, read when a row paints because the combo's border is installed after its popup.
+         */
+        private Insets cellPadding() {
+            Insets padding = UIManager.getInsets("ComboBox.padding");
+            Insets scaled = padding == null ? new Insets(1, 1, 1, 1) : UIScale.scale((Insets) padding.clone());
+            int focus = Math.round(FlatUIUtils.getBorderFocusWidth(combo));
+            scaled.left += focus;
+            scaled.right += focus;
+            return scaled;
+        }
+
+        /**
+         * A row: the entry's literal text with the combo's padding, the "no matches" line greyed. The combo's own renderer
+         * also paints the closed dropdown, and FlatLaf pads it only while it paints there, so the list has its own.
+         */
+        private final class Cell extends DefaultListCellRenderer {
+            Cell() { putClientProperty("html.disable", Boolean.TRUE); }
+
+            @Override public Component getListCellRendererComponent(JList<?> source, Object value, int row, boolean selected, boolean focused) {
+                super.getListCellRendererComponent(source, value, row, selected, false);
+                Insets padding = cellPadding();
+                setBorder(BorderFactory.createEmptyBorder(padding.top, padding.left, padding.bottom, padding.right));
+                if (row >= 0 && row < indexes.size() && indexes.get(row) < 0) setForeground(color("Label.disabledForeground", "Label.foreground"));
+                return this;
+            }
         }
 
         /** Opens on the current choice with no search. */
@@ -353,6 +384,11 @@ final class SearchCombo extends JComboBox<String> {
                 event.consume();
             }
         }
+    }
+
+    private static String style(Insets insets) {
+        Insets value = insets == null ? new Insets(0, 0, 0, 0) : insets;
+        return value.top + "," + value.left + "," + value.bottom + "," + value.right;
     }
 
     private static Color color(String key, String fallback) {
