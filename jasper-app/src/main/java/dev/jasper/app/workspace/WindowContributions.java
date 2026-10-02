@@ -346,9 +346,8 @@ final class WindowContributions implements AutoCloseable {
         if (listening == null) return;
         listening.close();
         listening = null;
-        // Closing the window is not hiding its panels: save them as they are, then let go of the dock.
+        // Closing the window is not hiding its panels, and every change was saved as it happened: just let go of the dock.
         dock.removeListener(docked);
-        persist();
         commands.values().forEach(Subscription::close);
         commands.clear();
         scopes.values().forEach(Subscription::close);

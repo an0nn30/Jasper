@@ -503,6 +503,27 @@ class WindowPanelsTest {
         });
     }
 
+    @Test void closingAWindowKeepsTheChangesAnotherWindowSaved() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        edt(() -> {
+            var model = new Contributions();
+            var state = UiState.load(file);
+            WindowContent first = window(), second = window();
+            first.connectContributions(model, state);
+            second.connectContributions(model, state);
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            var menu = first.leftStripe().buttons().getFirst().getComponentPopupMenu();
+            ToolWindowHeaderTest.item(menu, "Right Top").doClick();
+            assertThat(UiState.load(file).panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+            second.close();
+            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the untouched window saves nothing as it closes")
+                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+            first.close();
+            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the last change saved wins")
+                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+        });
+    }
+
     @Test void closingTheWindowSavesShowingPanelsAsShowing() throws Exception {
         edt(() -> {
             var model = new Contributions();
