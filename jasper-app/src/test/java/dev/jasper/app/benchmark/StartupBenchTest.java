@@ -6,11 +6,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@DisabledOnOs(OS.WINDOWS)
 class StartupBenchTest {
     @TempDir Path temp;
 
@@ -118,6 +121,20 @@ class StartupBenchTest {
         List<Map<String, Object>> runs = (List<Map<String, Object>>) report.get("runs");
         assertThat(runs).hasSize(1);
         assertThat(runs.get(0).get("outcome")).isEqualTo("incomplete");
+    }
+
+    @Test void cleanupStopsEveryJasperEvenWhenOneStopFails() {
+        List<Long> attemptedPids = new java.util.ArrayList<>();
+        var host = new StartupRuns.Host(command -> 0, System::currentTimeMillis,
+            pid -> {
+                attemptedPids.add(pid);
+                if (pid == 2L) throw new IllegalStateException("x");
+                return true;
+            },
+            pid -> -1L, () -> List.of(1L, 2L, 3L));
+        var options = StartupBenchOptions.parse(new String[] {"--app", "/A.app", "--output", "/tmp/out.json", "--revision", "r"});
+        new StartupRuns(options, host).stopAll();
+        assertThat(attemptedPids).containsExactly(1L, 2L, 3L);
     }
 
     private static String[] join(String[] base, String... more) {

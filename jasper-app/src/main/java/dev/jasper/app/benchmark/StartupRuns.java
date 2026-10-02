@@ -123,6 +123,8 @@ final class StartupRuns {
             System.err.println("A Jasper process is running; quit every Jasper (including a resident one) first.");
             return 3;
         }
+        Thread hook = new Thread(this::stopAll, "startup-bench-cleanup");
+        Runtime.getRuntime().addShutdownHook(hook);
         // Short root: the handoff socket lives under the home, and macOS caps socket paths at 104 bytes.
         Path root = Files.createTempDirectory(Path.of("/tmp"), "jsb");
         try {
@@ -164,7 +166,22 @@ final class StartupRuns {
             writeCompanion(report);
             return status.equals("ok") ? 0 : 1;
         } finally {
-            for (long pid : host.jasperPids().get()) host.terminate().test(pid);
+            stopAll();
+            try {
+                Runtime.getRuntime().removeShutdownHook(hook);
+            } catch (IllegalStateException shuttingDown) {
+                // The hook is running (happens during shutdown)
+            }
+        }
+    }
+
+    void stopAll() {
+        for (long pid : host.jasperPids().get()) {
+            try {
+                host.terminate().test(pid);
+            } catch (RuntimeException failure) {
+                System.err.println("Could not stop Jasper " + pid + ": " + failure);
+            }
         }
     }
 
@@ -212,7 +229,7 @@ final class StartupRuns {
             if (trace.get("pid") instanceof Number pid && !host.terminate().test(pid.longValue()))
                 outcome = "did-not-exit";
         } else {
-            for (long pid : host.jasperPids().get()) host.terminate().test(pid);
+            stopAll();
         }
         result.put("outcome", outcome);
         result.put("fromClick", fromClick);
