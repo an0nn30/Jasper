@@ -56,7 +56,7 @@ final class ToolWindowHeader extends JPanel {
         buttons.add(options);
         buttons.add(Box.createHorizontalStrut(2));
         buttons.add(hide);
-        // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern WorkspaceRegions.Host.gutters uses.
+        // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern ToolWindowArea.Host.gutters uses.
         setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, 10, 0, 6), null));
         add(title, BorderLayout.CENTER);
         add(buttons, BorderLayout.EAST);

@@ -12,6 +12,8 @@ import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Side;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
@@ -75,8 +77,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     // One root binding per stroke; dispatch picks the action for where focus is.
     private final java.util.Map<KeyStroke, String> rootKeys = new java.util.HashMap<>();
     private WindowContributions contributed;
-    private final WorkspaceRegions regions;
-    private final WindowRail rail;
+    /** Where this window's tool windows dock: its contributions change it, its area lays it out. */
+    private final DockState dock = new DockState();
+    private final ToolWindowArea area;
+    private final ToolStripe leftStripe = new ToolStripe(Side.LEFT), rightStripe = new ToolStripe(Side.RIGHT);
     private UiState uiState = UiState.inMemory();
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
@@ -192,18 +196,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
         windowTabs = new WindowTabs(this);
-        // The tabs belong to the terminal column, so the rail and the side panels reach the toolbar.
+        // The tabs belong to the terminal column, so the stripes and the side panels reach the toolbar.
         var terminalColumn = new JPanel(new BorderLayout());
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
-        regions = new WorkspaceRegions(terminalColumn);
-        regions.setStatusVisible(chrome.status().isVisible());
-        regions.setHeaderVisible(true);
-        rail = new WindowRail();
-        rail.setVisible(false);
+        area = new ToolWindowArea(terminalColumn, dock);
+        area.setStatusVisible(chrome.status().isVisible());
+        area.setHeaderVisible(true);
+        leftStripe.setVisible(false);
+        rightStripe.setVisible(false);
         var body = new JPanel(new BorderLayout());
-        body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
+        body.add(leftStripe, BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(rightStripe, BorderLayout.EAST);
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
@@ -639,8 +643,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
     public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
 
-    WorkspaceRegions regions() { return regions; }
-    WindowRail rail() { return rail; }
+    ToolWindowArea area() { return area; }
+    DockState dock() { return dock; }
+    ToolStripe leftStripe() { return leftStripe; }
+    ToolStripe rightStripe() { return rightStripe; }
     boolean railVisible() { return uiState.railVisible(); }
 
     void setRailVisible(boolean value) {
@@ -650,11 +656,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
-    /** The rail shows only when it has contributed items and the user has not hidden it. */
+    /**
+     * Both stripes show together while either has a tool window or an action (an empty right stripe included: it is a
+     * place to move windows to), unless the user hid them with View > Rail.
+     */
     void syncRailVisibility() {
-        boolean wanted = !rail.empty() && uiState.railVisible();
-        regions.setRailVisible(wanted);
-        if (rail.isVisible() != wanted) { rail.setVisible(wanted); revalidate(); repaint(); }
+        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && uiState.railVisible();
+        area.setStripesVisible(wanted);
+        if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
+            leftStripe.setVisible(wanted);
+            rightStripe.setVisible(wanted);
+            revalidate(); repaint();
+        }
     }
     boolean updatingActions() { return workspaceActions.updating(); }
     Action action(ActionId id) { return workspaceActions.action(id); }
@@ -983,9 +996,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             }
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
-            rail.refreshTheme();
-            regions.refreshTheme();
-            regions.setTerminalBackground(theme.palette().background());
+            leftStripe.refreshTheme();
+            rightStripe.refreshTheme();
+            area.refreshTheme();
+            area.setTerminalBackground(theme.palette().background());
             WorkspaceTheme.apply(windowTabs, theme);
             windowTabs.refresh();
             for (var component : new ArrayList<>(hostedStylers.keySet())) {
@@ -1053,7 +1067,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         requireSize("Rail width", width, ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH);
         if (closed || railWidth == width) return;
         railWidth = width;
-        rail.setRailWidth(width);
+        leftStripe.setRailWidth(width);
+        rightStripe.setRailWidth(width);
         revalidate(); repaint();
         onMinimumSizeChanged.run();
     }
@@ -1079,7 +1094,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
     void setStatusVisible(boolean visible) {
-        chrome.setStatusVisible(visible); regions.setStatusVisible(visible);
+        chrome.setStatusVisible(visible); area.setStatusVisible(visible);
         updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
 

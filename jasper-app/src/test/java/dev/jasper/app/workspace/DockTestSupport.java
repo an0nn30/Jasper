@@ -25,6 +25,11 @@ final class DockTestSupport {
         area.sync();
     }
 
+    /** The same in a window's own area; a connected window's contributions ignore these ids. */
+    static void show(WindowContent owner, Slot slot, JComponent content, int size) { show(owner.area(), slot, content, size); }
+
+    static void hide(WindowContent owner, Slot slot) { hide(owner.area(), slot); }
+
     /** The id the helper gives a slot's content, such as {@code test.left-top}. */
     static String id(Slot slot) { return "test." + slot.name().toLowerCase(Locale.ROOT).replace('_', '-'); }
 }

@@ -235,10 +235,12 @@ class PluginPaneAppearanceTest {
         edt(() -> {
             var themes = new ThemeController(Theme.JASPER_LIGHT);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            var railBackground = owner.rail().getBackground();
+            var railBackground = owner.leftStripe().getBackground();
             themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
-            assertThat(owner.rail().getClientProperty("Jasper.workspaceStyle")).isNull();
-            assertThat(owner.rail().getBackground()).isEqualTo(railBackground);
+            for (var stripe : java.util.List.of(owner.leftStripe(), owner.rightStripe())) {
+                assertThat(stripe.getClientProperty("Jasper.workspaceStyle")).isNull();
+                assertThat(stripe.getBackground()).isEqualTo(railBackground);
+            }
             var nativeRoot = new JRootPane(); var auxiliary = new JList<>(new String[] {"entry"});
             nativeRoot.getContentPane().add(auxiliary);
             assertThat(auxiliary.getClientProperty("Jasper.workspaceStyle")).isNull();

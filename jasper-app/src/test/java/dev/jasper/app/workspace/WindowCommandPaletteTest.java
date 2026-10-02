@@ -133,9 +133,9 @@ class WindowCommandPaletteTest {
                         var palette = owner.commandPalette().component();
                         var placed = palette.getBounds();
                         for (int sideWidth : new int[]{260, 400}) {
-                            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, new JPanel(), sideWidth);
-                            owner.regions().show(dev.jasper.app.contributions.PanelRegion.RIGHT, new JPanel(), 220);
-                            owner.regions().show(dev.jasper.app.contributions.PanelRegion.BOTTOM, new JPanel(), 180);
+                            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.LEFT_TOP, new JPanel(), sideWidth);
+                            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.RIGHT_TOP, new JPanel(), 220);
+                            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.BOTTOM_LEFT, new JPanel(), 180);
                             LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root);
                             assertThat(palette.getBounds()).as("panels leave the card where it is").isEqualTo(placed);
                         }
