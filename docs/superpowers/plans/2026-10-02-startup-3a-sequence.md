@@ -28,7 +28,7 @@ below is the code as those plans leave it. Not started. No GUI launch, push or m
 **Builds on (names from the written plans, used verbatim):**
 - Plan 1 ([measure](2026-10-02-startup-1-measure.md)): `StartupTrace.current()`, `StartupTrace.detached()`,
   `mark`, `millis`, `phase(String, long)`, `when(Milestone, Executor, Runnable)`; in `JasperApplication` the field
-  `trace`, the map `outputs` (`Map<TerminalSession, SessionOutput>`, synchronized, weak keys), `watchOutput(TerminalSession)`
+  `trace`, the map `outputs` (`Map<TerminalSession, SessionOutput>`, a `ConcurrentHashMap` filled through the package-private `trackOutput(TerminalSession, SessionOutput)`, which drops an entry when its session exits; Plan 1 Task 5 fix round), `watchOutput(TerminalSession)`
   (marks `SHELL_SPAWNED`, registers `SessionOutput.watch(session, () -> trace.mark(SHELL_OUTPUT))`),
   `timeFirstTerminal(pane, windowTrace)` (removes the pane session's entry from `outputs` to time `OUTPUT_PAINTED`),
   `openWindow(Path, boolean, String trigger)` whose launcher starts with
@@ -2101,7 +2101,7 @@ public final class EarlySession {
         earlySession = null;
         if (pending == null) return Optional.empty();
         return Optional.of(pending.claim(directory, settings).thenApply(spawned -> {
-            outputs.put(spawned.session(), spawned.output());
+            trackOutput(spawned.session(), spawned.output());
             return spawned.session();
         }));
     }
