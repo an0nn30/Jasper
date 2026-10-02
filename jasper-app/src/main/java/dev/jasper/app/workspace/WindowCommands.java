@@ -66,6 +66,7 @@ final class WindowCommands implements AutoCloseable {
             add(registry, "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
                 "Terminal Colors: " + label, () -> owner.selectTerminalColors(colors), List.of("terminal", "colors", "palette"));
         }
+        add(registry, "view.themes", "Themes…", "Themes…", owner::openThemesSettings, List.of("theme", "workspace", "colors", "palette"));
         add(registry, "view.window_settings", "Window Settings\u2026", "Window Settings\u2026", owner::openWindowSettings,
             List.of("tab height", "rail width", "toolbar height", "status bar height", "size"));
     }
@@ -108,6 +109,7 @@ final class WindowCommands implements AutoCloseable {
             action.putValue(Action.SELECTED_KEY, owner.terminalColorsSelected(colors));
             action.setEnabled(true);
         }
+        view("view.themes").setEnabled(owner.settingsConnected());
         view("view.window_settings").setEnabled(owner.settingsConnected());
     }
 

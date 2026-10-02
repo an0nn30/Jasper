@@ -80,7 +80,7 @@ public final class ThemeCatalog {
     /** The folder this catalog scans; empty for the built-in catalog. */
     public Optional<Path> directory() { return Optional.ofNullable(directory); }
 
-    /** Reads the themes folder, creating it when missing, and re-reads only files whose size or modified time changed. */
+    /** Reads bounded native content, creating the folder when missing; unchanged fingerprints reuse parsed documents. */
     public synchronized Snapshot scan() {
         if (directory == null) return latest;
         var problems = new ArrayList<Problem>();

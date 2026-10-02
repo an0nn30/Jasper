@@ -32,13 +32,13 @@ class ThemeActionsTest {
             windows = new AuxiliaryWindows(UiState.inMemory(), s -> new AuxiliarySurface.Shell(() -> {}, () -> {}, () -> {}, t -> {}, () -> new Rectangle(0,0,10,10), (t,p) -> Optional.empty()));
             owner = windows.window("settings", "Settings", new Dimension(600,600), false); owner.show();
             context = new PageContext(draft, s -> {}, Runnable::run, (t,p) -> Optional.ofNullable(chosen), () -> {}, () -> owner);
-            actions = new ThemeActions(context, home, windows, () -> { refreshes.incrementAndGet(); afterRefresh.run(); return CompletableFuture.completedFuture(null); },
+            actions = new ThemeActions(context, home, windows, () -> { assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); refreshes.incrementAndGet(); afterRefresh.run(); return CompletableFuture.completedFuture(null); },
                 p -> { assertThat(SwingUtilities.isEventDispatchThread()).isFalse(); opened.add(p); }, p -> trash.test(p), worker);
         });
     }
     @AfterEach void stop() throws Exception { edt(() -> { actions.close(); windows.close(); }); }
     Path source(String name) throws Exception { Path p=home.resolve("input.toml"); Files.writeString(p, "name = \""+name+"\"\nextends = \"Jasper Dark\"\n"); return p; }
-    void next() throws Exception { worker.next(); edt(() -> {}); }
+    void next() throws Exception { worker.next(); edt(() -> {}); edt(() -> {}); }
     static void edt(Runnable run) throws Exception { var thrown=new AtomicReference<Throwable>(); SwingUtilities.invokeAndWait(() -> {try{run.run();}catch(Throwable t){thrown.set(t);}}); if(thrown.get()!=null)throw new AssertionError(thrown.get()); }
     <T extends Component> T find(Class<T> type) { return find(windows.open().getLast().holder(),type); }
     static <T extends Component> T find(Container root,Class<T> type) { if(type.isInstance(root))return type.cast(root);for(var c:root.getComponents()){if(type.isInstance(c))return type.cast(c);if(c instanceof Container nested){var found=find(nested,type);if(found!=null)return found;}}return null; }
@@ -60,7 +60,7 @@ class ThemeActionsTest {
     }
     @Test void closingDuringCommittedRefreshSuppressesCallbackButPreservesFile() throws Exception {
         chosen=source("Example"); edt(() -> actions.importThemes(report::set)); next(); click("Import");
-        afterRefresh=() -> {try{edt(actions::close);}catch(Exception e){throw new RuntimeException(e);}}; next();
+        afterRefresh=actions::close; next();
         assertThat(ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Example")).isPresent();
         assertThat(refreshes).hasValue(1); assertThat(report).hasValue(null);
     }

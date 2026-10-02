@@ -399,3 +399,25 @@ flow remain in `ShortcutPanel`/`ShortcutEditPanel`. The tree, viewport and scrol
 use `Panel.background`; nested editor containers are transparent. Row selection, labels
 and icons use the active theme and bundled catalog. `shortcutHelpPreview` renders closed,
 expanded and editing states in both themes and larger UI type without opening a window.
+
+
+### Maintaining the Themes page
+
+`themesui.ThemesPage` owns the two draft-bound pickers, local `ThemePreview` and page-scoped `ThemeActions` worker.
+`settingsui.CorePages` receives its factory from application wiring, so it has no dependency on themesui. The two
+canonical theme settings are deliberately absent from schema rows; the setting-coverage test counts their explicit
+page ownership. Preview generation runs on EDT against private effective defaults; it never installs a LAF.
+
+All file/conversion/hash/desktop work runs on the serial action worker. Dialogs and reload requests run on EDT;
+completion waits for catalog refresh before updating a live page. A closed page suppresses UI callbacks while a
+running confirmed write still refreshes application state. Removal eligibility is checked off EDT and the eventual
+operation captures/rechecks its own frozen intent. Never replace a failed trash operation with silent deletion.
+
+The configuration worker's companion scan hashes native content every second and publishes catalog-only changes.
+`WindowContent` receives the latest snapshot supplier from `ConfigurationController`; menu models rebuild on opening
+only when names or requested choices change. Menu listeners and catalogs are released with the window. Keep the three
+legacy terminal-color command IDs mapped to explicit Jasper names; canonical Light/Dark user names are literal.
+
+Headless checks: ThemesPageTest, ThemePreviewTest, ThemeActionsTest, ThemesWorkflowTest, WindowThemeMenuTest and
+JasperApplicationThemesTest. The user-run native checklist is in the Plan 5 implementation plan; do not launch the GUI
+or native Trash from an unattended agent.

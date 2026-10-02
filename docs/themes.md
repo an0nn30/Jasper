@@ -17,8 +17,9 @@ workspace = "match" # or "Jasper Dark", another native theme
 ```
 
 The name is the theme's own name, matched ignoring case and surrounding spaces. Changing it applies the theme to
-every window at once, keeping shells, scrollback and splits. Settings › Appearance › Theme lists every built-in and
-user theme. Settings › Terminal › Font & Colors offers the same native collection and a checkbox for `match`. The
+every window at once, keeping shells, scrollback and splits. Settings › Appearance & Behavior › Themes has independent UI and Workspace pickers. Each supports a name search,
+All/Dark/Light and All/Bundled/Mine filters, effective color swatches and keyboard selection. **Same as UI theme**
+is always the first workspace choice, even under a filter. Appearance and Terminal › Font & Colors link to these pickers. The
 workspace choice switches independently, including between two dark themes. The pane tab strip, find controls,
 split dividers, terminal palette, zone-aware icons and Editor syntax follow it. Menus, sidebars and dialogs follow
 the UI theme. Ordinary controls in hosted center plugin panes also follow the workspace, including lists, tables,
@@ -38,10 +39,39 @@ detaching, reopening and closing its pane; check Vim error/bell feedback and ban
 GitHub Dark or another complete imported theme. These checks require the native GUI and are not claimed by headless
 test results.
 
+## Settings and file actions
+
+Theme choices and the two-zone miniature update immediately in Settings; running windows change only on **Apply**
+or **OK**. Cancel discards pending choices. The preview contains canned terminal output and a fixed syntax snippet;
+it never starts a shell or changes the application's look and feel. Missing UI choices preview the safe Jasper theme
+of the last preview's darkness; missing workspace choices follow UI. Requested names remain intact for repair.
+Invalid files appear in diagnostics with a filename and line when available.
+
+**Import**, **Duplicate** and **Remove** change files immediately and survive Cancel. Import accepts local
+`.theme.json`, `.jar`, `.zip` and `.toml` files, then shows providers, conversion warnings and failures. Existing user
+names default to Skip; choose Replace or Keep both explicitly. Decisions use a frozen plan, and changed replacement
+files are refused. Partial reports name only files actually imported. Import does not change the staged selection.
+
+Duplicate proposes a unique name and writes an `extends` reference plus commented effective colors, ANSI entries
+and tokens. Uncomment only values you want to override; inherited syntax, UI and icons remain live. A successful copy
+selects itself only in the initiating picker, provided that picker's choice has not changed while the copy was running.
+
+Remove is available only for validated regular user files. Jasper tries Trash after confirmation. If Trash is unavailable
+or fails, a **separate** permanent-deletion confirmation appears; Cancel retains the file. Changed files and symlinks
+are refused. Removal keeps saved/requested theme names so restoring the file recovers the choice.
+
+**Open themes folder** uses the folder beside the active config file, including a `--config` override. **About bundled
+themes** shows packaged license/source notices offline. Closing Settings cancels unstarted work and closes its dialogs;
+a confirmed write already running may finish and refresh the app without reopening Settings.
+
+View › **UI Theme** and **Workspace Theme** offer the current catalog. Large catalogs are grouped into numbered
+submenus of at most 30 themes. View › **Themes…** opens Settings; the command palette also finds it. These View choices
+save immediately, whereas Settings choices stay staged until Apply/OK.
+
 ## Writing a theme
 
 Put a `.toml` file in the `themes` folder beside `config.toml` (`~/.config/jasper/themes/` on macOS) and name it in
-`ui.theme.name`. Jasper rereads the folder when the configuration is reloaded. The smallest theme names its seed colours:
+`ui.theme.name`. Jasper checks the folder every second, independently of config edits, and also on explicit reload. Content hashes detect equal-size edits even when timestamps are preserved; parent edits refresh inherited themes. The smallest theme names its seed colours:
 
 ```toml
 name = "Mocha"

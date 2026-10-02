@@ -469,9 +469,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
+    private java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest();
+    /** Connects a read-only current catalog; released with the configuration/window lifetime. */
+    public void connectThemeCatalog(java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> catalog) {
+        if (!closed) themeCatalog = java.util.Objects.requireNonNull(catalog);
+    }
+    dev.jasper.app.appearance.ThemeCatalog.Snapshot availableThemes() { return themeCatalog.get(); }
+    String requestedUiTheme() { return configurationState == null ? themes.choice().name() : configurationState.values().get(dev.jasper.app.config.CoreSettings.UI_THEME_NAME); }
+    String requestedWorkspaceTheme() { return configurationState == null ? themes.workspaceChoice().name() : configurationState.values().get(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE); }
+    void chooseUiTheme(String name) {
+        choose(dev.jasper.app.config.CoreSettings.UI_THEME_NAME, name, () -> selectTheme(availableThemes().find(name).orElse(themes.choice().dark() ? Theme.DARK : Theme.JASPER_LIGHT)));
+    }
+    void chooseWorkspaceTheme(String name) {
+        var choice = new dev.jasper.app.config.WorkspaceThemeChoice(name);
+        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, choice.name(), () -> {
+            themes.configureWorkspace(choice, choice.matchesChrome() ? null : availableThemes().find(choice.name()).orElse(null));
+            chrome.refreshTheme();
+        });
+    }
+    void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("themes"); }
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         saveSettings = null; openSettingsAt = null; configurationState = null;
+        themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest(); chrome.clearThemeMenus();
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
@@ -1087,7 +1107,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         paletteKeys.close();
         if (contributed != null) { contributed.close(); contributed = null; }
-        commandPalette.close(); windowCommands.close(); commands.close();
+        commandPalette.close(); windowCommands.close(); chrome.closeThemeMenus(); commands.close();
         scopes.close();
         closed = true;
         if (contentHost != null) { contentHost.close(); contentHost = null; }

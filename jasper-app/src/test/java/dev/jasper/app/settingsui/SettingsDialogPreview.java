@@ -93,7 +93,7 @@ public final class SettingsDialogPreview {
                 var keymap = new KeymapPage[1];
                 var dialog = new SettingsDialog(windows, CorePages.pages(() -> List.of("Jasper Dark", "IntelliJ Light"),
                     new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
-                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context), previewPlugins[0].pages()),
+                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context), CorePagesTest::themes, previewPlugins[0].pages()),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,
                         listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true));
                 SwingUtilities.invokeAndWait(() -> {

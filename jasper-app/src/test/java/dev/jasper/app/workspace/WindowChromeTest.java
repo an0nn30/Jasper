@@ -39,17 +39,18 @@ class WindowChromeTest {
                 var themes = new ThemeController();
                 first = content(launcher(new ArrayDeque<>()), themes);
                 second = content(launcher(new ArrayDeque<>()), themes);
-                JMenu firstColors = terminalColors(first);
-                JMenu secondColors = terminalColors(second);
-                firstColors.getItem(1).doClick();
+                first.setActive(true);
+                JMenu firstColors = WindowThemeMenuTest.workspace(first);
+                JMenu secondColors = WindowThemeMenuTest.workspace(second);
+                WindowThemeMenuTest.item(firstColors,"Jasper Light").doClick();
                 secondColors.setSelected(true);
-                assertThat(secondColors.getItem(1).isSelected()).isTrue();
-                assertThat(secondColors.getItem(0).isSelected()).isFalse();
+                assertThat(WindowThemeMenuTest.item(secondColors,"Jasper Light").isSelected()).isTrue();
+                assertThat(WindowThemeMenuTest.item(secondColors,"Same as UI theme").isSelected()).isFalse();
                 secondColors.setSelected(false);
-                firstColors.getItem(2).doClick();
+                WindowThemeMenuTest.item(firstColors,"Jasper Dark").doClick();
                 secondColors.setSelected(true);
-                assertThat(secondColors.getItem(2).isSelected()).isTrue();
-                assertThat(secondColors.getItem(1).isSelected()).isFalse();
+                assertThat(WindowThemeMenuTest.item(secondColors,"Jasper Dark").isSelected()).isTrue();
+                assertThat(WindowThemeMenuTest.item(secondColors,"Jasper Light").isSelected()).isFalse();
             } finally {
                 if (first != null) first.close();
                 if (second != null) second.close();
@@ -57,27 +58,15 @@ class WindowChromeTest {
         });
     }
 
-    @Test void theViewMenuOffersTerminalColorsButNoThemeChoice() throws Exception {
+    @Test void viewOffersBothCatalogsAndThemesWithoutRegisteringEachThemeAsACommand() throws Exception {
         edt(() -> {
-            try (var owner = content(launcher(new ArrayDeque<>()))) {
-                var names = new java.util.ArrayList<String>();
-                for (var component : owner.menuBar().getMenu(2).getMenuComponents())
-                    if (component instanceof JMenuItem item) names.add(item.getText());
-                assertThat(names).contains("Terminal Colors").doesNotContain("Appearance");
-                assertThat(java.util.Arrays.stream(terminalColors(owner).getMenuComponents())
-                    .filter(JMenuItem.class::isInstance).map(item -> ((JMenuItem) item).getText()))
-                    .containsExactly("Terminal: Match UI", "Terminal: Light", "Terminal: Dark");
-                assertThat(owner.commands().entries().stream().map(entry -> entry.command().id()))
-                    .noneMatch(id -> id.startsWith("view.appearance."));
+            try(var owner=content(launcher(new ArrayDeque<>()))) {
+                var names=new java.util.ArrayList<String>();
+                for(var component:owner.menuBar().getMenu(2).getMenuComponents())if(component instanceof JMenuItem item)names.add(item.getText());
+                assertThat(names).contains("UI Theme","Workspace Theme","Themes…").doesNotContain("Terminal Colors");
+                assertThat(owner.commands().entries().stream().map(entry->entry.command().id())).contains("view.themes").noneMatch(id->id.startsWith("view.appearance."));
             }
         });
-    }
-
-    private static JMenu terminalColors(WindowContent owner) {
-        for (var component : owner.menuBar().getMenu(2).getMenuComponents()) {
-            if (component instanceof JMenu menu && menu.getText().equals("Terminal Colors")) return menu;
-        }
-        throw new AssertionError("Terminal Colors menu is absent");
     }
 
     @Test void referenceToolbarKeepsLabelsAccessibilityDisabledActionsAndVisibilityModes() throws Exception {

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), especially §§2.3, 6.3, 7–9. Read it together with this plan, [Plan 4](2026-10-01-theme-system-4-conversion-migration.md), and [STATUS](../../STATUS.md).
 
-**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Task 4 is complete (local two-zone preview); full check 7,962/0/0/6. Task 5 is complete (owned asynchronous file actions and dialogs); full check 7,974/0/0/6. Task 6 remains.
+**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Task 4 is complete (local two-zone preview); full check 7,962/0/0/6. Task 5 is complete (owned asynchronous file actions and dialogs); full check 7,974/0/0/6. Task 6 implementation and headless gates are complete; full check 7,972/0/0/6 (1m28s), including four architecture gates, doclint and packaged resources. Obsolete dropdown/menu tests were replaced by the staged-page/catalog tests, explaining the lower count. All 1,661 Java sources and authored whitespace pass hygiene. One independent whole-branch review remains before completion; native acceptance remains user-run.
 
 **Execution ruling:** Task 1 preserves the pre-existing bounded startup scan wait on EDT; the original plan incorrectly described its caller as off EDT. No new runtime EDT waits are introduced. Cost: existing initial scan latency remains; a bootstrap handoff change is separate work.
 
@@ -374,7 +374,7 @@ git commit -m "feat(themes): wire local import and file actions" -m "Co-Authored
 - Produces: CorePages.Pages adds `Function<PageContext,SettingsPage> themes` between plugins and tools; update all factories/callers/tests explicitly. Its production caller is application wiring, so settingsui does not import themesui. Extend `CorePages.specs` with a `Consumer<String> navigate` parameter for link actions, keeping old overloads as forwarding compatibility for fixtures only where still used.
 - Produces `WindowContent.connectThemeCatalog(Supplier<ThemeCatalog.Snapshot>)`; package-private `ThemeCatalog.Snapshot availableThemes()`, `void chooseUiTheme(String name)`, `void chooseWorkspaceTheme(String name)`. ConfigurationController.register supplies catalog::latest; unregister/close releases supplier and menu listeners. Unconnected test windows default to the bundled snapshot. All writes go through existing choose(Setting, value, fallback).
 
-- [ ] **Step 1: Add failing integration tests.** CorePages must contain exactly one `themes` page; theme settings are absent from schema rows and owned by ThemesPage instead. Update the “every core setting exactly once” test to combine schema settings with the explicit pair `UI_THEME_NAME` / `UI_THEME_WORKSPACE`, not to remove the coverage assertion. Both links navigate to correct fragments. All required keywords find Themes; removed store IDs are absent.
+- [x] **Step 1: Add failing integration tests.** CorePages must contain exactly one `themes` page; theme settings are absent from schema rows and owned by ThemesPage instead. Update the “every core setting exactly once” test to combine schema settings with the explicit pair `UI_THEME_NAME` / `UI_THEME_WORKSPACE`, not to remove the coverage assertion. Both links navigate to correct fragments. All required keywords find Themes; removed store IDs are absent.
 
 Use SettingsDialog's actual headless shell/hooks to test preview → Apply → Cancel/OK, including a failed/stale ConfigService save. Pin shared-draft saving once, no page-side second write, Cancel discarding choices, and an externally refreshed catalog preserving dirty choices. An already confirmed Import/Duplicate remains on disk after Cancel.
 
@@ -389,7 +389,7 @@ assertThat(saveRequests.getFirst().changes()).containsKeys(CoreSettings.UI_THEME
 
 Menu tests add a native file after window creation, open View, choose it, then delete/repair it; rows and selected marks follow the current catalog/request, and canonical config strings are written. Include a native theme literally named Light or Dark: it must not be interpreted as a legacy alias. With 284 bundled choices, every catalog name appears exactly once per zone, no missing off-screen-only path; test submenus' bounded item counts. Settings workflow test combines a duplicate with commented defaults, external edit, automatic preview/live-window refresh, malformed edit warning and repair. No GUI process.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*CorePagesTest' --tests '*NativeThemeNavigationTest' --tests '*SettingsDialogTest' --tests '*WindowThemeMenuTest' --tests '*JasperApplicationThemesTest' --tests '*ThemesWorkflowTest'
@@ -397,7 +397,7 @@ Menu tests add a native file after window creation, open View, choose it, then d
 
 Expected: missing page/links and current View menu limited to three legacy terminal choices.
 
-- [ ] **Step 3: Wire and finish the deliverable.** Application page factory passes real catalog supplier, current terminal options and page-owned ThemeActions. The options supplier calls `configuration.snapshot().viewOptions(configuration.snapshot().font().size(), themes.current().palette())` on EDT; use the configured base size, not a particular window’s zoom. Map configuration.reload to CompletableFuture<Void> for actions; directory home is configuration.state().file().toAbsolutePath().getParent(), honoring --config. Use Desktop.OPEN for the folder (off EDT), exposing unavailable/failure text. Never launch a terminal shell as a folder fallback.
+- [x] **Step 3: Wire and finish the deliverable.** Application page factory passes real catalog supplier, current terminal options and page-owned ThemeActions. The options supplier calls `configuration.snapshot().viewOptions(configuration.snapshot().font().size(), themes.current().palette())` on EDT; use the configured base size, not a particular window’s zoom. Map configuration.reload to CompletableFuture<Void> for actions; directory home is configuration.state().file().toAbsolutePath().getParent(), honoring --config. Use Desktop.OPEN for the folder (off EDT), exposing unavailable/failure text. Never launch a terminal shell as a folder fallback.
 
 Replace Appearance's UI-theme row with “Choose UI theme…” → themes#ui; retain interface-font rows. Replace Font & Colors' workspace dropdown with “Choose workspace theme…” → themes#workspace. Keep existing Font & Colors title and terminal typography. Retire Editors.theme/terminalColors and their now-unused ActionCombo infrastructure only after checking no other consumers. Update CoreSettings descriptions to point to native TOML/Settings › Themes; this closes Plan 4's deferred misleading-plugin help text.
 
@@ -405,7 +405,7 @@ View gets **UI Theme** and **Workspace Theme** menus sourced from availableTheme
 
 Preserve standalone-window fallback behavior using current ThemeController and resolved catalog themes; application-connected windows always save through ConfigurationController. Record allowed dependencies without weakening architecture guards. Update documentation for selection vs immediate file actions, filtering, fallback/errors, duplicate inheritance, trash/permanent-confirmation behavior, config override homes, and one-second live refresh.
 
-- [ ] **Step 4: Run GREEN and final review.** Repeat Step 2, then one serialized full gate:
+- [x] **Step 4: Run GREEN and final review.** Repeat Step 2, then one serialized full gate:
 
 ```bash
 ./gradlew check
@@ -421,7 +421,7 @@ User-only acceptance checklist (record unperformed until user reports results):
 5. Remove a temporary user copy to trash; verify unsupported-trash permanent-delete confirmation can be canceled. Do not remove real user themes merely to test.
 6. Check two app windows, settings closed/reopened, light/dark syntax flags, plugin panes, and the accepted hidden-rail framing. No preview shell should appear.
 
-- [ ] **Step 5: Commit and record evidence.**
+- [x] **Step 5: Commit and record evidence.**
 
 ```bash
 git add jasper-app/src docs
@@ -435,4 +435,4 @@ git commit -m "feat(themes): finish settings workflow and catalog navigation" -m
 - Interfaces use actual Setting<String>, Snapshot, Theme.UserFile, GeneratedTheme, PageContext and frozen ImportPlan types. No new interface abstraction, SDK dependency, private Editor import, global preview LAF or extra watcher.
 - Task 3's initial constructor is deliberately extended in Task 5, with all tests updated then; registration only occurs in Task 6. Each prior commit has independently testable behavior and keeps the existing app runnable.
 - Plan decisions needing user review are explicit above: immediate file actions, local preview fallback, one-second polling reuse, trash failure confirmation, duplicate-name validation and menu grouping. These refine the approved design without adding network sources or a visual editor.
-- Implementation remains unstarted. Ask the user to review this complete plan, preserving their inline execution preference for the next phase.
+- Six tasks implemented inline with RED/GREEN evidence and one commit per task. Independent whole-branch review is the remaining gate. Native acceptance has not been run; no GUI, benchmark, push or merge was performed for Plan 5.

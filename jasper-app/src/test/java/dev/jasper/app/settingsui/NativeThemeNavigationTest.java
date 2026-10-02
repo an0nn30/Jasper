@@ -23,16 +23,10 @@ class NativeThemeNavigationTest {
         var names = ThemeManager.builtIns().stream().map(t -> t.name()).toList();
         var pages = CorePages.pages(() -> names, system,
             ctx -> new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, ctx),
-            ctx -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, ctx)).apply(context);
+            ctx -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, ctx), CorePagesTest::themes).apply(context);
         var ids = pages.stream().map(SettingsPage::id).toList();
-        assertThat(ids).doesNotContain("themes", "themes.intellij", "themes.alacritty").contains("appearance", "terminal.font");
+        assertThat(ids).doesNotContain("themes.intellij", "themes.alacritty").containsOnlyOnce("themes").contains("appearance", "terminal.font");
         for (var page : pages) page.parent().ifPresent(parent -> assertThat(ids).contains(parent));
-        var chrome = Editors.theme(() -> names).build().apply(CoreSettings.UI_THEME_NAME, context);
-        var box = (javax.swing.JComboBox<?>) chrome.component();
-        var items = new ArrayList<String>(); for (int i=0; i<box.getItemCount(); i++) items.add(box.getItemAt(i).toString());
-        assertThat(items).contains("Studio Dark", "Catppuccin Mocha").doesNotContain("Get More Themes\u2026", "Manage Themes\u2026");
-        var workspace = (Editors.TerminalColorsEditor) Editors.terminalColors(() -> names).build().apply(CoreSettings.UI_THEME_WORKSPACE, context);
-        workspace.show("match"); assertThat(workspace.value()).isEqualTo("match");
-        workspace.show("Studio Dark"); assertThat(workspace.value()).isEqualTo("Studio Dark");
+        assertThat(names).contains("Studio Dark", "Catppuccin Mocha");
     }
 }

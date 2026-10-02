@@ -128,6 +128,7 @@ final class ConfigurationController implements AutoCloseable {
         if (closed || !owners.add(owner)) return;
         owner.connectConfiguration(() -> settingsOpener.accept(owner, null),
             () -> reportFailure(owner, service.reload()), () -> migrateFor(owner), () -> unregister(owner));
+        owner.connectThemeCatalog(catalog::latest);
         owner.connectSettings(this::save, page -> settingsOpener.accept(owner, page));
         owner.applyConfiguration(state.snapshot(), service.macOs());
         owner.setConfigurationState(shown());

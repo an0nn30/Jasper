@@ -28,7 +28,7 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
-The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
+The tree on the left groups them as Appearance & Behavior (Appearance, Themes, Window, Notifications, Command Palette,
 Desk Buddy, System Settings), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
 the search field filters the tree and highlights matching settings on the page.
 Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
@@ -44,7 +44,7 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
-Appearance and Terminal › Font & Colors list the same native theme catalog. The old stores are retired; see
+Appearance and Terminal › Font & Colors link to Settings › Themes, which holds both staged pickers and the local preview. The old stores are retired; see
 [Themes](themes.md) for the offline collection and automatic legacy upgrade.
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
@@ -385,7 +385,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices save: Toolbar, Status Bar and Terminal Colors write `window.toolbar`, `window.status_bar` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
+View menu choices save: Toolbar, Status Bar, UI Theme and Workspace Theme write `window.toolbar`, `window.status_bar`, `ui.theme.name` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -666,10 +666,10 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 `ui.theme.name` names the UI theme:
 - `"Jasper Dark"` (the default) or `"Jasper Light"`;
 - `"IntelliJ Light"` or `"Darcula"` (IntelliJ's classic themes, converted);
-- or a Jasper theme file or theme plugin in the `themes` folder beside this file.
+- or a native Jasper TOML theme in the `themes` folder beside this file.
 
 The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers installing
-Marketplace themes and how a theme colours the terminal. An unknown name is a warning that lists
+local import, duplication, removal and how a theme colours the workspace. An unknown name is a warning that lists
 the available themes: at start-up Jasper uses Jasper Dark; on reload it uses the safe built-in
 for the last successfully applied chrome darkness. The requested name stays in the file for a later retry.
 A non-string value rejects the configuration.
@@ -687,7 +687,7 @@ supported: a `[colors]` table is reported as an unknown setting and ignored. See
 ## Workspace theme
 
 `ui.theme.workspace` chooses the theme for the terminal workspace independently of `ui.theme.name`.
-`"match"` follows the interface theme. A separate choice names a native theme or an Alacritty theme;
+`"match"` follows the interface theme. A separate choice names a native theme, including converted Alacritty palettes;
 `"Jasper Light"` and `"Jasper Dark"` name the bundled themes. A native theme named `"Light"` is
 selected literally. The older `terminal.colors` and `ui.theme.terminal` keys still load; their
 `light` and `dark` values become `Jasper Light` and `Jasper Dark` when migrated. A canonical
@@ -702,15 +702,17 @@ with the same light/dark variant produce a workspace update. A missing workspace
 temporarily matches the chrome; its requested name stays saved for repair and reload.
 General hosted plugin pane controls also follow the workspace theme.
 
-In Settings › Terminal › Font & Colors, the workspace match checkbox follows the UI theme. Clearing
-it enables the native theme choices (including Jasper Light and Jasper Dark). View → Terminal Colors continues to save this
-workspace choice while the menu is retained. A blank value warns and uses `"match"`; a non-string
-value rejects the configuration.
+Settings › Themes has a pinned **Same as UI theme** entry, searchable lists and a local preview. Apply/OK saves
+choices; Cancel discards them. Confirmed Import, Duplicate and Remove file actions happen immediately and survive
+Cancel. View › UI Theme and Workspace Theme save immediately; View › Themes… opens the staged workflow.
+Native file edits, deletions and repairs reload automatically on the existing one-second poll, including inherited
+parent changes. Filesystem work runs off the EDT. A blank workspace value warns and uses `"match"`; a non-string
+value rejects the configuration. [Themes](themes.md#settings-and-file-actions) details safe removal and fallback.
 
 ### Alacritty themes
 
 Alacritty palettes are converted into native themes. Existing `terminal-themes/` files migrate once at startup;
-the old store is removed. Select converted palettes in Settings › Terminal › Font & Colors. See
+the old store is removed. Select converted palettes in Settings › Themes. See
 [Themes](themes.md#converted-terminal-palettes). `themes.marketplace.enabled` is ignored for compatibility.
 
 ### Interface typography

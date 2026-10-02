@@ -42,12 +42,18 @@ public final class ThemeActions implements AutoCloseable {
             T value=null;Throwable failure=null;
             try{value=operation.call();}catch(Exception e){failure=e;}
             final T result=value;final Throwable problem=failure;
-            CompletableFuture<Void> reloaded=CompletableFuture.completedFuture(null);
-            if(writes)try{reloaded=refresh.get();}catch(Exception e){reloaded=CompletableFuture.failedFuture(e);}
-            reloaded.whenComplete((ignored,reloadFailure)->SwingUtilities.invokeLater(()->{
-                if(closed||ticket!=generation)return;
-                if(problem!=null)error(problem);else if(reloadFailure!=null)error(new IllegalStateException("File operation finished, but reload failed: "+reloadFailure.getMessage(),reloadFailure));else success.accept(result);
-            }));
+            SwingUtilities.invokeLater(() -> {
+                // ConfigurationController owns the reload request on EDT, even when this page has closed.
+                CompletableFuture<Void> reloaded = CompletableFuture.completedFuture(null);
+                if (writes) try { reloaded = refresh.get(); }
+                catch (Exception e) { reloaded = CompletableFuture.failedFuture(e); }
+                reloaded.whenComplete((ignored, reloadFailure) -> SwingUtilities.invokeLater(() -> {
+                    if (closed || ticket != generation) return;
+                    if (problem != null) error(problem);
+                    else if (reloadFailure != null) error(new IllegalStateException("File operation finished, but reload failed: " + reloadFailure.getMessage(), reloadFailure));
+                    else success.accept(result);
+                }));
+            });
         }));}catch(RejectedExecutionException failure){error(failure);}
     }
     /** Read-only eligibility; the destructive action still captures and validates a fresh intent. */
