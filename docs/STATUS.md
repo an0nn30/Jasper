@@ -2,10 +2,10 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system Plan 4 implemented inline; independent review pending** (2026-10-01):
+- **Theme system Plan 4 complete, independently reviewed; ready for integration** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)
   completes all seven tasks on `codex/theme-system-plans` in `.worktrees/theme-system`. Full `./gradlew check`
-  passes **7,912 tests, zero failures/errors, six skips**, including all four architecture gates, packaged resources,
+  passes **7,930 tests, zero failures/errors, six skips**, including all four architecture gates, packaged resources,
   JavaDoc and compiled documentation examples. Java hygiene scans 1,637 source files cleanly; authored diff whitespace passes.
   The lower final test count reflects retired store/runtime-legacy tests; converter/security/installation parity and
   native fallback/reload coverage remain. No GUI, merge or push.
@@ -21,7 +21,15 @@
   precedence; explicit classic Darcula scheme and One Dark Modern packaging associations; Frappe → Frappé alias;
   excluded extra Islands variants; publication/marker cleanup failures do not negate already committed success.
   Task 7 also fixes positive-line/zero-column theme diagnostics that interrupted malformed-native reloads.
-  Final independent whole-branch review follows the user-approved inline workflow. User-only acceptance checklist:
+  Final independent review found four Important issues; one inline TDD fix pass resolves all four. Native parent
+  references follow renamed legacy parents through journaled comment-preserving edits with original backups and
+  crash/stale-file checks (explicit exception to the plan's no-native-rewrite rule). Native imports resolve declared
+  names in local filename order before bundles, with bounded sibling scans. The journal accepts 16×64 providers
+  and validates serialized intent before publication; migration hashes honor format limits before/during reads.
+  The 18 added regression cases include 66-provider ZIP recovery and sparse oversized inputs. Final full check:
+  **7,930/0/0/6**, all architecture gates and 1,637-source hygiene pass; authored diff whitespace clean.
+  Deferred minor: CoreSettings theme help still mentions runtime theme plugins; update with Plan 5 Import UI.
+  No second review or desktop visual acceptance. User-only acceptance checklist:
   [themes](themes.md#native-acceptance-for-this-upgrade-user-run). **Next: Plan 5**, the Themes page, staged preview,
   Import/Duplicate/Open/Remove UI and live file reload on the completed APIs.
 

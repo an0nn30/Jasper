@@ -14,7 +14,7 @@ script, Swing/FlatLaf 3.7, headless JUnit/AssertJ. No new runtime dependencies o
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), §§2, 6, 8–9.
 **Companion:** [Requirement coverage and decisions](2026-10-01-theme-system-remaining-work.md).
-**Status:** All seven tasks implemented inline (2026-10-01); full verification passed; independent review pending. Re-audited against local `main@c8365dd1`,
+**Status:** All seven tasks implemented inline (2026-10-01); independent review completed and its four Important findings fixed; final verification recorded below. Re-audited against local `main@c8365dd1`,
 with Plans 2 and 3 merged and verified. This replaces the earlier six-task outline with seven sequential review gates.
 All 12 upstream/local sources and 413 hashed assets are locked; 284 native themes are generated offline.
 The `[icons]` format amendment is implemented and recorded in the approved spec. The maximum native theme is
@@ -751,7 +751,7 @@ with its existing fake/canned transport; no shell. Remove Marketplace active set
 registrations/callers; preserve exact-key ignored compatibility. Keep relevant parser/security/installation parity tests
 in their new owner packages, deleting only tests whose feature was deliberately removed. Update dependencies in
 package-info/architecture fixtures; no weakened verifier. Update notices and distribution resources.
-- [ ] **Step 4: Run GREEN, final review and acceptance documentation.** Repeat Step 2, then one serialized
+- [x] **Step 4: Run GREEN, final review and acceptance documentation.** Repeat Step 2, then one serialized
 `./gradlew check`. Count XML from explicit module/plugin test roots, record tests/failures/errors/skips and all four
 architecture gates. Run AGENTS.md's Java control/private-use/surrogate hygiene check and `git diff --check`.
 Final independent whole-branch review covers the complete source manifest, format parity, migration/config crash
@@ -762,7 +762,7 @@ User-only acceptance after implementation: launch against a copied legacy home; 
 preserved originals and failed-input warning; choose Dracula, Catppuccin Mocha, Solarized Light, Gruvbox and Code Dark
 with a mismatched workspace and plugin pane; confirm current selectors/menu work. Import dialogs, Duplicate/Open/Remove,
 staged preview and live theme-file reload are Plan 5, not missing Plan 4 UI.
-- [ ] **Step 5: Commit the reviewed deliverable.**
+- [x] **Step 5: Commit the reviewed deliverable.**
 
 ```bash
 git add jasper-app gradle docs THIRD-PARTY-THEMES.md
@@ -782,3 +782,43 @@ git commit -m "refactor(themes): retire legacy stores after native migration" -m
 - User-authorized inline execution supersedes per-task subagents and the draft re-review instruction: one independent
   whole-branch reviewer, one TDD fix pass, full verification; no second reviewer. No GUI, merge or push was performed.
 - Next deliverable: Plan 5 adds the Themes page, staged preview, file actions and live reload on these APIs.
+
+## Final independent review and fix pass
+
+The whole-branch reviewer assessed all eleven original rulings and found four Important issues and one Minor.
+One inline TDD fix pass addresses all four Important findings:
+
+- Existing native inheritance now follows the same legacy parent after a collision renames it. Migration records a
+  narrowly scoped, comment-preserving `extends` edit and original backup in its journal. Tests cover same-name layers,
+  a separately named child, interrupted publication/movement/backup/replacement, and stale native/backup/parent files.
+  This is an explicit exception to Task 5's “Do not rewrite native TOMLs”; unrelated native content remains intact.
+- Journal reader/writer limits allow all 16 nested JARs × 64 providers. The writer validates its serialized state with
+  the recovery parser before publication. A 66-provider ZIP completes and resumes after output/source interruptions.
+- Native import uses declared parent names and local filename ordering before bundled names, including overrides and
+  same-name layers. It scans at most 4096 regular native siblings, 64 MiB total, 256 KiB per sibling.
+- Migration fingerprints enforce format size limits before opening and during streaming. Oversized files remain in
+  place with persistent bounded diagnostics; a partial digest never authorizes relocation.
+
+Deferred minor: `CoreSettings` theme help still mentions runtime theme plugins. Correct the wording with Plan 5's
+Import UI. Until then this description can mislead users; runtime behavior and the theme guide are native-only.
+Final `./gradlew check` passed **7,930 tests, zero failures/errors, six skips** (5m08s), including all four architecture
+checks, JavaDoc/doclint, packaged resources and compiled documentation examples. Java hygiene: 1,637 files clean;
+authored `git diff --check` clean. The regression additions total 18 cases. Native import, journal validation/recovery,
+oversized fingerprint and inheritance regressions each failed before their fix and passed afterward.
+No declined-to-judge findings. No second review, GUI launch, merge or push.
+
+### Recorded inline rulings
+
+- Ruling: Execute inline with one fresh final reviewer, overriding per-task subagents — explicit user instruction (lgtm, do inline) — cost if wrong: less per-task independent scrutiny, covered by TDD and final review.
+- Task 2: Ruling: Keep unknown IntelliJ parent fallback with explicit warning — binding spec says preserve today's ThemeLoader logic, which falls back to classic parent — cost if wrong: unsupported parent may differ visually, but import reports fallback and originals survive.
+- Task 2: Ruling: Do not freeze inverse tokens that would synthesize unauthored Jasper chrome aliases — four author/installation parity tests show raw Component.borderColor and muted foreground would change title colors; retained UI plus private workspace materialization preserves original colors — cost if wrong: exported token section is smaller, while resolved UI/workspace appearance remains covered by parity.
+- Task 2: Ruling: Infer tokens only from canonical keys and verified equivalent FlatLaf aliases, not every UiTemplate key sharing a token — full-suite parity found five different effective colors (popup, hover, pressed, track, accent); template forward fan-out is not a reversible mapping — cost if wrong: fewer serialized tokens, with original UI and private materialization retained. Wildcard hover/pressed exclusions follow FlatLaf's own implementation.
+- Task 3: Ruling: Record Islands variants of One Dark/Dracula/Catppuccin/Xcode as excluded, preserve all six current Gruvbox variants under approved names — approved set names only the classic variants except Gruvbox's current six — cost if wrong: user can expand catalog by manifest change.
+- Task 3: Ruling: Explicitly expose One Dark Modern's scheme at the path its JSON declares — pinned source stores theme/one_dark_modern.xml but JSON requests /one_dark_modern.xml; bytes remain unchanged and packagingNotes/SOURCE record the alias — cost if wrong: remove the alias and retain the warning/fallback.
+- Task 3: Ruling: Treat Alacritty Catppuccin Frappe as an alias of canonical Catppuccin Frappé, removing its duplicate palette output — equivalent family/spelling and approved native-family precedence — cost if wrong: restore one separate variant; old selection spelling is retained in manifest.
+- Task 3: Ruling: Preserve the classic Darcula named-scheme association explicitly in the lock — its JSON has no editorScheme, but Jasper's original built-in used EditorScheme.named("Darcula"); regression RED proves generic fallback changed #2b2b2b to #282a36 — cost if wrong: delete manifest scheme association.
+- Task 3: Ruling: Omit inferred tokens affected by FlatLaf's post-JSON theme/author properties, using pinned dependency data; honor start/end gradient precedence and ordered mapped aliases — whole-catalog installed/workspace parity produced mismatches across 12 effective keys, so raw inverse colors cannot safely outrank runtime defaults — cost if wrong: smaller explicit-token export while preserved UI determines effective appearance. No EDT materialization or platform selection occurs in conversion.
+- Task 4: Ruling: Preserve an already successful publication result even if temporary cleanup fails; log cleanup failure and never delete a replacement file — otherwise an I/O cleanup error would report failure after the target was committed — cost if wrong: an owned hidden temporary may require later cleanup. SecureDirectoryStream pins cleanup where supported, with identity-checked fallback and no writes through observed replaced/symlink directories.
+- Task 5: Ruling: Stage all converted outputs before any original moves — a local parent can itself be migrated before a dependent source resumes — cost if wrong: additional temporary disk space; staged hashes prevent changed bytes being published. Cleanup after a durable marker follows Task 4 success semantics.
+- Final fix pass Ruling: narrowly relax Task 5's “Do not rewrite native TOMLs” for a valid native document whose previously resolved legacy parent is renamed. Journal a comment-preserving `extends` edit, expected/desired fingerprints and parent identity, preserve the original in legacy, and recover interruption before/after replacement. This preserves the binding design's existing-theme behavior. Cost if wrong: an existing native reference changes; its exact original remains in the backup and stale files are never overwritten.
+- Final fix pass Ruling: native import scans bounded regular sibling TOMLs by declared name and filename order before bundled parents (4096 files, 64 MiB aggregate, 256 KiB per parent), rather than the plan's literal-name sidecar assumption. Cost if wrong: exceptionally large source folders require isolating the import and its parents; unrelated malformed native siblings are skipped.

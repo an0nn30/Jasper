@@ -48,7 +48,7 @@ public final class ThemeMigration {
             var previous = state.configIntent();
             if (previous != null && (!previous.configFileName().equals(intent.configFileName()) || !previous.before().equals(intent.before()) || !previous.after().equals(intent.after())))
                 throw new IOException("Pending configuration intent conflicts with this edit");
-            journal.write(new MigrationJournal.State(state.generation(), state.sources(), state.workspaceAliases(), intent));
+            journal.write(new MigrationJournal.State(state.generation(), state.sources(), state.workspaceAliases(), intent, state.nativeEdits()));
             return null;
         });
     }
@@ -117,6 +117,7 @@ public final class ThemeMigration {
         // Every successful conversion is staged before any source moves, including files used as local parents.
         for (int i = 0; i < context.state.sources().size(); i++) stage(context, i, plannedBytes);
         for (int i = 0; i < context.state.sources().size(); i++) publish(context, i);
+        for (int i = 0; i < context.state.nativeEdits().size(); i++) applyNativeEdit(context, i);
         Path terminal = home.resolve("terminal-themes");
         if (Files.isDirectory(terminal, LinkOption.NOFOLLOW_LINKS)) {
             try (var children = Files.list(terminal)) { if (children.findAny().isEmpty()) Files.delete(terminal); }
@@ -134,12 +135,15 @@ public final class ThemeMigration {
     private Planned plan(MigrationJournal journal) throws IOException {
         var inputs = new ArrayList<Input>(); var candidates = new ArrayList<Candidate>();
         var nativeNames = new HashSet<String>();
+        var nativeBytes = new HashMap<String, byte[]>();
         for (String folder : List.of("themes", "terminal-themes")) for (Path file : regularFiles(folder)) {
             String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
             String relative = folder + "/" + file.getFileName();
             if (folder.equals("themes") && name.endsWith(".toml")) {
                 try {
-                    var document = ThemeToml.parse(new String(MigrationJournal.readBounded(file, ThemeCatalog.MAX_THEME_FILE), StandardCharsets.UTF_8), relative);
+                    byte[] content = MigrationJournal.readBounded(file, ThemeCatalog.MAX_THEME_FILE);
+                    var document = ThemeToml.parse(new String(content, StandardCharsets.UTF_8), relative);
+                    nativeBytes.put(relative, content);
                     candidates.add(new Candidate(document, relative, "", true));
                 } catch (IOException | RuntimeException ignored) { /* Existing broken native files remain untouched. */ }
                 continue;
@@ -210,7 +214,70 @@ public final class ThemeMigration {
             sources.add(new MigrationJournal.Source(input.relative(), input.hash(), input.key(), destination, complete, false, false, outputs, problems));
             staged.put(input.relative(), bytes);
         }
-        return new Planned(new MigrationJournal.State(generation, sources, aliases, null), staged);
+        var edits = new ArrayList<MigrationJournal.NativeEdit>();
+        for (Candidate candidate : candidates) {
+            if (!candidate.nativeFile() || candidate.document().parent().isEmpty()) continue;
+            try { ThemeResolver.resolve(candidate.document(), name -> named(documents, name)); }
+            catch (RuntimeException invalid) { continue; }
+            String parentName = candidate.document().parent().orElseThrow();
+            var layers = named(documents, parentName);
+            int first = key(candidate.document().name()).equals(key(parentName)) ? layers.indexOf(candidate.document()) + 1 : 0;
+            ThemeDocument parent = null;
+            for (int i = first; i < layers.size(); i++) {
+                try { ThemeResolver.resolve(layers.get(i), name -> named(documents, name)); parent = layers.get(i); break; }
+                catch (RuntimeException invalid) { /* Same first-resolvable-layer rule as the catalog. */ }
+            }
+            ThemeDocument selected = parent;
+            var owner = candidates.stream().filter(value -> !value.nativeFile() && value.document() == selected).findFirst();
+            if (owner.isEmpty()) continue;
+            var output = sources.stream().filter(value -> value.path().equals(owner.get().source()))
+                .flatMap(value -> value.outputs().stream()).filter(value -> value.provider().equals(owner.get().provider())).findFirst();
+            if (output.isEmpty() || key(output.get().name()).equals(key(parentName))) continue;
+            byte[] original = nativeBytes.get(candidate.source());
+            String edited = dev.jasper.app.settings.TomlDocument.parse(new String(original, StandardCharsets.UTF_8))
+                .set(List.of("extends"), MigrationJournal.quoted(output.get().name())).text();
+            byte[] content = edited.getBytes(StandardCharsets.UTF_8);
+            if (content.length > ThemeCatalog.MAX_THEME_FILE) throw new IOException("Native parent edit exceeds theme size limit");
+            String backup = "themes/legacy/" + reserve("native-" + ThemeFiles.fileId(candidate.source()), ".toml", legacyFiles);
+            edits.add(new MigrationJournal.NativeEdit(candidate.source(), ThemeSources.hash(original), fileKey(journal.resolve(candidate.source())),
+                ThemeSources.hash(content), edited, backup, output.get().path(), output.get().hash(), false, ""));
+        }
+        return new Planned(new MigrationJournal.State(generation, sources, aliases, null, edits), staged);
+    }
+
+    private static List<ThemeDocument> named(List<ThemeDocument> documents, String name) {
+        return documents.stream().filter(document -> key(document.name()).equals(key(name))).toList();
+    }
+
+    private void applyNativeEdit(Context context, int index) throws IOException {
+        var edit = context.state.nativeEdits().get(index);
+        if (edit.applied() || !edit.problem().isEmpty()) return;
+        try {
+            Path target = context.journal.resolve(edit.path()), backup = context.journal.resolve(edit.backup());
+            String current = ThemeSources.hash(MigrationJournal.readBounded(target, ThemeCatalog.MAX_THEME_FILE));
+            if (current.equals(edit.desiredHash())) {
+                // A crash may occur after replacement but before recording progress.
+                if (!edit.hash().equals(ThemeSources.hash(MigrationJournal.readBounded(backup, ThemeCatalog.MAX_THEME_FILE)))
+                        || !edit.fileKey().equals(fileKey(backup))) throw new IOException("Native theme backup changed; original edit not acknowledged");
+            } else {
+                if (!current.equals(edit.hash()) || !edit.fileKey().equals(fileKey(target)))
+                    throw new IOException("Native theme changed after migration planning; parent reference retained; use Import to repair");
+                Path parent = context.journal.resolve(edit.parentPath());
+                if (!edit.parentHash().equals(ThemeSources.hash(MigrationJournal.readBounded(parent, ThemeCatalog.MAX_THEME_FILE))))
+                    throw new IOException("Migrated native parent is unavailable or changed; parent reference retained");
+                if (Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) {
+                    if (!edit.fileKey().equals(fileKey(backup)) || !edit.hash().equals(ThemeSources.hash(MigrationJournal.readBounded(backup, ThemeCatalog.MAX_THEME_FILE))))
+                        throw new IOException("Native backup destination is occupied; original retained");
+                } else Files.createLink(backup, target);
+                fault.accept("native-backup");
+                MigrationJournal.atomic(target, edit.text().getBytes(StandardCharsets.UTF_8), edit.hash());
+                fault.accept("native-edit");
+            }
+            context.state = context.state.replacingEdit(index, edit.progress(true, ""));
+        } catch (IOException failure) {
+            context.state = context.state.replacingEdit(index, edit.progress(false, failure.getMessage()));
+        }
+        context.journal.write(context.state);
     }
 
     private void stage(Context context, int index, Map<String, Map<String, byte[]>> plannedBytes) throws IOException {
@@ -333,6 +400,10 @@ public final class ThemeMigration {
                 if (!output.workspaceKey().isEmpty() && !output.workspaceKey().equals(key(output.name()))) workspace.put(output.workspaceKey(), output.name());
             }
         }
+        for (var edit : state.nativeEdits()) {
+            if (!edit.problem().isEmpty()) problems.add(new ThemeCatalog.Problem(home.resolve(edit.path()), edit.problem()));
+            if (!completed && edit.applied()) originals.add(journal.resolve(edit.backup()));
+        }
         return new MigrationReport(state.generation(), completed, chrome, workspace, outputs, originals, problems);
     }
 
@@ -346,10 +417,19 @@ public final class ThemeMigration {
     }
     private static String sourceHash(Path path) throws IOException {
         if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Not a regular legacy source");
+        String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        long limit = name.endsWith(".jar") || name.endsWith(".zip") ? ThemeArchive.MAX_ARCHIVE : ThemeArchive.MAX_FILE;
+        String oversized = path.getFileName() + " is larger than " + limit + " bytes; use Import after reducing its size";
+        if (Files.size(path) > limit) throw new IOException(oversized);
         try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
             var digest = java.security.MessageDigest.getInstance("SHA-256");
             byte[] buffer = new byte[8192]; int count;
-            while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+            long read = 0;
+            while ((count = input.read(buffer, 0, (int) Math.min(buffer.length, limit - read + 1))) != -1) {
+                read += count;
+                if (read > limit) throw new IOException(oversized);
+                digest.update(buffer, 0, count);
+            }
             return java.util.HexFormat.of().formatHex(digest.digest());
         } catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
     }

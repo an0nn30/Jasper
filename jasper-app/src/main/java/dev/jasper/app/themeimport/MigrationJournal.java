@@ -25,9 +25,20 @@ final class MigrationJournal {
             return new Source(path, hash, fileKey, legacy, convertible, relocated, stopped, values, diagnostics);
         }
     }
-    record State(String generation, List<Source> sources, java.util.Map<String, String> workspaceAliases, ThemeMigration.ConfigIntent configIntent) {
-        State { sources = List.copyOf(sources); workspaceAliases = java.util.Map.copyOf(workspaceAliases); }
-        State replacing(int index, Source source) { var next = new ArrayList<>(sources); next.set(index, source); return new State(generation, next, workspaceAliases, configIntent); }
+    record NativeEdit(String path, String hash, String fileKey, String desiredHash, String text, String backup,
+                      String parentPath, String parentHash, boolean applied, String problem) {
+        NativeEdit progress(boolean done, String diagnostic) {
+            return new NativeEdit(path, hash, fileKey, desiredHash, text, backup, parentPath, parentHash, done, diagnostic);
+        }
+    }
+    record State(String generation, List<Source> sources, java.util.Map<String, String> workspaceAliases,
+                 ThemeMigration.ConfigIntent configIntent, List<NativeEdit> nativeEdits) {
+        State { sources = List.copyOf(sources); workspaceAliases = java.util.Map.copyOf(workspaceAliases); nativeEdits = List.copyOf(nativeEdits); }
+        State(String generation, List<Source> sources, java.util.Map<String, String> aliases, ThemeMigration.ConfigIntent intent) {
+            this(generation, sources, aliases, intent, List.of());
+        }
+        State replacing(int index, Source source) { var next = new ArrayList<>(sources); next.set(index, source); return new State(generation, next, workspaceAliases, configIntent, nativeEdits); }
+        State replacingEdit(int index, NativeEdit edit) { var next = new ArrayList<>(nativeEdits); next.set(index, edit); return new State(generation, sources, workspaceAliases, configIntent, next); }
     }
     private final Path home;
     private final Path file;
@@ -38,6 +49,12 @@ final class MigrationJournal {
     State read() throws IOException {
         if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) { expectedHash = null; return null; }
         byte[] bytes = readBounded(file, MAX_BYTES);
+        State state = parse(bytes);
+        expectedHash = ThemeSources.hash(bytes);
+        return state;
+    }
+
+    private static State parse(byte[] bytes) throws IOException {
         try {
             var toml = Toml.parse(StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString());
             if (toml.hasErrors()) throw new IOException("Invalid migration journal: " + toml.errors().getFirst());
@@ -56,7 +73,7 @@ final class MigrationJournal {
                 boolean convertible = bool(source, "convertible"), moved = bool(source, "moved"), blocked = bool(source, "blocked");
                 var outputs = new ArrayList<Output>(); var providers = new HashSet<String>();
                 var out = source.getArray("outputs");
-                if (out == null || out.size() > ThemeArchive.MAX_PROVIDERS) throw new IOException("Missing/oversized output list");
+                if (out == null || out.size() > ThemeArchive.MAX_PROVIDERS * ThemeArchive.MAX_NESTED_JARS) throw new IOException("Missing/oversized output list");
                 for (int j = 0; j < out.size(); j++) {
                     var output = out.getTable(j); String target = required(output, "path"); outputPath(target);
                     if (!outputPaths.add(target.toLowerCase(java.util.Locale.ROOT))) throw new IOException("Duplicate journal output");
@@ -74,7 +91,6 @@ final class MigrationJournal {
                 for (int j = 0; j < problemArray.size(); j++) problems.add(problemArray.getString(j));
                 sources.add(new Source(path, hash, fileKey, legacy, convertible, moved, blocked, outputs, problems));
             }
-            expectedHash = ThemeSources.hash(bytes);
             var aliases = new java.util.LinkedHashMap<String, String>();
             var aliasTable = toml.getTable("workspace_aliases");
             if (aliasTable != null) for (String key : aliasTable.keySet()) {
@@ -89,7 +105,32 @@ final class MigrationJournal {
                 intent = new ThemeMigration.ConfigIntent(filename, expected, desired, values(config.getTable("before")), values(config.getTable("after")));
                 validateIntent(intent);
             }
-            return new State(generation, sources, aliases, intent);
+            var edits = new ArrayList<NativeEdit>();
+            var editArray = toml.getArray("native_edits");
+            if (editArray != null) {
+                if (editArray.size() > 4096) throw new IOException("Oversized native edit list");
+                var editedPaths = new HashSet<String>();
+                for (int i = 0; i < editArray.size(); i++) {
+                    var entry = editArray.getTable(i);
+                    String path = required(entry, "path"), backup = required(entry, "backup"), parent = required(entry, "parent_path");
+                    sourcePath(path); legacyPath(backup); outputPath(parent);
+                    if (!path.startsWith("themes/") || !path.toLowerCase(java.util.Locale.ROOT).endsWith(".toml")
+                            || sourcePaths.contains(path) || outputPaths.contains(path.toLowerCase(java.util.Locale.ROOT))
+                            || !editedPaths.add(path.toLowerCase(java.util.Locale.ROOT)) || !legacyPaths.add(backup.toLowerCase(java.util.Locale.ROOT)))
+                        throw new IOException("Conflicting native edit path");
+                    String original = required(entry, "hash"), desired = required(entry, "desired_hash"), parentHash = required(entry, "parent_hash");
+                    hash(original); hash(desired); hash(parentHash);
+                    String text = required(entry, "text"); byte[] content = text.getBytes(StandardCharsets.UTF_8);
+                    if (content.length > dev.jasper.app.appearance.ThemeCatalog.MAX_THEME_FILE || !ThemeSources.hash(content).equals(desired))
+                        throw new IOException("Invalid native edit content");
+                    dev.jasper.app.appearance.ThemeToml.parse(text, path);
+                    if (sources.stream().flatMap(source -> source.outputs().stream()).noneMatch(output -> output.path().equals(parent) && output.hash().equals(parentHash)))
+                        throw new IOException("Native edit has no planned parent");
+                    edits.add(new NativeEdit(path, original, required(entry, "file_key"), desired, text, backup, parent, parentHash,
+                        bool(entry, "applied"), string(entry, "problem")));
+                }
+            }
+            return new State(generation, sources, aliases, intent, edits);
         } catch (RuntimeException invalid) { throw new IOException("Invalid migration journal: " + invalid.getMessage(), invalid); }
     }
 
@@ -112,6 +153,13 @@ final class MigrationJournal {
                 text.append("published = ").append(output.published()).append('\n'); value(text, "chrome_key", output.chromeKey()); value(text, "workspace_key", output.workspaceKey());
             }
         }
+        for (NativeEdit edit : state.nativeEdits()) {
+            text.append("\n[[native_edits]]\n");
+            value(text, "path", edit.path()); value(text, "hash", edit.hash()); value(text, "file_key", edit.fileKey());
+            value(text, "desired_hash", edit.desiredHash()); value(text, "text", edit.text()); value(text, "backup", edit.backup());
+            value(text, "parent_path", edit.parentPath()); value(text, "parent_hash", edit.parentHash());
+            text.append("applied = ").append(edit.applied()).append('\n'); value(text, "problem", edit.problem());
+        }
         if (state.configIntent() != null) {
             var intent = state.configIntent(); validateIntent(intent);
             text.append("\n[config_intent]\n"); value(text, "file", intent.configFileName());
@@ -121,6 +169,7 @@ final class MigrationJournal {
         }
         byte[] bytes = text.toString().getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_BYTES) throw new IOException("Migration journal is larger than 4 MiB");
+        if (!state.equals(parse(bytes))) throw new IOException("Migration journal does not round-trip");
         atomic(file, bytes, expectedHash);
         expectedHash = ThemeSources.hash(bytes);
     }

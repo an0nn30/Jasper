@@ -26,6 +26,96 @@ class ThemeMigrationTest {
         }
         return text;
     }
+    @ParameterizedTest @ValueSource(strings = {"none", "intent", "output", "original", "native-backup", "native-edit"})
+    void preservesSameNameNativeInheritanceAcrossEveryBoundary(String boundary) throws Exception {
+        plugin("z.jar", "Custom");
+        String original = "# keep my override\nname='Custom'\nextends='Custom' # my parent\n[colors]\naccent='#abcdef'\n";
+        Path nativeFile = Files.writeString(home.resolve("themes/a.toml"), original);
+        var once = new java.util.concurrent.atomic.AtomicBoolean();
+        var interrupted = new ThemeMigration(home, step -> { if (step.equals(boundary) && !once.getAndSet(true)) throw new Crash(); });
+        if (!boundary.equals("none")) assertThatThrownBy(interrupted::run).isInstanceOf(Crash.class);
+        var migration = new ThemeMigration(home); var report = migration.run(); migration.complete(report);
+        var theme = dev.jasper.app.appearance.ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Custom");
+        assertThat(theme).isPresent();
+        assertThat(theme.orElseThrow().source().document().seeds()).containsEntry(dev.jasper.app.appearance.Seed.BACKGROUND, new java.awt.Color(0x010203));
+        assertThat(Files.readString(nativeFile)).contains("# keep my override", "# my parent", "accent='#abcdef'");
+        assertThat(ThemeToml.parse(Files.readString(nativeFile), "a.toml").parent()).contains("Custom 2");
+        try (var saved = Files.list(home.resolve("themes/legacy"))) {
+            assertThat(saved.filter(path -> path.toString().endsWith(".toml") && !path.getFileName().toString().equals("migration.toml")).map(path -> {
+                try { return Files.readString(path); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+            }).toList()).containsExactly(original);
+        }
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"native", "backup", "parent"})
+    void staleNativeParentEditsNeverClobberUserFiles(String changed) throws Exception {
+        plugin("z.jar", "Custom");
+        Path nativeFile = Files.writeString(home.resolve("themes/a.toml"), "name='Custom'\nextends='Custom'\n");
+        assertThatThrownBy(() -> new ThemeMigration(home, step -> { if (step.equals("intent")) throw new Crash(); }).run()).isInstanceOf(Crash.class);
+        var journal = new MigrationJournal(home); var edit = journal.read().nativeEdits().getFirst();
+        Path occupied = switch (changed) {
+            case "backup" -> home.resolve(edit.backup());
+            case "parent" -> home.resolve(edit.parentPath());
+            default -> nativeFile;
+        };
+        Files.writeString(occupied, "# user's change\n");
+        var migration = new ThemeMigration(home); var report = migration.run(); migration.complete(report);
+        assertThat(Files.readString(occupied)).isEqualTo("# user's change\n");
+        assertThat(report.problems()).isNotEmpty();
+        if (!changed.equals("native")) assertThat(ThemeToml.parse(Files.readString(nativeFile), "a.toml").parent()).contains("Custom");
+    }
+
+    @Test void nativeChildKeepsLegacyParentThatWonOverLaterNativeCollision() throws Exception {
+        plugin("a.jar", "Custom");
+        Files.writeString(home.resolve("themes/z.toml"), ThemeTomlWriter.write(named("Custom")));
+        Path child = Files.writeString(home.resolve("themes/child.toml"), "name='Child'\nextends='Custom'\n");
+        var migration = new ThemeMigration(home); var report = migration.run(); migration.complete(report);
+        var theme = dev.jasper.app.appearance.ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Child").orElseThrow();
+        assertThat(theme.source().document().seeds()).containsEntry(dev.jasper.app.appearance.Seed.BACKGROUND, new java.awt.Color(0x010203));
+        assertThat(ThemeToml.parse(Files.readString(child), "child.toml").parent()).contains("Custom 2");
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"oversize.jar", "oversize.theme.json", "oversize.toml"})
+    void sourceFingerprintRejectsOversizedFilesAndKeepsWarningsBounded(String name) throws Exception {
+        Path path = home.resolve(name.endsWith(".toml") ? "terminal-themes" : "themes").resolve(name);
+        Files.createDirectories(path.getParent());
+        long limit = name.endsWith(".jar") ? ThemeArchive.MAX_ARCHIVE : ThemeArchive.MAX_FILE;
+        try (var channel = java.nio.channels.FileChannel.open(path, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE)) {
+            channel.position(limit); channel.write(java.nio.ByteBuffer.wrap(new byte[] {0}));
+        }
+        var hash = ThemeMigration.class.getDeclaredMethod("sourceHash", Path.class); hash.setAccessible(true);
+        assertThatThrownBy(() -> hash.invoke(null, path)).hasCauseInstanceOf(java.io.IOException.class);
+        var migration = new ThemeMigration(home); var report = migration.run(); migration.complete(report);
+        assertThat(path).exists(); assertThat(report.outputs()).isEmpty();
+        assertThat(migration.problems()).anyMatch(problem -> problem.message().contains("larger than"));
+        assertThat(migration.problems()).isEqualTo(migration.problems());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"none", "output", "original"})
+    void nestedProvidersCompleteAndResumeBeyondOneJarLimit(String boundary) throws Exception {
+        var outer = new java.util.LinkedHashMap<String, byte[]>();
+        for (int jar = 0; jar < 2; jar++) {
+            var entries = new java.util.LinkedHashMap<String, byte[]>();
+            var names = new String[33];
+            for (int i = 0; i < names.length; i++) {
+                names[i] = "theme-" + i + ".theme.json";
+                entries.put(names[i], ThemeFixtures.theme("Theme " + jar + " " + i, true, null, "#123456").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            entries.put("META-INF/plugin.xml", ThemeFixtures.pluginXml("Many", names).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            outer.put("plugin/lib/themes-" + jar + ".jar", ThemeFixtures.jarBytes(entries));
+        }
+        Path original = ThemeFixtures.jar(home.resolve("themes/many.zip"), outer);
+        assertThat(ThemeConverter.convertAll(original).results()).hasSize(66);
+        var once = new java.util.concurrent.atomic.AtomicBoolean();
+        var migration = new ThemeMigration(home, step -> { if (step.equals(boundary) && !once.getAndSet(true)) throw new Crash(); });
+        if (!boundary.equals("none")) assertThatThrownBy(migration::run).isInstanceOf(Crash.class);
+        var resumed = new ThemeMigration(home); var report = resumed.run();
+        assertThat(report.outputs()).hasSize(66);
+        resumed.complete(report);
+        assertThat(new ThemeMigration(home).run().completed()).isTrue();
+        assertThat(original).doesNotExist();
+    }
+
     @Test void completedPassKeepsFailedOriginalAndDiagnostics() throws Exception {
         Files.createDirectories(home.resolve("themes"));
         Path bad = Files.write(home.resolve("themes/bad.jar"), new byte[] {1, 2, 3});

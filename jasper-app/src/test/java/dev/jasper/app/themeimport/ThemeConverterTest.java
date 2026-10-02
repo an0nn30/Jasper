@@ -25,6 +25,17 @@ class ThemeConverterTest {
         return ThemeConverter.convert(file("test.theme.json", json)).getFirst().document();
     }
 
+    @Test void nativeParentsUseDeclaredNamesAndLocalFilenamePrecedence() throws Exception {
+        file("ocean-base.toml", "name='Ocean Base'\nextends='Jasper Dark'\n[colors]\nbackground='#123456'\n");
+        var child = ThemeConverter.convert(file("child.toml", "name='Child'\nextends='oCEan bASE'\n")).getFirst().document();
+        assertThat(child.seeds()).containsEntry(Seed.BACKGROUND, new Color(0x123456));
+        file("a-override.toml", "name='Jasper Dark'\nextends='Jasper Dark'\n[colors]\nbackground='#654321'\n");
+        var override = ThemeConverter.convert(home.resolve("a-override.toml")).getFirst().document();
+        assertThat(override.seeds()).containsEntry(Seed.BACKGROUND, new Color(0x654321));
+        var local = ThemeConverter.convert(file("local-child.toml", "name='Local Child'\nextends='Jasper Dark'\n")).getFirst().document();
+        assertThat(local.seeds()).containsEntry(Seed.BACKGROUND, new Color(0x654321));
+    }
+
     @Test void flattensParentsAndSyntaxWithoutLosingFlags() throws Exception {
         file("Parent.theme.json", """
             {"name":"Parent","parentTheme":"Darcula","colors":{"base":"#223344"},

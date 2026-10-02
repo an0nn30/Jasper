@@ -134,19 +134,36 @@ public final class ThemeConverter {
                 palette.palette().orElseThrow(), source.getFileName().toString()), palette.problems(), source.getFileName().toString());
         }
         ThemeDocument document = ThemeToml.parse(text, source.getFileName().toString());
-        var available = new ArrayList<ThemeDocument>(); available.add(document);
-        // Native import resolves only the explicitly named sibling file or bundled parent.
-        ThemeDocument current = document;
-        for (int depth = 0; depth < 32 && current.parent().isPresent(); depth++) {
-            String name = current.parent().orElseThrow();
-            var bundled = ThemeManager.builtIns().stream().filter(theme -> theme.name().strip().equalsIgnoreCase(name.strip())).findFirst();
-            if (bundled.isPresent()) { available.add(bundled.get().source().document()); break; }
-            Path parent = child(source.toAbsolutePath().getParent(), name + ".toml");
-            if (!Files.exists(parent, LinkOption.NOFOLLOW_LINKS)) break;
-            current = ThemeToml.parse(read(parent), parent.getFileName().toString());
-            if (available.stream().anyMatch(item -> item.origin().equals(parent.getFileName().toString()))) break;
-            available.add(current);
+        var available = new ArrayList<ThemeDocument>();
+        // Match catalog semantics: declared names, local filename order, then bundled layers.
+        Path root = source.toAbsolutePath().normalize().getParent();
+        try (var siblings = Files.list(root)) {
+            var paths = siblings.filter(path -> !path.getFileName().toString().startsWith(".")
+                    && path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".toml")
+                    && Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+                .limit(4097)
+                .sorted(java.util.Comparator.comparing((Path path) -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(path -> path.getFileName().toString()))
+                .toList();
+            if (paths.size() > 4096) throw new IOException("Native import folder has more than 4096 theme files");
+            long total = 0;
+            for (Path path : paths) {
+                if (path.equals(source.toAbsolutePath().normalize())) { available.add(document); continue; }
+                byte[] content;
+                try {
+                    if (Files.size(path) > ThemeCatalog.MAX_THEME_FILE) continue;
+                    content = MigrationJournal.readBounded(path, ThemeCatalog.MAX_THEME_FILE);
+                } catch (IOException invalid) { continue; }
+                total += content.length;
+                if (total > ThemeArchive.MAX_ARCHIVE) throw new IOException("Native import parents exceed 64 MiB");
+                try {
+                    available.add(ThemeToml.parse(StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(content)).toString(),
+                        path.getFileName().toString()));
+                } catch (IllegalArgumentException | java.nio.charset.CharacterCodingException invalid) { /* Broken siblings do not shadow valid parents. */ }
+            }
         }
+        if (!available.contains(document)) available.addFirst(document);
+        ThemeManager.builtIns().forEach(theme -> available.add(theme.source().document()));
         var flattened = ThemeResolver.resolve(document, name -> available.stream().filter(item -> item.name().strip().equalsIgnoreCase(name.strip())).toList());
         return new ConversionResult(flattened, List.of(), source.getFileName().toString());
     }

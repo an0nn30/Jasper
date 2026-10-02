@@ -8,6 +8,15 @@ import static org.assertj.core.api.Assertions.*;
 
 class MigrationJournalTest {
     @TempDir Path home;
+    @Test void writerRejectsInvalidIntentBeforePublishingIt() throws Exception {
+        Files.createDirectories(home.resolve("themes/legacy"));
+        var journal = new MigrationJournal(home);
+        var source = new MigrationJournal.Source("themes/../escape.jar", "0".repeat(64), "identity", "themes/legacy/source.jar", false, false, false, java.util.List.of(), java.util.List.of());
+        assertThatThrownBy(() -> journal.write(new MigrationJournal.State(java.util.UUID.randomUUID().toString(), java.util.List.of(source), java.util.Map.of(), null)))
+            .isInstanceOf(java.io.IOException.class);
+        assertThat(journal.file()).doesNotExist();
+    }
+
     @Test void corruptJournalAndMarkerFailClosedWithoutMovingOriginals() throws Exception {
         Files.createDirectories(home.resolve("themes/legacy"));
         Path original = dev.jasper.app.appearance.ThemeFixtures.plugin(home.resolve("themes/fixture.jar"), "Example", true, "#123456", "010203");

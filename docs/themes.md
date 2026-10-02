@@ -113,6 +113,9 @@ Before the initial configuration is loaded, Jasper upgrades legacy files beside 
 - `themes/legacy/migration.toml` records hashes, output names, ownership and progress. Staged output permits safe
   resume after interruption. `.migrated` is written only after the config step succeeds. Config edits preserve
   unrelated text/comments and keep numbered `<config>.v1.bak` backups.
+- If a renamed legacy theme is the parent of an existing native theme, migration updates only that native file’s
+  `extends` value, preserving comments and backing up the original in `themes/legacy/`. Interrupted edits resume from
+  the journal; changed native files or occupied backups are retained with warnings.
 - Changed originals, edited outputs, corrupt recovery files or conflicting config edits are retained with warnings.
   A completed pass does not silently reconvert failed or newly added legacy files. Removing a failed input clears
   its warning on config reload. The Import service is available internally; its user dialog is Plan 5.
