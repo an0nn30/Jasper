@@ -10,7 +10,7 @@
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), especially §§2.3, 6.3, 7–9. Read it together with this plan, [Plan 4](2026-10-01-theme-system-4-conversion-migration.md), and [STATUS](../../STATUS.md).
 
-**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Tasks 3–6 remain.
+**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Tasks 4–6 remain.
 
 **Execution ruling:** Task 1 preserves the pre-existing bounded startup scan wait on EDT; the original plan incorrectly described its caller as off EDT. No new runtime EDT waits are introduced. Cost: existing initial scan latency remains; a bootstrap handoff change is separate work.
 
@@ -206,7 +206,7 @@ git commit -m "feat(themes): add safe inherited copies and removal" -m "Co-Autho
 - Produces package-private ThemeChoices enums `Tone { ALL, DARK, LIGHT }`, `Source { ALL, BUNDLED, MINE }` and `static List<Theme> filter(ThemeCatalog.Snapshot catalog, String query, Tone tone, Source source)`.
 - Produces package-private ThemePicker with `ThemePicker(boolean workspace, Consumer<String> selected)`, `void update(ThemeCatalog.Snapshot catalog, String requested)`, `String requested()`, `void reveal()`. Owns search/filter widgets and a JList; its root is a JPanel. A row's identity uses Theme source/id; callback carries the canonical display name or `match`.
 
-- [ ] **Step 1: Write failing tests.** Filter a snapshot containing a bundled light theme, bundled dark theme and a user dark theme; combine case-insensitive substring query with both filter axes and assert deterministic case-insensitive name order. For a user override of a bundled name, only the catalog winner appears and is Mine. Test empty-result text, keyboard selection and name strings starting `<html>` displayed literally.
+- [x] **Step 1: Write failing tests.** Filter a snapshot containing a bundled light theme, bundled dark theme and a user dark theme; combine case-insensitive substring query with both filter axes and assert deterministic case-insensitive name order. For a user override of a bundled name, only the catalog winner appears and is Mine. Test empty-result text, keyboard selection and name strings starting `<html>` displayed literally.
 
 Create PageContext and SettingsDraft from ConfigLoader.parse; run widget work on EDT. Tests stage UI and workspace independently and assert:
 
@@ -225,7 +225,7 @@ assertThat(draft.modified(CoreSettings.UI_THEME_WORKSPACE)).isFalse();
 
 Drive actual list selection as well; assert it produces those edits, while filtering produces none. Refresh after deleting the staged theme: requested name and draft edit remain, the missing status appears, and a repair restores the row. `match` is first and available under every filter. Invalid files without a Theme still appear in diagnostics with filename/line. Repeated refresh must preserve filters, caret and scroll selection; dispose twice closes draft listeners once.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ThemeChoicesTest' --tests '*ThemesPageTest'
@@ -233,14 +233,14 @@ Drive actual list selection as well; assert it produces those edits, while filte
 
 Expected: page/filter/picker classes missing.
 
-- [ ] **Step 3: Implement the page and widgets.** Use JList single selection with a renderer that shows plain text plus six swatches: background, accent, ANSI red/green/blue/yellow (indices 1/2/4/3). Derive the row's effective colors on EDT, cache only current rows/themes, and do not generate every theme repeatedly from paint. Set each list to seven visible rows in its own scroll pane; place the page body in a scrollable container so file actions and preview remain reachable in the existing Settings window. Search is a separate JTextField per picker; filter selectors are keyboard accessible and have labels/accessible names. Rebuilding models suppresses selection callbacks; selecting a row by keyboard/mouse stages precisely one setting. Match is a distinct row, never a fake user Theme.
+- [x] **Step 3: Implement the page and widgets.** Use JList single selection with a renderer that shows plain text plus six swatches: background, accent, ANSI red/green/blue/yellow (indices 1/2/4/3). Derive the row's effective colors on EDT, cache only current rows/themes, and do not generate every theme repeatedly from paint. Set each list to seven visible rows in its own scroll pane; place the page body in a scrollable container so file actions and preview remain reachable in the existing Settings window. Search is a separate JTextField per picker; filter selectors are keyboard accessible and have labels/accessible names. Rebuilding models suppresses selection callbacks; selecting a row by keyboard/mouse stages precisely one setting. Match is a distinct row, never a fake user Theme.
 
 ThemesPage owns both controls, a diagnostics area and a reserved preview region for Task 4. `modified()` returns false and `apply()` returns completedFuture(null): the shared draft owns pending changes and saves exactly once. `reset()` calls draft.reset for these two settings only. `valid()` permits existing missing names because fallback is supported; parse/install warnings are visible rather than silently rewriting selections. `refresh()` reads only supplier.latest data and draft values. `reveal("ui"|"workspace")` focuses the corresponding picker; unknown fragments ignored. `helpAnchor()` is `theme`.
 
 `searchTerms()` includes exactly the requested keywords plus the two labels: theme, colour scheme, palette, alacritty, intellij, marketplace, syntax, workspace. `highlight` updates matching labels without changing list queries. Implement lazy component creation and idempotent dispose, releasing subscriptions even if component was never requested. Dependencies of themesui become appearance, config, settingsui, lifecycle and terminal config/session/view; later tasks add themeimport/windows. No settingsui→themesui dependency.
 
-- [ ] **Step 4: Run GREEN.** Repeat Step 2, then `./gradlew verifyApplicationArchitecture`; pass. The page remains unregistered until Task 6 supplies complete actions/preview.
-- [ ] **Step 5: Commit.**
+- [x] **Step 4: Run GREEN.** Repeat Step 2, then `./gradlew verifyApplicationArchitecture`; pass. The page remains unregistered until Task 6 supplies complete actions/preview.
+- [x] **Step 5: Commit.**
 
 ```bash
 git add jasper-app/src
