@@ -236,6 +236,66 @@ class DockGeometryTest {
         assertThat(layout.divider(Handle.LEFT_WIDTH).orElseThrow().bounds().width).isEqualTo(6);
     }
 
+    @Test void theBottomAreaGrowsOnlyUntilASplitSidesHalvesReachTheirMinimum() {
+        DockState state = showing(Slot.LEFT_TOP, Slot.LEFT_BOTTOM, Slot.BOTTOM_LEFT);
+        var bar = layout(1144, 746, state).divider(Handle.BOTTOM_HEIGHT).orElseThrow();
+        // Above the bottom area the halves need 120 + 6 + 120 = 246, more than the terminal's 120.
+        assertThat(List.of(bar.position(), bar.minimum(), bar.maximum())).containsExactly(540, 246, 620);
+        DockGeometry.drag(state, bar, 0, Metrics.DEFAULT);
+        assertThat(state.size(Side.BOTTOM)).as("the limit leaves the halves their minimum").isEqualTo(746 - 6 - 246);
+
+        Layout limit = layout(1144, 746, state);
+        assertThat(limit.slot(Slot.LEFT_TOP)).hasValue(rect(0, 0, 260, 120));
+        assertThat(limit.slot(Slot.LEFT_BOTTOM)).hasValue(rect(0, 126, 260, 120));
+        assertThat(limit.slot(Slot.BOTTOM_LEFT)).hasValue(rect(0, 252, 1144, 494));
+        var split = limit.divider(Handle.LEFT_RATIO).orElseThrow();
+        assertThat(List.of(split.position(), split.minimum(), split.maximum()))
+            .as("the split keeps the range that holds both halves at their minimum").containsExactly(120, 120, 120);
+
+        DockGeometry.drag(state, limit.divider(Handle.BOTTOM_HEIGHT).orElseThrow(), 286, Metrics.DEFAULT);
+        var roomier = layout(1144, 746, state).divider(Handle.LEFT_RATIO).orElseThrow();
+        assertThat(List.of(roomier.minimum(), roomier.maximum())).as("and it moves again once there is room").containsExactly(120, 160);
+    }
+
+    @Test void aShortWindowSqueezesTheBottomAreaBeforeASplitSidesHalves() {
+        DockState state = showing(Slot.LEFT_TOP, Slot.LEFT_BOTTOM, Slot.BOTTOM_LEFT);
+        Layout squeezed = layout(640, 420, state);
+        assertThat(squeezed.slot(Slot.LEFT_TOP)).hasValue(rect(0, 0, 260, 120));
+        assertThat(squeezed.slot(Slot.LEFT_BOTTOM)).hasValue(rect(0, 126, 260, 120));
+        assertThat(squeezed.slot(Slot.BOTTOM_LEFT)).as("the bottom area gives way first").hasValue(rect(0, 252, 640, 168));
+        assertThat(squeezed.terminal()).isEqualTo(rect(266, 0, 374, 246));
+
+        Layout tight = layout(640, 372, state);
+        assertThat(tight.slot(Slot.LEFT_TOP)).hasValue(rect(0, 0, 260, 120));
+        assertThat(tight.slot(Slot.LEFT_BOTTOM)).hasValue(rect(0, 126, 260, 120));
+        assertThat(tight.slot(Slot.BOTTOM_LEFT)).as("down to its own minimum").hasValue(rect(0, 252, 640, 120));
+
+        Layout tooShort = layout(640, 360, state);
+        assertThat(tooShort.slot(Slot.BOTTOM_LEFT).orElseThrow().height).isEqualTo(120);
+        assertThat(tooShort.slot(Slot.LEFT_TOP).orElseThrow().height).as("only now do the halves give way").isEqualTo(114);
+
+        Layout right = layout(640, 420, showing(Slot.RIGHT_TOP, Slot.RIGHT_BOTTOM, Slot.BOTTOM_RIGHT));
+        assertThat(right.slot(Slot.RIGHT_TOP)).hasValue(rect(380, 0, 260, 120));
+        assertThat(right.slot(Slot.RIGHT_BOTTOM)).hasValue(rect(380, 126, 260, 120));
+        assertThat(right.slot(Slot.BOTTOM_RIGHT)).hasValue(rect(0, 252, 640, 168));
+        assertThat(state.size(Side.BOTTOM)).as("the squeeze never changes the saved sizes").isEqualTo(200);
+    }
+
+    @Test void theSplitSidesMinimumScalesWithTheUi() {
+        Metrics scaled = Metrics.at(1.5);
+        var bounds = new Rectangle(0, 0, 1500, 1000);
+        DockState state = showing(Slot.LEFT_TOP, Slot.LEFT_BOTTOM, Slot.BOTTOM_LEFT);
+        var bar = DockGeometry.compute(bounds, state, scaled).divider(Handle.BOTTOM_HEIGHT).orElseThrow();
+        // 180 + 9 + 180 = 369 scaled pixels above the bottom area.
+        assertThat(List.of(bar.position(), bar.minimum(), bar.maximum())).containsExactly(691, 369, 811);
+        DockGeometry.drag(state, bar, 0, scaled);
+        assertThat(state.size(Side.BOTTOM)).as("1000 - 369 - 9 = 622 pixels, unscaled").isEqualTo(415);
+        Layout limit = DockGeometry.compute(bounds, state, scaled);
+        assertThat(limit.slot(Slot.LEFT_TOP)).hasValue(rect(0, 0, 390, 180));
+        assertThat(limit.slot(Slot.LEFT_BOTTOM)).hasValue(rect(0, 189, 390, 180));
+        assertThat(limit.slot(Slot.BOTTOM_LEFT)).as("rounding back up to 623 pixels is squeezed away").hasValue(rect(0, 378, 1500, 622));
+    }
+
     @Test void aWideSplitsDividerRangeStaysWithinTheRatioLimits() {
         DockState state = showing(Slot.BOTTOM_LEFT, Slot.BOTTOM_RIGHT);
         Layout layout = DockGeometry.compute(new Rectangle(0, 0, 1512, 982), state, Metrics.DEFAULT);

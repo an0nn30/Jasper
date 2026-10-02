@@ -12,7 +12,8 @@ import java.util.Optional;
  * Where everything goes: a pure function from bounds and a {@link DockState} to the rectangle of each showing slot,
  * the terminal column and each divider. The bottom area spans the full width under the sides and the terminal
  * column. When the bounds are too small, the bottom area gives way first, then the right side, then the left, before
- * the terminal column goes under its minimum; the sizes in the state are never changed by that squeeze.
+ * the terminal column goes under its minimum; the bottom area also gives way before the halves of a side that shows
+ * both go under theirs. The sizes in the state are never changed by that squeeze.
  */
 public final class DockGeometry {
     private DockGeometry() { }
@@ -106,7 +107,10 @@ public final class DockGeometry {
         var dividers = new ArrayList<Divider>();
 
         int[] bottomHeight = {bottom ? Math.max(floor, metrics.scaled(state.size(Side.BOTTOM))) : 0};
-        int upper = squeeze(height - (bottom ? gap : 0), metrics.scaled(metrics.terminalMinimumHeight()), floor, bottomHeight);
+        // Above the bottom area: the terminal's minimum height, or a side's two halves at theirs when it shows both.
+        int upperMinimum = Math.max(metrics.scaled(metrics.terminalMinimumHeight()),
+            halves(state, Slot.LEFT_TOP) || halves(state, Slot.RIGHT_TOP) ? 2 * floor + gap : 0);
+        int upper = squeeze(height - (bottom ? gap : 0), upperMinimum, floor, bottomHeight);
         int[] sides = {right ? Math.max(floor, metrics.scaled(state.size(Side.RIGHT))) : 0,
                        left ? Math.max(floor, metrics.scaled(state.size(Side.LEFT))) : 0};
         int terminalWidth = squeeze(width - (left ? gap : 0) - (right ? gap : 0),
@@ -128,7 +132,7 @@ public final class DockGeometry {
         }
         if (bottom) {
             int bar = y + upper;
-            int surplusHeight = Math.max(0, upper - metrics.scaled(metrics.terminalMinimumHeight()));
+            int surplusHeight = Math.max(0, upper - upperMinimum);
             dividers.add(divider(Handle.BOTTOM_HEIGHT, new Rectangle(x, bar, width, gap), new Rectangle(x, y, width, height),
                 bar - surplusHeight, y + height - floor - gap));
             pair(new Rectangle(x, bar + gap, width, bottomHeight[0]), state, Slot.BOTTOM_LEFT, Handle.BOTTOM_RATIO,
@@ -193,6 +197,11 @@ public final class DockGeometry {
             slots.put(second, new Rectangle(area.x, bar + gap, area.width, total - part));
             dividers.add(divider(handle, new Rectangle(area.x, bar, area.width, gap), area, minimum, maximum));
         }
+    }
+
+    /** Whether both slots of the first slot's side show, so the side splits. */
+    private static boolean halves(DockState state, Slot first) {
+        return state.active(first).isPresent() && state.active(first.partner()).isPresent();
     }
 
     /** A divider whose range always contains where it is now, however squeezed the layout. */
