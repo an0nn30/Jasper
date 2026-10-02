@@ -25,8 +25,8 @@
   `Optional<Boolean>` that `GlassLevels.resolve` reads. Review follow-ups: the corner-mask observer is a
   `JasperCornerObserver` the effect view keeps alive, so its lifetime follows the view (and the window); the Blur row
   shows "Use theme's value" for `"theme"`.
-  `./gradlew check --continue`: BUILD SUCCESSFUL; 8,028 tests, 0 failures, 0 errors, 6 skipped across all modules
-  (jasper-app 1,805, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins 5,538). Not
+  `./gradlew check --continue`: BUILD SUCCESSFUL; 8,029 tests, 0 failures, 0 errors, 6 skipped across all modules
+  (jasper-app 1,806, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins 5,538). Not
   done: plan 2 (editor glass, SDK 0.12.1); GUI checks (user-run): Clear Dark beside Terminal.app's, the Clear Dark
   (`hudWindow`) versus Clear Light (light `underWindowBackground`) material, rounded corners without slivers and square
   full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, hidden-rail mode,
