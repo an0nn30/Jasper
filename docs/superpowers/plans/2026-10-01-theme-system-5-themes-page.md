@@ -10,7 +10,7 @@
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), especially §§2.3, 6.3, 7–9. Read it together with this plan, [Plan 4](2026-10-01-theme-system-4-conversion-migration.md), and [STATUS](../../STATUS.md).
 
-**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Task 4 is complete (local two-zone preview); full check 7,962/0/0/6. Task 5 is complete (owned asynchronous file actions and dialogs); full check 7,974/0/0/6. Task 6 implementation and headless gates are complete; full check 7,972/0/0/6 (1m28s), including four architecture gates, doclint and packaged resources. Obsolete dropdown/menu tests were replaced by the staged-page/catalog tests, explaining the lower count. All 1,661 Java sources and authored whitespace pass hygiene. One independent whole-branch review remains before completion; native acceptance remains user-run.
+**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Task 2 is complete (safe inherited copies/removal); full check 7,950/0/0/6. Task 3 is complete (searchable staged pickers); full check 7,958/0/0/6. Task 4 is complete (local two-zone preview); full check 7,962/0/0/6. Task 5 is complete (owned asynchronous file actions and dialogs); full check 7,974/0/0/6. Task 6 implementation and headless gates are complete; full check 7,972/0/0/6 (1m28s), including four architecture gates, doclint and packaged resources. Obsolete dropdown/menu tests were replaced by the staged-page/catalog tests, explaining the lower count. All 1,661 Java sources and authored whitespace pass hygiene. Independent review of cc0429f5..fb74ca16 found no Critical/Important issues; two minors are deferred below. Fresh exact-HEAD check 7,972/0/0/6 (1m27s). Native acceptance remains user-run.
 
 **Execution ruling:** Task 1 preserves the pre-existing bounded startup scan wait on EDT; the original plan incorrectly described its caller as off EDT. No new runtime EDT waits are introduced. Cost: existing initial scan latency remains; a bootstrap handoff change is separate work.
 
@@ -435,4 +435,25 @@ git commit -m "feat(themes): finish settings workflow and catalog navigation" -m
 - Interfaces use actual Setting<String>, Snapshot, Theme.UserFile, GeneratedTheme, PageContext and frozen ImportPlan types. No new interface abstraction, SDK dependency, private Editor import, global preview LAF or extra watcher.
 - Task 3's initial constructor is deliberately extended in Task 5, with all tests updated then; registration only occurs in Task 6. Each prior commit has independently testable behavior and keeps the existing app runnable.
 - Plan decisions needing user review are explicit above: immediate file actions, local preview fallback, one-second polling reuse, trash failure confirmation, duplicate-name validation and menu grouping. These refine the approved design without adding network sources or a visual editor.
-- Six tasks implemented inline with RED/GREEN evidence and one commit per task. Independent whole-branch review is the remaining gate. Native acceptance has not been run; no GUI, benchmark, push or merge was performed for Plan 5.
+- Six tasks implemented inline with RED/GREEN evidence and one commit per task. Independent whole-branch review is complete with no blocking findings. Native acceptance has not been run; no GUI, benchmark, push or merge was performed for Plan 5.
+
+
+## Final independent review — 2026-10-02
+
+The single fresh reviewer (gpt-6-astra) reviewed `cc0429f5..fb74ca16` and judged the branch ready to merge.
+No Critical or Important findings; no fix pass or second review was needed. Exact reviewed-head `./gradlew check`
+passes **7,972 tests, zero failures/errors, six skips** (1m27s). All four architecture guards, packaged resources,
+doclint and compiled docs pass. All 1,661 Java sources pass source hygiene; authored diff whitespace is clean.
+The full suite count includes replacement of obsolete theme-dropdown/legacy-menu tests with staged-page and catalog-menu coverage.
+
+Deferred minors (per approved inline workflow):
+- Themes has no Settings tree modified marker: `modified()` remains false to avoid double-counting or independently saving the shared draft. A follow-up should separate visual dirty indicators from page save accounting.
+- The original binding design spec's status banner still says Plan 5 awaits approval. That historical banner needs a follow-up correction; this plan and STATUS record completion.
+
+Review rulings:
+- Native layout/focus/platform menus remain user-run because AGENTS.md forbids unattended GUI launch. Cost: native-only visual/interaction defects may remain.
+- Actual desktop Trash/folder functions remain user-run; injected behavior and error paths are tested. Cost: platform-specific failures may remain.
+- The initial bounded EDT scan wait is retained, as ruled in Task 1. Cost: startup still has its existing up-to-ten-second wait.
+
+Earlier rulings remain binding: runtime polling is asynchronous without changing bootstrap; only the exact production
+ThemePreview class is exempt from the packaging fixture-name heuristic. No GUI, benchmark, merge or push for Plan 5.
