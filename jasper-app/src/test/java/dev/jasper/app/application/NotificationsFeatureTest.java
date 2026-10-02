@@ -126,6 +126,20 @@ class NotificationsFeatureTest {
         assertThat(feature.layer(window.id()).showing()).hasSize(2);
     }
 
+    @Test void aCardPostedWhileAWindowOpensWaitsForItsFirstActivation() {
+        // The window is attached but the native activation event has not arrived yet: the application reports NO_WINDOW.
+        presence = Delivery.Presence.NO_WINDOW;
+        var feature = new NotificationsFeature(center, contributions);
+        var window = window();
+        feature.attach(window);
+        feature.error("Could not start /bin/zsh", "No such file");
+        assertThat(feature.layer(window.id()).showing()).isEmpty();
+        assertThat(center.history()).hasSize(1);
+        presence = Delivery.Presence.FOCUSED;
+        feature.activated(window);
+        assertThat(feature.layer(window.id()).showing()).hasSize(1);
+    }
+
     @Test void dismissCardsClosesTheInvokingWindowsCardsAndReadsThem() {
         var feature = new NotificationsFeature(center, contributions);
         var window = window();

@@ -72,6 +72,8 @@ public final class JasperApplication {
     private final ThemeController themes;
     private final ThemeCatalog themeCatalog;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
+    /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
+    private boolean activatedSinceOpen;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -565,9 +567,18 @@ public final class JasperApplication {
 
     /** Where Jasper stands for notifications: focused, in the background, or with no window open. */
     private Delivery.Presence presence() {
-        if (windows.isEmpty()) return Delivery.Presence.NO_WINDOW;
-        return java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null
-            ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
+        return presence(!windows.isEmpty(), activatedSinceOpen,
+            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null);
+    }
+
+    /**
+     * The rule behind {@link #presence()}. A window counts only once it has been activated: a failure raised while the
+     * first window opens is queued ahead of the native activation event, and judging it "background" would keep its
+     * card out of sight for good. Until then the card waits, as it does with no window at all, and shows on activation.
+     */
+    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive) {
+        if (!windowsOpen || !activatedSinceOpen) return Delivery.Presence.NO_WINDOW;
+        return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
     }
 
     /** Show Problems on the configuration notification: the details over the window used last. */
@@ -698,6 +709,7 @@ public final class JasperApplication {
         if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
+        if (windows.isEmpty()) activatedSinceOpen = false;
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.
@@ -716,6 +728,7 @@ public final class JasperApplication {
     void windowActivated(TerminalWindow window) {
         if (!windows.contains(window)) return;
         lastActive = window;
+        activatedSinceOpen = true;
         notificationViews.activated(window.content());
         terminals.windowActivated(window.content().id());
         if (buddy != null && !quitting && !stopped) buddy.greet();
