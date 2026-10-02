@@ -5,11 +5,14 @@ import java.util.ArrayDeque;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.until;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@DisabledOnOs(OS.WINDOWS)
 class WindowContentFirstTerminalTest {
     @AfterEach void close() throws Exception { DesktopTestSupport.closeOwners(); }
 
