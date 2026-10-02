@@ -2,13 +2,13 @@
 
 ## Current state — 2026-10-01
 
-- **Theme system Plan 5 implementation plan ready for user review** (2026-10-01):
+- **Theme system Plan 5 approved; inline implementation underway** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
   against local merge `cc0429f5`, on `codex/theme-system-plan5` in the reused `.worktrees/theme-system` worktree.
   Six tasks cover serialized theme polling, safe Duplicate/Remove, searchable staged pickers, local two-zone preview,
   owner-scoped import/file dialogs and final navigation/acceptance. Selection stays staged; confirmed file actions
   happen immediately. Plan 4's stale help text is included in Task 6. Preserve the user's inline execution preference
-  after plan approval; implementation has not started. No GUI or push.
+  after approval. Task 1 now reloads native changes independently of config, including equal-metadata parent edits and descendant refresh, with unchanged-object reuse. Full check passes **7,939/0/0/6**. The existing bounded startup EDT wait is retained (plan correction); new runtime work remains asynchronous. No GUI or push.
 
 - **Theme system Plan 4 complete, independently reviewed and merged locally** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)

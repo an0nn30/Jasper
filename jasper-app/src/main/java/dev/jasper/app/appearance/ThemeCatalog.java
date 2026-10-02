@@ -5,7 +5,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,8 +48,7 @@ public final class ThemeCatalog {
         }
     }
 
-    private record Stamp(long size, FileTime modified) {}
-    private record Read(Stamp stamp, List<Theme> themes, ThemeDocument document, List<Problem> problems) {}
+    private record Read(String fingerprint, List<Theme> themes, ThemeDocument document, List<Problem> problems) {}
 
     private static final Snapshot BUILT_IN = new Snapshot(ThemeManager.builtIns(), List.of());
 
@@ -170,27 +168,35 @@ public final class ThemeCatalog {
         }
     }
 
-    /** The file's themes or document, from the last read when its size and modified time are unchanged; null when it vanished. */
+    /** Reads bounded bytes once, reusing parsed content even across timestamp-only edits. */
     private Read read(Path file) {
-        Stamp stamp;
+        String name = file.getFileName().toString();
         try {
             var attributes = Files.readAttributes(file, BasicFileAttributes.class);
-            stamp = new Stamp(attributes.size(), attributes.lastModifiedTime());
-        } catch (IOException | SecurityException failure) {
-            return null;
+            if (!attributes.isRegularFile()) return null;
+            if (attributes.size() > MAX_THEME_FILE) return oversized(file, name);
+            byte[] bytes;
+            try (var input = Files.newInputStream(file)) { bytes = input.readNBytes(MAX_THEME_FILE + 1); }
+            if (bytes.length > MAX_THEME_FILE) return oversized(file, name);
+            String fingerprint;
+            try { fingerprint = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)); }
+            catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
+            Read previous = reads.get(file);
+            if (previous != null && fingerprint.equals(previous.fingerprint())) return previous;
+            try {
+                String text = java.nio.charset.StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+                return new Read(fingerprint, List.of(), ThemeToml.parse(text, name), List.of());
+            } catch (ThemeFileException failure) {
+                return new Read(fingerprint, List.of(), null, List.of(new Problem(file, failure.line(), failure.getMessage())));
+            }
+        } catch (java.nio.file.NoSuchFileException vanished) { return null; }
+        catch (IOException | SecurityException failure) {
+            return new Read(null, List.of(), null, List.of(new Problem(file, name + " cannot be read: " + failure)));
         }
-        Read previous = reads.get(file);
-        if (previous != null && previous.stamp().equals(stamp)) return previous;
-        String name = file.getFileName().toString();
-        if (stamp.size() > MAX_THEME_FILE)
-            return new Read(stamp, List.of(), null, List.of(new Problem(file, name + " is larger than 256 KiB.")));
-        try {
-            return new Read(stamp, List.of(), ThemeToml.parse(Files.readString(file), name), List.of());
-        } catch (ThemeFileException failure) {
-            return new Read(stamp, List.of(), null, List.of(new Problem(file, failure.line(), failure.getMessage())));
-        } catch (IOException failure) {
-            return new Read(stamp, List.of(), null, List.of(new Problem(file, name + " cannot be read: " + failure)));
-        }
+    }
+
+    private static Read oversized(Path file, String name) {
+        return new Read(null, List.of(), null, List.of(new Problem(file, name + " is larger than 256 KiB.")));
     }
 
     private static String key(String name) { return name.strip().toLowerCase(Locale.ROOT); }

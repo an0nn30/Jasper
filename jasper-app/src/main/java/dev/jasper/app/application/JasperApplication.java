@@ -228,14 +228,17 @@ public final class JasperApplication {
     }
 
     /**
-     * The first scan of the themes and terminal-themes folders runs on the configuration worker; start-up waits for it, at most
-     * 10 s, so the first window shows the saved theme. Later scans run with each configuration read.
+     * The first native scan runs on the configuration worker; start-up waits for it, at most 10 s,
+     * so the first window shows the saved theme. Later scans run on every configuration poll.
      */
     private void scanThemes(ConfigService service) {
-        try { service.watchWith(() -> { scanQuietly("native themes", themeCatalog::scan);
+        try { service.watchChanges(() -> {
+            var before = themeCatalog.latest(); var previousProblems = migrationProblems;
+            scanQuietly("native themes", themeCatalog::scan);
             var refreshed = new java.util.LinkedHashSet<>(startupConfigProblems);
             refreshed.addAll(ThemeUpgrade.diagnostics(service.initialState().file()));
             migrationProblems = List.copyOf(refreshed);
+            return !before.equals(themeCatalog.latest()) || !previousProblems.equals(migrationProblems);
         })
             .get(10, java.util.concurrent.TimeUnit.SECONDS); }
         catch (ExecutionException | TimeoutException failure) {

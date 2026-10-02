@@ -7,6 +7,33 @@ import static org.assertj.core.api.Assertions.*;
 
 class NativeThemeCatalogTest {
     @TempDir Path home;
+    @Test void equalMetadataParentEditsRefreshDescendantsAndKeepUnchangedIdentity() throws Exception {
+        Path base = home.resolve("themes/base.toml"); Files.createDirectories(base.getParent());
+        Files.writeString(base, "name='Base'\nextends='Jasper Dark'\n[colors]\nbackground='#112233'\n");
+        Files.writeString(base.resolveSibling("child.toml"), "name='Child'\nextends='Base'\n");
+        var catalog = ThemeCatalog.beside(home.resolve("config.toml"));
+        var before = catalog.scan().find("Child").orElseThrow();
+        var stamp = Files.getLastModifiedTime(base);
+        Files.writeString(base, Files.readString(base).replace("#112233", "#445566")); Files.setLastModifiedTime(base, stamp);
+        var after = catalog.scan().find("Child").orElseThrow();
+        assertThat(after).isNotSameAs(before);
+        assertThat(after.source().document().seeds()).containsEntry(Seed.BACKGROUND, new java.awt.Color(0x445566));
+        assertThat(catalog.scan().find("Child").orElseThrow()).isSameAs(after);
+    }
+
+    @Test void malformedRepairAndDirectoryRecreationRefreshProblemsAndThemes() throws Exception {
+        Path file = home.resolve("themes/theme.toml"); Files.createDirectories(file.getParent());
+        Files.writeString(file, "name='Child'\nextends='Missing'\n");
+        var catalog = ThemeCatalog.beside(home.resolve("config.toml"));
+        assertThat(catalog.scan().problems()).anyMatch(problem -> problem.line() == 2);
+        Files.writeString(file, "name='Child'\nextends='Darcula'\n");
+        assertThat(catalog.scan().find("Child")).isPresent(); assertThat(catalog.latest().problems()).isEmpty();
+        Files.delete(file); Files.delete(file.getParent());
+        assertThat(catalog.scan().find("Child")).isEmpty(); assertThat(file.getParent()).isDirectory();
+        Files.writeString(file, "name='Child'\nextends='Darcula'\n");
+        assertThat(catalog.scan().find("Child")).isPresent();
+    }
+
     @Test void indexedCollectionIsNativeAndReusesClassicSingletons() throws Exception {
         var snapshot = ThemeCatalog.builtIn().scan();
         assertThat(snapshot.themes()).hasSize(284).allMatch(theme -> theme.source() instanceof Theme.Bundled);

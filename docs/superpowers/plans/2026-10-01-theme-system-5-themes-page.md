@@ -10,7 +10,9 @@
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), especially §§2.3, 6.3, 7–9. Read it together with this plan, [Plan 4](2026-10-01-theme-system-4-conversion-migration.md), and [STATUS](../../STATUS.md).
 
-**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. This plan is awaiting user review; implementation has not started.
+**Status:** Written and self-reviewed 2026-10-01 against local `main@cc0429f5`. Plan 4 and the newer hidden-rail terminal framing fix are merged locally. Fresh merged `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No push or GUI launch. User approved inline execution; Task 1 is complete (content-aware live reload); full check 7,939/0/0/6. Tasks 2–6 remain.
+
+**Execution ruling:** Task 1 preserves the pre-existing bounded startup scan wait on EDT; the original plan incorrectly described its caller as off EDT. No new runtime EDT waits are introduced. Cost: existing initial scan latency remains; a bootstrap handoff change is separate work.
 
 **Workspace / execution:** Reuse `.worktrees/theme-system` on `codex/theme-system-plan5`, based on the verified merge. Preserve the user's inline execution preference if approved: TDD and one commit per task, followed by one independent whole-branch review and the executing-plans fix workflow. Do not start implementation merely because this document exists. Record departures in this banner and STATUS.
 
@@ -76,7 +78,7 @@ All production paths in the map are under `jasper-app/src/main/java/dev/jasper/a
 - Produces: `ConfigService.watchChanges(BooleanSupplier companion): CompletableFuture<Void>`. Calls once on registration and once per scheduled/forced refresh on its worker; true means companion state changed and the existing State must be republished even if config is equal. Keep watchWith's current documented read-triggered contract for other callers/tests; do not create an ambiguous overload.
 - Produces: ThemeCatalog.scan detects changed content even when size/mtime are identical, rebuilds affected descendants, preserves Theme object identity for unchanged effective themes, and continues returning immutable snapshots.
 
-- [ ] **Step 1: Add failing regression tests.** Use the existing injected scheduler/publisher in ConfigServiceTest to run one scheduled poll deterministically (no sleeps). Add tests named `companionChangePublishesUnchangedConfigOnce`, `unchangedCompanionDoesNotPublish`, `throwingCompanionRetriesNextPoll`, and `closeDropsQueuedCompanionPublication`. Their assertions include:
+- [x] **Step 1: Add failing regression tests.** Use the existing injected scheduler/publisher in ConfigServiceTest to run one scheduled poll deterministically (no sleeps). Add tests named `companionChangePublishesUnchangedConfigOnce`, `unchangedCompanionDoesNotPublish`, `throwingCompanionRetriesNextPoll`, and `closeDropsQueuedCompanionPublication`. Their assertions include:
 
 ```java
 @Test void companionChangePublishesUnchangedConfigOnce() throws Exception {
@@ -123,7 +125,7 @@ assertThat(catalog.scan().find("Child").orElseThrow()).isSameAs(after);
 
 Extend existing real WindowContent fixtures: edit/delete/recreate a selected native workspace without changing config; assert every retained owner and plugin appearance observer updates once per changed effective theme, while duplicate unchanged polls cause no reinstall. Also test malformed→repaired file diagnostics and directory delete/recreate. Keep selection strings unchanged throughout.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ConfigServiceTest' --tests '*NativeThemeCatalogTest' --tests '*InstalledThemesTest' --tests '*JasperApplicationThemesTest'
@@ -131,14 +133,14 @@ Extend existing real WindowContent fixtures: edit/delete/recreate a selected nat
 
 Expected: missing watchChanges API and/or no publication for a theme-only change; equal-metadata content is currently cached.
 
-- [ ] **Step 3: Implement the interfaces.** Store the BooleanSupplier separately from the old Runnable companion. In refresh, read config, run each applicable companion once, then publish if forced, config changed, or watchChanges returned true. Catch a companion failure outside the scheduled executor's lifecycle, log and retry; never interpret failure as successful change. Registration returns a future and obeys existing close/pending guards. Startup still waits off EDT for the first catalog scan before constructing the configuration controller.
+- [x] **Step 3: Implement the interfaces.** Store the BooleanSupplier separately from the old Runnable companion. In refresh, read config, run each applicable companion once, then publish if forced, config changed, or watchChanges returned true. Catch a companion failure outside the scheduled executor's lifecycle, log and retry; never interpret failure as successful change. Registration returns a future and obeys existing close/pending guards. Startup retains the existing bounded wait for the worker’s first catalog scan before constructing the configuration controller. Inspection found that JasperApplication currently performs this wait on EDT; this pre-existing bootstrap behavior is retained, while all new runtime polling stays asynchronous.
 
 Change the catalog cache from metadata-only invalidation to bounded content fingerprints: each regular native file is read at most MAX_THEME_FILE+1 per scan; hash/read the same bytes once, then reuse its parsed document when unchanged. Include presence and read/parse diagnostics in snapshot comparison. Do not make name-order/cache identity depend on directory iteration order. Preserve existing per-file errors and fallback resolution; a missing directory is recreated by existing scan behavior. Ignore legacy directories, lock/stage files and non-TOML files. Reuse unchanged resolved Theme instances; a changed inherited parent invalidates descendants even when child bytes match.
 
 In `JasperApplication.scanThemes`, register watchChanges. Capture previous `themeCatalog.latest()` and migrationProblems, scan/update them on the worker, then return whether either changed. No migration rerun or repeated config parsing is needed for theme-only updates. ConfigurationController's existing accept path handles repaint, settings refresh and plugin appearance notifications; retain its installation-failure fallback.
 
-- [ ] **Step 4: Run GREEN.** Repeat Step 2; then `./gradlew verifyApplicationArchitecture`. All pass. Prove the test observes the scheduled poll, not only explicit reload.
-- [ ] **Step 5: Commit.**
+- [x] **Step 4: Run GREEN.** Repeat Step 2; then `./gradlew verifyApplicationArchitecture`. All pass. Prove the test observes the scheduled poll, not only explicit reload.
+- [x] **Step 5: Commit.**
 
 ```bash
 git add jasper-app/src

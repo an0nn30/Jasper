@@ -56,6 +56,49 @@ class InstalledThemesTest {
         edt(() -> {});
     }
 
+    @Test void themeOnlyPollUpdatesEveryOwnerAndAppearanceObserverWithoutReinstallingUnchangedThemes() throws Exception {
+        Path file = themes().resolve("fixture.toml"); Files.createDirectories(file.getParent());
+        String original = "name='Live'\nextends='Jasper Dark'\n[colors]\nbackground='#112233'\n";
+        Files.writeString(file, original);
+        String configText = "ui.theme.workspace='Live'\n"; Files.writeString(config(), configText);
+        var worker = new dev.jasper.app.testsupport.ConfigPollWorker();
+        service = new ConfigService(config(), false, worker, javax.swing.SwingUtilities::invokeLater);
+        var catalog = ThemeCatalog.beside(config());
+        service.watchChanges(() -> { var previous = catalog.latest(); return !catalog.scan().equals(previous); }).get();
+        ThemeController[] appearance = new ThemeController[1]; WindowContent[] owners = new WindowContent[2];
+        int[] events = {0}; dev.jasper.app.lifecycle.Subscription[] listening = new dev.jasper.app.lifecycle.Subscription[1];
+        try {
+            edt(() -> {
+                appearance[0] = new ThemeController(); controller = new ConfigurationTestSupport(appearance[0], service, catalog);
+                for (int i = 0; i < owners.length; i++) {
+                    owners[i] = DesktopTestSupport.content(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), appearance[0]);
+                    controller.register(owners[i]);
+                }
+                listening[0] = appearance[0].subscribe((resolved, refresh) -> events[0]++);
+            });
+            edt(() -> events[0] = 0);
+            var stamp = Files.getLastModifiedTime(file);
+            Files.writeString(file, original.replace("#112233", "#445566")); Files.setLastModifiedTime(file, stamp);
+            worker.poll(); edt(() -> {
+                for (var owner : owners) assertThat(owner.theme().workspace().terminal().background()).isEqualTo(new Color(0x445566));
+                assertThat(events[0]).isEqualTo(1);
+            });
+            worker.poll(); edt(() -> assertThat(events[0]).isEqualTo(1));
+            Files.writeString(file, "name='Live'\nextends='Missing'\n"); worker.poll();
+            edt(() -> {
+                assertThat(controller.shown().diagnostics()).anyMatch(problem -> problem.file().equals(file) && problem.line() == 2);
+                for (var owner : owners) assertThat(owner.theme().matching()).isTrue();
+            });
+            Files.delete(file); worker.poll(); Files.writeString(file, original); worker.poll();
+            edt(() -> {
+                for (var owner : owners) assertThat(owner.theme().workspace().terminal().background()).isEqualTo(new Color(0x112233));
+                assertThat(controller.snapshot().workspaceTheme().name()).isEqualTo("Live");
+                assertThat(controller.shown().diagnostics()).isEmpty();
+            });
+            assertThat(Files.readString(config())).isEqualTo(configText);
+        } finally { edt(() -> { if (listening[0] != null) listening[0].close(); for (var owner : owners) if (owner != null) owner.close(); }); }
+    }
+
     @Test void aThemeInstalledInTheFolderAppliesByNameWithItsConsoleColours() throws Exception {
         ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Dark", true, "#123456", "101820");
         var themes = start("[ui.theme]\nname = 'fixture dark'\n");

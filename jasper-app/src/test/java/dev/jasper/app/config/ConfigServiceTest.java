@@ -25,6 +25,67 @@ import static org.assertj.core.api.Assertions.*;
 class ConfigServiceTest {
     @TempDir Path directory;
 
+    @Test void companionChangePublishesUnchangedConfigOnce() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "# unchanged config\n");
+        String before = Files.readString(file);
+        var worker = new PollWorker();
+        var published = new ArrayList<ConfigService.State>();
+        var changed = new AtomicBoolean();
+        try (var service = new ConfigService(file, true, worker, Runnable::run)) {
+            service.watchChanges(() -> {
+                assertThat(SwingUtilities.isEventDispatchThread()).isFalse();
+                return changed.getAndSet(false);
+            }).get(5, TimeUnit.SECONDS);
+            service.start(published::add);
+            changed.set(true);
+            worker.poll();
+            assertThat(published).hasSize(2);
+            assertThat(published.get(1)).isEqualTo(published.get(0));
+            worker.poll();
+            assertThat(published).hasSize(2);
+            assertThat(Files.readString(file)).isEqualTo(before);
+        }
+    }
+
+    @Test void unchangedCompanionDoesNotPublish() throws Exception {
+        var worker = new PollWorker(); var published = new ArrayList<ConfigService.State>();
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        try (var service = new ConfigService(directory.resolve("config.toml"), true, worker, Runnable::run)) {
+            service.watchChanges(() -> { calls.incrementAndGet(); return false; }).get(5, TimeUnit.SECONDS);
+            service.start(published::add); worker.poll(); worker.poll();
+            assertThat(calls.get()).isEqualTo(3); assertThat(published).hasSize(1);
+            service.reload().get(5, TimeUnit.SECONDS);
+            assertThat(calls.get()).isEqualTo(4); assertThat(published).hasSize(2);
+        }
+    }
+
+    @Test void throwingCompanionRetriesNextPoll() throws Exception {
+        var worker = new PollWorker(); var published = new ArrayList<ConfigService.State>();
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        try (var service = new ConfigService(directory.resolve("config.toml"), true, worker, Runnable::run)) {
+            service.watchChanges(() -> {
+                int call = calls.incrementAndGet();
+                if (call == 2) throw new IllegalStateException("injected scan failure");
+                return call == 3;
+            }).get(5, TimeUnit.SECONDS);
+            service.start(published::add); worker.poll(); assertThat(published).hasSize(1);
+            worker.poll(); assertThat(published).hasSize(2);
+        }
+    }
+
+    @Test void closeDropsQueuedCompanionPublication() throws Exception {
+        var worker = new PollWorker(); var queued = new ConcurrentLinkedQueue<Runnable>();
+        var published = new ArrayList<ConfigService.State>();
+        var service = new ConfigService(directory.resolve("config.toml"), true, worker, queued::add);
+        service.watchChanges(() -> true).get(5, TimeUnit.SECONDS);
+        service.start(published::add); queued.remove().run();
+        worker.poll(); service.close();
+        queued.forEach(Runnable::run);
+        assertThat(published).hasSize(1);
+        assertThat(service.watchChanges(() -> true)).isCompletedExceptionally();
+    }
+
     @Test void missingInitialConfigUsesDefaultsWithoutCreatingDirectories() {
         Path file = directory.resolve("absent/config.toml");
         try (var service = new ConfigService(file, false)) {
