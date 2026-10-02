@@ -79,7 +79,7 @@
   because the title search field is its only remaining caller. Merged into main 2026-10-02 and pushed with `5729a684`.
   Not done: GUI check.
 
-- **Notifications plan 1: core, implemented and verified; awaiting the final whole-branch review and the user's GUI checks** (2026-10-02; branch `claude/notifications`, spec
+- **Notifications plan 1: core, reviewed and merged to local `main`; awaiting the user's GUI checks** (2026-10-02; branch `claude/notifications`, spec
   `docs/superpowers/specs/2026-10-02-jasper-notifications-design.md`, plan
   `docs/superpowers/plans/2026-10-02-notifications-1-core.md`, [guide](notifications.md)): an EDT `NotificationCenter` (in-memory history of 500,
   60 s coalescing, read/expired state, waiting cards), per-window card stacks in the content corner, the built-in
@@ -107,6 +107,14 @@
   card no longer stays waiting for focus; each card's shadow is rendered once and cached instead of twelve rings on
   every repaint. `./gradlew check` after the fixes (same short temp path): **8,084 tests, 0 failures, 0 errors, 6
   skips** (8 new tests; the 8,076 above is the count before them).
+
+  Merged to local `main` on 2026-10-02 with the user's agreement: `main` (`8a428f0b`) was merged into the branch first
+  (`438f6a99`; one trivial conflict in `WindowCommandPalette`, keeping main's argument list without `scopeShortcut` and
+  this branch's titled "Command failed" error), then `main` was fast-forwarded. `./gradlew cleanTest check --continue`
+  on the merged tree, with no temp-path workaround: **8,079 tests, 0 failures, 0 errors, 6 skips**. One earlier run of
+  it failed `FtpEngineTest.tlsWithoutRequireAllowsBoth` with "425 Can't open passive connection"; the File Server
+  suite then passed three isolated re-runs (160/160) and the next full run, so it is a load-dependent passive-port
+  flake, not a regression (the branch does not touch File Server). Not pushed.
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
