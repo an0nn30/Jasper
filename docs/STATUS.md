@@ -2,6 +2,23 @@
 
 ## Current state — 2026-10-02
 
+- **Workspace glass, plan 1 (foundation)** (branch `claude/workspace-glass`, user request 2026-10-02):
+  [spec](superpowers/specs/2026-10-02-jasper-workspace-glass-design.md),
+  [plan](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md). Themes gain `[workspace] opacity/blur`;
+  Settings › Appearance › Workspace overrides them (`ui.workspace.opacity`, `ui.workspace.blur`, percent); bundled
+  Clear Dark (0.95/0.5) and Clear Light (0.93/0.5) are ported from Terminal.app (catalog 286). On macOS, `WindowGlass`
+  makes the window translucent through two JDK internals (new launcher flags) and blurs behind it through
+  `libjasper-glass.dylib`; terminal panes paint their default background with alpha inside a cleared surface, and any
+  failure keeps the window opaque. Deviations from the spec: ancestors stay opaque and the workspace host clears a
+  hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no `TerminalOptions` field), and it takes
+  a `float`; `WindowGlass` follows the root pane. Rulings made during execution: `ClearThemesTest` runs under
+  `EdtTestExtension`; the Workspace section keeps its own "Choose workspace theme…" button (Terminal › Font & Colors
+  has one too). `./gradlew check --continue`: BUILD SUCCESSFUL; 8,015 tests, 0 failures, 0 errors, 6 skipped across
+  all modules (jasper-app 1,792, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 84, plugins
+  5,538).
+  Not done: plan 2 (editor glass, SDK 0.12.1); GUI checks (user-run): Clear Dark beside Terminal.app's, the blur
+  radius at 0.5, live opacity/blur changes, splits, hidden-rail mode, native fullscreen, switching back to an
+  opaque theme, a packaged build loading `Contents/app/libjasper-glass.dylib`, and Settings rows disabled off macOS.
 - **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
   user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
   failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT

@@ -1,6 +1,6 @@
 # Jasper workspace glass: opacity, blur and the Clear themes
 
-**Status:** Design approved in chat by the user on 2026-10-02, section by section. No plan written yet.
+**Status:** Design approved in chat by the user on 2026-10-02, section by section. Plan 1 (foundation) executed on claude/workspace-glass; plan 2 (editor) not written. Plan 1 deviations are listed in the plan and docs/STATUS.md.
 
 ## Purpose
 

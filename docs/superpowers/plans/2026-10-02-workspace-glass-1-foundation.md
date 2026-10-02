@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Written 2026-10-02 on `claude/workspace-glass`; not started.
+**Status:** Executed 2026-10-02; see docs/STATUS.md.
 
 **Goal:** Terminal panes in a Jasper window become translucent, with the desktop behind them blurred, when the workspace theme (for example the new Clear Dark) or the Appearance › Workspace settings ask for it on macOS.
 

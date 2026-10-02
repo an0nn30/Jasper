@@ -159,6 +159,33 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*StartupResourcesTest" --tests "*ApplicationBootstrapRollbackTest" --tests "*MacTitleBarTest"
 ```
 
+### Workspace glass
+
+A translucent, blurred terminal workspace on macOS. The workspace theme's `[workspace]` table and
+`ui.workspace.opacity`/`ui.workspace.blur` combine in `GlassLevels.resolve`; `WindowContent.requestGlass` sends the
+result to the window's `WindowGlass` after every theme or configuration change. `WindowGlass` decides, and reports the
+opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting never reads the raw settings, so any
+failure leaves an opaque window.
+
+- **Translucency** needs two JDK internals (AWT refuses alpha on a decorated frame): `MacGlass` sets
+  `Component.background` and calls `WindowPeer.setOpaque(false)`. The launcher passes
+  `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED`;
+  `packaging.gradle` refuses a `Jasper.cfg` without them. After a JBR upgrade, check that a Clear theme is still
+  translucent; if the internals changed, `WindowGlass` logs one warning and windows stay opaque.
+- **Blur** is `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by `gradle/mac-glass.gradle`).
+  It finds the `NSWindow` through JAWT's layer and calls the private `CGSSetWindowBackgroundBlurRadius` on the main
+  thread, never waiting for it. `./gradlew :jasper-app:run` passes `-Djasper.glassLibrary`; a packaged app loads it
+  from `Contents/app/`. Tune the radius with `WindowGlass.MAX_BLUR_RADIUS` (0-1 maps linearly onto 0-40).
+- **Painting**: the window peer is the only non-opaque ancestor. `WorkspaceRegions`' center host clears its rounded
+  surface; `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
+  `TerminalView` fill the default background with alpha using the `Src` composite. Anything new inside the terminal
+  surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
+
+```sh
+./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest" --tests "*ClearThemesTest"
+./gradlew :jasper-app:testMacGlass :jasper-terminal:test --tests "*TerminalPainterTest"
+```
+
 ## Session lifecycle change
 
 Begin with [SessionLaunchCoordinator](../jasper-app/src/main/java/dev/jasper/app/application/SessionLaunchCoordinator.java), [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/launch/ShellLauncher.java) and [TerminalPane](../jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java). Capture launch settings when requested, start off EDT, and validate lifetime after delivery to EDT. Close a late returned session and never attach it. Pane close owns admitted sessions; application shutdown stops admission and waits off EDT via ApplicationShutdown. Keep the coordinator drain future in that wait so accepted launch workers and their late children remain tracked even if no session existed at shutdown start. Register endpoint/process cleanup through JasperApplication.onShutdown: it runs on a daemon worker within the bounded application wait, so callbacks must not touch Swing. Keep TERM/COLORTERM and the terminal library threading contract. This example builds options only; it launches no shell.
