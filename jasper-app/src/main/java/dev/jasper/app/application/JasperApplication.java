@@ -20,6 +20,10 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.CommandNotice;
 import dev.jasper.app.notifications.CommandNotifier;
+import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.NotificationCenter;
+import dev.jasper.app.notifications.NotificationRequest;
+import dev.jasper.app.notifications.Severity;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
@@ -117,6 +121,8 @@ public final class JasperApplication {
     private volatile List<CompletableFuture<?>> processCleanups;
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     private ActivityNotifier activityNotifier;
+    private final NotificationCenter notificationCenter;
+    private final NotificationsFeature notificationViews;
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
@@ -178,6 +184,8 @@ public final class JasperApplication {
             created = new ThemeController(Theme.DARK);
         }
         themes = created;
+        notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
+        notificationViews = new NotificationsFeature(notificationCenter, contributions);
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
@@ -203,6 +211,10 @@ public final class JasperApplication {
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
             updateMigrateAction();
         });
+        if (configuration != null) {
+            var problems = new ConfigProblemNotices(notificationCenter, this::showConfigurationProblems, this::openConfigFile);
+            configuration.onProblems(problems::accept);
+        }
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler((event, response) -> {
                 response.cancelQuit();
@@ -290,6 +302,9 @@ public final class JasperApplication {
             launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
         if (configuration != null) configuration.register(window.content());
         window.content().connectContributions(contributions, uiState);
+        window.content().onError = notificationViews::error;
+        window.content().onInfo = notificationViews::info;
+        notificationViews.attach(window.content());
         window.content().connectTerminals(terminals, window::toFront);
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
@@ -504,8 +519,9 @@ public final class JasperApplication {
         private void migrateConfiguration() {
             if (configuration == null || quitting || stopped) return;
             configuration.migrate().whenComplete((message, failure) -> javax.swing.SwingUtilities.invokeLater(() -> {
-                if (failure == null) info(message);
-                else notice((failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
+                if (failure == null) notificationViews.info("Migrate Config", message);
+                else notificationViews.error("Migrate Config failed",
+                    (failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
             }));
         }
 
@@ -520,7 +536,7 @@ public final class JasperApplication {
         private void openConfigFile() {
             if (configuration == null) return;
             configuration.openConfigFile().whenComplete((file, failure) -> {
-                if (failure != null) SwingUtilities.invokeLater(() -> notice(failure.getMessage()));
+                if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not open config.toml", failure.getMessage()));
             });
         }
 
@@ -529,7 +545,7 @@ public final class JasperApplication {
             Path folder = configuration.state().file().toAbsolutePath().getParent();
             CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().reveal(folder))
                 .whenComplete((ignored, failure) -> {
-                    if (failure != null) SwingUtilities.invokeLater(() -> notice("Could not reveal " + folder));
+                    if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not reveal the folder", folder.toString()));
                 });
         }
 
@@ -541,19 +557,25 @@ public final class JasperApplication {
             });
         }
 
-        /** A plain informational message: the window the user used last, or the log when there is none. */
-        void info(String message) {
-            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
-            if (target == null) LOG.log(System.Logger.Level.INFO, message);
-            else target.content().onInfo.accept("Jasper", message);
+        /** A plugin's error notice, until plugins post notifications themselves: one message, split into title and details. */
+        void notice(String message) {
+            notificationCenter.submit(NotificationRequest.message(NotificationsFeature.GENERAL.id(), Severity.ERROR, message));
         }
 
-        /** A plugin's error notice: the window the user used last, or the log when there is none. */
-        void notice(String message) {
-            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
-            if (target == null) LOG.log(System.Logger.Level.WARNING, "Plugin notice with no window: " + message);
-            else target.content().onError.accept("Jasper", message);
-        }
+    /** Where Jasper stands for notifications: focused, in the background, or with no window open. */
+    private Delivery.Presence presence() {
+        if (windows.isEmpty()) return Delivery.Presence.NO_WINDOW;
+        return java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null
+            ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
+    }
+
+    /** Show Problems on the configuration notification: the details over the window used last. */
+    private void showConfigurationProblems() {
+        TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
+        if (target == null) return;
+        target.toFront();
+        target.content().showConfigurationDetails();
+    }
 
     /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
     List<KeyBindings.Problem> bindingProblems() {
@@ -672,6 +694,7 @@ public final class JasperApplication {
 
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
+        if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
         // Residency keeps the warm process: the command history, the plugins and the configuration
@@ -692,6 +715,7 @@ public final class JasperApplication {
     void windowActivated(TerminalWindow window) {
         if (!windows.contains(window)) return;
         lastActive = window;
+        notificationViews.activated(window.content());
         terminals.windowActivated(window.content().id());
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
@@ -841,6 +865,7 @@ public final class JasperApplication {
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();
         buddy.close();
+        notificationViews.close();
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }
