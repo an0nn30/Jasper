@@ -63,4 +63,11 @@ class MacGlassTest {
         assertThat(MacGlass.restored(Color.RED, current)).as("an application colour is kept").isEqualTo(Color.RED);
         assertThat(MacGlass.restored(null, current)).as("nothing recorded").isNull();
     }
+
+    @Test void effectMaterialsAreNamedAndDefaultToUnderWindowBackground() {
+        assertThat(MacGlass.material("hudWindow")).isEqualTo(13);
+        assertThat(MacGlass.material(" sidebar ")).isEqualTo(7);
+        assertThat(MacGlass.material(null)).isEqualTo(21);
+        assertThat(MacGlass.material("nonsense")).isEqualTo(21);
+    }
 }

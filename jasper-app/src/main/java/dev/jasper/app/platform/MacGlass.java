@@ -116,14 +116,37 @@ final class MacGlass {
         if (peer != null) Class.forName("java.awt.peer.ComponentPeer").getMethod("setBackground", Color.class).invoke(peer, color);
     }
 
+    /** NSVisualEffectMaterial values by name; {@code jasper.glassMaterial} picks one for the effect blur. */
+    private static final Map<String, Integer> MATERIALS = Map.ofEntries(Map.entry("titlebar", 3), Map.entry("menu", 5),
+        Map.entry("popover", 6), Map.entry("sidebar", 7), Map.entry("headerView", 10), Map.entry("sheet", 11),
+        Map.entry("windowBackground", 12), Map.entry("hudWindow", 13), Map.entry("fullScreenUI", 15),
+        Map.entry("toolTip", 17), Map.entry("contentBackground", 18), Map.entry("underWindowBackground", 21),
+        Map.entry("underPageBackground", 22));
+    static final String DEFAULT_MATERIAL = "underWindowBackground";
+
+    /**
+     * Blurs behind the window. {@code jasper.glassBlur=effect} (the default) uses a public NSVisualEffectView with the
+     * {@code jasper.glassMaterial} material, on whenever the radius is above 0; {@code jasper.glassBlur=radius} uses
+     * the private CoreGraphics radius, whose blur ignores the window's rounded corners.
+     */
     static boolean blur(JRootPane root, int radius) {
         Window window = SwingUtilities.getWindowAncestor(root);
         if (window == null || !load()) return false;
         try {
-            return setBlur(window, radius);
+            if ("radius".equals(System.getProperty("jasper.glassBlur"))) {
+                setEffect(window, -1);
+                return setBlur(window, radius);
+            }
+            setBlur(window, 0);
+            return setEffect(window, radius > 0 ? material(System.getProperty("jasper.glassMaterial")) : -1);
         } catch (UnsatisfiedLinkError failure) {
             return false;
         }
+    }
+
+    /** The NSVisualEffectMaterial value for a material name, or the default material's for an unknown one. */
+    static int material(String name) {
+        return MATERIALS.getOrDefault(name == null ? DEFAULT_MATERIAL : name.strip(), MATERIALS.get(DEFAULT_MATERIAL));
     }
 
     /** Under {@code ./gradlew run} the build passes {@code jasper.glassLibrary}; a packaged app has it in Contents/app. */
@@ -153,4 +176,5 @@ final class MacGlass {
     }
 
     private static native boolean setBlur(Window window, int radius);
+    private static native boolean setEffect(Window window, int material);
 }

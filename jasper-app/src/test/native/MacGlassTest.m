@@ -47,6 +47,12 @@ int main(void) {
         assert(JasperWindowForLayer([CALayer layer], windows) == nil);
         assert(JasperWindowForLayer(nil, windows) == nil);
         assert(JasperWindowForLayer(metal, @[]) == nil);
+
+        // The effect view's mask keeps the window's corners and stretches only between them.
+        NSImage *mask = JasperCornerMask(16);
+        assert(mask.size.width == 33 && mask.size.height == 33);
+        assert(mask.capInsets.top == 16 && mask.capInsets.left == 16 && mask.capInsets.bottom == 16 && mask.capInsets.right == 16);
+        assert(mask.resizingMode == NSImageResizingModeStretch);
     }
     return 0;
 }
