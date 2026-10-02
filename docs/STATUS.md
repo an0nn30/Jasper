@@ -2,6 +2,15 @@
 
 ## Current state — 2026-10-02
 
+- **No FlatLaf SEVERE at start-up with Nord** (branch `fix/theme-lazy-border`, user report 2026-10-02): Nord sets
+  `TableHeader.cellBorder` to a colour. Resolving workspace values asked the private, never-installed FlatLaf defaults
+  `get(key) == null` for every explicit colour key, which built FlatLaf's lazy `FlatTableHeaderBorder`; its constructor
+  reads `TableHeader.cellMargins` from the installed look, missing before any theme is installed, and FlatLaf logged
+  the NPE. `FlatLafThemeData.defines` checks the table without building values (then `get` for keys FlatLaf serves
+  elsewhere); WorkspaceValues and ThemeManager.install use it. Full check **7,967/0/0/6**. Separate, not fixed here:
+  Darcula and four other converted themes keep IntelliJ named-colour values such as `"panel"`, which FlatLaf logs as
+  "Failed to parse" (`TitlePane.background`, `NewUiOnboarding.Dialog.background`).
+
 - **Theme dropdowns search as you type** (branch `claude/theme-search`, worktree `.claude/worktrees/settings-appearance`,
   design approved in chat 2026-10-02): both Appearance dropdowns (`Editors.ThemePick`) are a `settingsui.SearchCombo`.
   Typing in the open or focused dropdown shows an IntelliJ-style search bar at the top of the list and keeps the

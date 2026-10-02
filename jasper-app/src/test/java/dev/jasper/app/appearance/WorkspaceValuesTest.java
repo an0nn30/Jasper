@@ -32,6 +32,37 @@ class WorkspaceValuesTest {
         assertThat(workspace.uiKeys()).isEqualTo(original.uiKeys());
     }
 
+    @Test void aColourOnAKeyFlatLafBuildsLazilyCreatesNothingAgainstTheInstalledLook() throws Exception {
+        // Nord sets TableHeader.cellBorder to a colour. FlatLaf's border for that key reads TableHeader.cellMargins from
+        // UIManager when built, which before any theme is installed (start-up) is missing.
+        var original = UIManager.getLookAndFeel();
+        var severe = new java.util.ArrayList<java.util.logging.LogRecord>();
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) {
+                if (record.getLevel().intValue() >= java.util.logging.Level.SEVERE.intValue()) severe.add(record);
+            }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        var flatLaf = java.util.logging.Logger.getLogger("com.formdev.flatlaf");
+        flatLaf.addHandler(handler);
+        try {
+            UIManager.setLookAndFeel(new javax.swing.plaf.metal.MetalLookAndFeel());
+            var base = ThemeTestSupport.named("Nord").source().document();
+            assertThat(base.ui()).containsEntry("TableHeader.cellBorder", "#434c5e");
+            // A copy, so that no earlier test's cached generation hides the lookup.
+            var ui = new java.util.LinkedHashMap<>(base.ui());
+            var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
+                base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), Map.of(), base.syntax(), ui, base.icons());
+            var values = WorkspaceValues.resolve(document, ThemeGenerator.generate(document));
+            assertThat(severe).extracting(java.util.logging.LogRecord::getMessage).isEmpty();
+            assertThat(values.tokens()).isNotEmpty();
+        } finally {
+            flatLaf.removeHandler(handler);
+            UIManager.setLookAndFeel(original);
+        }
+    }
+
     @Test void explicitAlphaTokensAndSyntaxSurviveEffectiveDefaults() {
         var base = Theme.DARCULA.source().document();
         var explicit = new Color(1, 2, 3, 100);
