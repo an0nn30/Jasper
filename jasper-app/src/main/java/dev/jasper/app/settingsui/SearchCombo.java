@@ -60,8 +60,13 @@ final class SearchCombo extends JComboBox<String> {
     SearchCombo(int pinned, String noMatches) {
         this.pinned = pinned;
         this.noMatches = noMatches;
-        setKeySelectionManager((key, model) -> -1);
     }
+
+    /**
+     * Never picks by key: typed characters are search text. Each look and feel installs its own key selection manager,
+     * whose index would count the filtered rows, so overriding this outlasts them all.
+     */
+    @Override public boolean selectWithKeyChar(char keyChar) { return false; }
 
     @Override public void updateUI() {
         setUI(UIManager.getLookAndFeel() instanceof FlatLaf ? new FlatUi() : new BasicUi());
@@ -186,8 +191,8 @@ final class SearchCombo extends JComboBox<String> {
         /** Opens on the current choice with no search. */
         @SuppressWarnings("deprecation")
         @Override public void show() {
-            reset();
             combo.firePopupMenuWillBecomeVisible();
+            reset();
             if (!combo.isShowing()) return;
             list.setVisibleRowCount(Math.max(1, Math.min(rows.size(), combo.getMaximumRowCount())));
             openWidth = 0;
@@ -281,7 +286,8 @@ final class SearchCombo extends JComboBox<String> {
                     rows.addElement(label);
                     indexes.add(index);
                 }
-                int row = keep >= 0 ? keep : first >= 0 ? first : rows.isEmpty() ? -1 : 0;
+                // With no match nothing is highlighted, so Enter after a typo picks nothing.
+                int row = keep >= 0 ? keep : first;
                 if (searching() && matched == 0) { rows.addElement(noMatches); indexes.add(-1); }
                 if (row < 0) list.clearSelection(); else { list.setSelectedIndex(row); list.ensureIndexIsVisible(row); }
             } finally { filtering = false; }
@@ -311,8 +317,14 @@ final class SearchCombo extends JComboBox<String> {
         private final class Keys extends KeyAdapter {
             @Override public void keyTyped(KeyEvent event) {
                 char typed = event.getKeyChar();
-                if (typed == KeyEvent.CHAR_UNDEFINED || Character.isISOControl(typed) || event.isControlDown()
-                    || event.isMetaDown() || !combo.isEnabled() || typed == ' ' && !searching()) return;
+                // AltGr arrives as Ctrl+Alt on Windows and Linux; its characters are search text.
+                boolean shortcut = event.isMetaDown() || event.isControlDown() && !event.isAltDown();
+                if (typed == KeyEvent.CHAR_UNDEFINED || Character.isISOControl(typed) || shortcut || !combo.isEnabled()) return;
+                if (typed == ' ' && !searching()) {
+                    if (!isVisible()) combo.setPopupVisible(true);
+                    event.consume();
+                    return;
+                }
                 if (!isVisible() && !searching()) combo.setPopupVisible(true);
                 search.setText(search.getText() + typed);
                 event.consume();
@@ -321,12 +333,15 @@ final class SearchCombo extends JComboBox<String> {
             @Override public void keyPressed(KeyEvent event) {
                 if (!isVisible() && !searching() || event.isControlDown() || event.isMetaDown() || event.isAltDown()) return;
                 switch (event.getKeyCode()) {
-                    case KeyEvent.VK_DOWN -> move(1);
-                    case KeyEvent.VK_UP -> move(-1);
+                    // Every key the combo's own bindings would answer with a pick behind the list is handled here.
+                    case KeyEvent.VK_DOWN, KeyEvent.VK_KP_DOWN -> move(1);
+                    case KeyEvent.VK_UP, KeyEvent.VK_KP_UP -> move(-1);
                     case KeyEvent.VK_PAGE_DOWN -> move(combo.getMaximumRowCount());
                     case KeyEvent.VK_PAGE_UP -> move(-combo.getMaximumRowCount());
+                    case KeyEvent.VK_END -> move(rows.size());
+                    case KeyEvent.VK_HOME -> { list.clearSelection(); move(1); }
                     case KeyEvent.VK_ENTER -> choose();
-                    case KeyEvent.VK_ESCAPE -> combo.setPopupVisible(false);
+                    case KeyEvent.VK_ESCAPE -> { combo.firePopupMenuCanceled(); combo.setPopupVisible(false); }
                     case KeyEvent.VK_BACK_SPACE -> {
                         if (!searching()) return;
                         String text = search.getText();

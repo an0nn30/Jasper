@@ -65,6 +65,8 @@ class SearchComboTest {
         popup.show();
         type("nordx");
         assertThat(popup.shown()).as("a line says so").containsExactly("Same as UI theme", "No matching themes");
+        assertThat(popup.highlighted()).as("nothing matched, so nothing is highlighted").isNull();
+        press(KeyEvent.VK_DOWN);
         press(KeyEvent.VK_DOWN);
         assertThat(popup.highlighted()).as("the line is not an entry").isEqualTo("Same as UI theme");
         assertThat(press(KeyEvent.VK_BACK_SPACE)).isTrue();
@@ -82,6 +84,49 @@ class SearchComboTest {
         assertThat(shortcut.isConsumed()).isFalse();
         assertThat(popup.query()).isEmpty();
         assertThat(press(KeyEvent.VK_DOWN)).as("closed and not searching: the combo's own keys").isFalse();
+    }
+
+    @Test void enterAfterASearchWithNoMatchesPicksNothing() {
+        combo.setSelectedItem("Nord");
+        popup.show();
+        type("xyz");
+        assertThat(press(KeyEvent.VK_ENTER)).isTrue();
+        assertThat(combo.getSelectedItem()).isEqualTo("Nord");
+    }
+
+    @Test void homeEndAndTheKeypadArrowsMoveTheHighlightWithoutPicking() {
+        popup.show();
+        type("jasper");
+        assertThat(press(KeyEvent.VK_END)).isTrue();
+        assertThat(popup.highlighted()).isEqualTo("Jasper Light");
+        assertThat(press(KeyEvent.VK_HOME)).isTrue();
+        assertThat(popup.highlighted()).isEqualTo("Same as UI theme");
+        assertThat(press(KeyEvent.VK_KP_DOWN)).isTrue();
+        assertThat(popup.highlighted()).isEqualTo("Jasper Dark");
+        assertThat(press(KeyEvent.VK_KP_UP)).isTrue();
+        assertThat(popup.highlighted()).isEqualTo("Same as UI theme");
+        assertThat(combo.getSelectedItem()).as("only Enter picks").isEqualTo("Same as UI theme");
+    }
+
+    @Test void aNewLookAndFeelKeepsTheSearchAndNeverPicksByFirstLetter() {
+        combo.updateUI();
+        var fresh = combo.searchPopup();
+        assertThat(fresh).isNotSameAs(popup);
+        assertThat(combo.selectWithKeyChar('n')).isFalse();
+        assertThat(combo.getSelectedItem()).isEqualTo("Same as UI theme");
+        fresh.show();
+        fresh.getKeyListener().keyTyped(new KeyEvent(combo, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, 'n'));
+        assertThat(fresh.shown()).containsExactly("Same as UI theme", "Catppuccin Mocha", "Nord");
+    }
+
+    @Test void spaceOpensTheListAndAltGrCharactersAreSearchText() {
+        var space = new KeyEvent(combo, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, ' ');
+        popup.getKeyListener().keyTyped(space);
+        assertThat(space.isConsumed()).isTrue();
+        assertThat(popup.query()).isEmpty();
+        var altGr = new KeyEvent(combo, KeyEvent.KEY_TYPED, 0, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK, KeyEvent.VK_UNDEFINED, '@');
+        popup.getKeyListener().keyTyped(altGr);
+        assertThat(popup.query()).isEqualTo("@");
     }
 
     @Test void aListChangeWhileSearchingRefilters() {

@@ -412,8 +412,10 @@ keeps its spelling. Only the Theme row has the gear; its page disposes the row, 
 Both picks use `settingsui.SearchCombo`, a `JComboBox` whose look-and-feel UI (a `FlatComboBoxUI` subclass, or Basic
 without FlatLaf) creates its own `ComboPopup`: a non-focusable `JPopupMenu` with a search bar over a filtered list.
 Focus stays on the combo; the popup's key listener, which the UI installs on the combo, routes typed characters into
-the search and handles Up/Down/Enter/Escape/Backspace while the list is open or a search runs. The combo's
-first-letter selection is disabled. The popup's size is fixed when it opens; only the bar's first appearance repacks.
+the search and handles Up/Down (keypad too), Page Up/Down, Home/End, Enter, Escape and Backspace while the list is
+open or a search runs; every key the combo's own bindings would answer with a pick behind the list must stay handled
+there. `selectWithKeyChar` always returns false, because each look and feel installs a fresh key selection manager.
+The popup's size is fixed when it opens; only the bar's first appearance repacks.
 FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
 
 `themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;

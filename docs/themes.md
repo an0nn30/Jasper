@@ -44,7 +44,7 @@ test results.
 Both dropdowns list every installed theme by name and update when theme files are added, imported, edited or removed.
 Start typing in an open (or focused) dropdown to search: a search bar appears at the top and the list keeps the names
 holding every typed word, ignoring case, so `cat mocha` finds Catppuccin Mocha. **Same as UI theme** stays at the top.
-Up and Down move, Enter picks, Backspace edits the search, × clears it and Escape closes the list.
+Up, Down, Home and End move, Enter picks, Backspace edits the search, × clears it and Escape closes the list.
 Running windows change only on **Apply** or **OK**; Cancel discards the choices. A saved name that no installed theme
 has shows as "(not found)" and stays saved for repair; Jasper uses the fallback described in
 [configuration](configuration.md#theme) meanwhile.

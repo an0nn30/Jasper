@@ -6,8 +6,9 @@
   design approved in chat 2026-10-02): both Appearance dropdowns (`Editors.ThemePick`) are a `settingsui.SearchCombo`.
   Typing in the open or focused dropdown shows an IntelliJ-style search bar at the top of the list and keeps the
   names holding every word; Same as UI theme stays pinned; "No matching themes" is an unpickable row. Up/Down/Enter/
-  Escape/Backspace work while searching, Enter picks without reaching OK, and the combo no longer jumps by first letter.
-  Not done: grouped sections (not requested), GUI check (the popup's look, hover/click, the × button, typing on a
+  Escape/Backspace/Home/End work while searching, Enter picks without reaching OK (and picks nothing when nothing
+  matched), Space opens the list, and the combo never picks by first letter, even after a theme change rebuilds its
+  look and feel (an independent review found that and the Home/End leak; both fixed with tests). Not done: grouped sections (not requested), GUI check (the popup's look, hover/click, the × button, typing on a
   closed dropdown), merge, push.
 
 - **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
