@@ -33,6 +33,7 @@ final class WorkspaceRegions extends JPanel {
 
         private final boolean toolWindow;
         private boolean rounded = true;
+        private boolean clear;
 
         Host() { this(true); }
         Host(boolean toolWindow) {
@@ -64,9 +65,15 @@ final class WorkspaceRegions extends JPanel {
                 g.setColor(UIManager.getColor("Jasper.titleBackground"));
                 g.fillRect(0, 0, getWidth(), getHeight());
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                // The terminal column (tab strip included) is one surface in the terminal palette, so every
-                // theme follows the same frame, including its optional rounded corners.
-                g.setColor(getBackground()); g.fill(surface());
+                if (clear) {
+                    // A translucent window: leave the surface empty, so the panes inside paint the only glass.
+                    g.setComposite(java.awt.AlphaComposite.Clear);
+                    g.fill(surface());
+                } else {
+                    // The terminal column (tab strip included) is one surface in the terminal palette, so every
+                    // theme follows the same frame, including its optional rounded corners.
+                    g.setColor(getBackground()); g.fill(surface());
+                }
             } finally { g.dispose(); }
         }
 
@@ -133,6 +140,13 @@ final class WorkspaceRegions extends JPanel {
 
     /** The terminal palette background of the whole center, including the tab strip and any lower arc. */
     void setTerminalBackground(java.awt.Color background) { center.setBackground(background); }
+
+    /** In a translucent window the center surface is cleared; what it holds paints the glass. */
+    void setGlass(boolean glass) {
+        if (center.clear == glass) return;
+        center.clear = glass;
+        center.repaint();
+    }
 
     void show(PanelRegion region, JComponent content, int size) {
         capture();

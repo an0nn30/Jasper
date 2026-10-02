@@ -1,0 +1,148 @@
+package dev.jasper.app.workspace;
+
+import dev.jasper.app.appearance.GlassLevels;
+import dev.jasper.app.appearance.ThemeCatalog;
+import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.GlassSettings;
+import dev.jasper.app.config.WorkspaceThemeChoice;
+import dev.jasper.app.testsupport.LayoutTestSupport;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Point;
+import java.awt.image.BufferedImage;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import javax.swing.JComponent;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import static dev.jasper.app.workspace.DesktopTestSupport.edt;
+import static org.assertj.core.api.Assertions.assertThat;
+
+class WorkspaceGlassTest {
+    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); edt(() -> new ThemeController()); }
+
+    private static BufferedImage render(JComponent root) {
+        var image = new BufferedImage(root.getWidth(), root.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { root.paint(graphics); } finally { graphics.dispose(); }
+        return image;
+    }
+
+    private static int alpha(BufferedImage image, JComponent root, Component component, int x, int y) {
+        Point point = SwingUtilities.convertPoint(component, x, y, root);
+        return new Color(image.getRGB(point.x, point.y), true).getAlpha();
+    }
+
+    @Test void theWorkspaceHostClearsOnlyItsSurfaceWhenGlassIsOn() throws Exception {
+        edt(() -> {
+            var deck = new JPanel();
+            deck.setOpaque(false);
+            var regions = new WorkspaceRegions(deck);
+            regions.setRailVisible(true);
+            regions.setTerminalBackground(new Color(0x212734));
+            regions.setSize(1000, 600);
+            LayoutTestSupport.layoutTree(regions);
+            LayoutTestSupport.layoutTree(regions);
+            assertThat(alpha(render(regions), regions, deck, 300, 200)).isEqualTo(255);
+
+            regions.setGlass(true);
+            var glass = render(regions);
+            assertThat(alpha(glass, regions, deck, 300, 200)).as("inside the rounded surface").isZero();
+            assertThat(alpha(glass, regions, regions, 997, 300)).as("the right gutter is chrome").isEqualTo(255);
+
+            regions.setGlass(false);
+            assertThat(alpha(render(regions), regions, deck, 300, 200)).isEqualTo(255);
+        });
+    }
+
+    @Test void splitsKeepASolidDividerBetweenTranslucentPanes() throws Exception {
+        var pending = new ArrayDeque<Runnable>();
+        TerminalTab[] created = new TerminalTab[1];
+        edt(() -> created[0] = new TerminalTab(DesktopTestSupport.HOME, DesktopTestSupport.launcher(pending)));
+        TerminalTab tab = created[0];
+        edt(tab::start);
+        try {
+            pending.remove().run();
+            edt(() -> {
+                tab.setBackgroundOpacity(0.5f);
+                tab.split(SplitTree.Axis.RIGHT);
+            });
+            pending.remove().run();
+            edt(() -> {
+                assertThat(tab.isOpaque()).isFalse();
+                assertThat(tab.panes()).hasSize(2).allMatch(pane -> !pane.isOpaque());
+                var split = (TerminalTab.PaneSplit) tab.getComponent(0);
+                assertThat(split.isOpaque()).isFalse();
+                tab.setSize(600, 300);
+                LayoutTestSupport.layoutTree(tab);
+                LayoutTestSupport.layoutTree(tab);
+                var image = render(tab);
+                var divider = ((BasicSplitPaneUI) split.getUI()).getDivider();
+                assertThat(alpha(image, tab, divider, divider.getWidth() / 2, divider.getHeight() / 2)).as("divider").isEqualTo(255);
+                for (TerminalPane pane : tab.panes())
+                    assertThat(alpha(image, tab, pane, 2, 2)).as("pane padding").isEqualTo(128);
+
+                tab.setBackgroundOpacity(1f);
+                assertThat(tab.isOpaque()).isTrue();
+                assertThat(split.isOpaque()).isTrue();
+                assertThat(tab.panes()).allMatch(JComponent::isOpaque);
+            });
+        } finally { edt(tab::close); }
+    }
+
+    @Test void aTranslucentWindowLeavesItsChromeSolid() throws Exception {
+        edt(() -> {
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.setSize(900, 600);
+            LayoutTestSupport.layoutTree(owner);
+            LayoutTestSupport.layoutTree(owner);
+            TerminalPane pane = owner.currentPane();
+            assertThat(alpha(render(owner), owner, pane, 2, 2)).isEqualTo(255);
+
+            owner.applyBackgroundOpacity(0.5);
+            assertThat(owner.backgroundOpacity()).isEqualTo(0.5f);
+            var glass = render(owner);
+            assertThat(alpha(glass, owner, pane, 2, 2)).as("pane padding").isEqualTo(128);
+            var status = owner.status();
+            assertThat(status.getHeight()).as("the status bar is laid out").isPositive();
+            assertThat(alpha(glass, owner, status, status.getWidth() / 2, status.getHeight() / 2)).as("status bar").isEqualTo(255);
+            var header = owner.chrome().header();
+            assertThat(alpha(glass, owner, header, header.getWidth() / 2, header.getHeight() / 2)).as("header").isEqualTo(255);
+
+            owner.applyBackgroundOpacity(1);
+            assertThat(alpha(render(owner), owner, pane, 2, 2)).isEqualTo(255);
+        });
+    }
+
+    @Test void newTabsFollowTheWindowsOpacity() throws Exception {
+        edt(() -> {
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.applyBackgroundOpacity(0.7);
+            TerminalTab tab = owner.openTab(DesktopTestSupport.HOME);
+            assertThat(tab.isOpaque()).isFalse();
+            assertThat(tab.panes()).allMatch(pane -> !pane.isOpaque());
+        });
+    }
+
+    @Test void requestsCombineSavedSettingsWithTheWorkspaceTheme() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
+            var requests = new ArrayList<GlassLevels>();
+            owner.setGlassRequests(requests::add);
+            assertThat(requests.getLast()).isEqualTo(GlassLevels.OPAQUE);
+
+            var clear = ThemeCatalog.builtIn().scan().find("Clear Dark").orElseThrow();
+            themes.configureWorkspace(new WorkspaceThemeChoice("Clear Dark"), clear);
+            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.95, 0.5));
+
+            owner.applyConfiguration(ConfigSnapshot.defaults().toBuilder()
+                .glass(new GlassSettings(80f, GlassSettings.UNSET_BLUR)).build(), true);
+            assertThat(requests.getLast()).isEqualTo(new GlassLevels(0.8, 0.5));
+        });
+    }
+}

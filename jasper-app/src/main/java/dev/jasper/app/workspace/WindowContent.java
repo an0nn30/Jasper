@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.GlassLevels;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
@@ -10,6 +11,7 @@ import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.persistence.UiState;
@@ -95,6 +97,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private boolean closed;
+    private float backgroundOpacity = 1f;
+    private Consumer<GlassLevels> glassRequests = levels -> {};
     private boolean rearranging;
     private WindowTerminals terminals;
     private boolean active = true;
@@ -715,6 +719,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
         WorkspaceTheme.apply(tab, themes.current());
         tab.setBackground(themes.current().palette().background());
+        tab.setBackgroundOpacity(backgroundOpacity);
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
@@ -1027,12 +1032,44 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
             onThemeChanged.accept(theme); update();
+            requestGlass();
             revalidate(); repaint();
         } finally {
             for (var styler : suspended) styler.afterUiUpdate();
             retained.forEach(TerminalTab::endThemeUpdate);
         }
     }
+
+    /** Where this window's requested workspace glass goes; the native window boundary installs it. */
+    void setGlassRequests(Consumer<GlassLevels> requests) {
+        glassRequests = Objects.requireNonNull(requests);
+        requestGlass();
+    }
+
+    /** Asks for the saved glass over the workspace theme's; called after every theme or configuration change. */
+    void requestGlass() {
+        if (closed) return;
+        ConfigSnapshot configured = workspaceConfiguration.snapshot();
+        glassRequests.accept(GlassLevels.resolve(configured == null ? GlassSettings.UNSET : configured.glass(),
+            themes.current().workspace().glass()));
+    }
+
+    /**
+     * The opacity actually in effect for this window, 1 being opaque. The terminal surface is cleared and each pane
+     * paints its own glass; chrome, tab strips and dividers stay solid.
+     */
+    void applyBackgroundOpacity(double opacity) {
+        float value = (float) opacity;
+        if (closed || value == backgroundOpacity) return;
+        backgroundOpacity = value;
+        boolean glass = value < 1f;
+        regions.setGlass(glass);
+        tabs.setOpaque(!glass);
+        for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
+        repaint();
+    }
+
+    float backgroundOpacity() { return backgroundOpacity; }
 
     int tabHeight() { return tabHeight; }
 
