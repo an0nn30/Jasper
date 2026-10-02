@@ -6,6 +6,8 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Component;
+import java.awt.KeyEventDispatcher;
+import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.InputEvent;
@@ -166,6 +168,35 @@ class WindowDragTest {
             f.owner.close();
             assertThat(f.owner.dockDrag().active()).as("the window closing").isFalse();
             assertThat(f.owner.dock().slot("dev.x.sessions")).hasValue(Slot.LEFT_TOP);
+        });
+    }
+
+    @Test void theWindowDeactivatingMidDragCancelsItAndNothingDrops() throws Exception {
+        edt(() -> {
+            var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            var keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
+            try {
+                var f = new Fixture();
+                List<KeyEventDispatcher> before = List.copyOf(keys.dispatchers);
+                var source = f.drag(f.button("Files"), f.cell(2, 1));
+                assertThat(f.owner.dockDrag().target()).as("a release here would drop").isPresent();
+                assertThat(keys.dispatchers).as("the drag's Esc dispatcher").hasSize(before.size() + 1);
+                // TerminalWindow on windowDeactivated: a modal dialog opened, whose window takes the release, or
+                // another application took focus.
+                f.owner.setActive(false);
+                assertThat(f.owner.dockDrag().active()).isFalse();
+                assertThat(f.owner.dockDrag().overlay().getParent()).as("no guides are left").isNull();
+                assertThat(f.owner.leftStripe().dragging()).isFalse();
+                assertThat(f.owner.rightStripe().dragging()).isFalse();
+                assertThat(keys.dispatchers).as("no Esc dispatcher is left").containsExactlyElementsOf(before);
+                f.mouse(source, MouseEvent.MOUSE_RELEASED, f.cell(2, 1));
+                assertThat(f.owner.dock().slot("dev.x.files")).as("nothing dropped").hasValue(Slot.LEFT_TOP);
+                assertThat(f.owner.dock().visible("dev.x.files")).isFalse();
+                assertThat(f.events).isEmpty();
+            } finally {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);
+            }
         });
     }
 

@@ -1094,6 +1094,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     void setActive(boolean value) {
         if (!value && commandPalette != null) commandPalette.dismiss();
+        // A modal dialog opening takes the drag's release, and so does another application taking focus.
+        if (!value) dockDrag.cancel();
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {

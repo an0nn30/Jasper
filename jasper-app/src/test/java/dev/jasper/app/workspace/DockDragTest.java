@@ -382,6 +382,23 @@ class DockDragTest {
         assertThat(w.drag.overlay().highlight()).as("where it lands if shown there").isNotNull();
     }
 
+    private static KeyEvent escape(Component source) {
+        return new KeyEvent(source, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
+    }
+
+    @Test void anEscInAnotherWindowIsLeftToItAndTheDragGoesOn() {
+        var w = window();
+        var other = window();
+        w.dragTo(w.button(w.left, "b"), w.cell(2, 1));
+        assertThat(keys.dispatchers).as("the running drag's Esc dispatcher").hasSize(1);
+        assertThat(keys.send(escape(other.button(other.left, "a")))).as("a dialog's or another window's Esc is its own").isFalse();
+        assertThat(w.drag.active()).as("and the drag goes on").isTrue();
+        assertThat(keys.send(escape(w.button(w.left, "a")))).as("an Esc in the drag's own window").isTrue();
+        assertThat(w.drag.active()).isFalse();
+        assertThat(keys.dispatchers).isEmpty();
+        assertThat(w.state.slot("b")).as("cancelled: nothing moves").hasValue(Slot.LEFT_TOP);
+    }
+
     @Test void escapeOrAReleaseWithoutATargetCancels() {
         var w = window();
         var source = w.dragTo(w.button(w.left, "b"), w.cell(1, 1));

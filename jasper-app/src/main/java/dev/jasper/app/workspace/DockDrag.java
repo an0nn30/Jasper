@@ -37,9 +37,9 @@ import javax.swing.SwingUtilities;
  * threshold and one more pixel on every side, that place is its own target, so pressing, moving a few pixels and
  * releasing on the spot changes nothing even near the button's edge, where the drag layout shifts the stripe; after
  * that the resolver decides from what the stripes show. Releasing the left button over a target hands the drop to
- * {@link #onDrop}; releasing it anywhere else, Esc, {@link #cancel} or another press (a right or middle click, or a
- * left press after a lost release) ends the drag without one. A window resize while dragging forgets the old place and
- * resolves the target again. EDT only.
+ * {@link #onDrop}; releasing it anywhere else, Esc in its window, {@link #cancel} or another press (a right or middle
+ * click, or a left press after a lost release) ends the drag without one. A window resize while dragging forgets the
+ * old place and resolves the target again. EDT only.
  */
 final class DockDrag {
     /** How far, in logical pixels, a press must move before it becomes a drag. */
@@ -111,11 +111,23 @@ final class DockDrag {
     /** Ends a drag or a pending press without dropping: Esc, the window closing, a plugin unloading, a dock change. */
     void cancel() { finish(); }
 
-    /** While a drag runs it owns Esc, which cancels it. */
+    /**
+     * While a drag runs it owns Esc pressed in its own window, which cancels it; an Esc in a dialog or another window is
+     * left to that window.
+     */
     boolean dispatchKeyEvent(KeyEvent event) {
-        if (!active() || event.getKeyCode() != KeyEvent.VK_ESCAPE) return false;
+        if (!active() || event.getKeyCode() != KeyEvent.VK_ESCAPE || !inThisWindow(event.getComponent())) return false;
         if (event.getID() == KeyEvent.KEY_PRESSED) cancel();
         return true;
+    }
+
+    /**
+     * True for a component in the drag's own window. Every Jasper window has exactly one root pane, and a dialog or a
+     * heavyweight popup has its own, so the root pane stands for the window; a key event sent to the window itself
+     * names it too, through its root pane.
+     */
+    private boolean inThisWindow(Component component) {
+        return component != null && SwingUtilities.getRootPane(component) == SwingUtilities.getRootPane(root);
     }
 
     private void pressed(JComponent component, String id, MouseEvent event) {
