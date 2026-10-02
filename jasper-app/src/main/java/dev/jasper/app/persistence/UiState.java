@@ -23,10 +23,10 @@ import org.tomlj.TomlTable;
 
 /**
  * Application-owned layout state: where each panel docks, the dock's sizes, whether the stripes show, and where
- * auxiliary windows were. It is not user configuration. Caller-thread-confined. A bad panel entry or dock key falls
- * back alone; an unreadable file or an unknown version falls back to defaults rather than blocking startup, and
- * failed writes are only logged. Version 1 files (a region and a size per panel) are migrated on read; saving writes
- * version 2.
+ * auxiliary windows were. It is not user configuration. Caller-thread-confined. A bad panel or window entry or dock
+ * key falls back alone; an unreadable file or an unknown version falls back to defaults rather than blocking
+ * startup, and failed writes are only logged. Version 1 files (a region and a size per panel) are migrated on read;
+ * saving writes version 2.
  */
 public final class UiState {
     /**
@@ -116,7 +116,7 @@ public final class UiState {
         if (toml.get(List.of("windows")) instanceof TomlTable table)
             for (String id : table.keySet())
                 if (ID.matcher(id).matches() && table.get(List.of(id)) instanceof TomlTable entry)
-                    windows.put(id, new Bounds(number(entry, "x"), number(entry, "y"), number(entry, "width"), number(entry, "height")));
+                    bounds(entry).ifPresent(bounds -> windows.put(id, bounds));
         if (toml.get(List.of("chooser")) instanceof TomlTable table)
             chooser = new Chooser(strings(table, "recent"), strings(table, "pinned"),
                 Boolean.TRUE.equals(table.get(List.of("preview"))), !Boolean.FALSE.equals(table.get(List.of("show_hidden"))));
@@ -187,9 +187,16 @@ public final class UiState {
         return table.get(List.of(key)) instanceof Double value && Dock.ratio(value) ? value : fallback;
     }
 
-    private static int number(TomlTable table, String key) throws IOException {
-        if (table.get(List.of(key)) instanceof Long value && value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE) return value.intValue();
-        throw new IOException("UI state " + key + " must be an integer");
+    /** One window's bounds, or empty when a key is missing, not an integer or the size is not positive: it falls back alone. */
+    private static Optional<Bounds> bounds(TomlTable entry) {
+        Optional<Integer> x = number(entry, "x"), y = number(entry, "y"), width = number(entry, "width"), height = number(entry, "height");
+        if (x.isEmpty() || y.isEmpty() || width.isEmpty() || height.isEmpty() || width.get() <= 0 || height.get() <= 0) return Optional.empty();
+        return Optional.of(new Bounds(x.get(), y.get(), width.get(), height.get()));
+    }
+
+    private static Optional<Integer> number(TomlTable table, String key) {
+        return table.get(List.of(key)) instanceof Long value && value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE
+            ? Optional.of(value.intValue()) : Optional.empty();
     }
 
     private static List<String> strings(TomlTable table, String key) {

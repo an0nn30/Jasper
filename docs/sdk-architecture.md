@@ -123,8 +123,8 @@ selections through `FakePluginHost.queueFileSelection`; an empty queue models ca
 
 `persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility,
 the dock's per-side sizes and ratios, stripe visibility and auxiliary window bounds. It is
-application state, not configuration: a bad panel entry or dock key falls back alone, an
-unreadable file falls back to defaults, writes are atomic, and a version 1 file migrates on read.
+application state, not configuration: a bad panel or window entry or dock key falls back alone,
+an unreadable file falls back to defaults, writes are atomic, and a version 1 file migrates on read.
 The process stays alive while a plugin window is open.
 
 ## Terminal API

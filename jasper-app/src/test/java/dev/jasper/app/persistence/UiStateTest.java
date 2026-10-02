@@ -163,6 +163,52 @@ class UiStateTest {
         assertThat(state.panel("dev.x.disordered")).hasValue(new UiState.Panel(Slot.LEFT_TOP, UiState.Panel.LAST, false));
     }
 
+    @Test void aBadWindowEntryFallsBackAlone() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 2
+            rail_visible = false
+
+            [dock]
+            left_width = 300
+            right_width = 260
+            bottom_height = 240
+            left_ratio = 0.4
+            right_ratio = 0.5
+            bottom_ratio = 0.5
+
+            [panels."dev.x.hosts"]
+            slot = "RIGHT_BOTTOM"
+            order = 1
+            visible = true
+
+            [windows."dev.x.flat"]
+            x = 10
+            y = 20
+            width = 0
+            height = 480
+
+            [windows."dev.x.lost"]
+            x = "left"
+            y = 20
+            width = 640
+            height = 480
+
+            [windows."dev.x.manager"]
+            x = -30
+            y = 40
+            width = 800
+            height = 600
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.railVisible()).isFalse();
+        assertThat(state.dock()).isEqualTo(new UiState.Dock(300, 260, 240, 0.4, 0.5, 0.5));
+        assertThat(state.panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_BOTTOM, 1, true));
+        assertThat(state.window("dev.x.manager")).hasValue(new UiState.Bounds(-30, 40, 800, 600));
+        assertThat(state.window("dev.x.flat")).isEmpty();
+        assertThat(state.window("dev.x.lost")).isEmpty();
+    }
+
     @Test void invalidValuesAreRejectedAndInvalidFilesFallBackToDefaults() throws Exception {
         assertThatNullPointerException().isThrownBy(() -> new UiState.Panel(null, 0, true));
         assertThatIllegalArgumentException().isThrownBy(() -> new UiState.Panel(Slot.LEFT_TOP, -1, true));
@@ -171,14 +217,17 @@ class UiStateTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new UiState.Dock(260, 260, 200, 0.5, Double.NaN, 0.5));
         assertThatIllegalArgumentException().isThrownBy(() -> new UiState.Bounds(0, 0, 0, 10));
         Path file = dir.resolve("ui-state.toml");
-        for (String bad : new String[]{"not toml = = =", "version = 3\n", "rail_visible = false\n",
-                "version = 2\nrail_visible = false\n[windows.\"a.b\"]\nx = \"left\"\n"}) {
+        for (String bad : new String[]{"not toml = = =", "version = 3\n", "rail_visible = false\n"}) {
             Files.writeString(file, bad);
             UiState state = UiState.load(file);
             assertThat(state.railVisible()).as(bad).isTrue();
             assertThat(state.dock()).as(bad).isEqualTo(UiState.Dock.DEFAULT);
             assertThat(state.panels()).as(bad).isEmpty();
         }
+        Files.writeString(file, "version = 2\nrail_visible = false\n[windows.\"a.b\"]\nx = \"left\"\n");
+        UiState badWindow = UiState.load(file);
+        assertThat(badWindow.railVisible()).as("a bad window entry is not a bad file").isFalse();
+        assertThat(badWindow.window("a.b")).isEmpty();
     }
 
     @Test void inMemoryStateNeverTouchesDisk() {
