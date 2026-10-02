@@ -2,13 +2,21 @@
 
 ## Current state — 2026-10-01
 
+- **Theme system Plan 5 implementation plan ready for user review** (2026-10-01):
+  [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
+  against local merge `cc0429f5`, on `codex/theme-system-plan5` in the reused `.worktrees/theme-system` worktree.
+  Six tasks cover serialized theme polling, safe Duplicate/Remove, searchable staged pickers, local two-zone preview,
+  owner-scoped import/file dialogs and final navigation/acceptance. Selection stays staged; confirmed file actions
+  happen immediately. Plan 4's stale help text is included in Task 6. Preserve the user's inline execution preference
+  after plan approval; implementation has not started. No GUI or push.
+
 - **Theme system Plan 4 complete, independently reviewed and merged locally** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)
-  completes all seven tasks on `codex/theme-system-plans` in `.worktrees/theme-system`. Full `./gradlew check`
+  completed all seven tasks on `codex/theme-system-plans`, now merged; the worktree is reused for Plan 5. Full `./gradlew check`
   passes **7,930 tests, zero failures/errors, six skips**, including all four architecture gates, packaged resources,
   JavaDoc and compiled documentation examples. Java hygiene scans 1,637 source files cleanly; authored diff whitespace passes.
   The lower final test count reflects retired store/runtime-legacy tests; converter/security/installation parity and
-  native fallback/reload coverage remain. Local merge includes the hidden-rail framing fix; merged verification pending. No GUI or push.
+  native fallback/reload coverage remain. Local merge `cc0429f5` includes the hidden-rail framing fix and passes a fresh `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No GUI or push.
   The catalog contains **284 native themes from 12 sources/413 hashed inputs**; exact pins, licenses, exclusions and
   renames are in `tools/themes/sources.json`, SOURCE.md and THIRD-PARTY-THEMES.md. Largest theme: 97,426 bytes;
   256 KiB cap unchanged. `[icons]` is now a documented native format table. All generation/testing is offline.
