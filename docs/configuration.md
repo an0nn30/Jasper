@@ -126,7 +126,7 @@ workspace = "match"
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
-| `window.rail_width` | `28` | Integer 28–64 logical pixels; the panel rail's buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
+| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
 | `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
 | `window.status_bar` | `true` | Boolean | Live |
@@ -539,8 +539,8 @@ settings file and data there too; their jars are in the application image). A zi
 `plugins/` is unpacked at the next launch and then waits for your review in Manage Plugins; an
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
-launch. `ui-state.toml` beside `config.toml` remembers panel placement, rail visibility and plugin
-window bounds; it is written by Jasper and is not meant to be edited.
+launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
+dock's sizes, stripe visibility and plugin window bounds; it is written by Jasper and is not meant to be edited.
 
 ## Shortcuts
 

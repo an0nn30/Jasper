@@ -11,7 +11,8 @@ plugin writer's view.
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
 | `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `contributions`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
 | `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
-| `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
+| `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `dock`, `lifecycle` |
+| `dev.jasper.app.dock` | The tool window dock model: the six slots, each window's `DockState` and the pure `DockGeometry`; JDK-only | none |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
 | `dev.jasper.app.pluginmanager` | The Settings dialog's Plugins page: passive Swing view, consent view and controller over app-native rows | `plugins`, `restart`, `settingsui`, `windows` |
 | `dev.jasper.app.restart` | Restart planning from the process's own command line, `ResidentControl`, and the Restart normally conversation | none |
@@ -82,12 +83,15 @@ plugin default.
 
 ## Panels, the rail and plugin windows
 
-Panels and rail actions are part of the `Contributions` model. Each window's
-`WindowContributions` keeps one lazily built instance per panel, shows at most one per region
-through `WorkspaceRegions` (nested split panes rebuilt around the terminal column, the tab
-strip over the deck: bottom wraps the column, right wraps that, left wraps that, so the rail and
-the side panels run from the toolbar to the status bar), and renders `WindowRail`. A window with nothing
-contributed has no rail and its old layout. Requests to show, hide or toggle a panel travel
+Panels and rail actions are part of the `Contributions` model; each panel carries its default
+`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0). Each
+window's `WindowContributions` keeps one lazily built instance per panel and docks the panels in the
+window's `DockState` (per slot an ordered list with at most one active window; per-side sizes and
+ratios). One listener on that state builds what starts showing, lays out `ToolWindowArea` (the terminal
+column, the tab strip over the deck, and a rounded frame with a `ToolWindowHeader` for each showing
+slot, placed by the pure `DockGeometry`: the bottom area spans the full width, the sides and the
+terminal column run from the toolbar to it), renders the two `ToolStripe`s, tells the panels and
+saves. A window with nothing contributed has no stripes and its old layout. Requests to show, hide or toggle a panel travel
 through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
 window. Every panel gets a View → Tools entry for its toggle action: the application-registered
 `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's own action named by
@@ -117,10 +121,11 @@ chooser over the shown window or dialog. `HostedUi` checks the plugin lifetime a
 parents `FileDialog` to the actual frame or dialog and always disposes it. The testkit queues
 selections through `FakePluginHost.queueFileSelection`; an empty queue models cancellation.
 
-`persistence.UiState` (`ui-state.toml`) holds panel region, visibility and size, rail
-visibility and auxiliary window bounds. It is application state, not configuration: strict
-read, atomic write, defaults when unreadable. The process stays alive while a plugin window
-is open.
+`persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility,
+the dock's per-side sizes and ratios, stripe visibility and auxiliary window bounds. It is
+application state, not configuration: a bad panel entry or dock key falls back alone, an
+unreadable file falls back to defaults, writes are atomic, and a version 1 file migrates on read.
+The process stays alive while a plugin window is open.
 
 ## Terminal API
 
@@ -387,7 +392,7 @@ Closed handles cannot reattach or take focus.
 
 The application translates SDK values to `contributions.ContentRegistry`/`ContentEntry`.
 `WindowContent` hosts both terminal and plugin components; `WindowTabs` and
-`WorkspaceRegions` remain the single renderer. Separate document windows reuse those same
+`ToolWindowArea` remain the single renderer. Separate document windows reuse those same
 owners without starting a shell. Terminal enumeration and active-pane APIs continue to
 report terminal content only. Plugins must tolerate an empty active pane while editing.
 

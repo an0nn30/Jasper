@@ -157,16 +157,22 @@ outside automatic branding. No additional SDK factory or dependency is required.
 
 ## Panels, the rail and windows
 
-A panel is a Swing component in the left, right or bottom region of every terminal window.
-Register it once; Jasper asks your factory for one instance per window, the first time the
-panel is shown there, and gives the panel a rail icon, a `<panel id>.toggle` action and a
-View → Tools entry, so don't add a View menu item of your own that toggles it. If you already have
+A panel is a Swing component docked as a tool window in every terminal window, as in IntelliJ:
+stripes of icons on the window's left and right edges, and six slots. The left and right sides each
+have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
+and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
+SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for one
+instance per window, the first time the panel is shown there, and gives the panel a stripe icon, a
+header (its title, an options menu and a hide button), a `<panel id>.toggle` action and a
+View → Tools entry, so don't add a View menu item of your own that toggles it, and don't repeat the
+panel's title inside it. If you already have
 an action that toggles the panel, for example to give it a shortcut, register it first and name it
 with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tools and the palette then list your action,
-with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per region; the user can move a panel to another region
-from its rail icon, and Jasper remembers where it was and how big.
+with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per slot; the user
+can move a panel to any of the six slots from its stripe icon's menu or its header's options menu,
+and Jasper remembers its slot, its place on the stripe and the side's size.
 
-A rail button runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS
+A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS
 title bar, menu bar, theme tracking and remembered bounds are its job; the content is yours.
 Dialogs belong to a terminal window or to one of your windows, so they are parented correctly
 without your plugin ever seeing a frame.
@@ -530,8 +536,8 @@ try (var host = new FakePluginHost()) {
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
 `host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
-`<panel id>.toggle` action or View → Tools menu; `host.panels()` appends `|<action id>` for a panel
-that names its own toggle.
+`<panel id>.toggle` action or View → Tools menu; `host.panels()` lists `id|title|ANCHOR`, with
+`+split` after the anchor for a split panel and `|<action id>` for a panel that names its own toggle.
 `host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
 `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,

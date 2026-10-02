@@ -294,28 +294,30 @@ padding. Keep compact palette rows tall enough for these insets. Plugin forms in
 these defaults; upstream theme assets should not be edited to duplicate them.
 
 
-Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and,
-while the rail is visible, matching rounded corners for the terminal/tab column. With
-the rail hidden or empty, the terminal/tab column has square corners, no exterior
+Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
+while the stripes are visible, matching rounded corners for the terminal/tab column. With
+the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
+Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
+tests first, and keep the drop preview (plan 2) on the same function.
 Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
-left/center/bottom surface has no additional leading gutter. Hiding or emptying the
-rail restores that gutter on plugin panel hosts without reparenting their content.
+beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. Hiding or emptying the
+stripes restores that gutter on tool window frames without reparenting their content.
 The following gutter and lower-inset rules apply to the terminal column only while
-the rail is visible. A visible status bar
+the stripes are visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header
 also replaces the exterior top gutter, keeping its controls centered between the window
 top and workspace surfaces. Hiding toolbar actions retains this spacing on macOS because
-the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent hosts omit
-their facing gutters so the plain 6px draggable splitter supplies the gap.
-Region widths/heights and persisted splitter sizes include exterior gutters. The center
+the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent frames omit
+their facing gutters so the area's plain 6px divider supplies the gap.
+Slot sizes and the saved dock sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px
 minimum. The center reserves an 8px lower inset (the corner radius) below the terminal
 grid, so terminal cells stay rectangular and unclipped. The inset uses the resolved
@@ -326,7 +328,7 @@ through it so opaque plugin content cannot fill the corners. `ToolWindowSurface`
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
 `ToolWindow.background` supplies the inner surface. `UiTemplate` maps it to the `sidebar` token and list/tree/table backgrounds to `surface_sunken`; edit the
 `[tokens]` in `jasper-dark.toml` or `jasper-light.toml` to tune the contrast.
-Rail selection uses the theme's toolbar-button background and the original theme-aware icon;
+Stripe selection uses the theme's toolbar-button background and the original theme-aware icon;
 do not substitute the tab accent or a different selected icon variant.
 
 
@@ -341,8 +343,8 @@ The palette uses the same geometry for selections, hover and scope highlights.
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
 workspace title bar, tab strip and status bar have no edge strokes. The selected tab
-uses an inset rounded selection instead of an underline. Workspace-region splitters remove their border/grip after every UI
-update; terminal-internal splits keep their existing visible indicators. The standalone
+uses an inset rounded selection instead of an underline. Dock dividers paint nothing, so no UI
+update can give them a border or grip; terminal-internal splits keep their existing visible indicators. The standalone
 dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 

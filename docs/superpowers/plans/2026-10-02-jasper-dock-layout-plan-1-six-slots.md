@@ -20,8 +20,21 @@ the area, tells the plugins and saves.
 approved by the user section by section). Plan 2 (drag and drop) builds on this plan:
 [plan 2](2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md).
 
-**Status:** Written 2026-10-02 on `claude/dock-layout` (base `7749e13b`, the spec commit, on top of `cc0429f5`
-"Merge theme system Plan 4"). Not executed. Waiting for the user's review.
+**Status:** Executed 2026-10-02 on `claude/dock-layout` with subagent-driven development (one implementer and one
+reviewer per task, plus fix rounds), on top of the plan commit `c2ca6dc6` (base `7749e13b`, the spec commit, on top of
+`cc0429f5` "Merge theme system Plan 4"). Commits: `400dcba5` through `4280e97d` (Tasks 1-9) plus the documentation
+commit (Task 10). Deviations from the plan text: Task 2, `DockGeometry` keeps each ratio divider's drag range inside
+`DockState`'s 0.1–0.9 ratio limits (new test `aWideSplitsDividerRangeStaysWithinTheRatioLimits`); Task 5,
+`ToolWindowHeader`'s padding is a compound border around `FlatEmptyBorder` so it survives theme switches, and
+`ToolWindowMenu`'s six Move to items share a `ButtonGroup`; Task 7, a divider press and release without a drag between
+them leaves the state alone (new test `aClickOnASqueezedDividerChangesNothing`); Task 8, `docked()` returns focus to the
+terminal between the hidden and the shown notifications as `hidePanel` did before, a throwing panel factory is logged
+at WARNING, `WindowPanelsTest` has 18 cases rather than 16, the close test checks the right stripe, and a
+`ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3, 4, 6 and 9 none.
+`./gradlew check --continue`: 7,987 tests, 1 failure, 0 errors, 6 skipped; the one failure is
+`ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
+"zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load
+(it passed in this run and passes alone). No GUI launched; the GUI checks are in the section "GUI checks for the user".
 
 **Execution:** The repository's usual shape: superpowers:subagent-driven-development, one implementer and one
 reviewer per task, fix rounds, then one whole-branch review. Record any deviation from the plan text in this banner

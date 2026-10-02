@@ -119,3 +119,12 @@ own tokens. For renderers shared with sidebars, `WorkspacePalette.current(compon
 zone on every call. `current()` reads workspace defaults. Unmarked components and popups use chrome colors.
 Custom hosts implementing the older `Appearance` methods remain source compatible: new methods have defaults,
 using ordinary Swing colors when no host semantic defaults exist and plain-text syntax with italic comments.
+
+## Tool windows (SDK 0.13.0)
+
+A panel docks in one of six slots: the upper or lower half of the left or right side, or the left or right half of
+the full-width bottom area. `Anchor` names the side; `PanelSpec.withSplit()` starts the panel in the second half
+(the lower half of a side, the right half of the bottom area). `withToggleActionId` keeps the flag, and the four- and
+five-argument constructors remain, so plugins built against 0.12 still link. Jasper gives every tool window a header
+with its title, so a panel should not show its own title. The user's placement wins over the default. The testkit
+lists a split panel as `id|title|LEFT+split`.
