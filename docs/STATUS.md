@@ -14,14 +14,14 @@
   pre-existing, machine-dependent assertion, `ExFilesTest.bufferSelectsATabByNumberOrName` (`:b zz` expects no match,
   but this Mac's temp folder `/var/folders/d0/…psfzzxc…/T/` contains "zz"); it passes with a `java.io.tmpdir` without
   "zz", and was previously hidden because `:jasper-app:test` failed first. It was fixed separately on main
-  (`185a5f8e`). Merged into local main 2026-10-02; not pushed.
+  (`185a5f8e`). Merged into main (`5729a684`) and pushed 2026-10-02.
 
 - **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
   chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
   and hid its detail. They are gone, so the hint bar always shows the selected row's detail and verbs. Typed prefixes,
   scope shortcuts and the query-field chip are unchanged. `WindowContent.scopeShortcut` became `paletteShortcut`,
-  because the title search field is its only remaining caller. Merged into local main 2026-10-02; not pushed.
-  Not done: GUI check, push.
+  because the title search field is its only remaining caller. Merged into main 2026-10-02 and pushed with `5729a684`.
+  Not done: GUI check.
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
