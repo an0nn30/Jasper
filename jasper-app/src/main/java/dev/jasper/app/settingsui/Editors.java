@@ -284,6 +284,8 @@ public final class Editors {
         /** How many entries are choices; any after them is the one missing choice being shown. */
         private int listed;
         private String shown = "";
+        /** The value shown or last chosen; Swing reports picking it again, which is no edit. */
+        private String current = "";
         private boolean showing;
 
         ThemePick(Supplier<List<String>> names, Map<String, String> leading, ThemeChoices.Import importer) {
@@ -310,7 +312,8 @@ public final class Editors {
             }
             fill();
             box.addActionListener(event -> {
-                if (showing) return;
+                if (showing || value().equals(current)) return;
+                current = value();
                 if (box.getSelectedIndex() >= 0 && box.getSelectedIndex() < listed) dropMissing();
                 for (Runnable listener : List.copyOf(edits)) listener.run();
             });
@@ -365,7 +368,7 @@ public final class Editors {
         }
         @Override public void show(String value) {
             showing = true;
-            try { shown = value; select(value); } finally { showing = false; }
+            try { shown = value; select(value); current = value(); } finally { showing = false; }
         }
         @Override public void onEdit(Runnable listener) { edits.add(listener); }
         @Override public void refresh() { fill(); }

@@ -205,7 +205,7 @@ Converters/security fixtures live in `themeimport`; native catalog/installation 
 file or deleting an equal-byte foreign backup. Keep original data and report the conflict. Config migration must
 stay ahead of ConfigService construction and use its actual override directory.
 
-Plan 5 consumes `ThemeFiles`, `ThemeImporter`, `ThemeTomlWriter` and the canned `themesui.SampleTerminal`.
+Import theme… (`themesui.ThemeImport`) consumes `ThemeImporter`, which writes through `ThemeFiles` and `ThemeTomlWriter`.
 Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
 ## Maintaining SDK icons

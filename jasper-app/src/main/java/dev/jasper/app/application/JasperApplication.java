@@ -766,9 +766,6 @@ public final class JasperApplication {
 
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
 
-    /** The IntelliJ Themes page's store, created the first time Settings builds that page. */
-
-
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
         if (pluginManager == null) {

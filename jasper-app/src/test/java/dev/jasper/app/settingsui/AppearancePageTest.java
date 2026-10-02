@@ -55,6 +55,15 @@ class AppearancePageTest {
         assertThat(page.modified()).isTrue();
     }
 
+    @Test void pickingTheEntryAlreadyShownIsNoEdit() {
+        var theme = editor(0);
+        theme.box.setSelectedItem("Jasper Dark");
+        assertThat(draft.modified()).as("the default stays unsaved").isFalse();
+        theme.box.setSelectedItem("Darcula");
+        theme.box.setSelectedItem("Darcula");
+        assertThat(draft.value(CoreSettings.UI_THEME_NAME)).isEqualTo("Darcula");
+    }
+
     @Test void theListsFollowTheCatalogAndKeepAChoiceItNoLongerHas() {
         var theme = editor(0);
         draft.stage(CoreSettings.UI_THEME_NAME, Optional.of("Gone"));
