@@ -6,8 +6,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Whether a session has printed anything yet, watched from right after its start. Any thread. A shell cannot print in
- * the moment between its start returning and this listener attaching, so the first screen change is not missed.
+ * Whether a session has printed anything yet. It watches for the first screen change caused by output, which the
+ * terminal processes on the session's reader thread; changes delivered on the Event Dispatch Thread (a resize or a
+ * cleared scrollback from the view) are not output and are ignored. The watch attaches right after the session
+ * starts, and output that arrives before it attaches is noticed at the next change (a shell that prints only once in
+ * that window would fall back to the trace's 10-second cap). Any thread.
  */
 final class SessionOutput implements TerminalSessionListener {
     private static final System.Logger LOG = System.getLogger(SessionOutput.class.getName());
@@ -29,6 +32,7 @@ final class SessionOutput implements TerminalSessionListener {
     }
 
     @Override public void screenChanged() {
+        if (java.awt.EventQueue.isDispatchThread()) return; // a resize or cleared scrollback, not shell output
         List<Runnable> ready;
         synchronized (this) {
             if (seen) return;

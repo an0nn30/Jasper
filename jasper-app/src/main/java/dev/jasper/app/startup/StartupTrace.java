@@ -141,7 +141,7 @@ public final class StartupTrace {
                 try {
                     dispatch.run();
                 } catch (RuntimeException failure) {
-                    environment.log().accept("A start-up trace action failed after " + label(milestone.name()) + ": " + failure);
+                    environment.log().accept("A start-up trace action failed after " + label(milestone.name()) + ": " + failure.getClass().getName());
                 }
             }
         }
@@ -175,7 +175,7 @@ public final class StartupTrace {
         try {
             dispatch.run();
         } catch (RuntimeException failure) {
-            environment.log().accept("A start-up trace action failed after " + label(milestone.name()) + ": " + failure);
+            environment.log().accept("A start-up trace action failed after " + label(milestone.name()) + ": " + failure.getClass().getName());
         }
     }
 
@@ -243,7 +243,7 @@ public final class StartupTrace {
             catch (IOException | RuntimeException failure) {
                 if (!fileFailureReported) {
                     fileFailureReported = true;
-                    environment.log().accept("Could not write the start-up trace " + file + ": " + failure);
+                    environment.log().accept("Could not write the start-up trace file: " + failure.getClass().getName());
                 }
             }
         }

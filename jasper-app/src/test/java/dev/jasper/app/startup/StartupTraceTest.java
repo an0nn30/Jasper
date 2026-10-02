@@ -162,7 +162,7 @@ class StartupTraceTest {
         trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
         assertThat(second).hasValue(1);
         assertThat(fixture.log).hasSize(2);
-        assertThat(fixture.log.get(0)).isEqualTo("A start-up trace action failed after output painted: java.lang.IllegalStateException: boom");
+        assertThat(fixture.log.get(0)).isEqualTo("A start-up trace action failed after output painted: java.lang.IllegalStateException");
         assertThat(fixture.log.get(1)).startsWith("Startup (cold");
     }
 

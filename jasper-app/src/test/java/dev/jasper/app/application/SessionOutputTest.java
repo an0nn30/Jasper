@@ -13,6 +13,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +92,24 @@ class SessionOutputTest {
             });
             feed.write("x");
             await(() -> waiter.get() == 1 && later.get() >= 1);
+        } finally {
+            feed.session.close();
+        }
+    }
+
+    @Test void aResizeOnTheEdtIsNotOutput() throws Exception {
+        var feed = new Feed();
+        try {
+            AtomicInteger first = new AtomicInteger();
+            AtomicInteger waiter = new AtomicInteger();
+            SessionOutput output = SessionOutput.watch(feed.session, first::incrementAndGet);
+            output.whenSeen(waiter::incrementAndGet);
+            SwingUtilities.invokeAndWait(() -> feed.session.resize(72, 20));
+            SwingUtilities.invokeAndWait(() -> { });
+            assertThat(first).as("a resize is not the shell's first output").hasValue(0);
+            assertThat(waiter).hasValue(0);
+            feed.write("prompt");
+            await(() -> first.get() == 1 && waiter.get() == 1);
         } finally {
             feed.session.close();
         }

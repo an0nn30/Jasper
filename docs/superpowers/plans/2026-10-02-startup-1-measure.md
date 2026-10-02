@@ -20,7 +20,7 @@ verbatim.
 
 **Status:** Executed 2026-10-02 on `claude/startup-speed` with subagent-driven development (per-task implementer and
 review). First of five plans (1 → 2 → 4 → 3A → 3B), written against `claude/startup-speed@3b1a1544` (local
-`main@91400d29` plus the spec). Final `./gradlew check`: BUILD SUCCESSFUL, 7,989 tests (the baseline 7,954 plus 35),
+`main@91400d29` plus the spec). Final `./gradlew check`: BUILD SUCCESSFUL, 7,990 tests (the baseline 7,954 plus 36),
 0 failures, 0 errors, 6 skips. The task text below is unchanged; the code differs from it in these ways:
 
 Deviations:
@@ -44,7 +44,9 @@ Deviations:
    running Jasper processes are found by executable path through `ProcessHandle` (no `pgrep`/`pkill`); every Jasper the
    run started is stopped in a `finally` and by a shutdown hook (Ctrl-C), each stop guarded, and a forced kill waits for
    exit; `StartupBenchTest` is disabled on Windows (`af112320`, `6a2d3efc`).
-6. Tests: 35 new tests instead of the plan's 28; the fix rounds added 7.
+6. Tests: 36 new tests instead of the plan's 28; the fix rounds added 8.
+7. Final review fix wave: SessionOutput ignores EDT-delivered screen changes (a resize is not output); start-up trace
+   failures log the exception class only; doc wording (this commit).
 
 ## Global Constraints
 

@@ -134,7 +134,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return new Subscription(() -> activityListeners.remove(listener));
     }
 
-    /** Called once, on the EDT, when this window's first terminal is configured: start-up timing. */
+    /**
+     * Called once, on the EDT, when this window's first terminal is configured: start-up timing. Register it before the
+     * window's first terminal is configured; a later registration never fires.
+     */
     public void onFirstTerminal(java.util.function.Consumer<TerminalPane> action) {
         firstTerminal = java.util.Objects.requireNonNull(action, "action");
     }

@@ -122,10 +122,11 @@ Native baseline execution belongs to the controller after tooling review. Preser
 [--prime N] [--real-home] [--timeout-seconds N]` launches a packaged image through LaunchServices, like a Dock click,
 reads each launch's start-up trace and quits it. Cold mode measures fresh launches; warm mode starts a resident Jasper
 with `--background`, records its idle memory (`ps` RSS, two seconds after it settles), then measures the window a
-reopen (`open -a`) produces. By default each run uses an isolated home
+reopen (`open -a`) produces. By default every run of one invocation shares one isolated home
 under `/tmp` (`-Duser.home`), so the user's configuration, logs and login items are untouched; one priming launch is
 discarded. `--real-home` measures the user's own setup and warns when the terminal program is tmux or screen, whose
-servers keep a session per launch. The benchmark refuses to start while any Jasper is running. It opens windows: ask
+servers keep a session per launch. The benchmark refuses to start while any Jasper is running, and while it runs it stops every Jasper process it finds
+when a run ends, so do not use Jasper during a run. It opens windows: ask
 the user before each run. The 2026-10-02 baseline is [recorded here](benchmarks/2026-10-02-startup-baseline.md).
 
 A run counts as `ok` only when its trace has `OUTPUT_PAINTED` (cold) or the reopen window's `OUTPUT_PAINTED` (warm);

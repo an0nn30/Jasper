@@ -26,7 +26,7 @@
   at HEAD, 1.7 s with an AOT cache. Executed with per-task review; the review rounds changed the plan's code (failure
   isolation in the trace and session output, a once-only trace-file error, `trackOutput` instead of a weak map, strict
   "incomplete" runs and guaranteed Jasper cleanup in the benchmark), listed in the plan's status banner.
-  `./gradlew check`: 7,989/0/0/6. Next: Plan 2 (JVM and packaging). Not done: a recorded `startupBench` run (user-run).
+  `./gradlew check`: 7,990/0/0/6. Next: Plan 2 (JVM and packaging). Not done: a recorded `startupBench` run (user-run).
 
 - **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
   worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
