@@ -55,13 +55,14 @@ class PluginThemeParityTest {
         try {
             jar(home.resolve("themes/vampire.jar"), entries(
                 "META-INF/plugin.xml", pluginXml("Vampire", "/" + ENTRY), ENTRY, json));
-            var snapshot = ThemeCatalog.beside(home.resolve("config.toml")).scan();
-            assertThat(snapshot.problems()).isEmpty();
+            var snapshot = dev.jasper.app.themeimport.LegacyThemeReader.catalog(home.resolve("config.toml")).scan();
+            assertThat(snapshot.problems()).singleElement().satisfies(problem ->
+                assertThat(problem.message()).contains("no console colours", "Jasper Dark"));
             Theme theme = snapshot.themes().stream().filter(candidate -> candidate.source() instanceof Theme.Archive)
                 .findFirst().orElseThrow();
             String label = ((Theme.Archive) theme.source()).entry();
 
-            var resolved = ThemeManager.loadArchive(label, json);
+            var resolved = dev.jasper.app.themeimport.LegacyThemeTestSupport.load(label, json);
             assertThat(ThemeManager.install(resolved.json(), resolved.colors(), theme.palette().background())).isTrue();
             Map<String, String> before = colours();
             assertThat(ThemeManager.install(theme)).isTrue();
@@ -77,7 +78,6 @@ class PluginThemeParityTest {
             var workspace = WorkspaceValues.resolve(reloaded, ThemeGenerator.generate(reloaded));
             assertThat(UIManager.getLookAndFeel()).isSameAs(installed);
             assertThat(workspace.icons()).isEqualTo(theme.source().document().icons());
-            assertThat(theme.source().document().seeds()).containsEntry(Seed.ACCENT, new Color(0xff79c6));
         } finally { UIManager.setLookAndFeel(original); }
     }
 

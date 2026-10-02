@@ -29,7 +29,7 @@ class ThemeStoreTest {
 
     @BeforeEach void start() throws Exception {
         market = new FakeMarketplace();
-        catalog = ThemeCatalog.beside(home.resolve("config.toml"));
+        catalog = dev.jasper.app.themeimport.LegacyThemeReader.catalog(home.resolve("config.toml"));
         catalog.scan();
         store = new ThemeStore(catalog, market.client(), Runnable::run, Runnable::run, new ThemeStore.Hooks(
             () -> { rescans[0]++; catalog.scan(); return CompletableFuture.completedFuture(null); }, browsed::add, folder -> { },

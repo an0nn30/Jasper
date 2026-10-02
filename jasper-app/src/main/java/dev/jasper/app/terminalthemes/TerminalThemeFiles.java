@@ -1,5 +1,7 @@
 package dev.jasper.app.terminalthemes;
 
+import dev.jasper.app.themeimport.AlacrittyTheme;
+
 import dev.jasper.app.config.TerminalColors;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

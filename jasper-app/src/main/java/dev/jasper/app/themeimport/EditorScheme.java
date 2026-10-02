@@ -1,4 +1,6 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+
+import dev.jasper.app.appearance.*;
 
 import dev.jasper.terminal.config.Palette;
 import java.awt.Color;
@@ -20,14 +22,15 @@ import org.w3c.dom.Element;
  */
 final class EditorScheme {
     /** A complete palette and the problems met building it. */
-    record Result(Palette palette, List<String> warnings) {
-        Result { warnings = List.copyOf(warnings); }
+    record Result(Palette palette, List<String> warnings, Map<SyntaxRole, SyntaxStyle> syntax) {
+        Result(Palette palette, List<String> warnings) { this(palette, warnings, Map.of()); }
+        Result { warnings = List.copyOf(warnings); syntax = Map.copyOf(syntax); }
     }
 
     private record Attribute(String base, Map<String, String> values) {}
     private record Scheme(String name, String parent, Map<String, String> colors, Map<String, Attribute> attributes) {}
 
-    private static final String BASE = "dev/jasper/app/themes/intellij/";
+    private static final String BASE = "dev/jasper/app/themeimport/intellij/";
     /** IntelliJ's Default and Darcula, then each scheme it bundles, one per file. */
     private static final List<String> PARENT_FILES = List.of(
         "DefaultColorSchemesManager.xml", "Light.xml", "expUI/expUI_lightScheme.xml", "expUI/expUI_darkScheme.xml",
@@ -45,8 +48,12 @@ final class EditorScheme {
 
     private EditorScheme() {}
 
+    static boolean hasBundledParent(String name) { return Parents.SCHEMES.containsKey(name); }
+
     /** The palette of the one scheme in {@code xml}; {@code label} names its file in warnings. */
-    static Result read(byte[] xml, String label, boolean dark) {
+    static Result read(byte[] xml, String label, boolean dark) { return read(xml, label, dark, name -> null); }
+
+    static Result read(byte[] xml, String label, boolean dark, java.util.function.Function<String, byte[]> localParents) {
         var warnings = new ArrayList<String>();
         List<Scheme> schemes;
         try { schemes = schemes(SafeXml.parse(xml)); }
@@ -58,7 +65,7 @@ final class EditorScheme {
             warnings.add(label + ": expected one <scheme>, found " + schemes.size() + "; the terminal uses Jasper's palette");
             return new Result(fallback(dark), warnings);
         }
-        return palette(schemes.getFirst(), label, dark, warnings);
+        return palette(schemes.getFirst(), label, dark, warnings, localParents);
     }
 
     /** The palette of a scheme IntelliJ ships, named by a theme's {@code editorScheme} instead of a path. */
@@ -66,11 +73,11 @@ final class EditorScheme {
         Scheme scheme = Parents.SCHEMES.get(name);
         if (scheme == null)
             return new Result(fallback(dark), List.of(label + ": editor scheme \"" + name + "\" is not one Jasper has; the terminal uses Jasper's palette"));
-        return palette(scheme, label, dark, new ArrayList<>());
+        return palette(scheme, label, dark, new ArrayList<>(), key -> null);
     }
 
-    private static Result palette(Scheme leaf, String label, boolean dark, List<String> warnings) {
-        var lookup = new Lookup(chain(leaf, label, warnings), label, warnings);
+    private static Result palette(Scheme leaf, String label, boolean dark, List<String> warnings, java.util.function.Function<String, byte[]> localParents) {
+        var lookup = new Lookup(chain(leaf, label, warnings, localParents), label, warnings);
         Palette base = fallback(dark);
         Color background = first(lookup.color("CONSOLE_BACKGROUND_KEY"), lookup.attribute("TEXT", "BACKGROUND"), base.background());
         Color foreground = first(lookup.attribute("CONSOLE_NORMAL_OUTPUT", "FOREGROUND"), lookup.attribute("TEXT", "FOREGROUND"), base.foreground());
@@ -78,18 +85,74 @@ final class EditorScheme {
         Color selection = first(lookup.color("SELECTION_BACKGROUND"), base.selection());
         var ansi = new ArrayList<Color>();
         for (int i = 0; i < ANSI.size(); i++) ansi.add(first(lookup.attribute(ANSI.get(i), "FOREGROUND"), base.ansi().get(i)));
-        return new Result(new Palette(foreground, background, cursor, selection, ansi), warnings);
+        var missing = new ArrayList<String>();
+        if (lookup.color("CONSOLE_BACKGROUND_KEY") == null) missing.add("CONSOLE_BACKGROUND_KEY");
+        if (lookup.attribute("CONSOLE_NORMAL_OUTPUT", "FOREGROUND") == null) missing.add("CONSOLE_NORMAL_OUTPUT");
+        for (String key : ANSI) if (lookup.attribute(key, "FOREGROUND") == null) missing.add(key);
+        if (!missing.isEmpty()) warnings.add(label + ": missing console colours (" + String.join(", ", missing)
+            + "); used editor/Jasper " + (dark ? "Dark" : "Light") + " fallbacks");
+        var syntax = syntax(lookup);
+        return new Result(new Palette(foreground, background, cursor, selection, ansi), warnings, syntax);
+    }
+
+    private static Map<SyntaxRole, SyntaxStyle> syntax(Lookup lookup) {
+        var priorities = new java.util.EnumMap<SyntaxRole, List<String>>(SyntaxRole.class);
+        priorities.put(SyntaxRole.KEYWORD, List.of("DEFAULT_KEYWORD"));
+        priorities.put(SyntaxRole.TYPE, List.of("DEFAULT_CLASS_NAME"));
+        priorities.put(SyntaxRole.FUNCTION, List.of("DEFAULT_FUNCTION_DECLARATION", "DEFAULT_FUNCTION_CALL"));
+        priorities.put(SyntaxRole.VARIABLE, List.of("DEFAULT_IDENTIFIER"));
+        priorities.put(SyntaxRole.CONSTANT, List.of("DEFAULT_CONSTANT"));
+        priorities.put(SyntaxRole.NUMBER, List.of("DEFAULT_NUMBER"));
+        priorities.put(SyntaxRole.STRING, List.of("DEFAULT_STRING"));
+        priorities.put(SyntaxRole.COMMENT, List.of("DEFAULT_LINE_COMMENT", "DEFAULT_BLOCK_COMMENT"));
+        priorities.put(SyntaxRole.DOC_COMMENT, List.of("DEFAULT_DOC_COMMENT"));
+        priorities.put(SyntaxRole.ANNOTATION, List.of("DEFAULT_METADATA"));
+        priorities.put(SyntaxRole.OPERATOR, List.of("DEFAULT_OPERATION_SIGN"));
+        priorities.put(SyntaxRole.PUNCTUATION, List.of("DEFAULT_COMMA", "DEFAULT_SEMICOLON"));
+        priorities.put(SyntaxRole.TAG, List.of("HTML_TAG", "XML_TAG"));
+        priorities.put(SyntaxRole.ATTRIBUTE, List.of("HTML_ATTRIBUTE_NAME", "XML_ATTRIBUTE_NAME"));
+        var regex = new java.util.LinkedHashSet<>(List.of("REGEXP_CHAR_CLASS", "REGEXP_CHARACTER"));
+        lookup.chain.stream().flatMap(scheme -> scheme.attributes().keySet().stream()).filter(key -> key.startsWith("REGEXP_"))
+            .sorted().forEach(regex::add);
+        priorities.put(SyntaxRole.REGEX, List.copyOf(regex));
+        priorities.put(SyntaxRole.ERROR, List.of("ERRORS_ATTRIBUTES"));
+        var result = new java.util.EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
+        priorities.forEach((role, keys) -> {
+            for (String key : keys) {
+                Color color = lookup.attribute(key, "FOREGROUND");
+                if (color == null) continue;
+                String font = lookup.field(key, "FONT_TYPE", new java.util.HashSet<>());
+                int flags = 0;
+                if (font != null) try { flags = Integer.parseInt(font); }
+                catch (NumberFormatException invalid) { lookup.warnings.add(lookup.label + ": invalid FONT_TYPE for " + key); }
+                result.put(role, new SyntaxStyle(color, (flags & 1) != 0, (flags & 2) != 0));
+                break;
+            }
+        });
+        return result;
     }
 
     /** The scheme and its parents. A missing {@code parent_scheme} means Default, as in IntelliJ. */
-    private static List<Scheme> chain(Scheme leaf, String label, List<String> warnings) {
+    private static List<Scheme> chain(Scheme leaf, String label, List<String> warnings, java.util.function.Function<String, byte[]> localParents) {
         var chain = new ArrayList<Scheme>();
         Scheme scheme = leaf;
-        while (scheme != null && !chain.contains(scheme)) {
+        var visited = new java.util.HashSet<String>();
+        while (scheme != null) {
+            if (!visited.add(scheme.name()) || chain.size() >= 32)
+                throw new IllegalArgumentException(label + ": editor scheme parent cycle or excessive nesting at " + scheme.name());
             chain.add(scheme);
             String parent = scheme.parent() != null ? scheme.parent() : "Default".equals(scheme.name()) ? null : "Default";
             if (parent == null) break;
             Scheme next = Parents.SCHEMES.get(parent);
+            if (next == null) {
+                byte[] bytes = localParents.apply(parent);
+                if (bytes != null) {
+                    var read = schemes(SafeXml.parse(bytes));
+                    if (read.size() != 1 || !read.getFirst().name().equals(parent))
+                        throw new IllegalArgumentException(label + ": editor parent file must contain scheme " + parent);
+                    next = read.getFirst();
+                }
+            }
             if (next == null) warnings.add(label + ": parent scheme \"" + parent + "\" is not one Jasper has; missing colours come from Jasper's palette");
             scheme = next;
         }
@@ -138,6 +201,18 @@ final class EditorScheme {
                 }
                 // baseAttributes redirects to another key, looked up from the start of the chain.
                 if (attribute.base() != null && depth < 16) return attribute(attribute.base(), field, depth + 1);
+            }
+            return null;
+        }
+
+        String field(String key, String field, java.util.Set<String> visited) {
+            if (!visited.add(key)) return null;
+            for (Scheme scheme : chain) {
+                Attribute attribute = scheme.attributes().get(key);
+                if (attribute == null) continue;
+                String value = attribute.values().get(field);
+                if (value != null && !value.isBlank()) return value;
+                if (attribute.base() != null) return field(attribute.base(), field, visited);
             }
             return null;
         }

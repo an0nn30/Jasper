@@ -1,4 +1,6 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+
+import dev.jasper.app.appearance.ThemeFixtures;
 
 import com.formdev.flatlaf.json.Json;
 import java.awt.Color;

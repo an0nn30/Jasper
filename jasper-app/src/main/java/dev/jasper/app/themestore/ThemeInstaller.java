@@ -72,7 +72,7 @@ final class ThemeInstaller {
         try {
             String ext = extension.toLowerCase(Locale.ROOT);
             if (!ext.equals(".jar") && !ext.equals(".zip")) throw new InstallException("Unsupported theme file type: " + extension);
-            var inspection = ThemeCatalog.inspect(download);
+            var inspection = dev.jasper.app.themeimport.LegacyThemeReader.inspect(download);
             if (inspection.themes().isEmpty()) throw new InstallException(source.name() + " has no themes Jasper can use." + detail(inspection));
             String name = safe(source.xmlId() + "-" + source.version()) + ext;
             Path target = themes.resolve(name);
@@ -104,7 +104,7 @@ final class ThemeInstaller {
         String lower = name.toLowerCase(Locale.ROOT);
         if (!lower.endsWith(".jar") && !lower.endsWith(".zip")) throw new InstallException(name + " is not a .jar or .zip theme plugin.");
         if (name.startsWith(".")) name = "_" + name.substring(1);
-        var inspection = ThemeCatalog.inspect(source);
+        var inspection = dev.jasper.app.themeimport.LegacyThemeReader.inspect(source);
         if (inspection.themes().isEmpty()) throw new InstallException(name + " has no themes Jasper can use." + detail(inspection));
         Path target = themes.resolve(name);
         if (Files.exists(target) && !replace) throw new Conflict(target);

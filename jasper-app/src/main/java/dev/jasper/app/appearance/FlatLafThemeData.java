@@ -63,7 +63,8 @@ public final class FlatLafThemeData {
         return write(json);
     }
 
-    static String write(Object value) {
+    /** Encodes a resolved legacy theme object for the FlatLaf adapter. */
+    public static String write(Map<String, Object> value) {
         var out = new StringBuilder();
         write(value, out);
         return out.toString();

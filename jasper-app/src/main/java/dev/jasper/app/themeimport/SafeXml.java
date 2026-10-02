@@ -1,4 +1,6 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+
+import dev.jasper.app.appearance.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

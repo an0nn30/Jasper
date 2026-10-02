@@ -28,7 +28,7 @@ class ThemeInstallerTest {
         assertThat(installed.themes()).containsExactly("Dracula");
         assertThat(installer.sources()).containsExactly(entry("com.vermouthx.idea-2.3.1.jar", dracula));
         assertThat(themes().resolve(".downloads")).isEmptyDirectory();
-        assertThat(ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Dracula")).isPresent();
+        assertThat(dev.jasper.app.themeimport.LegacyThemeReader.catalog(home.resolve("config.toml")).scan().find("Dracula")).isPresent();
     }
 
     @Test void aDownloadWithoutThemesIsRefusedAndLeavesNothingBehind() throws Exception {

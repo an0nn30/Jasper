@@ -21,7 +21,7 @@ class WorkspaceValuesTest {
         var ui = new java.util.LinkedHashMap<>(base.ui());
         ui.put("Panel.background", "#123456");
         var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
-            base.uiComplete(), base.metadata(), seeds, base.ansi(), base.tokens(), base.syntax(), ui, base.icons());
+            base.uiComplete(), base.metadata(), seeds, base.ansi(), Map.of(), base.syntax(), ui, base.icons());
         var original = ThemeGenerator.generate(document);
         var workspace = WorkspaceValues.resolve(document, original);
         assertThat(UIManager.getLookAndFeel()).isSameAs(chromeLaf);
@@ -61,10 +61,12 @@ class WorkspaceValuesTest {
             assertThat(ThemeManager.generated(Theme.DARK)).isSameAs(nativeValues);
             var values = ThemeManager.generated(Theme.DARCULA);
             assertThat(ThemeManager.install(Theme.DARCULA)).isTrue();
+            var mismatches = new java.util.ArrayList<String>();
             WorkspaceTokenKeys.KEYS.forEach((token, key) -> {
                 var color = UIManager.getLookAndFeelDefaults().getColor(key);
-                if (color != null) assertThat(values.tokens().get(token)).as(key).isEqualTo(color);
+                if (color != null && !color.equals(values.tokens().get(token))) mismatches.add(key + ": " + values.tokens().get(token) + " != " + color);
             });
+            assertThat(mismatches).isEmpty();
         } finally { UIManager.setLookAndFeel(original); }
     }
 

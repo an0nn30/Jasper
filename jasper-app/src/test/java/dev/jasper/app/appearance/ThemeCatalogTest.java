@@ -15,7 +15,7 @@ class ThemeCatalogTest {
     @TempDir Path home;
 
     private Path themes() { return home.resolve("themes"); }
-    private ThemeCatalog catalog() { return ThemeCatalog.beside(home.resolve("config.toml")); }
+    private ThemeCatalog catalog() { return dev.jasper.app.themeimport.LegacyThemeReader.catalog(home.resolve("config.toml")); }
 
     @Test void theBuiltInCatalogFindsBuiltInThemesByNameIgnoringCaseAndSpaces() {
         var snapshot = ThemeCatalog.builtIn().scan();
@@ -127,7 +127,7 @@ class ThemeCatalogTest {
         plugin(themes().resolve("one.jar"), "One", true, "#111111", "111111");
         plugin(themes().resolve("two.jar"), "Two", false, "#222222", "222222");
         var reads = new ArrayList<String>();
-        var catalog = new ThemeCatalog(themes(), file -> { reads.add(file.getFileName().toString()); return ThemeArchive.read(file); });
+        var catalog = new ThemeCatalog(themes(), file -> { reads.add(file.getFileName().toString()); return dev.jasper.app.themeimport.LegacyThemeReader.read(file); });
         Theme one = catalog.scan().find("One").orElseThrow();
         assertThat(catalog.scan().find("One")).as("an unchanged file keeps its Theme instance").containsSame(one);
         assertThat(reads).containsExactlyInAnyOrder("one.jar", "two.jar");
@@ -160,7 +160,7 @@ class ThemeCatalogTest {
         assertThat(themes()).isDirectory();
         Path other = Files.createDirectories(home.resolve("other"));
         Files.writeString(other.resolve("themes"), "a file, not a folder");
-        var snapshot = ThemeCatalog.beside(other.resolve("config.toml")).scan();
+        var snapshot = dev.jasper.app.themeimport.LegacyThemeReader.catalog(other.resolve("config.toml")).scan();
         assertThat(snapshot.themes()).containsExactlyElementsOf(ThemeManager.builtIns());
         assertThat(snapshot.problems()).singleElement().satisfies(problem ->
             assertThat(problem.message()).contains("Cannot read the themes folder"));
@@ -186,7 +186,7 @@ class ThemeCatalogTest {
         Files.writeString(themes().resolve("bad.jar"), "x");
         var catalog = new ThemeCatalog(themes(), file -> {
             if (file.getFileName().toString().equals("bad.jar")) throw new StackOverflowError();
-            return ThemeArchive.read(file);
+            return dev.jasper.app.themeimport.LegacyThemeReader.read(file);
         });
         var snapshot = catalog.scan();
         assertThat(snapshot.find("Good")).isPresent();
@@ -199,8 +199,7 @@ class ThemeCatalogTest {
     @Test void aFileWhoseThemesCannotBeBuiltBecomesAProblemNotAThrow() throws Exception {
         Files.createDirectories(themes());
         Files.writeString(themes().resolve("odd.jar"), "x");
-        var catalog = new ThemeCatalog(themes(), file -> new ThemeArchive.Contents(
-            java.util.List.of(new ThemeArchive.Found("odd.jar!/a.theme.json", null, null, null, null)), java.util.List.of()));
+        var catalog = new ThemeCatalog(themes(), file -> null);
         var snapshot = catalog.scan();
         assertThat(snapshot.themes()).containsExactlyElementsOf(ThemeManager.builtIns());
         assertThat(snapshot.problems()).singleElement().satisfies(problem -> {
@@ -217,18 +216,19 @@ class ThemeCatalogTest {
         var snapshot = catalog().scan();
         assertThat(snapshot.find("Same").map(Theme::source)).get().isInstanceOfSatisfying(Theme.Archive.class,
             archive -> assertThat(archive.entry()).isEqualTo("pair.jar!/one.theme.json"));
-        assertThat(snapshot.problems()).singleElement().satisfies(problem ->
-            assertThat(problem.message()).contains("\"Same\"").contains("provided twice"));
+        assertThat(snapshot.problems()).filteredOn(problem -> problem.message().contains("provided twice")).singleElement().satisfies(problem ->
+            assertThat(problem.message()).contains("\"Same\""));
+        assertThat(snapshot.problems()).filteredOn(problem -> problem.message().contains("no console colours")).hasSize(2);
     }
 
     @Test void inspectingAnArchiveNamesItsThemesWithoutInstallingIt() {
         Path file = plugin(home.resolve("elsewhere/fixture.jar"), "Fixture Dark", true, "#123456", "101820");
-        var inspection = ThemeCatalog.inspect(file);
+        var inspection = dev.jasper.app.themeimport.LegacyThemeReader.inspect(file);
         assertThat(inspection.themes()).containsExactly("Fixture Dark");
         assertThat(inspection.problems()).isEmpty();
         Path empty = jar(home.resolve("elsewhere/empty.jar"), entries("META-INF/plugin.xml", pluginXml("Nothing")));
-        assertThat(ThemeCatalog.inspect(empty).themes()).isEmpty();
-        assertThat(ThemeCatalog.inspect(home.resolve("elsewhere/missing.jar")).problems()).isNotEmpty();
+        assertThat(dev.jasper.app.themeimport.LegacyThemeReader.inspect(empty).themes()).isEmpty();
+        assertThat(dev.jasper.app.themeimport.LegacyThemeReader.inspect(home.resolve("elsewhere/missing.jar")).problems()).isNotEmpty();
         assertThat(catalog().directory()).contains(themes());
         assertThat(ThemeCatalog.builtIn().directory()).isEmpty();
         assertThat(themes()).doesNotExist();

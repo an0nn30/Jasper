@@ -1,4 +1,5 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+import dev.jasper.app.appearance.*;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -10,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class IntellijThemesTest {
-    private static final String BASE = "dev/jasper/app/themes/intellij/";
+    private static final String BASE = "dev/jasper/app/themeimport/intellij/";
     private static final Map<String, String> PINNED = Map.ofEntries(
         Map.entry("Light.theme.json", "429151594b8a013938c3c66dd3a5121702182c028ad87ae1e68bc4243cc1c68d"),
         Map.entry("intellijlaf.theme.json", "4450e2a85381b7b644c73bc9ec21f898aa55b184fc80f109a43ae9ff67af21ba"),
@@ -75,16 +76,16 @@ class IntellijThemesTest {
     @Test void everyBundledThemeResolvesAsAPluginThemesParentWithoutWarnings() {
         PARENTS.forEach((id, dark) -> {
             String json = "{\"name\": \"Child of " + id + "\", \"dark\": " + dark + ", \"parentTheme\": \"" + id + "\"}";
-            var resolved = ThemeManager.loadArchive("child.theme.json", json);
+            var resolved = ThemeParents.load("child.theme.json", json);
             assertThat(resolved.warnings()).as(id).isEmpty();
             assertThat(resolved.dark()).as(id).isEqualTo(dark);
         });
     }
 
     @Test void anIslandsChildInheritsTheIslandsChainNotTheClassicBase() {
-        var islands = ThemeManager.loadArchive("child.theme.json",
+        var islands = ThemeParents.load("child.theme.json",
             "{\"name\": \"Child\", \"dark\": true, \"parentTheme\": \"Islands Dark\"}");
-        var darcula = ThemeManager.loadArchive("child.theme.json",
+        var darcula = ThemeParents.load("child.theme.json",
             "{\"name\": \"Child\", \"dark\": true, \"parentTheme\": \"Darcula\"}");
         assertThat(islands.json()).contains("\"Island.borderColor\"");
         assertThat(darcula.json()).doesNotContain("\"Island.borderColor\"");

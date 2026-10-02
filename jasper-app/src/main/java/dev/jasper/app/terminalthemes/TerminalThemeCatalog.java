@@ -1,5 +1,11 @@
 package dev.jasper.app.terminalthemes;
 
+import dev.jasper.app.themeimport.AlacrittyTheme;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.io.UncheckedIOException;
+
 import dev.jasper.app.config.TerminalColors;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -170,8 +176,8 @@ public final class TerminalThemeCatalog {
     private static List<TerminalTheme> readBundled() {
         var themes = new ArrayList<TerminalTheme>();
         var seen = new HashSet<String>();
-        for (String file : AlacrittyTheme.bundledFiles()) {
-            var result = AlacrittyTheme.read(AlacrittyTheme.bundledText(file));
+        for (String file : bundledFiles()) {
+            var result = AlacrittyTheme.read(bundledText(file));
             String name = AlacrittyTheme.displayName(file);
             if (result.palette().isEmpty() || TerminalColors.reserved(name) || !seen.add(key(name))) continue;
             themes.add(new TerminalTheme(name, result.palette().get(), Optional.empty()));
@@ -181,4 +187,20 @@ public final class TerminalThemeCatalog {
     }
 
     private static String key(String name) { return name == null ? "" : name.strip().toLowerCase(Locale.ROOT); }
+    private static final String RESOURCES = "/dev/jasper/app/terminalthemes/alacritty/";
+    /** The bundled files, from {@code index.txt}. */
+    static List<String> bundledFiles() {
+        return bundledText("index.txt").lines().map(String::strip).filter(line -> !line.isEmpty()).toList();
+    }
+
+    /** A bundled file's text. */
+    static String bundledText(String file) {
+        try (InputStream in = TerminalThemeCatalog.class.getResourceAsStream(RESOURCES + file)) {
+            if (in == null) throw new IllegalStateException("Missing bundled terminal theme " + file);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
+    }
+
 }

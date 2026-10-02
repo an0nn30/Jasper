@@ -1,4 +1,6 @@
-package dev.jasper.app.terminalthemes;
+package dev.jasper.app.themeimport;
+
+import dev.jasper.app.appearance.ThemeFixtures;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -104,11 +106,11 @@ class AlacrittyThemeTest {
     }
 
     @Test void everyBundledThemeIsUsableWithoutWarningsAndHasItsOwnName() {
-        var files = AlacrittyTheme.bundledFiles();
+        var files = dev.jasper.app.terminalthemes.TerminalThemeTestSupport.bundledFiles();
         assertThat(files).hasSize(177);
         var names = new HashSet<String>();
         for (String file : files) {
-            var result = AlacrittyTheme.read(AlacrittyTheme.bundledText(file));
+            var result = AlacrittyTheme.read(dev.jasper.app.terminalthemes.TerminalThemeTestSupport.bundledText(file));
             assertThat(result.palette()).as(file).isPresent();
             assertThat(result.problems()).as(file).isEmpty();
             String name = AlacrittyTheme.displayName(file);

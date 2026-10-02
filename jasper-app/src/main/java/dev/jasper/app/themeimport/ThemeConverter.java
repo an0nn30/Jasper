@@ -1,0 +1,188 @@
+package dev.jasper.app.themeimport;
+
+import com.formdev.flatlaf.json.Json;
+import dev.jasper.app.appearance.*;
+import dev.jasper.terminal.config.Palette;
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/** Offline, bounded conversion shared by imports, migration and bundle generation. No plugin classes are loaded. */
+public final class ThemeConverter {
+    /** A source/provider that could not be converted. */
+    public record Failure(String sourceEntry, String message) {}
+    /** Successful providers remain available even when a sibling provider fails. */
+    public record Batch(List<ConversionResult> results, List<Failure> failures) {
+        public Batch { results = List.copyOf(results); failures = List.copyOf(failures); }
+    }
+    private ThemeConverter() {}
+
+    /** Strict conversion; callers needing partial results use {@link #convertAll(Path)}. */
+    public static List<ConversionResult> convert(Path source) {
+        Batch batch = convertAll(source);
+        if (!batch.failures().isEmpty()) throw new IllegalArgumentException(batch.failures().toString());
+        return batch.results();
+    }
+
+    /** Converts every supported local provider, retaining contextual failures and fallback warnings. */
+    public static Batch convertAll(Path source) { return convertAll(source, false); }
+
+    // Legacy downloads are inspected before their .part suffix is replaced with .jar/.zip.
+    static Batch archive(Path source) { return convertAll(source, true); }
+
+    private static Batch convertAll(Path source, boolean archive) {
+        var results = new ArrayList<ConversionResult>();
+        var failures = new ArrayList<Failure>();
+        String entry = source.getFileName().toString();
+        try {
+            if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Not a regular theme source");
+            String lower = entry.toLowerCase(Locale.ROOT);
+            if (archive || lower.endsWith(".jar") || lower.endsWith(".zip")) {
+                ThemeArchive.Contents contents = ThemeArchive.read(source);
+                contents.problems().forEach(problem -> failures.add(new Failure(entry, problem)));
+                for (ThemeArchive.Found found : contents.themes()) {
+                    String id = found.label();
+                    int bang = id.indexOf("!/");
+                    if (bang >= 0) id = id.substring(bang + 2);
+                    try {
+                        var names = new LinkedHashMap<>(ThemeParents.FILES);
+                        found.parents().keySet().forEach(name -> names.put(name, "archive-parent:" + name));
+                        var loader = new ThemeLoader(name -> name.equals(found.label()) ? found.json()
+                            : name.startsWith("archive-parent:") ? found.parents().get(name.substring(15)) : ThemeParents.read(name), names);
+                        var resolved = loader.load(found.label());
+                        EditorScheme.Result scheme = found.schemeXml() != null
+                            ? EditorScheme.read(found.schemeXml(), found.schemeLabel(), resolved.dark(), found.schemeParents()::get)
+                            : found.schemeName() != null ? EditorScheme.named(found.schemeName(), found.schemeLabel(), resolved.dark())
+                            : missingScheme(resolved.dark());
+                        results.add(converted(resolved, scheme, id));
+                    } catch (RuntimeException failure) { failures.add(new Failure(id, message(failure))); }
+                }
+            } else if (lower.endsWith(".theme.json")) results.add(standalone(source));
+            else if (lower.endsWith(".toml")) results.add(toml(source));
+            else throw new IOException("Supported sources are .theme.json, .jar, .zip and .toml (not YAML)");
+        } catch (IOException | RuntimeException | StackOverflowError failure) {
+            failures.add(new Failure(entry, message(failure)));
+        }
+        return new Batch(results, failures);
+    }
+
+    private static ConversionResult standalone(Path source) throws IOException {
+        Path root = source.toAbsolutePath().normalize().getParent();
+        var names = new LinkedHashMap<>(ThemeParents.FILES);
+        String own = source.getFileName().toString();
+        String json = read(source);
+        // Resolve only requested local parent names: do not scan unrelated files in a user's folder.
+        var local = new LinkedHashMap<String, String>();
+        local.put(own, json);
+        String current = json;
+        for (int depth = 0; depth < 32; depth++) {
+            Object parent = object(current).get("parentTheme");
+            if (!(parent instanceof String name) || names.containsKey(name)) break;
+            String filename = name.endsWith(".theme.json") ? name : name + ".theme.json";
+            Path path = child(root, filename);
+            if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) break;
+            names.put(name, filename);
+            current = read(path); local.put(filename, current);
+        }
+        var resolved = new ThemeLoader(name -> local.containsKey(name) ? local.get(name) : ThemeParents.read(name), names).load(own);
+        Object schemeRef = object(json).get("editorScheme");
+        EditorScheme.Result scheme = missingScheme(resolved.dark());
+        if (schemeRef instanceof String name) {
+            if (name.toLowerCase(Locale.ROOT).endsWith(".xml") || name.toLowerCase(Locale.ROOT).endsWith(".icls")) {
+                Path file = child(root, name);
+                byte[] xml = read(file).getBytes(StandardCharsets.UTF_8);
+                SafeXml.parse(xml); // A rejected XML input is not a successful import with an unnoticed fallback.
+                scheme = EditorScheme.read(xml, name, resolved.dark(), parent -> {
+                    try {
+                        for (String suffix : List.of(".xml", ".icls")) {
+                            Path candidate = child(file.getParent(), parent + suffix);
+                            if (Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) return read(candidate).getBytes(StandardCharsets.UTF_8);
+                        }
+                        return null;
+                    } catch (IOException failure) { throw new UncheckedIOException(failure); }
+                });
+            } else scheme = EditorScheme.named(name, name, resolved.dark());
+        }
+        return converted(resolved, scheme, own);
+    }
+
+    private static ConversionResult converted(ThemeLoader.Resolved resolved, EditorScheme.Result scheme, String entry) {
+        var warnings = new ArrayList<>(resolved.warnings()); warnings.addAll(scheme.warnings());
+        ThemeDocument document = IntellijConversion.convert(resolved, scheme, entry);
+        // Apply the exact native validation before a conversion can be offered for publication.
+        document = ThemeToml.parse(ThemeTomlWriter.write(document), entry);
+        return new ConversionResult(document, warnings, entry);
+    }
+
+    private static ConversionResult toml(Path source) throws IOException {
+        String text = read(source);
+        var parsed = org.tomlj.Toml.parse(text);
+        if (parsed.hasErrors()) throw new IllegalArgumentException(parsed.errors().getFirst().toString());
+        if (parsed.contains("colors.primary")) {
+            var palette = AlacrittyTheme.read(text);
+            if (palette.palette().isEmpty()) throw new IllegalArgumentException(String.join("; ", palette.problems()));
+            return new ConversionResult(AlacrittyConversion.convert(AlacrittyTheme.displayName(source.getFileName().toString()),
+                palette.palette().orElseThrow(), source.getFileName().toString()), palette.problems(), source.getFileName().toString());
+        }
+        ThemeDocument document = ThemeToml.parse(text, source.getFileName().toString());
+        var available = new ArrayList<ThemeDocument>(); available.add(document);
+        // Native import resolves only the explicitly named sibling file or bundled parent.
+        ThemeDocument current = document;
+        for (int depth = 0; depth < 32 && current.parent().isPresent(); depth++) {
+            String name = current.parent().orElseThrow();
+            var bundled = ThemeManager.builtIns().stream().filter(theme -> theme.name().strip().equalsIgnoreCase(name.strip())).findFirst();
+            if (bundled.isPresent()) { available.add(bundled.get().source().document()); break; }
+            Path parent = child(source.toAbsolutePath().getParent(), name + ".toml");
+            if (!Files.exists(parent, LinkOption.NOFOLLOW_LINKS)) break;
+            current = ThemeToml.parse(read(parent), parent.getFileName().toString());
+            if (available.stream().anyMatch(item -> item.origin().equals(parent.getFileName().toString()))) break;
+            available.add(current);
+        }
+        var flattened = ThemeResolver.resolve(document, name -> available.stream().filter(item -> item.name().strip().equalsIgnoreCase(name.strip())).toList());
+        return new ConversionResult(flattened, List.of(), source.getFileName().toString());
+    }
+
+    private static EditorScheme.Result missingScheme(boolean dark) {
+        return new EditorScheme.Result(dark ? Palette.jasperDark() : Palette.jasperLight(),
+            List.of("no console colours: used Jasper " + (dark ? "Dark" : "Light") + "'s"));
+    }
+
+    private static Path child(Path root, String relative) throws IOException {
+        Path input = Path.of(relative);
+        if (input.isAbsolute() || relative.contains("\\") || input.toString().isEmpty()) throw new IOException("Unsafe theme sidecar path: " + relative);
+        for (Path part : input) if (part.toString().equals("..")) throw new IOException("Theme sidecar escapes its source folder: " + relative);
+        Path target = root.resolve(input).normalize();
+        Path cursor = root;
+        for (Path part : root.relativize(target)) {
+            cursor = cursor.resolve(part);
+            if (Files.isSymbolicLink(cursor)) throw new IOException("Theme sidecar is a symbolic link: " + relative);
+        }
+        return target;
+    }
+
+    private static String read(Path file) throws IOException {
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Not a regular theme file: " + file.getFileName());
+        try (var input = Files.newInputStream(file)) {
+            byte[] bytes = input.readNBytes(ThemeArchive.MAX_FILE + 1);
+            if (bytes.length > ThemeArchive.MAX_FILE) throw new IOException(file.getFileName() + " is larger than 4 MiB");
+            return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+        }
+    }
+    private static Map<?, ?> object(String json) {
+        try {
+            Object value = Json.parse(new StringReader(json));
+            if (value instanceof Map<?, ?> map) return map;
+            throw new IllegalArgumentException("Theme must be a JSON object");
+        } catch (IOException failure) { throw new UncheckedIOException(failure); }
+    }
+    private static String message(Throwable failure) { return failure.getMessage() == null ? failure.toString() : failure.getMessage(); }
+}

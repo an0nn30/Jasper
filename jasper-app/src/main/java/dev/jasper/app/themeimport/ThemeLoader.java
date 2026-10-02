@@ -1,4 +1,6 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+
+import dev.jasper.app.appearance.*;
 
 import com.formdev.flatlaf.json.Json;
 import com.formdev.flatlaf.json.ParseException;
@@ -245,5 +247,5 @@ final class ThemeLoader {
     static String json(String name, boolean dark, String author, Map<String, Object> ui, Map<String, Object> icons) {
         return FlatLafThemeData.json(name, dark, author, ui, icons);
     }
-    private static String write(Object value) { return FlatLafThemeData.write(value); }
+    private static String write(Map<String, Object> value) { return FlatLafThemeData.write(value); }
 }

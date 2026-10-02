@@ -1,4 +1,5 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+import dev.jasper.app.appearance.*;
 
 import dev.jasper.terminal.config.Palette;
 import java.awt.Color;
@@ -24,14 +25,14 @@ class IntellijConversionTest {
             .containsEntry(Seed.FOREGROUND, palette.foreground()).containsEntry(Seed.CURSOR, palette.cursor())
             .containsEntry(Seed.SELECTION, palette.selection()).containsEntry(Seed.ACCENT, new Color(0x3592c4));
         for (int i = 0; i < 16; i++) assertThat(document.ansi()).containsEntry(i, palette.ansi().get(i));
-        assertThat(document.tokens()).isEmpty();
+        assertThat(document.tokens()).containsEntry(Token.SURFACE, new Color(0x2b2b2b));
         var ui = new LinkedHashMap<String, Object>();
         ui.put("ColorPalette.blue", "#3592c4");
         ui.putAll(resolved.ui());
         assertThat(document.ui()).as("the named colours lead, as FlatLaf's ColorPalette keys").containsExactlyEntriesOf(ui);
         assertThat(document.icons()).isEqualTo(Map.of("ColorPalette", Map.of("Actions.Red", "#c75450")));
         GeneratedTheme generated = ThemeGenerator.generate(document);
-        assertThat(generated.uiKeys()).as("a complete theme installs its own keys only").containsExactlyEntriesOf(ui);
+        assertThat(generated.uiKeys()).as("authored keys survive inverse tokens").containsAllEntriesOf(ui);
         assertThat(generated.terminal()).isEqualTo(palette);
     }
 
@@ -45,7 +46,7 @@ class IntellijConversionTest {
             {"name": "Fixture", "dark": true, "colors": {"pink": "#ff79c6", "accentColor": "pink"},
              "ui": {"Component.focusColor": "#3592c4"}}""")::get, Map.of()).load("t.json");
         ThemeDocument document = IntellijConversion.convert(accentColor, Palette.jasperDark(), "t.json");
-        assertThat(document.seeds()).as("then ColorPalette.accentColor").containsEntry(Seed.ACCENT, new Color(0xff79c6));
+        assertThat(document.seeds()).as("then Component.focusColor (accentColor remains authored UI)").containsEntry(Seed.ACCENT, new Color(0x3592c4));
         assertThat(document.ui()).containsEntry("ColorPalette.accentColor", "#ff79c6").containsEntry("ColorPalette.pink", "#ff79c6");
     }
 

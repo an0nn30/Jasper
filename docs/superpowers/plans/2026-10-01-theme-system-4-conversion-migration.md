@@ -18,7 +18,7 @@ script, Swing/FlatLaf 3.7, headless JUnit/AssertJ. No new runtime dependencies o
 with Plans 2 and 3 merged and verified. This replaces the earlier six-task outline with seven sequential review gates.
 Only existing local provenance was inspected; the other upstream inputs/licenses have not been acquired or verified.
 Task 3 freezes those inputs. The `[icons]` addition below is an explicit proposed format amendment, reviewed with this
-plan; record it in the spec when implemented. No deviation from this revised plan has been executed.
+plan; record it in the spec when implemented. Execution decisions and verification are recorded below.
 **Execution:** User chose inline execution after approving the plan: one implementer in this session, TDD/commits
 per task, then one independent whole-branch review. This supersedes the per-task subagent workflow in the draft. Reuse `.worktrees/theme-system` / `codex/theme-system-plans`; do not commit on main. No merge or push is part
 of this planning change. User review received; continue through all tasks without intermediate approval requests.
@@ -29,6 +29,16 @@ icons/shallow copies; a separate Unicode regression failed before correction. Fo
 passed: **7,904 tests, zero failures/errors, six skips**. The `[icons]` amendment is recorded in the spec. No GUI run.
 The two temporary ThemeManager legacy-loader entry points remain until Task 2; its install/materialization paths
 already use the extracted data-only adapter. Inline execution (explicit user selection) replaces per-task reviewers.
+
+Task 2 conversion is complete: full `./gradlew check` passed **7,918 tests, zero failures/errors, six skips**. Legacy parsers/resources now belong to `themeimport`;
+classic built-ins are native TOML. Conversion preserves syntax/font flags, icons, authors, ordered/per-OS UI and
+local/archive theme and scheme parents. Strict and partial-result APIs share bounded parsing. The transitional catalog
+retains filename precedence, diagnostics and cache identity, including archive inspection of `.part` downloads.
+Deviations: unknown IntelliJ parents retain the existing explicit fallback warning rather than failing (binding design
+requires preserving loader behavior). Inverse tokens use canonical keys and verified equivalent FlatLaf aliases only;
+forward template fan-out is not reversible. Unauthored Jasper chrome aliases and OS-dependent tokens remain omitted,
+so retained UI/private materialization preserve appearance. Five full-suite effective-color mismatches proved this
+necessary. Cost: a smaller exported token section; authored UI and effective appearance remain covered by parity.
 
 ## Global Constraints
 
@@ -199,7 +209,7 @@ flat theme list would lose both ownership and problems. `beside(Path)`/`builtIn(
 application and existing store tests explicitly inject LegacyThemeReader until Task 7. Move `ThemeCatalog.inspect`
 callers to LegacyThemeReader. Make `Theme.of(String, Theme.Source)` public for this app-native boundary.
 
-- [ ] **Step 1: Write exact conversion goldens and bridge tests.** Fixture `child.theme.json` extends a local parent
+- [x] **Step 1: Write exact conversion goldens and bridge tests.** Fixture `child.theme.json` extends a local parent
 with named colors, ordered wildcards, per-OS UI, icons and a relative XML scheme. Scheme parent supplies normal ANSI,
 child overrides bright blue `#010203`, keyword `#aabbcc` with FONT_TYPE=3. Expected assertions:
 
@@ -232,9 +242,9 @@ each fixture; compare bytes. Additional named tests and required assertions:
 | `rejectsInvalidParentsAndBoundedSidecars` | Parent/color/scheme cycles, missing parent, escaped sidecar, external entity, oversized file → contextual failure, no external read |
 | `legacyBridgeKeepsPrecedenceAndProblems` | Native/archive files ordered both ways, bad provider and unchanged rescan → same winning source, warnings, retained theme identity |
 
-- [ ] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*ThemeConverterTest' --tests '*LegacyThemeReaderTest'`.
+- [x] **Step 2: Run RED.** `./gradlew :jasper-app:test --tests '*ThemeConverterTest' --tests '*LegacyThemeReaderTest'`.
 Expect missing conversion API or missing syntax/inverse token behavior.
-- [ ] **Step 3: Implement extraction and conversion.** Move parser/resource ownership without creating an appearance→
+- [x] **Step 3: Implement extraction and conversion.** Move parser/resource ownership without creating an appearance→
 themeimport edge. Split AlacrittyConversion's pure `convert(String name, Palette palette, String origin)` returning a
 ThemeDocument from the transitional TerminalTheme wrapper; the wrapper stays in terminalthemes and delegates.
 Move AlacrittyTheme's bundled-resource listing out to TerminalThemeCatalog; the importer parser has no legacy-store
@@ -278,9 +288,9 @@ parents as fallbacks. Native TOML import is additive convenience: classify it se
 source directory plus bundled themes, and export standalone; do not misclassify malformed native input as Alacritty.
 `sourceEntry` is a stable relative provider path (including nested-jar path), not a display name or absolute path.
 
-- [ ] **Step 4: Run GREEN.** Repeat Step 2, moved archive/parser/scheme tests, existing store/catalog/FlatLaf parity tests,
+- [x] **Step 4: Run GREEN.** Repeat Step 2, moved archive/parser/scheme tests, existing store/catalog/FlatLaf parity tests,
 then `./gradlew check`. Verify both old stores still work headlessly and no appearance→themeimport edge exists.
-- [ ] **Step 5: Commit after independent review.**
+- [x] **Step 5: Commit after independent review.**
 
 ```bash
 git add jasper-app/src gradle/application-architecture.gradle.kts

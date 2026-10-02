@@ -160,7 +160,7 @@ public final class JasperApplication {
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
-        themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
+        themeCatalog = service == null ? ThemeCatalog.builtIn() : dev.jasper.app.themeimport.LegacyThemeReader.catalog(service.initialState().file());
         terminalThemes = service == null ? dev.jasper.app.terminalthemes.TerminalThemeCatalog.bundledOnly()
             : dev.jasper.app.terminalthemes.TerminalThemeCatalog.beside(service.initialState().file());
         if (service != null) scanThemes(service);

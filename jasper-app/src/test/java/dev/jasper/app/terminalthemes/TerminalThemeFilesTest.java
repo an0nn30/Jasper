@@ -37,7 +37,7 @@ class TerminalThemeFilesTest {
             .isInstanceOf(TerminalThemeFiles.ThemeFileException.class).hasMessageContaining("reserved");
         assertThatThrownBy(() -> files.install(download("big.toml", "#" + "x".repeat(TerminalThemeCatalog.MAX_FILE)), false))
             .isInstanceOf(TerminalThemeFiles.ThemeFileException.class).hasMessageContaining("64 KiB");
-        assertThatThrownBy(() -> files.install(download("nested.toml", AlacrittyThemeTest.NESTED), false))
+        assertThatThrownBy(() -> files.install(download("nested.toml", TerminalThemeTestSupport.NESTED), false))
             .isInstanceOf(TerminalThemeFiles.ThemeFileException.class).hasMessage("Nested cannot be used: It cannot be read as TOML.");
         assertThat(folder()).satisfiesAnyOf(path -> assertThat(path).doesNotExist(), path -> assertThat(path).isEmptyDirectory());
     }

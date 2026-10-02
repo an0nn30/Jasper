@@ -13,7 +13,12 @@
   and Alacritty pins are recorded; new upstream artifacts/licenses remain Task 3 work, not verified by planning.
   Task 1 is implemented: native serialization, bounded icon data, immutable nested values and runtime FlatLaf adapter.
   RED regressions and focused GREEN checks passed; full `./gradlew check`: 7,904 tests, zero failures/errors, six skips.
-  No GUI, merge or push. Next: continue Task 2 shared conversion. Plan 5 adds the Themes page, preview/file actions and live reload.
+  Task 2 is complete: shared bounded conversion, local/archive parents, syntax/font flags, per-OS UI, author/icons,
+  complete golden and parity tests; native classics replace runtime parsing. Legacy store/catalog behavior is retained.
+  Full `./gradlew check`: **7,918 tests, zero failures/errors, six skips**. Decisions: preserve unknown-parent fallback
+  warnings; infer only equivalent UI keys and omit tokens that would invent Jasper aliases or freeze per-OS values.
+  Raw forward-template inversion changed five effective colors; original UI/private materialization preserves them.
+  No GUI, merge or push. Next: Task 3 pinned offline catalog. Plan 5 adds the Themes page, preview/file actions and live reload.
 
 - **Theme system Plan 3 complete, independently reviewed and merged to local `main`**
   (2026-10-01, not pushed): [plugin pane restyler](superpowers/plans/2026-10-01-theme-system-3-plugin-panes.md)

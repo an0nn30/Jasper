@@ -40,9 +40,9 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     /** Jasper's own dark theme, the default. */
     public static final Theme DARK = BuiltInThemes.toml("jasper-dark", "jasper-dark.toml");
     /** Classic IntelliJ Light, converted from intellij-community. */
-    public static final Theme INTELLIJ_LIGHT = BuiltInThemes.intellij("intellij-light", "intellij/Light.theme.json", "IntelliJ Light");
+    public static final Theme INTELLIJ_LIGHT = BuiltInThemes.toml("intellij-light", "intellij-light.toml");
     /** Darcula, converted from intellij-community. */
-    public static final Theme DARCULA = BuiltInThemes.intellij("darcula", "intellij/darcula.theme.json", "Darcula");
+    public static final Theme DARCULA = BuiltInThemes.toml("darcula", "darcula.toml");
 
     public Theme {
         Objects.requireNonNull(id);
@@ -52,7 +52,7 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     }
 
     /** The theme {@code source}'s document generates, under {@code id}. */
-    static Theme of(String id, Source source) {
+    public static Theme of(String id, Source source) {
         GeneratedTheme generated = ThemeGenerator.generate(source.document());
         return new Theme(id, generated.name(), generated.dark(), generated.terminal(), source);
     }

@@ -1,4 +1,6 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+
+import dev.jasper.app.appearance.*;
 
 import com.formdev.flatlaf.json.Json;
 import com.formdev.flatlaf.json.ParseException;
@@ -46,7 +48,8 @@ final class ThemeArchive {
      * One provided theme: {@code label} ({@code archive!/entry}, or {@code archive!/lib-jar!/entry}) and its
      * JSON, with the scheme file's bytes, or the name of an IntelliJ scheme, when the theme names one.
      */
-    record Found(String label, String json, byte[] schemeXml, String schemeName, String schemeLabel) {}
+    record Found(String label, String json, byte[] schemeXml, String schemeName, String schemeLabel,
+                 Map<String, String> parents, Map<String, byte[]> schemeParents) {}
 
     record Contents(List<Found> themes, List<String> problems) {
         Contents { themes = List.copyOf(themes); problems = List.copyOf(problems); }
@@ -254,10 +257,12 @@ final class ThemeArchive {
         Batch schemeBatch = wantedSchemeEntries.isEmpty()
             ? new Batch(Map.of(), Set.of()) : jar.reader().apply(wantedSchemeEntries);
         for (Pending theme : pending) {
+            try {
             if (theme.schemeEntry() == null) {
                 // schemeLabelIfPath carries a named (not a path) scheme; schemeXml stays null either way.
                 themes.add(new Found(theme.label(), theme.json(), null, theme.schemeLabelIfPath(),
-                    theme.schemeLabelIfPath() == null ? null : theme.label()));
+                    theme.schemeLabelIfPath() == null ? null : theme.label(),
+                    themeParents(jar, theme), Map.of()));
                 continue;
             }
             String schemeLabel = jar.label() + "!/" + theme.schemeEntry();
@@ -270,8 +275,58 @@ final class ThemeArchive {
                 if (schemeXml == null)
                     problems.add(schemeLabel + " is named by " + theme.label() + " but missing; the terminal uses Jasper's palette");
             }
-            themes.add(new Found(theme.label(), theme.json(), schemeXml, null, schemeLabel));
+            themes.add(new Found(theme.label(), theme.json(), schemeXml, null, schemeLabel,
+                themeParents(jar, theme), schemeParents(jar, theme.schemeEntry(), schemeXml)));
+            } catch (RuntimeException failure) {
+                problems.add(theme.label() + ": cannot resolve parent data: "
+                    + (failure instanceof TooLarge ? "parent is larger than 4 MiB" : failure.getMessage()));
+            }
         }
+    }
+
+    private static Map<String, String> themeParents(Jar jar, Pending theme) {
+        var parents = new java.util.LinkedHashMap<String, String>();
+        String json = theme.json();
+        String folder = directory(theme.label().substring(jar.label().length() + 2));
+        for (int depth = 0; depth < 32; depth++) {
+            String parent = jsonField(json, "parentTheme");
+            if (parent == null || ThemeParents.FILES.containsKey(parent) || parents.containsKey(parent)) break;
+            String filename = parent.endsWith(".theme.json") ? parent : parent + ".theme.json";
+            String path = entry(filename, folder);
+            if (path == null) throw new IllegalArgumentException("Theme parent leaves the plugin: " + parent);
+            byte[] bytes = jar.read(path);
+            if (bytes == null) break;
+            json = new String(bytes, StandardCharsets.UTF_8);
+            parents.put(parent, json);
+            folder = directory(path);
+        }
+        return Map.copyOf(parents);
+    }
+
+    private static Map<String, byte[]> schemeParents(Jar jar, String path, byte[] xml) {
+        var parents = new java.util.LinkedHashMap<String, byte[]>();
+        for (int depth = 0; depth < 32 && xml != null; depth++) {
+            Element root;
+            try { root = SafeXml.parse(xml); }
+            catch (IllegalArgumentException invalid) { break; } // EditorScheme retains its existing diagnostic.
+            String parent = root.getAttribute("parent_scheme");
+            if (parent.isBlank() || EditorScheme.hasBundledParent(parent) || parents.containsKey(parent)) break;
+            String filename = entry(parent + ".xml", directory(path));
+            if (filename == null) throw new IllegalArgumentException("Scheme parent leaves the plugin: " + parent);
+            byte[] bytes = jar.read(filename);
+            if (bytes == null) {
+                filename = entry(parent + ".icls", directory(path));
+                bytes = jar.read(filename);
+            }
+            if (bytes == null) break;
+            parents.put(parent, bytes); xml = bytes; path = filename;
+        }
+        return Map.copyOf(parents);
+    }
+
+    private static String jsonField(String json, String key) {
+        try { return Json.parse(new StringReader(json)) instanceof Map<?, ?> map && map.get(key) instanceof String value ? value : null; }
+        catch (IOException | ParseException failure) { return null; }
     }
 
     /** The theme's {@code editorScheme}, or null; an unparsable theme is left for ThemeLoader to report. */

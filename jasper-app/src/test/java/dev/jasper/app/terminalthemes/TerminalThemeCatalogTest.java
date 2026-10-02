@@ -79,7 +79,7 @@ class TerminalThemeCatalogTest {
 
     @Test void aFileThatBreaksTheParserIsAProblemAndTheScanContinues() throws Exception {
         Files.createDirectories(folder());
-        Files.writeString(folder().resolve("nested.toml"), AlacrittyThemeTest.NESTED);
+        Files.writeString(folder().resolve("nested.toml"), TerminalThemeTestSupport.NESTED);
         Files.writeString(folder().resolve("mine.toml"), theme("#010101"));
         var snapshot = catalog().scan();
         assertThat(snapshot.problems()).extracting(problem -> problem.file().getFileName().toString()).containsExactly("nested.toml");

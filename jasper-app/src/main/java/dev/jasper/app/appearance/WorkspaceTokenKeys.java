@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 /** Pure inverse of effective UI colors; absent keys retain their generated value. */
-final class WorkspaceTokenKeys {
+public final class WorkspaceTokenKeys {
     static final Map<Token, String> KEYS = Map.ofEntries(
         Map.entry(Token.SURFACE, "Panel.background"),
         Map.entry(Token.TEXT, "Label.foreground"),
@@ -66,5 +66,48 @@ final class WorkspaceTokenKeys {
             if (color != null) tokens.put(token, color);
         });
         return tokens;
+    }
+
+    /** Inverse authored colors only; platform-specific values remain in UI for runtime materialization. */
+    public static Map<Token, Color> explicitTokens(Map<String, Object> resolvedUi) {
+        var result = new EnumMap<Token, Color>(Token.class);
+        for (Token token : Token.values()) {
+            // In a complete theme, an explicit token also emits Jasper chrome aliases. Do not invent those
+            // from another component's color: ChromeKeys may derive them differently (including contrast).
+            // Authored UI remains intact and WorkspaceValues still resolves these tokens from effective defaults.
+            if (UiTemplate.JASPER.entrySet().stream().anyMatch(entry -> entry.getValue() == token && !resolvedUi.containsKey(entry.getKey())))
+                continue;
+            var keys = new java.util.LinkedHashSet<String>();
+            keys.add(KEYS.get(token));
+            // Template keys sharing a token are not inverse aliases: a tooltip is not a popup menu,
+            // and a progress fill is not Component.accentColor. Only equivalent FlatLaf inputs qualify.
+            switch (token) {
+                case BUTTON_BACKGROUND -> keys.add("Button.startBackground");
+                case BUTTON_DEFAULT -> keys.add("Button.default.startBackground");
+                case SCROLLBAR_TRACK -> keys.add("ScrollBar.trackColor");
+                case SCROLLBAR_THUMB -> keys.add("ScrollBar.thumbColor");
+                case SEPARATOR -> keys.add("Separator.separatorColor");
+                case LINK -> keys.add("Link.activeForeground");
+                default -> { }
+            }
+            var candidates = new java.util.ArrayList<>(keys);
+            // A wildcard matching an absent canonical key must not outrank an authored alternate key.
+            candidates.sort(java.util.Comparator.comparing(key -> !resolvedUi.containsKey(key)));
+            for (String key : candidates) {
+                Object supplied = null;
+                for (var entry : resolvedUi.entrySet()) {
+                    String source = entry.getKey();
+                    if (source.equals(key) || (source.startsWith("*.") && !key.startsWith("@")
+                            && !key.endsWith(".hoverBackground") && !key.endsWith(".pressedBackground")
+                            && key.endsWith(source.substring(1))))
+                        supplied = entry.getValue();
+                }
+                // Even an os.default value cannot be frozen as a token: explicit tokens outrank effective workspace defaults.
+                if (supplied instanceof Map<?, ?>) break;
+                Color color = FlatLafThemeData.color(supplied);
+                if (color != null) { result.put(token, color); break; }
+            }
+        }
+        return Map.copyOf(result);
     }
 }

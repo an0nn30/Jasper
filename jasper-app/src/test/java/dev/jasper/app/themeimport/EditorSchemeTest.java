@@ -1,4 +1,6 @@
-package dev.jasper.app.appearance;
+package dev.jasper.app.themeimport;
+
+import dev.jasper.app.appearance.ThemeFixtures;
 
 import dev.jasper.terminal.config.Palette;
 import java.awt.Color;
@@ -31,9 +33,9 @@ class EditorSchemeTest {
     @Test void theSchemesTheBuiltInIntellijThemesNameHaveNoWarnings() {
         // BuiltInThemes passes the darkness of the theme file it converts.
         assertThat(EditorScheme.named("IntelliJ Light", "IntelliJ Light",
-            ThemeManager.loadBuiltIn("intellij/Light.theme.json").dark()).warnings()).isEmpty();
+            ThemeParents.load("Light.theme.json").dark()).warnings()).isEmpty();
         assertThat(EditorScheme.named("Darcula", "Darcula",
-            ThemeManager.loadBuiltIn("intellij/darcula.theme.json").dark()).warnings()).isEmpty();
+            ThemeParents.load("darcula.theme.json").dark()).warnings()).isEmpty();
     }
 
     @Test void everyConsoleKeyMapsToItsPaletteField() {
@@ -86,7 +88,8 @@ class EditorSchemeTest {
         assertThat(result.palette().background()).isEqualTo(new Color(0x222222));
         assertThat(result.palette().ansi()).isEqualTo(Palette.jasperDark().ansi());
         assertThat(result.palette().cursor()).isEqualTo(Palette.jasperDark().cursor());
-        assertThat(result.warnings()).singleElement().asString().contains("fixture.xml").contains("Nobody");
+        assertThat(result.warnings()).anySatisfy(warning -> assertThat(warning).contains("fixture.xml", "Nobody"));
+        assertThat(result.warnings()).anySatisfy(warning -> assertThat(warning).contains("missing console", "Jasper Dark"));
     }
 
     @Test void coloursAreHexNumbersThatMayDropLeadingZeros() {

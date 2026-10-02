@@ -1,4 +1,4 @@
-package dev.jasper.app.terminalthemes;
+package dev.jasper.app.themeimport;
 
 import dev.jasper.terminal.config.Palette;
 import java.awt.Color;
@@ -26,7 +26,6 @@ public final class AlacrittyTheme {
         public Result { problems = List.copyOf(problems); }
     }
 
-    static final String RESOURCES = "/dev/jasper/app/terminalthemes/alacritty/";
     static final List<String> COLOURS = List.of("black", "red", "green", "yellow", "blue", "magenta", "cyan", "white");
     private static final Pattern HEX = Pattern.compile("(?:#|0[xX])([0-9a-fA-F]{6})");
     private static final List<String> KEYWORDS = List.of("cellforeground", "cellbackground");
@@ -77,21 +76,6 @@ public final class AlacrittyTheme {
         for (String word : base.split("[_\\-\\s]+"))
             if (!word.isEmpty()) words.add(Character.toUpperCase(word.charAt(0)) + word.substring(1));
         return String.join(" ", words);
-    }
-
-    /** The bundled files, from {@code index.txt}. */
-    static List<String> bundledFiles() {
-        return bundledText("index.txt").lines().map(String::strip).filter(line -> !line.isEmpty()).toList();
-    }
-
-    /** A bundled file's text. */
-    static String bundledText(String file) {
-        try (InputStream in = AlacrittyTheme.class.getResourceAsStream(RESOURCES + file)) {
-            if (in == null) throw new IllegalStateException("Missing bundled terminal theme " + file);
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException failure) {
-            throw new UncheckedIOException(failure);
-        }
     }
 
     /** The colour at {@code dotted}; null when missing, a keyword, or not a colour (then a problem is added). */

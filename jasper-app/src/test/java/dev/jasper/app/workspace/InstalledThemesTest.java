@@ -36,7 +36,7 @@ class InstalledThemesTest {
     private ThemeController start(String text) throws Exception {
         Files.writeString(config(), text);
         service = new ConfigService(config(), false);
-        var catalog = ThemeCatalog.beside(config());
+        var catalog = dev.jasper.app.themeimport.LegacyThemeReader.catalog(config());
         service.watchWith(catalog::scan).get();
         ThemeController[] themes = new ThemeController[1];
         edt(() -> {
@@ -139,7 +139,7 @@ class InstalledThemesTest {
         ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
         Files.writeString(config(), "[ui.theme]\nname = 'Fixture Dark'\n");
         service = new ConfigService(config(), false);
-        var catalog = ThemeCatalog.beside(config());
+        var catalog = dev.jasper.app.themeimport.LegacyThemeReader.catalog(config());
         service.watchWith(catalog::scan).get();
         edt(() -> {
             var themes = new ThemeController(theme -> !theme.name().equals("Fixture Dark") && ThemeTestSupport.install(theme));
