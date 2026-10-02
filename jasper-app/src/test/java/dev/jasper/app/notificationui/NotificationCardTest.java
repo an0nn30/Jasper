@@ -119,4 +119,68 @@ class NotificationCardTest {
                 .isEqualTo(new Color(light.getRGB()));
         } finally { new ThemeController(); }
     }
+
+    private static NotificationRequest withActions(NotificationRequest request, List<String> labels) {
+        for (String label : labels) request = request.withAction(NotificationAction.of(label, () -> {}));
+        return request;
+    }
+
+    private static List<String> moreLabels(NotificationCard card) {
+        return card.moreMenu() == null ? List.of() : Arrays.stream(card.moreMenu().getComponents())
+            .filter(JMenuItem.class::isInstance).map(JMenuItem.class::cast).map(JMenuItem::getText).toList();
+    }
+
+    /** What a user can reach: the visible links in order, then the More menu's items. */
+    private static List<String> reachableLabels(NotificationCard card) {
+        var buttons = card.actionButtons();
+        var labels = new ArrayList<String>();
+        for (var button : buttons) if (!button.getText().equals("More ▾")) labels.add(button.getText());
+        labels.addAll(moreLabels(card));
+        return labels;
+    }
+
+    private static void layOut(NotificationCard card) {
+        card.setSize(card.getPreferredSize());
+        card.doLayout();
+        card.actionsPanel().doLayout();
+    }
+
+    private static void assertSingleRowInsideThePanel(NotificationCard card) {
+        var panel = card.actionsPanel();
+        assertThat(card.actionButtons()).allSatisfy(button -> {
+            assertThat(button.getY()).as(button.getText() + " is on the first and only row").isZero();
+            assertThat(button.getX() + button.getWidth()).as(button.getText() + " fits the panel").isLessThanOrEqualTo(panel.getWidth());
+        });
+    }
+
+    @Test void actionLabelsNeverRenderMarkup() {
+        var labels = List.of("<html>One", "<html>Two", "<html>Three", "<html>Four", "<html>Five");
+        var card = new NotificationCard(center, posted(withActions(titled("Markup"), labels)), false);
+        assertThat(card.actionButtons()).extracting(JButton::getText).containsExactly("<html>One", "<html>Two", "<html>Three", "More ▾");
+        assertThat(card.actionButtons()).allSatisfy(button -> assertThat(button.getClientProperty("html")).as(button.getText()).isNull());
+        assertThat(moreLabels(card)).containsExactly("<html>Four", "<html>Five");
+        assertThat(card.moreMenu().getComponents()).allSatisfy(item ->
+            assertThat(((JMenuItem) item).getClientProperty("html")).as(((JMenuItem) item).getText()).isNull());
+    }
+
+    @Test void wideActionLabelsLeaveMoreInsideTheRowAndEveryActionReachable() {
+        try {
+            new ThemeController(Theme.DARK);
+            var labels = List.of("Open in Editor window", "Show in Finder window", "Copy path to clipboard", "Four", "Five", "Six", "Seven");
+            var card = new NotificationCard(center, posted(withActions(titled("Wide"), labels)), false);
+            layOut(card);
+            assertSingleRowInsideThePanel(card);
+            assertThat(card.actionButtons().getLast().getText()).isEqualTo("More ▾");
+            assertThat(reachableLabels(card)).containsExactlyElementsOf(labels);
+        } finally { new ThemeController(); }
+    }
+
+    @Test void threeLongLabelsStillGetAMoreLink() {
+        var labels = List.of("a".repeat(40), "b".repeat(40), "c".repeat(40));
+        var card = new NotificationCard(center, posted(withActions(titled("Long"), labels)), false);
+        layOut(card);
+        assertSingleRowInsideThePanel(card);
+        assertThat(card.actionButtons().getLast().getText()).isEqualTo("More ▾");
+        assertThat(reachableLabels(card)).containsExactlyElementsOf(labels);
+    }
 }

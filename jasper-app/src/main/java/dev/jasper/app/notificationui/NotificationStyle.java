@@ -32,8 +32,10 @@ final class NotificationStyle {
 
     /** A borderless, link-coloured button that never takes focus and never renders markup. */
     static JButton link(String label, Runnable run) {
-        var button = new JButton(label);
+        var button = new JButton();
+        // The property is read when the text is set, so it goes in first: JButton(String) would parse markup before it exists.
         button.putClientProperty("html.disable", Boolean.TRUE);
+        button.setText(label);
         button.putClientProperty("JButton.buttonType", "borderless");
         button.setFocusable(false);
         button.setContentAreaFilled(false);

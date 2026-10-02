@@ -16,6 +16,7 @@ import java.awt.HeadlessException;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -26,6 +27,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
+import javax.swing.border.Border;
 
 /**
  * One notification as a card (spec section 3): icon, wrapping bold title with a muted repeat count, at most five lines
@@ -101,8 +103,7 @@ final class NotificationCard extends JPanel {
         actions.removeAll();
         more = null;
         List<NotificationAction> all = request.actions();
-        for (int i = 0; i < Math.min(all.size(), VISIBLE_ACTIONS); i++) actions.add(actionLink(i, all.get(i).label()));
-        if (all.size() > VISIBLE_ACTIONS) actions.add(moreLink(all));
+        fillActions(all);
         actions.setVisible(!all.isEmpty());
         setCursor(request.activate().isPresent() ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
         close.setVisible(sticky || hovered);
@@ -127,34 +128,75 @@ final class NotificationCard extends JPanel {
     JPopupMenu moreMenu() { return more; }
     JButton closeButton() { return close; }
     Color titleColor() { return title.getForeground(); }
+    JPanel actionsPanel() { return actions; }
 
     private boolean pointerInside() {
         try { return getMousePosition(true) != null; }
         catch (HeadlessException headless) { return false; }
     }
 
+    /**
+     * At most {@link #VISIBLE_ACTIONS} leading links, all of them when they fit one row; otherwise as many as fit beside
+     * More (possibly none), with every other action under More. Wrapping onto a second row would hide More.
+     */
+    private void fillActions(List<NotificationAction> all) {
+        int candidates = Math.min(all.size(), VISIBLE_ACTIONS);
+        List<JButton> links = new ArrayList<>();
+        for (int i = 0; i < candidates; i++) links.add(actionLink(i, all.get(i).label()));
+        int shown = candidates;
+        if (all.size() > candidates || widthOf(links, candidates) > textWidth()) {
+            int moreWidth = moreButton(true).getPreferredSize().width;
+            shown = Math.min(candidates, all.size() - 1);
+            while (shown > 0 && widthOf(links, shown) + moreWidth > textWidth()) shown--;
+        }
+        for (int i = 0; i < shown; i++) actions.add(links.get(i));
+        if (shown < all.size()) actions.add(moreLink(all, shown));
+    }
+
+    private static int widthOf(List<JButton> links, int count) {
+        int width = 0;
+        for (int i = 0; i < count; i++) width += links.get(i).getPreferredSize().width;
+        return width;
+    }
+
     private JButton actionLink(int index, String label) {
         JButton link = NotificationStyle.link(label, () -> center.runAction(notification.id(), index));
-        if (index > 0) link.setBorder(BorderFactory.createEmptyBorder(2, UIScale.scale(12), 2, 0));
+        link.setBorder(linkBorder(index > 0));
         link.addMouseListener(hover);
         return link;
     }
 
-    private JButton moreLink(List<NotificationAction> all) {
+    private JButton moreLink(List<NotificationAction> all, int first) {
         var menu = new JPopupMenu();
-        for (int i = VISIBLE_ACTIONS; i < all.size(); i++) {
+        for (int i = first; i < all.size(); i++) {
             int index = i;
-            var item = new JMenuItem(all.get(i).label());
+            var item = new JMenuItem();
+            // Before the text, which is when markup would be parsed.
             item.putClientProperty("html.disable", Boolean.TRUE);
+            item.setText(all.get(i).label());
             item.addActionListener(event -> center.runAction(notification.id(), index));
             menu.add(item);
         }
         more = menu;
-        JButton link = NotificationStyle.link("More ▾", () -> {});
+        JButton link = moreButton(first > 0);
         link.addActionListener(event -> menu.show(link, 0, link.getHeight()));
-        link.setBorder(BorderFactory.createEmptyBorder(2, UIScale.scale(12), 2, 0));
         link.addMouseListener(hover);
         return link;
+    }
+
+    private static JButton moreButton(boolean gapBefore) {
+        JButton link = NotificationStyle.link("More ▾", () -> {});
+        link.setBorder(linkBorder(gapBefore));
+        return link;
+    }
+
+    private static Border linkBorder(boolean gapBefore) {
+        return BorderFactory.createEmptyBorder(2, gapBefore ? UIScale.scale(12) : 0, 2, 0);
+    }
+
+    /** The width of the text column: the card less its padding, icon and the gap after the icon. */
+    private static int textWidth() {
+        return UIScale.scale(WIDTH) - UIScale.scale(PAD) - UIScale.scale(ICON) - UIScale.scale(GAP) - UIScale.scale(PAD);
     }
 
     /** Places the parts and returns the height they need; with {@code apply} false it only measures. */
@@ -163,7 +205,7 @@ final class NotificationCard extends JPanel {
         int width = UIScale.scale(WIDTH);
         int textX = pad + iconSize + gap;
         int titleWidth = width - textX - pad - closeSize - UIScale.scale(4);
-        int textWidth = width - textX - pad;
+        int textWidth = textWidth();
         title.setWrapWidth(titleWidth);
         content.setWrapWidth(textWidth);
         int y = pad;
