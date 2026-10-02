@@ -329,6 +329,7 @@ final class HostedUi {
             }
             @Override public Subscription onWorkspaceChanged(Consumer<Variant> handler) {
                 guard("onWorkspaceChanged"); java.util.Objects.requireNonNull(handler, "handler");
+                // Only test hosts lack an appearance (production always supplies one), so glass changes reach no handler here.
                 if (appearanceSnapshot == null) return onChanged(handler);
                 var closed = new AtomicBoolean();
                 Consumer<Variant> guarded = value -> { if (!closed.get()) handler.accept(value); };

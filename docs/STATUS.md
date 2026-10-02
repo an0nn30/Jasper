@@ -33,13 +33,20 @@
   find/Vim bars, banner and loading state stay solid). Deviation: the spec's no-argument `workspaceOpacity()` became
   `workspaceOpacity(Component)` because opacity is per window and content moves between windows. Rulings: the gutter
   border is cleared in glass mode (it was an opaque stripe); `EditorTabTest` primes RSyntaxTextArea 3.6.0 font metrics by
-  reflection (headless, no peer). `./gradlew check --continue`: BUILD SUCCESSFUL; 8,039 tests, 0 failures, 0 errors, 6
-  skipped across all modules (jasper-app 1,812, jasper-terminal 394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit
-  85, plugins 5,541). A first run failed once in `TerminalAppIntegrationTest` `rowResetRejectsACompletedSearchAlreadyQueued
-  AheadOfReconciliation[3 reflow]` (jasper-terminal is untouched by this branch; it passed three isolated reruns and the
-  second full check): a timing flake under load, not investigated further. GUI checks (user-run) for plan 2: an editor tab
+  reflection (headless, no peer). Final-review fix wave: `workspaceOpacity` answers the window's opacity only inside the
+  workspace centre (`WindowContent.workspaceOpacity`: the deck holding terminal and hosted content tabs) and 1.0 for
+  chrome, the rail and side/bottom panels; the applied opacity is kept as the double it arrived as (0.8 reads back as
+  0.8); the glass listener runs after `mountContent`'s try; gutter children reattached by RSyntaxTextArea (Vim
+  `:set nonumber`/`number`) take the gutter's opacity through a once-per-gutter container listener.
+  `./gradlew check --continue`: 8,043 tests, 0 errors, 6 skipped across all modules (jasper-app 1,815, jasper-terminal
+  394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 85, plugins 5,542); its one failure was the known flake
+  `TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation` `[3 reflow]`
+  (jasper-terminal is untouched by plan 2), which passed an isolated rerun and the rerun of the check (BUILD
+  SUCCESSFUL): a timing flake under load, not investigated further. GUI checks (user-run) for plan 2: an editor tab
   in Clear Dark and Clear Light, a split of terminal and editor tabs, moving an editor tab to a separate window and back,
-  opacity changes live, and the current-line and selection look. Plan 1 GUI checks: Clear Dark beside Terminal.app's, the Clear Dark
+  opacity changes live, and the current-line and selection look; scroll bars stay solid in a glass editor (by design),
+  so check a long file looks acceptable; Vim `:set nonumber` then `:set number` in a glass window (digits do not smear);
+  a plugin tool panel (e.g. a side panel) in a glass window stays opaque. Plan 1 GUI checks: Clear Dark beside Terminal.app's, the Clear Dark
   (`hudWindow`) versus Clear Light (light `underWindowBackground`) material, rounded corners without slivers and square
   full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, hidden-rail mode,
   native fullscreen, switching back to an opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a
