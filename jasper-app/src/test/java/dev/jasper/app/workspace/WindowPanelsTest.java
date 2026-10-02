@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.LayoutTestSupport;
@@ -53,13 +54,13 @@ class WindowPanelsTest {
             List<PanelSite> sites = new ArrayList<>();
             List<String> events = new ArrayList<>();
             var hostsView = new JLabel("hosts");
-            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), PanelRegion.LEFT, site -> {
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> {
                 sites.add(site);
                 site.onVisibility(visible -> events.add("hosts:" + visible));
                 site.onClosed(() -> events.add("hosts:closed"));
                 return hostsView;
             });
-            PanelEntry files = model.addPanel("dev.x.files", "Files", new ImageIcon(), PanelRegion.LEFT, site -> new JLabel("files"));
+            PanelEntry files = model.addPanel("dev.x.files", "Files", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("files"));
             assertThat(owner.rail().isVisible()).isTrue();
             assertThat(owner.rail().buttons()).extracting(AbstractButton::getToolTipText).containsExactly("Hosts", "Files");
             assertThat(sites).as("no instance until first shown").isEmpty();
@@ -97,7 +98,7 @@ class WindowPanelsTest {
             WindowContent first = window();
             first.connectContributions(model, UiState.load(file));
             List<String> created = new ArrayList<>();
-            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), PanelRegion.LEFT, site -> { created.add("hosts"); return new JLabel("hosts"); });
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> { created.add("hosts"); return new JLabel("hosts"); });
             toggle(model, first, "dev.x.hosts");
             first.rail().onMove.accept("dev.x.hosts", PanelRegion.RIGHT);
             assertThat(first.regions().content(PanelRegion.LEFT)).isNull();
@@ -120,8 +121,8 @@ class WindowPanelsTest {
             WindowContent owner = window();
             owner.connectContributions(model, UiState.inMemory());
             List<String> events = new ArrayList<>();
-            model.addPanel("dev.x.broken", "Broken", new ImageIcon(), PanelRegion.BOTTOM, site -> null);
-            PanelEntry live = model.addPanel("dev.x.live", "Live", new ImageIcon(), PanelRegion.RIGHT, site -> {
+            model.addPanel("dev.x.broken", "Broken", new ImageIcon(), Slot.BOTTOM_LEFT, site -> null);
+            PanelEntry live = model.addPanel("dev.x.live", "Live", new ImageIcon(), Slot.RIGHT_TOP, site -> {
                 site.onClosed(() -> events.add("closed"));
                 return new JLabel("live");
             });
@@ -172,7 +173,7 @@ class WindowPanelsTest {
             var button = new javax.swing.JButton("Plugin action");
             button.addActionListener(event -> clicks.incrementAndGet());
             var instances = new java.util.concurrent.atomic.AtomicInteger();
-            model.addPanel("dev.x.hidden", "Hidden panel", new ImageIcon(), PanelRegion.LEFT, site -> {
+            model.addPanel("dev.x.hidden", "Hidden panel", new ImageIcon(), Slot.LEFT_TOP, site -> {
                 instances.incrementAndGet(); return button;
             });
             toggle(model, owner, "dev.x.hidden");
@@ -191,9 +192,9 @@ class WindowPanelsTest {
             WindowContent owner = window();
             owner.connectContributions(model, UiState.inMemory());
             var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
-            model.addPanel("dev.x.left", "Left", new ImageIcon(), PanelRegion.LEFT, site -> left);
-            model.addPanel("dev.x.right", "Right", new ImageIcon(), PanelRegion.RIGHT, site -> right);
-            model.addPanel("dev.x.bottom", "Bottom", new ImageIcon(), PanelRegion.BOTTOM, site -> bottom);
+            model.addPanel("dev.x.left", "Left", new ImageIcon(), Slot.LEFT_TOP, site -> left);
+            model.addPanel("dev.x.right", "Right", new ImageIcon(), Slot.RIGHT_TOP, site -> right);
+            model.addPanel("dev.x.bottom", "Bottom", new ImageIcon(), Slot.BOTTOM_LEFT, site -> bottom);
             toggle(model, owner, "dev.x.left"); toggle(model, owner, "dev.x.right"); toggle(model, owner, "dev.x.bottom");
             owner.setSize(1200, 800);
             // Twice: a trailing split learns its size in the first pass and places its divider in the second.

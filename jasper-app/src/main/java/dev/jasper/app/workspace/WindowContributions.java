@@ -153,7 +153,8 @@ final class WindowContributions implements AutoCloseable {
             if (panels.containsKey(entry.id())) continue;
             var panel = new PanelInstance(entry);
             var saved = state.panel(entry.id());
-            panel.region = saved.map(value -> PanelRegion.valueOf(value.region())).orElse(entry.defaultRegion());
+            panel.region = saved.map(value -> PanelRegion.valueOf(value.region()))
+                .orElse(PanelRegion.valueOf(entry.defaultSlot().side().name()));
             panel.size = saved.map(UiState.Panel::size).orElse(owner.regions().size(panel.region));
             panels.put(entry.id(), panel);
             if (saved.map(UiState.Panel::visible).orElse(false)) showPanel(entry.id());

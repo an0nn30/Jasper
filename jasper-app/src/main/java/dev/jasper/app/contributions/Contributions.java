@@ -1,6 +1,7 @@
 package dev.jasper.app.contributions;
 
 import dev.jasper.app.commands.KeyContext;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.lifecycle.Subscription;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -131,19 +132,19 @@ public final class Contributions {
         return new Subscription(() -> listeners.remove(listener));
     }
 
-    public PanelEntry addPanel(String id, String title, Icon icon, PanelRegion defaultRegion,
+    public PanelEntry addPanel(String id, String title, Icon icon, Slot defaultSlot,
                                Function<PanelSite, JComponent> factory) {
-        return addPanel(id, title, icon, defaultRegion, Optional.empty(), factory);
+        return addPanel(id, title, icon, defaultSlot, Optional.empty(), factory);
     }
 
     /** A panel toggled by {@code toggleActionId} when present; otherwise the model registers {@code <id>.toggle}. */
-    public PanelEntry addPanel(String id, String title, Icon icon, PanelRegion defaultRegion, Optional<String> toggleActionId,
+    public PanelEntry addPanel(String id, String title, Icon icon, Slot defaultSlot, Optional<String> toggleActionId,
                                Function<PanelSite, JComponent> factory) {
         requireEdt();
         Objects.requireNonNull(factory, "factory");
         if (panels.containsKey(id)) throw new IllegalArgumentException("Panel already registered: " + id);
         String toggle = toggleActionId.orElse(id + ".toggle");
-        var entry = new PanelEntry(this, id, title, icon, Objects.requireNonNull(defaultRegion, "defaultRegion"),
+        var entry = new PanelEntry(this, id, title, icon, Objects.requireNonNull(defaultSlot, "defaultSlot"),
             toggle, toggleActionId.isPresent(), factory);
         panels.put(id, entry);
         if (toggleActionId.isEmpty())

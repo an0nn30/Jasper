@@ -329,8 +329,14 @@ class HostedUiTest {
         assertThatIllegalArgumentException().isThrownBy(() -> ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.other.panel", "Foreign",
             new javax.swing.ImageIcon(), dev.jasper.sdk.ui.Anchor.LEFT), host -> new javax.swing.JLabel()));
 
+        ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.files", "Files", new javax.swing.ImageIcon(),
+            dev.jasper.sdk.ui.Anchor.BOTTOM).withSplit(), host -> new javax.swing.JLabel("files"));
+
         var entry = model.panels().get(0);
-        assertThat(entry.defaultRegion()).isEqualTo(dev.jasper.app.contributions.PanelRegion.RIGHT);
+        assertThat(entry.defaultSlot()).isEqualTo(dev.jasper.app.dock.Slot.RIGHT_TOP);
+        assertThat(model.panels().get(1).defaultSlot()).isEqualTo(dev.jasper.app.dock.Slot.LEFT_TOP);
+        assertThat(model.panels().get(2).defaultSlot()).as("a split panel starts in its side's secondary half")
+            .isEqualTo(dev.jasper.app.dock.Slot.BOTTOM_RIGHT);
         UUID window = UUID.randomUUID();
         boolean[] visible = {true};
         var site = new dev.jasper.app.contributions.PanelSite(window, () -> visible[0] = true, () -> visible[0] = false, () -> visible[0]);
@@ -351,7 +357,7 @@ class HostedUiTest {
         ui.panels().toggle("dev.x.tool.hosts", hosts.getFirst().window());
         assertThat(requests).containsExactly(new dev.jasper.app.contributions.Contributions.PanelRequest(window, "dev.x.tool.hosts", dev.jasper.app.contributions.Contributions.PanelRequest.Op.TOGGLE));
         panel.close();
-        assertThat(model.panels()).hasSize(1);
+        assertThat(model.panels()).hasSize(2);
         ui.closeAll();
         assertThat(model.panels()).isEmpty();
         assertThat(model.railActions()).isEmpty();

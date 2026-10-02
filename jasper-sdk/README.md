@@ -84,7 +84,7 @@ SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it ac
 programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
-guards too. Plugins declare `sdk = ">=0.12.0, <0.13"`.
+guards too. Plugins declare `sdk = ">=0.13.0, <0.14"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or

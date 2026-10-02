@@ -4,7 +4,7 @@ import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
-import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.Slot;
 import java.awt.Component;
 import java.awt.DefaultKeyboardFocusManager;
 import java.awt.KeyboardFocusManager;
@@ -38,7 +38,7 @@ class ShortcutContextDispatchTest {
             model.addAction("dev.x.hosts.new", "New Host", null, List.of(), Optional.of("cmd+alt+j"), Optional.empty(),
                 KeyContext.panel("dev.x.hosts"), invocation -> ran.add("panel"));
             var panelField = new JTextField();
-            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), PanelRegion.LEFT, site -> panelField);
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> panelField);
             model.requestPanel(new Contributions.PanelRequest(owner.id(), "dev.x.hosts", Contributions.PanelRequest.Op.SHOW));
             TerminalPane pane = owner.currentPane();
 
@@ -139,7 +139,7 @@ class ShortcutContextDispatchTest {
                 var owner = holder[0];
                 var model = new Contributions(); owner.connectContributions(model);
                 var field = new JTextField();
-                model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), PanelRegion.LEFT, site -> field);
+                model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> field);
                 model.requestPanel(new Contributions.PanelRequest(owner.id(), "dev.x.hosts", Contributions.PanelRequest.Op.SHOW));
                 var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
                 KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager() {
