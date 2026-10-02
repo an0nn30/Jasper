@@ -125,7 +125,15 @@ public final class StartupTrace {
         if (!marks.compareAndSet(milestone.ordinal(), UNSET, environment.nanos().getAsLong())) return;
         List<Runnable> ready;
         synchronized (this) { ready = waiting.remove(milestone); }
-        if (ready != null) ready.forEach(Runnable::run);
+        if (ready != null) {
+            for (Runnable dispatch : ready) {
+                try {
+                    dispatch.run();
+                } catch (RuntimeException failure) {
+                    environment.log().accept("A start-up trace action failed after " + label(milestone.name()) + ": " + failure);
+                }
+            }
+        }
         if (marked(Milestone.PLUGINS_BOUND) && (marked(Milestone.OUTPUT_PAINTED) || marked(Milestone.WARMED_UP))) settle();
     }
 
@@ -153,7 +161,11 @@ public final class StartupTrace {
                 return;
             }
         }
-        dispatch.run();
+        try {
+            dispatch.run();
+        } catch (RuntimeException failure) {
+            environment.log().accept("A start-up trace action failed after " + label(milestone.name()) + ": " + failure);
+        }
     }
 
     /** Starts timing a window requested now; it gives up 10 s later if it never paints output. */

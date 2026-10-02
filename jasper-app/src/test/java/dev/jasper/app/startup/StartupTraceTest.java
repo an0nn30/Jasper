@@ -151,4 +151,18 @@ class StartupTraceTest {
         assertThat(trace.millis(StartupTrace.Milestone.OUTPUT_PAINTED)).isPresent();
         assertThat(trace.windows()).hasSize(1);
     }
+
+    @Test void aThrowingWaiterNeitherStopsTheOthersNorTheSettleNorTheCaller() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        AtomicInteger second = new AtomicInteger();
+        trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, Runnable::run, () -> { throw new IllegalStateException("boom"); });
+        trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, Runnable::run, second::incrementAndGet);
+        trace.mark(StartupTrace.Milestone.PLUGINS_BOUND);
+        trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+        assertThat(second).hasValue(1);
+        assertThat(fixture.log).hasSize(2);
+        assertThat(fixture.log.get(0)).isEqualTo("A start-up trace action failed after output painted: java.lang.IllegalStateException: boom");
+        assertThat(fixture.log.get(1)).startsWith("Startup (cold");
+    }
 }
