@@ -7,20 +7,24 @@
 #include <jawt.h>
 #include <jawt_md.h>
 
-typedef int JasperConnection;
+typedef int32_t JasperConnection;
 typedef JasperConnection (*JasperDefaultConnection)(void);
-typedef int32_t (*JasperSetBlurRadius)(JasperConnection, NSInteger, int);
+typedef int32_t (*JasperSetBlurRadius)(JasperConnection, int32_t, int);
 typedef jboolean (JNICALL *JasperGetAWT)(JNIEnv *, JAWT *);
 
 /** The radius CoreGraphics receives; Java already limits it to 40. */
 static int JasperClampRadius(jint radius) { return radius < 0 ? 0 : radius > 64 ? 64 : (int) radius; }
 
-/** The window whose content view hosts {@code layer}: the view's own layer or one of its direct sublayers. */
+/**
+ * The window whose content view hosts {@code layer}: the view's own layer or any layer beneath it, however deep (a
+ * custom title bar nests the frame's layer). The nearest ancestor that is a content view's layer wins.
+ */
 static id JasperWindowForLayer(CALayer *layer, NSArray *windows) {
-    if (layer == nil) return nil;
-    for (id window in windows) {
-        CALayer *content = [[window contentView] layer];
-        if (content == layer || [[content sublayers] containsObject:layer]) return window;
+    for (CALayer *ancestor = layer; ancestor != nil; ancestor = [ancestor superlayer]) {
+        for (id window in windows) {
+            CALayer *content = [[window contentView] layer];
+            if (content != nil && content == ancestor) return window;
+        }
     }
     return nil;
 }
@@ -59,7 +63,7 @@ JNIEXPORT jboolean JNICALL Java_dev_jasper_app_platform_MacGlass_setBlur(JNIEnv 
     // AppKit belongs to the main thread. Never wait for it here: it may be waiting for the EDT.
     dispatch_async(dispatch_get_main_queue(), ^{
         NSWindow *target = JasperWindowForLayer(layer, [NSApp windows]);
-        if (target != nil) setBlurRadius(connection(), [target windowNumber], clamped);
+        if (target != nil) setBlurRadius(connection(), (int32_t) [target windowNumber], clamped);
     });
     return JNI_TRUE;
 }

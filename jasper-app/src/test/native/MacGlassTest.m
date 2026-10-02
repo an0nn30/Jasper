@@ -28,12 +28,22 @@ int main(void) {
         CALayer *content = [CALayer layer];
         CALayer *metal = [CALayer layer];
         [content addSublayer:metal];
+        // A custom title bar nests the frame's layer deeper inside the content view's.
+        CALayer *wrapper = [CALayer layer];
+        CALayer *nested = [CALayer layer];
+        [content addSublayer:wrapper];
+        [wrapper addSublayer:nested];
         TestWindow *other = WindowWithLayer([CALayer layer]);
         TestWindow *jasper = WindowWithLayer(content);
         NSArray *windows = @[other, jasper];
 
         assert(JasperWindowForLayer(content, windows) == jasper);
         assert(JasperWindowForLayer(metal, windows) == jasper);
+        assert(JasperWindowForLayer(nested, windows) == jasper);
+        CALayer *detached = [CALayer layer];
+        CALayer *detachedChild = [CALayer layer];
+        [detached addSublayer:detachedChild];
+        assert(JasperWindowForLayer(detachedChild, windows) == nil);
         assert(JasperWindowForLayer([CALayer layer], windows) == nil);
         assert(JasperWindowForLayer(nil, windows) == nil);
         assert(JasperWindowForLayer(metal, @[]) == nil);
