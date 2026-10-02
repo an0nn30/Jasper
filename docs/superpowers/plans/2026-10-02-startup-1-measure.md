@@ -18,8 +18,33 @@ No new dependencies.
 with Plans 2, 3A, 3B and 4 come from the contract reproduced in "Interfaces produced" below; later plans use them
 verbatim.
 
-**Status:** Written 2026-10-02 against `claude/startup-speed@3b1a1544` (local `main@91400d29` plus the spec). First of
-five plans (1 → 2 → 4 → 3A → 3B). Baseline `./gradlew check`: 7,954 tests, 0 failures, 6 skips.
+**Status:** Executed 2026-10-02 on `claude/startup-speed` with subagent-driven development (per-task implementer and
+review). First of five plans (1 → 2 → 4 → 3A → 3B), written against `claude/startup-speed@3b1a1544` (local
+`main@91400d29` plus the spec). Final `./gradlew check`: BUILD SUCCESSFUL, 7,989 tests (the baseline 7,954 plus 35),
+0 failures, 0 errors, 6 skips. The task text below is unchanged; the code differs from it in these ways:
+
+Deviations:
+
+1. Task 1: `StartupTrace.mark` and the already-marked path of `when` run each `when` action in its own try/catch; a
+   failure is logged through the trace's log sink and never thrown into the marking thread, and settling still runs
+   (`c62d56f6`).
+2. Task 2: an unwritable trace file is reported once per process, not on every write (`c354ac01`).
+3. Task 4: `SessionOutput` isolates its first action and every waiter (a failure is logged at WARNING and never reaches
+   the terminal's reader thread), `whenSeen` documents which thread runs the action, and `WindowContent` guards the
+   `onFirstTerminal` observer the same way (`ced8e6c4`); `WindowContentFirstTerminalTest` is disabled on Windows like
+   the other workspace tests that start a real shell (`e4845fc0`).
+4. Task 5: `JasperApplication.outputs` is a `ConcurrentHashMap` filled through package-private
+   `trackOutput(TerminalSession, SessionOutput)`, which removes the entry when the session exits (the plan's weak-keyed
+   map could never clear, because each watch holds its session); `StartupTrace` treats an invalid
+   `-Djasper.startupTrace` path as no trace file instead of failing class initialisation in `main`; the application
+   package-info also lists `dev.jasper.terminal.view` (`9aca0c41`, `55118e0f`). Plan 3A's early-session hand-over now
+   calls `trackOutput` (`856ba73f`).
+5. Task 6: a run counts as `ok` only when its trace has `OUTPUT_PAINTED` (cold) or the reopen window's
+   `OUTPUT_PAINTED` (warm); otherwise the run and the report are `incomplete` and only `ok` runs feed the medians;
+   running Jasper processes are found by executable path through `ProcessHandle` (no `pgrep`/`pkill`); every Jasper the
+   run started is stopped in a `finally` and by a shutdown hook (Ctrl-C), each stop guarded, and a forced kill waits for
+   exit; `StartupBenchTest` is disabled on Windows (`af112320`, `6a2d3efc`).
+6. Tests: 35 new tests instead of the plan's 28; the fix rounds added 7.
 
 ## Global Constraints
 

@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-02
 
-- **Start-up speed: designed, measured and planned; not started** (branch `claude/startup-speed`, worktree
+- **Start-up speed: designed, measured and planned; Plan 1 executed** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, from local `main@91400d29`; user request in chat 2026-10-02).
   [Spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) approved section by section. Measured Dock click
   to window on screen: ~3.5 s for the installed pre-`c4211cf1` build, 2.3 s at HEAD, 1.7 s with a JDK 25 AOT cache and
@@ -15,7 +15,18 @@
   [3B Contribution replay](superpowers/plans/2026-10-02-startup-3b-contribution-replay.md). Plan 1's trace, file,
   benchmark and session-output tests were compiled and run against the plan's own code; the others were cross-checked
   against each other's written code. Baseline `./gradlew check`: 7,954/0/0/6. GUI measurement runs need the user's
-  approval per batch. Not done: execution of any plan.
+  approval per batch. Not done: Plans 2, 4, 3A and 3B.
+
+- **Start-up speed Plan 1 (Measure)** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
+  [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md),
+  [plan](superpowers/plans/2026-10-02-startup-1-measure.md)): every launch logs one start-up line (milestones from the
+  OS process start, phases, AOT/CDS use) and each window logs its own timing; `-Djasper.startupTrace` writes JSON;
+  `TerminalView.afterNextPaint` is the new supported view hook; `tools/benchmarks/run-macos.sh … startup` measures cold
+  and warm launches of a packaged image. [Baseline](benchmarks/2026-10-02-startup-baseline.md): window on screen 2.3 s
+  at HEAD, 1.7 s with an AOT cache. Executed with per-task review; the review rounds changed the plan's code (failure
+  isolation in the trace and session output, a once-only trace-file error, `trackOutput` instead of a weak map, strict
+  "incomplete" runs and guaranteed Jasper cleanup in the benchmark), listed in the plan's status banner.
+  `./gradlew check`: 7,989/0/0/6. Next: Plan 2 (JVM and packaging). Not done: a recorded `startupBench` run (user-run).
 
 - **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
   worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
