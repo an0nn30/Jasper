@@ -30,7 +30,8 @@ and every plugin has started, or 10 seconds after the process started), for exam
 
     Startup (cold, AOT cache used, CDS on): main entered 71 ms, config loaded 90 ms, … output painted 512 ms, plugins bound 980 ms | application 210 ms, plugins 280 ms
 
-Times are milliseconds since the operating system started the process. `AOT cache stale` means the cache in the
+Times before the `|` are milliseconds since the operating system started the process; after it, each phase is how long
+that piece of work took. `AOT cache stale` means the cache in the
 package no longer matches its jars (for example after a copy that did not keep modification times) and costs more than
 having none. Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …, output painted …
 after the request`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the start-up benchmark

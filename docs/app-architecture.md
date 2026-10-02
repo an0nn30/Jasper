@@ -158,7 +158,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `themesui` | The Appearance page's Import theme…: a serial import worker and its dialogs over Settings. The Appearance page owns each ThemeImport and closes it when disposed. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
-| `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`); JDK-only, depended on by bootstrap, application, plugins and benchmark. Safe from any thread; marking, settling and file writes never block the EDT and run on virtual threads. |
+| `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`); JDK-only, depended on by bootstrap, application, plugins and benchmark. Safe from any thread; `mark` and `phase` are non-blocking and run on the caller's thread; settling, logging and file writes run on virtual threads, never on the EDT. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
 
 Buddy's supported packages are `view`, `notice` and `config`; its internal model and
