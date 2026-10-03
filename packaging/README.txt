@@ -1,7 +1,9 @@
 Jasper native package
 ====================
 
-macOS: open the DMG and drag Jasper.app to Applications. The current development
+macOS: open the DMG and drag Jasper.app to Applications. Copy it with Finder or
+ditto: a copy that resets file modification times, such as cp -R, still runs
+but loses Jasper's start-up cache. The current development
 build has only a local ad-hoc signature and has no final application icon. It is
 not Developer ID signed or notarized, so macOS may require the usual confirmation
 for software from an unidentified developer.

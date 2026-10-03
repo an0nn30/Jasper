@@ -192,3 +192,25 @@ printf '%s\\n' "$@" > "${cache%/*}/options.txt"
         logger.lifecycle('Verified a timed-out training launch leaves no process behind')
     }
 }
+
+verifySupport.configure {
+    doLast {
+        File original = new File(temporaryDir, 'times/original')
+        File copied = new File(temporaryDir, 'times/copied')
+        [original, copied].each { it.deleteDir(); new File(it, 'plugins').mkdirs() }
+        long stamp = 1_759_400_000_000L
+        ['jasper-app.jar', 'plugins/tool.jar', 'jasper.aot'].each { String name ->
+            [original, copied].each { File root ->
+                File file = new File(root, name)
+                file.text = name
+                assert file.setLastModified(stamp)
+            }
+        }
+        assert modificationTimeMismatches(original, copied).isEmpty()
+        assert new File(copied, 'plugins/tool.jar').setLastModified(stamp + 1_000)
+        assert new File(copied, 'jasper.aot').delete()
+        assert new File(copied, 'jasper-app.jar').setLastModified(stamp + 400)   // same second: HFS+ and the JVM keep whole seconds
+        assert modificationTimeMismatches(original, copied) == ['jasper.aot', "plugins${File.separator}tool.jar".toString()]
+        logger.lifecycle('Verified modification-time comparison')
+    }
+}

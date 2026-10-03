@@ -858,35 +858,68 @@ if (normalizedHost().os == 'windows') {
     }
     tasks.register('packageDist') {
         group = 'distribution'
-        description = 'Creates the macOS distribution after verifying its image.'
-        dependsOn(verifyPackage)
+        description = 'Trains the AOT cache, verifies the image and creates the macOS DMG (launches Jasper once: ask first).'
+        dependsOn(trainAotCache, verifyPackage)
         inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property('version', version)
         outputs.files(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-macos-${normalizedHost().architecture}.dmg") })
         doLast {
-        def context = nativeContext()
-        File distDir = distributionDirectory.get().asFile
-        distDir.mkdirs()
-        File artifact = new File(distDir, "Jasper-${context.version}-macos-${context.host.architecture}.dmg")
-        delete(artifact)
-        File temporary = new File(packagingRoot.get().asFile, 'dist-dmg-work')
-        delete(temporary)
-        temporary.mkdirs()
-        try {
-            executeNative([context.jpackage.absolutePath, '--type', 'dmg', '--name', 'Jasper',
-                '--app-image', new File(imageDirectory.get().asFile, 'Jasper.app').absolutePath,
-                '--dest', temporary.absolutePath], 'jpackage dmg')
-            File generated = temporary.listFiles().find { it.name.endsWith('.dmg') }
-            if (generated == null) throw new GradleException('jpackage dmg completed without producing a DMG')
-            Files.move(generated.toPath(), artifact.toPath())
-            executeNative(['/usr/bin/hdiutil', 'verify', artifact.absolutePath], 'hdiutil verify')
-        } catch (Exception failure) {
+            def context = nativeContext()
+            File image = new File(imageDirectory.get().asFile, 'Jasper.app')
+            File distDir = distributionDirectory.get().asFile
+            distDir.mkdirs()
+            File artifact = new File(distDir, "Jasper-${context.version}-macos-${context.host.architecture}.dmg")
             delete(artifact)
-            throw failure
-        } finally {
+            File temporary = new File(packagingRoot.get().asFile, 'dist-dmg-work')
             delete(temporary)
-        }
-        logger.lifecycle("Created ${artifact}")
+            File volume = new File(temporary, 'volume')
+            File mount = new File(temporary, 'mount')
+            volume.mkdirs()
+            mount.mkdirs()
+            try {
+                // jpackage --type dmg copies the image without modification times (Files.copy without COPY_ATTRIBUTES),
+                // and the JVM then refuses the AOT cache and the CDS archive. ditto and hdiutil keep the times.
+                executeNative(['/usr/bin/ditto', image.absolutePath, new File(volume, 'Jasper.app').absolutePath], 'ditto Jasper.app into the DMG folder')
+                Files.createSymbolicLink(new File(volume, 'Applications').toPath(), new File('/Applications').toPath())
+                int attempt = 0
+                while (true) {
+                    attempt++
+                    try {
+                        executeNative(['/usr/bin/hdiutil', 'create', '-volname', 'Jasper', '-srcfolder', volume.absolutePath,
+                            '-fs', 'HFS+', '-format', 'UDZO', '-ov', artifact.absolutePath], 'hdiutil create')
+                        break
+                    } catch (GradleException busy) {
+                        // hdiutil sometimes reports a busy resource; jpackage retries for the same reason.
+                        if (attempt == 3) throw busy
+                        Thread.sleep(2000)
+                    }
+                }
+                executeNative(['/usr/bin/hdiutil', 'verify', artifact.absolutePath], 'hdiutil verify')
+                // Check what a user installs: mounted read-only and hidden from Finder, no window opens.
+                executeNative(['/usr/bin/hdiutil', 'attach', artifact.absolutePath, '-readonly', '-nobrowse', '-noautoopen',
+                    '-mountpoint', mount.absolutePath], 'hdiutil attach')
+                try {
+                    File installed = new File(mount, 'Jasper.app')
+                    List<String> changed = modificationTimeMismatches(new File(image, 'Contents/app'), new File(installed, 'Contents/app'))
+                    if (changed) throw new GradleException("DMG verification failed: modification times differ for ${changed.take(10)}; the JVM would refuse the AOT cache")
+                    executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', installed.absolutePath], 'codesign verification of the DMG copy')
+                    if (!verifyAotCache(new File(installed, 'Contents/runtime/Contents/Home'), new File(installed, 'Contents/app'))) {
+                        throw new GradleException('DMG verification failed: the app in the DMG has no AOT cache')
+                    }
+                } finally {
+                    try {
+                        executeNative(['/usr/bin/hdiutil', 'detach', mount.absolutePath], 'hdiutil detach')
+                    } catch (GradleException detachFailure) {
+                        logger.warn("Could not detach ${mount}: ${detachFailure.message}")
+                    }
+                }
+            } catch (Exception failure) {
+                delete(artifact)
+                throw failure
+            } finally {
+                if (!new File(mount, 'Jasper.app').exists()) delete(temporary)
+            }
+            logger.lifecycle("Created ${artifact}")
         }
     }
 }

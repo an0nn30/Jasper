@@ -236,3 +236,22 @@ ext.aotCheckCommand = { File java, String config, File appDir ->
     ([java.absolutePath] + launcherJavaOptions(config, appDir) +
         ['-XX:AOTMode=on', '-cp', launcherClasspath(config, appDir).join(File.pathSeparator), '-version'])*.toString()
 }
+
+// Files under expectedRoot whose copy under actualRoot is missing or has another modification time, to the second
+// (HFS+ stores whole seconds, and so does the JVM's check of the class-path jars an AOT cache was trained with).
+ext.modificationTimeMismatches = { File expectedRoot, File actualRoot ->
+    List<String> mismatches = []
+    def expected = expectedRoot.toPath(), actual = actualRoot.toPath()
+    Files.walk(expected).withCloseable { paths ->
+        paths.filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) }.forEach { file ->
+            String relative = expected.relativize(file).toString()
+            def copy = actual.resolve(relative)
+            if (!Files.isRegularFile(copy, LinkOption.NOFOLLOW_LINKS) ||
+                    Files.getLastModifiedTime(file, LinkOption.NOFOLLOW_LINKS).to(TimeUnit.SECONDS) !=
+                    Files.getLastModifiedTime(copy, LinkOption.NOFOLLOW_LINKS).to(TimeUnit.SECONDS)) {
+                mismatches << relative
+            }
+        }
+    }
+    mismatches.sort()
+}
