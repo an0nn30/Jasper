@@ -21,7 +21,8 @@ import dev.jasper.app.files.ChooserSource;
 
 /**
  * What extensions have contributed, in registration order. Windows subscribe and re-render the part
- * that changed. Everything here is EDT-only; callbacks into contributors are their concern to contain.
+ * that changed. A {@code BADGES} change updates the existing stripe buttons in place instead. Everything here is
+ * EDT-only; callbacks into contributors are their concern to contain.
  */
 public final class Contributions {
     private final ContentRegistry content = new ContentRegistry();

@@ -16,10 +16,12 @@
   `WindowPanelsTest.aBadgedPanelShowsADotAndDescribesItsCount` (on the right stripe),
   `WindowDragTest.aBadgedButtonStillDragsAndLiftsOutAndItsGhostIsThePlainIcon`,
   `WindowCornerLayerTest.theLayerStaysBetweenTheStripesOverDockedWindowsAndUnderADockDrag` (its two older cases now
-  follow the area) and `HistoryPanelTest.theToolWindowHeaderCarriesTheTitle`. `./gradlew check --continue` on the merged
-  tree: **8,195 tests, 0 failures, 0 errors, 6 skipped**, all four architecture gates and doclint included; main's
-  `ExFilesTest` fix (`185a5f8e`) makes it pass on this Mac, and the Remote `ListenerTest` flake did not fail. Open: the
-  notifications GUI checks now look at the Notifications button on the right stripe. Nothing pushed, no GUI launched.
+  follow the area) and `HistoryPanelTest.theToolWindowHeaderCarriesTheTitle`. Polish commit with in-place badge update
+  fixes and size contract test: `BadgedIcon` size equals the base icon's and the badge paints inside it, so a button
+  change never relayouts; test assertions verify this. `./gradlew check --continue`: **8,200 tests, 0 failures, 0
+  errors, 6 skipped**, all four architecture gates and doclint included. GUI check: start a tool window drag, then
+  trigger a notification (for example a config error); the stripe button gains its dot and the drag continues. Nothing
+  pushed, no GUI launched.
 
 - **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe

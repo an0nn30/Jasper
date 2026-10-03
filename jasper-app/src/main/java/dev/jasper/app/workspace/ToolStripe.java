@@ -40,8 +40,9 @@ import javax.swing.UIManager;
  * badge on the existing button, so a badge change never rebuilds the stripe or ends a drag. During a dock drag the
  * stripe shows all three groups with their separators (an empty group as one button's drop space), lifts the dragged
  * window's button out, and opens a gap where the window would drop. The lifted button's step stays empty at the end of
- * its group, so no later group slides under the cursor, and a gap in that group uses it. The stripe owns no state: the
- * window renders it again after every change, except a badge's. EDT only.
+ * its group, so no later group slides under the cursor, and a gap in that group uses it. The stripe keeps only what
+ * its last render built, and the window renders it again after every dock change; a badge change re-decorates the
+ * existing button in place via {@link #updateBadge}. EDT only.
  */
 final class ToolStripe extends JPanel {
     /** One tool window's button, with its unread badge if it has one. */

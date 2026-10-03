@@ -27,7 +27,7 @@ class PanelBadgeTest {
         panel.close();
         kinds.clear();
         panel.setBadge(Optional.of(badge));
-        assertThat(kinds).as("a closed panel has no rail button to mark").isEmpty();
+        assertThat(kinds).as("a closed panel has no stripe button to mark").isEmpty();
     }
 
     @Test void aBadgeCountsSomethingAndSaysWhat() {

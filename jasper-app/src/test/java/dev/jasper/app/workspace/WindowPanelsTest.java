@@ -625,7 +625,10 @@ class WindowPanelsTest {
             var icon = new ImageIcon(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB));
             PanelEntry notes = model.addPanel("dev.x.notes", "Notes", icon, Slot.RIGHT_TOP, site -> new JLabel("notes"));
             AbstractButton button = owner.rightStripe().buttons().getFirst();
+            owner.setSize(1200, 800);
+            LayoutTestSupport.layoutTree(owner);
             var layoutBefore = button.getBounds();
+            assertThat(layoutBefore).isNotEqualTo(new Rectangle());
             notes.setBadge(Optional.of(new PanelBadge(4, PanelBadge.Tone.ERROR, "4 unread notifications, 1 error")));
             assertThat(owner.rightStripe().buttons().getFirst()).as("the badge is not a render").isSameAs(button);
             assertThat(button.getIcon()).isInstanceOf(BadgedIcon.class);
