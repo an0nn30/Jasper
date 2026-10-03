@@ -1,5 +1,6 @@
 package dev.jasper.vault.service;
 
+import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.vault.api.*;
 import dev.jasper.vault.keygen.*;
 import dev.jasper.vault.lock.LockManager;
@@ -17,7 +18,7 @@ class KeyImportInterleavingTest {
     @TempDir Path directory;
     final ArrayDeque<Runnable> reads = new ArrayDeque<>(), writes = new ArrayDeque<>(), ui = new ArrayDeque<>();
     final List<KeyImportPrompt> prompts = new ArrayList<>();
-    final List<String> notices = new ArrayList<>();
+    final FakeNotifications notifications = new FakeNotifications();
     LockManager lock;
     VaultService service;
     VaultApi api;
@@ -27,7 +28,7 @@ class KeyImportInterleavingTest {
         lock = new LockManager(new VaultFile(directory.resolve("vault.jv")), secrets, writes::add, ui::add,
             state -> { if (service != null) service.lockStateChanged(state); });
         var created = lock.create("pw".toCharArray(), false); drain(writes); created.join();
-        service = new VaultService(lock, () -> Optional.of(owner), p -> {}, p -> {}, p -> {}, notices::add,
+        service = new VaultService(lock, () -> Optional.of(owner), p -> {}, p -> {}, p -> {}, notifications.group("dev.jasper.vault"),
             reads::add, ui::add, w -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), prompts::add, () -> {});
         api = service.forConsumer(VaultServiceTest.SSH);
     }

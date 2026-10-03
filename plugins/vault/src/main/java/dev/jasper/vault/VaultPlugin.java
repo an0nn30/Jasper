@@ -111,7 +111,7 @@ public class VaultPlugin implements Plugin {
         timer.setTimeout(settings.autoLock());
         lock = new LockManager(new VaultFile(context.dataDirectory().resolve("vault.jv")), secretsFactory.apply(context), context.background(), ui, this::lockStateChanged);
         service = new VaultService(lock, () -> context.terminals().activeWindow().or(() -> context.terminals().windows().stream().findFirst()),
-            this::showUnlock, this::showGrant, this::showPick, context.notices()::error,
+            this::showUnlock, this::showGrant, this::showPick, context.notifications().group(),
             context.background(), ui, owner -> switch (lock.state()) {
                 case NO_VAULT -> createVault(owner);
                 case LOCKED -> service.requestUnlock(owner);
@@ -126,7 +126,7 @@ public class VaultPlugin implements Plugin {
             .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
         lockAction.setEnabled(false);
         clipboard = clipboardFactory.get();
-        scope = new VaultScope(lock, service, clipboard, this::open, context.notices()::error);
+        scope = new VaultScope(lock, service, clipboard, this::open, context.notifications().group());
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
         managerWindow = new VaultManagerWindow(context, lock, manager, service, clipboard, this::managerStatus, this::showGenerator);
@@ -182,7 +182,7 @@ public class VaultPlugin implements Plugin {
             managerWindow.show(named, select);
             after.run();
         }).exceptionally(failure -> {
-            if (!stopped) context.notices().error("Could not open Credential Vault: " + message(failure));
+            if (!stopped) context.notifications().group().error("Could not open Credential Vault", message(failure), failure);
             return null;
         });
     }
@@ -218,7 +218,7 @@ public class VaultPlugin implements Plugin {
                     success[0] = true; dialog.close(); result.complete(true);
                 } else {
                     form[0].setBusy(false);
-                    context.notices().error("Could not create the vault: " + message(failure));
+                    context.notifications().group().error("Could not create the vault", message(failure), failure);
                 }
             });
         }, dialog::close);

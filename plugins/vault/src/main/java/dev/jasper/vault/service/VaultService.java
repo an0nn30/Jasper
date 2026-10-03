@@ -1,6 +1,7 @@
 package dev.jasper.vault.service;
 
 import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.vault.api.Credential;
 import dev.jasper.vault.api.CredentialDescriptor;
@@ -26,6 +27,7 @@ import java.util.function.Supplier;
 
 /** One per plugin instance; {@link #forConsumer} hands each requiring plugin its own view. */
 public final class VaultService {
+    static final String NO_VAULT_TITLE = "No vault yet";
     static final String NO_VAULT_NOTICE = "Create a vault in Credential Vault first (Open Vault...)";
     static final String NO_WINDOW_NOTICE = "Credential Vault has no window to ask in";
 
@@ -34,7 +36,7 @@ public final class VaultService {
     private final Consumer<UnlockPrompt> showUnlock;
     private final Consumer<GrantPrompt> showGrant;
     private final Consumer<PickPrompt> showPick;
-    private final Consumer<String> notice;
+    private final NotificationGroup notifications;
     private java.util.concurrent.Executor background, ui;
     private java.util.function.Function<WindowHandle, CompletableFuture<Boolean>> openForImport;
     private Consumer<KeyImportPrompt> showImport;
@@ -47,16 +49,17 @@ public final class VaultService {
     private final Map<String, WindowHandle> lastOwner = new HashMap<>();
 
     public VaultService(LockManager lock, Supplier<Optional<WindowHandle>> fallbackOwner, Consumer<UnlockPrompt> showUnlock,
-                        Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, Consumer<String> notice) {
-        this.lock = lock; this.fallbackOwner = fallbackOwner; this.showUnlock = showUnlock; this.showGrant = showGrant; this.showPick = showPick; this.notice = notice;
+                        Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, NotificationGroup notifications) {
+        this.lock = lock; this.fallbackOwner = fallbackOwner; this.showUnlock = showUnlock; this.showGrant = showGrant; this.showPick = showPick;
+        this.notifications = notifications;
     }
 
     public VaultService(LockManager lock, Supplier<Optional<WindowHandle>> fallbackOwner, Consumer<UnlockPrompt> showUnlock,
-                        Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, Consumer<String> notice,
+                        Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, NotificationGroup notifications,
                         java.util.concurrent.Executor background, java.util.concurrent.Executor ui,
                         java.util.function.Function<WindowHandle, CompletableFuture<Boolean>> openForImport,
                         Consumer<KeyImportPrompt> showImport, Runnable changed) {
-        this(lock, fallbackOwner, showUnlock, showGrant, showPick, notice);
+        this(lock, fallbackOwner, showUnlock, showGrant, showPick, notifications);
         this.background = background; this.ui = ui; this.openForImport = openForImport;
         this.showImport = showImport; this.changed = changed;
     }
@@ -77,7 +80,7 @@ public final class VaultService {
     public CompletableFuture<Boolean> requestUnlock(WindowHandle owner) {
         switch (lock.state()) {
             case UNLOCKED: return CompletableFuture.completedFuture(true);
-            case NO_VAULT: notice.accept(NO_VAULT_NOTICE); return CompletableFuture.completedFuture(false);
+            case NO_VAULT: notifications.warning(NO_VAULT_TITLE, NO_VAULT_NOTICE); return CompletableFuture.completedFuture(false);
             default:
         }
         if (unlock == null) {
@@ -141,7 +144,7 @@ public final class VaultService {
             case ALWAYS -> {
                 lock.transact(v -> { v.grants().add(prompt.grant()); return (Void) null; }, () -> false)
                     .whenComplete((ignored, failure) -> {
-                        if (failure != null) { notice.accept("Could not save the credential grant"); prompt.settle(Optional::empty); }
+                        if (failure != null) { notifications.error("Could not save the credential grant", failure); prompt.settle(Optional::empty); }
                         else prompt.settle(() -> copyOf(prompt.grant().credentialId()));
                     });
             }
@@ -161,7 +164,7 @@ public final class VaultService {
                 WindowHandle owner, List<dev.jasper.vault.api.SshKeySource> sources, List<UUID> selected) {
             if (showImport == null) return VaultApi.super.importSshKeys(owner, sources, selected);
             lastOwner.put(consumer.id(), owner);
-            KeyImportPrompt prompt = new KeyImportPrompt(consumer, owner, sources, selected, lock, background, ui, notice, changed);
+            KeyImportPrompt prompt = new KeyImportPrompt(consumer, owner, sources, selected, lock, background, ui, notifications, changed);
             imports.add(prompt);
             prompt.result().whenComplete((value, failure) -> imports.remove(prompt));
             showImport.accept(prompt); prompt.start(openForImport);
@@ -213,7 +216,7 @@ public final class VaultService {
                 java.util.function.Consumer<WindowHandle> observedOwner) {
             var result = new CompletableFuture<Optional<Credential>>();
             if (lock.state() != LockState.UNLOCKED && lock.state() != LockState.NO_VAULT && owner.isEmpty()) {
-                notice.accept(NO_WINDOW_NOTICE);
+                notifications.warning(NO_WINDOW_NOTICE, "");
                 result.complete(Optional.empty());
                 return result;
             }

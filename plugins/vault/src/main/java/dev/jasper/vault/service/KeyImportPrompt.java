@@ -2,6 +2,7 @@ package dev.jasper.vault.service;
 
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.vault.api.*;
 import dev.jasper.vault.crypto.SecureBytes;
@@ -23,7 +24,7 @@ public final class KeyImportPrompt {
     private final List<UUID> selected;
     private final LockManager lock;
     private final Executor background, ui;
-    private final Consumer<String> notice;
+    private final NotificationGroup notifications;
     private final Runnable changed;
     private final Map<Path, PreparedKey> prepared = new LinkedHashMap<>();
     private final List<Runnable> listeners = new ArrayList<>();
@@ -35,10 +36,10 @@ public final class KeyImportPrompt {
     private long generation;
     private boolean dismissed;
     public KeyImportPrompt(PluginInfo consumer, WindowHandle owner, List<SshKeySource> sources, List<UUID> selected,
-                           LockManager lock, Executor background, Executor ui, Consumer<String> notice, Runnable changed) {
+                           LockManager lock, Executor background, Executor ui, NotificationGroup notifications, Runnable changed) {
         this.consumer = consumer; this.owner = Objects.requireNonNull(owner); this.sources = List.copyOf(sources);
         this.selected = List.copyOf(new LinkedHashSet<>(selected)); this.lock = lock; this.background = background; this.ui = ui;
-        this.notice = notice; this.changed = changed;
+        this.notifications = notifications; this.changed = changed;
         if (sources.size() > 4096 || sources.stream().map(SshKeySource::requestId).distinct().count() != sources.size())
             throw new IllegalArgumentException("Invalid key import batch");
         result.whenComplete((answer, failure) -> { if (result.isCancelled()) ui.execute(this::cancel); });
@@ -133,7 +134,8 @@ public final class KeyImportPrompt {
             if (failure != null) result.completeExceptionally(new IllegalStateException("Could not finish saving imported credentials; check Vault before retrying"));
             else {
                 changed.run();
-                if (dismissed || !owner.isOpen()) notice.accept("Keys were saved in Vault; host import was cancelled. Re-import to finish.");
+                if (dismissed || !owner.isOpen())
+                    notifications.warning("Host import was cancelled", "Keys were saved in Vault; re-import the hosts to finish.");
                 result.complete(Optional.of(answer));
             }
             fire();
