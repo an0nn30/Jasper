@@ -193,6 +193,27 @@ printf '%s\\n' "$@" > "${cache%/*}/options.txt"
     }
 }
 
+// detachMount: hdiutil detach, once more after a pause, then hdiutil detach -force. The runner here answers from a list
+// of exit codes and the pause is counted, not slept, so the fixtures stay instant.
+verifySupport.configure {
+    doLast {
+        File mount = new File(temporaryDir, 'My Volume/mount')   // a space, as in a checkout under "My Projects"
+        List<String> plain = ['/usr/bin/hdiutil', 'detach', mount.absolutePath]
+        List<String> forced = ['/usr/bin/hdiutil', 'detach', '-force', mount.absolutePath]
+        def detach = { List<Integer> exitCodes ->
+            List<List<String>> commands = []
+            int pauses = 0
+            boolean detached = detachMount(mount, { List<String> command -> commands << command; exitCodes[commands.size() - 1] }, { pauses++ })
+            [detached: detached, commands: commands, pauses: pauses]
+        }
+        assert detach([0]) == [detached: true, commands: [plain], pauses: 0]
+        assert detach([1, 0]) == [detached: true, commands: [plain, plain], pauses: 1]
+        assert detach([1, 16, 0]) == [detached: true, commands: [plain, plain, forced], pauses: 1]
+        assert detach([1, 1, 1]) == [detached: false, commands: [plain, plain, forced], pauses: 1]
+        logger.lifecycle('Verified the DMG detach retry and force')
+    }
+}
+
 verifySupport.configure {
     doLast {
         File original = new File(temporaryDir, 'times/original')

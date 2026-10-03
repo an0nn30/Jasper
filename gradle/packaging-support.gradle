@@ -5,7 +5,7 @@ import java.nio.file.LinkOption
 import java.util.concurrent.TimeUnit
 
 // What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, the
-// launcher configuration and the AOT training launch. gradle/packaging.gradle applies this file;
+// launcher configuration, the AOT training launch and the DMG detach. gradle/packaging.gradle applies this file;
 // gradle/packaging-support-test.gradle checks it with fixtures (verifyPackagingSupport, part of check). The imports
 // serve helpers further down: Groovy accepts imports only before the first statement.
 
@@ -235,6 +235,17 @@ ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSe
 ext.aotCheckCommand = { File java, String config, File appDir ->
     ([java.absolutePath] + launcherJavaOptions(config, appDir) +
         ['-XX:AOTMode=on', '-cp', launcherClasspath(config, appDir).join(File.pathSeparator), '-version'])*.toString()
+}
+
+// Detaches the disk image mounted at mount: hdiutil detach, once more after pause (a volume something still has open is
+// busy for a moment), then hdiutil detach -force. run executes a command and returns its exit code. Returns whether any
+// attempt succeeded; a read-only mount that stays behind makes the next packageDist and clean fail to delete it.
+ext.detachMount = { File mount, Closure run, Closure pause = { Thread.sleep(1000L) } ->
+    List<String> detach = ['/usr/bin/hdiutil', 'detach', mount.absolutePath]
+    if (run(detach) == 0) return true
+    pause()
+    if (run(detach) == 0) return true
+    run(['/usr/bin/hdiutil', 'detach', '-force', mount.absolutePath]) == 0
 }
 
 // Files under expectedRoot whose copy under actualRoot is missing or has another modification time, to the second

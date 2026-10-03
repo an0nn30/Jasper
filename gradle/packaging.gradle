@@ -869,13 +869,30 @@ if (normalizedHost().os == 'windows') {
             File distDir = distributionDirectory.get().asFile
             distDir.mkdirs()
             File artifact = new File(distDir, "Jasper-${context.version}-macos-${context.host.architecture}.dmg")
-            delete(artifact)
             File temporary = new File(packagingRoot.get().asFile, 'dist-dmg-work')
-            delete(temporary)
             File volume = new File(temporary, 'volume')
             File mount = new File(temporary, 'mount')
+            def detach = { File target ->
+                detachMount(target) { List<String> command ->
+                    try {
+                        executeNative(command, 'hdiutil detach')
+                        return 0
+                    } catch (GradleException refused) {
+                        logger.warn(refused.message)
+                        return 1
+                    }
+                }
+            }
+            String recovery = "hdiutil detach -force ${mount}".toString()
+            // A killed or failed earlier run can leave its DMG mounted read-only, which delete(temporary) cannot remove.
+            if (new File(mount, 'Jasper.app').exists() && !detach(mount)) {
+                throw new GradleException("An earlier packageDist left ${mount} mounted and it will not detach; run ${recovery}, then try again")
+            }
+            delete(artifact)
+            delete(temporary)
             volume.mkdirs()
             mount.mkdirs()
+            String stillMounted = null
             try {
                 // jpackage --type dmg copies the image without modification times (Files.copy without COPY_ATTRIBUTES),
                 // and the JVM then refuses the AOT cache and the CDS archive. ditto and hdiutil keep the times.
@@ -907,18 +924,20 @@ if (normalizedHost().os == 'windows') {
                         throw new GradleException('DMG verification failed: the app in the DMG has no AOT cache')
                     }
                 } finally {
-                    try {
-                        executeNative(['/usr/bin/hdiutil', 'detach', mount.absolutePath], 'hdiutil detach')
-                    } catch (GradleException detachFailure) {
-                        logger.warn("Could not detach ${mount}: ${detachFailure.message}")
+                    if (!detach(mount)) {
+                        stillMounted = "Could not detach ${mount}, a hidden read-only mount that makes the next packageDist and clean fail; run ${recovery}".toString()
                     }
                 }
             } catch (Exception failure) {
+                // The check failure propagates; a detach failure on top of it is reported here rather than masking it.
+                if (stillMounted != null) logger.error(stillMounted)
                 delete(artifact)
                 throw failure
             } finally {
                 if (!new File(mount, 'Jasper.app').exists()) delete(temporary)
             }
+            // The checks passed and the DMG was written; only the mount is left to clean up by hand.
+            if (stillMounted != null) throw new GradleException("${stillMounted}. The DMG itself was written to ${artifact}.")
             logger.lifecycle("Created ${artifact}")
         }
     }

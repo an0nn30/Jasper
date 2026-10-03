@@ -49,9 +49,16 @@ class BundledNativesProbeTest {
             "-Djava.io.tmpdir=" + scratch.resolve("tmp"), "-Djna.tmpdir=" + scratch.resolve("jna"),
             "-Dpty4j.tmpdir=" + scratch.resolve("pty4j"), "-Xlog:library=info:stdout",
             "-cp", classPath(), BundledNativesProbe.class.getName()));
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        assertThat(process.waitFor(60, TimeUnit.SECONDS)).isTrue();
+        // Output goes to a file, not a pipe: reading a pipe to its end blocks for as long as the child lives, and a blocked
+        // read cannot be interrupted, so a hung probe would otherwise be bounded only by the CI job's own timeout.
+        Path log = root.resolve("probe-output.txt");
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        if (!process.waitFor(60, TimeUnit.SECONDS)) {
+            process.destroyForcibly().waitFor(10, TimeUnit.SECONDS);
+            throw new AssertionError("the bundled natives probe did not exit within 60 s; output so far:\n"
+                + read(log));
+        }
+        String output = read(log);
         assertThat(process.exitValue()).as(output).isZero();
         assertThat(output).contains("Loaded library " + natives.resolve(flatLaf) + ", handle",
             "Loaded library " + natives.resolve("libjnidispatch.jnilib") + ", handle",
@@ -61,6 +68,11 @@ class BundledNativesProbeTest {
         try (var files = Files.walk(scratch)) {
             assertThat(files.filter(Files::isRegularFile).toList()).as("files extracted while loading").isEmpty();
         }
+    }
+
+    /** The file's text, decoding bytes that are not UTF-8 leniently as the old pipe read did. */
+    private static String read(Path file) throws Exception {
+        return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }
 
     private static void copy(String owner, String entry, Path target) throws Exception {
