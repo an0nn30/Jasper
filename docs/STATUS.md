@@ -6,9 +6,9 @@
   plan `docs/superpowers/plans/2026-10-02-startup-2-jvm-packaging.md`): packaged Jasper ships a trimmed runtime (41
   modules, 42 on Windows; `runtimeRootModules` in `gradle/packaging-support.gradle`, documented in plugin-authoring
   "The Java runtime"; 189 MB, was 192 MB: `lib/modules` fell from 146 to 96 MB, but jlink's two default CDS archives
-  add 63 MB and other removals outside `lib/modules` offset only part of that, so there is little disk-size win) with jlink's default CDS archive; loads FlatLaf's, JNA's and pty4j's
-  native libraries from `Contents/app/native` on macOS and Windows (Linux keeps extraction: FlatLaf's Linux library
-  links GTK 3); and on macOS carries a JDK 25 AOT cache (about 60 MB) from `trainAotCache` (`packageDist` always trains,
+  add 63 MB and other removals outside `lib/modules` offset only part of that, so there is little disk-size win) with
+  jlink's default CDS archive; loads FlatLaf's, JNA's and pty4j's native libraries from `Contents/app/native` on macOS
+  and Windows (Linux keeps extraction: FlatLaf's Linux library links GTK 3); and on macOS carries a JDK 25 AOT cache (about 60 MB) from `trainAotCache` (`packageDist` always trains,
   `packageApp` with `-Pjasper.aot=true`; AGENTS.md: ask first, it opens a window). `packageDist` builds the DMG
   (155.7 MB) with `ditto` and `hdiutil` because jpackage's DMG copy resets modification times, which invalidates the
   cache, and checks the mounted copy. `verifyPackage` checks modules, CDS, natives (bytes, signatures, a headless load
@@ -17,9 +17,10 @@
   build with the recovery command (`hdiutil detach -force <mount>`) if the mount stays and clears a stale mount before
   its next run (`detachMount`, pinned in `verifyPackagingSupport`); the probe test's wait is bounded; documentation
   corrections. Final full check: **7,991/0/0/6** (tests/failures/errors/skipped).
-  Measured (`startupBench`, medians of 10 cold launches, Plan 1 image `34f51a8b` against the trained image `d22ea939`): window on screen 1908 → 1184 ms (WINDOW_SHOWN), shell output painted 2727 → 2057 ms
-  (OUTPUT_PAINTED); AOT cache used and CDS on in all 10 after runs, no new extraction folder in `$TMPDIR` (the probe in
-  `verifyPackage` covers the rest); see
+  Measured (`startupBench`, medians of 10 cold launches, Plan 1 image `34f51a8b` against the trained image
+  `d22ea939`): window on screen 1908 → 1184 ms (WINDOW_SHOWN), shell output painted 2727 → 2057 ms (OUTPUT_PAINTED);
+  AOT cache used and CDS on in all 10 after runs, no new extraction folder in `$TMPDIR` (the probe in `verifyPackage`
+  covers the rest); see
   [Part 2 in the baseline](benchmarks/2026-10-02-startup-baseline.md#part-2--jvm-and-packaging). About 1 s (984 ms
   median) still separates SHELL_SPAWNED from SHELL_OUTPUT, as before Part 2 (941 ms), so the JVM work did not move it;
   most likely it is the shell's own start-up before its first prompt (not measured; the benchmark runs the default
@@ -27,8 +28,11 @@
   alone. Not done: the Windows packaging run (not verifiable on the Mac); CI on Linux and Windows and
   `.github/workflows/linux-packages.yml` (needs a push, so the user decides); the GUI checklist items in
   `docs/packaging.md`; the deferred `-Pjasper.aot=true` item (it throws at configuration time on Windows and Linux, even
-  for unrelated tasks; an explicit opt-in that fails loudly). Next: Plan 4 (resident by default), which starts with a
-  user-run spike.
+  for unrelated tasks; an explicit opt-in that fails loudly); three parked review minors in `packageDist`'s detach path
+  in `gradle/packaging.gradle`: the recovery command does not shell-quote the mount path; the detach-failure message
+  says the next `packageDist` fails, but it now clears a stale mount and only `clean` fails; an `hdiutil` that cannot
+  start at all would throw from the inner `finally` and mask a check failure. Next: Plan 4 (resident by default), which
+  starts with a user-run spike.
 
 - **Start-up speed: designed, measured and planned; Plan 1 executed** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, from local `main@91400d29`; user request in chat 2026-10-02).
