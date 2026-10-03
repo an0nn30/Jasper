@@ -104,6 +104,17 @@ verifySupport.configure {
         assert trainingTraceProblem(good + [milestones: [WINDOW_SHOWN: 1.0]], 42L) == 'start-up settled without OUTPUT_PAINTED, PLUGINS_BOUND'
         assert trainingTraceProblem(good + [milestones: null], 42L) == 'start-up settled without WINDOW_SHOWN, OUTPUT_PAINTED, PLUGINS_BOUND'
         logger.lifecycle('Verified launcher configuration edits and the AOT checks')
+
+        // Training must not see the user's real Jasper home or any JVM option or class path a real launch would not have.
+        Map<String, String> inherited = [JASPER_HOME: '/Users/x/real-jasper', _JAVA_OPTIONS: '-Xmx1m', JDK_JAVA_OPTIONS: '-Xms1m',
+            CLASSPATH: '/some/classes', JAVA_TOOL_OPTIONS: '-Dinherited=1', HOME: '/Users/x', PATH: '/usr/bin:/bin']
+        Map<String, String> training = aotTrainingEnvironment(inherited, '-Dtraining=2')
+        ['JASPER_HOME', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { assert !training.containsKey(it) : "${it} leaked into the training environment" }
+        assert training.JAVA_TOOL_OPTIONS == '-Dtraining=2'
+        assert training.HOME == '/Users/x' && training.PATH == '/usr/bin:/bin'
+        assert training.keySet() == ['JAVA_TOOL_OPTIONS', 'HOME', 'PATH'] as Set
+        assert inherited.size() == 7 && inherited.JASPER_HOME == '/Users/x/real-jasper' : 'the inherited map must not be modified'
+        logger.lifecycle('Verified the training environment scrub')
     }
 }
 
@@ -163,5 +174,21 @@ printf '%s\\n' "$@" > "${cache%/*}/options.txt"
         expectFailure('start-up did not settle within 1 s') { runAotTraining(fake('stalls', 'while :; do sleep 1; done\n'), work, 1, 20) }
         expectFailure('the JVM wrote no cache') { runAotTraining(fake('no-cache', settles(complete, false)), work, 20, 20) }
         logger.lifecycle('Verified AOT training orchestration against stand-in launchers')
+
+        // A launcher that ignores SIGTERM, with a child that does too (the JVM's cache-assembly child): once the bounded
+        // exit wait times out, runAotTraining must kill both rather than orphan the child.
+        String stubborn = 'trap \'\' TERM\n' +
+            'sleep 600 &\n' +
+            'printf \'%s %s\' "$$" "$!" > "${cache%/*}/pids.txt"\n' +
+            'printf \'{"schema":1,"pid":%s,"kind":"cold","settled":true,"milestones":{' + complete + '}}\' "$$" > "$trace.part"\n' +
+            'mv "$trace.part" "$trace"\n' +
+            'while :; do sleep 1; done\n'
+        expectFailure('did not exit within 1 s of SIGTERM') { runAotTraining(fake('stubborn', stubborn), work, 20, 1) }
+        List<Long> stubbornPids = new File(work, 'pids.txt').getText('UTF-8').tokenize().collect { it as Long }
+        assert stubbornPids.size() == 2 && stubbornPids.every { it > 1 } : stubbornPids
+        stubbornPids.each { Long pid ->
+            assert !ProcessHandle.of(pid).map { it.isAlive() }.orElse(false) : "process ${pid} outlived the failed training launch"
+        }
+        logger.lifecycle('Verified a timed-out training launch leaves no process behind')
     }
 }

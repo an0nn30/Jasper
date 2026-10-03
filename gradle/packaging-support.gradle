@@ -155,6 +155,16 @@ ext.trainingTraceProblem = { Map trace, long pid ->
     missing ? "start-up settled without ${missing.join(', ')}".toString() : null
 }
 
+// The training launch's environment: inherited with JASPER_HOME removed (it would point training at the user's real
+// configuration and data), JDK_JAVA_OPTIONS, _JAVA_OPTIONS and CLASSPATH removed (they would change the JVM options
+// and class path a real launch has) and JAVA_TOOL_OPTIONS replaced by javaToolOptions. Returns a new map.
+ext.aotTrainingEnvironment = { Map<String, String> inherited, String javaToolOptions ->
+    Map<String, String> environment = new LinkedHashMap<String, String>(inherited)
+    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH'].each { environment.remove(it) }
+    environment.put('JAVA_TOOL_OPTIONS', javaToolOptions)
+    environment
+}
+
 // One training launch of launcher (the image's Contents/MacOS/Jasper, so jpackage's launcher sets everything a real
 // launch has) in work, isolated like startupBench: user.home is work/home with the training configuration, and
 // JAVA_TOOL_OPTIONS asks for the cache, the start-up trace and no Dock icon. Once the trace has settled, SIGTERM; the
@@ -176,9 +186,10 @@ ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSe
     def builder = new ProcessBuilder(launcher.absolutePath).directory(work).redirectErrorStream(true)
         .redirectOutput(ProcessBuilder.Redirect.to(log))
     Map<String, String> environment = builder.environment()
-    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH'].each { environment.remove(it) }
-    environment.put('JAVA_TOOL_OPTIONS', javaToolOptions(["-XX:AOTCacheOutput=${cache.absolutePath}",
+    Map<String, String> trainingEnvironment = aotTrainingEnvironment(environment, javaToolOptions(["-XX:AOTCacheOutput=${cache.absolutePath}",
         "-Duser.home=${home.absolutePath}", "-Djasper.startupTrace=${trace.absolutePath}", '-Dapple.awt.UIElement=true']*.toString()))
+    environment.clear()
+    environment.putAll(trainingEnvironment)
     def tail = { log.isFile() ? log.readLines('UTF-8').takeRight(40).join('\n') : '(no output)' }
     Process process = builder.start()
     try {
@@ -205,9 +216,16 @@ ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSe
         if (!cache.isFile() || cache.length() == 0) throw new GradleException("AOT training: the JVM wrote no cache to ${cache}\n${tail()}")
         return cache
     } finally {
+        // After SIGTERM the exiting JVM runs the runtime's bin/java to assemble the cache and waits for it. If this
+        // method gives up (a timed-out wait, an interrupt), kill that child and anything below it first: once the
+        // launcher is gone they would be orphans that keep writing the cache and temporary files into work.
         if (process.isAlive()) {
+            List<ProcessHandle> descendants = process.descendants().toList()
+            descendants.each { it.destroyForcibly() }
             process.destroyForcibly()
-            process.waitFor(10, TimeUnit.SECONDS)
+            (descendants*.onExit() + [process.onExit()]).each { future ->
+                try { future.get(10, TimeUnit.SECONDS) } catch (Exception ignored) { }
+            }
         }
     }
 }
