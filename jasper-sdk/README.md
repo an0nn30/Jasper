@@ -84,7 +84,7 @@ SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it ac
 programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
-guards too. Plugins declare `sdk = ">=0.12.0, <0.13"`.
+guards too. Plugins declare `sdk = ">=0.13.0, <0.14"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -119,3 +119,12 @@ own tokens. For renderers shared with sidebars, `WorkspacePalette.current(compon
 zone on every call. `current()` reads workspace defaults. Unmarked components and popups use chrome colors.
 Custom hosts implementing the older `Appearance` methods remain source compatible: new methods have defaults,
 using ordinary Swing colors when no host semantic defaults exist and plain-text syntax with italic comments.
+
+## Tool windows (SDK 0.13.0)
+
+A panel docks in one of six slots: the upper or lower half of the left or right side, or the left or right half of the
+full-width bottom area. `Anchor` names the side; `PanelSpec.withSplit()` starts the panel in the second half (the
+lower half of a side, the right half of the bottom area). `withToggleActionId` keeps the flag, and the four- and
+five-argument constructors remain, so plugins written for 0.12 compile unchanged; they need only the new `sdk` range.
+Jasper gives every tool window a header with its title, so a panel should not show its own title. The user's placement
+wins over the default. The testkit lists a split panel as `id|title|LEFT+split`.

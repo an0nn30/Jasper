@@ -2,7 +2,7 @@ package dev.jasper.app.contributions;
 
 import java.util.Objects;
 
-/** A rail button's unread mark: how many, how urgent, and the words its tooltip and screen readers use. */
+/** A stripe button's unread mark: how many, how urgent, and the words its tooltip and screen readers use. */
 public record PanelBadge(int count, Tone tone, String description) {
     public enum Tone { ACCENT, ERROR }
 

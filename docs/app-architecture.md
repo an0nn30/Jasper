@@ -135,7 +135,8 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT argument/handoff flow and EDT composition. StartupResources owns rollback until explicit transfer. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows, tabs, splits, panes, panel regions and the rail, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
+| `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
@@ -219,7 +220,7 @@ colours are required), the 48 tokens and the syntax roles are derived with contr
 keys install through the IntelliJ path above. The four classic singleton built-ins are `Theme.DARK` (`themes/jasper-dark.toml`),
 `Theme.JASPER_LIGHT` (`themes/jasper-light.toml`), and `Theme.INTELLIJ_LIGHT` and `Theme.DARCULA`, converted from the
 vendored IntelliJ files by `IntellijConversion` as `ui_complete` documents (their own keys install unchanged).
-Side panels paint `ToolWindow.background` through `ToolWindowSurface`; the rail stays chrome.
+Tool windows paint `ToolWindow.background` through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
 Native themes come from `ThemeCatalog`: user TOML files beside the actual config, then the indexed offline
 collection. `Theme.Source` permits only `Bundled` and `UserFile`. The index loads lazily and reuses the four classic

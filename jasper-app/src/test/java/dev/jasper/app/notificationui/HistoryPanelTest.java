@@ -219,6 +219,22 @@ class HistoryPanelTest {
         if (component instanceof Container container) for (Component child : container.getComponents()) invalidateTree(child);
     }
 
+    @Test void theToolWindowHeaderCarriesTheTitle() {
+        var panel = panel(true);
+        show();
+        assertThat(texts(panel)).as("the dock's header shows Notifications").doesNotContain("Notifications");
+        assertThat(SwingUtilities.isDescendingFrom(panel.clearAllButton(), panel)).as("Clear All stays").isTrue();
+    }
+
+    private static java.util.List<String> texts(Container root) {
+        var found = new ArrayList<String>();
+        for (Component child : root.getComponents()) {
+            if (child instanceof javax.swing.JLabel label) found.add(label.getText());
+            if (child instanceof Container nested) found.addAll(texts(nested));
+        }
+        return found;
+    }
+
     @Test void aClosedSiteStopsListening() {
         var panel = panel(true);
         show();

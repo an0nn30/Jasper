@@ -54,14 +54,14 @@ class BarHeightTest {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setSize(900, 600);
             var panel = new JPanel();
-            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, panel, 200);
+            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.LEFT_TOP, panel, 200);
             var parent = panel.getParent();
             for (var mode : new ToolbarMode[] {ToolbarMode.ICONS, ToolbarMode.HIDDEN, ToolbarMode.ICONS_AND_LABELS}) {
                 owner.setToolbarMode(mode);
                 dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
                 int expected = owner.chrome().header().getHeight();
                 assertThat(expected).isEqualTo(UIScale.scale(30));
-                assertThat(SwingUtilities.convertPoint(panel, 0, 0, owner).y).isEqualTo(expected);
+                assertThat(SwingUtilities.convertPoint(panel.getParent(), 0, 0, owner).y).as("the frame starts under the header row").isEqualTo(expected);
                 assertThat(panel.getParent()).isSameAs(parent);
             }
         });
@@ -120,18 +120,21 @@ class BarHeightTest {
                 }
             }
             var left = new JPanel(); var bottom = new JPanel();
-            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, left, 250);
-            owner.regions().show(dev.jasper.app.contributions.PanelRegion.BOTTOM, bottom, 150);
-            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.LEFT_TOP, left, 250);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
             int top = SwingUtilities.convertPoint(owner.status(), 0, 0, owner).y;
-            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(top);
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).as("alone, a side reaches the status bar").isEqualTo(top);
+            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.BOTTOM_LEFT, bottom, 150);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
             assertThat(SwingUtilities.convertPoint(bottom, 0, bottom.getHeight(), owner).y).isEqualTo(top);
-            var parent = left.getParent();
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).as("above the bottom area, a side ends at its divider")
+                .isEqualTo(SwingUtilities.convertPoint(bottom.getParent(), 0, 0, owner).y - UIScale.scale(6));
+            var parent = bottom.getParent();
             owner.setStatusVisible(false); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
-            assertThat(left.getParent()).isSameAs(parent);
-            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(owner.getHeight() - UIScale.scale(6));
+            assertThat(bottom.getParent()).isSameAs(parent);
+            assertThat(SwingUtilities.convertPoint(bottom, 0, bottom.getHeight(), owner).y).isEqualTo(owner.getHeight() - UIScale.scale(6));
             owner.setStatusVisible(true); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
-            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(top);
+            assertThat(SwingUtilities.convertPoint(bottom, 0, bottom.getHeight(), owner).y).isEqualTo(top);
         });
     }
 

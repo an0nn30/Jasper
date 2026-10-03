@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.WindowHandle;
 
-/** Side and bottom panels. Each registered panel gets a rail icon in every window. */
+/** Tool window panels. Each registered panel gets a stripe icon in every window. */
 public interface Panels {
     /**
      * Registers a panel on the UI thread.

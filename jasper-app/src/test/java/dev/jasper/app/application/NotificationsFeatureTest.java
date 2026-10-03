@@ -3,7 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
-import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.notificationui.CardLayer;
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.DisplayMode;
@@ -42,7 +42,7 @@ class NotificationsFeatureTest {
         new NotificationsFeature(center, contributions);
         assertThat(center.groups()).extracting(NotificationGroup::id).containsExactly("jasper.general", "jasper.config");
         assertThat(center.mode("jasper.config")).isEqualTo(DisplayMode.STICKY);
-        assertThat(panel().defaultRegion()).isEqualTo(PanelRegion.RIGHT);
+        assertThat(panel().defaultSlot()).isEqualTo(Slot.RIGHT_TOP);
         assertThat(panel().toggleActionId()).isEqualTo(NotificationsFeature.SHOW_HISTORY);
         assertThat(contributions.action(NotificationsFeature.SHOW_HISTORY))
             .hasValueSatisfying(action -> assertThat(action.title()).isEqualTo("Notifications: Show History"));

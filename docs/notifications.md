@@ -26,9 +26,10 @@ back. Notifications that arrive before the first window opens show when it does.
 
 ## The Notifications panel
 
-The Notifications button on the rail opens the panel, which starts on the right; right-click the button to move it.
-**Notifications: Show History** in the command palette does the same. The button shows a dot while anything is
-unread: red when an error is unread. Its tooltip gives the count.
+The Notifications button on the right stripe opens the panel, which starts in the upper half of the window's right
+side; drag the button or the panel's header to move it, or use **Move to** on the button's right-click menu or the
+header's ⋮ menu. **Notifications: Show History** in the command palette also opens and closes it. The button shows a
+dot while anything is unread: red when an error is unread. Its tooltip gives the count.
 
 Unread notifications are listed under **New**, in bold. Opening the panel in a focused window marks everything read;
 what it read stays under **New** until you close the panel, and everything else is under **Earlier**, newest first.

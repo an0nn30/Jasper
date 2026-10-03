@@ -85,8 +85,8 @@ class MacTitleBarTest {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
             var left = new JPanel(); var right = new JPanel();
-            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, left, 200);
-            owner.regions().show(dev.jasper.app.contributions.PanelRegion.RIGHT, right, 200);
+            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.LEFT_TOP, left, 200);
+            DockTestSupport.show(owner, dev.jasper.app.dock.Slot.RIGHT_TOP, right, 200);
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(1400, 600);
                 for (Theme theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
@@ -97,7 +97,7 @@ class MacTitleBarTest {
                         int surfaceTop = SwingUtilities.convertPoint(tabs, 0, 0, root).y;
                         assertThat(surfaceTop).as("no extra gutter below the header").isEqualTo(bar.getHeight());
                         for (var panel : java.util.List.of(left, right))
-                            assertThat(SwingUtilities.convertPoint(panel, 0, 0, root).y).isEqualTo(surfaceTop);
+                            assertThat(SwingUtilities.convertPoint(panel.getParent(), 0, 0, root).y).isEqualTo(surfaceTop);
                         assertThat(field(owner).getY() * 2 + field(owner).getHeight()).isEqualTo(surfaceTop);
                         for (var child : owner.toolbar().getComponents()) {
                             if (!(child instanceof JButton) || !child.isVisible()) continue;
@@ -108,7 +108,7 @@ class MacTitleBarTest {
                     }
                 }
                 owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(root);
-                assertThat(SwingUtilities.convertPoint(left, 0, 0, root).y)
+                assertThat(SwingUtilities.convertPoint(left.getParent(), 0, 0, root).y)
                     .as("the native context row remains visible when actions are hidden").isEqualTo(bar.getHeight());
             }
         });

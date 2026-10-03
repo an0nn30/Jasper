@@ -10,7 +10,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Rectangle;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -58,13 +57,10 @@ public final class HistoryPanel extends JPanel {
         this.focused = focused;
         time = DateTimeFormatter.ofPattern("HH:mm").withZone(center.clock().getZone());
         getAccessibleContext().setAccessibleName("Notifications");
+        // The tool window header carries the title.
         var header = new JPanel(new BorderLayout());
         header.setOpaque(false);
         header.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 6));
-        var heading = new JLabel("Notifications");
-        heading.putClientProperty("html.disable", Boolean.TRUE);
-        heading.setFont(heading.getFont().deriveFont(Font.BOLD));
-        header.add(heading, BorderLayout.WEST);
         clearAll.putClientProperty("JButton.buttonType", "borderless");
         clearAll.setToolTipText("Remove every notification");
         clearAll.addActionListener(event -> center.clear());

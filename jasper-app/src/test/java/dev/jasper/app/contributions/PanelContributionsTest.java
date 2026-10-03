@@ -1,5 +1,6 @@
 package dev.jasper.app.contributions;
 
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,8 +20,8 @@ class PanelContributionsTest {
         List<Contributions.PanelRequest> requests = new ArrayList<>();
         model.onPanelRequest(requests::add);
         ActionEntry show = model.addAction("dev.x.show", "Toggle Hosts", null, List.of(), Optional.of("cmd+shift+s"), invocation -> { });
-        PanelEntry hosts = model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), PanelRegion.LEFT, Optional.of("dev.x.show"), site -> new JLabel());
-        PanelEntry files = model.addPanel("dev.x.files", "Files", new ImageIcon(), PanelRegion.RIGHT, site -> new JLabel());
+        PanelEntry hosts = model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, Optional.of("dev.x.show"), site -> new JLabel());
+        PanelEntry files = model.addPanel("dev.x.files", "Files", new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel());
         assertThat(hosts.toggleActionId()).isEqualTo("dev.x.show");
         assertThat(hosts.namedToggle()).isTrue();
         assertThat(files.toggleActionId()).isEqualTo("dev.x.files.toggle");
@@ -44,9 +45,9 @@ class PanelContributionsTest {
         List<Contributions.PanelRequest> requests = new ArrayList<>();
         model.onChanged(changes::add);
         model.onPanelRequest(requests::add);
-        PanelEntry hosts = model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), PanelRegion.LEFT, site -> new JLabel("hosts"));
+        PanelEntry hosts = model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
         assertThatIllegalArgumentException().isThrownBy(() ->
-            model.addPanel("dev.x.hosts", "Again", new ImageIcon(), PanelRegion.RIGHT, site -> new JLabel()));
+            model.addPanel("dev.x.hosts", "Again", new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel()));
         assertThat(model.panels()).containsExactly(hosts);
         assertThat(changes).contains(Contributions.Kind.PANELS, Contributions.Kind.ACTIONS, Contributions.Kind.MENUS);
 

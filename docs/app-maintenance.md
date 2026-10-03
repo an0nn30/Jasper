@@ -153,7 +153,10 @@ Application code never opens a message dialog to tell the user something; it pos
 - Contextual feedback (a Settings field error, a palette error row, a plugin's inline row) stays where it is, and
   confirmation or input prompts stay dialogs: notifications are for things that happen elsewhere or later.
 - Cards, the panel and the badge read `Jasper.notification.*` and `Jasper.railBadge*` colours derived in `ChromeKeys`;
-  a theme's own `Notification.*` keys win.
+  a theme's own `Notification.*` keys win. The badge is a `PanelEntry.setBadge` on the panel: each window's
+  `ToolStripe` shows it as a `BadgedIcon` on that panel's stripe button, with the count in the tooltip and
+  accessible description. Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner
+  of the `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
 
 ## Recording an incident
 
@@ -341,39 +344,61 @@ padding. Keep compact palette rows tall enough for these insets. Plugin forms in
 these defaults; upstream theme assets should not be edited to duplicate them.
 
 
-Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and,
-while the rail is visible, matching rounded corners for the terminal/tab column. With
-the rail hidden or empty, the terminal/tab column has square corners, no exterior
+Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
+while the stripes are visible, matching rounded corners for the terminal/tab column. With
+the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
-Keep the layout-only terminal
+Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
+components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
+headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
+button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
+to the pressed component keep arriving. Any dock change or stripe render, View › Rail and the window
+being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher
+claims only an Esc from its own window. A panel badge change is not a render: it fires
+`Contributions.Kind.BADGES`, and `WindowContributions` applies it to the existing stripe buttons with
+`ToolStripe.updateBadge` (the icon's size is the base icon's, so nothing is laid out), so a notification
+arriving mid-drag leaves the drag alone. An action's enable or title change is not a render either:
+`WindowContributions` calls `ToolStripe.refreshActions`, which renames the existing rail action buttons
+(a button follows the action's enabled state itself) and repaints them. Only adding or removing an
+action or a rail placement, or a dock or panel change, renders the stripes again. Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
-left/center/bottom surface has no additional leading gutter. Hiding or emptying the
-rail restores that gutter on plugin panel hosts without reparenting their content.
+beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. Hiding or emptying the
+stripes restores that gutter on tool window frames without reparenting their content.
 The following gutter and lower-inset rules apply to the terminal column only while
-the rail is visible. A visible status bar
+the stripes are visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header
 also replaces the exterior top gutter, keeping its controls centered between the window
 top and workspace surfaces. Hiding toolbar actions retains this spacing on macOS because
-the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent hosts omit
-their facing gutters so the plain 6px draggable splitter supplies the gap.
-Region widths/heights and persisted splitter sizes include exterior gutters. The center
+the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent frames omit
+their facing gutters so the area's plain 6px divider supplies the gap.
+Slot sizes and the saved dock sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px
 minimum. The center reserves an 8px lower inset (the corner radius) below the terminal
 grid, so terminal cells stay rectangular and unclipped. The inset uses the resolved
 terminal palette, including independent terminal-color changes. Its height contributes
-to the workspace minimum and scales with the UI. Keep clipping and hit testing in the
+to the workspace minimum and scales with the UI. The area's minimum height is the larger of the
+terminal column's minimum and `DockGeometry.splitMinimum` (two tool window minimums and a divider
+when the left or the right side shows both halves, else 0), plus the bottom row; only a split side
+raises it, so the scaled 120px terminal floor never raises an unsplit layout's minimum (the terminal
+column's own minimum, the gap and the bottom floor still scale with the UI). `DockGeometry.compute`
+keeps `upperMinimum` (that, or the terminal's own 120px floor, whichever is larger) above the bottom
+row. `ToolWindowArea.sync` and `WindowContent.syncRailVisibility` tell the window
+(`onMinimumSizeChanged`) so the frame's minimum follows a split, or the stripes, appearing or going
+away. Keep clipping and hit testing in the
 host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
 `ToolWindow.background` supplies the inner surface. `UiTemplate` maps it to the `sidebar` token and list/tree/table backgrounds to `surface_sunken`; edit the
 `[tokens]` in `jasper-dark.toml` or `jasper-light.toml` to tune the contrast.
-Rail selection uses the theme's toolbar-button background and the original theme-aware icon;
+Stripe selection uses the theme's toolbar-button background and the original theme-aware icon;
 do not substitute the tab accent or a different selected icon variant.
 
 
@@ -388,8 +413,8 @@ The palette uses the same geometry for selections, hover and scope highlights.
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
 workspace title bar, tab strip and status bar have no edge strokes. The selected tab
-uses an inset rounded selection instead of an underline. Workspace-region splitters remove their border/grip after every UI
-update; terminal-internal splits keep their existing visible indicators. The standalone
+uses an inset rounded selection instead of an underline. Dock dividers paint nothing, so no UI
+update can give them a border or grip; terminal-internal splits keep their existing visible indicators. The standalone
 dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 

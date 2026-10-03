@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Contributions;
-import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.testsupport.IdleTerminalSession;
 import java.awt.FocusTraversalPolicy;
@@ -24,7 +24,7 @@ class StartupFocusTest {
                 directory -> IdleTerminalSession.start(), "idle-test-session"));
             var model = new Contributions();
             owner.connectContributions(model);
-            model.addPanel("focus.panel", "Tool panel", new ImageIcon(), PanelRegion.LEFT, site -> new JTextField("Search hosts"));
+            model.addPanel("focus.panel", "Tool panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JTextField("Search hosts"));
             model.requestPanel(new Contributions.PanelRequest(owner.id(), "focus.panel", Contributions.PanelRequest.Op.SHOW));
             var policy = policies[0] = owner.getFocusTraversalPolicy();
             assertThat(policy).as("the window supplies a terminal-first focus policy").isNotNull();

@@ -36,4 +36,11 @@ class BadgedIconTest {
             }
         }
     }
+
+    @Test void theSizeEqualsTheBaseIconsSize() {
+        var base = new ImageIcon(new BufferedImage(24, 32, BufferedImage.TYPE_INT_ARGB));
+        var badged = new BadgedIcon(base, PanelBadge.Tone.ERROR);
+        assertThat(badged.getIconWidth()).isEqualTo(base.getIconWidth());
+        assertThat(badged.getIconHeight()).isEqualTo(base.getIconHeight());
+    }
 }

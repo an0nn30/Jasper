@@ -22,6 +22,25 @@ class PanelAndWindowValuesTest {
         assertThatNullPointerException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", "Hosts", new ImageIcon(), Anchor.LEFT, null));
     }
 
+    @Test void aSplitSurvivesTheToggleActionAndOlderConstructorsStillLink() throws Exception {
+        var spec = new PanelSpec("dev.x.tool.files", "Files", new ImageIcon(), Anchor.LEFT);
+        assertThat(spec.split()).as("the first half unless asked").isFalse();
+        assertThat(new PanelSpec("dev.x.tool.files", "Files", new ImageIcon(), Anchor.LEFT,
+            java.util.Optional.of("dev.x.tool.show")).split()).isFalse();
+        var split = spec.withSplit();
+        assertThat(split.split()).isTrue();
+        assertThat(split.defaultAnchor()).isEqualTo(Anchor.LEFT);
+        assertThat(split.withToggleActionId("dev.x.tool.show")).satisfies(value -> {
+            assertThat(value.split()).as("withToggleActionId keeps the flag").isTrue();
+            assertThat(value.toggleActionId()).hasValue("dev.x.tool.show");
+        });
+        assertThat(spec.withToggleActionId("dev.x.tool.show").withSplit().toggleActionId()).hasValue("dev.x.tool.show");
+        // Plugins built against 0.12 and earlier call these two constructors.
+        assertThat(PanelSpec.class.getConstructor(String.class, String.class, javax.swing.Icon.class, Anchor.class)).isNotNull();
+        assertThat(PanelSpec.class.getConstructor(String.class, String.class, javax.swing.Icon.class, Anchor.class,
+            java.util.Optional.class)).isNotNull();
+    }
+
     @Test void windowAndDialogSpecsValidateAndCopyTheSize() {
         var size = new Dimension(640, 480);
         var spec = new WindowSpec("dev.x.tool.manager", "Manager", size, true);

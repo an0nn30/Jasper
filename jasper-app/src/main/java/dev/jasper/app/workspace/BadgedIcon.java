@@ -10,7 +10,11 @@ import java.awt.RenderingHints;
 import javax.swing.Icon;
 import javax.swing.UIManager;
 
-/** A rail icon with an unread dot at its top-right corner, ringed in the rail's colour so it reads on any artwork. */
+/**
+ * A stripe icon with an unread dot at its top-right corner, ringed in the stripe's colour so it reads on any artwork.
+ * The badge is painted inside the base icon's bounds, and the size equals the base icon's, so a stripe button can
+ * change its badge without a relayout.
+ */
 final class BadgedIcon implements Icon {
     private final Icon base;
     private final PanelBadge.Tone tone;

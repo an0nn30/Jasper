@@ -85,7 +85,8 @@ class WorkspaceThemeTest {
                 var graphics = image.createGraphics(); title.paint(graphics); graphics.dispose();
                 assertThat(new java.awt.Color(image.getRGB(0, 2))).as("rendered title bar").isEqualTo(titleBackground);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
-                assertThat(owner.rail().getBackground()).as("sidebar rail").isEqualTo(titleBackground);
+                assertThat(owner.leftStripe().getBackground()).as("left stripe").isEqualTo(titleBackground);
+                assertThat(owner.rightStripe().getBackground()).as("right stripe").isEqualTo(titleBackground);
                 assertThat(owner.status().getBackground()).as("status bar").isEqualTo(statusBackground);
                 // Build effective dialog contents without constructing a top-level window in headless mode.
                 var dialogRoot = new JRootPane();

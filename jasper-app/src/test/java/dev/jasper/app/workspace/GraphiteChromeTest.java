@@ -23,19 +23,19 @@ class GraphiteChromeTest {
                     for (boolean visible : new boolean[]{false, true, false}) {
                         owner.setRailVisible(visible);
                         root.setSize(1000, 640); layoutTree(root); layoutTree(root);
-                        var regions = owner.regions();
+                        var area = owner.area();
                         var column = owner.windowTabs().getParent();
-                        var bounds = javax.swing.SwingUtilities.convertRectangle(column.getParent(), column.getBounds(), regions);
+                        var bounds = javax.swing.SwingUtilities.convertRectangle(column.getParent(), column.getBounds(), area);
                         if (visible) {
-                            assertThat(bounds.width).isLessThan(regions.getWidth());
-                            assertThat(bounds.height).isLessThan(regions.getHeight());
+                            assertThat(bounds.width).as("the stripes supply the side spacing").isEqualTo(area.getWidth());
+                            assertThat(bounds.height).as("the lower corner spacer").isLessThan(area.getHeight());
                             continue;
                         }
-                        assertThat(bounds).as("no gutter or bottom spacer when the rail is hidden")
-                            .isEqualTo(new java.awt.Rectangle(0, 0, regions.getWidth(), regions.getHeight()));
-                        var image = new java.awt.image.BufferedImage(regions.getWidth(), regions.getHeight(), 2);
+                        assertThat(bounds).as("no gutter or bottom spacer when the stripes are hidden")
+                            .isEqualTo(new java.awt.Rectangle(0, 0, area.getWidth(), area.getHeight()));
+                        var image = new java.awt.image.BufferedImage(area.getWidth(), area.getHeight(), 2);
                         var g = image.createGraphics();
-                        try { regions.paint(g); } finally { g.dispose(); }
+                        try { area.paint(g); } finally { g.dispose(); }
                         int terminal = owner.theme().palette().background().getRGB();
                         for (int x : new int[]{0, image.getWidth() - 1}) for (int y : new int[]{0, image.getHeight() - 1}) {
                             assertThat(image.getRGB(x, y)).as("square terminal corner (%s,%s), %s", x, y, theme)
@@ -51,8 +51,8 @@ class GraphiteChromeTest {
     }
 
     private static void showRail(WindowContent owner) {
-        owner.rail().render(java.util.List.of(new WindowRail.PanelButton("hosts", "SSH hosts",
-            dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.contributions.PanelRegion.LEFT, false)), java.util.List.of());
+        owner.leftStripe().render(java.util.List.of(new ToolStripe.Button("hosts", "SSH hosts",
+            dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.dock.Slot.LEFT_TOP, false)), java.util.List.of());
         owner.setRailVisible(true);
     }
 
@@ -97,7 +97,7 @@ class GraphiteChromeTest {
             assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(new Color(0x191c20));
             assertThat(UIManager.getColor("Jasper.titleBackground")).isEqualTo(new Color(0x25292e));
             assertThat(UIManager.getColor("Jasper.tabUnderline")).isEqualTo(new Color(0x8eb8d2));
-            assertThat(java.util.Arrays.stream(owner.rail().getComponents())
+            assertThat(java.util.Arrays.stream(owner.leftStripe().getComponents())
                 .filter(javax.swing.JButton.class::isInstance)
                 .map(child -> ((javax.swing.JButton) child).getToolTipText())).doesNotContain("Settings");
         }
@@ -139,16 +139,18 @@ class GraphiteChromeTest {
                     panel.add(new javax.swing.JLabel("SSH hosts"), java.awt.BorderLayout.NORTH);
                     var hosts = new javax.swing.JList<>(new String[]{"staging-01", "production"});
                     hosts.setFixedCellHeight(28); hosts.setSelectedIndex(0); panel.add(hosts);
-                    owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, panel, 260);
-                    owner.rail().render(java.util.List.of(new WindowRail.PanelButton("hosts", "SSH hosts",
-                        dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.contributions.PanelRegion.LEFT, true)), java.util.List.of());
+                    DockTestSupport.show(owner, dev.jasper.app.dock.Slot.LEFT_TOP, panel, 260);
+                    owner.leftStripe().render(java.util.List.of(new ToolStripe.Button("hosts", "SSH hosts",
+                        dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.dock.Slot.LEFT_TOP, true)), java.util.List.of());
                     owner.syncRailVisibility();
                     root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                     var image = new java.awt.image.BufferedImage(1000, 640, 2);
                     var g = image.createGraphics(); root.printAll(g); g.dispose();
                     int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
-                    var railEdge = javax.swing.SwingUtilities.convertPoint(owner.rail(), owner.rail().getWidth() - 1, 120, root);
-                    assertThat(image.getRGB(railEdge.x, railEdge.y)).as("no rail border").isEqualTo(chrome);
+                    var railEdge = javax.swing.SwingUtilities.convertPoint(owner.leftStripe(), owner.leftStripe().getWidth() - 1, 120, root);
+                    assertThat(image.getRGB(railEdge.x, railEdge.y)).as("no stripe border").isEqualTo(chrome);
+                    var rightEdge = javax.swing.SwingUtilities.convertPoint(owner.rightStripe(), 0, 120, root);
+                    assertThat(image.getRGB(rightEdge.x, rightEdge.y)).as("no right stripe border").isEqualTo(chrome);
                     assertThat(image.getRGB(500, header.getHeight() - 1)).as("no workspace header rule").isEqualTo(chrome);
                     var strip = owner.windowTabs();
                     var corner = javax.swing.SwingUtilities.convertPoint(strip, 0, 0, root);

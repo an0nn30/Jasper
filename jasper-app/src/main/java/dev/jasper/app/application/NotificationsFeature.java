@@ -3,7 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
-import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notificationui.CardLayer;
 import dev.jasper.app.notificationui.HistoryPanel;
@@ -58,7 +58,7 @@ final class NotificationsFeature implements AutoCloseable {
                 Attached attached = windows.get(invocation.windowId());
                 if (attached != null) attached.layer().dismissAll();
             });
-        panel = contributions.addPanel(PANEL_ID, "Notifications", icon, PanelRegion.RIGHT, Optional.of(SHOW_HISTORY),
+        panel = contributions.addPanel(PANEL_ID, "Notifications", icon, Slot.RIGHT_TOP, Optional.of(SHOW_HISTORY),
             site -> new HistoryPanel(center, site, focused(site.windowId())));
         listening = center.onChange(this::changed);
         updateBadge();
