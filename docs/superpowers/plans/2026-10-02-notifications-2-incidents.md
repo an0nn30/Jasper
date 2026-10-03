@@ -2,8 +2,32 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/notifications-2` (worktree `.worktrees/notifications-2`, cut from main
-`63e3b95c`, where plan 1 is merged).
+**Status:** Implemented on branch `claude/notifications-2` (worktree `.worktrees/notifications-2`, cut from main
+`63e3b95c`, where plan 1 is merged); every task passed its review; the final whole-branch review is pending.
+`./gradlew check` is green (8,149 tests, 0 failures, 0 errors, 6 skips). Awaiting the user's GUI checks (listed in [STATUS](../../STATUS.md)) and the
+merge decision.
+
+Commits: Task 1 `a23e383f`, Task 2 `86e9c537`, Task 3 `97bbc662`, Task 4 `6c3490cc` with its review fix `cd428136`,
+Task 5 `1ff6a29e`, Task 6 `f5a59e97`, Task 7 the documentation commit that follows them.
+
+**Execution deviations** (the plan text below is not amended; where it differs, this list governs):
+
+1. Task 4 review (`cd428136`): shell launch failures are announced per occurrence. Each failure posts its own
+   `jasper.general` notification targeted at its own window, with its own directory and cause, plus Show more…; the
+   incident still coalesces (the Errors window counts it up), but the repeat-with-a-card-once-a-minute rule applies only
+   to Jasper and plugin incidents. Every notification linked to an incident, each launch notification included,
+   expires when the incident is cleared or dropped. `launchFailure` never throws (a null window means no target), and
+   when the throwable is rejected (the notification system's own failure, or one raised while an incident is announced)
+   the user still gets the plain "Could not start the terminal" notification without Show more…. Reason: spec section 7
+   producer 1 announces each launch failure in its window with its directory and cause, and the plan's code folded a
+   second window's failure into the first window's notification.
+2. Ruling during Task 4: the center's 60 s coalescing is unchanged (same group, severity, title and content; the target
+   is not compared, per spec section 2). Within 60 s, a second window failing with byte-identical details therefore
+   folds into the first window's notification, as in plan 1, which deferred "coalescing keeps the first request's
+   target" to plan 4.
+3. Ruling during Task 5: the `plugins`, `workspace`, `bootstrap` and `application` package-info files are unchanged (no
+   new package edges; their descriptions stay accurate); only `notifications` and `notificationui` are updated
+   (Task 7).
 
 **Goal:** Record every unexpected failure (uncaught exceptions on any thread, failed plugin callbacks, failed shell
 launches, failing notification actions) as an in-memory incident. Each incident gets one ERROR notification and a

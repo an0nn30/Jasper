@@ -155,6 +155,31 @@ Application code never opens a message dialog to tell the user something; it pos
 - Cards, the panel and the badge read `Jasper.notification.*` and `Jasper.railBadge*` colours derived in `ChromeKeys`;
   a theme's own `Notification.*` keys win.
 
+## Recording an incident
+
+An unexpected failure is an incident: it is kept for the Errors window and announced by one error notification
+([guide](notifications.md#the-errors-window), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+`application.IncidentNotices` is the only producer, and its entry points are safe from any thread:
+
+- `jasperFailure(operation, failure)` is for Jasper's own failures. The default uncaught-exception handler (every
+  thread, the EDT included) forwards through `JasperApplication.unexpected`, and a notification action that throws
+  arrives through `NotificationCenter.reportActionFailuresTo`.
+- `pluginFailure(pluginId, operation, failure)` receives every failure `plugins.Containment` catches, through
+  `PluginRuntime.reportFailuresTo`. Give each contained call a short operation ("panel <id>", "action <id>"): it is
+  the incident's header and the notification's title.
+- `launchFailure(window, details, failure)` is for a shell that could not start, from `WindowContent.onLaunchFailure`.
+
+Expected failures the user can act on, such as a file that cannot be read or a host that cannot be reached, are not
+incidents: post a notification with the details instead.
+
+A `Capture` takes the trace once, on the thread that caught the failure (trace at most 256 KiB, message at most
+16 KiB), so later changes to the throwable never reach the incident. Incidents coalesce by source, exception class
+and the root cause's top five frames; at most 100 are kept. Capture never throws and does not re-enter on the same
+thread. A failure whose first Jasper frame lies in `dev.jasper.app.notifications`, `dev.jasper.app.notificationui`,
+`IncidentNotices`, `NotificationsFeature`, `ErrorsWindow` or `ConfigProblemNotices` is left to the log, so the
+notification system can never report its own failures in a loop. The log is unchanged: incidents add no messages or
+traces to it.
+
 ## Platform integration
 
 Place OS behavior in [MacTitleBar](../jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java)-style adapters or the existing platform package. Supply narrow JDK callbacks and values rather than WindowContent/JasperApplication back-references. Register cleanup immediately using [StartupResources](../jasper-app/src/main/java/dev/jasper/app/bootstrap/StartupResources.java) during startup, then transfer it to the long-lived owner only after wiring succeeds. Keep handoff before AWT; distinguish unsupported capability from failed startup. Tests inject boundary callbacks and do not open a real desktop window.

@@ -116,6 +116,30 @@
   suite then passed three isolated re-runs (160/160) and the next full run, so it is a load-dependent passive-port
   flake, not a regression (the branch does not touch File Server). Not pushed.
 
+- **Notifications plan 2: incidents and the Errors window, implemented on branch `claude/notifications-2`; final review pending; awaiting the
+  user's GUI checks and merge decision** (2026-10-02; plan `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`,
+  [guide](notifications.md#the-errors-window)): uncaught exceptions on any thread, contained plugin failures, failed
+  shell launches and failing notification actions are in-memory incidents (at most 100, coalesced by source, class
+  and root-cause frames, traces taken on the catching thread and capped at 256 KiB). Each is announced by one ERROR
+  notification in `jasper.errors`, `jasper.plugins` or, for a shell, `jasper.general`, with Show more… (and Disable
+  Plugin for plugins); a repeat updates it, with a card at most once a minute. The Errors window lists them with
+  Copy, Disable Plugin, Open Log Folder and Clear. The log is unchanged. Recorded interpretations are in the plan's
+  "Spec interpretations" section; the execution deviations are in its status banner: each shell launch failure is
+  announced in its own window (the once-a-minute repeat rule covers Jasper and plugin incidents only), the center's
+  60 s coalescing still ignores the target, and no package-info files changed beyond `notifications` and
+  `notificationui`. `./gradlew check`: **8,149 tests, 0 failures, 0 errors, 6 skips** (all four architecture gates, doclint and compiled examples
+  included; source hygiene over the 31 changed Java files and `git diff --check` clean). No GUI was launched
+  and nothing was pushed. GUI checks for the user:
+  - an uncaught exception (for example from a plugin under development) shows an "Unexpected error in Jasper" or
+    plugin card; Show more… opens the Errors window at it, in light and dark themes;
+  - the Errors window: list selection with the mouse and the arrow keys, the monospaced trace scrolls, Copy pastes a
+    report, Open Log Folder opens the folder, Clear empties the list and disables the cleared notifications' links;
+  - a plugin that keeps failing shows one card, counts up `×N`, and shows its card again no sooner than a minute later;
+  - Disable Plugin posts "… will be disabled when Jasper restarts", and the Plugins page agrees after a restart;
+  - a broken shell profile shows "Could not start the terminal" with Show more…, and the window's only pane stays
+    open showing the failure;
+  - Notifications: Show Errors from the palette; the window remembers its size and position.
+
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
   against local merge `cc0429f5`, on `codex/theme-system-plan5` in the reused `.worktrees/theme-system` worktree.
