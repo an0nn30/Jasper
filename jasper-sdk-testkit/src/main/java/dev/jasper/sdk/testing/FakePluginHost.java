@@ -571,13 +571,33 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     private void deliver(String topicId, Object payload) {
-        if (payload instanceof ActivityEvent event && topicId.equals(Activities.TOPIC.id())) activityLog.add(event);
+        if (payload instanceof ActivityEvent event && topicId.equals(Activities.TOPIC.id())) {
+            activityLog.add(event);
+            outcome(event);
+        }
         if (payload instanceof ConnectionEvent event && topicId.equals(Activities.CONNECTIONS.id())) connectionLog.add(event);
         for (Entry entry : subscribers.getOrDefault(topicId, new CopyOnWriteArrayList<>())) {
             if (entry.closed().get()) continue;
             try { entry.handler().accept(payload); }
             catch (RuntimeException | LinkageError failure) { failures.add(entry.pluginId() + " handler: " + failure); }
         }
+    }
+
+    /**
+     * As the host does: an activity that succeeded or failed is posted in its plugin's activities group, unless the
+     * plugin is no longer running.
+     */
+    private void outcome(ActivityEvent event) {
+        FakePluginContext owner = contexts.get(event.sourcePluginId());
+        if (owner == null || !active(event.sourcePluginId())) return;
+        // Like the host: only the source plugin's own action, run in the window used last.
+        Optional<Runnable> activate = event.activateActionId().filter(owner.ui.actions::containsKey)
+            .<Runnable>map(id -> () -> {
+                var window = workspace.lastActive;
+                if (window != null) invoke(id, window.id, workspace.activePane().map(pane -> pane.id).orElse(null));
+            });
+        try { notifications.outcome(event, activate); }
+        catch (IllegalArgumentException unshowable) { failures.add(event.sourcePluginId() + " activity outcome: " + unshowable); }
     }
 
     void stage(String pluginId, Class<?> api, Function<PluginInfo, ?> factory) {

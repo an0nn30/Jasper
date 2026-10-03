@@ -1,5 +1,6 @@
 package dev.jasper.sdk.testing;
 
+import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.notifications.DisplayMode;
 import dev.jasper.sdk.notifications.GroupSpec;
 import dev.jasper.sdk.notifications.NotificationAction;
@@ -7,6 +8,7 @@ import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.notifications.NotificationHandle;
 import dev.jasper.sdk.notifications.NotificationSpec;
 import dev.jasper.sdk.notifications.Notifications;
+import dev.jasper.sdk.notifications.Severity;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -161,6 +163,15 @@ public final class FakeNotifications {
     /** A plugin stopped: everything it posted expires. */
     void stopped(String pluginId) {
         for (Post post : posts) if (post.pluginId.equals(pluginId)) post.expired = true;
+    }
+
+    /** As the host does: an activity that succeeded or failed is posted in its plugin's activities group. */
+    void outcome(ActivityEvent event, Optional<Runnable> activate) {
+        if (event.state() != ActivityEvent.State.SUCCEEDED && event.state() != ActivityEvent.State.FAILED) return;
+        String detail = event.detail();
+        var spec = NotificationSpec.of(event.state() == ActivityEvent.State.SUCCEEDED ? Severity.INFO : Severity.ERROR, event.title())
+            .withContent(detail.length() <= 4_000 ? detail : detail.substring(0, 3_999) + "…");
+        posts.add(new Post(event.sourcePluginId(), event.sourcePluginId() + ACTIVITIES, activate.map(spec::withActivate).orElse(spec)));
     }
 
     private void declare(String id, String name, DisplayMode mode) {

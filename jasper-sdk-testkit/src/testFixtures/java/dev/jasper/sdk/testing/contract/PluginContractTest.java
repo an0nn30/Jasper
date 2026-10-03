@@ -1385,6 +1385,43 @@ public abstract class PluginContractTest {
             .containsExactly("test.a|ERROR|Could not copy the address|IllegalStateException: clipboard busy|-|cause|-|live");
     }
 
+    @Test void activityOutcomesArePostedInTheHostsActivitiesGroup() {
+        var shown = new AtomicInteger();
+        var context = new AtomicReference<PluginContext>();
+        h.start(info("test.a"), Set.of(), Set.of(), started -> {
+            context.set(started);
+            started.actions().register(ActionSpec.of("test.a.show", "Show"), invoked -> shown.incrementAndGet());
+        });
+        PluginContext a = context.get();
+        UUID window = h.addTerminalWindow();
+        h.activateTerminalWindow(window);
+        h.ui(() -> {
+            a.activities().begin(ActivitySpec.of("Sync hosts")).succeed("3 hosts");
+            a.activities().begin(ActivitySpec.of("Upload")).fail("Connection lost");
+            a.activities().begin(ActivitySpec.of("Index")).cancelled();
+            a.activities().begin(new ActivitySpec("Deploy", "", Optional.of("test.a.show"), Optional.empty())).succeed("");
+        });
+        h.flush();
+        assertThat(h.clickNotification("Deploy")).as("the body runs the activity's action").isTrue();
+        h.flush();
+        assertThat(shown).hasValue(1);
+        h.start(info("test.b"), Set.of(), Set.of(), broken -> {
+            broken.activities().begin(ActivitySpec.of("Left open"));
+            throw new IllegalStateException("broken");
+        });
+        h.flush();
+        assertThat(h.activityLog()).as("the host still fails the activity it left open")
+            .anySatisfy(event -> assertThat(event.title()).isEqualTo("Left open"));
+        assertThat(h.notifications()).as("but a plugin that is not running posts no outcome").containsExactly(
+            "test.a.activities|INFO|Sync hosts|3 hosts|-|-|-|live",
+            "test.a.activities|ERROR|Upload|Connection lost|-|-|-|live",
+            "test.a.activities|INFO|Deploy||-|-|-|live");
+        h.ui(() -> a.activities().begin(ActivitySpec.of("Still running")));
+        h.stopAll();
+        h.flush();
+        assertThat(h.notifications()).as("nor does one that stopped").hasSize(3);
+    }
+
     @Test void browseOpensOnlyWebAddressesAndReachesTheHost() {
         PluginContext a = started("test.a", Set.of());
         h.ui(() -> {

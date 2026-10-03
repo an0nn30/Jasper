@@ -40,7 +40,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import dev.jasper.app.terminals.TerminalRegistry;
-import dev.jasper.app.terminals.PaneEntry;
 
 /**
  * The application's single entry to plugins: discover, resolve, load and start them once at launch,
@@ -714,12 +713,7 @@ public final class PluginRuntime {
      */
     private Optional<Runnable> activation(String source, Optional<String> actionId) {
         PluginHost current = host;
-        if (current == null) return Optional.empty();
-        return actionId.filter(id -> current.ownsAction(source, id)).<Runnable>map(id -> () -> {
-            if (!current.ownsAction(source, id)) return;
-            terminals.activeWindow().ifPresent(window -> contributions.action(id).ifPresent(entry ->
-                entry.invoke(new Contributions.Invocation(window.id(), terminals.activePane().map(PaneEntry::id)))));
-        });
+        return current == null ? Optional.empty() : current.activation(source, actionId);
     }
 
     /**
