@@ -630,7 +630,7 @@ public final class JasperApplication {
     private void openLogFolder() {
         Path folder = logFolder;
         if (folder == null) return;
-        CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().reveal(folder))
+        CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().openFolder(folder))
             .whenComplete((ignored, failure) -> {
                 if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not open the log folder", folder.toString()));
             });

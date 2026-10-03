@@ -85,7 +85,7 @@ class JasperApplicationIncidentsTest {
     }
 
     @DisabledOnOs(OS.WINDOWS)
-    @Test void aPluginThatFailsToStartIsAPluginProblemWithShowMoreAndDisablePlugin() throws Exception {
+    @Test void aPluginThatFailsToStartIsAPluginProblemWithDisablePluginAndShowMore() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
         Path dev = home.resolve("dev-plugin");
         PluginJars.build(dev, "boom.jar", PluginJars.descriptor("dev.example.boom", "1.0.0", "fix.boom.Main"),
@@ -105,7 +105,7 @@ class JasperApplicationIncidentsTest {
             var notice = application[0].notificationCenter().history().stream()
                 .filter(entry -> entry.request().group().equals("jasper.plugins")).findFirst().orElseThrow();
             assertThat(notice.request().title()).isEqualTo("dev.example.boom failed to start");
-            assertThat(notice.request().actions()).extracting(NotificationAction::label).containsExactly("Show more…", "Disable Plugin");
+            assertThat(notice.request().actions()).extracting(NotificationAction::label).containsExactly("Disable Plugin", "Show more…");
             assertThat(application[0].contributions().action(ErrorsWindow.SHOW_ERRORS)).isPresent();
         });
         edt(application[0]::quit);

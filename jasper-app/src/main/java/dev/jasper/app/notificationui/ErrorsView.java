@@ -39,9 +39,9 @@ import javax.swing.SwingConstants;
 import javax.swing.UIManager;
 
 /**
- * The Errors window's content (spec section 5): this session's incidents, newest first, beside the selected one's
- * source and operation, sightings, message and stack trace, with Copy, Disable Plugin (a plugin's incidents only),
- * Open Log Folder and Clear. Every text is plain. EDT only; {@link #close} stops it listening.
+ * The Errors window's content (spec section 5): this session's incidents, most recently seen first, beside the
+ * selected one's source and operation, sightings, message and stack trace, with Copy, Disable Plugin (a plugin's
+ * incidents only), Open Log Folder and Clear. Every text is plain. EDT only; {@link #close} stops it listening.
  */
 public final class ErrorsView extends JPanel {
     /**
@@ -177,6 +177,12 @@ public final class ErrorsView extends JPanel {
         if (index < 0) return;
         list.setSelectedIndex(index);
         list.ensureIndexIsVisible(index);
+    }
+
+    /** Scrolls the selected row into view again; the window calls this once it has been laid out. */
+    public void revealSelection() {
+        int index = list.getSelectedIndex();
+        if (index >= 0) list.ensureIndexIsVisible(index);
     }
 
     /** Stops listening; the window calls this when it closes. Idempotent. */

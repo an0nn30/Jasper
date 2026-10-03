@@ -11,6 +11,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import javax.swing.SwingUtilities;
 
 /**
  * The Errors window (spec section 5): one auxiliary window over this session's incidents, opened by an incident's
@@ -39,7 +40,10 @@ final class ErrorsWindow {
             invocation -> show(Optional.empty()));
     }
 
-    /** Opens the window, or brings it forward, and selects {@code incident} when it is still listed. */
+    /**
+     * Opens the window, or brings it forward, and selects {@code incident} when it is still listed. A window that
+     * opens now is laid out as it shows, so its selected row is scrolled into view again on the next EDT turn.
+     */
     void show(Optional<UUID> incident) {
         if (surface == null || surface.closed()) {
             surface = windows.window(ID, "Errors", SIZE, true);
@@ -51,6 +55,7 @@ final class ErrorsWindow {
         incident.ifPresent(view::select);
         surface.show();
         surface.toFront();
+        if (incident.isPresent()) SwingUtilities.invokeLater(view::revealSelection);
     }
 
     /** Test access: the open window's view. */

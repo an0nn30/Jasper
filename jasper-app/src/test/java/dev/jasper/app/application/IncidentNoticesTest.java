@@ -46,6 +46,18 @@ class IncidentNoticesTest {
         @Override public String getMessage() { throw new IllegalStateException("unreadable"); }
     }
 
+    /** A failure whose cause cannot be read. */
+    private static final class Causeless extends RuntimeException {
+        Causeless() { super("no cause to read"); }
+        @Override public synchronized Throwable getCause() { throw new IllegalStateException("unreadable cause"); }
+    }
+
+    /** A failure whose stack trace reads as nothing at all. */
+    private static final class Traceless extends RuntimeException {
+        Traceless() { super("no trace to read"); }
+        @Override public StackTraceElement[] getStackTrace() { return null; }
+    }
+
     /** Delayed tasks a test runs by hand, as the application's Swing timers would run them. */
     private static final class ManualScheduler implements BiFunction<Duration, Runnable, Runnable> {
         private record Scheduled(Duration delay, Runnable task, AtomicBoolean cancelled) {}
@@ -157,8 +169,10 @@ class IncidentNoticesTest {
         assertThat(notice.request().title()).isEqualTo("Remote failed in panel remote.sftp");
         assertThat(notice.request().content()).isEqualTo("UncheckedIOException: no route");
         assertThat(notice.request().source()).as("Jasper posts it, not the plugin").isEqualTo("jasper");
-        assertThat(labels(notice)).containsExactly("Show more…", "Disable Plugin");
+        assertThat(labels(notice)).as("Show more… last (spec section 3)").containsExactly("Disable Plugin", "Show more…");
         center.runAction(notice.id(), 1);
+        assertThat(opened).containsExactly(incidents.list().getFirst().id());
+        center.runAction(notice.id(), 0);
         assertThat(disabled).containsExactly("dev.jasper.remote");
         Notification outcome = center.history().getFirst();
         assertThat(outcome.request().title()).isEqualTo("Remote will be disabled when Jasper restarts");
@@ -383,6 +397,15 @@ class IncidentNoticesTest {
         notices.pluginFailure("dev.jasper.remote", "background task", new Unreadable());
         assertThat(incidents.list().getFirst().trace()).isEqualTo(Unreadable.class.getName());
         assertThat(center.history().getFirst().request().content()).isEqualTo("IncidentNoticesTest$Unreadable");
+    }
+
+    @Test void aFailureWhoseCauseOrTraceCannotBeReadIsStillAnIncident() {
+        var notices = notices();
+        notices.jasperFailure("thread worker", new Causeless());
+        notices.pluginFailure("dev.jasper.remote", "background task", new Traceless());
+        assertThat(incidents.list()).hasSize(2);
+        assertThat(center.history()).extracting(entry -> entry.request().content()).containsExactly(
+            "IncidentNoticesTest$Traceless: no trace to read", "IncidentNoticesTest$Causeless: no cause to read");
     }
 
     @Test void aShellThatCannotStartIsAnIncidentAnnouncedInItsWindow() {

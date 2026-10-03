@@ -189,12 +189,16 @@ final class IncidentNotices implements AutoCloseable {
 
     /**
      * Whether the notification system itself failed: the first {@code dev.jasper.} frame of the failure, or of any
-     * cause, lies in it. Whoever caught such a failure has logged it; recording it could fail the same way again.
+     * cause, lies in it. Whoever caught such a failure has logged it; recording it could fail the same way again. A
+     * cause or stack trace that cannot be read ends the walk.
      */
     static boolean ownFailure(Throwable failure) {
         Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Throwable next = failure; next != null && seen.add(next); next = next.getCause()) {
-            for (StackTraceElement frame : next.getStackTrace()) {
+        for (Throwable next = failure; next != null && seen.add(next); next = causeOf(next)) {
+            StackTraceElement[] frames = framesOf(next);
+            if (frames == null) return false;
+            for (StackTraceElement frame : frames) {
+                if (frame == null) return false;
                 String type = frame.getClassName();
                 if (!type.startsWith("dev.jasper.")) continue;
                 if (own(type)) return true;
@@ -202,6 +206,18 @@ final class IncidentNotices implements AutoCloseable {
             }
         }
         return false;
+    }
+
+    /** The failure's cause; none when reading it fails. */
+    private static Throwable causeOf(Throwable failure) {
+        try { return failure.getCause(); }
+        catch (RuntimeException | Error unreadable) { return null; }
+    }
+
+    /** The failure's stack trace; null when reading it fails. */
+    private static StackTraceElement[] framesOf(Throwable failure) {
+        try { return failure.getStackTrace(); }
+        catch (RuntimeException | Error unreadable) { return null; }
     }
 
     private static boolean own(String type) {
@@ -344,7 +360,7 @@ final class IncidentNotices implements AutoCloseable {
         }
     }
 
-    /** An internal error, or a plugin problem with Disable Plugin. */
+    /** An internal error, or a plugin problem with Disable Plugin; Show more… comes last (spec section 3). */
     private NotificationRequest announcement(Incident incident) {
         if (!incident.fromPlugin())
             return NotificationRequest.of(ERRORS.id(), Severity.ERROR, "Unexpected error in Jasper")
@@ -352,8 +368,8 @@ final class IncidentNotices implements AutoCloseable {
         String plugin = incident.source();
         return NotificationRequest.of(PLUGINS.id(), Severity.ERROR, pluginTitle(nameOf(plugin), incident.operation()))
             .withContent(incident.summary())
-            .withAction(showMore(incident))
-            .withAction(new NotificationAction(DISABLE_PLUGIN, () -> disablePlugin(plugin), false));
+            .withAction(new NotificationAction(DISABLE_PLUGIN, () -> disablePlugin(plugin), false))
+            .withAction(showMore(incident));
     }
 
     private NotificationAction showMore(Incident incident) {

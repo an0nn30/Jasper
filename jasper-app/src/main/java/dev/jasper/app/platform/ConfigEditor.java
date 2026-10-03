@@ -54,4 +54,20 @@ public final class ConfigEditor {
             }
             throw failure;
         }
+
+    /**
+     * Opens a directory in the file manager, else reveals it in its parent. Never on the EDT.
+     *
+     * @param path the directory
+     * @throws IllegalStateException on the EDT, or when neither worked (each attempt's failure is suppressed in it)
+     */
+    public void openFolder(Path path) {
+        if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
+        var failure = new IllegalStateException("Could not open: " + path);
+        for (Consumer<Path> attempt : List.of(attempts.get(1), attempts.get(2))) {
+            try { attempt.accept(path); return; }
+            catch (RuntimeException exception) { failure.addSuppressed(exception); }
+        }
+        throw failure;
+    }
 }
