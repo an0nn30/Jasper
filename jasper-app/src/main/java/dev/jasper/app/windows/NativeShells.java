@@ -48,7 +48,8 @@ import java.util.Optional;
 
 /**
  * The native boundary for auxiliary windows: frame or dialog, application icon, the unified macOS title
- * bar, a menu bar so the screen menu does not vanish, theme tracking and remembered bounds. It also shows Jasper's file
+ * bar, a menu bar so the screen menu does not vanish, theme tracking and remembered bounds. A modal dialog floats above
+ * Jasper's windows while Jasper is active ({@link FloatWhileActive}). It also shows Jasper's file
  * chooser in place of the platform's file dialogs. Everything
  * testable lives in {@link AuxiliarySurface}. EDT only; never constructed in headless tests.
  */
@@ -169,12 +170,15 @@ public final class NativeShells {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
             if (bar != null) bar.setLight(!resolved.chrome().dark());
         });
+        FloatWhileActive floating = surface.modal() ? FloatWhileActive.attach(dialog) : null;
         natives.put(surface, dialog);
         return new AuxiliarySurface.Shell(() -> {
                 if (!remembered) { dialog.pack(); dialog.setLocationRelativeTo(owner); }
+                if (floating != null) floating.update();
                 dialog.setVisible(true);
             },
             dialog::toFront, () -> {
+                if (floating != null) floating.close();
                 theme.close();
                 if (bar != null) bar.close();
                 natives.remove(surface); dialog.dispose();

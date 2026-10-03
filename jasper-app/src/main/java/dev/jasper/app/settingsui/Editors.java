@@ -2,9 +2,10 @@ package dev.jasper.app.settingsui;
 
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.config.CoreSettings;
-import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.config.TerminalConfig;
+import dev.jasper.app.config.WorkspaceThemeChoice;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.settings.Setting;
 import dev.jasper.app.settings.SettingKind;
 import java.awt.BorderLayout;
@@ -24,7 +25,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -94,44 +94,21 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Combo(() -> Fonts.families(monospaced)), List.of());
     }
 
-    /** Built-in workspace themes: stored value to shown text, in dropdown order. */
-    private static final Map<String, String> BUILT_IN_COLORS = builtInColors();
+    /** The gear menu's one item beside the theme dropdown. */
+    static final String IMPORT_THEME = "Import theme\u2026";
+    /** The workspace scheme entry for {@code match}. */
+    static final String SAME_AS_UI_THEME = "Same as UI theme";
 
-    private static Map<String, String> builtInColors() {
-        var names = new LinkedHashMap<String, String>();
-        names.put("match", "Match the theme");
-        names.put("Jasper Light", "Jasper Light");
-        names.put("Jasper Dark", "Jasper Dark");
-        return Collections.unmodifiableMap(names);
+    /** Every installed theme by name, with a gear whose menu offers Import theme\u2026. */
+    public static Factory<String> theme(ThemeChoices themes) {
+        return new Factory<>((setting, context) -> new ThemePick(themes.names(), Map.of(), themes.importer().apply(context)),
+            List.of(IMPORT_THEME));
     }
 
-    /** Editable native theme names; unknown requested names remain available for repair. */
-    public static Factory<String> theme(Supplier<List<String>> names) {
-        return new Factory<>((setting, context) -> new ActionCombo(new Choices(names, UnaryOperator.identity(), UnaryOperator.identity(),
-            index -> false, () -> null, label -> {})), List.of("theme"));
-    }
-
-    /**
-     * Workspace theme: a checkbox for {@code match}, over native choices.
-     */
-    public static Factory<String> terminalColors(Supplier<List<String>> themes) {
-        return new Factory<>((setting, context) -> new TerminalColorsEditor(themes, context),
-            List.of(TerminalColorsEditor.FOLLOW, "follow couple match"));
-    }
-
-    /**
-     * A shown workspace theme entry as saved; typed names are preserved except for {@code match}.
-     */
-    static String storedColors(String shown) {
-        for (var entry : BUILT_IN_COLORS.entrySet()) if (entry.getValue().equals(shown.strip())) return entry.getKey();
-        return shown.isBlank() ? "" : WorkspaceThemeChoice.parse(shown).name();
-    }
-
-    /** A saved workspace theme value as shown. */
-    static String shownColors(String stored) {
-        if (stored.isBlank()) return "";
-        String normalized = WorkspaceThemeChoice.parse(stored).name();
-        return BUILT_IN_COLORS.getOrDefault(normalized, normalized);
+    /** "Same as UI theme" ({@code match}), then every installed theme by name. */
+    public static Factory<String> workspaceScheme(ThemeChoices themes) {
+        return new Factory<>((setting, context) -> new ThemePick(themes.names(),
+            Map.of(WorkspaceThemeChoice.MATCH.name(), SAME_AS_UI_THEME), null), List.of(SAME_AS_UI_THEME));
     }
 
     /** A text field with Browse\u2026, for a program path. */
@@ -289,225 +266,114 @@ public final class Editors {
     }
 
     /**
-     * Workspace theme choice: the checkbox is {@code match}; the dropdown holds a separate theme. Clearing
-     * the checkbox returns to the last separate choice in this dialog, else the saved one, else Jasper Dark.
+     * A theme by name: the {@code leading} entries (value to label), then the installed names, read again on each
+     * refresh. The dropdown searches as you type, keeping the leading entries. A saved name the list lacks shows as
+     * "(not found)" until another is chosen; a name matches an entry as the catalog finds themes, ignoring case and
+     * surrounding spaces, and keeps its saved spelling. With an import, a gear beside the dropdown offers Import theme\u2026.
      */
-    static final class TerminalColorsEditor implements ValueEditor<String> {
-        static final String FOLLOW = "Workspace theme follows the UI theme";
-        final JCheckBox follow = new JCheckBox(FOLLOW);
-        final ActionCombo choice;
-        private final JPanel component = new JPanel();
-        private final List<Runnable> listeners = new ArrayList<>();
-        private String separate = "Jasper Dark";
+    static final class ThemePick implements ValueEditor<String> {
+        final JComboBox<String> box;
+        final JButton gear;
+        final JPopupMenu menu;
+        private final Supplier<List<String>> names;
+        private final Map<String, String> leading;
+        private final ThemeChoices.Import importer;
+        private final List<String> values = new ArrayList<>();
+        private final JComponent component;
+        private final List<Runnable> edits = new ArrayList<>();
+        /** How many entries are choices; any after them is the one missing choice being shown. */
+        private int listed;
+        private String shown = "";
+        /** The value shown or last chosen; Swing reports picking it again, which is no edit. */
+        private String current = "";
         private boolean showing;
 
-        TerminalColorsEditor(Supplier<List<String>> themes, PageContext context) {
-            choice = new ActionCombo(new Choices(() -> {
-                    var all = new ArrayList<>(List.of(BUILT_IN_COLORS.get("Jasper Light"), BUILT_IN_COLORS.get("Jasper Dark")));
-                    all.addAll(themes.get());
-                    return all.stream().distinct().toList();
-                }, Editors::storedColors, Editors::shownColors, index -> index == 2,
-                () -> null, label -> {}));
-            String saved = context.draft().saved(CoreSettings.UI_THEME_WORKSPACE).map(WorkspaceThemeChoice::parse)
-                .map(WorkspaceThemeChoice::name).orElse("");
-            if (separate(saved)) separate = saved;
-            follow.putClientProperty("html.disable", true);
-            follow.setOpaque(false);
-            component.setLayout(new BoxLayout(component, BoxLayout.Y_AXIS));
-            component.setOpaque(false);
-            for (JComponent part : List.of(follow, choice.component())) { part.setAlignmentX(0f); component.add(part); }
-            follow.addActionListener(event -> {
-                if (showing) return;
-                if (!follow.isSelected()) choice.show(separate);
-                sync();
-                edited();
+        ThemePick(Supplier<List<String>> names, Map<String, String> leading, ThemeChoices.Import importer) {
+            this.names = names;
+            this.leading = leading;
+            this.importer = importer;
+            box = new SearchCombo(leading.size(), "No matching themes");
+            box.setPrototypeDisplayValue("Catppuccin Macchiato (Material)");
+            box.setMaximumRowCount(20);
+            if (importer == null) {
+                gear = null;
+                menu = null;
+                component = box;
+            } else {
+                menu = new JPopupMenu();
+                var item = new JMenuItem(IMPORT_THEME);
+                item.addActionListener(event -> importer.start().run());
+                menu.add(item);
+                gear = new JButton(AppIcons.icon("settings"));
+                gear.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+                gear.setToolTipText("Theme actions");
+                gear.getAccessibleContext().setAccessibleName("Theme actions");
+                gear.addActionListener(event -> menu.show(gear, 0, gear.getHeight()));
+                component = line(box, gear);
+            }
+            fill();
+            box.addActionListener(event -> {
+                if (showing || value().equals(current)) return;
+                current = value();
+                if (box.getSelectedIndex() >= 0 && box.getSelectedIndex() < listed) dropMissing();
+                for (Runnable listener : List.copyOf(edits)) listener.run();
             });
-            choice.onEdit(() -> {
-                if (showing) return;
-                String value = choice.value();
-                if (separate(value)) separate = value;
-                edited();
-            });
-            sync();
         }
 
-        /** Whether {@code value} is a separate choice rather than following the UI theme. */
-        private static boolean separate(String value) { return !value.isBlank() && !value.equals("match"); }
+        /** Rebuilds the entries from the current names, keeping the selection. */
+        private void fill() {
+            String keep = value();
+            showing = true;
+            try {
+                box.removeAllItems();
+                values.clear();
+                leading.forEach(this::add);
+                for (String name : names.get()) add(name, name);
+                listed = values.size();
+                select(keep);
+            } finally { showing = false; }
+        }
 
-        private void sync() { choice.component().setEnabled(!follow.isSelected()); }
-        private void edited() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
+        private void add(String value, String label) { values.add(value); box.addItem(label); }
+
+        private void select(String value) {
+            dropMissing();
+            int index = -1;
+            for (int i = 0; i < values.size() && index < 0; i++) if (same(values.get(i), value)) index = i;
+            if (index < 0) {
+                add(value, value.isBlank() ? "(none)" : value + " (not found)");
+                index = values.size() - 1;
+            }
+            box.setSelectedIndex(index);
+        }
+
+        private void dropMissing() {
+            boolean was = showing;
+            showing = true;
+            try {
+                while (values.size() > listed) {
+                    values.removeLast();
+                    box.removeItemAt(box.getItemCount() - 1);
+                }
+            } finally { showing = was; }
+        }
+
+        private static boolean same(String listed, String value) { return listed.strip().equalsIgnoreCase(value.strip()); }
 
         @Override public JComponent component() { return component; }
-        @Override public String value() { return follow.isSelected() ? "match" : choice.value(); }
+        @Override public String value() {
+            int index = box.getSelectedIndex();
+            if (index < 0) return shown;
+            String value = values.get(index);
+            return same(value, shown) ? shown : value;
+        }
         @Override public void show(String value) {
             showing = true;
-            try {
-                String normalized = value.isBlank() ? "match" : WorkspaceThemeChoice.parse(value).name();
-                boolean follows = !separate(normalized);
-                follow.setSelected(follows);
-                if (!follows) separate = normalized;
-                choice.show(separate);
-                sync();
-            } finally { showing = false; }
+            try { shown = value; select(value); current = value(); } finally { showing = false; }
         }
-        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
-        @Override public void dispose() { choice.dispose(); }
-    }
-
-    /**
-     * What an {@link ActionCombo} offers.
-     *
-     * @param entries the choices as shown
-     * @param stored shown text to the stored value
-     * @param shown a stored value to shown text
-     * @param ruleBefore rows that start a group, drawn below a rule
-     * @param actionLabel the trailing entry's label, read each time the list opens
-     * @param action runs, with the label, when the trailing entry is chosen
-     */
-    record Choices(Supplier<List<String>> entries, UnaryOperator<String> stored, UnaryOperator<String> shown,
-                   IntPredicate ruleBefore, Supplier<String> actionLabel, Consumer<String> action) { }
-
-    /**
-     * An editable combo of choices, re-read each time the list opens, ending in an entry that runs an action (such as
-     * opening another page) instead of being chosen; the value stays as it was.
-     */
-    static final class ActionCombo implements ValueEditor<String> {
-        private final Choices choices;
-        private final Model model = new Model();
-        private final JComboBox<String> box = new JComboBox<>(model);
-        private final List<Runnable> listeners = new ArrayList<>();
-        private String action = "";
-        private boolean showing;
-
-        ActionCombo(Choices choices) {
-            this.choices = choices;
-            box.setEditable(true);
-            box.setPrototypeDisplayValue("JetBrains Mono NL Extra");
-            box.setRenderer(new Renderer());
-            reload();
-            // A look-and-feel update gives the combo a new editor field; follow each one (see Combo).
-            onText(editor(), this::edited);
-            bindEnter(editor());
-            box.addPropertyChangeListener("editor", event -> {
-                if (box.getEditor() == null) return;
-                onText(editor(), this::edited);
-                bindEnter(editor());
-            });
-            box.addPopupMenuListener(new PopupMenuListener() {
-                @Override public void popupMenuWillBecomeVisible(PopupMenuEvent event) { reload(); }
-                @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent event) { }
-                @Override public void popupMenuCanceled(PopupMenuEvent event) { }
-            });
-        }
-
-        /** Re-reads the entries and the action's label, keeping the text shown. */
-        void reload() {
-            showing = true;
-            try {
-                String text = editor().getText();
-                model.removeAllElements();
-                for (String entry : choices.entries().get()) model.addElement(entry);
-                action = choices.actionLabel().get();
-                if (action != null) model.addElement(action);
-                model.select(text);
-                editor().setText(text);
-            } finally { showing = false; }
-        }
-
-        private boolean isAction(Object item) { return item != null && item.equals(action); }
-
-        /**
-         * Whether choosing the action entry during {@code current} should run it. Basic and FlatLaf select as the arrow
-         * and page keys move through the open list, so only a click, Enter or a programmatic choice (no event) runs it.
-         */
-        static boolean navigates(java.awt.AWTEvent current) {
-            if (current instanceof java.awt.event.KeyEvent key) return key.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER
-                || key.getKeyChar() == '\n';
-            return true;
-        }
-
-        private JTextComponent editor() { return (JTextComponent) box.getEditor().getEditorComponent(); }
-        private void edited() { if (!showing) for (Runnable listener : List.copyOf(listeners)) listener.run(); }
-
-        /**
-         * Binds Enter on the editor field. An editable combo's Enter takes the typed text, not the row highlighted in the
-         * open list, and the arrow keys never select the action entry, so Enter on it would do nothing without this.
-         */
-        private void bindEnter(JTextComponent field) {
-            field.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "jasper.actionComboEnter");
-            field.getActionMap().put("jasper.actionComboEnter", new AbstractAction() {
-                @Override public void actionPerformed(java.awt.event.ActionEvent event) { enter(event, box.isPopupVisible()); }
-            });
-        }
-
-        /** Enter: the highlighted action entry of the open list runs; anything else accepts the text as usual. */
-        void enter(java.awt.event.ActionEvent event, boolean listOpen) {
-            Object highlighted = popupList().map(JList::getSelectedValue).orElse(null);
-            if (listOpen && isAction(highlighted)) { run(); return; }
-            Action accept = editor().getActionMap().get(JTextField.notifyAction);
-            if (accept != null) accept.actionPerformed(event);
-        }
-
-        /** Highlights a row of the list, as the arrow keys do. */
-        void highlight(int index) { popupList().ifPresent(list -> list.setSelectedIndex(index)); }
-
-        private Optional<JList<?>> popupList() {
-            return box.getUI().getAccessibleChild(box, 0) instanceof javax.swing.plaf.basic.ComboPopup popup
-                ? Optional.of(popup.getList()) : Optional.empty();
-        }
-
-        private void run() {
-            box.hidePopup();
-            choices.action().accept(action);
-        }
-
-        @Override public JComponent component() { return box; }
-        @Override public String value() { return choices.stored().apply(editor().getText()); }
-        @Override public void show(String value) {
-            showing = true;
-            try {
-                String text = choices.shown().apply(value);
-                model.select(text);
-                editor().setText(text);
-            } finally { showing = false; }
-        }
-        @Override public void onEdit(Runnable listener) { listeners.add(listener); }
-
-        /** Refuses the action entry as a selection and runs it instead. */
-        private final class Model extends DefaultComboBoxModel<String> {
-            @Override public void setSelectedItem(Object item) {
-                if (isAction(item)) {
-                    if (showing || !navigates(java.awt.EventQueue.getCurrentEvent())) return;
-                    // Enter on typed action text: put the chosen entry back so the action is never the value.
-                    Object chosen = getSelectedItem();
-                    String text = chosen == null ? "" : chosen.toString();
-                    if (!editor().getText().equals(text)) editor().setText(text);
-                    run();
-                    return;
-                }
-                super.setSelectedItem(item);
-            }
-            void select(Object item) { super.setSelectedItem(item); }
-        }
-
-        /** Draws the action entry as a link, and a rule above it and above each row that starts a group. */
-        private final class Renderer extends DefaultListCellRenderer {
-            @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
-                var label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focused);
-                label.putClientProperty("html.disable", true);
-                boolean actionEntry = isAction(value);
-                if (actionEntry && !selected) {
-                    Color link = UIManager.getColor("Component.linkColor");
-                    if (link != null) label.setForeground(link);
-                }
-                if (index >= 0 && (actionEntry || choices.ruleBefore().test(index))) {
-                    Color rule = UIManager.getColor("Separator.foreground");
-                    label.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(1, 0, 0, 0, rule != null ? rule : Color.GRAY), label.getBorder()));
-                }
-                return label;
-            }
-        }
+        @Override public void onEdit(Runnable listener) { edits.add(listener); }
+        @Override public void refresh() { fill(); }
+        @Override public void dispose() { if (importer != null) importer.close().run(); }
     }
 
     static final class Browse implements ValueEditor<String> {

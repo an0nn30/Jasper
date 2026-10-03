@@ -30,10 +30,16 @@ final class WindowChrome {
     private final WindowHeader header;
     private final WindowStatusBar status = new WindowStatusBar();
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
-    private final java.util.Map<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.LinkedHashMap<>();
+    private final JMenu uiThemes = new JMenu("UI Theme");
+    private final JMenu workspaceThemes = new JMenu("Workspace Scheme");
+    private dev.jasper.app.appearance.ThemeCatalog.Snapshot displayedThemes;
+    private String displayedUi, displayedWorkspace;
+    private final MenuListener themeMenuListener = new MenuListener() {
+        @Override public void menuSelected(MenuEvent event) { rebuildThemeMenus(); }
+        @Override public void menuDeselected(MenuEvent event) {}
+        @Override public void menuCanceled(MenuEvent event) {}
+    };
     private final ButtonGroup toolbarModes = new ButtonGroup();
-    /** The built-in terminal colour choices; none is selected while a named terminal theme is in use. */
-    private final ButtonGroup terminalGroup = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new MenuBarItems.CheckBox("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new MenuBarItems.CheckBox("Show Jasper", false);
     private final JCheckBoxMenuItem railVisible = new MenuBarItems.CheckBox("Rail", true);
@@ -53,7 +59,7 @@ final class WindowChrome {
         toolbar.setBorder(BorderFactory.createEmptyBorder());
         search = new TitleSearchField(() -> owner.action(ActionId.COMMAND_PALETTE).actionPerformed(
             new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
-            () -> owner.scopeShortcut(dev.jasper.app.palette.PaletteScope.ALL_ID));
+            owner::paletteShortcut);
         header = new WindowHeader(search, toolbar);
         header.setOpaque(true);
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
@@ -85,18 +91,10 @@ final class WindowChrome {
         statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
         buddyVisible.setAction(owner.windowCommands().view("view.buddy"));
         railVisible.setAction(owner.windowCommands().view("view.rail"));
-        JMenu terminalColors = new JMenu("Terminal Colors");
-        for (TerminalColors colors : TerminalColors.builtIns()) {
-            JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view(
-                "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT)));
-            terminalItems.put(colors, item); terminalGroup.add(item); terminalColors.add(item);
-        }
-        terminalColors.addMenuListener(new MenuListener() {
-            @Override public void menuSelected(MenuEvent event) { refreshTheme(); }
-            @Override public void menuDeselected(MenuEvent event) {}
-            @Override public void menuCanceled(MenuEvent event) {}
-        });
-        view.add(terminalColors);
+        view.add(uiThemes); view.add(workspaceThemes);
+        view.add(new MenuBarItems.Item(owner.windowCommands().view("view.themes")));
+        view.addMenuListener(themeMenuListener);
+        uiThemes.addMenuListener(themeMenuListener); workspaceThemes.addMenuListener(themeMenuListener);
         view.add(new MenuBarItems.Item(owner.windowCommands().view("view.window_settings")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
@@ -425,6 +423,37 @@ final class WindowChrome {
         return menu;
     }
 
+    void clearThemeMenus() { uiThemes.removeAll(); workspaceThemes.removeAll(); displayedThemes = null; }
+    void closeThemeMenus() {
+        clearThemeMenus(); uiThemes.removeMenuListener(themeMenuListener); workspaceThemes.removeMenuListener(themeMenuListener);
+        standardMenus.get(MenuTarget.Slot.VIEW).removeMenuListener(themeMenuListener);
+    }
+    private void rebuildThemeMenus() {
+        var catalog = owner.availableThemes(); String ui = owner.requestedUiTheme(), workspace = owner.requestedWorkspaceTheme();
+        if (catalog.equals(displayedThemes) && ui.equals(displayedUi) && workspace.equals(displayedWorkspace)) return;
+        displayedThemes = catalog; displayedUi = ui; displayedWorkspace = workspace;
+        fillThemes(uiThemes, catalog.names(), ui, false); fillThemes(workspaceThemes, catalog.names(), workspace, true);
+    }
+    private void fillThemes(JMenu menu, List<String> names, String selected, boolean workspace) {
+        menu.removeAll(); var group = new ButtonGroup();
+        if (workspace) addTheme(menu, group, "Same as UI theme", "match", selected, true);
+        for (int start = 0; start < names.size(); start += 30) {
+            int end = Math.min(start + 30, names.size());
+            JMenu destination = menu;
+            if (names.size() > 30) { destination = new JMenu((start + 1) + "–" + end); menu.add(destination); }
+            for (String name : names.subList(start, end)) addTheme(destination, group, name, name, selected, workspace);
+        }
+    }
+    private void addTheme(JMenu menu, ButtonGroup group, String label, String value, String selected, boolean workspace) {
+        var item = new JRadioButtonMenuItem(label); item.putClientProperty("html.disable", Boolean.TRUE);
+        item.setSelected(value.equalsIgnoreCase(selected)); group.add(item); menu.add(item);
+        item.addActionListener(event -> {
+            if (!owner.isActiveAndOpen() || owner.commandPalette().isOpen() || dev.jasper.app.platform.WindowInput.blocked(owner)) return;
+            if (workspace) owner.chooseWorkspaceTheme(value); else owner.chooseUiTheme(value);
+            // An attempted write may be rejected; the next open must rebuild the actual selection.
+            displayedThemes = null;
+        });
+    }
     void setToolbarMode(ToolbarMode mode) {
         toolbar.setVisible(mode != ToolbarMode.HIDDEN);
         toolbar.setLabelsWanted(mode == ToolbarMode.ICONS_AND_LABELS);
@@ -437,9 +466,7 @@ final class WindowChrome {
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
         status.refreshTheme();
-        // A ButtonGroup ignores setSelected(false) on its selected member, so a named theme clears the group.
-        terminalGroup.clearSelection();
-        terminalItems.forEach((colors, item) -> { if (owner.terminalColorsSelected(colors)) item.setSelected(true); });
+
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }

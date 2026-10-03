@@ -1,6 +1,25 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-02
+## Current state — 2026-10-03
+
+- **Merged `main` into `claude/dock-layout`** (2026-10-03; `main` at `63e3b95c`, merge base `cc0429f5`): main's
+  features that touch the dock now use it. Unread badges are on the stripes: `ToolStripe.Button` carries the
+  `PanelBadge`, a badged button shows a `BadgedIcon` and names the badge in its tooltip and accessible description, and
+  a badge change re-renders the stripes (`Contributions.Kind.RAIL`); the drag ghost keeps the plain icon. The
+  Notifications panel docks in Right Top (`Slot.RIGHT_TOP`, where `PanelRegion.RIGHT` was), and its in-content
+  "Notifications" heading is gone because the tool window header carries the title (Clear All stays). The notification
+  card layer sits in the bottom-right corner of `ToolWindowArea` (between the stripes, above the status bar, over any
+  docked tool window), on `PALETTE_LAYER` under the dock drag's `DRAG_LAYER` guides. `NotificationsFeature`'s
+  `dev.jasper.app.dock` import is listed in the `application` package-info. Docs: this file keeps both sides' entries;
+  the notifications guide and app maintenance describe the stripe button, its badge and the area corner. New tests:
+  `WindowPanelsTest.aBadgedPanelShowsADotAndDescribesItsCount` (on the right stripe),
+  `WindowDragTest.aBadgedButtonStillDragsAndLiftsOutAndItsGhostIsThePlainIcon`,
+  `WindowCornerLayerTest.theLayerStaysBetweenTheStripesOverDockedWindowsAndUnderADockDrag` (its two older cases now
+  follow the area) and `HistoryPanelTest.theToolWindowHeaderCarriesTheTitle`. `./gradlew check --continue` on the merged
+  tree: **8,195 tests, 0 failures, 0 errors, 6 skipped**, all four architecture gates and doclint included; main's
+  `ExFilesTest` fix (`185a5f8e`) makes it pass on this Mac, and the Remote `ListenerTest` flake did not fail. Open: a
+  badge change is a stripe render, so a notification arriving mid-drag cancels the drag. The notifications GUI checks
+  now look at the Notifications button on the right stripe. Nothing pushed, no GUI launched.
 
 - **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe
@@ -81,13 +100,136 @@
   side's two halves, so a window made very short can still squeeze them under 120px. No GUI launched. GUI checks
   for the user: the plan's section
   "GUI checks for the user". Plan 2 (drag and drop) was executed on top of it; see the entry above.
+
+- **No FlatLaf SEVERE at start-up with Nord** (branch `fix/theme-lazy-border`, user report 2026-10-02): Nord sets
+  `TableHeader.cellBorder` to a colour. Resolving workspace values asked the private, never-installed FlatLaf defaults
+  `get(key) == null` for every explicit colour key, which built FlatLaf's lazy `FlatTableHeaderBorder`; its constructor
+  reads `TableHeader.cellMargins` from the installed look, missing before any theme is installed, and FlatLaf logged
+  the NPE. `FlatLafThemeData.defines` checks the table without building values (then `get` for keys FlatLaf serves
+  elsewhere); WorkspaceValues and ThemeManager.install use it. Full check **7,967/0/0/6**; merged into local main
+  2026-10-02 (fast-forward), not pushed. Separate, not fixed here:
+  Darcula and four other converted themes keep IntelliJ named-colour values such as `"panel"`, which FlatLaf logs as
+  "Failed to parse" (`TitlePane.background`, `NewUiOnboarding.Dialog.background`).
+
+- **Theme dropdowns search as you type** (branch `claude/theme-search`, worktree `.claude/worktrees/settings-appearance`,
+  design approved in chat 2026-10-02): both Appearance dropdowns (`Editors.ThemePick`) are a `settingsui.SearchCombo`.
+  Typing in the open or focused dropdown shows an IntelliJ-style search bar at the top of the list and keeps the
+  names holding every word; Same as UI theme stays pinned; "No matching themes" is an unpickable row. Up/Down/Enter/
+  Escape/Backspace/Home/End work while searching, Enter picks without reaching OK (and picks nothing when nothing
+  matched), Space opens the list, and the combo never picks by first letter, even after a theme change rebuilds its
+  look and feel (an independent review found that and the Home/End leak; both fixed with tests). Rows are padded as
+  FlatLaf pads its own combo popup (the user saw text outside the highlight; fixed in `a1d3022f`). Full check
+  **7,966/0/0/6**; merged into local main 2026-10-02 (fast-forward), not pushed. Not done: grouped sections (not
+  requested), GUI check (hover/click, the × button, typing on a closed dropdown), push.
+
+- **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
+  worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
+  - **On top:** macOS raised the window Settings blocks in front of it. Every modal dialog now floats above Jasper's
+    windows while Jasper is active (`windows.FloatWhileActive`) and drops to the normal level while another
+    application is. Blocking is unchanged: only the opening window.
+  - **Appearance:** Theme and Workspace scheme dropdowns (`Editors.ThemePick`), with a gear beside Theme whose only
+    item is Import theme… (`themesui.ThemeImport`). They are staged until Apply/OK and re-read the catalog on refresh;
+    a missing saved name shows as "(not found)". Font & Colors links to Appearance; View › Themes… opens it.
+    "Workspace theme" is "Workspace scheme" in the UI and docs; the key `ui.theme.workspace` is unchanged.
+  - **Removed:** the Themes page, its pickers, preview, sample terminal and syntax sample, Duplicate, Remove, Open
+    themes folder and About, and the now-unused `ThemeDuplicate` and `ThemeFiles` duplicate/removal operations.
+    The notices still ship (now checked by `PackagedResourcesTest`). The theme-system spec §7 carries a superseded banner.
+  - Merged into local main 2026-10-02 after merging main (`c4211cf1`) into the branch; not pushed. Merged-tree
+    `./gradlew check`: **7,954/0/0/6**. Not done: GUI check (Settings over its window and other windows, switching apps, the
+    dropdowns, the gear and an import), push.
+
+- **Built-in theme catalog no longer stalls start-up** (branch `claude/theme-catalog-edt`, user request in chat
+  2026-10-02): building the application parsed all 284 bundled theme files on the EDT (`ThemeCatalog`'s built-in
+  snapshot), about 1.5 s cold, nearly all of it tomlj reading the converted themes' `[ui]` and `[icons]` tables (96% of
+  the 9.4 MB). This is the start-up side of the cold-JVM cost behind the contended-endpoint test below, which now
+  warms up outside its window; before that warm-up landed, this change alone made the test pass cold (5 of 5). A
+  bundled theme's name, darkness and palette now come from its file up to the first `[ui]` or `[icons]` table
+  (`ThemeTomlWriter` writes them last); `Theme.Bundled` parses the whole file on its first `document()` call, once, and
+  bundled themes are equal by file. The native scan and the importer match bundled `extends` parents by name before
+  reading their documents. A cold catalog load takes about 250 ms; parsing in parallel was measured and rejected
+  (1.7x). `BuiltInThemesTest` checks every bundled theme against its whole file. Full check after rebasing on `e0e61461`: **7,975/0/0/6**. Not done: GUI
+  check, push.
+
+- **`:b` name test no longer depends on the temp folder** (merged into main as `f1c1acd3` and pushed, 2026-10-02):
+  `ExFilesTest.bufferSelectsATabByNumberOrName` failed on the dev Mac, whose `java.io.tmpdir` holds "zz", because `:b`
+  matches whole paths, as Vim 9.1 does (checked with `/usr/bin/vim`). The test's buffers now live under a fixed `/work`
+  folder. Open: `ExFiles.match` tries exact, ends-with, starts-with, contains and stops at the first level with any
+  match; Vim tries contains, starts-with, ends-with, exact and stops at the first with exactly one. With buffers `xab`
+  and `abab`, Vim's `:b ab` selects `abab` where Jasper reports E93.
+
+- **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
+  user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
+  failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
+  (about 900 classes, mostly `Theme`'s built-in TOML parse through tomlj/ANTLR, plus FlatLaf/font setup), the same with
+  or without the child-held lock, with zero samples in `FileChannel.lock`; later compositions take under 10 ms with
+  the lock held. The cold case also never exercised the contended path: the child released the lock before shutdown
+  ran. The test now composes and quits once uncontended before the lock child starts; the 1 s budget is unchanged.
+  A temporary mutation (shutdown actions run on the EDT) still fails both cases. 10 isolated class runs and 5
+  method-only runs pass. `./gradlew check --continue`: **7,971 tests, 1 failure, 6 skips**. The failure is a separate,
+  pre-existing, machine-dependent assertion, `ExFilesTest.bufferSelectsATabByNumberOrName` (`:b zz` expects no match,
+  but this Mac's temp folder `/var/folders/d0/…psfzzxc…/T/` contains "zz"); it passes with a `java.io.tmpdir` without
+  "zz", and was previously hidden because `:jasper-app:test` failed first. It was fixed separately on main
+  (`185a5f8e`). Merged into main (`5729a684`) and pushed 2026-10-02.
+
+- **Palette scope pills removed** (branch `palette-remove-scope-hints`, user request in chat 2026-10-02): with no
+  chip, the pills along the palette's bottom edge (`> commands`, `history >`, …) overlapped the selected row's verbs
+  and hid its detail. They are gone, so the hint bar always shows the selected row's detail and verbs. Typed prefixes,
+  scope shortcuts and the query-field chip are unchanged. `WindowContent.scopeShortcut` became `paletteShortcut`,
+  because the title search field is its only remaining caller. Merged into main 2026-10-02 and pushed with `5729a684`.
+  Not done: GUI check.
+
+- **Notifications plan 1: core, reviewed and merged to local `main`; awaiting the user's GUI checks** (2026-10-02; branch `claude/notifications`, spec
+  `docs/superpowers/specs/2026-10-02-jasper-notifications-design.md`, plan
+  `docs/superpowers/plans/2026-10-02-notifications-1-core.md`, [guide](notifications.md)): an EDT `NotificationCenter` (in-memory history of 500,
+  60 s coalescing, read/expired state, waiting cards), per-window card stacks in the content corner, the built-in
+  Notifications rail panel with an unread badge, and the `jasper.general` / `jasper.config` producers. Window errors
+  and info, plugin `Notices` and configuration problems no longer open dialogs. Recorded interpretations are in the
+  plan's "Spec interpretations" section; the six deviations made during execution are in its status banner. `./gradlew check`: **8,076 tests, 0 failures, 0 errors, 6 skips**
+  (all four architecture gates, doclint and compiled examples included; source hygiene over the 58 changed Java files
+  and `git diff --check` clean). On this Mac `plugins/editor`'s `ExFilesTest.bufferSelectsATabByNumberOrName` fails when
+  the temp folder's path contains `zz` (as `$TMPDIR` does here); main already fixes it (`185a5f8e`), the branch base does
+  not, so the check was run with `java.io.tmpdir` pointed at a short path without `zz` (some tests also depend on the temp path's length and text); merging main removes the need. No GUI was launched
+  and nothing was pushed. GUI checks for the user:
+  - cards in light and dark themes, their shadow, and the badge dot on a normal and a selected/hovered rail button;
+  - several windows: a card appears in the window that raised it; clicks beside a card reach the terminal; Dismiss Cards;
+  - the Notifications panel: New/Earlier, Clear All, row ✕, theme switch while open;
+  - auto-hide pausing while the window is in the background and while hovering a card (including while its More menu is open);
+  - a broken `config.toml` at startup shows a sticky Configuration card with Show Problems / Open config.toml;
+  - a broken shell profile at startup leaves the window open with the failure in the pane and an error card; at cold
+    start this also checks the final-review fix for a card raised before the first window's activation (the card must
+    show once the window is active, not only sit in history);
+  - busy terminal output (for example `yes` or a large `cat`) scrolling under a sticky card stays smooth, and the
+    card's shadow looks as before on a Retina display.
+
+  Final whole-branch review fixes, all applied on the branch (`d2bd488f`, `08a2c9ff`, `498e4d61`): a card raised
+  before a new window's first activation waits instead of landing in history only; a coalesced repeat that shows its
+  card no longer stays waiting for focus; each card's shadow is rendered once and cached instead of twelve rings on
+  every repaint. `./gradlew check` after the fixes (same short temp path): **8,084 tests, 0 failures, 0 errors, 6
+  skips** (8 new tests; the 8,076 above is the count before them).
+
+  Merged to local `main` on 2026-10-02 with the user's agreement: `main` (`8a428f0b`) was merged into the branch first
+  (`438f6a99`; one trivial conflict in `WindowCommandPalette`, keeping main's argument list without `scopeShortcut` and
+  this branch's titled "Command failed" error), then `main` was fast-forwarded. `./gradlew cleanTest check --continue`
+  on the merged tree, with no temp-path workaround: **8,079 tests, 0 failures, 0 errors, 6 skips**. One earlier run of
+  it failed `FtpEngineTest.tlsWithoutRequireAllowsBoth` with "425 Can't open passive connection"; the File Server
+  suite then passed three isolated re-runs (160/160) and the next full run, so it is a load-dependent passive-port
+  flake, not a regression (the branch does not touch File Server). Not pushed.
+
+- **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
+  [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
+  against local merge `cc0429f5`, on `codex/theme-system-plan5` in the reused `.worktrees/theme-system` worktree.
+  Six tasks cover serialized theme polling, safe Duplicate/Remove, searchable staged pickers, local two-zone preview,
+  owner-scoped import/file dialogs and final navigation/acceptance. Selection stays staged; confirmed file actions
+  happen immediately. Plan 4's stale help text is included in Task 6. Preserve the user's inline execution preference
+  after approval. Task 1 now reloads native changes independently of config, including equal-metadata parent edits and descendant refresh, with unchanged-object reuse. Task 2 adds inherited commented copies and frozen removal intents; stale bytes, identities and symlinks are refused. Task 3 adds independent searchable staged pickers, literal labels, effective swatches and retained missing selections/diagnostics. Task 4 adds isolated two-zone previews with effective syntax styles, canned output and disposal. Task 5 wires immediate import/copy/removal, owner-bound dialogs, notices and folder actions, with worker validation and lifetime guards. Task 6 registers Settings > Themes, native catalog menus and staged/immediate workflows, closes the outdated help text, and preserves legacy shortcut IDs. Full check passes **7,972/0/0/6** (1m28s); retired dropdown tests are replaced by page/menu integration coverage. All four architecture gates, packaged resources, doclint and 1,661-source hygiene pass. Independent review of `cc0429f5..fb74ca16` found no Critical/Important issues; exact-head full check repeats **7,972/0/0/6** (1m27s). Deferred minors: no Themes tree modified marker, and the original design spec status banner is stale. Native visual/focus/menu and real Trash/folder checks remain user-run; the pre-existing bounded startup wait is retained. No second review or fix pass was needed. The existing bounded startup EDT wait is retained (plan correction); new runtime work remains asynchronous. Task 4 also narrows the packaged-resource fixture guard to allow only the new production ThemePreview; other Preview classes remain forbidden. No GUI or push.
+
 - **Theme system Plan 4 complete, independently reviewed and merged locally** (2026-10-01):
   [conversion, vendoring and migration](superpowers/plans/2026-10-01-theme-system-4-conversion-migration.md)
-  completes all seven tasks on `codex/theme-system-plans` in `.worktrees/theme-system`. Full `./gradlew check`
+  completed all seven tasks on `codex/theme-system-plans`, now merged; the worktree is reused for Plan 5. Full `./gradlew check`
   passes **7,930 tests, zero failures/errors, six skips**, including all four architecture gates, packaged resources,
   JavaDoc and compiled documentation examples. Java hygiene scans 1,637 source files cleanly; authored diff whitespace passes.
   The lower final test count reflects retired store/runtime-legacy tests; converter/security/installation parity and
-  native fallback/reload coverage remain. Local merge includes the hidden-rail framing fix; merged verification pending. No GUI or push.
+  native fallback/reload coverage remain. Local merge `cc0429f5` includes the hidden-rail framing fix and passes a fresh `./gradlew check`: **7,931 tests, zero failures/errors, six skips** (1m33s; `/tmp/moray-plan4-main-check.log`). No GUI or push.
   The catalog contains **284 native themes from 12 sources/413 hashed inputs**; exact pins, licenses, exclusions and
   renames are in `tools/themes/sources.json`, SOURCE.md and THIRD-PARTY-THEMES.md. Largest theme: 97,426 bytes;
   256 KiB cap unchanged. `[icons]` is now a documented native format table. All generation/testing is offline.
@@ -562,6 +704,7 @@ s
   most 50. SDK 0.9.2 adds `ScopeSpec.withInRecents`; History opts out (`sdk = ">=0.9.2, <0.10"`) and scopes out of
   All are out too. Each hint pill shows the key that selects its scope (`>` for Commands, else the scope's own
   shortcut). Merged into local main 2026-09-29; not pushed. Not done: GUI check of the pills and lists, push.
+  The pills were removed on 2026-10-02 (see above).
 - **Title-bar command centre, plan B** (branch `claude/titlebar-plan-b`, plan
   `docs/superpowers/plans/2026-09-29-jasper-titlebar-command-center-b.md`):
   - **Centring:** the search field is always centred on the window, and the sides give way first.

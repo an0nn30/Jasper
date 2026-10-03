@@ -20,6 +20,10 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.CommandNotice;
 import dev.jasper.app.notifications.CommandNotifier;
+import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.NotificationCenter;
+import dev.jasper.app.notifications.NotificationRequest;
+import dev.jasper.app.notifications.Severity;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
@@ -68,6 +72,8 @@ public final class JasperApplication {
     private final ThemeController themes;
     private final ThemeCatalog themeCatalog;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
+    /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
+    private boolean activatedSinceOpen;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -117,6 +123,8 @@ public final class JasperApplication {
     private volatile List<CompletableFuture<?>> processCleanups;
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     private ActivityNotifier activityNotifier;
+    private final NotificationCenter notificationCenter;
+    private final NotificationsFeature notificationViews;
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
@@ -178,6 +186,8 @@ public final class JasperApplication {
             created = new ThemeController(Theme.DARK);
         }
         themes = created;
+        notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
+        notificationViews = new NotificationsFeature(notificationCenter, contributions);
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
@@ -203,6 +213,10 @@ public final class JasperApplication {
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
             updateMigrateAction();
         });
+        if (configuration != null) {
+            var problems = new ConfigProblemNotices(notificationCenter, this::showConfigurationProblems, this::openConfigFile);
+            configuration.onProblems(problems::accept);
+        }
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler((event, response) -> {
                 response.cancelQuit();
@@ -228,14 +242,17 @@ public final class JasperApplication {
     }
 
     /**
-     * The first scan of the themes and terminal-themes folders runs on the configuration worker; start-up waits for it, at most
-     * 10 s, so the first window shows the saved theme. Later scans run with each configuration read.
+     * The first native scan runs on the configuration worker; start-up waits for it, at most 10 s,
+     * so the first window shows the saved theme. Later scans run on every configuration poll.
      */
     private void scanThemes(ConfigService service) {
-        try { service.watchWith(() -> { scanQuietly("native themes", themeCatalog::scan);
+        try { service.watchChanges(() -> {
+            var before = themeCatalog.latest(); var previousProblems = migrationProblems;
+            scanQuietly("native themes", themeCatalog::scan);
             var refreshed = new java.util.LinkedHashSet<>(startupConfigProblems);
             refreshed.addAll(ThemeUpgrade.diagnostics(service.initialState().file()));
             migrationProblems = List.copyOf(refreshed);
+            return !before.equals(themeCatalog.latest()) || !previousProblems.equals(migrationProblems);
         })
             .get(10, java.util.concurrent.TimeUnit.SECONDS); }
         catch (ExecutionException | TimeoutException failure) {
@@ -287,6 +304,10 @@ public final class JasperApplication {
             launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
         if (configuration != null) configuration.register(window.content());
         window.content().connectContributions(contributions, uiState);
+        UUID windowId = window.content().id();
+        window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
+        window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
+        notificationViews.attach(window.content());
         window.content().connectTerminals(terminals, window::toFront);
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
@@ -462,9 +483,16 @@ public final class JasperApplication {
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
+            var themeChoices = new dev.jasper.app.settingsui.ThemeChoices(() -> themeCatalog.latest().names(), context -> {
+                var imports = new dev.jasper.app.themesui.ThemeImport(context, configuration.state().file().toAbsolutePath().getParent(), auxiliary,
+                    () -> configuration.reload().thenApply(ignored -> null),
+                    java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
+                        var thread = new Thread(runnable, "jasper-theme-import"); thread.setDaemon(true); return thread;
+                    }));
+                return new dev.jasper.app.settingsui.ThemeChoices.Import(imports::start, imports::close);
+            });
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(),
-                    system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
+                dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
                         context -> plugins.settingsPages(context))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
@@ -487,8 +515,9 @@ public final class JasperApplication {
         private void migrateConfiguration() {
             if (configuration == null || quitting || stopped) return;
             configuration.migrate().whenComplete((message, failure) -> javax.swing.SwingUtilities.invokeLater(() -> {
-                if (failure == null) info(message);
-                else notice((failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
+                if (failure == null) notificationViews.info("Migrate Config", message);
+                else notificationViews.error("Migrate Config failed",
+                    (failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
             }));
         }
 
@@ -503,7 +532,7 @@ public final class JasperApplication {
         private void openConfigFile() {
             if (configuration == null) return;
             configuration.openConfigFile().whenComplete((file, failure) -> {
-                if (failure != null) SwingUtilities.invokeLater(() -> notice(failure.getMessage()));
+                if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not open config.toml", failure.getMessage()));
             });
         }
 
@@ -512,7 +541,7 @@ public final class JasperApplication {
             Path folder = configuration.state().file().toAbsolutePath().getParent();
             CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().reveal(folder))
                 .whenComplete((ignored, failure) -> {
-                    if (failure != null) SwingUtilities.invokeLater(() -> notice("Could not reveal " + folder));
+                    if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not reveal the folder", folder.toString()));
                 });
         }
 
@@ -524,19 +553,34 @@ public final class JasperApplication {
             });
         }
 
-        /** A plain informational message: the window the user used last, or the log when there is none. */
-        void info(String message) {
-            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
-            if (target == null) LOG.log(System.Logger.Level.INFO, message);
-            else target.content().onInfo.accept(message);
+        /** A plugin's error notice, until plugins post notifications themselves: one message, split into title and details. */
+        void notice(String message) {
+            notificationCenter.submit(NotificationRequest.message(NotificationsFeature.GENERAL.id(), Severity.ERROR, message));
         }
 
-        /** A plugin's error notice: the window the user used last, or the log when there is none. */
-        void notice(String message) {
-            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
-            if (target == null) LOG.log(System.Logger.Level.WARNING, "Plugin notice with no window: " + message);
-            else target.content().onError.accept(message);
-        }
+    /** Where Jasper stands for notifications: focused, in the background, or with no window open. */
+    private Delivery.Presence presence() {
+        return presence(!windows.isEmpty(), activatedSinceOpen,
+            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null);
+    }
+
+    /**
+     * The rule behind {@link #presence()}. A window counts only once it has been activated: a failure raised while the
+     * first window opens is queued ahead of the native activation event, and judging it "background" would keep its
+     * card out of sight for good. Until then the card waits, as it does with no window at all, and shows on activation.
+     */
+    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive) {
+        if (!windowsOpen || !activatedSinceOpen) return Delivery.Presence.NO_WINDOW;
+        return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
+    }
+
+    /** Show Problems on the configuration notification: the details over the window used last. */
+    private void showConfigurationProblems() {
+        TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
+        if (target == null) return;
+        target.toFront();
+        target.content().showConfigurationDetails();
+    }
 
     /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
     List<KeyBindings.Problem> bindingProblems() {
@@ -655,8 +699,10 @@ public final class JasperApplication {
 
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
+        if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
+        if (windows.isEmpty()) activatedSinceOpen = false;
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.
@@ -675,6 +721,8 @@ public final class JasperApplication {
     void windowActivated(TerminalWindow window) {
         if (!windows.contains(window)) return;
         lastActive = window;
+        activatedSinceOpen = true;
+        notificationViews.activated(window.content());
         terminals.windowActivated(window.content().id());
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
@@ -756,9 +804,6 @@ public final class JasperApplication {
 
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
 
-    /** The IntelliJ Themes page's store, created the first time Settings builds that page. */
-
-
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
         if (pluginManager == null) {
@@ -824,6 +869,7 @@ public final class JasperApplication {
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();
         buddy.close();
+        notificationViews.close();
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }

@@ -137,6 +137,27 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*CommandNotifierTest" --tests "*WorkspaceActivityTest" :jasper-buddy:test --tests "*BuddyDeckTest" --tests "*BuddyCompanionTest"
 ```
 
+## Posting a notification
+
+Application code never opens a message dialog to tell the user something; it posts a notification
+([guide](notifications.md), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+
+- Window code calls `WindowContent.onError` / `onInfo` with a fixed title and the details; the application posts them
+  to `jasper.general`. Never put user data in the title: it is what a window logs when nothing receives the message.
+- Application code calls `NotificationsFeature.error` / `info`, or posts a `NotificationRequest` for another group,
+  actions or a default action. `NotificationCenter.submit` is the any-thread entry point (at once on the EDT,
+  otherwise through the UI executor); `NotificationCenter.post` is EDT-only and throws elsewhere. Declare a group with
+  `NotificationCenter.register` before posting to it; posts to an undeclared group are dropped and logged.
+- Text is plain and bounded: titles are one line (cut at 200 characters), details at most 4,000. Pass exception
+  messages as details, never as titles.
+- Contextual feedback (a Settings field error, a palette error row, a plugin's inline row) stays where it is, and
+  confirmation or input prompts stay dialogs: notifications are for things that happen elsewhere or later.
+- Cards, the panel and the badge read `Jasper.notification.*` and `Jasper.railBadge*` colours derived in `ChromeKeys`;
+  a theme's own `Notification.*` keys win. The badge is a `PanelEntry.setBadge` on the panel: each window's
+  `ToolStripe` shows it as a `BadgedIcon` on that panel's stripe button, with the count in the tooltip and
+  accessible description. Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner
+  of the `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
+
 ## Platform integration
 
 Place OS behavior in [MacTitleBar](../jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java)-style adapters or the existing platform package. Supply narrow JDK callbacks and values rather than WindowContent/JasperApplication back-references. Register cleanup immediately using [StartupResources](../jasper-app/src/main/java/dev/jasper/app/bootstrap/StartupResources.java) during startup, then transfer it to the long-lived owner only after wiring succeeds. Keep handoff before AWT; distinguish unsupported capability from failed startup. Tests inject boundary callbacks and do not open a real desktop window.
@@ -205,7 +226,7 @@ Converters/security fixtures live in `themeimport`; native catalog/installation 
 file or deleting an equal-byte foreign backup. Keep original data and report the conflict. Config migration must
 stay ahead of ConfigService construction and use its actual override directory.
 
-Plan 5 consumes `ThemeFiles`, `ThemeImporter`, `ThemeTomlWriter` and the canned `themesui.SampleTerminal`.
+Import theme… (`themesui.ThemeImport`) consumes `ThemeImporter`, which writes through `ThemeFiles` and `ThemeTomlWriter`.
 Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
 ## Maintaining SDK icons
@@ -304,9 +325,10 @@ Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag so
 components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
 headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
 button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
-to the pressed component keep arriving. Any dock change or stripe render, View › Rail and the
-window being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and its Esc
-dispatcher claims only an Esc from its own window. Keep the layout-only terminal
+to the pressed component keep arriving. Any dock change or stripe render (a panel badge change
+included, since it fires `Contributions.Kind.RAIL`), View › Rail and the window being deactivated
+(`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher claims only an Esc
+from its own window. Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
@@ -407,3 +429,37 @@ flow remain in `ShortcutPanel`/`ShortcutEditPanel`. The tree, viewport and scrol
 use `Panel.background`; nested editor containers are transparent. Row selection, labels
 and icons use the active theme and bundled catalog. `shortcutHelpPreview` renders closed,
 expanded and editing states in both themes and larger UI type without opening a window.
+
+
+### Maintaining the theme dropdowns and Import theme…
+
+The Appearance page's Theme and Workspace scheme rows are ordinary schema rows (`Editors.theme` and
+`Editors.workspaceScheme`, one `Editors.ThemePick` each). `settingsui.ThemeChoices` carries the catalog's names and a
+per-page import factory from application wiring, so settingsui has no dependency on themesui. A pick re-reads the
+names on each page refresh (`ValueEditor.refresh`); a saved name the catalog lacks stays listed as "(not found)" and
+keeps its spelling. Only the Theme row has the gear; its page disposes the row, which closes the import.
+
+Both picks use `settingsui.SearchCombo`, a `JComboBox` whose look-and-feel UI (a `FlatComboBoxUI` subclass, or Basic
+without FlatLaf) creates its own `ComboPopup`: a non-focusable `JPopupMenu` with a search bar over a filtered list.
+Focus stays on the combo; the popup's key listener, which the UI installs on the combo, routes typed characters into
+the search and handles Up/Down (keypad too), Page Up/Down, Home/End, Enter, Escape and Backspace while the list is
+open or a search runs; every key the combo's own bindings would answer with a pick behind the list must stay handled
+there. `selectWithKeyChar` always returns false, because each look and feel installs a fresh key selection manager.
+The popup's size is fixed when it opens; only the bar's first appearance repacks. Its rows have their own renderer,
+padded as FlatLaf pads its own combo popup (`ComboBox.padding` plus the combo's focus width at each side, read at paint
+time), with the combo's `selectionInsets`/`selectionArc` and `popupInsets`; `SearchComboTest` compares the padding
+with a stock FlatLaf combo.
+FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
+
+`themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;
+completion waits for the catalog refresh before reporting. A closed import suppresses UI callbacks while a running
+confirmed write still refreshes application state. Copying, editing and removing themes are file edits in the
+`themes` folder; there is no UI for them.
+
+The configuration worker's companion scan hashes native content every second and publishes catalog-only changes.
+`WindowContent` receives the latest snapshot supplier from `ConfigurationController`; menu models rebuild on opening
+only when names or requested choices change. Menu listeners and catalogs are released with the window. Keep the three
+legacy terminal-color command IDs mapped to explicit Jasper names; canonical Light/Dark user names are literal.
+
+Headless checks: AppearancePageTest, ThemeImportTest, ThemeImportViewTest, WindowThemeMenuTest and
+JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.

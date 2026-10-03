@@ -282,7 +282,7 @@ class ThemeControllerTest {
         edt(() -> {
             var themes = new ThemeController(theme -> theme != Theme.INTELLIJ_LIGHT && ThemeTestSupport.install(theme));
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            var errors = new ArrayList<String>(); owner.onError = errors::add;
+            var errors = new ArrayList<String>(); owner.onError = (title, message) -> errors.add(message);
             var before = UIManager.getLookAndFeel();
             owner.selectTheme(Theme.INTELLIJ_LIGHT);
             assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));

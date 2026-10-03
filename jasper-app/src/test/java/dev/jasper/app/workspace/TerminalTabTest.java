@@ -80,13 +80,14 @@ class TerminalTabTest {
         }, "sh");
         WindowContent[] owner = new WindowContent[1];
         List<String> errors = new ArrayList<>();
-        edt(() -> { owner[0] = content(launcher); owner[0].onError = errors::add; });
+        edt(() -> { owner[0] = content(launcher); owner[0].onError = (title, message) -> errors.add(title + ": " + message); });
         pending.remove().run();
         TerminalPane[] first = new TerminalPane[1];
         edt(() -> { first[0] = owner[0].currentPane(); owner[0].invoke(ActionId.SPLIT_DOWN); });
         pending.remove().run();
         edt(() -> {
             assertThat(errors).singleElement().asString().contains("shell executable unavailable");
+            assertThat(errors.getFirst()).startsWith("Could not start the terminal: ");
             assertThat(owner[0].currentPane()).isSameAs(first[0]);
             assertThat(first[0].running()).isTrue();
             assertThat(owner[0].currentTab().panes()).hasSize(1);

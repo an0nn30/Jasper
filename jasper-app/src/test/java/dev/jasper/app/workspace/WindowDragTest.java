@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.persistence.UiState;
@@ -221,6 +222,26 @@ class WindowDragTest {
                 f.layout();
             }
             assertThat(f.events).containsExactly("sessions:true");
+        });
+    }
+
+    @Test void aBadgedButtonStillDragsAndLiftsOutAndItsGhostIsThePlainIcon() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            f.files.setBadge(java.util.Optional.of(new PanelBadge(2, PanelBadge.Tone.ACCENT, "2 unread notifications")));
+            f.layout();
+            AbstractButton files = f.button("Files (2 unread notifications)");
+            assertThat(files.getIcon()).isInstanceOf(BadgedIcon.class);
+            f.drag(files, f.cell(2, 1));
+            assertThat(f.owner.dockDrag().dragged()).isEqualTo("dev.x.files");
+            assertThat(files.getWidth()).as("lifted out of the stripe").isZero();
+            assertThat(f.owner.dockDrag().icons.apply("dev.x.files")).as("the ghost has no dot").isSameAs(f.files.icon());
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, f.cell(2, 1));
+            f.layout();
+            assertThat(f.owner.dock().slot("dev.x.files")).hasValue(Slot.BOTTOM_RIGHT);
+            AbstractButton moved = f.button("Files (2 unread notifications)");
+            assertThat(moved.getParent()).as("the badge goes with it").isSameAs(f.owner.rightStripe());
+            assertThat(moved.getIcon()).isInstanceOfSatisfying(BadgedIcon.class, badged -> assertThat(badged.base()).isSameAs(f.files.icon()));
         });
     }
 

@@ -207,6 +207,11 @@ public final class ThemeFiles {
 
     private static void publishIn(Path directory, Path target, byte[] bytes, Callable<Void> replacementCheck,
                                   BiConsumer<String, Path> fault, Callable<Path> guard) throws IOException {
+        publishIn(directory, target, bytes, replacementCheck, fault, guard, null);
+    }
+
+    private static void publishIn(Path directory, Path target, byte[] bytes, Callable<Void> replacementCheck,
+                                  BiConsumer<String, Path> fault, Callable<Path> guard, Callable<Void> creationCheck) throws IOException {
         Object directoryKey = identity(directory);
         var handle = Files.newDirectoryStream(directory);
         Path temporary = null; Object temporaryKey = null;
@@ -224,6 +229,7 @@ public final class ThemeFiles {
                 throw new IOException("Themes directory changed during publication");
             if (!Files.isRegularFile(temporary, LinkOption.NOFOLLOW_LINKS) || !Objects.equals(temporaryKey, identity(temporary)))
                 throw new IOException("Theme temporary changed during publication");
+            if (creationCheck != null) call(creationCheck);
             if (replacementCheck == null) {
                 // Hard-link is an atomic no-replace primitive; unsupported filesystems fail without a fallback move.
                 Files.createLink(target, temporary);

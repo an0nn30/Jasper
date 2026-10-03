@@ -57,7 +57,7 @@ class SettingsDialogTest {
     private SettingsDialog dialog() {
         return new SettingsDialog(windows, context -> {
             contexts.add(context);
-            return CorePages.pages(() -> List.of("Jasper Dark", "IntelliJ Light"), new CorePages.SystemActions(() -> FILE,
+            return CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark", "IntelliJ Light")), new CorePages.SystemActions(() -> FILE,
                     () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
                 page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
         }, hooks());
@@ -65,7 +65,7 @@ class SettingsDialogTest {
 
     @Test void aFragmentRevealsItsPartBeforeThePageIsSelectedEvenWhenItIsAlreadyShown() throws Exception {
         var revealed = new ArrayList<String>();
-        var dialog = new SettingsDialog(windows, context -> CorePages.pages(() -> List.of("Jasper Dark"),
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
                 new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), ShellChoices.NONE,
                 page -> fake, page -> new Revealing(new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page), revealed), page -> List.of()).apply(context), hooks());
         edt(() -> {
@@ -93,6 +93,33 @@ class SettingsDialogTest {
         @Override public void dispose() { header.dispose(); }
         @Override public void reveal(String fragment) { revealed.add("reveal " + fragment); }
         @Override public void selected() { header.selected(); revealed.add("selected"); }
+    }
+
+    @Test void themeAndWorkspaceSchemeShareOneSaveRetainFailedDraftAndCancelDiscardsThem() throws Exception {
+        var dialog = new SettingsDialog(windows, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Darcula", "Jasper Dark", "Jasper Light")),
+            new CorePages.SystemActions(() -> FILE, () -> {}, () -> {}, () -> {}, () -> {}, () -> false),
+            page -> fake, page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context), hooks());
+        saveResult = CompletableFuture.failedFuture(new IllegalStateException("Setting changed on disk"));
+        edt(() -> {
+            dialog.open(null, "appearance");
+            dialog.draft().stage(CoreSettings.UI_THEME_NAME, Optional.of("Jasper Light"));
+            dialog.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of("Darcula"));
+            dialog.apply();
+        });
+        edt(() -> {});
+        edt(() -> {
+            assertThat(saved).hasSize(1);
+            assertThat(saved.getFirst().changes()).containsKeys(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE);
+            assertThat(dialog.draft().modified()).isTrue();
+        });
+        state = state("ui.theme.name='Jasper Light'\nui.theme.workspace='Darcula'\n"); saveResult = CompletableFuture.completedFuture(state);
+        edt(dialog::apply); edt(() -> {});
+        edt(() -> {
+            assertThat(saved).hasSize(2); assertThat(dialog.draft().modified()).isFalse();
+            dialog.draft().stage(CoreSettings.UI_THEME_WORKSPACE, Optional.of("Jasper Dark")); dialog.cancel();
+            assertThat(dialog.isOpen()).isFalse(); dialog.open(null,"appearance");
+            assertThat(dialog.draft().value(CoreSettings.UI_THEME_WORKSPACE)).isEqualTo("Darcula"); dialog.cancel();
+        });
     }
 
     @Test void openingShowsTheTreeHidesEmptyToolsAndSelectsTheDefaultPage() throws Exception {

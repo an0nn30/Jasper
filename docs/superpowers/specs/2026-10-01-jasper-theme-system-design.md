@@ -5,7 +5,7 @@ review fixes are merged to main at `5fc76c7d`; implementation deviations are rec
 [Remaining-work assessment and plans 2–5](../plans/2026-10-01-theme-system-remaining-work.md) track implementation.
 Plan 2 is implemented, headless-verified and independently reviewed, then merged and verified on local `main`
 on 2026-10-01 (not pushed); user GUI acceptance remains pending. Plan 3 is implemented, independently reviewed, merged to local `main` and verified there (not pushed),
-with final fixes at `863ca6b9`; user visual acceptance remains pending. Plans 4–5 remain future work.
+with final fixes at `863ca6b9`; user visual acceptance remains pending. Plan 4 is implemented, independently reviewed and merged locally at `cc0429f5` (merged check: 7,931 tests, zero failures/errors, six skips). [Plan 5](../plans/2026-10-01-theme-system-5-themes-page.md) is written and awaiting user review; implementation has not started.
 Plan 2 and Plan 3 deviations are recorded in their status banners and `docs/STATUS.md`;
 the assessment labels later integration decisions. The user approved the combo-dropdown clarification below on
 2026-10-01 while planning Plan 3.
@@ -371,6 +371,13 @@ Theme and Trash Panda (no licence or no source).
   `third_party/themes/` (sources) and `dev/jasper/app/themeimport/intellij/` (importer parents).
 
 ## 7. Settings › Themes
+
+> **Superseded 2026-10-02 (user request in chat, branch `claude/settings-appearance`).** The Themes page, its pickers,
+> preview, Duplicate, Remove, Open themes folder and About were removed. Settings › Appearance now has, as in IntelliJ,
+> a **Theme** dropdown of every installed name with a gear whose menu offers **Import theme…** (the import flow below,
+> unchanged), and a **Workspace scheme** dropdown (the user's name for the workspace theme) starting with "Same as UI
+> theme" (`match`). Both are staged until Apply or OK and re-read the catalog on each refresh. Font & Colors links to
+> Appearance; View › Themes… opens it. Live file reload stays. The text below records the original design.
 
 One page replaces the Themes group's IntelliJ Themes and Alacritty Themes pages.
 

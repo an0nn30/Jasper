@@ -11,19 +11,16 @@ you ran from the palette, then **Most used**, rows ranked by how often and how r
 topped up with each scope's own suggestions (Commands' starters, …) until there are ten. History's
 shell commands and Vault's entries never appear here unprompted; they show once you type. A row
 that no longer exists (a deleted host or snippet) drops out. Uses are saved with the command
-history (`command-history.toml`, at most 50). Along the bottom edge, pills name each scope's
-prefix (`> commands`, `history >`, `snippets >`, `ssh >`, `vault >`); each pill also shows, as a key cap, the
-key that selects that scope from the keyboard: `>` for Commands, and each scope's own shortcut
-(Cmd+J Snippets, Cmd+R History, F8 Vault, Shift+Cmd+H SSH on macOS), which switches scope while the
-palette is open. Clicking a pill does the same. Typing anything else searches every scope at once and groups the matches
-under each scope's name. The list shows `palette.visible_rows` rows (five by default) and scrolls
+history (`command-history.toml`, at most 50). Typing anything else searches every scope at once and groups the
+matches under each scope's name. The list shows `palette.visible_rows` rows (five by default) and scrolls
 to the rest; if a very large result set runs past 200 rows, a "More in <Scope>…" row sets that scope's chip with the query kept. Vault's secrets stay out of that search;
 its chip searches them.
 
 Chips: `>` at the start of the query is Commands; `<scope> >` (for example `history > ls`, or any
 unique start such as `hist >`) is that scope, and the prefix leaves the field. With a chip set, `>`
 is ordinary text. Backspace in an empty query removes the chip. Each scope's own shortcut opens the
-palette with its chip: Cmd+R (Ctrl+Shift+R elsewhere) History, Cmd+J (Ctrl+Shift+J) Snippets.
+palette with its chip, or switches to it while the palette is open: Cmd+R (Ctrl+Shift+R elsewhere) History,
+Cmd+J (Ctrl+Shift+J) Snippets.
 Pressing the shortcut of the chip already showing, or Cmd/Ctrl+K with no chip, closes the palette.
 Tab does nothing outside a form.
 

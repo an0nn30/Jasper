@@ -20,6 +20,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 class JasperApplicationThemesTest {
     @TempDir Path home;
 
+    @Test void applicationPollAppliesNativeEditsWithoutChangingConfiguration() throws Exception {
+        Path file = home.resolve("themes/live.toml"); Files.createDirectories(file.getParent());
+        Files.writeString(file, "name='Live'\nextends='Jasper Dark'\n[ui]\n'Panel.background'='#112233'\n");
+        Path config = home.resolve("config.toml"); String text = "ui.theme.name='Live'\n"; Files.writeString(config, text);
+        var worker = new dev.jasper.app.testsupport.ConfigPollWorker();
+        var service = new ConfigService(config, false, worker, javax.swing.SwingUtilities::invokeLater);
+        var terminated = new CountDownLatch(1); JasperApplication[] app = new JasperApplication[1];
+        try {
+            edt(() -> app[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown));
+            Files.writeString(file, Files.readString(file).replace("#112233", "#445566")); worker.poll();
+            edt(() -> assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x445566)));
+            assertThat(Files.readString(config)).isEqualTo(text);
+        } finally {
+            if (app[0] != null) { edt(app[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
+            service.close(); edt(() -> new ThemeController());
+        }
+    }
+
     @Test void theApplicationStartsInTheInstalledThemeItsConfigurationNames() throws Exception {
         Files.writeString(home.resolve("config.toml"), "ui.theme.name = 'Fixture Dark'\n");
         ThemeFixtures.plugin(home.resolve("themes/fixture.jar"), "Fixture Dark", true, "#123456", "101820");

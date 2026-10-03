@@ -71,7 +71,7 @@ public final class ThemeManager {
         UIDefaults defaults = UIManager.getLookAndFeelDefaults();
         var extra = new LinkedHashMap<>(APP_DEFAULTS);
         colors.forEach((key, color) -> {
-            if (defaults.get(key) != null) return;
+            if (FlatLafThemeData.defines(defaults, key)) return;
             defaults.put(key, new ColorUIResource(color));
             extra.put(key, UiTemplate.hex(color));
         });

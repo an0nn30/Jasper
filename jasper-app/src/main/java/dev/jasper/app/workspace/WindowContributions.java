@@ -298,7 +298,8 @@ final class WindowContributions implements AutoCloseable {
             for (String id : dock.ids(slot)) {
                 PanelInstance panel = panels.get(id);
                 if (panel == null) continue;
-                var button = new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id));
+                var button = new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
+                    panel.entry.badge());
                 (slot.stripe() == Side.LEFT ? left : right).add(button);
             }
         List<Action> railActions = new ArrayList<>();

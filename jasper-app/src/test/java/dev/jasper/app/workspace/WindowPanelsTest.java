@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.dock.DockGeometry;
@@ -589,6 +590,30 @@ class WindowPanelsTest {
             assertThat(state.panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.BOTTOM_RIGHT, 0, true));
             assertThat(events).as("closing is not hiding").containsExactly("visible:true", "closed");
             assertThat(owner.rightStripe().buttons()).as("closing clears the stripe").isEmpty();
+        });
+    }
+
+    @Test void aBadgedPanelShowsADotAndDescribesItsCount() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            var icon = new ImageIcon(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB));
+            PanelEntry notes = model.addPanel("dev.x.notes", "Notes", icon, Slot.RIGHT_TOP, site -> new JLabel("notes"));
+            notes.setBadge(Optional.of(new PanelBadge(4, PanelBadge.Tone.ERROR, "4 unread notifications, 1 error")));
+            AbstractButton button = owner.rightStripe().buttons().getFirst();
+            assertThat(button.getToolTipText()).isEqualTo("Notes (4 unread notifications, 1 error)");
+            assertThat(button.getAccessibleContext().getAccessibleName()).isEqualTo("Notes");
+            assertThat(button.getAccessibleContext().getAccessibleDescription()).isEqualTo("4 unread notifications, 1 error");
+            assertThat(button.getIcon()).isInstanceOfSatisfying(BadgedIcon.class, badged -> {
+                assertThat(badged.tone()).isEqualTo(PanelBadge.Tone.ERROR);
+                assertThat(badged.base()).isSameAs(icon);
+            });
+            notes.setBadge(Optional.empty());
+            assertThat(owner.rightStripe().buttons().getFirst().getIcon()).isSameAs(icon);
+            assertThat(owner.rightStripe().buttons().getFirst().getToolTipText()).isEqualTo("Notes");
+            assertThat(owner.rightStripe().buttons().getFirst().getAccessibleContext().getAccessibleDescription())
+                .as("the badge's words go with it").doesNotContain("unread");
         });
     }
 }

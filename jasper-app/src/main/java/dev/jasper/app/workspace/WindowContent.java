@@ -41,6 +41,7 @@ import dev.jasper.app.terminals.SessionRequest;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(WindowContent.class.getName());
     private final ShellLauncher launcher;
     private final Consumer<Path> newWindow;
     private final Runnable quit;
@@ -89,6 +90,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final ThemeController themes;
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
+    private JComponent cornerLayer;
+    private JRootPane cornerRoot;
+    private final ComponentAdapter cornerRelayout = new ComponentAdapter() {
+        @Override public void componentResized(ComponentEvent event) { layoutCornerLayer(); }
+        @Override public void componentMoved(ComponentEvent event) { layoutCornerLayer(); }
+    };
+    private final java.beans.PropertyChangeListener cornerResized = event -> layoutCornerLayer();
     private final Map<KeyStroke, String> contentBindings = new HashMap<>();
     private final Map<Component, dev.jasper.app.lifecycle.Subscription> contentListeners = new IdentityHashMap<>();
     Runnable onMinimumSizeChanged = () -> {};
@@ -114,9 +122,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
     Consumer<String> onTitle = title -> {};
-    public Consumer<String> onError = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.ERROR_MESSAGE);
-    /** Shows a plain informational message, such as the result of Migrate Config. */
-    public Consumer<String> onInfo = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.INFORMATION_MESSAGE);
+    /** An error to tell the user about, as a title and details; the application posts it as a notification. */
+    public java.util.function.BiConsumer<String, String> onError = WindowContent::unheard;
+    /** Information to tell the user, such as the result of Migrate Config; the application posts it as a notification. */
+    public java.util.function.BiConsumer<String, String> onInfo = WindowContent::unheard;
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     public Runnable onToggleBuddy = () -> {};
     public java.util.function.BooleanSupplier buddyEnabled = () -> false;
@@ -303,6 +312,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         });
         syncContentBindings();
         commandPalette.install(root);
+        installCornerLayer(root);
         syncPaletteDispatcher();
     }
 
@@ -439,6 +449,49 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         bindingRoot = null;
     }
 
+    /**
+     * The application's notification card layer: kept flush with the bottom-right corner of the tool window area
+     * (between the stripes, above the status bar, over any docked tool window) on the root's palette layer, at its
+     * preferred size, under a dock drag's guides. Once per window; removed at close.
+     */
+    public void mountCornerLayer(JComponent layer) {
+        if (closed || cornerLayer != null) return;
+        cornerLayer = Objects.requireNonNull(layer, "layer");
+        layer.addPropertyChangeListener("preferredSize", cornerResized);
+        if (bindingRoot != null) installCornerLayer(bindingRoot);
+    }
+
+    private void installCornerLayer(JRootPane root) {
+        if (cornerLayer == null || cornerRoot == root) return;
+        uninstallCornerLayer();
+        cornerRoot = root;
+        root.getLayeredPane().add(cornerLayer, JLayeredPane.PALETTE_LAYER);
+        root.getLayeredPane().addComponentListener(cornerRelayout);
+        area.addComponentListener(cornerRelayout);
+        layoutCornerLayer();
+    }
+
+    private void uninstallCornerLayer() {
+        if (cornerRoot == null) return;
+        cornerRoot.getLayeredPane().removeComponentListener(cornerRelayout);
+        area.removeComponentListener(cornerRelayout);
+        cornerRoot.getLayeredPane().remove(cornerLayer);
+        cornerRoot.repaint();
+        cornerRoot = null;
+    }
+
+    void layoutCornerLayer() {
+        if (cornerRoot == null || cornerLayer == null) return;
+        JLayeredPane pane = cornerRoot.getLayeredPane();
+        if (!SwingUtilities.isDescendingFrom(area, pane)) { cornerLayer.setBounds(0, 0, 0, 0); return; }
+        Rectangle bounds = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), pane);
+        Dimension size = cornerLayer.getPreferredSize();
+        int width = Math.min(size.width, bounds.width), height = Math.min(size.height, bounds.height);
+        cornerLayer.setBounds(bounds.x + bounds.width - width, bounds.y + bounds.height - height, width, height);
+        cornerLayer.revalidate();
+        cornerLayer.repaint();
+    }
+
     void setBindings(KeyBindings replacement) {
         baseBindings = Objects.requireNonNull(replacement);
         rebind();
@@ -479,9 +532,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
+    private java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest();
+    /** Connects a read-only current catalog; released with the configuration/window lifetime. */
+    public void connectThemeCatalog(java.util.function.Supplier<dev.jasper.app.appearance.ThemeCatalog.Snapshot> catalog) {
+        if (!closed) themeCatalog = java.util.Objects.requireNonNull(catalog);
+    }
+    dev.jasper.app.appearance.ThemeCatalog.Snapshot availableThemes() { return themeCatalog.get(); }
+    String requestedUiTheme() { return configurationState == null ? themes.choice().name() : configurationState.values().get(dev.jasper.app.config.CoreSettings.UI_THEME_NAME); }
+    String requestedWorkspaceTheme() { return configurationState == null ? themes.workspaceChoice().name() : configurationState.values().get(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE); }
+    void chooseUiTheme(String name) {
+        choose(dev.jasper.app.config.CoreSettings.UI_THEME_NAME, name, () -> selectTheme(availableThemes().find(name).orElse(themes.choice().dark() ? Theme.DARK : Theme.JASPER_LIGHT)));
+    }
+    void chooseWorkspaceTheme(String name) {
+        var choice = new dev.jasper.app.config.WorkspaceThemeChoice(name);
+        choose(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE, choice.name(), () -> {
+            themes.configureWorkspace(choice, choice.matchesChrome() ? null : availableThemes().find(choice.name()).orElse(null));
+            chrome.refreshTheme();
+        });
+    }
+    void openThemesSettings() { if (openSettingsAt != null) openSettingsAt.accept("appearance"); }
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         saveSettings = null; openSettingsAt = null; configurationState = null;
+        themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest(); chrome.clearThemeMenus();
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
@@ -520,6 +593,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         };
     }
 
+    /** Opens the status bar's configuration details, as clicking its configuration button does. */
+    public void showConfigurationDetails() {
+        if (!closed) status().onConfigurationDetails.run();
+    }
+
+    /** A message before the application connected a receiver: logged by its fixed title, never shown in a dialog. */
+    private static void unheard(String title, String details) {
+        LOG.log(System.Logger.Level.WARNING, "A window message had no receiver: " + title);
+    }
+
     public void applyConfiguration(ConfigSnapshot next, boolean macOs) { workspaceConfiguration.apply(next, macOs); }
     float configuredFontSize() { return workspaceConfiguration.configuredFontSize(); }
     boolean closed() { return closed; }
@@ -537,12 +620,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void dispatchCommand(Command command) {
         command.action().actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, command.id()));
     }
-    /** The shortcut that opens a scope's chip (or the palette, for {@code ALL_ID}), for the mode list; null when none. */
-    String scopeShortcut(String scopeId) {
-        if (PaletteScope.ALL_ID.equals(scopeId))
-            return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
-        return scopes.find(scopeId).flatMap(PaletteScope::shortcutActionId).flatMap(bindings::strokeFor)
-            .map(stroke -> CommandsScope.shortcutText(stroke, macOs)).orElse(null);
+    /** The shortcut that opens the palette, shown in the title search field. */
+    String paletteShortcut() {
+        return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
     }
     String tabShortcut(int index) {
         if (index < 0 || index >= 9) return "";
@@ -714,7 +794,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             update();
         };
         tab.onEmpty = () -> closeTab(tab);
-        tab.onError = message -> onError.accept(message);
+        tab.onError = message -> onError.accept("Could not start the terminal", message);
+        tab.lastInWindow = () -> tabs.getTabCount() == 1;
         tab.configure = pane -> configurePane(tab, pane);
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
@@ -925,7 +1006,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void selectTheme(Theme theme) {
         if (closed) return;
         try { themes.configure(theme); }
-        catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
+        catch (ThemeController.InstallationFailure failure) { onError.accept("Could not apply the theme", failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
@@ -970,7 +1051,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var save = saveSettings;
         var state = configurationState;
         if (save == null || state == null) { locally.run(); return; }
-        if (state.rejected()) { revertChoices(); onError.accept(REJECTED_CHOICE); return; }
+        if (state.rejected()) { revertChoices(); onError.accept("Settings not saved", REJECTED_CHOICE); return; }
         java.util.concurrent.CompletableFuture<?> result;
         try { result = save.apply(dev.jasper.app.config.SettingsEdit.of(setting, value, state.values())); }
         catch (RuntimeException failure) { result = java.util.concurrent.CompletableFuture.failedFuture(failure); }
@@ -981,7 +1062,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 revertChoices();
                 Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
                     ? failure.getCause() : failure;
-                onError.accept(cause.getMessage());
+                onError.accept("Settings not saved", cause.getMessage());
             });
         });
     }
@@ -1114,7 +1195,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         dockDrag.cancel();
         paletteKeys.close();
         if (contributed != null) { contributed.close(); contributed = null; }
-        commandPalette.close(); windowCommands.close(); commands.close();
+        commandPalette.close(); windowCommands.close(); chrome.closeThemeMenus(); commands.close();
         scopes.close();
         closed = true;
         if (contentHost != null) { contentHost.close(); contentHost = null; }
@@ -1126,6 +1207,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
         if (windowTabs != null) windowTabs.close();
+        uninstallCornerLayer();
+        if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
         Runnable closeTabs = () -> {
             for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }
@@ -1137,7 +1220,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         refreshTabs();
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
-        onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
+        onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();
         anyWindowActive = () -> false;

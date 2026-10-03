@@ -63,7 +63,8 @@ class PackagedResourcesTest {
                 "dev/jasper/app/themeimport/intellij/LICENSE.txt",
                 "dev/jasper/app/themes/intellij-light.toml",
                 "dev/jasper/app/themes/darcula.toml",
-                "dev/jasper/app/themes/jasper-dark.toml"
+                "dev/jasper/app/themes/jasper-dark.toml",
+                "dev/jasper/app/themes/THIRD-PARTY-THEMES.md"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")

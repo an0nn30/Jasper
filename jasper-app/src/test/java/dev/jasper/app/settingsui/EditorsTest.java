@@ -69,18 +69,6 @@ class EditorsTest {
         assertThat(Editors.<ToolbarMode>choice(Map.of("icons", "Icons only")).terms()).contains("Icons only");
     }
 
-    @Test void anEditableComboStillReportsPicksAfterItsLookAndFeelIsUpdated() {
-        // Each dialog replays the current theme when it opens, and updateUI gives an editable combo a new editor field.
-        var editor = build(Editors.theme(() -> List.of("Jasper Dark", "IntelliJ Light")), CoreSettings.UI_THEME_NAME, context);
-        var edits = new int[1];
-        editor.show("Jasper Dark");
-        editor.onEdit(() -> edits[0]++);
-        javax.swing.SwingUtilities.updateComponentTreeUI(editor.component());
-        ((JComboBox<?>) editor.component()).setSelectedIndex(1);
-        assertThat(edits[0]).isPositive();
-        assertThat(editor.value()).isEqualTo("IntelliJ Light");
-    }
-
     @Test void listsTablesAndExecutablesEditTheirValues() {
         var args = (Editors.Items) build(Editors.textList(), CoreSettings.TERMINAL_SHELL_ARGS, context);
         args.show(List.of("-l"));
@@ -187,83 +175,4 @@ class EditorsTest {
     }
 
 
-    @Test void onlyClicksEnterAndProgrammaticChoicesNavigateFromTheActionEntry() {
-        var source = new javax.swing.JPanel();
-        assertThat(Editors.ActionCombo.navigates(null)).isTrue();
-        assertThat(Editors.ActionCombo.navigates(new java.awt.event.MouseEvent(source, java.awt.event.MouseEvent.MOUSE_RELEASED,
-            0, 0, 1, 1, 1, false))).isTrue();
-        assertThat(Editors.ActionCombo.navigates(new java.awt.event.ActionEvent(source, java.awt.event.ActionEvent.ACTION_PERFORMED, ""))).isTrue();
-        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_ENTER))).isTrue();
-        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_DOWN))).isFalse();
-        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_PAGE_DOWN))).isFalse();
-        assertThat(Editors.ActionCombo.navigates(key(source, java.awt.event.KeyEvent.VK_END))).isFalse();
-    }
-
-    private static java.awt.event.KeyEvent key(java.awt.Component source, int code) {
-        return new java.awt.event.KeyEvent(source, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, code, java.awt.event.KeyEvent.CHAR_UNDEFINED);
-    }
-
-
-
-    private static Editors.TerminalColorsEditor terminalColors(String config, List<String> navigated) {
-        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), config, true).values());
-        var ctx = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
-        return (Editors.TerminalColorsEditor) build(Editors.terminalColors(() -> List.of("Dracula", "Nord")), CoreSettings.TERMINAL_COLORS, ctx);
-    }
-
-    @Test void followingTheUiThemeIsACheckboxOverTheSeparateChoices() {
-        var navigated = new ArrayList<String>();
-        var editor = terminalColors("", navigated);
-        @SuppressWarnings("unchecked") var box = (JComboBox<String>) editor.choice.component();
-        assertThat(java.util.stream.IntStream.range(0, box.getItemCount()).mapToObj(box::getItemAt))
-            .as("Match is the checkbox, not a choice").containsExactly("Jasper Light", "Jasper Dark", "Dracula", "Nord");
-        assertThat(editor.follow.getText()).isEqualTo("Workspace theme follows the UI theme");
-
-        editor.show("match");
-        assertThat(editor.follow.isSelected()).isTrue();
-        assertThat(box.isEnabled()).isFalse();
-        assertThat(editor.value()).isEqualTo("match");
-
-        var edits = new int[1];
-        editor.onEdit(() -> edits[0]++);
-        editor.follow.doClick();
-        assertThat(editor.follow.isSelected()).isFalse();
-        assertThat(box.isEnabled()).isTrue();
-        assertThat(editor.value()).as("nothing chosen before: Dark").isEqualTo("Jasper Dark");
-        assertThat(edits[0]).isEqualTo(1);
-
-        box.setSelectedIndex(2);
-        assertThat(editor.value()).isEqualTo("Dracula");
-        editor.follow.doClick();
-        assertThat(editor.value()).isEqualTo("match");
-        assertThat(box.isEnabled()).isFalse();
-        editor.follow.doClick();
-        assertThat(editor.value()).as("unticking returns to the last separate choice").isEqualTo("Dracula");
-
-        editor.show("Nord");
-        assertThat(editor.follow.isSelected()).isFalse();
-        assertThat(editor.value()).isEqualTo("Nord");
-        editor.show("DARK");
-        assertThat(editor.value()).isEqualTo("DARK");
-
-        assertThat(navigated).isEmpty();
-    }
-
-    @Test void unTickingStartsFromTheSavedSeparateChoice() {
-        var editor = terminalColors("[terminal]\ncolors = 'Nord'\n", new ArrayList<>());
-        editor.show("match");
-        editor.follow.doClick();
-        assertThat(editor.value()).isEqualTo("Nord");
-    }
-
-    @Test void onlyTheShownBuiltInLabelsBecomeTheirTokens() {
-        assertThat(Editors.storedColors("Match the theme")).isEqualTo("match");
-        assertThat(Editors.storedColors("Jasper Light")).isEqualTo("Jasper Light");
-        assertThat(Editors.storedColors(" Jasper Dark ")).isEqualTo("Jasper Dark");
-        assertThat(Editors.storedColors("Light")).isEqualTo("Light");
-        assertThat(Editors.storedColors("match")).isEqualTo("match");
-        assertThat(Editors.storedColors("LIGHT")).isEqualTo("LIGHT");
-        assertThat(Editors.storedColors("Match The Theme")).as("a user theme of that name").isEqualTo("Match The Theme");
-        assertThat(Editors.storedColors("match the theme")).isEqualTo("match the theme");
-    }
 }

@@ -61,6 +61,10 @@ public final class ThemeController {
         requireEdt();
         return state.workspace() == null ? List.of(state.choice()) : List.of(state.choice(), state.workspace());
     }
+    /** Changes only workspace values, preserving the active chrome and interface typography. */
+    public void configureWorkspace(WorkspaceThemeChoice choice, Theme workspaceOrNull) {
+        requireEdt(); configure(state.choice(), choice, workspaceOrNull, uiFont);
+    }
     public void configureTerminal(TerminalColors terminal) {
         requireEdt(); configure(state.choice(), terminal, uiFont);
     }

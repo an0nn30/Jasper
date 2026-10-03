@@ -14,7 +14,7 @@ script, Swing/FlatLaf 3.7, headless JUnit/AssertJ. No new runtime dependencies o
 
 **Spec:** [Approved theme design](../specs/2026-10-01-jasper-theme-system-design.md), §§2, 6, 8–9.
 **Companion:** [Requirement coverage and decisions](2026-10-01-theme-system-remaining-work.md).
-**Status:** All seven tasks implemented inline (2026-10-01); independent review completed and its four Important findings fixed; final verification recorded below. Re-audited against local `main@c8365dd1`,
+**Status:** Merged locally at `cc0429f5` (2026-10-01), including the hidden-rail fix from main; merged `./gradlew check` passes **7,931/0/0/6**, no push. All seven tasks implemented inline (2026-10-01); independent review completed and its four Important findings fixed; final verification recorded below. Re-audited against local `main@c8365dd1`,
 with Plans 2 and 3 merged and verified. This replaces the earlier six-task outline with seven sequential review gates.
 All 12 upstream/local sources and 413 hashed assets are locked; 284 native themes are generated offline.
 The `[icons]` format amendment is implemented and recorded in the approved spec. The maximum native theme is

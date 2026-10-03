@@ -61,75 +61,24 @@ class TerminalColorsTest {
         });
     }
 
-    @Test void terminalColorsMenuOffersChoicesThatApplyLiveAndReflectTheCurrentChoice() throws Exception {
+    @Test void compatibilityCommandsStillSelectExplicitNativeNames() throws Exception {
         edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(Theme.DARK));
-            owner.updateActions();
-            JMenu menu = terminalColors(owner);
-            List<JRadioButtonMenuItem> items = terminalItems(menu);
-            assertThat(items).extracting(JMenuItem::getText)
-                .containsExactly("Terminal: Match UI", "Terminal: Light", "Terminal: Dark");
-            open(menu);
-            assertThat(items.get(0).isSelected()).isTrue();
-            items.get(1).doClick();
-            assertThat(owner.workspaceChoice().name()).isEqualTo("Jasper Light");
-            assertThat(owner.theme().palette()).isEqualTo(Palette.jasperLight());
-            owner.selectTerminalColors(TerminalColors.DARK);
-            open(menu);
-            assertThat(items.get(2).isSelected()).isTrue();
-            assertThat(items).allMatch(JMenuItem::isEnabled);
+            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(Theme.DARK)); owner.setActive(true);
+            for (var entry : java.util.Map.of("light", "Jasper Light", "dark", "Jasper Dark", "match", "match").entrySet()) {
+                owner.windowCommands().view("view.terminal_colors." + entry.getKey()).actionPerformed(new java.awt.event.ActionEvent(owner,0,""));
+                assertThat(owner.workspaceChoice().name()).isEqualTo(entry.getValue());
+            }
         });
     }
-
-    @Test void aNamedTerminalThemeLeavesNoMenuChoiceChecked() throws Exception {
+    @Test void namedWorkspaceIsCheckedByNameAndMissingNamesCheckNothing() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.DARK);
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            owner.updateActions();
-            JMenu menu = terminalColors(owner);
-            List<JRadioButtonMenuItem> items = terminalItems(menu);
-            owner.selectTerminalColors(TerminalColors.DARK);
-            open(menu);
-            assertThat(items.get(2).isSelected()).isTrue();
-            themes.configure(Theme.DARK, new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
-            open(menu);
-            assertThat(items).as("no built-in choice is checked for a named theme").noneMatch(JMenuItem::isSelected);
-            owner.selectTerminalColors(TerminalColors.DARK);
-            open(menu);
-            assertThat(items).extracting(JMenuItem::isSelected).containsExactly(false, false, true);
+            var themes = new ThemeController(Theme.DARK);var owner=content(launcher(new ArrayDeque<>()),themes);
+            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"),Theme.DARCULA,UiFontConfig.defaults());
+            var menu=WindowThemeMenuTest.workspace(owner);
+            assertThat(WindowThemeMenuTest.item(menu,"Darcula").isSelected()).isTrue();
+            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Light"),Theme.DARCULA,UiFontConfig.defaults());
+            menu=WindowThemeMenuTest.workspace(owner);
+            assertThat(WindowThemeMenuTest.leaves(menu)).noneMatch(JMenuItem::isSelected);
         });
-    }
-
-    @Test void nativeLightNameDoesNotSelectTheLegacyLightMenuChoice() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController(Theme.DARK);
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            var menu = terminalColors(owner);
-            owner.selectTerminalColors(TerminalColors.LIGHT);
-            open(menu);
-            assertThat(terminalItems(menu).get(1).isSelected()).isTrue();
-            themes.configure(Theme.DARK, new dev.jasper.app.config.WorkspaceThemeChoice("Light"),
-                Theme.DARCULA, UiFontConfig.defaults());
-            open(menu);
-            assertThat(terminalItems(menu)).noneMatch(JMenuItem::isSelected);
-            assertThat(themes.workspaceChoice().name()).isEqualTo("Light");
-        });
-    }
-
-    private static void open(JMenu menu) {
-        for (var listener : menu.getMenuListeners()) listener.menuSelected(new MenuEvent(menu));
-    }
-
-    private static JMenu terminalColors(WindowContent owner) {
-        for (var component : owner.menuBar().getMenu(2).getMenuComponents())
-            if (component instanceof JMenu menu && menu.getText().equals("Terminal Colors")) return menu;
-        throw new AssertionError("Terminal Colors menu is absent");
-    }
-
-    private static List<JRadioButtonMenuItem> terminalItems(JMenu menu) {
-        var items = new ArrayList<JRadioButtonMenuItem>();
-        for (var component : menu.getMenuComponents())
-            if (component instanceof JRadioButtonMenuItem item && item.getText().startsWith("Terminal:")) items.add(item);
-        return items;
     }
 }

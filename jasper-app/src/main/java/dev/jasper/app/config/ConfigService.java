@@ -102,6 +102,7 @@ public final class ConfigService implements AutoCloseable {
     private boolean closed;
     /** Runs on the worker after each read of the file; see {@link #watchWith}. */
     private volatile Runnable companion;
+    private java.util.function.BooleanSupplier changes; // confined to the worker
 
     public ConfigService(Path file, boolean macOs) {
         this(file, macOs, newWorker(), SwingUtilities::invokeLater);
@@ -131,6 +132,16 @@ public final class ConfigService implements AutoCloseable {
         Objects.requireNonNull(companion, "companion");
         this.companion = companion;
         return submit(() -> { companion.run(); return null; });
+    }
+
+    /**
+     * Runs once now and on each scheduled or forced refresh, on the configuration worker. A true result
+     * republishes the configuration even when its values are unchanged, after the companion updated its data.
+     * The returned future completes after the initial run. Later failures are logged and retried next poll.
+     */
+    public CompletableFuture<Void> watchChanges(java.util.function.BooleanSupplier companion) {
+        Objects.requireNonNull(companion, "companion");
+        return submit(() -> { changes = companion; companion.getAsBoolean(); return null; });
     }
 
     /** Registers once, publishing the current state before watching for subsequent changes. */
@@ -341,9 +352,14 @@ public final class ConfigService implements AutoCloseable {
         State previous = lastConfig;
         lastConfig = readState(lastConfig, force);
         if (force || !lastConfig.equals(previous)) runCompanion();
+        boolean companionChanged = false;
+        if (changes != null) {
+            try { companionChanged = changes.getAsBoolean(); }
+            catch (Throwable failure) { LOG.log(System.Logger.Level.WARNING, "Configuration change companion failed", failure); }
+        }
         State next = lastConfig;
         synchronized (lifecycle) {
-            if (!closed && (publishUnchanged || !next.equals(state))) {
+            if (!closed && (publishUnchanged || companionChanged || !next.equals(state))) {
                 state = next;
                 revision++;
                 publish();

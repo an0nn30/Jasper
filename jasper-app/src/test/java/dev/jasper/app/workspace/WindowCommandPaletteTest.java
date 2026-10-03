@@ -353,7 +353,7 @@ class WindowCommandPaletteTest {
             };
             logger.addHandler(handler);
             try (var history = new CommandHistory(); var owner = owner(history)) {
-                install(owner); var errors = new ArrayList<String>(); owner.onError = errors::add;
+                install(owner); var errors = new ArrayList<String>(); owner.onError = (title, message) -> errors.add(message);
                 owner.commands().register(command("failing", () -> { throw new IllegalStateException("fixture"); }));
                 owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("failing");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(owner.commandPalette().component());

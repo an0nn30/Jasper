@@ -21,7 +21,9 @@ final class ChromeKeys {
         "Jasper.editorBackground", "Jasper.editorForeground", "Jasper.editorCaret", "Jasper.editorSelection",
         "Jasper.editorCurrentLine", "Jasper.editorGutter", "Jasper.editorLineNumbers", "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground",
         "Jasper.titleSearch.background", "Jasper.titleSearch.hoverBackground", "Jasper.titleSearch.border",
-        "Jasper.titleSearch.foreground", "Jasper.titleSearch.hintForeground");
+        "Jasper.titleSearch.foreground", "Jasper.titleSearch.hintForeground", "Jasper.railBadgeAccent", "Jasper.railBadgeError",
+        "Jasper.notification.background", "Jasper.notification.borderColor", "Jasper.notification.foreground",
+        "Jasper.notification.mutedForeground", "Jasper.notification.linkForeground");
 
     private ChromeKeys() {}
 
@@ -76,6 +78,17 @@ final class ChromeKeys {
         put(defaults, added, "Jasper.editorCurrentLine", mix(foreground, editor, .06));
         put(defaults, added, "Jasper.editorGutter", editor);
         put(defaults, added, "Jasper.editorLineNumbers", first(defaults, "Label.disabledForeground"));
+        put(defaults, added, "Jasper.railBadgeAccent", readable(first(defaults, "TabbedPane.underlineColor"), title, 3, foreground));
+        put(defaults, added, "Jasper.railBadgeError", readable(first(defaults, "Actions.Red"), title, 3, foreground));
+        put(defaults, added, "Jasper.notification.background", first(defaults, "Notification.background", "PopupMenu.background", "Panel.background"));
+        Color card = defaults.getColor("Jasper.notification.background");
+        put(defaults, added, "Jasper.notification.borderColor", first(defaults, "Notification.borderColor", "Popup.borderColor", "Component.borderColor"));
+        put(defaults, added, "Jasper.notification.foreground", first(defaults, "Notification.foreground", "Label.foreground"));
+        Color cardText = defaults.getColor("Jasper.notification.foreground");
+        put(defaults, added, "Jasper.notification.mutedForeground",
+            readable(first(defaults, "Label.infoForeground", "Label.disabledForeground"), card, 4.5, cardText));
+        put(defaults, added, "Jasper.notification.linkForeground",
+            readable(first(defaults, "Link.activeForeground", "TabbedPane.underlineColor"), card, 4.5, cardText));
         return added;
     }
 

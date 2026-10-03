@@ -3,6 +3,8 @@ package dev.jasper.app.palette;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.lifecycle.Subscription;
+import java.awt.Component;
+import java.awt.Container;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,16 +75,26 @@ public final class PaletteTestSupport {
     /** The chip's label, or null while no chip is set. */
     public static String chipText(CommandPalette palette) { return palette.chipText(); }
     public static JLabel chip(CommandPalette palette) { return palette.chip(); }
-    /** The scope hints along the bottom edge, as their text; empty while a chip is set. */
-    public static List<String> scopeHints(CommandPalette palette) { return palette.scopeHintTexts(); }
-    public static void clickScopeHint(CommandPalette palette, String text) { palette.clickScopeHint(text); }
-    /** The key shown on each scope hint, in order; empty for a scope without one. */
-    public static List<String> scopeHintKeys(CommandPalette palette) { return palette.scopeHintKeys(); }
     public static boolean backspace(PaletteController controller) { return controller.backspacePressed(); }
     public static String placeholder(CommandPalette palette) { return (String) palette.queryField().getClientProperty("JTextField.placeholderText"); }
     public static JPanel hintBar(CommandPalette palette) { return palette.hintBar(); }
     public static JPanel fieldRow(CommandPalette palette) { return (JPanel) palette.queryField().getParent(); }
     public static String hint(CommandPalette palette) { return palette.hintText(); }
+
+    /** The text of every label the hint bar shows, in component order. */
+    public static List<String> hintBarTexts(CommandPalette palette) {
+        var texts = new ArrayList<String>();
+        visibleLabelTexts(palette.hintBar(), texts);
+        return texts;
+    }
+
+    private static void visibleLabelTexts(Container container, List<String> texts) {
+        for (Component child : container.getComponents()) {
+            if (!child.isVisible()) continue;
+            if (child instanceof JLabel label) texts.add(label.getText());
+            else if (child instanceof Container nested) visibleLabelTexts(nested, texts);
+        }
+    }
     public static List<String> hintActions(CommandPalette palette) { return palette.hintActionTexts(); }
     public static void clickHintAction(CommandPalette palette, int index) { palette.clickHintAction(index); }
     public static int itemHeight(CommandPalette palette) { return palette.itemHeight(); }

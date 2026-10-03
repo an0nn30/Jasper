@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
@@ -33,15 +34,20 @@ import javax.swing.UIManager;
  * One of the window's two tool window stripes (IntelliJ's tool window bars). Top to bottom: the top group; a separator
  * when the second group has icons; the second group; on the left stripe, the plugins' rail actions behind their own
  * separator; flexible space; and the foot group, pinned to the bottom. A button is selected while its window shows;
- * a click toggles the window and a right-click opens its {@link ToolWindowMenu}. During a dock drag the stripe shows
+ * a click toggles the window and a right-click opens its {@link ToolWindowMenu}. A button with an unread badge shows a
+ * {@link BadgedIcon} and names the badge in its tooltip and accessible description. During a dock drag the stripe shows
  * all three groups with their separators (an empty group as one button's drop space), lifts the dragged window's
  * button out, and opens a gap where the window would drop. The lifted button's step stays empty at the end of its group,
  * so no later group slides under the cursor, and a gap in that group uses it. The stripe owns no state: the window
  * renders it again after every change. EDT only.
  */
 final class ToolStripe extends JPanel {
-    /** One tool window's button. */
-    record Button(String id, String title, Icon icon, Slot slot, boolean selected) { }
+    /** One tool window's button, with its unread badge if it has one. */
+    record Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge) {
+        Button(String id, String title, Icon icon, Slot slot, boolean selected) {
+            this(id, title, icon, slot, selected, Optional.empty());
+        }
+    }
 
     /** Where the last layout put everything; during a drag, also each group's drop bounds and the gap. */
     private static final class Placement {
@@ -129,7 +135,12 @@ final class ToolStripe extends JPanel {
 
     private AbstractButton toggle(Button window) {
         var button = new JToggleButton();
-        style(button, window.icon(), window.title());
+        style(button, window.badge().<Icon>map(badge -> new BadgedIcon(window.icon(), badge.tone())).orElse(window.icon()),
+            window.title());
+        window.badge().ifPresent(badge -> {
+            button.setToolTipText(window.title() + " (" + badge.description() + ")");
+            button.getAccessibleContext().setAccessibleDescription(badge.description());
+        });
         button.setSelected(window.selected());
         button.addActionListener(event -> onToggle.accept(window.id()));
         button.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),

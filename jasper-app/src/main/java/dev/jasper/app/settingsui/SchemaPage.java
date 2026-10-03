@@ -393,6 +393,7 @@ public final class SchemaPage implements SettingsPage {
 
     @Override public void refresh() {
         actionRefreshers.forEach(Runnable::run);
+        for (Row<?> row : rows) row.editor.refresh();
         if (panel != null) showValues();
     }
 
