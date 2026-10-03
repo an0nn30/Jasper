@@ -48,12 +48,19 @@ public final class MacDock {
         }
     }
 
-    /** Loads the bridge and starts watching for a log-out or shutdown; start-up calls it once it has settled. EDT. */
-    public static void prepare() {
+    /**
+     * Loads the bridge and starts watching for a log-out or shutdown; start-up calls it once it has settled. EDT.
+     *
+     * @return true only when the bridge is loaded and the power-off observer is installed, now or by an earlier call;
+     *     false when the library could not load, the process is not Jasper's bundle, or registering failed, so that a
+     *     log-out could never be recognised
+     */
+    public static boolean prepare() {
         try {
-            if (MacNative.load()) watchPowerOff();
+            return MacNative.load() && watchPowerOff();
         } catch (RuntimeException | LinkageError failure) {
             warnOnce(failure);
+            return false;
         }
     }
 
@@ -79,7 +86,7 @@ public final class MacDock {
 
     private static native void setRegular(boolean regular);
 
-    private static native void watchPowerOff();
+    private static native boolean watchPowerOff();
 
     private static native boolean poweringOffNow();
 }

@@ -22,7 +22,7 @@ class MacDockTest {
         // Real JNI linkage; a JVM outside Jasper's bundle returns before touching NSApp or NSWorkspace.
         setRegular.invoke(null, false);
         setRegular.invoke(null, true);
-        watch.invoke(null);
+        assertThat(watch.invoke(null)).as("no observer outside Jasper's bundle").isEqualTo(false);
         assertThat(poweringOff.invoke(null)).isEqualTo(false);
     }
 
@@ -41,7 +41,7 @@ class MacDockTest {
     }
 
     @Test void outsideAPackagedAppNothingLoadsAndNothingThrows() {
-        MacDock.prepare();
+        assertThat(MacDock.prepare()).as("nothing was prepared, so a log-out cannot be recognised").isFalse();
         MacDock.show(false);
         MacDock.show(true);
         assertThat(MacDock.poweringOff()).isFalse();

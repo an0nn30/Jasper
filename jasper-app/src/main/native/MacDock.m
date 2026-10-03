@@ -44,10 +44,15 @@ static void JasperApplyPolicy(NSApplication *app, BOOL foreground) {
 static atomic_bool JasperPoweringOff;
 static id JasperPowerOffObserver;
 
-// Posted before macOS asks every application to quit for a log-out, restart or shutdown.
-static void JasperWatchPowerOff(NSNotificationCenter *center) {
-    JasperPowerOffObserver = [center addObserverForName:NSWorkspaceWillPowerOffNotification object:nil queue:nil
-        usingBlock:^(NSNotification *notification) { atomic_store(&JasperPoweringOff, true); }];
+// Posted before macOS asks every application to quit for a log-out, restart or shutdown. Returns whether the observer is
+// installed, now or by an earlier call: a failed registration must never read as a watch that will never fire.
+static BOOL JasperWatchPowerOff(NSNotificationCenter *center) {
+    @synchronized(NSNotificationCenter.class) {
+        if (JasperPowerOffObserver != nil) return YES;
+        JasperPowerOffObserver = [center addObserverForName:NSWorkspaceWillPowerOffNotification object:nil queue:nil
+            usingBlock:^(NSNotification *notification) { atomic_store(&JasperPoweringOff, true); }];
+        return JasperPowerOffObserver != nil;
+    }
 }
 
 // Gradle, an IDE or a test JVM has no Jasper bundle: never change another application's presence.
@@ -63,11 +68,11 @@ JNIEXPORT void JNICALL Java_dev_jasper_app_platform_MacDock_setRegular(JNIEnv *e
     }
 }
 
-JNIEXPORT void JNICALL Java_dev_jasper_app_platform_MacDock_watchPowerOff(JNIEnv *env, jclass type) {
+// True when the power-off observer is installed (now or earlier); false outside Jasper's bundle or when registering fails.
+JNIEXPORT jboolean JNICALL Java_dev_jasper_app_platform_MacDock_watchPowerOff(JNIEnv *env, jclass type) {
     @autoreleasepool {
-        if (!JasperIsJasper()) return;
-        static dispatch_once_t once;
-        dispatch_once(&once, ^{ JasperWatchPowerOff(NSWorkspace.sharedWorkspace.notificationCenter); });
+        if (!JasperIsJasper()) return JNI_FALSE;
+        return JasperWatchPowerOff(NSWorkspace.sharedWorkspace.notificationCenter) ? JNI_TRUE : JNI_FALSE;
     }
 }
 

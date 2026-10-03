@@ -10,10 +10,12 @@ import java.util.function.Consumer;
  *
  * @param show applies the activation policy: true shows Jasper in the Dock and Cmd+Tab and activates it, false hides
  *     it from both; returns once applied. EDT, with no AWT lock held, and never while quitting
- * @param prepare loads what {@code show} and {@code poweringOff} need, ahead of the first switch. EDT
+ * @param prepare loads what {@code show} and {@code poweringOff} need, ahead of the first switch, and returns whether
+ *     {@code poweringOff} can now be trusted: false when the bridge could not load or could not watch for a power-off.
+ *     EDT
  * @param poweringOff whether macOS is logging out, restarting or shutting down. Any thread
  */
-public record DockControl(Consumer<Boolean> show, Runnable prepare, BooleanSupplier poweringOff) {
+public record DockControl(Consumer<Boolean> show, BooleanSupplier prepare, BooleanSupplier poweringOff) {
     /** Rejects nulls. */
     public DockControl {
         Objects.requireNonNull(show, "show");

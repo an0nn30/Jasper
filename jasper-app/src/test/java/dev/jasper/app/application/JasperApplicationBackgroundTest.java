@@ -2,11 +2,16 @@ package dev.jasper.app.application;
 
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.contributions.ContentHost;
+import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.startup.StartupTrace;
+import dev.jasper.app.testsupport.PluginJars;
 import java.awt.HeadlessException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -16,6 +21,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JLabel;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.io.TempDir;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
@@ -32,6 +40,10 @@ class JasperApplicationBackgroundTest {
     private final List<Boolean> dock = new CopyOnWriteArrayList<>();
     private final AtomicInteger prepared = new AtomicInteger();
     private final AtomicBoolean poweringOff = new AtomicBoolean();
+    /** What the bridge's prepare reports: false stands for a library that did not load or a missing power-off observer. */
+    private final AtomicBoolean prepareSucceeds = new AtomicBoolean(true);
+
+    @TempDir Path home;
 
     /** How macOS's quit request was answered. */
     private record Answer(AtomicInteger cancelled, AtomicInteger performed) implements java.awt.desktop.QuitResponse {
@@ -45,7 +57,10 @@ class JasperApplicationBackgroundTest {
         edt(() -> {
             held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminate);
             held[0].trace(trace);
-            held[0].backgroundOnQuit(new DockControl(dock::add, prepared::incrementAndGet, poweringOff::get), visibleAtLaunch);
+            held[0].backgroundOnQuit(new DockControl(dock::add, () -> {
+                prepared.incrementAndGet();
+                return prepareSucceeds.get();
+            }, poweringOff::get), visibleAtLaunch);
         });
         return held[0];
     }
@@ -265,15 +280,14 @@ class JasperApplicationBackgroundTest {
         JasperApplication application = application(trace, () -> { }, true);
         try {
             edt(() -> {
-                application.settleFallback(Duration.ofMillis(100));
+                application.settleFallback(Duration.ofHours(1));
                 application.residency(true);
                 application.residency(true);
             });
             trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
             trace.mark(StartupTrace.Milestone.WARMED_UP);
             trace.mark(StartupTrace.Milestone.FIRST_PAINT);
-            until(() -> prepared.get() >= 1);
-            Thread.sleep(400); // past the fallback, which must have been cancelled or found nothing to do
+            // Every settled step queued above has run once the EDT reaches this turn.
             edt(() -> application.residency(true));
             edt(() -> { });
             assertThat(prepared).hasValue(1);
@@ -346,6 +360,163 @@ class JasperApplicationBackgroundTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(answer.cancelled()).as("the log-out goes on").hasValue(0);
         assertThat(dock).isEmpty();
+    }
+
+    @Test void aProcessThatIsNotResidentKeepsTheOrdinaryHandlerEvenWithAPresence() throws Exception {
+        // --standalone, --safe-mode, run_in_background = false or a failed bind: a presence is installed, nothing prepares it.
+        var terminated = new CountDownLatch(1);
+        var recorded = new Answer();
+        var answer = new Answer();
+        JasperApplication application = application(terminated::countDown, true);
+        edt(() -> application.residency(false));
+        assertThat(application.quitIsSystemQuit()).as("today's handler: cancel, then capture, then quit").isFalse();
+        application.nativeQuitRequested(recorded, () -> true);
+        edt(() -> { });
+        assertThat(recorded.cancelled()).as("the Shortcuts recorder takes Cmd+Q").hasValue(1);
+        assertThat(terminated.getCount()).as("and Jasper does not quit").isEqualTo(1);
+        application.nativeQuitRequested(answer, () -> false);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(answer.cancelled()).as("cancelled first, then a real quit").hasValue(1);
+        assertThat(dock).isEmpty();
+    }
+
+    @Test void aPresenceThatNeverBecameResidentAlsoKeepsTheOrdinaryHandler() throws Exception {
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = application(terminated::countDown, true);
+        assertThat(application.quitIsSystemQuit()).isFalse();
+        edt(application::quitRequested);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(dock).isEmpty();
+    }
+
+    @Test void aWindowRecordingShortcutsTakesCommandQBeforeTheBridgeIsPrepared() throws Exception {
+        var terminations = new AtomicInteger();
+        var answer = new Answer();
+        JasperApplication application = unsettled(terminations::incrementAndGet, true);
+        try {
+            assertThat(application.quitIsSystemQuit()).isTrue();
+            application.nativeQuitRequested(answer, () -> true);
+            edt(() -> { });
+            assertThat(answer.cancelled()).as("the recorder keeps the keystroke").hasValue(1);
+            assertThat(terminations).hasValue(0);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aLogOutIsNeverCancelledWhileAWindowRecordsShortcuts() throws Exception {
+        var terminated = new CountDownLatch(1);
+        var answer = new Answer();
+        JasperApplication application = settled(terminated::countDown, true);
+        poweringOff.set(true);
+        application.nativeQuitRequested(answer, () -> true);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(answer.cancelled()).as("the log-out goes on").hasValue(0);
+    }
+
+    @Test void anOrdinaryRequestIsCancelledAndTakenByAWindowRecordingShortcuts() throws Exception {
+        var terminations = new AtomicInteger();
+        var answer = new Answer();
+        JasperApplication application = settled(terminations::incrementAndGet, true);
+        try {
+            assertThat(application.quitIsSystemQuit()).isFalse();
+            application.nativeQuitRequested(answer, () -> true);
+            edt(() -> { });
+            assertThat(answer.cancelled()).hasValue(1);
+            assertThat(terminations).hasValue(0);
+            assertThat(dock).as("not even the background").isEmpty();
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aBridgeThatCouldNotPrepareLeavesLogOutsUncancelled() throws Exception {
+        // The library did not load, or loaded without a power-off observer: poweringOff would read false for ever.
+        prepareSucceeds.set(false);
+        var terminated = new CountDownLatch(1);
+        var answer = new Answer();
+        StartupTrace trace = StartupTrace.detached();
+        trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+        JasperApplication application = application(trace, terminated::countDown, true);
+        edt(() -> application.residency(true));
+        edt(() -> { });
+        assertThat(prepared).as("start-up tried to prepare it").hasValue(1);
+        assertThat(application.quitIsSystemQuit()).as("a resident process that never prepared").isTrue();
+        application.nativeQuitRequested(answer, () -> false);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(answer.cancelled()).hasValue(0);
+        assertThat(dock).isEmpty();
+    }
+
+    @Test void aBridgeThatCouldNotPrepareMakesJasperQuitRealInsteadOfGoingToTheBackground() throws Exception {
+        prepareSucceeds.set(false);
+        var terminated = new CountDownLatch(1);
+        StartupTrace trace = StartupTrace.detached();
+        trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+        JasperApplication application = application(trace, terminated::countDown, true);
+        edt(() -> application.residency(true));
+        edt(() -> { });
+        edt(application::quitRequested);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(dock).isEmpty();
+    }
+
+    @Test void withoutAPresenceTheNativeQuitRequestIsCancelledAndThenQuits() throws Exception {
+        var terminated = new CountDownLatch(1);
+        var answer = new Answer();
+        JasperApplication[] held = new JasperApplication[1];
+        edt(() -> {
+            held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            held[0].trace(StartupTrace.detached());
+            held[0].residency(true);
+        });
+        held[0].nativeQuitRequested(answer);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(answer.cancelled()).as("as before: cancelled, then quit").hasValue(1);
+    }
+
+    private static final String GUARD_FIXTURE = """
+        package fix.guard;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import dev.jasper.sdk.ui.WindowSpec;
+        import java.awt.Dimension;
+        import java.nio.file.Files;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                var window = context.windows().create(new WindowSpec("dev.example.guard.window", "Guarded", new Dimension(100, 100), false));
+                window.onClosing(() -> {
+                    try { Files.writeString(context.dataDirectory().resolve("asked"), "yes"); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return Files.exists(context.dataDirectory().resolve("allow"));
+                });
+            }
+        }
+        """;
+
+    @Test @DisabledOnOs(OS.WINDOWS) void aPluginWindowThatRefusesToCloseKeepsEverythingOpenAndTheDockAsItWas() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
+            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
+        Path data = dirs.plugins().resolve("dev.example.guard/data");
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = settled(terminated::countDown, true);
+        try {
+            edt(() -> application.startPlugins(null, dev, false, dirs));
+            edt(application::quitRequested);
+            assertThat(data.resolve("asked")).as("the plugin window was asked, as when it is closed").exists();
+            assertThat(dock).as("nothing closed, so Jasper stays in the Dock").isEmpty();
+            assertThat(terminated.getCount()).isEqualTo(1);
+            Files.writeString(data.resolve("allow"), "yes");
+            edt(application::quitRequested);
+            assertThat(dock).as("it was still open, and closes once the plugin agrees").containsExactly(false);
+            assertThat(terminated.getCount()).as("and the process stays").isEqualTo(1);
+        } finally {
+            edt(application::quitNow);
+            // The shutdown writes the plugin's and the window state under the temporary directory.
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     @Test void anOrdinaryNativeQuitRequestIsCancelledAndGoesToTheBackground() throws Exception {

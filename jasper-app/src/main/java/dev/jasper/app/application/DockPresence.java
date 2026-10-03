@@ -26,10 +26,13 @@ final class DockPresence {
 
     boolean visible() { return visible; }
 
-    /** Loads the bridge and starts watching for a log-out; only once it returns does {@link #prepared} hold. EDT. */
+    /**
+     * Loads the bridge and starts watching for a log-out. {@link #prepared} holds only when that succeeded: a bridge that
+     * failed to load or to watch, or one that throws, leaves it false, so quits stay real and a log-out is never cancelled.
+     * EDT.
+     */
     void prepare() {
-        control.prepare().run();
-        prepared = true;
+        if (control.prepare().getAsBoolean()) prepared = true;
     }
 
     /** Whether {@link #prepare} has run: until then {@link #poweringOff} cannot tell a log-out from a user's Quit. Any thread. */

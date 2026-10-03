@@ -76,7 +76,8 @@ public final class JasperApplication {
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
     private boolean quitting;
-    private boolean resident;
+    /** Written on the EDT, read by the native quit handler's thread too. */
+    private volatile boolean resident;
     /** A packaged macOS Jasper's Dock presence while resident; null where Quit really quits (Windows, Linux, development runs). */
     private volatile DockPresence dock;
     private volatile StartupTrace trace = StartupTrace.current();
@@ -344,9 +345,7 @@ public final class JasperApplication {
         } catch (RuntimeException | Error failure) {
             // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
             try {
-                if (window != null) window.close();
-            } catch (RuntimeException | Error closing) {
-                failure.addSuppressed(closing);
+                if (window != null) discard(window, failure);
             } finally {
                 presence();
             }
@@ -355,6 +354,24 @@ public final class JasperApplication {
         windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
         return window;
+    }
+
+    /**
+     * Closes a window whose composition failed. If closing it fails too, the window is still forgotten and its frame
+     * disposed, and that second failure is added to {@code failure} as suppressed. EDT.
+     */
+    private void discard(TerminalWindow window, Throwable failure) {
+        try {
+            window.close();
+        } catch (RuntimeException | Error closing) {
+            failure.addSuppressed(closing);
+            windows.remove(window);
+            try {
+                window.nativeWindow().dispose();
+            } catch (RuntimeException | Error disposing) {
+                failure.addSuppressed(disposing);
+            }
+        }
     }
 
     /**
@@ -952,35 +969,51 @@ public final class JasperApplication {
     }
 
     /**
-     * macOS's quit request (Cmd+Q, the application menu, the Dock's Quit, a log-out or a shutdown). A system quit is
-     * answered by quitting for real and never cancelled; anything else is cancelled here and goes through
-     * {@link #quitRequested} unless a window that is recording shortcuts takes the Cmd+Q. Any thread.
+     * macOS's quit request (Cmd+Q, the application menu, the Dock's Quit, a log-out or a shutdown). Any thread.
+     *
+     * <p>An ordinary request is cancelled here and goes through {@link #quitRequested} unless a window that is recording
+     * shortcuts takes the Cmd+Q. A system quit (see {@link #quitIsSystemQuit}) quits for real, with the request left
+     * unanswered; the one exception is a user recording Cmd+Q in the Shortcuts panel while macOS is not powering off:
+     * the recorder takes it and the request is cancelled.
      */
     void nativeQuitRequested(java.awt.desktop.QuitResponse response) {
+        nativeQuitRequested(response, JasperApplication::commandQCaptured);
+    }
+
+    /** As {@link #nativeQuitRequested(java.awt.desktop.QuitResponse)}; tests replace how a recording window is found. */
+    void nativeQuitRequested(java.awt.desktop.QuitResponse response, BooleanSupplier recorderTakesCommandQ) {
+        DockPresence presence = dock;
         if (quitIsSystemQuit()) {
-            SwingUtilities.invokeLater(() -> quitForSystem(response));
+            SwingUtilities.invokeLater(() -> {
+                // A log-out is never cancelled; a flag not yet watched (before the bridge is prepared) reads as no log-out.
+                if (!presence.poweringOff() && recorderTakesCommandQ.getAsBoolean()) response.cancelQuit();
+                else quitForSystem(response);
+            });
             return;
         }
         response.cancelQuit();
-        SwingUtilities.invokeLater(() -> {
-            var focused = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
-            var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.META_DOWN_MASK);
-            if (!dev.jasper.app.platform.WindowInput.captureShortcut(focused, stroke)) quitRequested();
-        });
+        SwingUtilities.invokeLater(() -> { if (!recorderTakesCommandQ.getAsBoolean()) quitRequested(); });
+    }
+
+    /** Whether the focused window is recording shortcuts and takes Cmd+Q for itself. EDT. */
+    private static boolean commandQCaptured() {
+        var focused = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
+        var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.META_DOWN_MASK);
+        return dev.jasper.app.platform.WindowInput.captureShortcut(focused, stroke);
     }
 
     /**
-     * Whether a native quit request is, or must be treated as, the system's (a log-out, restart or shutdown): with Dock
-     * presence, until start-up has settled and the bridge is prepared, and from the moment macOS is powering off.
-     * Before the bridge exists a log-out cannot be told from a user's Quit, so both quit for real and never cancel;
-     * the request is never interrupted. Without Dock presence (development runs, Windows, Linux) it is always false.
-     * Any thread.
+     * Whether a native quit request is the system's (a log-out, restart or shutdown) or must be treated as one: a
+     * resident process with Dock presence, until its bridge is prepared and from the moment macOS is powering off.
+     * Before the bridge is prepared a log-out cannot be told from a user's Quit, so both quit for real and the request
+     * is never interrupted. A process that is not resident, or has no Dock presence (development runs, Windows, Linux),
+     * keeps today's handler: cancel, then quit. Any thread.
      */
     boolean quitIsSystemQuit() {
         DockPresence presence = dock;
         // The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a cancelled log-out a
         // later Cmd+Q quits for real, which is the safe direction.
-        return presence != null && (!presence.prepared() || presence.poweringOff());
+        return presence != null && resident && (!presence.prepared() || presence.poweringOff());
     }
 
     /**

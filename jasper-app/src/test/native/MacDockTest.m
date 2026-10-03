@@ -30,16 +30,23 @@ int main(void) {
         __block BOOL ran = NO;
         JasperOnMainThread(^{ ran = YES; });
         assert(ran); // The main thread runs it inline.
-        NSNotificationCenter *center = [NSNotificationCenter new];
         assert(Java_dev_jasper_app_platform_MacDock_poweringOffNow(NULL, NULL) == JNI_FALSE);
-        JasperWatchPowerOff(center);
+        // A registration that yields no observer reports failure, and leaves the door open for a later success.
+        assert(JasperWatchPowerOff(nil) == NO);
+        NSNotificationCenter *center = [NSNotificationCenter new];
+        assert(JasperWatchPowerOff(center) == YES);
+        // Already installed: reported as installed, and a second center is not registered with.
+        NSNotificationCenter *other = [NSNotificationCenter new];
+        assert(JasperWatchPowerOff(other) == YES);
+        [other postNotificationName:NSWorkspaceWillPowerOffNotification object:nil];
+        assert(Java_dev_jasper_app_platform_MacDock_poweringOffNow(NULL, NULL) == JNI_FALSE);
         [center postNotificationName:NSWorkspaceDidWakeNotification object:nil];
         assert(Java_dev_jasper_app_platform_MacDock_poweringOffNow(NULL, NULL) == JNI_FALSE);
         [center postNotificationName:NSWorkspaceWillPowerOffNotification object:nil];
         assert(Java_dev_jasper_app_platform_MacDock_poweringOffNow(NULL, NULL) == JNI_TRUE);
         // A plain process has no Jasper bundle: both entry points return before touching NSApp or NSWorkspace.
         Java_dev_jasper_app_platform_MacDock_setRegular(NULL, NULL, JNI_TRUE);
-        Java_dev_jasper_app_platform_MacDock_watchPowerOff(NULL, NULL);
+        assert(Java_dev_jasper_app_platform_MacDock_watchPowerOff(NULL, NULL) == JNI_FALSE);
         assert(NSApp == nil);
         puts("macOS Dock bridge: all headless checks passed");
     }
