@@ -24,7 +24,10 @@ import javax.swing.UIManager;
  */
 final class DockDropOverlay extends JComponent {
     private static final int FILL_ALPHA = 64, BORDER_ALPHA = 153, ARC = 10;
-    /** The antialiased stroke and the ghost's soft edge reach this far past their rectangles. */
+    /**
+     * A margin, in pixels, for pipeline rounding when repainting the placeholder and the ghost. The antialiased stroke
+     * stays inside its rectangle in the software pipeline.
+     */
     private static final int BLEED = 1;
     /** IntelliJ's accent, for a theme without an accent colour. */
     private static final Color FALLBACK_ACCENT = new Color(0x3574f0);
@@ -38,8 +41,8 @@ final class DockDropOverlay extends JComponent {
 
     /**
      * Shows the guides; each may be null. Repaints only what changed: for each guide that differs from the one shown
-     * before, the union of its old and new bounds (the placeholder's and the ghost's grown by a pixel for their
-     * antialiased edges), and nothing at all when no guide changed.
+     * before, the union of its old and new bounds (the placeholder's and the ghost's grown by a pixel of margin
+     * for pipeline rounding), and nothing at all when no guide changed.
      *
      * @param highlight where the window would land
      * @param placeholder the stripe's gap
@@ -109,8 +112,9 @@ final class DockDropOverlay extends JComponent {
             if (placeholder != null) {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 double arc = UIScale.scale(ARC);
-                // Inset by the border's width, with the arc reduced to match, so the fill never lies under the border.
-                double inner = Math.max(0, arc - 2);
+                // The fill sits inside the border, so the two never stack. The border is stroked 0.5px in, so its
+                // inner edge has corner diameter arc - 1: the fill uses it too, and the two are concentric.
+                double inner = Math.max(0, arc - 1);
                 g.setColor(fill());
                 g.fill(new RoundRectangle2D.Double(placeholder.x + 1, placeholder.y + 1, placeholder.width - 2, placeholder.height - 2, inner, inner));
                 g.setColor(border());

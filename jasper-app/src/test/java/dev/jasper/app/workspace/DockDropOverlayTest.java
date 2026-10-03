@@ -8,6 +8,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.swing.ImageIcon;
@@ -110,7 +111,7 @@ class DockDropOverlayTest {
 
     /** Every dirty rectangle lies within the union of the areas that changed, and together they cover each of them. */
     private static void assertDirties(List<Rectangle> dirty, Rectangle... changed) {
-        Rectangle allowed = union(changed[0], java.util.Arrays.copyOfRange(changed, 1, changed.length));
+        Rectangle allowed = union(changed[0], Arrays.copyOfRange(changed, 1, changed.length));
         assertThat(dirty).as("something was marked dirty").isNotEmpty();
         for (Rectangle rectangle : dirty) assertThat(allowed.contains(rectangle)).as("%s lies within %s", rectangle, allowed).isTrue();
         Rectangle covered = union(dirty.get(0), dirty.subList(1, dirty.size()).toArray(new Rectangle[0]));

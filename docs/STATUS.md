@@ -69,8 +69,19 @@
   foot can clip by one step during a drag; and the overlay now repaints only what changed on each drag event (each
   changed guide's old and new bounds, nothing when none changed, no longer the whole window and every terminal under
   it), and the placeholder's fill sits inside its border like the highlight's, so the two no longer stack; GUI check:
-  the ghost should not lag while dragging on a large HiDPI window. No GUI launched; GUI checks for the user are the
-  plan's last section.
+  the ghost should not lag while dragging on a large HiDPI window; if the ghost still lags over a terminal, the next
+  lever is in `jasper-terminal`: `TerminalView.paintComponent` takes a full snapshot and paints every row whatever its
+  clip, so a terminal under a small dirty rectangle still pays the whole snapshot. No GUI launched; GUI checks for the
+  user are the plan's last section.
+  Polish round (branch `claude/dock-polish`, 2026-10-03): the overlay repaints only what changed, the placeholder's
+  border no longer stacks over its fill, and the placeholder's fill is concentric with its border (its corner
+  diameter is `arc - 1`, where the border's inner edge lies); `DockState.dropIndex` is the one drop-index rule shared
+  by the preview and the drop. 8 new tests pin behaviour that was already there: `HostedUiTest` maps all six anchor and
+  split combinations to their slots (`everyAnchorAndSplitCombinationMapsToItsOwnSlot`); `UiStateTest` gains 7 cases: a
+  version 1 side takes its size from the visible panel, else from the first panel (2), the dock's sizes and ratios
+  exactly at their limits are accepted and one step outside each falls back alone (2), and a scalar where the `dock`
+  or `panels` table belongs, or where a panel entry does, loses only that part (3). `./gradlew check --continue`:
+  **8,314 tests, 0 failures, 0 errors, 6 skipped** (8,306 before).
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.
