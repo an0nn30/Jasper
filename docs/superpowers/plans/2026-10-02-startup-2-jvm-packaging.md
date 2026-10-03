@@ -12,7 +12,38 @@
 
 **Builds on:** Plan 1 (Measure), exactly as named in the shared contract: `StartupTrace.TRACE_FILE_PROPERTY = "jasper.startupTrace"`, its JSON (`schema`, `pid`, `kind`, `settled`, `milestones` with `WINDOW_SHOWN`, `OUTPUT_PAINTED`, `PLUGINS_BOUND`, `jvm.aotCache` = `used`/`stale`/`none`), written atomically; and `tools/benchmarks/run-macos.sh <app> startup <revision> <output.json> [--mode cold|warm] [--runs N] [--prime N] [--real-home]` (Plan 1, Task 6), whose report lists each run's trace `jvm` status.
 
-**Status:** Written and self-reviewed 2026-10-02 on `claude/startup-speed` (HEAD `3b1a1544`), assuming Plan 1 has been applied. Not started. Windows steps are written to the same standard but are **not verifiable on this Mac**; they run on a Windows packaging machine.
+**Status:** Executed 2026-10-02/03 on `claude/startup-speed` with subagent-driven development (per-task implementer
+and review, final whole-branch review). Second of five plans (1 → 2 → 4 → 3A → 3B). Final `./gradlew check`: BUILD
+SUCCESSFUL, 7,991 tests (Plan 1's 7,990 plus the probe test), 0 failures, 0 errors, 6 skips, with
+`verifyPackagingSupport` run. The task text below is unchanged; the result differs from it in these ways:
+
+1. The runtime is 189 MB on disk (192 MB before), not the plan's ~80 MB. `lib/modules` fell from 146 to 96 MB, but jlink's
+   default CDS archives add `classes.jsa` (31 MB) and `classes_nocoops.jsa` (32 MB); `lib/modules` stays uncompressed by
+   design. The trimmed runtime has 41 modules (42 on Windows).
+2. The AOT cache is 63,569,920 bytes (60.6 MiB), not about 67 MB. A training launch settles in about 3-4 s, and the JVM
+   then writes the cache in about 1 s.
+3. `runAotTraining(File, File, Long, Long)` takes boxed `Long`. With two primitive `long` closure parameters, Groovy
+   4.0.32 (Gradle 9.7.0) generates bytecode that the verifier rejects.
+4. Training's `finally` kills the launcher's descendants first (the cache-assembly JVM), then the launcher. The
+   environment scrub is a pure, fixture-pinned helper, `aotTrainingEnvironment(Map, String)`. Both came from the Task 3
+   review.
+5. The three GUI steps were run by the controller after the user approved each batch in chat: Task 3 Step 7 (training),
+   Task 4 Step 7 (`packageDist`) and Task 5 Step 9 (before/after benchmark).
+6. Final-review fixes: the DMG detach in `packageDist` retries once, then forces (`detachMount(File, Closure, Closure)`
+   in `gradle/packaging-support.gradle`, pinned by fixtures in `verifyPackagingSupport`), fails the build with the
+   recovery command if the mount stays, and pre-detaches a stale mount left by a killed run; the probe test's wait is
+   bounded (60 s, then the child is killed); documentation corrections.
+7. Measured, from 10 cold runs each (medians): `WINDOW_SHOWN` went from 1908 to 1184 ms, and `OUTPUT_PAINTED` from 2727
+   to 2057 ms. The AOT cache was used and CDS was on in 10/10 runs. See
+   `docs/benchmarks/2026-10-02-startup-baseline.md`, "Part 2 — JVM and packaging".
+8. Known and deferred:
+   - `-Pjasper.aot=true` throws at configuration time on Windows and Linux, even for unrelated tasks. It is an explicit
+     opt-in and fails loudly.
+   - Windows packaging has not been run.
+   - CI on Linux and Windows, and `.github/workflows/linux-packages.yml`, have not yet run this branch (that needs a
+     push).
+   - On a Mac with 128 GB or more of RAM, the cache stays valid. JDK 25 caps the ergonomic heap to keep compressed
+     pointers, because the launcher sets no heap flags.
 
 ## Global Constraints
 

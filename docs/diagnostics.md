@@ -44,5 +44,8 @@ uses it.
 The packaged macOS app starts with an AOT cache (`Contents/app/jasper.aot`) trained when it was built, and the start-up
 line in the log says whether the JVM used it. If it reports the cache as stale, a copy changed the application's file
 modification times (for example `cp -R`): Jasper works, but starts slower than an app without a cache, because the JVM
-then also skips the runtime's default CDS archive. Reinstall from the DMG with Finder. See
+then also skips the runtime's default CDS archive. Reinstall from the DMG with Finder. A stale or refused cache can
+also come from JVM options in the environment, not only from a copy that lost modification times: `JAVA_TOOL_OPTIONS`
+or `JDK_JAVA_OPTIONS` with a heap above about 32 GB, which turns compressed object pointers off, or a different garbage
+collector. The default heap is safe at any RAM size, because the JVM caps it to keep compressed pointers. See
 [keeping the cache valid](packaging.md#keeping-the-cache-valid).

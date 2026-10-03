@@ -12,17 +12,23 @@
   `packageApp` with `-Pjasper.aot=true`; AGENTS.md: ask first, it opens a window). `packageDist` builds the DMG
   (155.7 MB) with `ditto` and `hdiutil` because jpackage's DMG copy resets modification times, which invalidates the
   cache, and checks the mounted copy. `verifyPackage` checks modules, CDS, natives (bytes, signatures, a headless load
-  probe), JVM options and the cache (`-XX:AOTMode=on`). The JVM prints AOT cache errors on stdout, not stderr. Full
-  check: **7,991/0/0/6**. Measured (`startupBench`, medians of 10 cold launches, Plan 1 image `34f51a8b` against the
-  trained image `d22ea939`): window on screen 1908 → 1184 ms (WINDOW_SHOWN), shell output painted 2727 → 2057 ms
+  probe), JVM options and the cache (`-XX:AOTMode=on`). The JVM prints AOT cache errors on stdout, not stderr. The final
+  whole-branch review is done and its fixes are in: `packageDist`'s DMG detach retries once, then forces, fails the
+  build with the recovery command (`hdiutil detach -force <mount>`) if the mount stays and clears a stale mount before
+  its next run (`detachMount`, pinned in `verifyPackagingSupport`); the probe test's wait is bounded; documentation
+  corrections. Final full check: **7,991/0/0/6** (tests/failures/errors/skipped).
+  Measured (`startupBench`, medians of 10 cold launches, Plan 1 image `34f51a8b` against the trained image `d22ea939`): window on screen 1908 → 1184 ms (WINDOW_SHOWN), shell output painted 2727 → 2057 ms
   (OUTPUT_PAINTED); AOT cache used and CDS on in all 10 after runs, no new extraction folder in `$TMPDIR` (the probe in
   `verifyPackage` covers the rest); see
   [Part 2 in the baseline](benchmarks/2026-10-02-startup-baseline.md#part-2--jvm-and-packaging). About 1 s (984 ms
   median) still separates SHELL_SPAWNED from SHELL_OUTPUT, as before Part 2 (941 ms), so the JVM work did not move it;
   most likely it is the shell's own start-up before its first prompt (not measured; the benchmark runs the default
   shell in an empty, isolated home), which Parts 3A and 4 target. The cold target (≤ 600 ms) is not met by Part 2
-  alone. Not done: Windows packaging run (not verifiable on the Mac), the GUI checklist items in
-  `docs/packaging.md`, push.
+  alone. Not done: the Windows packaging run (not verifiable on the Mac); CI on Linux and Windows and
+  `.github/workflows/linux-packages.yml` (needs a push, so the user decides); the GUI checklist items in
+  `docs/packaging.md`; the deferred `-Pjasper.aot=true` item (it throws at configuration time on Windows and Linux, even
+  for unrelated tasks; an explicit opt-in that fails loudly). Next: Plan 4 (resident by default), which starts with a
+  user-run spike.
 
 - **Start-up speed: designed, measured and planned; Plan 1 executed** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, from local `main@91400d29`; user request in chat 2026-10-02).
@@ -37,7 +43,7 @@
   [3B Contribution replay](superpowers/plans/2026-10-02-startup-3b-contribution-replay.md). Plan 1's trace, file,
   benchmark and session-output tests were compiled and run against the plan's own code; the others were cross-checked
   against each other's written code. Baseline `./gradlew check`: 7,954/0/0/6. GUI measurement runs need the user's
-  approval per batch. Not done: Plans 2, 4, 3A and 3B.
+  approval per batch. Not done: Plans 4, 3A and 3B.
 
 - **Start-up speed Plan 1 (Measure)** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
   [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md),

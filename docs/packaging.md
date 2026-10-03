@@ -17,12 +17,13 @@ On macOS:
 
 ```bash
 ./gradlew check :jasper-app:packageDist   # trains the AOT cache: a Jasper window for a few seconds
-./gradlew :jasper-app:verifyPackage
 ./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
 ```
 
 On macOS, `packageDist` launches the packaged app once to train its start-up cache; run it from your desktop session.
-See [Start-up performance](#start-up-performance).
+It already runs `verifyPackage`. Training changes `packageApp`'s outputs, so a `packageApp` or `verifyPackage` run after
+`packageDist` rebuilds the image untrained: `jasper-app/build/packaging/image` then no longer matches the DMG, which is
+unaffected. See [Start-up performance](#start-up-performance).
 
 On Windows:
 
@@ -222,9 +223,9 @@ one prompt and discards input, keeps residency off and enables the bundled plugi
 (no Dock icon or menu bar) and `-Djasper.startupTrace`. It needs your desktop session: a Jasper window appears for a
 few seconds where macOS places new windows, and anything typed into it goes to the stand-in. When the trace reports
 start-up settled with the shell's output painted and every plugin bound, the task sends SIGTERM and the JVM assembles
-the cache as it exits; the launch takes about 13 s, then the assembly. A launch that exits early, never settles, or
-settles without its window, output or plugins fails the task. The trace, the log and the isolated home stay in
-`aot-training/` for diagnosis.
+the cache as it exits. The launch settles in about 3-4 s, then the JVM writes the cache (about 1 s). A launch that
+exits early, never settles, or settles without its window, output or plugins fails the task. The trace, the log and
+the isolated home stay in `aot-training/` for diagnosis.
 
 ### Keeping the cache valid
 
