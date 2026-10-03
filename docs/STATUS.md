@@ -116,25 +116,31 @@
   suite then passed three isolated re-runs (160/160) and the next full run, so it is a load-dependent passive-port
   flake, not a regression (the branch does not touch File Server). Not pushed.
 
-- **Notifications plan 2: incidents and the Errors window, implemented on branch `claude/notifications-2`; final review pending; awaiting the
-  user's GUI checks and merge decision** (2026-10-02; plan `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`,
-  [guide](notifications.md#the-errors-window)): uncaught exceptions on any thread, contained plugin failures, failed
-  shell launches and failing notification actions are in-memory incidents (at most 100, coalesced by source, class
-  and root-cause frames, traces taken on the catching thread and capped at 256 KiB). Each is announced by one ERROR
-  notification in `jasper.errors`, `jasper.plugins` or, for a shell, `jasper.general`, with Show more… (and Disable
-  Plugin for plugins); a repeat updates it, with a card at most once a minute. The Errors window lists them with
-  Copy, Disable Plugin, Open Log Folder and Clear. The log is unchanged. Recorded interpretations are in the plan's
-  "Spec interpretations" section; the execution deviations are in its status banner: each shell launch failure is
-  announced in its own window (the once-a-minute repeat rule covers Jasper and plugin incidents only), the center's
-  60 s coalescing still ignores the target, and no package-info files changed beyond `notifications` and
-  `notificationui`. `./gradlew check`: **8,149 tests, 0 failures, 0 errors, 6 skips** (all four architecture gates, doclint and compiled examples
-  included; source hygiene over the 31 changed Java files and `git diff --check` clean). No GUI was launched
-  and nothing was pushed. GUI checks for the user:
+- **Notifications plan 2: incidents and the Errors window, reviewed on branch `claude/notifications-2`; awaiting the
+  user's GUI checks and merge decision** (2026-10-02 to 2026-10-03; plan
+  `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-window)):
+  uncaught exceptions on any thread, contained plugin failures, failed shell launches and failing notification
+  actions are in-memory incidents (at most 100, coalesced by source, class and root-cause frames, traces taken on the
+  catching thread and capped at 256 KiB). Each is announced by one ERROR notification in `jasper.errors`,
+  `jasper.plugins` or, for a shell, `jasper.general`, with Disable Plugin for plugins and Show more… last; a repeat
+  updates it at most once a second (failures waiting for the EDT are merged first, and the count catches up), with a
+  card at most once a minute. The Errors window lists them with Copy, Disable Plugin, Open Log Folder and Clear. The
+  log is unchanged. Recorded interpretations are in the plan's "Spec interpretations" section; the execution
+  deviations are in its status banner: each shell launch failure is announced in its own window (the repeat rules
+  cover Jasper and plugin incidents only), the center's 60 s coalescing still ignores the target, no package-info
+  files changed beyond `notifications` and `notificationui`, and the final review's fixes (the once-a-second update
+  with the merge, Show more… last, Open Log Folder opening the folder). Every task passed its review, and the final
+  whole-branch review's findings were fixed (`5aa67e75`, `ac407bbb`). Findings deferred to plans 3, 4 and 5, and the
+  smaller ones left open, are listed under "Deferred findings" in the plan's status banner. `./gradlew check`:
+  **8,161 tests, 0 failures, 0 errors, 6 skips** (all four architecture gates, doclint and compiled examples
+  included; source hygiene over the 34 changed Java files and `git diff --check` clean). No GUI was launched and
+  nothing was pushed. GUI checks for the user:
   - an uncaught exception (for example from a plugin under development) shows an "Unexpected error in Jasper" or
     plugin card; Show more… opens the Errors window at it, in light and dark themes;
   - the Errors window: list selection with the mouse and the arrow keys, the monospaced trace scrolls, Copy pastes a
     report, Open Log Folder opens the folder, Clear empties the list and disables the cleared notifications' links;
   - a plugin that keeps failing shows one card, counts up `×N`, and shows its card again no sooner than a minute later;
+  - with the Notifications panel open, a plugin failing in a tight loop keeps Jasper responsive and its card counts up;
   - Disable Plugin posts "… will be disabled when Jasper restarts", and the Plugins page agrees after a restart;
   - a broken shell profile shows "Could not start the terminal" with Show more…, and the window's only pane stays
     open showing the failure;

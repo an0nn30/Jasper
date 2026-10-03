@@ -3,12 +3,14 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Status:** Implemented on branch `claude/notifications-2` (worktree `.worktrees/notifications-2`, cut from main
-`63e3b95c`, where plan 1 is merged); every task passed its review; the final whole-branch review is pending.
-`./gradlew check` is green (8,149 tests, 0 failures, 0 errors, 6 skips). Awaiting the user's GUI checks (listed in [STATUS](../../STATUS.md)) and the
-merge decision.
+`63e3b95c`, where plan 1 is merged); every task passed its review; the final whole-branch review's findings were fixed
+in this round (`5aa67e75`, `ac407bbb` and the documentation commit that follows them) and re-reviewed. Awaiting the
+user's GUI checks (listed in [STATUS](../../STATUS.md)) and the merge decision. The final check's counts close this
+banner.
 
 Commits: Task 1 `a23e383f`, Task 2 `86e9c537`, Task 3 `97bbc662`, Task 4 `6c3490cc` with its review fix `cd428136`,
-Task 5 `1ff6a29e`, Task 6 `f5a59e97`, Task 7 the documentation commit that follows them.
+Task 5 `1ff6a29e`, Task 6 `f5a59e97`, Task 7 `f49f6430` with its review fix `ef76e6a2`; the final review's fixes
+`5aa67e75` and `ac407bbb`, then the documentation commit that records them.
 
 **Execution deviations** (the plan text below is not amended; where it differs, this list governs):
 
@@ -28,6 +30,52 @@ Task 5 `1ff6a29e`, Task 6 `f5a59e97`, Task 7 the documentation commit that follo
 3. Ruling during Task 5: the `plugins`, `workspace`, `bootstrap` and `application` package-info files are unchanged (no
    new package edges; their descriptions stay accurate); only `notifications` and `notificationui` are updated
    (Task 7).
+4. Final review (`5aa67e75`), recorded as plan interpretation 13: a repeating Jasper or plugin incident updates its
+   notification at most once a second (the count catches up), and failures waiting for the EDT are merged by key
+   first. Sightings whose incident key (source, exception class, signature) already waits for the EDT only add to its
+   count, so a burst queues one record task, which records them all at once (`Incidents.record` and
+   `NotificationCenter.repeat` take a count). On the EDT, repeats within a second of the notification's last update
+   are counted by one trailing update through an injected scheduler (the application's Swing timer, `afterDelay`),
+   which decides the card by the once-a-minute rule when it is pushed; close cancels it, and an update whose
+   notification is gone or expired does nothing. Launch failures are not merged: each keeps its own window and
+   details. Reason: one queued task (and capture) per failure let a plugin failing every few milliseconds outrun the
+   EDT, and a component throwing in paint beneath a card could loop through card repaints at EDT speed.
+5. Final review (`ac407bbb`): a plugin incident's notification lists Disable Plugin first and Show more… last, as spec
+   section 3 says; the plan's code put Show more… first.
+6. Final review (`ac407bbb`): Open Log Folder opens the folder through the new `ConfigEditor.openFolder` (OPEN first,
+   then BROWSE_FILE_DIR); the plan's code used `reveal`, which on macOS shows the folder inside its parent.
+
+**Deferred findings** (from the final whole-branch review):
+
+- Plan 3 (SDK): `ownFailure` also treats a caller's precondition failure thrown inside `notifications` (a request the
+  model rejects, `requireEdt`) as the notification system's own, so it is only logged; once plugins post through the
+  center, validate SDK requests in `plugins` or exempt `pluginFailure` from that filter. Incident rows use the error
+  icon for every source (plugin icons come with the SDK).
+- Plan 4 (higher post rates): `CardLayer` refreshes and the History panel rebuilds on every center change (plan 1's
+  deferral); this plan's once-a-second repeat update bounds the incident-driven rate only.
+- Plan 5 (OS notifiers): two different incidents whose notifications read the same within 60 s share one
+  notification (the second counts on the first, and Show more… opens the first); once `Notification.incident` exists,
+  do not coalesce incident posts. Incident OS notifications must carry only the title.
+- Behaviour: plugin `stop()` failures at shutdown are logged but not recorded (the incident producer closes first); a
+  closed Errors window keeps its last view reachable until it is opened again; Disable Plugin from an incident does
+  not refresh a Plugins page that is already open; uncaught failures thrown by plugin code outside `Containment` (a
+  plugin component's paint or listener) are attributed to Jasper; a repeat after the user removed its notification
+  posts a fresh card at once; within 60 s a second window failing with byte-identical launch details folds into the
+  first window's notification.
+- Robustness: `Incidents.emit` and `Containment.record` contain only `RuntimeException` from a listener or sink;
+  `Capture`'s canonical constructor does not enforce the caps; failures with no stack frames coalesce per class; a
+  lone CR is dropped from traces; a null plugin name would show as "null" (unreachable with the shipped hooks).
+- Tests: the EDT guard is tested on `Incidents.list()` only; several wiring paths are not covered headless
+  (`onLaunchFailure` in `openWindow`, the bootstrap `forwardTo`, Show more… opening the window, Disable Plugin's
+  outcome mapping, the clipboard and log-folder failures); no test for `repeat` with an OFF group or in the
+  background with a card; the `Error` branch of the uncaught forward is untested; expected WARNING traces reach test
+  stderr.
+- Polish: some Errors window colours are read once (stale after a theme change) and some borders are unscaled;
+  `openLogFolder` repeats `revealConfigFile`'s shape; `JasperApplication` grew by about 70 lines.
+
+**Final check** (on the final-review fixes): `./gradlew check` is green: 8,161 tests, 0 failures, 0 errors, 6 skips
+(all four architecture gates, doclint and compiled documentation examples included); source hygiene over the 34 Java
+files changed since `63e3b95c` and `git diff --check 63e3b95c` are clean.
 
 **Goal:** Record every unexpected failure (uncaught exceptions on any thread, failed plugin callbacks, failed shell
 launches, failing notification actions) as an in-memory incident. Each incident gets one ERROR notification and a
