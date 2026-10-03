@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,13 @@ class PluginRuntimeTest {
                 context.activities().begin(ActivitySpec.of("Probe work")).progress(0.5, "half way");
             }
             @Override public void stop() { note(context, "stopped", "yes"); }
+        }
+        """;
+
+    static final String BOOM = """
+        package fix.boom;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) { throw new IllegalStateException("boom at start"); }
         }
         """;
 
@@ -95,6 +103,23 @@ class PluginRuntimeTest {
         PluginJars.build(directory, "probe.jar", PluginJars.descriptor(id, "1.0.0", "fix.probe.Main"),
             Map.of("fix.probe.Main", FIXTURE), List.of());
         return directory;
+    }
+
+    @Test void aPluginFailureIsReportedWithThePluginAndWhatItWasDoing() throws Exception {
+        Path bundled = root.resolve("bundled");
+        PluginJars.build(bundled.resolve("dev.example.boom"), "boom.jar", PluginJars.descriptor("dev.example.boom", "1.2.3", "fix.boom.Main"),
+            Map.of("fix.boom.Main", BOOM), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("absent"), null, false, new ArrayList<>());
+        var failures = new CopyOnWriteArrayList<PluginRuntime.Failure>();
+        runtime.reportFailuresTo(failures::add);
+        onEdt(() -> runtime.start(Map.of(), true));
+        assertThat(failures).singleElement().satisfies(failure -> {
+            assertThat(failure.pluginId()).isEqualTo("dev.example.boom");
+            assertThat(failure.operation()).isEqualTo("start");
+            assertThat(failure.cause()).isInstanceOf(IllegalStateException.class).hasMessage("boom at start");
+        });
+        assertThat(runtime.pluginVersions()).containsEntry("dev.example.boom", "1.2.3");
+        onEdt(runtime::stop);
     }
 
     @Test void runsADevelopmentPluginBridgesItsActivityAndStopsIt() throws Exception {

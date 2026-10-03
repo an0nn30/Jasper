@@ -182,6 +182,21 @@ public final class PluginRuntime {
     public record Outcome(boolean ok, String message, Snapshot snapshot) { }
 
     /**
+     * A plugin callback that failed and was contained.
+     *
+     * @param pluginId the plugin
+     * @param operation what the host asked it to do, such as {@code start} or {@code panel <id>}
+     * @param cause what it threw
+     */
+    public record Failure(String pluginId, String operation, Throwable cause) {
+        public Failure {
+            Objects.requireNonNull(pluginId, "pluginId");
+            Objects.requireNonNull(operation, "operation");
+            Objects.requireNonNull(cause, "cause");
+        }
+    }
+
+    /**
      * Where plugin settings problems go, on the UI thread.
      *
      * @param report adds one problem, attributed to the plugin's own settings file
@@ -243,6 +258,7 @@ public final class PluginRuntime {
     private final PluginSettingsFiles settingsFiles;
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
     private volatile Map<String, PluginCandidate> launched = Map.of();
+    private volatile Consumer<Failure> failureSink = failure -> { };
     private volatile PluginHost host;
     private Subscription bridge, connectionBridge;
     private volatile PluginCatalog.Launch launch;
@@ -384,7 +400,7 @@ public final class PluginRuntime {
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber));
+            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure)));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
@@ -448,6 +464,24 @@ public final class PluginRuntime {
         var names = new java.util.LinkedHashMap<String, String>();
         launched.forEach((id, candidate) -> names.put(id, candidate.descriptor().name()));
         return Map.copyOf(names);
+    }
+
+    /**
+     * Where contained plugin failures go after they are logged; the application records each as an incident.
+     *
+     * @param sink hears each failure on the thread it happened on
+     */
+    public void reportFailuresTo(Consumer<Failure> sink) { failureSink = Objects.requireNonNull(sink, "sink"); }
+
+    /**
+     * Discovered plugin versions, without performing file I/O.
+     *
+     * @return each plugin's version by id
+     */
+    public Map<String, String> pluginVersions() {
+        var versions = new java.util.LinkedHashMap<String, String>();
+        launched.forEach((id, candidate) -> versions.put(id, candidate.descriptor().version().toString()));
+        return Map.copyOf(versions);
     }
 
     /**

@@ -33,7 +33,21 @@ final class PluginHost {
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser,
                        java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+                       java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber,
+                       Consumer<PluginRuntime.Failure> failures) {
+        /** Contained failures are only logged and counted. */
+        Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
+                       Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
+                       Duration drainGrace, Contributions contributions, BooleanSupplier dark,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
+                       Consumer<java.net.URI> browser,
+                       java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
                        java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber) {
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notice,
+                editor, settingsFiles, clearReports, profiles, browser, appearance, appearanceSubscriber, failure -> { });
+        }
+
         Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
@@ -41,7 +55,7 @@ final class PluginHost {
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser) {
             this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notice,
-                editor, settingsFiles, clearReports, profiles, browser, null, null);
+                editor, settingsFiles, clearReports, profiles, browser, null, null, failure -> { });
         }
     }
 
@@ -61,7 +75,7 @@ final class PluginHost {
 
     PluginHost(Environment environment) {
         this.environment = Objects.requireNonNull(environment);
-        this.containment = new Containment(environment.onUi());
+        this.containment = new Containment(environment.onUi(), environment.failures());
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
         this.connections = new ConnectionHub(bus);

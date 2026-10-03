@@ -95,6 +95,31 @@ class TerminalTabTest {
         });
     }
 
+    @Test void aFailedLaunchReportsItsDetailsAndWhatWasThrown() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var thrown = new IllegalStateException("shell executable unavailable");
+        int[] launches = {0};
+        ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
+            if (++launches[0] > 1) throw thrown;
+            return shell(path);
+        }, "sh");
+        WindowContent[] owner = new WindowContent[1];
+        List<String> details = new ArrayList<>();
+        List<Throwable> causes = new ArrayList<>();
+        edt(() -> {
+            owner[0] = content(launcher);
+            owner[0].onLaunchFailure = (text, cause) -> { details.add(text); causes.add(cause); };
+        });
+        pending.remove().run();
+        edt(() -> owner[0].invoke(ActionId.SPLIT_DOWN));
+        pending.remove().run();
+        edt(() -> {
+            assertThat(details).singleElement().asString().contains("shell executable unavailable");
+            assertThat(causes).containsExactly(thrown);
+            owner[0].close();
+        });
+    }
+
     @Test void titleOverrideSurvivesRealOscTitleChangeAndBlankRestoresIt() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.isExecutable(java.nio.file.Path.of("/bin/bash")), "Bash fixture unavailable");
         Queue<Runnable> pending = new ArrayDeque<>();
