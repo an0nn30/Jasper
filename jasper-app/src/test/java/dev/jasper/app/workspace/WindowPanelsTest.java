@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
@@ -349,6 +350,48 @@ class WindowPanelsTest {
             owner.setRailVisible(true);
             assertThat(owner.leftStripe().isVisible()).isTrue();
             assertThat(owner.rightStripe().isVisible()).isTrue();
+        });
+    }
+
+    @Test void aRailActionsTitleAndEnabledChangesUpdateItsButtonInPlace() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            ActionEntry open = model.addAction("dev.x.open", "Open Manager", new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
+            model.addRailAction("dev.x.open");
+            AbstractButton button = owner.leftStripe().buttons().getFirst();
+            assertThat(button.isEnabled()).isTrue();
+
+            open.setTitle("Open Manager (2)");
+            assertThat(owner.leftStripe().buttons()).as("the same button, not a rebuilt one").containsExactly(button);
+            assertThat(button.getToolTipText()).isEqualTo("Open Manager (2)");
+            assertThat(button.getAccessibleContext().getAccessibleName()).isEqualTo("Open Manager (2)");
+
+            open.setEnabled(false);
+            assertThat(owner.leftStripe().buttons()).containsExactly(button);
+            assertThat(button.isEnabled()).isFalse();
+            open.setEnabled(true);
+            assertThat(button.isEnabled()).isTrue();
+        });
+    }
+
+    @Test void addingOrRemovingARailActionStillRendersTheStripe() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addRailAction("dev.x.open");
+            assertThat(owner.leftStripe().buttons()).as("nothing to show until the action exists").isEmpty();
+
+            ActionEntry open = model.addAction("dev.x.open", "Open Manager", new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
+            assertThat(tips(owner.leftStripe())).as("a new action appears").containsExactly("Open Manager");
+
+            open.close();
+            assertThat(owner.leftStripe().buttons()).as("a removed action goes").isEmpty();
+
+            model.addAction("dev.x.open", "Open Again", new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
+            assertThat(tips(owner.leftStripe())).as("and a registered one appears again").containsExactly("Open Again");
         });
     }
 

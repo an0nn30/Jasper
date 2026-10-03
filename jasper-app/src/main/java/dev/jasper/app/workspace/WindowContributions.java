@@ -330,12 +330,16 @@ final class WindowContributions implements AutoCloseable {
     private void changed(Contributions.Kind kind) {
         switch (kind) {
             case ACTIONS -> {
-                if (syncActions()) owner.rebind();
+                boolean structural = syncActions();
+                if (structural) owner.rebind();
                 // Titles label toolbar buttons, and a vanished or disabled action changes every placement of it.
                 owner.chrome().renderContributedToolbar();
                 owner.chrome().renderContributedMenus();
                 renderStatus();
-                renderStripes();
+                // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
+                // enabled change renames and repaints the buttons it has, so that it does not end a drag.
+                if (structural) renderStripes();
+                else for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) stripe.refreshActions();
             }
             case PANELS -> { syncPanels(); renderStripes(); }
             case RAIL -> renderStripes();

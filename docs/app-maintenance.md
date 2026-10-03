@@ -330,7 +330,10 @@ being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and 
 claims only an Esc from its own window. A panel badge change is not a render: it fires
 `Contributions.Kind.BADGES`, and `WindowContributions` applies it to the existing stripe buttons with
 `ToolStripe.updateBadge` (the icon's size is the base icon's, so nothing is laid out), so a notification
-arriving mid-drag leaves the drag alone. Keep the layout-only terminal
+arriving mid-drag leaves the drag alone. An action's enable or title change is not a render either:
+`WindowContributions` calls `ToolStripe.refreshActions`, which renames the existing rail action buttons
+(a button follows the action's enabled state itself) and repaints them. Only adding or removing an
+action, or a dock or panel change, renders the stripes again. Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
@@ -355,7 +358,8 @@ terminal palette, including independent terminal-color changes. Its height contr
 to the workspace minimum and scales with the UI. The area's minimum height is the larger of the
 terminal column's minimum and `DockGeometry.splitMinimum` (two tool window minimums and a divider
 when the left or the right side shows both halves, else 0), plus the bottom row; only a split side
-raises it, so an unsplit layout's minimum never depends on the UI scale. `DockGeometry.compute`
+raises it, so the scaled 120px terminal floor never raises an unsplit layout's minimum (the terminal
+column's own minimum, the gap and the bottom floor still scale with the UI). `DockGeometry.compute`
 keeps `upperMinimum` (that, or the terminal's own 120px floor, whichever is larger) above the bottom
 row. `ToolWindowArea.sync` and `WindowContent.syncRailVisibility` tell the window
 (`onMinimumSizeChanged`) so the frame's minimum follows a split, or the stripes, appearing or going

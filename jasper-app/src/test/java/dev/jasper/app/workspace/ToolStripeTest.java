@@ -176,4 +176,39 @@ class ToolStripeTest {
         assertThat(stripe.buttons()).as("a render forgets the windows it dropped").hasSize(1);
         assertThat(stripe.buttons().getFirst().getIcon()).isSameAs(icon);
     }
+
+    @Test void refreshingTheActionsRereadsTheirNamesInPlaceAndLeavesTheStripeAndItsDragAlone() {
+        var stripe = new ToolStripe(Side.LEFT);
+        Action open = action("Open", new ArrayList<>()), other = action("Other", new ArrayList<>());
+        stripe.render(List.of(window("a", Slot.LEFT_TOP), window("b", Slot.LEFT_TOP)), List.of(open, other));
+        layout(stripe, 400);
+        stripe.beginDrag("b");
+        stripe.showGap(Slot.LEFT_TOP, 0);
+        stripe.doLayout();
+        AbstractButton b = stripe.buttons().get(1), openButton = stripe.buttons().get(2), otherButton = stripe.buttons().get(3);
+        Component[] children = stripe.getComponents();
+        Rectangle gap = stripe.gapBounds().orElseThrow(), openBounds = openButton.getBounds();
+        assertThat(b.getWidth()).as("lifted").isZero();
+
+        open.putValue(Action.NAME, "Open Now");
+        open.setEnabled(false);
+        stripe.refreshActions();
+
+        assertThat(stripe.getComponents()).as("nothing rebuilt").containsExactly(children);
+        assertThat(stripe.buttons().get(2)).as("the same button").isSameAs(openButton);
+        assertThat(openButton.getToolTipText()).isEqualTo("Open Now");
+        assertThat(openButton.getAccessibleContext().getAccessibleName()).isEqualTo("Open Now");
+        assertThat(openButton.isEnabled()).isFalse();
+        assertThat(otherButton.getToolTipText()).isEqualTo("Other");
+        assertThat(otherButton.isEnabled()).isTrue();
+        assertThat(stripe.dragging()).isTrue();
+        assertThat(stripe.gapBounds()).hasValue(gap);
+        assertThat(openButton.getBounds()).as("no layout ran").isEqualTo(openBounds);
+        assertThat(b.getWidth()).as("still lifted").isZero();
+
+        stripe.endDrag();
+        stripe.render(List.of(), List.of());
+        stripe.refreshActions();
+        assertThat(stripe.buttons()).as("a render forgets the actions it dropped").isEmpty();
+    }
 }

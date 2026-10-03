@@ -62,10 +62,12 @@
   failure, 0 errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails
   on this Mac only (its `java.io.tmpdir` contains "zz") and predates the branch, and
   `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load (it did not fail in this run and
-  passes when run alone). Open: the GUI checks are pending; any dock change, stripe render or action change (a plugin
-  enabling an action or changing its title) cancels a running drag; on stripes shorter than about 200px the foot can
-  clip by one step during a drag; and the overlay repaints the whole window on each drag event, which may lag on large
-  HiDPI windows (the GUI checks will tell). No GUI launched; GUI checks for the user are the plan's last section.
+  passes when run alone). Open: the GUI checks are pending; any dock change or stripe render cancels a running drag
+  (an action's enable or title change now refreshes the stripe in place, so only adding or removing an action, or a
+  dock or panel change, re-renders it; follow-up on `claude/dock-followups`); on stripes shorter than about 200px the
+  foot can clip by one step during a drag; and the overlay repaints the whole window on each drag event, which may
+  lag on large HiDPI windows (the GUI checks will tell). No GUI launched; GUI checks for the user are the plan's last
+  section.
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.

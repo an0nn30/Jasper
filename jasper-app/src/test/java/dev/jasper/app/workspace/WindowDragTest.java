@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
@@ -321,6 +322,49 @@ class WindowDragTest {
             second.layout();
             assertThat(first.owner.dock().slot("dev.x.files")).hasValue(Slot.BOTTOM_RIGHT);
             assertThat(second.owner.dock().slot("dev.x.sessions")).hasValue(Slot.BOTTOM_RIGHT);
+        });
+    }
+
+    @Test void anActionsEnableOrTitleChangeMidDragRefreshesItsRailButtonInPlaceAndTheDragDrops() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            ActionEntry open = f.model.addAction("dev.x.open", "Open Manager", new ImageIcon(), List.of(), Optional.empty(), invocation -> { });
+            f.model.addRailAction("dev.x.open");
+            f.layout();
+            AbstractButton files = f.button("Files");
+            AbstractButton rail = f.button("Open Manager");
+            f.drag(files, f.cell(2, 1));
+            assertThat(f.owner.dockDrag().active()).isTrue();
+            assertThat(files.getWidth()).as("lifted out of the stripe").isZero();
+            Optional<Rectangle> leftGap = f.owner.leftStripe().gapBounds(), rightGap = f.owner.rightStripe().gapBounds();
+
+            open.setEnabled(false);
+
+            assertThat(f.owner.dockDrag().active()).as("an enable change is not a render").isTrue();
+            assertThat(f.owner.dockDrag().dragged()).isEqualTo("dev.x.files");
+            assertThat(f.owner.leftStripe().buttons()).as("the same buttons").contains(files, rail);
+            assertThat(files.getWidth()).as("still lifted out").isZero();
+            assertThat(rail.isEnabled()).isFalse();
+            assertThat(f.owner.leftStripe().gapBounds()).isEqualTo(leftGap);
+            assertThat(f.owner.rightStripe().gapBounds()).isEqualTo(rightGap);
+
+            open.setTitle("Open Manager Now");
+
+            assertThat(f.owner.dockDrag().active()).as("a title change is not a render").isTrue();
+            assertThat(f.owner.dockDrag().dragged()).isEqualTo("dev.x.files");
+            assertThat(f.owner.leftStripe().buttons()).contains(files, rail);
+            assertThat(files.getWidth()).as("still lifted out").isZero();
+            assertThat(f.button("Open Manager Now")).as("the rail button follows the title").isSameAs(rail);
+            assertThat(rail.getAccessibleContext().getAccessibleName()).isEqualTo("Open Manager Now");
+            assertThat(f.owner.leftStripe().gapBounds()).isEqualTo(leftGap);
+            assertThat(f.owner.rightStripe().gapBounds()).isEqualTo(rightGap);
+
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, f.cell(2, 1));
+            f.layout();
+            assertThat(f.owner.dockDrag().active()).isFalse();
+            assertThat(f.owner.dock().slot("dev.x.files")).as("the drop happened").hasValue(Slot.BOTTOM_RIGHT);
+            assertThat(f.owner.rightStripe().buttons()).extracting(AbstractButton::getToolTipText).containsExactly("Files");
+            assertThat(f.button("Open Manager Now").isEnabled()).as("the drop's render keeps the rail button's state").isFalse();
         });
     }
 

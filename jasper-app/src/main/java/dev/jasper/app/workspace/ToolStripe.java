@@ -42,7 +42,8 @@ import javax.swing.UIManager;
  * window's button out, and opens a gap where the window would drop. The lifted button's step stays empty at the end of
  * its group, so no later group slides under the cursor, and a gap in that group uses it. The stripe keeps only what
  * its last render built, and the window renders it again after every dock change; a badge change re-decorates the
- * existing button in place via {@link #updateBadge}. EDT only.
+ * existing button in place via {@link #updateBadge}, and an action's title change renames its button in place via
+ * {@link #refreshActions} (the button follows the action's enabled state itself). EDT only.
  */
 final class ToolStripe extends JPanel {
     /** One tool window's button, with its unread badge if it has one. */
@@ -182,13 +183,31 @@ final class ToolStripe extends JPanel {
     private AbstractButton action(Action action) {
         var button = new JButton(action);
         Icon icon = action.getValue(Command.ICON) instanceof Icon contributed ? contributed : AppIcons.icon("command");
-        String name = (String) action.getValue(Action.NAME);
         style(button);
         button.setIcon(icon);
-        button.setToolTipText(name);
-        button.getAccessibleContext().setAccessibleName(name);
+        name(button, action);
         buttons.add(button);
         return button;
+    }
+
+    /** Names the action's button after the action's current title, in its tooltip and its accessible name. */
+    private static void name(AbstractButton button, Action action) {
+        String name = (String) action.getValue(Action.NAME);
+        button.setToolTipText(name);
+        button.getAccessibleContext().setAccessibleName(name);
+    }
+
+    /**
+     * Gives each action button the action's current title and repaints it; the button already follows the action's
+     * enabled state. It rebuilds nothing, asks for no layout and leaves a drag as it is: which actions show and where
+     * does not change with a title, so a lifted button stays lifted. An action that is added or removed needs a
+     * {@link #render} instead.
+     */
+    void refreshActions() {
+        for (AbstractButton button : actions) {
+            name(button, button.getAction());
+            button.repaint();
+        }
     }
 
     /** True when there are neither tool windows nor actions on this stripe. */
