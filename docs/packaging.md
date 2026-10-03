@@ -191,8 +191,9 @@ start faster without application code. `gradle/packaging-support.gradle` holds t
   `verifyPackage` fails when the packaged runtime has other modules or when `jdeps` finds that the application or a
   bundled plugin needs one it lacks, and logs the runtime's size. `lib/modules` stays uncompressed (jlink's default),
   which loads classes faster; `bin/java` stays because the AOT cache assembly runs it. This does not shrink the
-  runtime on disk: `lib/modules` fell from 146 MB to 96 MB, but jlink now writes two default CDS archives
-  (`classes.jsa`, 31 MB, and `classes_nocoops.jsa`, 32 MB), so the runtime is 189 MB against 192 MB before.
+  runtime much on disk: `lib/modules` fell from 146 MB to 96 MB, but jlink now writes two default CDS archives
+  (`classes.jsa`, 31 MB, and `classes_nocoops.jsa`, 32 MB), and other removals outside `lib/modules` (files of the
+  dropped modules) offset only part of those 63 MB, so the runtime is 189 MB against 192 MB before.
 - **Default CDS archive.** jlink's `--generate-cds-archive` writes `lib/server/classes.jsa` (`bin\server` on Windows),
   the fallback whenever the AOT cache cannot be used, and `classes_nocoops.jsa` for heaps too large for compressed
   object pointers. `verifyPackage` runs the bundled `java -Xshare:on`.
@@ -202,8 +203,9 @@ start faster without application code. `gradle/packaging-support.gradle` holds t
   (`flatlaf.nativeLibraryPath`, `jna.boot.library.path` with `jna.nosys`, `pty4j.preferred.native.folder`). No launch
   extracts a copy under a new name, so macOS can reuse its signature checks. `verifyPackage` compares each file with its
   jar, checks its signature on macOS and runs `BundledNativesProbe` headless with the image's runtime, options and class
-  path: `-Xlog:library` must show each library loaded from the image, and the probe's temporary folders must stay
-  empty. Linux keeps extraction: FlatLaf's Linux library links GTK 3, which would become a package dependency.
+  path: `-Xlog:library` must show the libraries loaded through `System.load` (FlatLaf's and JNA's dispatch library)
+  coming from the image, the probe must report pty4j's `libpty` and spawn helper (opened through JNA, so not in that
+  log) resolved to files under `native/`, and the probe's temporary folders must stay empty. Linux keeps extraction: FlatLaf's Linux library links GTK 3, which would become a package dependency.
 - **AOT cache (macOS).** `trainAotCache` launches the freshly built image once and records a JDK 25 AOT cache,
   `Contents/app/jasper.aot` (about 60 MB), then adds `-XX:AOTCache=$APPDIR/jasper.aot` to `Jasper.cfg` and re-signs.
   `packageDist` always trains; `packageApp` trains only with `-Pjasper.aot=true`. The cache holds the JDK's and the

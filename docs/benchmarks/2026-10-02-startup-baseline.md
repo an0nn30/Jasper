@@ -36,6 +36,9 @@ Jasper, VM or game running. Both batches finished with status ok and 10 of 10 ru
 | Before | `34f51a8b` (end of Plan 1) | plain `packageApp`, no AOT cache |
 | After | `d22ea939` | the trained image from `packageDist`, copied with `ditto` |
 
+The after image was built by `packageDist` from the code at `98bc62e6`; `d22ea939` only adds documentation, so the
+code is identical and `d22ea939` stays the label.
+
 Milliseconds from the click, over the 10 cold runs of each image (the benchmark's trace milestones, not the external
 probe of the table above, so the absolute values are not comparable with that table):
 
@@ -59,13 +62,18 @@ to 429.2, plugins 301.9 to 181.9, theme upgrade 160.6 to 122.2, config 16.8 to 6
 
 - **JVM state, from each run's `jvm` record.** Before: AOT cache `none` and CDS `off` in all 10 runs. After: AOT cache
   `used` and CDS `on` in all 10 runs.
-- **Native extraction.** No pty4j, JNA, FlatLaf or SQLite folder appeared in `$TMPDIR` during the after batch (checked
-  against a timestamp marker), which also shows that the launcher expands `$APPDIR` in the bundled-native options.
+- **Native extraction.** Checked against a timestamp marker, no new extraction folder (pty4j's, for example) appeared
+  in `$TMPDIR` during the after batch, which is consistent with the launcher expanding `$APPDIR` in the bundled-native
+  options. That check looked only at `$TMPDIR`: it did not look for single extracted files such as FlatLaf's, nor in
+  `~/Library/Caches/JNA/temp`, where JNA extracts on macOS. The proof for FlatLaf and JNA is `verifyPackage`'s
+  headless probe, where `-Xlog:library` shows both loading from the image; its byte comparison and pty4j path check
+  cover pty4j's files, and the macOS checklist in [packaging](../packaging.md) has the remaining by-hand check.
 - **Sizes (`du -sh`).** Runtime 192M before, 189M after. The whole `Jasper.app` grew from 265M to 323M, the difference
-  being `jasper.aot`, 63,569,920 bytes (61 MiB).
+  being `jasper.aot`, 63,569,920 bytes (60.6 MiB).
 
-What remains: after Part 2 about 800 ms still separate SHELL_SPAWNED from SHELL_OUTPUT. That is the shell's own
-start-up before its first prompt, outside the JVM; Parts 3A and 4 address it (an earlier spawn, and residency), Part 2
-does not. The cold target of 600 ms is therefore not met by Part 2 alone, which is expected: Part 2 is the JVM and
+What remains: after Part 2 about 1 s still separates SHELL_SPAWNED from SHELL_OUTPUT (984 ms median), about the same as
+before Part 2 (941 ms), so the JVM work did not move it. The cause was not measured; most likely it is the shell's own
+start-up before its first prompt (the benchmark runs the default shell in an empty, isolated home), outside the JVM.
+Parts 3A and 4 target it (an earlier spawn, and residency); Part 2 does not. The cold target of 600 ms is therefore not met by Part 2 alone, which is expected: Part 2 is the JVM and
 packaging layer. The raw reports stay in `$HOME/jasper-bench/startup-part2/` (`before.json`, `after.json`) and are not
 committed, because they record absolute paths.
