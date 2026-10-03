@@ -285,6 +285,18 @@ class NotificationCenterTest {
         assertThat(((NotificationCenter.Change.CardRequested) changes.getFirst()).notification().count()).isEqualTo(2);
     }
 
+    @Test void aRepeatCanCountSeveralSightingsAtOnce() {
+        var center = center();
+        UUID a = center.post(request(CARDS, "a")).orElseThrow();
+        changes.clear();
+        assertThat(center.repeat(a, false, 9_999)).isTrue();
+        assertThat(center.find(a).orElseThrow().count()).isEqualTo(10_000);
+        assertThat(kinds()).as("one update for them all").containsExactly("Upserted");
+        assertThatThrownBy(() -> center.repeat(a, false, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(center.repeat(a, true)).as("the short form counts one").isTrue();
+        assertThat(center.find(a).orElseThrow().count()).isEqualTo(10_001);
+    }
+
     @Test void aRepeatOfAGoneOrExpiredEntryIsRefused() {
         var center = center();
         UUID expired = center.post(request(CARDS, "expired")).orElseThrow();

@@ -75,6 +75,28 @@ class IncidentsTest {
         assertThat(changes.getLast()).isEqualTo(new Incidents.Change.Repeated(again));
     }
 
+    @Test void oneRecordCanCountSeveralSightings() {
+        var incidents = incidents();
+        Incident first = incidents.record("jasper", "thread worker", "worker", capture("x.Boom", "m", "same"), 3);
+        assertThat(first.count()).isEqualTo(3);
+        assertThat(first.firstSeen()).isEqualTo(first.lastSeen());
+        clock.advance(Duration.ofSeconds(1));
+        Incident again = incidents.record("jasper", "thread worker", "worker", capture("x.Boom", "m", "same"), 4);
+        assertThat(again.id()).isEqualTo(first.id());
+        assertThat(again.count()).isEqualTo(7);
+        assertThat(again.lastSeen()).isEqualTo(first.firstSeen().plusSeconds(1));
+        assertThat(incidents.record("jasper", "a", "t", capture("x.Boom", "m", "same")).count()).as("the short form counts one").isEqualTo(8);
+        assertThatThrownBy(() -> incidents.record("jasper", "a", "t", capture("x.Boom", "m", "same"), 0))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(incidents.list()).singleElement().satisfies(incident -> assertThat(incident.count()).isEqualTo(8));
+        assertThat(Incidents.key("jasper", capture("x.Boom", "m", "same")))
+            .as("the key callers coalesce by is the store's")
+            .isEqualTo(Incidents.key("jasper", capture("x.Boom", "other message", "same")))
+            .isNotEqualTo(Incidents.key("dev.example.tool", capture("x.Boom", "m", "same")))
+            .isNotEqualTo(Incidents.key("jasper", capture("x.Other", "m", "same")))
+            .isNotEqualTo(Incidents.key("jasper", capture("x.Boom", "m", "else")));
+    }
+
     @Test void theSameFailureFromAnotherSourceOrOfAnotherClassIsAnotherIncident() {
         var incidents = incidents();
         incidents.record("jasper", "a", "t", capture("java.lang.IllegalStateException", "m", "same"));

@@ -44,8 +44,8 @@ public record Incident(UUID id, String source, String operation, String thread, 
     /** Whether a plugin, not Jasper, failed. */
     public boolean fromPlugin() { return !NotificationRequest.JASPER.equals(source); }
 
-    /** The same failure again: counted and re-stamped; the first sighting's text is kept. */
-    Incident repeated(Instant at) {
-        return new Incident(id, source, operation, thread, exceptionClass, message, trace, count + 1, firstSeen, at);
+    /** The same failure {@code times} more times: counted and re-stamped; the first sighting's text is kept. */
+    Incident repeated(Instant at, int times) {
+        return new Incident(id, source, operation, thread, exceptionClass, message, trace, count + times, firstSeen, at);
     }
 }

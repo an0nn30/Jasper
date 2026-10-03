@@ -23,6 +23,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,6 +46,35 @@ class IncidentNoticesTest {
         @Override public String getMessage() { throw new IllegalStateException("unreadable"); }
     }
 
+    /** Delayed tasks a test runs by hand, as the application's Swing timers would run them. */
+    private static final class ManualScheduler implements BiFunction<Duration, Runnable, Runnable> {
+        private record Scheduled(Duration delay, Runnable task, AtomicBoolean cancelled) {}
+        private final List<Scheduled> scheduled = new ArrayList<>();
+
+        @Override public Runnable apply(Duration delay, Runnable task) {
+            var entry = new Scheduled(delay, task, new AtomicBoolean());
+            scheduled.add(entry);
+            return () -> entry.cancelled().set(true);
+        }
+
+        /** The delays of the tasks still waiting. */
+        List<Duration> waiting() { return scheduled.stream().filter(entry -> !entry.cancelled().get()).map(Scheduled::delay).toList(); }
+
+        /** Runs every task still waiting. */
+        void fire() {
+            List<Scheduled> due = List.copyOf(scheduled);
+            scheduled.clear();
+            for (Scheduled entry : due) if (!entry.cancelled().get()) entry.task().run();
+        }
+
+        /** Runs every task, cancelled or not, as a timer that had already fired would. */
+        void fireEvenCancelled() {
+            List<Scheduled> due = List.copyOf(scheduled);
+            scheduled.clear();
+            due.forEach(entry -> entry.task().run());
+        }
+    }
+
     private final MutableClock clock = new MutableClock();
     private final NotificationCenter center = new NotificationCenter(Runnable::run, clock, () -> Delivery.Presence.FOCUSED);
     private final Incidents incidents = new Incidents(clock);
@@ -52,11 +83,12 @@ class IncidentNoticesTest {
     private final List<String> disabled = new ArrayList<>();
     private Optional<String> disableProblem = Optional.empty();
     private Executor ui = Runnable::run;
+    private final ManualScheduler scheduler = new ManualScheduler();
 
     private IncidentNotices notices() {
         center.register(NotificationsFeature.GENERAL);
         center.onChange(changes::add);
-        return new IncidentNotices(center, incidents, task -> ui.execute(task),
+        return new IncidentNotices(center, incidents, task -> ui.execute(task), scheduler,
             id -> id.equals("dev.jasper.remote") ? "Remote" : id,
             (id, done) -> { disabled.add(id); done.accept(disableProblem); }, opened::add);
     }
@@ -66,6 +98,8 @@ class IncidentNoticesTest {
     }
 
     private long cards() { return changes.stream().filter(NotificationCenter.Change.CardRequested.class::isInstance).count(); }
+
+    private List<String> kinds() { return changes.stream().map(change -> change.getClass().getSimpleName()).toList(); }
 
     /** The notification targeted at {@code window}. */
     private Notification noticeIn(UUID window) {
@@ -182,6 +216,94 @@ class IncidentNoticesTest {
         });
         assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.count()).isEqualTo(50));
         assertThat(cards()).isEqualTo(1);
+    }
+
+    @Test void failuresWaitingForTheEdtAreMergedIntoOneRecord() throws Exception {
+        var queued = new ConcurrentLinkedQueue<Runnable>();
+        ui = queued::add;
+        var notices = notices();
+        List<IllegalStateException> flood = sameSite(10_001);
+        Thread worker = Thread.ofPlatform().name("jasper-test-flood").start(() -> flood.subList(0, 10_000)
+            .forEach(failure -> notices.pluginFailure("dev.jasper.remote", "background task", failure)));
+        worker.join();
+        assertThat(queued).as("one record task, however many failures wait").hasSize(1);
+        queued.remove().run();
+        assertThat(incidents.list()).singleElement().satisfies(incident -> {
+            assertThat(incident.count()).isEqualTo(10_000);
+            assertThat(incident.thread()).isEqualTo("jasper-test-flood");
+            assertThat(incident.message()).as("the first failure's text").isEqualTo("broken 0");
+        });
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.count()).isEqualTo(10_000));
+        assertThat(cards()).isEqualTo(1);
+        notices.pluginFailure("dev.jasper.remote", "background task", flood.getLast());
+        assertThat(queued).as("once recorded, the next failure waits anew").hasSize(1);
+        clock.advance(IncidentNotices.UPDATE_INTERVAL);
+        queued.remove().run();
+        assertThat(incidents.list().getFirst().count()).isEqualTo(10_001);
+        assertThat(center.history().getFirst().count()).isEqualTo(10_001);
+    }
+
+    @Test void repeatsWithinASecondUpdateTheNotificationOnceAndItsCountCatchesUp() {
+        var notices = notices();
+        List<IllegalStateException> burst = sameSite(5);
+        notices.jasperFailure("thread worker", burst.get(0));
+        UUID notice = center.history().getFirst().id();
+        changes.clear();
+        for (int i = 1; i < 5; i++) {
+            clock.advance(Duration.ofMillis(200));
+            notices.jasperFailure("thread worker", burst.get(i));
+        }
+        assertThat(incidents.list().getFirst().count()).as("the Errors window counts each at once").isEqualTo(5);
+        assertThat(changes).as("the notification waits for the second to pass").isEmpty();
+        assertThat(scheduler.waiting()).as("one update, due when the second is over").containsExactly(Duration.ofMillis(800));
+        clock.advance(Duration.ofMillis(200));
+        scheduler.fire();
+        assertThat(center.find(notice).orElseThrow().count()).isEqualTo(5);
+        assertThat(kinds()).as("one update, without a card within the minute").containsExactly("Upserted");
+    }
+
+    @Test void theWaitingUpdateDecidesItsCardWhenItIsPushed() {
+        var notices = notices();
+        List<IllegalStateException> burst = sameSite(3);
+        notices.jasperFailure("thread worker", burst.get(0));
+        clock.advance(Duration.ofMillis(59_500));
+        notices.jasperFailure("thread worker", burst.get(1));
+        assertThat(cards()).as("no second card within the minute").isEqualTo(1);
+        assertThat(center.history().getFirst().count()).isEqualTo(2);
+        clock.advance(Duration.ofMillis(400));
+        notices.jasperFailure("thread worker", burst.get(2));
+        assertThat(center.history().getFirst().count()).as("within a second of the last update").isEqualTo(2);
+        clock.advance(Duration.ofMillis(600));
+        scheduler.fire();
+        assertThat(cards()).as("the minute is over when the update is pushed").isEqualTo(2);
+        assertThat(center.history().getFirst().count()).isEqualTo(3);
+    }
+
+    @Test void aFailureAfterTheSecondTakesTheWaitingCountWithItWhenTheTimerIsLate() {
+        var notices = notices();
+        List<IllegalStateException> burst = sameSite(3);
+        notices.jasperFailure("thread worker", burst.get(0));
+        clock.advance(Duration.ofMillis(500));
+        notices.jasperFailure("thread worker", burst.get(1));
+        clock.advance(Duration.ofMillis(700));
+        notices.jasperFailure("thread worker", burst.get(2));
+        assertThat(center.history().getFirst().count()).isEqualTo(3);
+        assertThat(scheduler.waiting()).as("the late update is cancelled").isEmpty();
+        scheduler.fireEvenCancelled();
+        assertThat(center.history().getFirst().count()).as("and counts nothing twice").isEqualTo(3);
+    }
+
+    @Test void closeCancelsAWaitingUpdate() {
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        notices.jasperFailure("thread worker", twice.get(0));
+        clock.advance(Duration.ofMillis(100));
+        notices.jasperFailure("thread worker", twice.get(1));
+        assertThat(scheduler.waiting()).hasSize(1);
+        notices.close();
+        assertThat(scheduler.waiting()).isEmpty();
+        scheduler.fireEvenCancelled();
+        assertThat(center.history().getFirst().count()).isEqualTo(1);
     }
 
     @Test void theTraceIsTakenWhenTheFailureIsCaughtNotWhenItIsRecorded() {
@@ -301,6 +423,22 @@ class IncidentNoticesTest {
         center.runAction(inFirst.id(), 0);
         center.runAction(inSecond.id(), 0);
         assertThat(opened).as("both open the one incident").containsExactly(incident, incident);
+    }
+
+    @Test void launchFailuresWaitingForTheEdtAreNotMerged() {
+        var queued = new ArrayDeque<Runnable>();
+        ui = queued::add;
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        notices.launchFailure(first, "in /tmp", twice.get(0));
+        notices.launchFailure(second, "in /home", twice.get(1));
+        assertThat(queued).as("each keeps its own window and details").hasSize(2);
+        while (!queued.isEmpty()) queued.remove().run();
+        assertThat(noticeIn(first).request().content()).isEqualTo("in /tmp");
+        assertThat(noticeIn(second).request().content()).isEqualTo("in /home");
+        assertThat(incidents.list()).singleElement().satisfies(incident -> assertThat(incident.count()).isEqualTo(2));
     }
 
     @Test void clearingAnIncidentExpiresEveryLaunchNotificationItAnnounced() {

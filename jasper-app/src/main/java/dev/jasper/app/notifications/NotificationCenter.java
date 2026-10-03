@@ -136,11 +136,23 @@ public final class NotificationCenter {
      * @param showCard whether the card may show again
      * @return false when the entry is gone or expired, so the caller posts a new notification instead
      */
-    public boolean repeat(UUID id, boolean showCard) {
+    public boolean repeat(UUID id, boolean showCard) { return repeat(id, showCard, 1); }
+
+    /**
+     * An incident happened {@code times} more times since its entry was last updated: as
+     * {@link #repeat(UUID, boolean)}, counted once for each, in one update.
+     *
+     * @param id the entry
+     * @param showCard whether the card may show again
+     * @param times how many more times, at least 1
+     * @return false when the entry is gone or expired, so the caller posts a new notification instead
+     */
+    public boolean repeat(UUID id, boolean showCard, int times) {
         requireEdt();
+        if (times < 1) throw new IllegalArgumentException("A repeat happened at least once");
         Notification earlier = history.get(id);
         if (earlier == null || earlier.expired()) return false;
-        Notification entry = earlier.repeated(clock.instant());
+        Notification entry = earlier.repeated(clock.instant(), times);
         history.remove(id);
         history.put(id, entry);
         announce(entry, showCard ? Delivery.route(mode(entry.request().group()), presence.get()) : Delivery.Outcome.HISTORY);

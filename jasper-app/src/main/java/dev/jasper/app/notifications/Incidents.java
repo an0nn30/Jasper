@@ -43,7 +43,18 @@ public final class Incidents {
     public Incidents(Clock clock) { this.clock = Objects.requireNonNull(clock, "clock"); }
 
     /**
-     * Records a failure: a new incident, or a repeat of the one with the same key.
+     * The key repeats coalesce by: the source, the exception class and the capture's signature. Any thread.
+     *
+     * @param source {@code jasper} or a plugin id
+     * @param capture what was taken of the throwable
+     * @return the key
+     */
+    public static String key(String source, Capture capture) {
+        return source + '\n' + capture.exceptionClass() + '\n' + capture.signature();
+    }
+
+    /**
+     * Records a failure seen once: a new incident, or a repeat of the one with the same key.
      *
      * @param source {@code jasper} or a plugin id
      * @param operation what it was doing, such as "thread main" or "panel remote.sftp"
@@ -52,22 +63,38 @@ public final class Incidents {
      * @return the incident as it now stands
      */
     public Incident record(String source, String operation, String thread, Capture capture) {
+        return record(source, operation, thread, capture, 1);
+    }
+
+    /**
+     * Records a failure seen {@code times} times since it was last recorded (the sightings that waited for the EDT
+     * together): a new incident counting them all, or a repeat of the one with the same key that adds them.
+     *
+     * @param source {@code jasper} or a plugin id
+     * @param operation what it was doing at the first of them
+     * @param thread the name of the thread that caught the first of them
+     * @param capture what was taken of the first throwable on that thread
+     * @param times how many sightings, at least 1
+     * @return the incident as it now stands
+     */
+    public Incident record(String source, String operation, String thread, Capture capture, int times) {
         requireEdt();
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(operation, "operation");
         Objects.requireNonNull(thread, "thread");
         Objects.requireNonNull(capture, "capture");
+        if (times < 1) throw new IllegalArgumentException("A failure is recorded once it was seen at least once");
         Instant now = clock.instant();
-        String key = source + '\n' + capture.exceptionClass() + '\n' + capture.signature();
+        String key = key(source, capture);
         Incident earlier = byKey.remove(key);
         if (earlier != null) {
-            Incident again = earlier.repeated(now);
+            Incident again = earlier.repeated(now, times);
             byKey.put(key, again);
             emit(new Change.Repeated(again));
             return again;
         }
         Incident added = new Incident(UUID.randomUUID(), source, operation, thread, capture.exceptionClass(),
-            capture.message(), capture.trace(), 1, now, now);
+            capture.message(), capture.trace(), times, now, now);
         byKey.put(key, added);
         var dropped = new ArrayList<UUID>();
         for (Iterator<Incident> oldest = byKey.values().iterator(); byKey.size() > LIMIT; ) {

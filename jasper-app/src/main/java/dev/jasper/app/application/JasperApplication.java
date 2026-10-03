@@ -198,8 +198,8 @@ public final class JasperApplication {
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions);
         incidents = new Incidents(notificationCenter.clock());
-        incidentNotices = new IncidentNotices(notificationCenter, incidents, SwingUtilities::invokeLater, this::pluginName,
-            this::disablePlugin, this::showErrors);
+        incidentNotices = new IncidentNotices(notificationCenter, incidents, SwingUtilities::invokeLater,
+            JasperApplication::afterDelay, this::pluginName, this::disablePlugin, this::showErrors);
         notificationCenter.reportActionFailuresTo(failure -> incidentNotices.jasperFailure("a notification action", failure));
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
