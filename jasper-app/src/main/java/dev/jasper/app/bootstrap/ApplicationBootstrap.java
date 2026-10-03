@@ -87,7 +87,11 @@ public final class ApplicationBootstrap {
                 service.close(); System.exit(0); return;
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
-                history -> createApplication(service, history, dirs, options, startup.themeProblems()), application -> {
+                history -> {
+                    JasperApplication application = createApplication(service, history, dirs, options, startup.themeProblems());
+                    exceptions.forwardTo(application::unexpected);
+                    return application;
+                }, application -> {
                     if (!standalone)
                         application.loginItems(loginItemReconciler(enabled -> reconcileLoginItem(enabled, appPath, home)));
                     if (!residentRole(options, resident)) return null;
