@@ -250,4 +250,74 @@ class NotificationCenterTest {
         worker.join();
         assertThat(thrown.get()).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test void aRepeatCountsReStampsMarksUnreadAndMovesToTheTop() {
+        var center = center();
+        UUID a = center.post(request(CARDS, "a")).orElseThrow();
+        center.post(request(CARDS, "b"));
+        center.markRead(a);
+        clock.advance(Duration.ofMinutes(5));
+        changes.clear();
+        assertThat(center.repeat(a, false)).isTrue();
+        Notification entry = center.find(a).orElseThrow();
+        assertThat(entry.count()).isEqualTo(2);
+        assertThat(entry.read()).isFalse();
+        assertThat(entry.posted()).isEqualTo(Instant.parse("2026-10-02T14:10:00Z"));
+        assertThat(center.history().getFirst().id()).isEqualTo(a);
+        assertThat(kinds()).as("no card unless asked").containsExactly("Upserted");
+    }
+
+    @Test void aRepeatShowsItsCardWhenAskedAndItsGroupRoutesOne() {
+        var center = center();
+        UUID card = center.post(request(CARDS, "card")).orElseThrow();
+        UUID quiet = center.post(request(QUIET, "quiet")).orElseThrow();
+        changes.clear();
+        center.repeat(card, true);
+        center.repeat(quiet, true);
+        assertThat(kinds()).containsExactly("Upserted", "CardRequested", "Upserted");
+        presence = Delivery.Presence.BACKGROUND;
+        UUID sticky = center.post(request(STICKY, "sticky")).orElseThrow();
+        center.repeat(sticky, true);
+        changes.clear();
+        presence = Delivery.Presence.FOCUSED;
+        center.focusReturned();
+        assertThat(kinds()).as("a sticky repeat in the background waits for focus").containsExactly("CardRequested");
+        assertThat(((NotificationCenter.Change.CardRequested) changes.getFirst()).notification().count()).isEqualTo(2);
+    }
+
+    @Test void aRepeatOfAGoneOrExpiredEntryIsRefused() {
+        var center = center();
+        UUID expired = center.post(request(CARDS, "expired")).orElseThrow();
+        UUID removed = center.post(request(CARDS, "removed")).orElseThrow();
+        center.expire(expired);
+        center.remove(removed);
+        changes.clear();
+        assertThat(center.repeat(expired, true)).isFalse();
+        assertThat(center.repeat(removed, true)).isFalse();
+        assertThat(center.repeat(UUID.randomUUID(), true)).isFalse();
+        assertThat(changes).isEmpty();
+    }
+
+    @Test void aFailingActionOrDefaultActionReachesTheFailureSink() {
+        var center = center();
+        var failures = new ArrayList<Throwable>();
+        center.reportActionFailuresTo(failures::add);
+        var action = new IllegalStateException("action broke");
+        var activation = new IllegalArgumentException("activation broke");
+        UUID id = center.post(request(CARDS, "boom")
+            .withAction(new NotificationAction("Boom", () -> { throw action; }, false))
+            .withActivate(() -> { throw activation; })).orElseThrow();
+        center.runAction(id, 0);
+        center.activate(id);
+        assertThat(failures).containsExactly(action, activation);
+    }
+
+    @Test void aFailureSinkThatThrowsIsContained() {
+        var center = center();
+        center.reportActionFailuresTo(failure -> { throw new IllegalStateException("sink broke"); });
+        UUID id = center.post(request(CARDS, "boom").withAction(NotificationAction.of("Boom", () -> { throw new IllegalStateException("boom"); })))
+            .orElseThrow();
+        assertThatCode(() -> center.runAction(id, 0)).doesNotThrowAnyException();
+        assertThat(center.find(id).orElseThrow().expired()).isTrue();
+    }
 }
