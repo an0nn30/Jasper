@@ -52,10 +52,12 @@ and **Open config.toml**. It goes away by itself once every problem is fixed.
 When something fails unexpectedly, in Jasper or in a plugin, Jasper records it as an incident and tells you with an
 error notification: "Unexpected error in Jasper", or, for a plugin, "Remote failed in …" or "Remote failed to start".
 **Show more…** opens the Errors window at that incident, and **Notifications: Show Errors** in the command palette opens
-it too. A shell that could not start is recorded the same way; its notification also offers **Show more…**.
+it too. A shell that could not start is recorded too: each failure is announced in the window it happened in, with its
+folder and cause, and offers **Show more…**.
 
-The list on the left holds this session's incidents, newest first. When the same failure happens again, its row counts
-up instead of a new row appearing, and its card shows again at most once a minute. The right side shows the
+The list on the left holds this session's incidents, most recently seen first. When the same failure happens again, its
+row counts up and moves to the top instead of a new row appearing, and, for a failure of Jasper or of a plugin, its card
+shows again at most once a minute. The right side shows the
 selected incident: who failed and what it was doing, when it was first and last seen, its message and its stack trace.
 
 - **Copy** puts a report on the clipboard: Jasper's version, your OS and Java runtime, the plugin and its version for a
@@ -66,8 +68,8 @@ selected incident: who failed and what it was doing, when it was first and last 
 - **Clear** empties the list. Notifications of cleared incidents stay in the Notifications panel with their links
   disabled.
 
-Incidents are kept in memory only, at most the latest 100, and are gone when Jasper quits. Messages and stack traces
-never reach the log, which keeps the same short, scrubbed records as before.
+Incidents are kept in memory only, at most the latest 100, and are gone when Jasper quits. Incidents add nothing to the log:
+exception messages are never written to it, and it keeps the same short, scrubbed records as before.
 
 ## Shortcuts
 
