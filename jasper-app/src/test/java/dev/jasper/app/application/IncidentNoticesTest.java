@@ -26,6 +26,7 @@ import java.util.concurrent.Executor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 @ExtendWith(EdtTestExtension.class)
 class IncidentNoticesTest {
@@ -65,6 +66,11 @@ class IncidentNoticesTest {
     }
 
     private long cards() { return changes.stream().filter(NotificationCenter.Change.CardRequested.class::isInstance).count(); }
+
+    /** The notification targeted at {@code window}. */
+    private Notification noticeIn(UUID window) {
+        return center.history().stream().filter(entry -> entry.request().target().equals(Optional.of(window))).findFirst().orElseThrow();
+    }
 
     /** Failures made on one line, so they share a signature. */
     private static List<IllegalStateException> sameSite(int count) {
@@ -271,6 +277,112 @@ class IncidentNoticesTest {
         assertThat(notice.request().content()).isEqualTo("Could not start terminal in /tmp:\nshell executable unavailable");
         assertThat(notice.request().target()).contains(window);
         assertThat(labels(notice)).containsExactly("Show more…");
+    }
+
+    @Test void eachLaunchFailureIsAnnouncedInItsOwnWindowEvenWhenTheyShareAnIncident() {
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        notices.launchFailure(first, "Could not start terminal in /tmp:\nno shell", twice.get(0));
+        notices.launchFailure(second, "Could not start terminal in /home:\nno shell", twice.get(1));
+        assertThat(incidents.list()).singleElement().satisfies(incident -> assertThat(incident.count()).isEqualTo(2));
+        UUID incident = incidents.list().getFirst().id();
+        assertThat(center.history()).hasSize(2);
+        Notification inFirst = noticeIn(first);
+        Notification inSecond = noticeIn(second);
+        assertThat(inFirst.request().content()).isEqualTo("Could not start terminal in /tmp:\nno shell");
+        assertThat(inSecond.request().content()).isEqualTo("Could not start terminal in /home:\nno shell");
+        assertThat(inFirst.request().title()).isEqualTo("Could not start the terminal");
+        assertThat(inSecond.request().title()).isEqualTo("Could not start the terminal");
+        assertThat(labels(inFirst)).containsExactly("Show more…");
+        assertThat(labels(inSecond)).containsExactly("Show more…");
+        assertThat(cards()).as("a card for each window").isEqualTo(2);
+        center.runAction(inFirst.id(), 0);
+        center.runAction(inSecond.id(), 0);
+        assertThat(opened).as("both open the one incident").containsExactly(incident, incident);
+    }
+
+    @Test void clearingAnIncidentExpiresEveryLaunchNotificationItAnnounced() {
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        notices.launchFailure(first, "in /tmp", twice.get(0));
+        notices.launchFailure(second, "in /home", twice.get(1));
+        incidents.clear();
+        assertThat(center.find(noticeIn(first).id()).orElseThrow().expired()).isTrue();
+        assertThat(center.find(noticeIn(second).id()).orElseThrow().expired()).isTrue();
+    }
+
+    @Test void aRemovedLaunchNotificationIsForgottenAndTheOthersStillExpire() {
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        notices.launchFailure(first, "in /tmp", twice.get(0));
+        notices.launchFailure(second, "in /home", twice.get(1));
+        center.remove(noticeIn(first).id());
+        incidents.clear();
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.expired()).isTrue());
+    }
+
+    @Test void identicalLaunchFailuresInOneWindowShareAnEntryThatExpiresWithTheIncident() {
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        UUID window = UUID.randomUUID();
+        notices.launchFailure(window, "in /tmp", twice.get(0));
+        notices.launchFailure(window, "in /tmp", twice.get(1));
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.count()).isEqualTo(2));
+        assertThat(incidents.list().getFirst().count()).isEqualTo(2);
+        incidents.clear();
+        assertThat(center.history().getFirst().expired()).isTrue();
+    }
+
+    @Test void aLaunchFailureWithoutAWindowIsAnnouncedWithoutATargetAndNeverThrows() {
+        var notices = notices();
+        assertThatCode(() -> notices.launchFailure(null, "details", new IllegalStateException("boom"))).doesNotThrowAnyException();
+        Notification notice = center.history().getFirst();
+        assertThat(notice.request().title()).isEqualTo("Could not start the terminal");
+        assertThat(notice.request().content()).isEqualTo("details");
+        assertThat(notice.request().target()).isEmpty();
+        assertThat(labels(notice)).containsExactly("Show more…");
+        assertThat(incidents.list()).hasSize(1);
+        assertThatCode(() -> notices.launchFailure(null, null, null)).doesNotThrowAnyException();
+        assertThat(center.history()).hasSize(2);
+        assertThat(center.history().getFirst().request().target()).isEmpty();
+    }
+
+    @Test void aLaunchFailureRejectedAsTheNotificationSystemsOwnStillTellsTheUser() {
+        var notices = notices();
+        UUID window = UUID.randomUUID();
+        notices.launchFailure(window, "Could not start terminal in /tmp:\nno shell",
+            thrownIn("dev.jasper.app.notificationui.CardLayer"));
+        assertThat(incidents.list()).isEmpty();
+        assertThat(center.history()).singleElement().satisfies(entry -> {
+            assertThat(entry.request().group()).isEqualTo("jasper.general");
+            assertThat(entry.request().title()).isEqualTo("Could not start the terminal");
+            assertThat(entry.request().content()).isEqualTo("Could not start terminal in /tmp:\nno shell");
+            assertThat(entry.request().target()).contains(window);
+            assertThat(entry.request().actions()).isEmpty();
+        });
+    }
+
+    @Test void aLaunchFailureRaisedWhileAnIncidentIsAnnouncedStillTellsTheUser() {
+        var notices = notices();
+        UUID window = UUID.randomUUID();
+        boolean[] raised = {false};
+        center.onChange(change -> {
+            if (raised[0]) return;
+            raised[0] = true;
+            notices.launchFailure(window, "nested details", new IllegalStateException("raised while announcing"));
+        });
+        notices.jasperFailure("thread worker", new IllegalStateException("outer"));
+        assertThat(incidents.list()).singleElement().satisfies(incident -> assertThat(incident.message()).isEqualTo("outer"));
+        Notification nested = noticeIn(window);
+        assertThat(nested.request().title()).isEqualTo("Could not start the terminal");
+        assertThat(nested.request().content()).isEqualTo("nested details");
+        assertThat(nested.request().actions()).isEmpty();
     }
 
     @Test void nothingIsRecordedAfterClose() {
