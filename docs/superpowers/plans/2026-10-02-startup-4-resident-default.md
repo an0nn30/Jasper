@@ -26,9 +26,19 @@ amending the [background residency design](../specs/2026-09-17-jasper-background
 `openOrRaise(String trigger)`, the `reopen`/`handoff`/`menu` triggers, `startupBench` warm mode) and on Plan 2
 (`2026-10-02-startup-2-jvm-packaging.md`, packaging), both executed first. Read [STATUS](../../STATUS.md) too.
 
-**Status:** Written 2026-10-02 against `claude/startup-speed@3b1a1544` plus the text of Plan 1; not started. Third of
-five plans (1 → 2 → 4 → 3A → 3B). Task 1 (spike) and Task 9 (measurements) are user-run GUI work: ask the user before
-each. Record the spike answers, every deviation and the measured numbers in this banner and in `docs/STATUS.md`.
+**Status:** Written 2026-10-02 against `claude/startup-speed@3b1a1544` plus the text of Plan 1; executing on
+`claude/startup-speed` from `5fc658db` (after Plans 1 and 2). Third of five plans (1 → 2 → 4 → 3A → 3B). Task 1 (spike)
+and Task 9 (measurements) are user-run GUI work: ask the user before each. Record the spike answers, every deviation and
+the measured numbers in this banner and in `docs/STATUS.md`.
+
+**Spike 2026-10-03 (user-run):** Q1 (a): the Dock tile, Spotlight and `open -a` each delivered a reopen event to the one
+running process (three reopens, no second process), also after a launchd-style `Contents/MacOS/Jasper --background` exec
+and after `open -a … --args --background`. Q2 variant A: after each reopen the menu bar, Cmd+Tab and typing were right.
+Q3 yes: the template glyph follows the light and dark menu bar. The launchd-style exec showed no Dock icon and no running
+dot; `open -a … --args --background` bounced the pinned tile once (LaunchServices' launch feedback) and showed no dot.
+The plan proceeds as written. Spike deviations: Step 1's `packageApp` was skipped (it would have replaced the trained
+Plan 2 image, which the user had not yet agreed to), so the base was the byte-identical Plan 2 benchmark copy; the
+spike was assembled in the session scratchpad instead of `/tmp/jasper-spike`.
 
 **Workspace / execution:** worktree `.claude/worktrees/startup-speed`, branch `claude/startup-speed`, after Plans 1 and
 2 are merged into it. TDD and one commit per task. Line numbers below are from `3b1a1544`; Plans 1 and 2 shift them, so
