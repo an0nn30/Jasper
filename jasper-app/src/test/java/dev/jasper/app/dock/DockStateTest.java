@@ -179,4 +179,24 @@ class DockStateTest {
         state.add("a", Slot.LEFT_TOP);
         assertThat(changes).hasSize(1);
     }
+
+    @Test void dropIndexReturnsTheWindowsPlaceIfItAlreadyIsInTheTargetSlot() {
+        state.add("a", Slot.LEFT_TOP); state.add("b", Slot.LEFT_TOP); state.add("c", Slot.LEFT_TOP);
+        assertThat(state.dropIndex("b", Slot.LEFT_TOP)).isEqualTo(1);
+    }
+
+    @Test void dropIndexReturnsTheTargetGroupsSizeForAWindowInAnotherSlot() {
+        state.add("a", Slot.LEFT_TOP); state.add("b", Slot.LEFT_BOTTOM); state.add("c", Slot.LEFT_BOTTOM);
+        assertThat(state.dropIndex("a", Slot.LEFT_BOTTOM)).isEqualTo(2);
+    }
+
+    @Test void dropIndexReturnsZeroForAnEmptyTargetSlot() {
+        state.add("a", Slot.LEFT_TOP);
+        assertThat(state.dropIndex("a", Slot.LEFT_BOTTOM)).isEqualTo(0);
+    }
+
+    @Test void dropIndexReturnsTheTargetGroupsSizeForAnUnknownId() {
+        state.add("a", Slot.LEFT_TOP); state.add("b", Slot.LEFT_TOP);
+        assertThat(state.dropIndex("unknown", Slot.LEFT_TOP)).isEqualTo(2);
+    }
 }
