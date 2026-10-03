@@ -66,9 +66,11 @@
   (an action's enable or title change now refreshes the stripe in place, so only adding or removing an action or a
   rail placement, or a dock or panel change, re-renders it; follow-up pushed to main on 2026-10-03; GUI check: lock the
   vault, or otherwise change an action, while dragging a tool window, and the drag carries on); on stripes shorter than about 200px the
-  foot can clip by one step during a drag; and the overlay repaints the whole window on each drag event, which may
-  lag on large HiDPI windows (the GUI checks will tell). No GUI launched; GUI checks for the user are the plan's last
-  section.
+  foot can clip by one step during a drag; and the overlay now repaints only what changed on each drag event (each
+  changed guide's old and new bounds, nothing when none changed, no longer the whole window and every terminal under
+  it), and the placeholder's fill sits inside its border like the highlight's, so the two no longer stack; GUI check:
+  the ghost should not lag while dragging on a large HiDPI window. No GUI launched; GUI checks for the user are the
+  plan's last section.
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.
