@@ -23,7 +23,8 @@
   gates and doclint included; main's `ExFilesTest` fix (`185a5f8e`) makes it pass on this Mac, and the Remote
   `ListenerTest` flake did not fail. Open: the notifications GUI checks now look at the Notifications button on the
   right stripe; one more GUI check: start a tool window drag, then trigger a notification (for example a config
-  error), and the stripe button gains its dot while the drag continues. Nothing pushed, no GUI launched.
+  error), and the stripe button gains its dot while the drag continues. No GUI launched. Fast-forwarded to `main` and
+  pushed to `origin` on 2026-10-03 at the user's choice, together with the notifications plan 1 merge below.
 
 - **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe
@@ -217,7 +218,8 @@
   on the merged tree, with no temp-path workaround: **8,079 tests, 0 failures, 0 errors, 6 skips**. One earlier run of
   it failed `FtpEngineTest.tlsWithoutRequireAllowsBoth` with "425 Can't open passive connection"; the File Server
   suite then passed three isolated re-runs (160/160) and the next full run, so it is a load-dependent passive-port
-  flake, not a regression (the branch does not touch File Server). Not pushed.
+  flake, not a regression (the branch does not touch File Server). Pushed to `origin` on 2026-10-03 with the dock
+  layout, at the user's choice; the GUI checks are still the user's.
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed
