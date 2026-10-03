@@ -205,7 +205,7 @@ start faster without application code. `gradle/packaging-support.gradle` holds t
   path: `-Xlog:library` must show each library loaded from the image, and the probe's temporary folders must stay
   empty. Linux keeps extraction: FlatLaf's Linux library links GTK 3, which would become a package dependency.
 - **AOT cache (macOS).** `trainAotCache` launches the freshly built image once and records a JDK 25 AOT cache,
-  `Contents/app/jasper.aot` (60 MB), then adds `-XX:AOTCache=$APPDIR/jasper.aot` to `Jasper.cfg` and re-signs.
+  `Contents/app/jasper.aot` (about 60 MB), then adds `-XX:AOTCache=$APPDIR/jasper.aot` to `Jasper.cfg` and re-signs.
   `packageDist` always trains; `packageApp` trains only with `-Pjasper.aot=true`. The cache holds the JDK's and the
   application class path's classes, not plugin classes, which come from their own class loaders. `verifyPackage` runs
   the image's `java -XX:AOTMode=on` with the launcher's options and class path, which fails for a stale or broken cache

@@ -23,3 +23,49 @@ dock-icon PNGs decoded and unused (~23 ms); the shell spawned only after all of 
 
 From Plan 1 on, `tools/benchmarks/run-macos.sh <image> startup …` replaces the throwaway harness; record its JSON next
 to this file for every later plan.
+
+## Part 2 — JVM and packaging
+
+Plan 2 (trimmed runtime, default CDS archive, bundled natives, trained AOT cache; see
+[start-up performance](../packaging.md#start-up-performance)) measured with `tools/benchmarks/run-macos.sh <image>
+startup <revision> <report> --mode cold --runs 10` on the development Mac, launching through LaunchServices with no
+Jasper, VM or game running. Both batches finished with status ok and 10 of 10 runs ok.
+
+| | Revision | Image |
+|---|---|---|
+| Before | `34f51a8b` (end of Plan 1) | plain `packageApp`, no AOT cache |
+| After | `d22ea939` | the trained image from `packageDist`, copied with `ditto` |
+
+Milliseconds from the click, over the 10 cold runs of each image (the benchmark's trace milestones, not the external
+probe of the table above, so the absolute values are not comparable with that table):
+
+| Milestone | Before median | min | max | After median | min | max | Median change |
+|---|---|---|---|---|---|---|---|
+| PROCESS_START | 21 | 17 | 38 | 22 | 15 | 27 | +1 |
+| MAIN_ENTERED | 125 | 118 | 197 | 115 | 103 | 128 | −10 |
+| CONFIG_LOADED | 305 | 296 | 375 | 246 | 229 | 265 | −59 |
+| TOOLKIT_READY | 318 | 310 | 388 | 253 | 235 | 271 | −65 |
+| PLUGINS_BOUND | 991 | 961 | 1045 | 743 | 709 | 768 | −248 |
+| SHELL_SPAWNED | 1770 | 1750 | 1827 | 1063 | 1005 | 1089 | −707 |
+| WINDOW_SHOWN | 1908 | 1884 | 2016 | 1184 | 1121 | 1201 | −724 |
+| FIRST_PAINT | 1993 | 1969 | 2188 | 1249 | 1182 | 1267 | −744 |
+| SHELL_OUTPUT | 2711 | 1824 | 2777 | 2047 | 1931 | 2087 | −664 |
+| OUTPUT_PAINTED | 2727 | 2189 | 2786 | 2057 | 1942 | 2098 | −670 |
+
+The window is on screen 724 ms sooner (1908 to 1184 ms) and the shell's first output is painted 670 ms sooner (2727 to
+2057 ms). At least one before run painted shell output much earlier than the others (SHELL_OUTPUT minimum 1824 ms
+against a median of 2711 ms), so compare medians. Phase medians (ms): application 670.0 to 487.0, first window 903.2
+to 429.2, plugins 301.9 to 181.9, theme upgrade 160.6 to 122.2, config 16.8 to 6.0.
+
+- **JVM state, from each run's `jvm` record.** Before: AOT cache `none` and CDS `off` in all 10 runs. After: AOT cache
+  `used` and CDS `on` in all 10 runs.
+- **Native extraction.** No pty4j, JNA, FlatLaf or SQLite folder appeared in `$TMPDIR` during the after batch (checked
+  against a timestamp marker), which also shows that the launcher expands `$APPDIR` in the bundled-native options.
+- **Sizes (`du -sh`).** Runtime 192M before, 189M after. The whole `Jasper.app` grew from 265M to 323M, the difference
+  being `jasper.aot`, 63,569,920 bytes (61 MiB).
+
+What remains: after Part 2 about 800 ms still separate SHELL_SPAWNED from SHELL_OUTPUT. That is the shell's own
+start-up before its first prompt, outside the JVM; Parts 3A and 4 address it (an earlier spawn, and residency), Part 2
+does not. The cold target of 600 ms is therefore not met by Part 2 alone, which is expected: Part 2 is the JVM and
+packaging layer. The raw reports stay in `$HOME/jasper-bench/startup-part2/` (`before.json`, `after.json`) and are not
+committed, because they record absolute paths.

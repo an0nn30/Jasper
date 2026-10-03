@@ -8,15 +8,18 @@
   "The Java runtime"; 189 MB, was 192 MB: `lib/modules` fell from 146 to 96 MB, but jlink's two default CDS archives
   add 63 MB, so there is no disk-size win) with jlink's default CDS archive; loads FlatLaf's, JNA's and pty4j's
   native libraries from `Contents/app/native` on macOS and Windows (Linux keeps extraction: FlatLaf's Linux library
-  links GTK 3); and on macOS carries a JDK 25 AOT cache (60 MB) from `trainAotCache` (`packageDist` always trains,
+  links GTK 3); and on macOS carries a JDK 25 AOT cache (about 60 MB) from `trainAotCache` (`packageDist` always trains,
   `packageApp` with `-Pjasper.aot=true`; AGENTS.md: ask first, it opens a window). `packageDist` builds the DMG
   (155.7 MB) with `ditto` and `hdiutil` because jpackage's DMG copy resets modification times, which invalidates the
   cache, and checks the mounted copy. `verifyPackage` checks modules, CDS, natives (bytes, signatures, a headless load
   probe), JVM options and the cache (`-XX:AOTMode=on`). The JVM prints AOT cache errors on stdout, not stderr. Full
-  check: **7,991/0/0/6**. Not done: the before/after start-up comparison (`startupBench`, 10 cold launches of the
-  Plan 1 image and of the trained image; pending, run by the controller with the user's approval, then recorded in
-  `docs/benchmarks/2026-10-02-startup-baseline.md`), Windows packaging run (not verifiable on the Mac), the GUI
-  checklist items in `docs/packaging.md`, push.
+  check: **7,991/0/0/6**. Measured (`startupBench`, medians of 10 cold launches, Plan 1 image `34f51a8b` against the
+  trained image `d22ea939`): window on screen 1908 → 1184 ms (WINDOW_SHOWN), shell output painted 2727 → 2057 ms
+  (OUTPUT_PAINTED); AOT cache used and CDS on in all 10 after runs, no native extraction; see
+  [Part 2 in the baseline](benchmarks/2026-10-02-startup-baseline.md#part-2--jvm-and-packaging). About 800 ms between
+  SHELL_SPAWNED and SHELL_OUTPUT is the shell's own start-up, which Parts 3A and 4 address; the cold target (≤ 600 ms)
+  is not met by Part 2 alone. Not done: Windows packaging run (not verifiable on the Mac), the GUI checklist items in
+  `docs/packaging.md`, push.
 
 - **Start-up speed: designed, measured and planned; Plan 1 executed** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, from local `main@91400d29`; user request in chat 2026-10-02).
