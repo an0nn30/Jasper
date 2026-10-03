@@ -1,5 +1,6 @@
 package dev.jasper.app.bootstrap;
 
+import dev.jasper.app.application.DockControl;
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.commands.CommandHistory;
@@ -8,12 +9,14 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.AppLog;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.LoginItem;
+import dev.jasper.app.platform.MacDock;
 import dev.jasper.app.platform.ResidentTray;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.bootstrap.StartupResources;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -72,6 +75,16 @@ public final class ApplicationBootstrap {
         System.setProperty("apple.laf.useScreenMenuBar", "true");
         // Read once when the first tray icon is created: the macOS menu bar glyph is a template image.
         System.setProperty("apple.awt.enableTemplateImages", "true");
+    }
+
+    /**
+     * Properties a launch sets before anything touches AWT. A packaged macOS {@code --background} launch (the login item)
+     * starts as an accessory application, so no Dock icon appears at login; the bridge brings Jasper back when a window
+     * opens. A development run, or a packaged image without its bridge, has nothing to bring it back, so it never starts
+     * hidden.
+     */
+    static Map<String, String> launchProperties(boolean background, String osName, String appPath) {
+        return background && MacDock.available(osName, appPath) ? Map.of("apple.awt.UIElement", "true") : Map.of();
     }
 
     private static void startDesktop(Startup startup, AppDirs dirs, AppLog log,
@@ -144,6 +157,9 @@ public final class ApplicationBootstrap {
                 replacementHandsOff(options), standaloneNotice(options));
             // The macOS menu bar item and the Windows notification-area icon, once start-up has settled.
             application.residentIndicator(ResidentTray::install);
+            // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
+            if (MacDock.available())
+                application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
             StartupTrace.current().phase("application", began);
             acquired.transfer();
@@ -232,6 +248,8 @@ public final class ApplicationBootstrap {
         catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
         if (options.help()) { out.println(AppArguments.USAGE); return 0; }
         String os = System.getProperty("os.name");
+        // AppKit reads this as the toolkit initialises, and the theme upgrade below may already initialise it.
+        launchProperties(options.background(), os, System.getProperty("jpackage.app-path")).forEach(System::setProperty);
         Path home = Path.of(System.getProperty("user.home"));
         AppDirs dirs = AppDirs.resolve(os, System.getenv(), home, System.getProperty("jasper.home"));
         options = options.withHomeOverride(dirs.overridden());

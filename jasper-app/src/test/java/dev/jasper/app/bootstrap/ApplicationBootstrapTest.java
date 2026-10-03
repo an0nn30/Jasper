@@ -184,6 +184,25 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(null, false, false, false, plugin, true))).isFalse();
     }
 
+    @Test void onlyAPackagedMacLoginLaunchStartsHiddenFromTheDock() throws Exception {
+        // A real bundle layout, because a packaged image only counts when it carries the bridge beside the launcher.
+        Path bundle = directory.resolve("Jasper.app");
+        Path launcher = Files.createDirectories(bundle.resolve("Contents/MacOS")).resolve("Jasper");
+        Files.writeString(launcher, "placeholder");
+        String app = launcher.toString();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Mac OS X", app))
+            .as("a packaged image missing its bridge could never come back").isEmpty();
+        Files.writeString(Files.createDirectories(bundle.resolve("Contents/app")).resolve("libjasper-macos.dylib"), "placeholder");
+        assertThat(ApplicationBootstrap.launchProperties(true, "Mac OS X", app))
+            .containsExactly(java.util.Map.entry("apple.awt.UIElement", "true"));
+        assertThat(ApplicationBootstrap.launchProperties(false, "Mac OS X", app)).isEmpty();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Mac OS X", null))
+            .as("a development run has no bridge, so it could never come back").isEmpty();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Windows 11", "C:\\Program Files\\Jasper\\Jasper.exe")).isEmpty();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Windows 11", app))
+            .as("the operating system decides even when the layout looks like a bundle").isEmpty();
+    }
+
     @Test void desktopPropertiesAlwaysUseTheMacScreenMenuBar() {
         String previous = System.getProperty("apple.laf.useScreenMenuBar");
         try {
