@@ -26,7 +26,7 @@ public record NotificationRequest(String group, Severity severity, String title,
         Objects.requireNonNull(group, "group");
         Objects.requireNonNull(severity, "severity");
         title = NotificationText.line(Objects.requireNonNull(title, "title"), MAX_TITLE);
-        if (title.isEmpty()) throw new IllegalArgumentException("A notification needs a title");
+        if (!NotificationText.visible(title)) throw new IllegalArgumentException("A notification needs a title");
         content = NotificationText.block(Objects.requireNonNull(content, "content"), MAX_CONTENT);
         Objects.requireNonNull(icon, "icon");
         actions = List.copyOf(actions);

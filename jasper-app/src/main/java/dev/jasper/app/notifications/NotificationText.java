@@ -13,7 +13,7 @@ final class NotificationText {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c == ' ' || c == '\t' || c == '\n' || c == '\r') { space = true; continue; }
-            if (Character.isISOControl(c)) continue;
+            if (Character.isISOControl(c) || bidiControl(c)) continue;
             if (space && !out.isEmpty()) out.append(' ');
             space = false;
             out.append(c);
@@ -27,9 +27,23 @@ final class NotificationText {
         var out = new StringBuilder(lines.length());
         for (int i = 0; i < lines.length(); i++) {
             char c = lines.charAt(i);
-            if (c == '\n' || !Character.isISOControl(c)) out.append(c);
+            if (c == '\n' || !(Character.isISOControl(c) || bidiControl(c))) out.append(c);
         }
         return cut(out.toString().strip(), max);
+    }
+
+    /**
+     * Whether the text shows anything: some character that is not white space, a space separator (no-break spaces
+     * included), a formatting mark (zero-width characters, bidi controls) or another control character.
+     */
+    static boolean visible(String text) {
+        return text.codePoints().anyMatch(point -> !Character.isWhitespace(point) && !Character.isSpaceChar(point)
+            && Character.getType(point) != Character.FORMAT && !Character.isISOControl(point));
+    }
+
+    /** A bidirectional formatting character: it could reorder how the text around it reads. */
+    private static boolean bidiControl(char c) {
+        return c == '\u061C' || c == '\u200E' || c == '\u200F' || (c >= '\u202A' && c <= '\u202E') || (c >= '\u2066' && c <= '\u2069');
     }
 
     /** {@code text}, or its first characters and an ellipsis in {@code max}; a surrogate pair is kept whole or dropped. */
