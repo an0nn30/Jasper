@@ -2,8 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/notifications-3` (worktree `.worktrees/notifications-3`, cut from main
-`c02673cd`, where plans 1 and 2 are merged).
+**Status:** Implemented on branch `claude/notifications-3` (worktree `.worktrees/notifications-3`, cut from main
+`c02673cd`, where plans 1 and 2 are merged), executed natively (one context, TDD per task) at the user's choice, with
+one independent whole-branch review at the end. `./gradlew check --continue`: 8,331 tests, 0 failures, 0 errors, 6
+skipped (37 new). Deviations from the plan text:
+- Task 5: the contract test's second plugin takes its context as `broken`, because a lambda parameter named `context`
+  would shadow the test's local of the same name and not compile.
+- Task 12: Step 4's `grep -rnw "Notices"` also matches the English verb in three existing comments (`FakePluginHost`,
+  `FakeSessions`, `LocalWatcher`), and the manifest grep matched stale `build/` copies until the next build; the type
+  is gone from source and every manifest declares `>=0.14.0, <0.15`.
+- Process: escapes typed into the executor's tool calls arrived as raw characters, so every Java file written was put
+  through an escape pass before compiling; the source hygiene check is clean.
+
+Final review: see the list below this paragraph once it has run.
 
 **Goal:** Give plugins notifications through the SDK (`dev.jasper.sdk.notifications`, SDK 0.14.0). Replace `Notices` in
 every bundled plugin with titled notifications that carry their causes. Announce plugin problems and activity outcomes

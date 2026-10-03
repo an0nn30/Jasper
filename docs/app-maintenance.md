@@ -187,6 +187,16 @@ whose first Jasper frame lies in `dev.jasper.app.notifications`, `dev.jasper.app
 notification system can never report its own failures in a loop; a launch failure rejected that way still gets its
 plain "Could not start the terminal" notification. The log is unchanged: incidents add no messages or traces to it.
 
+## A plugin's notifications
+
+Plugins post through `PluginContext.notifications()`, which `plugins.HostedNotifications` implements over the
+application's `NotificationCenter` ([design](superpowers/specs/2026-10-02-jasper-notifications-design.md)). The
+runtime gets a `PluginRuntime.NotificationHost`: the center; `caused`, for a plugin's notification with a cause, which
+`JasperApplication` hands to `IncidentNotices.pluginNotice`; and `problem`, for a plugin problem of the runtime's own,
+such as a settings file that cannot be opened. `PluginHost` posts activity outcomes, and
+`application.PluginProblemNotices` posts `PluginRuntime.problems()` after `PluginRuntime.start`. Change the SDK side
+in `PluginContractTest` first, so the testkit's `FakeNotifications` and the application keep one contract.
+
 ## Platform integration
 
 Place OS behavior in [MacTitleBar](../jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java)-style adapters or the existing platform package. Supply narrow JDK callbacks and values rather than WindowContent/JasperApplication back-references. Register cleanup immediately using [StartupResources](../jasper-app/src/main/java/dev/jasper/app/bootstrap/StartupResources.java) during startup, then transfer it to the long-lived owner only after wiring succeeds. Keep handoff before AWT; distinguish unsupported capability from failed startup. Tests inject boundary callbacks and do not open a real desktop window.

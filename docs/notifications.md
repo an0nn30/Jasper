@@ -42,11 +42,25 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 |---|---|---|
 | Jasper | errors and results of Jasper's own commands: a shell that could not start, a theme that could not be applied, Migrate Config | card |
 | Configuration | problems in `config.toml`, themes and plugin settings files | sticky card |
-| Plugin problems | a plugin that failed while Jasper asked it to do something | card |
+| Plugin problems | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
 | Internal errors | unexpected errors in Jasper itself | card |
+| *Plugin name*, one per plugin | the plugin's own messages, such as a host that could not be saved | card |
+| *Plugin name* activities | a plugin's background work that finished or failed, such as a sync or an upload | card |
+| Tunnels | Remote's tunnel failures | card |
 
 A configuration notification offers **Show Problems** (the same list as the status bar's configuration indicator)
 and **Open config.toml**. It goes away by itself once every problem is fixed.
+
+## Plugin notifications
+
+Plugins post notifications in their own groups, so you can tell them apart from Jasper's. When an error a plugin
+reports has an exception behind it, its notification offers **Show more…**, which opens the Errors window at it. When
+a plugin's background work finishes or fails, Jasper posts the outcome in the plugin's activities group; clicking it
+runs the plugin's action for that work, if it has one.
+
+At launch, each plugin that could not be loaded, was not started (it needs another version of Jasper, or a plugin it
+requires is missing) or could not be read is reported in Plugin problems with **Open Plugins**, which opens
+Settings › Plugins. A plugin that failed while starting is reported once, by its incident's notification.
 
 ## The Errors window
 

@@ -183,10 +183,9 @@ and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained
 `PaletteQuery` built from the target's window and pane ids through the plugin's own handles, and
 the plugin's row kept as the app row's token so it comes back unchanged. Every scope gets a tab;
 `ScopeSpec.inAll` (SDK 0.8.0, `withInAll(false)` to opt out) decides whether the All tab searches it
-too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `HostedContext.notices()`
-posts an error notification in the Jasper group (`jasper.general`) until plan 3 replaces `Notices`; `platform().openInEditor` runs the application's
-`ConfigEditor` on the plugin's executor and reports failure as a notice, and `platform().browse`
-does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
+too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `platform().openInEditor` runs the application's
+`ConfigEditor` on the plugin's executor and posts a failure in the plugin's notification group, and
+`platform().browse` does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
 contributors; `stagePlugins` copies each plugin's jar and runtime classpath into `lib/plugins/<id>/`.
 
@@ -209,6 +208,21 @@ stroke when their contexts don't conflict (a conflict is the same context, or Gl
 a terminal pane). `WindowContent.dispatchShortcut` resolves the stroke against the focus owner: an enabled action in
 the most specific containing context runs; a disabled one takes the key without running in a terminal pane (plan K1
 Deviation 9: X11 would send it to the shell as a control character); otherwise the key is not consumed. Window contexts apply once plugin windows get the Keymap (plan K4).
+
+## Notifications (SDK 0.14.0)
+
+`PluginContext.notifications()` is `plugins.HostedNotifications`, one per context. When the context is made it
+registers the plugin's default group (`<plugin-id>`, CARD) and `<plugin-id>.activities` in the application's
+`NotificationCenter`; `group(GroupSpec)` registers more inside the plugin's namespace. `post` requires an open context,
+turns the SDK spec into a `NotificationRequest` with the plugin id as its source, wraps every action and the body in
+`Containment.run`, and posts from any thread. A spec with a cause goes to `PluginRuntime.NotificationHost.caused`,
+which the application wires to `IncidentNotices.pluginNotice`: the trace is captured on the posting thread and
+recorded as the plugin's incident, named after the title, and the notification gains Show more…. A handle learns its
+entry's id on the EDT and expires with it; teardown expires everything the plugin posted. `PluginHost` hears
+`Activities.TOPIC` and posts a running plugin's succeeded or failed activity in its activities group.
+`PluginRuntime.problems()` lists what kept plugins from running at launch, and `application.PluginProblemNotices`
+posts each in Plugin problems with Open Plugins. The testkit's `FakeNotifications` records the same posts, and
+`PluginContractTest` holds both hosts to one contract.
 
 ## Plugins manager, install and restart
 
