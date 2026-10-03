@@ -678,4 +678,32 @@ class WindowPanelsTest {
             assertThat(owner.getMinimumSize().height).isEqualTo(alone);
         });
     }
+
+    @Test void theStripesAppearingAndGoingAwayRefreshTheWindowsMinimum() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            // The stripes show without any dock sync (a panel is only registered, none shows), so only their own
+            // appearing can tell the window what its minimum is with them.
+            List<Boolean> stripes = new ArrayList<>();
+            List<java.awt.Dimension> minimums = new ArrayList<>();
+            owner.onMinimumSizeChanged = () -> { stripes.add(owner.leftStripe().isVisible()); minimums.add(owner.getMinimumSize()); };
+            var bare = owner.getMinimumSize();
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            assertThat(owner.leftStripe().isVisible()).isTrue();
+            assertThat(stripes).as("the stripes appearing tell the window").isNotEmpty();
+            assertThat(stripes.getLast()).as("and it last heard with them showing").isTrue();
+            var withStripes = minimums.getLast();
+            assertThat(withStripes.width).as("both stripes").isGreaterThanOrEqualTo(bare.width + 2 * UIScale.scale(owner.railWidth()));
+            assertThat(withStripes.height).as("the lower inset").isGreaterThanOrEqualTo(bare.height + UIScale.scale(8));
+            assertThat(withStripes).as("what the window heard is what it has").isEqualTo(owner.getMinimumSize());
+
+            int heard = stripes.size();
+            owner.setRailVisible(false);
+            assertThat(stripes.size()).as("hiding the stripes tells the window too").isGreaterThan(heard);
+            assertThat(stripes.getLast()).isFalse();
+            assertThat(minimums.getLast()).isEqualTo(owner.getMinimumSize()).isEqualTo(bare);
+        });
+    }
 }

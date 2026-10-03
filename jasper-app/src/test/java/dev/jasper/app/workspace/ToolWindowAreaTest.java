@@ -150,6 +150,24 @@ class ToolWindowAreaTest {
         assertThat(area.getMinimumSize().height).as("either side splits it").isEqualTo(2 * 120 + 6 + 6 + 120);
     }
 
+    @Test void onlyASplitSideRaisesTheMinimumHeightWhateverTheUiScale() {
+        var metrics = DockGeometry.Metrics.at(1.5);
+        // The terminal column's own minimum is under the scaled 120px terminal floor, as with a minimal tab strip.
+        var terminal = new Dimension(300, 100);
+        var state = new DockState();
+        var area = new ToolWindowArea(new JPanel(), state);
+        DockTestSupport.show(area, Slot.LEFT_TOP, new JLabel("upper"), 260);
+        DockTestSupport.show(area, Slot.BOTTOM_LEFT, new JLabel("bottom"), 200);
+        assertThat(ToolWindowArea.size(terminal, state, metrics, false)).as("the terminal's minimum plus the bottom row, as before")
+            .isEqualTo(new Dimension(300 + 9 + 180, 100 + 9 + 180));
+        assertThat(ToolWindowArea.size(new Dimension(300, 400), state, metrics, false).height).isEqualTo(400 + 9 + 180);
+
+        DockTestSupport.show(area, Slot.LEFT_BOTTOM, new JLabel("lower"), 260);
+        assertThat(ToolWindowArea.size(terminal, state, metrics, false).height).as("a split side's halves, then the bottom row")
+            .isEqualTo(2 * 180 + 9 + 9 + 180);
+        assertThat(ToolWindowArea.size(terminal, state, metrics, true).height).isEqualTo(2 * 180 + 9 + 9 + Math.round(1.5f * 200));
+    }
+
     @Test void theAreaTellsItsWindowWhenWhatShowsChanges() {
         var area = new ToolWindowArea(new JPanel(), new DockState());
         int[] told = {0};

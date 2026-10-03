@@ -102,7 +102,7 @@
   `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
   "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite
   load (it did not fail in this run and passes alone). The window's minimum height now counts a split side's two
-  halves (one shared rule, `DockGeometry.upperMinimum`; follow-up on `claude/dock-followups`). No GUI launched. GUI
+  halves (one shared rule, `DockGeometry.splitMinimum`; follow-up on `claude/dock-followups`). No GUI launched. GUI
   checks for the user: the plan's section
   "GUI checks for the user". Plan 2 (drag and drop) was executed on top of it; see the entry above.
 

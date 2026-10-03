@@ -100,14 +100,20 @@ public final class DockGeometry {
     }
 
     /**
-     * The least height, in scaled pixels, of the area above the bottom row: the terminal column's minimum height, or
-     * two tool window minimums and the divider between them when the left or the right side shows both halves. The
-     * layout keeps that much above the bottom row, and the window's minimum height must leave it.
+     * The least height, in scaled pixels, that a side showing both halves needs: two tool window minimums and the
+     * divider between them. It is 0 while neither the left nor the right side shows both halves.
+     */
+    public static int splitMinimum(DockState state, Metrics metrics) {
+        int gap = metrics.scaled(metrics.divider()), floor = metrics.scaled(metrics.toolWindowMinimum());
+        return halves(state, Slot.LEFT_TOP) || halves(state, Slot.RIGHT_TOP) ? 2 * floor + gap : 0;
+    }
+
+    /**
+     * The least height, in scaled pixels, of the area above the bottom row: the larger of the terminal column's
+     * minimum height and {@link #splitMinimum}. The layout keeps that much above the bottom row.
      */
     public static int upperMinimum(DockState state, Metrics metrics) {
-        int gap = metrics.scaled(metrics.divider()), floor = metrics.scaled(metrics.toolWindowMinimum());
-        return Math.max(metrics.scaled(metrics.terminalMinimumHeight()),
-            halves(state, Slot.LEFT_TOP) || halves(state, Slot.RIGHT_TOP) ? 2 * floor + gap : 0);
+        return Math.max(metrics.scaled(metrics.terminalMinimumHeight()), splitMinimum(state, metrics));
     }
 
     public static Layout compute(Rectangle bounds, DockState state, Metrics metrics) {
@@ -118,8 +124,8 @@ public final class DockGeometry {
         var dividers = new ArrayList<Divider>();
 
         int[] bottomHeight = {bottom ? Math.max(floor, metrics.scaled(state.size(Side.BOTTOM))) : 0};
-        int upperMinimum = upperMinimum(state, metrics);
-        int upper = squeeze(height - (bottom ? gap : 0), upperMinimum, floor, bottomHeight);
+        int upperFloor = upperMinimum(state, metrics);
+        int upper = squeeze(height - (bottom ? gap : 0), upperFloor, floor, bottomHeight);
         int[] sides = {right ? Math.max(floor, metrics.scaled(state.size(Side.RIGHT))) : 0,
                        left ? Math.max(floor, metrics.scaled(state.size(Side.LEFT))) : 0};
         int terminalWidth = squeeze(width - (left ? gap : 0) - (right ? gap : 0),
@@ -141,7 +147,7 @@ public final class DockGeometry {
         }
         if (bottom) {
             int bar = y + upper;
-            int surplusHeight = Math.max(0, upper - upperMinimum);
+            int surplusHeight = Math.max(0, upper - upperFloor);
             dividers.add(divider(Handle.BOTTOM_HEIGHT, new Rectangle(x, bar, width, gap), new Rectangle(x, y, width, height),
                 bar - surplusHeight, y + height - floor - gap));
             pair(new Rectangle(x, bar + gap, width, bottomHeight[0]), state, Slot.BOTTOM_LEFT, Handle.BOTTOM_RATIO,

@@ -179,7 +179,7 @@ final class ToolWindowArea extends JPanel {
     /** A divider drag in progress lays out this copy of the state. */
     private DockState preview;
     private boolean stripesVisible, statusVisible, headerVisible;
-    /** Hears that a sync changed which windows show, and with them the area's minimum size. */
+    /** Runs after every sync, which may have changed which windows show and so the area's minimum size. */
     Runnable onMinimumSizeChanged = () -> { };
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
     Consumer<String> onHide = id -> { };
@@ -263,7 +263,6 @@ final class ToolWindowArea extends JPanel {
         }
         refreshGutters();
         revalidate(); repaint();
-        // A split appearing or going away, or a side showing or hiding, changes the window's minimum size.
         onMinimumSizeChanged.run();
     }
 
@@ -328,11 +327,16 @@ final class ToolWindowArea extends JPanel {
         });
     }
 
-    private Dimension size(Dimension terminal, boolean preferred) {
-        var metrics = metrics();
+    private Dimension size(Dimension terminal, boolean preferred) { return size(terminal, state, metrics(), preferred); }
+
+    /**
+     * The area's preferred or minimum size around a terminal column of the given size. Only a split side raises the
+     * height above the terminal's: two tool window minimums and the divider between them, when a side shows both halves.
+     * The bottom row adds its divider and its minimum, or its saved size when preferred.
+     */
+    static Dimension size(Dimension terminal, DockState state, DockGeometry.Metrics metrics, boolean preferred) {
         int gap = metrics.scaled(metrics.divider()), floor = metrics.scaled(metrics.toolWindowMinimum());
-        // The upper area is the terminal column's size, or a split side's two halves when those need more height.
-        int width = terminal.width, height = Math.max(terminal.height, DockGeometry.upperMinimum(state, metrics));
+        int width = terminal.width, height = Math.max(terminal.height, DockGeometry.splitMinimum(state, metrics));
         for (Side side : List.of(Side.LEFT, Side.RIGHT))
             if (state.showing(side)) width += gap + (preferred ? Math.max(floor, metrics.scaled(state.size(side))) : floor);
         if (state.showing(Side.BOTTOM))

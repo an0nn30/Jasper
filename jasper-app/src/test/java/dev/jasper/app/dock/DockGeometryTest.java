@@ -311,6 +311,15 @@ class DockGeometryTest {
             .as("180 + 9 + 180 scaled pixels").isEqualTo(2 * 180 + 9);
     }
 
+    @Test void onlyASplitSideHasASplitMinimum() {
+        assertThat(DockGeometry.splitMinimum(new DockState(), Metrics.DEFAULT)).isZero();
+        assertThat(DockGeometry.splitMinimum(showing(Slot.LEFT_TOP, Slot.RIGHT_BOTTOM, Slot.BOTTOM_LEFT, Slot.BOTTOM_RIGHT),
+            Metrics.at(1.5))).as("one window per side, and a split bottom row, do not split a side").isZero();
+        assertThat(DockGeometry.splitMinimum(showing(Slot.LEFT_TOP, Slot.LEFT_BOTTOM), Metrics.DEFAULT)).isEqualTo(2 * 120 + 6);
+        assertThat(DockGeometry.splitMinimum(showing(Slot.RIGHT_TOP, Slot.RIGHT_BOTTOM), Metrics.at(1.5)))
+            .as("180 + 9 + 180 scaled pixels").isEqualTo(2 * 180 + 9);
+    }
+
     @Test void aWideSplitsDividerRangeStaysWithinTheRatioLimits() {
         DockState state = showing(Slot.BOTTOM_LEFT, Slot.BOTTOM_RIGHT);
         Layout layout = DockGeometry.compute(new Rectangle(0, 0, 1512, 982), state, Metrics.DEFAULT);

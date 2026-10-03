@@ -758,6 +758,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             leftStripe.setVisible(wanted);
             rightStripe.setVisible(wanted);
             revalidate(); repaint();
+            // The stripes' own width, and the area's lower inset, are part of the window's minimum size.
+            onMinimumSizeChanged.run();
         }
     }
     boolean updatingActions() { return workspaceActions.updating(); }
