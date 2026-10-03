@@ -488,6 +488,8 @@ public final class JasperApplication {
             return created.content().id();
         });
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
+        new PluginProblemNotices(notificationCenter, incidentNotices,
+            () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         var keymap = new dev.jasper.app.shortcuthelp.KeymapPage.Hooks(contributions,
             () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).keybindings(),

@@ -248,6 +248,36 @@ public final class PluginRuntime {
     }
 
     /**
+     * Something that kept a plugin from running at this launch, for the application to announce (spec section 7,
+     * producer 5). A plugin that failed while starting is not one: its incident already says so.
+     *
+     * @param kind what went wrong
+     * @param pluginId the plugin's id; empty for a directory that holds no readable plugin
+     * @param name the plugin's name; empty with the id
+     * @param detail why, in the user's terms
+     * @param cause the exception behind it, when there is one
+     */
+    public record Problem(Kind kind, Optional<String> pluginId, Optional<String> name, String detail, Optional<Throwable> cause) {
+        /** What went wrong. */
+        public enum Kind {
+            /** The plugin's jars could not be loaded. */
+            NOT_LOADED,
+            /** The plugin was skipped: it needs another SDK, or a dependency is missing, failed or forms a cycle. */
+            NOT_STARTED,
+            /** A directory in a plugins folder holds no plugin Jasper can read. */
+            UNREADABLE
+        }
+
+        public Problem {
+            Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(pluginId, "pluginId");
+            Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(detail, "detail");
+            Objects.requireNonNull(cause, "cause");
+        }
+    }
+
+    /**
      * Where plugin settings problems go, on the UI thread.
      *
      * @param report adds one problem, attributed to the plugin's own settings file
@@ -305,6 +335,7 @@ public final class PluginRuntime {
 
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
+    private final List<Problem> startupProblems = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
     private final PluginSettingsFiles settingsFiles;
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
@@ -446,8 +477,14 @@ public final class PluginRuntime {
             LOG.log(System.Logger.Level.WARNING, "Plugin state is unreadable; user plugins will need consent", unreadable);
             state = Map.of();
         }
+        for (String problem : problems)
+            startupProblems.add(new Problem(Problem.Kind.UNREADABLE, Optional.empty(), Optional.empty(), problem, Optional.empty()));
         var resolution = PluginResolver.resolve(candidates, state, Version.parse(JasperSdk.VERSION), options.safeMode());
         statuses.addAll(resolution.rejected());
+        for (PluginStatus rejected : resolution.rejected())
+            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.superseded())
+                startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(rejected.id()), Optional.of(rejected.name()),
+                    rejected.reason(), Optional.empty()));
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
@@ -467,6 +504,8 @@ public final class PluginRuntime {
             try { unit = PluginLoader.load(candidate, loaded, PluginRuntime.class.getClassLoader()); }
             catch (PluginLoader.LoadFailure failure) {
                 statuses.add(PluginStatus.of(candidate, PluginStatus.State.FAILED, failure.getMessage()));
+                startupProblems.add(new Problem(Problem.Kind.NOT_LOADED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
+                    failure.getMessage(), failure.getCause() == null ? Optional.empty() : Optional.of(failure)));
                 continue;
             }
             loaded.put(candidate.id(), unit);
@@ -477,6 +516,9 @@ public final class PluginRuntime {
             PluginHost.Outcome outcome = created.start(new HostedPlugin(candidate.descriptor().info(), hard, optional,
                 candidate.descriptor().exports(), unit.loader(), unit::instantiate));
             statuses.add(PluginStatus.of(candidate, outcome.state(), outcome.reason()));
+            if (outcome.state() == PluginStatus.State.SKIPPED)
+                startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
+                    outcome.reason(), Optional.empty()));
         }
         launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode());
         admin = new PluginAdmin(options, Version.parse(JasperSdk.VERSION), () -> launch, created.containment::failures, LOCK_WAIT);
@@ -516,6 +558,13 @@ public final class PluginRuntime {
         launched.forEach((id, candidate) -> names.put(id, candidate.descriptor().name()));
         return Map.copyOf(names);
     }
+
+    /**
+     * What kept plugins from running at this launch, in the order it was found; empty before {@link #start}. UI thread.
+     *
+     * @return the problems
+     */
+    public List<Problem> problems() { return List.copyOf(startupProblems); }
 
     /**
      * Where contained plugin failures go after they are logged; the application records each as an incident.
