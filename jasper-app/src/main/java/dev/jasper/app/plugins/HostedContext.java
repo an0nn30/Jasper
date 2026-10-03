@@ -12,9 +12,7 @@ import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.events.Topic;
-import dev.jasper.sdk.notifications.NotificationSpec;
 import dev.jasper.sdk.notifications.Notifications;
-import dev.jasper.sdk.notifications.Severity;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
@@ -49,7 +47,6 @@ import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.palette.Palette;
-import dev.jasper.sdk.ui.Notices;
 import dev.jasper.sdk.ui.Platform;
 
 /** One plugin's view of the host. Closed after a failed start and after stop: nothing can be contributed through it. */
@@ -158,16 +155,6 @@ final class HostedContext implements PluginContext {
         @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
 
         @Override public Notifications notifications() { return notifications; }
-
-        @Override public Notices notices() {
-            return message -> {
-                requireOpen();
-                Objects.requireNonNull(message, "message");
-                // Notices is replaced by notifications(): its error becomes one titled with the plugin's name.
-                notifications.group().post(NotificationSpec.of(Severity.ERROR, hosted.info().name())
-                    .withContent(message.length() <= 4_000 ? message : message.substring(0, 3_999) + "…"));
-            };
-        }
 
         @Override public Platform platform() {
             return new Platform() {

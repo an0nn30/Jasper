@@ -97,9 +97,9 @@ class FakePaletteTest {
             assertThatIllegalArgumentException().as("another plugin's namespace").isThrownBy(() -> b.get().palette().register(new Things()));
             first.close();
             assertThat(host.scopes()).isEmpty();
-            a.get().notices().error("It broke");
+            a.get().notifications().group().error("It broke", "");
             a.get().platform().openInEditor(Path.of("/tmp/x.toml"));
-            assertThat(host.notices()).containsExactly("test.a: It broke");
+            assertThat(host.notifications().lines()).containsExactly("test.a|ERROR|It broke|");
             assertThat(host.openedInEditor()).containsExactly(Path.of("/tmp/x.toml"));
         }
     }

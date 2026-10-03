@@ -107,7 +107,6 @@ public final class FakePluginContext implements PluginContext {
         @Override public dev.jasper.sdk.palette.Palette palette() { return palette; }
     @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
     @Override public dev.jasper.sdk.notifications.Notifications notifications() { return notifications; }
-        @Override public dev.jasper.sdk.ui.Notices notices() { return message -> { requireOpen(); host.notices.add(info.id() + ": " + Objects.requireNonNull(message, "message")); }; }
         @Override public dev.jasper.sdk.ui.Platform platform() {
             return new dev.jasper.sdk.ui.Platform() {
                 @Override public void openInEditor(Path file) { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }

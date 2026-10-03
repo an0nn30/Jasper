@@ -77,7 +77,6 @@ public final class FakePluginHost implements AutoCloseable {
     private final java.util.ArrayDeque<List<dev.jasper.sdk.files.FileLocation>> fileChoiceQueue = new java.util.ArrayDeque<>();
     private final List<dev.jasper.sdk.files.FileChoice> fileChoices = new ArrayList<>();
         final List<String> paletteOpens = new ArrayList<>();
-        final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
     final List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
     final FakeNotifications notifications = new FakeNotifications(this);
@@ -1307,9 +1306,6 @@ public final class FakePluginHost implements AutoCloseable {
 
         /** Every {@code Palette.open} call as {@code windowId scopeId query rowId}, with {@code -} for an absent value. */
         public List<String> paletteOpens() { return List.copyOf(paletteOpens); }
-
-        /** Every error notice as {@code pluginId: message}. */
-        public List<String> notices() { return List.copyOf(notices); }
 
         /** Every file a plugin asked to open in the editor. */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }

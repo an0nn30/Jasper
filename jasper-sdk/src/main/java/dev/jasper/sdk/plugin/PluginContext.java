@@ -19,7 +19,6 @@ import dev.jasper.sdk.terminal.Terminals;
 import dev.jasper.sdk.palette.Palette;
 import dev.jasper.sdk.files.FileSources;
 import dev.jasper.sdk.notifications.Notifications;
-import dev.jasper.sdk.ui.Notices;
 import dev.jasper.sdk.ui.Platform;
 
 /**
@@ -167,9 +166,6 @@ public interface PluginContext {
      * @since 0.14.0
      */
     Notifications notifications();
-
-        /** @return error notices shown to the user */
-        Notices notices();
 
         /** @return desktop integration such as opening a file in the editor */
         Platform platform();
