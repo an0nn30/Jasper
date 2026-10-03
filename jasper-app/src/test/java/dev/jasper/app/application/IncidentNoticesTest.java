@@ -1,0 +1,284 @@
+package dev.jasper.app.application;
+
+import dev.jasper.app.notifications.Capture;
+import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.DisplayMode;
+import dev.jasper.app.notifications.Incident;
+import dev.jasper.app.notifications.Incidents;
+import dev.jasper.app.notifications.Notification;
+import dev.jasper.app.notifications.NotificationAction;
+import dev.jasper.app.notifications.NotificationCenter;
+import dev.jasper.app.notifications.NotificationGroup;
+import dev.jasper.app.notifications.Severity;
+import dev.jasper.app.testsupport.EdtTestExtension;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executor;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@ExtendWith(EdtTestExtension.class)
+class IncidentNoticesTest {
+    /** A clock a test moves by hand. */
+    private static final class MutableClock extends Clock {
+        private Instant now = Instant.parse("2026-10-02T14:05:00Z");
+        void advance(Duration by) { now = now.plus(by); }
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
+    }
+
+    /** A failure whose message, and so its toString and trace, cannot be read. */
+    private static final class Unreadable extends RuntimeException {
+        @Override public String getMessage() { throw new IllegalStateException("unreadable"); }
+    }
+
+    private final MutableClock clock = new MutableClock();
+    private final NotificationCenter center = new NotificationCenter(Runnable::run, clock, () -> Delivery.Presence.FOCUSED);
+    private final Incidents incidents = new Incidents(clock);
+    private final List<NotificationCenter.Change> changes = new ArrayList<>();
+    private final List<UUID> opened = new ArrayList<>();
+    private final List<String> disabled = new ArrayList<>();
+    private Optional<String> disableProblem = Optional.empty();
+    private Executor ui = Runnable::run;
+
+    private IncidentNotices notices() {
+        center.register(NotificationsFeature.GENERAL);
+        center.onChange(changes::add);
+        return new IncidentNotices(center, incidents, task -> ui.execute(task),
+            id -> id.equals("dev.jasper.remote") ? "Remote" : id,
+            (id, done) -> { disabled.add(id); done.accept(disableProblem); }, opened::add);
+    }
+
+    private static List<String> labels(Notification notification) {
+        return notification.request().actions().stream().map(NotificationAction::label).toList();
+    }
+
+    private long cards() { return changes.stream().filter(NotificationCenter.Change.CardRequested.class::isInstance).count(); }
+
+    /** Failures made on one line, so they share a signature. */
+    private static List<IllegalStateException> sameSite(int count) {
+        var failures = new ArrayList<IllegalStateException>();
+        for (int i = 0; i < count; i++) failures.add(new IllegalStateException("broken " + i));
+        return failures;
+    }
+
+    /** A failure whose stack starts in Swing, then runs through each of {@code jasperClasses}. */
+    private static IllegalStateException thrownIn(String... jasperClasses) {
+        var frames = new ArrayList<StackTraceElement>();
+        frames.add(new StackTraceElement("javax.swing.JComponent", "paint", "JComponent.java", 1));
+        for (int i = 0; i < jasperClasses.length; i++) frames.add(new StackTraceElement(jasperClasses[i], "run", "Source.java", 10 + i));
+        var failure = new IllegalStateException("from " + jasperClasses[0]);
+        failure.setStackTrace(frames.toArray(StackTraceElement[]::new));
+        return failure;
+    }
+
+    @Test void declaresThePluginProblemsAndInternalErrorsGroups() {
+        notices();
+        assertThat(center.group("jasper.plugins")).contains(new NotificationGroup("jasper.plugins", "Plugin problems", "jasper", DisplayMode.CARD));
+        assertThat(center.group("jasper.errors")).contains(new NotificationGroup("jasper.errors", "Internal errors", "jasper", DisplayMode.CARD));
+    }
+
+    @Test void aJasperFailureIsAnIncidentAndAnInternalError() {
+        var notices = notices();
+        notices.jasperFailure("thread worker", new IllegalStateException("broken\nsecond line"));
+        Incident incident = incidents.list().getFirst();
+        assertThat(incident.source()).isEqualTo("jasper");
+        assertThat(incident.operation()).isEqualTo("thread worker");
+        assertThat(incident.thread()).isEqualTo(Thread.currentThread().getName());
+        Notification notice = center.history().getFirst();
+        assertThat(notice.request().group()).isEqualTo("jasper.errors");
+        assertThat(notice.request().severity()).isEqualTo(Severity.ERROR);
+        assertThat(notice.request().title()).isEqualTo("Unexpected error in Jasper");
+        assertThat(notice.request().content()).isEqualTo("IllegalStateException: broken");
+        assertThat(labels(notice)).containsExactly("Show more…");
+        assertThat(cards()).isEqualTo(1);
+        center.runAction(notice.id(), 0);
+        assertThat(opened).containsExactly(incident.id());
+        assertThat(center.find(notice.id()).orElseThrow().expired()).as("Show more… keeps working").isFalse();
+    }
+
+    @Test void aPluginFailureNamesThePluginAndOffersDisablePlugin() {
+        var notices = notices();
+        notices.pluginFailure("dev.jasper.remote", "panel remote.sftp",
+            new java.io.UncheckedIOException("no route", new java.io.IOException("no route")));
+        Notification notice = center.history().getFirst();
+        assertThat(notice.request().group()).isEqualTo("jasper.plugins");
+        assertThat(notice.request().title()).isEqualTo("Remote failed in panel remote.sftp");
+        assertThat(notice.request().content()).isEqualTo("UncheckedIOException: no route");
+        assertThat(notice.request().source()).as("Jasper posts it, not the plugin").isEqualTo("jasper");
+        assertThat(labels(notice)).containsExactly("Show more…", "Disable Plugin");
+        center.runAction(notice.id(), 1);
+        assertThat(disabled).containsExactly("dev.jasper.remote");
+        Notification outcome = center.history().getFirst();
+        assertThat(outcome.request().title()).isEqualTo("Remote will be disabled when Jasper restarts");
+        assertThat(outcome.request().severity()).isEqualTo(Severity.INFO);
+        assertThat(outcome.request().group()).isEqualTo("jasper.plugins");
+        assertThat(center.find(notice.id()).orElseThrow().expired()).isFalse();
+    }
+
+    @Test void startAndStopFailuresReadNaturallyAndAFailedDisableIsAnError() {
+        assertThat(IncidentNotices.pluginTitle("Remote", "start")).isEqualTo("Remote failed to start");
+        assertThat(IncidentNotices.pluginTitle("Remote", "stop")).isEqualTo("Remote failed to stop");
+        assertThat(IncidentNotices.pluginTitle("Remote", "action remote.connect")).isEqualTo("Remote failed in action remote.connect");
+        var notices = notices();
+        disableProblem = Optional.of("The plugin state is locked");
+        notices.disablePlugin("dev.jasper.remote");
+        Notification outcome = center.history().getFirst();
+        assertThat(outcome.request().title()).isEqualTo("Could not disable Remote");
+        assertThat(outcome.request().content()).isEqualTo("The plugin state is locked");
+        assertThat(outcome.request().group()).isEqualTo("jasper.plugins");
+        assertThat(outcome.request().severity()).isEqualTo(Severity.ERROR);
+    }
+
+    @Test void aRepeatUpdatesTheSameNotificationAndShowsItsCardAtMostOnceAMinute() {
+        var notices = notices();
+        List<IllegalStateException> burst = sameSite(4);
+        notices.jasperFailure("thread worker", burst.get(0));
+        clock.advance(Duration.ofSeconds(10));
+        notices.jasperFailure("thread worker", burst.get(1));
+        clock.advance(Duration.ofSeconds(10));
+        notices.jasperFailure("thread worker", burst.get(2));
+        assertThat(center.history()).singleElement().satisfies(entry -> {
+            assertThat(entry.count()).isEqualTo(3);
+            assertThat(entry.read()).isFalse();
+        });
+        assertThat(incidents.list()).singleElement().satisfies(incident -> assertThat(incident.count()).isEqualTo(3));
+        assertThat(cards()).as("one card in the first minute").isEqualTo(1);
+        clock.advance(Duration.ofSeconds(41));
+        notices.jasperFailure("thread worker", burst.get(3));
+        assertThat(cards()).as("a minute after the last card").isEqualTo(2);
+        assertThat(center.history().getFirst().count()).isEqualTo(4);
+    }
+
+    @Test void aBurstFromAnotherThreadIsOneIncidentAndOneCard() throws Exception {
+        var queued = new ConcurrentLinkedQueue<Runnable>();
+        ui = queued::add;
+        var notices = notices();
+        List<IllegalStateException> burst = sameSite(50);
+        Thread worker = Thread.ofPlatform().name("jasper-test-burst")
+            .start(() -> burst.forEach(failure -> notices.pluginFailure("dev.jasper.remote", "background task", failure)));
+        worker.join();
+        for (Runnable task = queued.poll(); task != null; task = queued.poll()) task.run();
+        assertThat(incidents.list()).singleElement().satisfies(incident -> {
+            assertThat(incident.count()).isEqualTo(50);
+            assertThat(incident.thread()).isEqualTo("jasper-test-burst");
+        });
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(entry.count()).isEqualTo(50));
+        assertThat(cards()).isEqualTo(1);
+    }
+
+    @Test void theTraceIsTakenWhenTheFailureIsCaughtNotWhenItIsRecorded() {
+        var queued = new ArrayDeque<Runnable>();
+        ui = queued::add;
+        var notices = notices();
+        var failure = new IllegalStateException("as caught");
+        notices.jasperFailure("thread worker", failure);
+        failure.setStackTrace(new StackTraceElement[0]);
+        failure.addSuppressed(new IllegalStateException("added later"));
+        assertThat(incidents.list()).as("recording waits for the EDT").isEmpty();
+        queued.remove().run();
+        assertThat(incidents.list().getFirst().trace())
+            .contains("at dev.jasper.app.application.IncidentNoticesTest").doesNotContain("added later");
+    }
+
+    @Test void aClearedIncidentExpiresItsNotificationAndTheNextFailurePostsANewOne() {
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        notices.jasperFailure("thread worker", twice.get(0));
+        UUID first = center.history().getFirst().id();
+        incidents.clear();
+        assertThat(center.find(first).orElseThrow().expired()).isTrue();
+        notices.jasperFailure("thread worker", twice.get(1));
+        assertThat(center.history()).hasSize(2);
+        assertThat(center.history().getFirst()).satisfies(entry -> {
+            assertThat(entry.id()).isNotEqualTo(first);
+            assertThat(entry.expired()).isFalse();
+            assertThat(entry.count()).isEqualTo(1);
+        });
+    }
+
+    @Test void anIncidentDroppedForNewerOnesExpiresItsNotification() {
+        var notices = notices();
+        notices.jasperFailure("thread worker", new IllegalStateException("oldest"));
+        UUID oldest = center.history().getFirst().id();
+        for (int i = 0; i < Incidents.LIMIT; i++) incidents.record("jasper", "filler", "t", new Capture("x.Filler" + i, "", "x.Filler" + i, ""));
+        assertThat(center.find(oldest).orElseThrow().expired()).isTrue();
+    }
+
+    @Test void aRepeatAfterItsNotificationWasRemovedPostsANewOne() {
+        var notices = notices();
+        List<IllegalStateException> twice = sameSite(2);
+        notices.jasperFailure("thread worker", twice.get(0));
+        center.remove(center.history().getFirst().id());
+        notices.jasperFailure("thread worker", twice.get(1));
+        assertThat(center.history()).singleElement()
+            .satisfies(entry -> assertThat(entry.request().content()).isEqualTo("IllegalStateException: broken 0"));
+        assertThat(incidents.list().getFirst().count()).isEqualTo(2);
+    }
+
+    @Test void aFailureOfTheNotificationSystemItselfIsOnlyLogged() {
+        var notices = notices();
+        notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.notificationui.CardLayer"));
+        notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.notifications.NotificationCenter"));
+        notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.application.IncidentNotices"));
+        notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.application.ErrorsWindow$1"));
+        notices.jasperFailure("a notification action",
+            new IllegalStateException("wrapped", thrownIn("dev.jasper.app.application.NotificationsFeature")));
+        assertThat(incidents.list()).isEmpty();
+        assertThat(center.history()).isEmpty();
+        notices.jasperFailure("thread AWT-EventQueue-0",
+            thrownIn("dev.jasper.app.workspace.WindowContent", "dev.jasper.app.notifications.NotificationCenter"));
+        notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.application.IncidentNoticesTest"));
+        assertThat(incidents.list()).as("the first Jasper frame decides, and only the named classes count").hasSize(2);
+    }
+
+    @Test void aFailureRaisedWhileAnIncidentIsAnnouncedIsNotRecordedAgain() {
+        var notices = notices();
+        center.onChange(change -> notices.jasperFailure("nested", new IllegalStateException("raised while announcing")));
+        notices.jasperFailure("thread worker", new IllegalStateException("outer"));
+        assertThat(incidents.list()).singleElement().satisfies(incident -> assertThat(incident.message()).isEqualTo("outer"));
+    }
+
+    @Test void aFailureThatCannotDescribeItselfIsStillAnIncident() {
+        var notices = notices();
+        notices.pluginFailure("dev.jasper.remote", "background task", new Unreadable());
+        assertThat(incidents.list().getFirst().trace()).isEqualTo(Unreadable.class.getName());
+        assertThat(center.history().getFirst().request().content()).isEqualTo("IncidentNoticesTest$Unreadable");
+    }
+
+    @Test void aShellThatCannotStartIsAnIncidentAnnouncedInItsWindow() {
+        var notices = notices();
+        UUID window = UUID.randomUUID();
+        notices.launchFailure(window, "Could not start terminal in /tmp:\nshell executable unavailable",
+            new IllegalStateException("shell executable unavailable"));
+        Incident incident = incidents.list().getFirst();
+        assertThat(incident.source()).isEqualTo("jasper");
+        assertThat(incident.operation()).isEqualTo("starting a shell");
+        Notification notice = center.history().getFirst();
+        assertThat(notice.request().group()).isEqualTo("jasper.general");
+        assertThat(notice.request().title()).isEqualTo("Could not start the terminal");
+        assertThat(notice.request().content()).isEqualTo("Could not start terminal in /tmp:\nshell executable unavailable");
+        assertThat(notice.request().target()).contains(window);
+        assertThat(labels(notice)).containsExactly("Show more…");
+    }
+
+    @Test void nothingIsRecordedAfterClose() {
+        var notices = notices();
+        notices.close();
+        notices.jasperFailure("thread worker", new IllegalStateException("late"));
+        notices.launchFailure(UUID.randomUUID(), "details", new IllegalStateException("late"));
+        assertThat(incidents.list()).isEmpty();
+        assertThat(center.history()).isEmpty();
+    }
+}
