@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class PanelBadgeTest {
-    @Test void aBadgeChangeRerendersTheRailOnlyWhenItChanges() {
+    @Test void aBadgeChangeNotifiesOnlyWhenItChangesAndIsNotARailChange() {
         var model = new Contributions();
         PanelEntry panel = model.addPanel("dev.x.notes", "Notes", new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel());
         var kinds = new ArrayList<Contributions.Kind>();
@@ -20,10 +20,10 @@ class PanelBadgeTest {
         var badge = new PanelBadge(2, PanelBadge.Tone.ACCENT, "2 unread notifications");
         panel.setBadge(Optional.of(badge));
         panel.setBadge(Optional.of(new PanelBadge(2, PanelBadge.Tone.ACCENT, "2 unread notifications")));
-        assertThat(kinds).containsExactly(Contributions.Kind.RAIL);
+        assertThat(kinds).containsExactly(Contributions.Kind.BADGES);
         assertThat(panel.badge()).contains(badge);
         panel.setBadge(Optional.empty());
-        assertThat(kinds).containsExactly(Contributions.Kind.RAIL, Contributions.Kind.RAIL);
+        assertThat(kinds).containsExactly(Contributions.Kind.BADGES, Contributions.Kind.BADGES);
         panel.close();
         kinds.clear();
         panel.setBadge(Optional.of(badge));

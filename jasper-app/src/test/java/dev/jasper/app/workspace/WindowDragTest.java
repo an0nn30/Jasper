@@ -16,6 +16,7 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
@@ -33,23 +34,32 @@ class WindowDragTest {
 
     /** A connected window in a root pane, with Sessions and Files on the left; events record what the plugins hear. */
     private static final class Fixture {
-        final Contributions model = new Contributions();
+        final Contributions model;
         final UiState state = UiState.inMemory();
         final WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
         final JRootPane root = new JRootPane();
         final List<String> events = new ArrayList<>();
         final PanelEntry sessions, files;
 
-        Fixture() {
+        Fixture() { this(null); }
+
+        /** A window on the same {@link Contributions} as another fixture's: a second window of the same application. */
+        Fixture(Fixture sibling) {
+            model = sibling == null ? new Contributions() : sibling.model;
             owner.connectContributions(model, state);
-            sessions = model.addPanel("dev.x.sessions", "Sessions", new ImageIcon(), Slot.LEFT_TOP, site -> {
-                site.onVisibility(visible -> events.add("sessions:" + visible));
-                return new JLabel("sessions");
-            });
-            files = model.addPanel("dev.x.files", "Files", new ImageIcon(), Slot.LEFT_TOP, site -> {
-                site.onVisibility(visible -> events.add("files:" + visible));
-                return new JLabel("files");
-            });
+            if (sibling != null) {
+                sessions = sibling.sessions;
+                files = sibling.files;
+            } else {
+                sessions = model.addPanel("dev.x.sessions", "Sessions", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add("sessions:" + visible));
+                    return new JLabel("sessions");
+                });
+                files = model.addPanel("dev.x.files", "Files", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                    site.onVisibility(visible -> events.add("files:" + visible));
+                    return new JLabel("files");
+                });
+            }
             root.setContentPane(owner);
             root.setSize(1200, 800);
             layout();
@@ -242,6 +252,75 @@ class WindowDragTest {
             AbstractButton moved = f.button("Files (2 unread notifications)");
             assertThat(moved.getParent()).as("the badge goes with it").isSameAs(f.owner.rightStripe());
             assertThat(moved.getIcon()).isInstanceOfSatisfying(BadgedIcon.class, badged -> assertThat(badged.base()).isSameAs(f.files.icon()));
+        });
+    }
+
+    @Test void aBadgeChangeMidDragUpdatesButtonsInPlaceAndTheDragDropsAsIfNothingHappened() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            PanelEntry notes = f.model.addPanel("dev.x.notes", "Notes", new ImageIcon(), Slot.RIGHT_TOP, site -> new JLabel("notes"));
+            f.layout();
+            AbstractButton files = f.button("Files");
+            AbstractButton notesButton = f.button("Notes");
+            Point overNotes = f.center(notesButton);
+            f.drag(files, overNotes);
+            assertThat(f.owner.dockDrag().active()).isTrue();
+            assertThat(files.getWidth()).as("lifted out of the stripe").isZero();
+            Optional<Rectangle> leftGap = f.owner.leftStripe().gapBounds(), rightGap = f.owner.rightStripe().gapBounds();
+            assertThat(rightGap).as("the gap is open over the right stripe").isPresent();
+
+            f.files.setBadge(Optional.of(new PanelBadge(2, PanelBadge.Tone.ACCENT, "2 unread notifications")));
+            notes.setBadge(Optional.of(new PanelBadge(1, PanelBadge.Tone.ERROR, "1 unread notification, 1 error")));
+
+            assertThat(f.owner.dockDrag().active()).as("a badge change is not a render").isTrue();
+            assertThat(f.owner.dockDrag().dragged()).isEqualTo("dev.x.files");
+            assertThat(f.owner.leftStripe().buttons()).as("the same buttons").contains(files);
+            assertThat(f.owner.rightStripe().buttons()).contains(notesButton);
+            assertThat(files.getWidth()).as("still lifted out").isZero();
+            assertThat(files.getIcon()).as("the dragged window's own badge shows").isInstanceOf(BadgedIcon.class);
+            assertThat(files.getToolTipText()).isEqualTo("Files (2 unread notifications)");
+            assertThat(notesButton.getIcon()).as("another window's badge shows too").isInstanceOf(BadgedIcon.class);
+            assertThat(f.owner.leftStripe().gapBounds()).isEqualTo(leftGap);
+            assertThat(f.owner.rightStripe().gapBounds()).isEqualTo(rightGap);
+
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, overNotes);
+            f.layout();
+            assertThat(f.owner.dockDrag().active()).isFalse();
+            assertThat(f.owner.dock().slot("dev.x.files")).as("the drop happened").hasValue(Slot.RIGHT_TOP);
+            assertThat(f.button("Files (2 unread notifications)").getParent()).isSameAs(f.owner.rightStripe());
+        });
+    }
+
+    @Test void aBadgeChangeDoesNotCancelADragInAnyWindow() throws Exception {
+        edt(() -> {
+            var first = new Fixture();
+            var second = new Fixture(first);
+            first.layout();
+            second.layout();
+            AbstractButton inFirst = first.button("Files"), inSecond = second.button("Sessions");
+            first.drag(inFirst, first.cell(2, 1));
+            second.drag(inSecond, second.cell(2, 1));
+            assertThat(first.owner.dockDrag().active()).isTrue();
+            assertThat(second.owner.dockDrag().active()).isTrue();
+
+            first.files.setBadge(Optional.of(new PanelBadge(3, PanelBadge.Tone.ACCENT, "3 unread notifications")));
+            second.sessions.setBadge(Optional.of(new PanelBadge(1, PanelBadge.Tone.ERROR, "1 unread notification, 1 error")));
+
+            assertThat(first.owner.dockDrag().active()).as("the window that heard the change").isTrue();
+            assertThat(second.owner.dockDrag().active()).as("and the other window").isTrue();
+            assertThat(first.owner.leftStripe().buttons()).contains(inFirst);
+            assertThat(second.owner.leftStripe().buttons()).contains(inSecond);
+            assertThat(inFirst.getWidth()).isZero();
+            assertThat(inSecond.getWidth()).isZero();
+            assertThat(second.button("Files (3 unread notifications)").getIcon()).as("every window's stripes show it")
+                .isInstanceOf(BadgedIcon.class);
+            assertThat(first.button("Sessions (1 unread notification, 1 error)").getIcon()).isInstanceOf(BadgedIcon.class);
+            first.mouse(inFirst, MouseEvent.MOUSE_RELEASED, first.cell(2, 1));
+            second.mouse(inSecond, MouseEvent.MOUSE_RELEASED, second.cell(2, 1));
+            first.layout();
+            second.layout();
+            assertThat(first.owner.dock().slot("dev.x.files")).hasValue(Slot.BOTTOM_RIGHT);
+            assertThat(second.owner.dock().slot("dev.x.sessions")).hasValue(Slot.BOTTOM_RIGHT);
         });
     }
 

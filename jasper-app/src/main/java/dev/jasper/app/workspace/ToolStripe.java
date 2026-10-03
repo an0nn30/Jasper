@@ -14,6 +14,7 @@ import java.awt.Insets;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,11 +36,12 @@ import javax.swing.UIManager;
  * when the second group has icons; the second group; on the left stripe, the plugins' rail actions behind their own
  * separator; flexible space; and the foot group, pinned to the bottom. A button is selected while its window shows;
  * a click toggles the window and a right-click opens its {@link ToolWindowMenu}. A button with an unread badge shows a
- * {@link BadgedIcon} and names the badge in its tooltip and accessible description. During a dock drag the stripe shows
- * all three groups with their separators (an empty group as one button's drop space), lifts the dragged window's
- * button out, and opens a gap where the window would drop. The lifted button's step stays empty at the end of its group,
- * so no later group slides under the cursor, and a gap in that group uses it. The stripe owns no state: the window
- * renders it again after every change. EDT only.
+ * {@link BadgedIcon} and names the badge in its tooltip and accessible description; {@link #updateBadge} changes a
+ * badge on the existing button, so a badge change never rebuilds the stripe or ends a drag. During a dock drag the
+ * stripe shows all three groups with their separators (an empty group as one button's drop space), lifts the dragged
+ * window's button out, and opens a gap where the window would drop. The lifted button's step stays empty at the end of
+ * its group, so no later group slides under the cursor, and a gap in that group uses it. The stripe owns no state: the
+ * window renders it again after every change, except a badge's. EDT only.
  */
 final class ToolStripe extends JPanel {
     /** One tool window's button, with its unread badge if it has one. */
@@ -66,6 +68,9 @@ final class ToolStripe extends JPanel {
     private final List<AbstractButton> buttons = new ArrayList<>();
     private final EnumMap<Slot.Group, List<AbstractButton>> groups = new EnumMap<>(Slot.Group.class);
     private final Map<AbstractButton, String> ids = new IdentityHashMap<>();
+    /** What each window button shows now, by window id: a badge change replaces the record without a render. */
+    private final Map<String, Button> windows = new HashMap<>();
+    private final Map<String, AbstractButton> byId = new HashMap<>();
     private final List<AbstractButton> actions = new ArrayList<>();
     /** The separators the normal layout has, or null; a drag adds the missing ones for its duration. */
     private JSeparator secondSeparator, actionsSeparator;
@@ -89,29 +94,26 @@ final class ToolStripe extends JPanel {
 
     Side side() { return side; }
 
-    private static void style(AbstractButton button, Icon icon, String name) {
+    private static void style(AbstractButton button) {
         button.setHideActionText(true);
         button.setText(null);
-        button.setIcon(icon);
         button.putClientProperty("JButton.buttonType", "toolBarButton");
         button.putClientProperty("FlatLaf.style", "arc: 10");
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setFocusable(false);
-        button.setToolTipText(name);
-        button.getAccessibleContext().setAccessibleName(name);
     }
 
     /**
      * Shows this stripe's windows by group, in the order given, and the actions after the second group. Windows whose
      * slot belongs to the other stripe are ignored. A render ends any drag view.
      */
-    void render(List<Button> windows, List<Action> contributed) {
+    void render(List<Button> toolWindows, List<Action> contributed) {
         dragging = false; lifted = null; gapGroup = null; gap = null;
         removeAll();
-        buttons.clear(); ids.clear(); actions.clear(); dragSeparators.clear();
+        buttons.clear(); ids.clear(); windows.clear(); byId.clear(); actions.clear(); dragSeparators.clear();
         for (Slot.Group group : Slot.Group.values()) groups.put(group, new ArrayList<>());
         secondSeparator = null; actionsSeparator = null;
-        List<Button> mine = windows.stream().filter(window -> window.slot().stripe() == side).toList();
+        List<Button> mine = toolWindows.stream().filter(window -> window.slot().stripe() == side).toList();
         for (Button window : group(mine, Slot.Group.TOP)) groups.get(Slot.Group.TOP).add(toggle(window));
         List<Button> second = group(mine, Slot.Group.SECOND);
         if (!second.isEmpty()) secondSeparator = new JSeparator();
@@ -135,26 +137,55 @@ final class ToolStripe extends JPanel {
 
     private AbstractButton toggle(Button window) {
         var button = new JToggleButton();
-        style(button, window.badge().<Icon>map(badge -> new BadgedIcon(window.icon(), badge.tone())).orElse(window.icon()),
-            window.title());
-        window.badge().ifPresent(badge -> {
-            button.setToolTipText(window.title() + " (" + badge.description() + ")");
-            button.getAccessibleContext().setAccessibleDescription(badge.description());
-        });
+        style(button);
+        decorate(button, window);
         button.setSelected(window.selected());
         button.addActionListener(event -> onToggle.accept(window.id()));
         button.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),
             slot -> onMove.accept(window.id(), slot), () -> onHide.accept(window.id())));
         buttons.add(button);
         ids.put(button, window.id());
+        windows.put(window.id(), window);
+        byId.put(window.id(), button);
         dragSource.accept(button, window.id());
         return button;
+    }
+
+    /**
+     * Shows the window's icon, with its badge's dot if it has one, and its tooltip and accessible name and description.
+     * It also serves a button that stays while its badge changes, so it clears what a gone badge set.
+     */
+    private void decorate(AbstractButton button, Button window) {
+        Optional<PanelBadge> badge = window.badge();
+        button.setIcon(badge.<Icon>map(mark -> new BadgedIcon(window.icon(), mark.tone())).orElse(window.icon()));
+        button.setToolTipText(badge.map(mark -> window.title() + " (" + mark.description() + ")").orElse(window.title()));
+        button.getAccessibleContext().setAccessibleName(window.title());
+        button.getAccessibleContext().setAccessibleDescription(badge.map(PanelBadge::description).orElse(null));
+    }
+
+    /**
+     * Changes the badge of the window's button in place and repaints it; a window this stripe does not show is ignored.
+     * It rebuilds nothing, asks for no layout and leaves a drag as it is: the dot is part of the icon, whose size is the
+     * base icon's, so the button keeps its place and a lifted button stays lifted.
+     */
+    void updateBadge(String id, Optional<PanelBadge> badge) {
+        AbstractButton button = byId.get(id);
+        Button window = windows.get(id);
+        if (button == null || window == null) return;
+        Button updated = new Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge);
+        windows.put(id, updated);
+        decorate(button, updated);
+        button.repaint();
     }
 
     private AbstractButton action(Action action) {
         var button = new JButton(action);
         Icon icon = action.getValue(Command.ICON) instanceof Icon contributed ? contributed : AppIcons.icon("command");
-        style(button, icon, (String) action.getValue(Action.NAME));
+        String name = (String) action.getValue(Action.NAME);
+        style(button);
+        button.setIcon(icon);
+        button.setToolTipText(name);
+        button.getAccessibleContext().setAccessibleName(name);
         buttons.add(button);
         return button;
     }

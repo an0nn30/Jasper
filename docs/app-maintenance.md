@@ -325,10 +325,12 @@ Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag so
 components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
 headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
 button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
-to the pressed component keep arriving. Any dock change or stripe render (a panel badge change
-included, since it fires `Contributions.Kind.RAIL`), View › Rail and the window being deactivated
-(`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher claims only an Esc
-from its own window. Keep the layout-only terminal
+to the pressed component keep arriving. Any dock change or stripe render, View › Rail and the window
+being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher
+claims only an Esc from its own window. A panel badge change is not a render: it fires
+`Contributions.Kind.BADGES`, and `WindowContributions` applies it to the existing stripe buttons with
+`ToolStripe.updateBadge` (the icon's size is the base icon's, so nothing is laid out), so a notification
+arriving mid-drag leaves the drag alone. Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.

@@ -1,18 +1,22 @@
 package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Component;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import javax.swing.AbstractAction;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
+import javax.swing.ImageIcon;
 import javax.swing.JSeparator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -124,5 +128,52 @@ class ToolStripeTest {
             assertThat(stripe.buttons().get(1).getY()).as("a button, then a separator").isEqualTo(s(4) + side + s(4) + s(8));
             assertThat(stripe.buttons().get(1).getWidth()).isEqualTo(side);
         }
+    }
+
+    @Test void aBadgeUpdateChangesOneButtonInPlaceAndLeavesTheStripeAndItsDragAlone() {
+        var stripe = new ToolStripe(Side.LEFT);
+        var icon = new ImageIcon(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB));
+        stripe.render(List.of(new ToolStripe.Button("a", "A", icon, Slot.LEFT_TOP, false),
+            new ToolStripe.Button("b", "B", icon, Slot.LEFT_TOP, true),
+            new ToolStripe.Button("x", "X", icon, Slot.RIGHT_TOP, false)), List.of());
+        layout(stripe, 400);
+        stripe.beginDrag("b");
+        stripe.showGap(Slot.LEFT_TOP, 0);
+        stripe.doLayout();
+        AbstractButton a = stripe.buttons().get(0), b = stripe.buttons().get(1);
+        Component[] children = stripe.getComponents();
+        Rectangle gap = stripe.gapBounds().orElseThrow(), aBounds = a.getBounds();
+        assertThat(b.getWidth()).as("lifted").isZero();
+
+        var badge = new PanelBadge(3, PanelBadge.Tone.ERROR, "3 unread notifications, 1 error");
+        stripe.updateBadge("a", Optional.of(badge));
+        stripe.updateBadge("b", Optional.of(badge));
+        stripe.updateBadge("x", Optional.of(badge));
+        stripe.updateBadge("nobody", Optional.of(badge));
+
+        assertThat(stripe.getComponents()).as("nothing rebuilt").containsExactly(children);
+        assertThat(stripe.buttons()).containsExactly(a, b);
+        assertThat(stripe.dragging()).isTrue();
+        assertThat(stripe.gapBounds()).hasValue(gap);
+        assertThat(a.getBounds()).as("no layout ran").isEqualTo(aBounds);
+        assertThat(b.getWidth()).as("still lifted").isZero();
+        assertThat(a.getIcon()).isInstanceOfSatisfying(BadgedIcon.class, badged -> assertThat(badged.tone()).isEqualTo(PanelBadge.Tone.ERROR));
+        assertThat(a.getToolTipText()).isEqualTo("A (3 unread notifications, 1 error)");
+        assertThat(a.getAccessibleContext().getAccessibleName()).isEqualTo("A");
+        assertThat(a.getAccessibleContext().getAccessibleDescription()).isEqualTo("3 unread notifications, 1 error");
+        assertThat(b.getIcon()).isInstanceOf(BadgedIcon.class);
+        assertThat(a.isSelected()).isFalse();
+        assertThat(b.isSelected()).as("a badge leaves the selection alone").isTrue();
+
+        stripe.updateBadge("a", Optional.empty());
+        assertThat(a.getIcon()).isSameAs(icon);
+        assertThat(a.getToolTipText()).isEqualTo("A");
+        assertThat(a.getAccessibleContext().getAccessibleDescription()).as("falls back to the tooltip, which has no badge").isEqualTo("A");
+
+        stripe.endDrag();
+        stripe.render(List.of(new ToolStripe.Button("a", "A", icon, Slot.LEFT_TOP, false)), List.of());
+        stripe.updateBadge("b", Optional.of(badge));
+        assertThat(stripe.buttons()).as("a render forgets the windows it dropped").hasSize(1);
+        assertThat(stripe.buttons().getFirst().getIcon()).isSameAs(icon);
     }
 }

@@ -29,8 +29,11 @@ public final class Contributions {
     private final QuitGuards quitGuards = new QuitGuards();
     public QuitGuards quitGuards() { return quitGuards; }
 
-    /** Which part changed. */
-    public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, SCOPES }
+    /**
+     * Which part changed. {@code RAIL} is the rail actions' placement and {@code BADGES} a panel's unread mark, which a
+     * window applies to its existing stripe buttons without a render.
+     */
+    public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, BADGES, SCOPES }
 
     /** Where an action was invoked: the window, and the pane it concerns if the window has one. */
     public record Invocation(UUID windowId, Optional<UUID> paneId) {

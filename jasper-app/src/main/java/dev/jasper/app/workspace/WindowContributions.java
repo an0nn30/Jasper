@@ -309,6 +309,18 @@ final class WindowContributions implements AutoCloseable {
         owner.syncRailVisibility();
     }
 
+    /**
+     * Gives each panel's stripe button its panel's current badge, without a render: a render rebuilds every button,
+     * which would end a drag, and a badge changes neither the layout nor which windows there are. The stripe that does
+     * not show a panel ignores it.
+     */
+    private void updateBadges() {
+        for (PanelInstance panel : panels.values()) {
+            owner.leftStripe().updateBadge(panel.entry.id(), panel.entry.badge());
+            owner.rightStripe().updateBadge(panel.entry.id(), panel.entry.badge());
+        }
+    }
+
     /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
     void refreshTheme() {
         for (PanelInstance panel : panels.values())
@@ -327,6 +339,7 @@ final class WindowContributions implements AutoCloseable {
             }
             case PANELS -> { syncPanels(); renderStripes(); }
             case RAIL -> renderStripes();
+            case BADGES -> updateBadges();
             case SCOPES -> syncScopes();
             case TOOLBAR -> owner.chrome().renderContributedToolbar();
             case MENUS -> owner.chrome().renderContributedMenus();

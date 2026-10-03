@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowCornerLayerTest {
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
-    @Test void theLayerSitsFlushInTheContentCornerOnThePaletteLayer() throws Exception {
+    @Test void theLayerSitsFlushInTheAreaCornerOnThePaletteLayer() throws Exception {
         var owner = content(launcher(new ArrayDeque<>()));
         var layer = new JPanel();
         layer.setPreferredSize(new Dimension(200, 120));

@@ -616,4 +616,36 @@ class WindowPanelsTest {
                 .as("the badge's words go with it").doesNotContain("unread");
         });
     }
+
+    @Test void aBadgeSetAndClearedUpdatesTheSameButtonInPlace() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            var icon = new ImageIcon(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB));
+            PanelEntry notes = model.addPanel("dev.x.notes", "Notes", icon, Slot.RIGHT_TOP, site -> new JLabel("notes"));
+            AbstractButton button = owner.rightStripe().buttons().getFirst();
+            var layoutBefore = button.getBounds();
+            notes.setBadge(Optional.of(new PanelBadge(4, PanelBadge.Tone.ERROR, "4 unread notifications, 1 error")));
+            assertThat(owner.rightStripe().buttons().getFirst()).as("the badge is not a render").isSameAs(button);
+            assertThat(button.getIcon()).isInstanceOf(BadgedIcon.class);
+            assertThat(button.getToolTipText()).isEqualTo("Notes (4 unread notifications, 1 error)");
+            assertThat(button.getAccessibleContext().getAccessibleDescription()).isEqualTo("4 unread notifications, 1 error");
+            notes.setBadge(Optional.of(new PanelBadge(1, PanelBadge.Tone.ACCENT, "1 unread notification")));
+            assertThat(owner.rightStripe().buttons().getFirst()).isSameAs(button);
+            assertThat(button.getIcon()).isInstanceOfSatisfying(BadgedIcon.class, badged -> {
+                assertThat(badged.tone()).as("a changed badge replaces the old one").isEqualTo(PanelBadge.Tone.ACCENT);
+                assertThat(badged.base()).isSameAs(icon);
+            });
+            assertThat(button.getToolTipText()).isEqualTo("Notes (1 unread notification)");
+            notes.setBadge(Optional.empty());
+            assertThat(owner.rightStripe().buttons().getFirst()).as("nor is clearing it").isSameAs(button);
+            assertThat(button.getIcon()).isSameAs(icon);
+            assertThat(button.getToolTipText()).isEqualTo("Notes");
+            assertThat(button.getAccessibleContext().getAccessibleName()).isEqualTo("Notes");
+            assertThat(button.getAccessibleContext().getAccessibleDescription())
+                .as("no badge, no badge description").doesNotContain("unread");
+            assertThat(button.getBounds()).as("the layout did not move").isEqualTo(layoutBefore);
+        });
+    }
 }

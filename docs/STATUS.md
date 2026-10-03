@@ -5,7 +5,8 @@
 - **Merged `main` into `claude/dock-layout`** (2026-10-03; `main` at `63e3b95c`, merge base `cc0429f5`): main's
   features that touch the dock now use it. Unread badges are on the stripes: `ToolStripe.Button` carries the
   `PanelBadge`, a badged button shows a `BadgedIcon` and names the badge in its tooltip and accessible description, and
-  a badge change re-renders the stripes (`Contributions.Kind.RAIL`); the drag ghost keeps the plain icon. The
+  a badge change updates its button in place (`Contributions.Kind.BADGES`, `ToolStripe.updateBadge`) and so never
+  cancels a drag; the drag ghost keeps the plain icon. The
   Notifications panel docks in Right Top (`Slot.RIGHT_TOP`, where `PanelRegion.RIGHT` was), and its in-content
   "Notifications" heading is gone because the tool window header carries the title (Clear All stays). The notification
   card layer sits in the bottom-right corner of `ToolWindowArea` (between the stripes, above the status bar, over any
@@ -17,9 +18,8 @@
   `WindowCornerLayerTest.theLayerStaysBetweenTheStripesOverDockedWindowsAndUnderADockDrag` (its two older cases now
   follow the area) and `HistoryPanelTest.theToolWindowHeaderCarriesTheTitle`. `./gradlew check --continue` on the merged
   tree: **8,195 tests, 0 failures, 0 errors, 6 skipped**, all four architecture gates and doclint included; main's
-  `ExFilesTest` fix (`185a5f8e`) makes it pass on this Mac, and the Remote `ListenerTest` flake did not fail. Open: a
-  badge change is a stripe render, so a notification arriving mid-drag cancels the drag. The notifications GUI checks
-  now look at the Notifications button on the right stripe. Nothing pushed, no GUI launched.
+  `ExFilesTest` fix (`185a5f8e`) makes it pass on this Mac, and the Remote `ListenerTest` flake did not fail. Open: the
+  notifications GUI checks now look at the Notifications button on the right stripe. Nothing pushed, no GUI launched.
 
 - **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe

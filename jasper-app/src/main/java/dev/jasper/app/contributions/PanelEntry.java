@@ -43,13 +43,13 @@ public final class PanelEntry {
     /** The stripe button's unread mark, if any. */
     public Optional<PanelBadge> badge() { return Optional.ofNullable(badge); }
 
-    /** Replaces the mark; every window's stripes re-render when it changed. EDT only. */
+    /** Replaces the mark; every window updates the panel's stripe button in place when it changed. EDT only. */
     public void setBadge(Optional<PanelBadge> value) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Contributions belong to the EDT");
         PanelBadge next = value.orElse(null);
         if (closed || Objects.equals(badge, next)) return;
         badge = next;
-        owner.changed(Contributions.Kind.RAIL);
+        owner.changed(Contributions.Kind.BADGES);
     }
 
     public void close() {
