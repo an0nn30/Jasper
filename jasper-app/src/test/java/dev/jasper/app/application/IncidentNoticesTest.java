@@ -9,6 +9,7 @@ import dev.jasper.app.notifications.Notification;
 import dev.jasper.app.notifications.NotificationAction;
 import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.notifications.NotificationGroup;
+import dev.jasper.app.notifications.NotificationRequest;
 import dev.jasper.app.notifications.Severity;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.time.Clock;
@@ -553,5 +554,76 @@ class IncidentNoticesTest {
         notices.launchFailure(UUID.randomUUID(), "details", new IllegalStateException("late"));
         assertThat(incidents.list()).isEmpty();
         assertThat(center.history()).isEmpty();
+    }
+
+    private static NotificationRequest pluginRequest(String group, String content) {
+        return NotificationRequest.of(group, Severity.ERROR, "Could not copy the address").withContent(content)
+            .withSource("dev.jasper.remote").withAction(new NotificationAction("Retry", () -> { }, true));
+    }
+
+    private void declareRemote() {
+        center.register(new NotificationGroup("dev.jasper.remote", "Remote", "dev.jasper.remote", DisplayMode.CARD));
+    }
+
+    @Test void aPluginsNotificationWithACauseIsItsIncidentAndOffersShowMoreLast() {
+        var notices = notices();
+        declareRemote();
+        var posted = new ArrayList<Optional<UUID>>();
+        notices.pluginNotice("dev.jasper.remote", pluginRequest("dev.jasper.remote", "Clipboard busy"),
+            new IllegalStateException("clipboard busy"), posted::add);
+        Incident incident = incidents.list().getFirst();
+        assertThat(incident.source()).isEqualTo("dev.jasper.remote");
+        assertThat(incident.operation()).isEqualTo("Could not copy the address");
+        Notification notice = center.history().getFirst();
+        assertThat(notice.request().group()).isEqualTo("dev.jasper.remote");
+        assertThat(notice.request().source()).isEqualTo("dev.jasper.remote");
+        assertThat(notice.request().content()).isEqualTo("Clipboard busy");
+        assertThat(labels(notice)).containsExactly("Retry", "Show more…");
+        assertThat(posted).containsExactly(Optional.of(notice.id()));
+        center.runAction(notice.id(), 1);
+        assertThat(opened).containsExactly(incident.id());
+    }
+
+    @Test void eachOfAPluginsNotificationsWithTheSameCauseIsPostedOnItsOwn() {
+        var notices = notices();
+        declareRemote();
+        List<IllegalStateException> twice = sameSite(2);
+        notices.pluginNotice("dev.jasper.remote", pluginRequest("dev.jasper.remote", "first"), twice.get(0), id -> { });
+        notices.pluginNotice("dev.jasper.remote", pluginRequest("dev.jasper.remote", "second"), twice.get(1), id -> { });
+        assertThat(center.history()).extracting(entry -> entry.request().content()).containsExactly("second", "first");
+        assertThat(incidents.list()).singleElement().satisfies(incident -> assertThat(incident.count()).isEqualTo(2));
+    }
+
+    @Test void aPluginsNotificationWhoseCauseCannotBeRecordedIsStillPosted() {
+        var notices = notices();
+        declareRemote();
+        var posted = new ArrayList<Optional<UUID>>();
+        notices.pluginNotice("dev.jasper.remote", pluginRequest("dev.jasper.remote", "own"),
+            thrownIn("dev.jasper.app.notificationui.CardLayer"), posted::add);
+        assertThat(incidents.list()).isEmpty();
+        assertThat(center.history()).singleElement().satisfies(entry -> assertThat(labels(entry)).containsExactly("Retry"));
+        assertThat(posted).containsExactly(Optional.of(center.history().getFirst().id()));
+    }
+
+    @Test void aCauseWrappedByAFutureIsRecordedAsTheFailureBehindIt() {
+        var notices = notices();
+        declareRemote();
+        notices.pluginNotice("dev.jasper.remote", pluginRequest("dev.jasper.remote", "wrapped"),
+            new java.util.concurrent.CompletionException(new java.io.IOException("connection reset")), id -> { });
+        assertThat(incidents.list()).singleElement().satisfies(incident -> {
+            assertThat(incident.exceptionClass()).isEqualTo("java.io.IOException");
+            assertThat(incident.message()).isEqualTo("connection reset");
+        });
+    }
+
+    @Test void aPluginsNotificationInAMutedGroupIsRecordedButReportsNothingPosted() {
+        var notices = notices();
+        center.register(new NotificationGroup("dev.jasper.remote.quiet", "Quiet", "dev.jasper.remote", DisplayMode.OFF));
+        var posted = new ArrayList<Optional<UUID>>();
+        notices.pluginNotice("dev.jasper.remote", pluginRequest("dev.jasper.remote.quiet", "quiet"),
+            new IllegalStateException("x"), posted::add);
+        assertThat(incidents.list()).hasSize(1);
+        assertThat(center.history()).isEmpty();
+        assertThat(posted).containsExactly(Optional.empty());
     }
 }
