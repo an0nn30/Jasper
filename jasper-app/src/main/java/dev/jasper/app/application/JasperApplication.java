@@ -85,8 +85,13 @@ public final class JasperApplication {
      */
     private final java.util.Map<TerminalSession, SessionOutput> outputs = new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
-    private java.util.function.BinaryOperator<Runnable> residentIndicator = (open, quit) -> () -> { };
+    private Function<dev.jasper.app.platform.ResidentTray.Actions, Runnable> residentIndicator = actions -> () -> { };
     private Runnable removeIndicator;
+    /** Whether {@link #residencySettled()} has run: it does its work once per process. */
+    private boolean startupSettled;
+    /** How long after the first paint a shell that prints nothing still counts as settled. */
+    private Duration settleFallback = Duration.ofSeconds(2);
+    private Runnable cancelSettleFallback;
     private boolean shutdownQueued;
     private boolean stopped;
     private final java.util.List<Runnable> shutdownActions = new java.util.ArrayList<>();
@@ -279,6 +284,9 @@ public final class JasperApplication {
     /** Tests replace the process-wide trace. EDT. */
     void trace(StartupTrace value) { trace = java.util.Objects.requireNonNull(value, "value"); }
 
+    /** Tests shorten the fallback that settles a shell printing nothing, 2 s by default. Set before {@link #residency}. EDT. */
+    void settleFallback(Duration delay) { settleFallback = java.util.Objects.requireNonNull(delay, "delay"); }
+
     /** The first plain window of a process is its cold start; later plain windows come from a menu or shortcut. */
     static String windowTrigger(int windowsOpened) { return windowsOpened == 0 ? "cold" : "menu"; }
 
@@ -340,32 +348,86 @@ public final class JasperApplication {
 
     /**
      * Whether this process outlives its windows. Decided once at startup: which process owns the
-     * handoff endpoint is not something to renegotiate while running.
+     * handoff endpoint is not something to renegotiate while running. The indicator appears once start-up has
+     * settled: the first output painted, a finished {@code --background} warm-up, or 2 s after the first paint.
      */
     public void residency(boolean resident) {
         this.resident = resident;
-        showIndicator(resident);
+        if (!resident) {
+            stopSettleFallback();
+            showIndicator(false);
+            return;
+        }
+        // Never on the start-up path: not at the first paint, which comes before the first shell output is shown.
+        Runnable settled = this::residencySettled;
+        trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, SwingUtilities::invokeLater, settled);
+        trace.when(StartupTrace.Milestone.WARMED_UP, SwingUtilities::invokeLater, settled);
+        // A shell that prints nothing never paints output; the first paint then starts a short countdown.
+        trace.when(StartupTrace.Milestone.FIRST_PAINT, SwingUtilities::invokeLater, this::armSettleFallback);
     }
 
     public boolean resident() { return resident; }
 
     /**
-     * Who shows that this process is resident, given its Open and Quit actions; it returns the way to
-     * remove what it showed. Injected, like {@link #loginItems}, so tests never touch the real
-     * notification area. Install before {@link #residency}.
+     * Who shows that this process is resident (the macOS menu bar item, the Windows notification-area icon), given its
+     * menu's actions; it returns the way to remove what it showed. Injected, like {@link #loginItems}, so tests never
+     * touch the real menu bar or notification area. Install before {@link #residency}.
      */
-    public void residentIndicator(java.util.function.BinaryOperator<Runnable> install) {
+    public void residentIndicator(Function<dev.jasper.app.platform.ResidentTray.Actions, Runnable> install) {
         residentIndicator = Objects.requireNonNull(install, "install");
     }
 
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
-            removeIndicator = residentIndicator.apply(() -> openOrRaise("menu"), this::quit);
+            removeIndicator = residentIndicator.apply(new dev.jasper.app.platform.ResidentTray.Actions(
+                () -> openOrRaise("menu"), this::newWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
         } else if (!show && removeIndicator != null) {
             Runnable remove = removeIndicator;
             removeIndicator = null;
             remove.run();
         }
+    }
+
+    /** The first paint is in: unless something settles start-up first, it does after {@link #settleFallback}. EDT. */
+    private void armSettleFallback() {
+        if (startupSettled || cancelSettleFallback != null || !resident || quitting || stopped) return;
+        cancelSettleFallback = afterDelay(settleFallback, this::residencySettled);
+    }
+
+    private void stopSettleFallback() {
+        Runnable cancel = cancelSettleFallback;
+        cancelSettleFallback = null;
+        if (cancel != null) cancel.run();
+    }
+
+    /**
+     * Start-up has settled while resident: the indicator appears. Runs once per process, whichever of the first output
+     * painted, a finished warm-up or the fallback after the first paint comes first. EDT.
+     */
+    private void residencySettled() {
+        if (startupSettled || !resident || quitting || stopped) return;
+        startupSettled = true;
+        stopSettleFallback();
+        showIndicator(true);
+    }
+
+    /** The menu bar item's New Window: always a new window, in front of other applications. EDT. */
+    private void newWindowFromMenuBar() {
+        if (quitting || stopped) return;
+        openWindow(null, false, "menu");
+        requestForeground();
+    }
+
+    /** The menu bar item's Settings\u2026: over the last active window, or on its own while Jasper has none. EDT. */
+    private void settingsFromMenuBar() {
+        if (quitting || stopped) return;
+        requestForeground();
+        openSettings(null, null);
+    }
+
+    /** Brings Jasper in front of other applications: choosing a menu bar item does not activate its application. */
+    private static void requestForeground() {
+        if (supports(Desktop.Action.APP_REQUEST_FOREGROUND)) Desktop.getDesktop().requestForeground(false);
     }
 
     /**
@@ -872,6 +934,7 @@ public final class JasperApplication {
         if (stopped) return;
         stopped = true;
         quitting = true;
+        stopSettleFallback();
         showIndicator(false);
         // Armed before anything else: a plugin's stop() that blocks the EDT cannot be abandoned, and
         // await() below is never reached in that case.

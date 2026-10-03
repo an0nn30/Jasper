@@ -70,6 +70,8 @@ public final class ApplicationBootstrap {
     static void configureDesktopProperties() {
         System.setProperty("apple.awt.application.appearance", "system");
         System.setProperty("apple.laf.useScreenMenuBar", "true");
+        // Read once when the first tray icon is created: the macOS menu bar glyph is a template image.
+        System.setProperty("apple.awt.enableTemplateImages", "true");
     }
 
     private static void startDesktop(Startup startup, AppDirs dirs, AppLog log,
@@ -140,7 +142,7 @@ public final class ApplicationBootstrap {
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
                 replacementHandsOff(options), standaloneNotice(options));
-            // Shown only once startup settles residency, and only on Windows.
+            // The macOS menu bar item and the Windows notification-area icon, once start-up has settled.
             application.residentIndicator(ResidentTray::install);
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
             StartupTrace.current().phase("application", began);

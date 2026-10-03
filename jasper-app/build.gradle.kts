@@ -13,6 +13,9 @@ dependencies {
     implementation("com.formdev:flatlaf:3.7")
     implementation("org.jetbrains.runtime:jbr-api:1.9.0")
     implementation("com.formdev:flatlaf-extras:3.7")
+    // flatlaf-extras brings jsvg at runtime only; javac needs its SVGDocument to resolve FlatSVGUtils.svg2image.
+    // Keep this the version flatlaf-extras declares.
+    compileOnly("com.github.weisj:jsvg:2.0.0")
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }
 

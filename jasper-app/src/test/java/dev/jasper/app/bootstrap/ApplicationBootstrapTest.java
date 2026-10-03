@@ -196,4 +196,15 @@ class ApplicationBootstrapTest {
             else System.setProperty("apple.laf.useScreenMenuBar", previous);
         }
     }
+
+    @Test void desktopPropertiesMakeTheMenuBarGlyphATemplateImage() {
+        String key = "apple.awt.enableTemplateImages", previous = System.getProperty(key);
+        try {
+            System.clearProperty(key);
+            ApplicationBootstrap.configureDesktopProperties();
+            assertThat(System.getProperty(key)).isEqualTo("true");
+        } finally {
+            if (previous == null) System.clearProperty(key); else System.setProperty(key, previous);
+        }
+    }
 }
