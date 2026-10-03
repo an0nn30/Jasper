@@ -134,14 +134,14 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     }
 
     /**
-     * Every constructor that predates long-command notifications and background residency: the
-     * default notification threshold, and never resident, because residency is opt-in.
+     * Every constructor that predates long-command notifications and background residency: the default notification
+     * threshold, and the platform's residency default ({@link CoreSettings#SYSTEM_RUN_IN_BACKGROUND}).
      */
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, String theme, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, int visibleRows) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal,
-            buddyEnabled, visibleRows, 10, false);
+            buddyEnabled, visibleRows, 10, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue());
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,

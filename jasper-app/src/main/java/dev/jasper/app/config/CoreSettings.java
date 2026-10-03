@@ -72,13 +72,22 @@ public final class CoreSettings {
         .description("Live. Notify when a command that ran at least this long finishes in a pane you are not\n"
             + "looking at. Needs shell integration: the duration comes from its command marks.\n"
             + "Zero disables notifications. Range 0-3600.").build();
-    public static final Setting<Boolean> SYSTEM_RUN_IN_BACKGROUND = Setting.of("system.run_in_background", SettingKind.bool(), false)
-        .alias("background.enabled").label("Run in background").keywords("resident", "login", "autostart", "background")
+    /**
+     * Residency is on by default where a windowless Jasper stays reachable: macOS (its menu bar item and Dock) and
+     * Windows (its notification-area icon). Linux has no tray, so it stays off there.
+     */
+    static boolean runsInBackgroundByDefault(String osName) {
+        return osName != null && (osName.startsWith("Mac") || osName.startsWith("Windows"));
+    }
+
+    public static final Setting<Boolean> SYSTEM_RUN_IN_BACKGROUND = Setting.of("system.run_in_background", SettingKind.bool(),
+            runsInBackgroundByDefault(System.getProperty("os.name")))
+        .alias("background.enabled").label("Run in background").keywords("resident", "login", "autostart", "background", "menu bar")
         .applies(Applies.RESTART)
-        .description("Keep Jasper running with no windows after the last one closes to reduce next-launch startup\n"
-            + "work, and start it in the background at login. Quit still exits completely.\n"
-            + "Residency applies from the next start; the login item updates as soon as you save.\n"
-            + "Autostart needs an installed Jasper, not a development run.").build();
+        .description("Keep Jasper running with no windows so a new window opens instantly, and start it in the background\n"
+            + "at login. On by default on macOS and Windows, off on Linux. On macOS, Quit (Cmd+Q) closes every window and\n"
+            + "keeps Jasper in the menu bar; Quit Jasper Completely there ends it. Residency applies from the next start;\n"
+            + "the login item updates as soon as you save. Autostart needs an installed Jasper, not a development run.").build();
     public static final Setting<Integer> PALETTE_VISIBLE_ROWS = Setting.of("palette.visible_rows",
             SettingKind.integer(PaletteSettings.MIN_VISIBLE_ROWS, PaletteSettings.MAX_VISIBLE_ROWS, DEFAULT), PaletteSettings.DEFAULT_VISIBLE_ROWS)
         .alias("palette.max_results").label("Visible rows").keywords("palette", "search", "results", "rows", "height")

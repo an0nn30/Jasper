@@ -56,7 +56,10 @@ class ConfigTemplateTest {
         var expected = new ArrayList<List<String>>();
         expected.add(List.of("version"));
         for (Setting<?> setting : CoreSettings.SCHEMA.settings())
-            if (!(setting.kind() instanceof SettingKind.StringMap) && setting != CoreSettings.UI_FONT_SIZE) expected.add(setting.key());
+            if (!(setting.kind() instanceof SettingKind.StringMap) && setting != CoreSettings.UI_FONT_SIZE
+                && setting != CoreSettings.SYSTEM_RUN_IN_BACKGROUND) expected.add(setting.key());
+        // Its default depends on the platform, so the example shows it commented out, like the platform-sized UI font.
+        assertThat(text).contains("\n# run_in_background = true\n");
         assertThat(TomlDocument.leaves(text).keySet()).containsExactlyInAnyOrderElementsOf(expected);
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();

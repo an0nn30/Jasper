@@ -66,6 +66,17 @@ class CoreSettingsTest {
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));
     }
 
+    @Test void residencyIsOnByDefaultWhereAWindowlessJasperStaysReachable() {
+        assertThat(CoreSettings.runsInBackgroundByDefault("Mac OS X")).as("menu bar item and Dock").isTrue();
+        assertThat(CoreSettings.runsInBackgroundByDefault("Windows 11")).as("notification-area icon").isTrue();
+        assertThat(CoreSettings.runsInBackgroundByDefault("Linux")).as("no tray").isFalse();
+        assertThat(CoreSettings.runsInBackgroundByDefault("FreeBSD")).isFalse();
+        assertThat(CoreSettings.runsInBackgroundByDefault(null)).isFalse();
+        assertThat(CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue())
+            .isEqualTo(CoreSettings.runsInBackgroundByDefault(System.getProperty("os.name")));
+        assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isEqualTo(CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue());
+    }
+
     @org.junit.jupiter.api.Test void nativeDecorationsIsARestartOnlyWindowSettingOffByDefault() {
         var setting = CoreSettings.WINDOW_NATIVE_DECORATIONS;
         assertThat(setting.name()).isEqualTo("window.native_decorations");
