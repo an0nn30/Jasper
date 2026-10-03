@@ -99,6 +99,17 @@ public final class DockGeometry {
         }
     }
 
+    /**
+     * The least height, in scaled pixels, of the area above the bottom row: the terminal column's minimum height, or
+     * two tool window minimums and the divider between them when the left or the right side shows both halves. The
+     * layout keeps that much above the bottom row, and the window's minimum height must leave it.
+     */
+    public static int upperMinimum(DockState state, Metrics metrics) {
+        int gap = metrics.scaled(metrics.divider()), floor = metrics.scaled(metrics.toolWindowMinimum());
+        return Math.max(metrics.scaled(metrics.terminalMinimumHeight()),
+            halves(state, Slot.LEFT_TOP) || halves(state, Slot.RIGHT_TOP) ? 2 * floor + gap : 0);
+    }
+
     public static Layout compute(Rectangle bounds, DockState state, Metrics metrics) {
         int x = bounds.x, y = bounds.y, width = Math.max(0, bounds.width), height = Math.max(0, bounds.height);
         int gap = metrics.scaled(metrics.divider()), floor = metrics.scaled(metrics.toolWindowMinimum());
@@ -107,9 +118,7 @@ public final class DockGeometry {
         var dividers = new ArrayList<Divider>();
 
         int[] bottomHeight = {bottom ? Math.max(floor, metrics.scaled(state.size(Side.BOTTOM))) : 0};
-        // Above the bottom area: the terminal's minimum height, or a side's two halves at theirs when it shows both.
-        int upperMinimum = Math.max(metrics.scaled(metrics.terminalMinimumHeight()),
-            halves(state, Slot.LEFT_TOP) || halves(state, Slot.RIGHT_TOP) ? 2 * floor + gap : 0);
+        int upperMinimum = upperMinimum(state, metrics);
         int upper = squeeze(height - (bottom ? gap : 0), upperMinimum, floor, bottomHeight);
         int[] sides = {right ? Math.max(floor, metrics.scaled(state.size(Side.RIGHT))) : 0,
                        left ? Math.max(floor, metrics.scaled(state.size(Side.LEFT))) : 0};

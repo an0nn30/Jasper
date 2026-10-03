@@ -651,4 +651,31 @@ class WindowPanelsTest {
             assertThat(button.getBounds()).as("the layout did not move").isEqualTo(layoutBefore);
         });
     }
+
+    @Test void aSplitSideRaisesTheWindowsMinimumHeightAndTheWindowHearsOfIt() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.sessions", "Sessions", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("sessions"));
+            model.addPanel("dev.x.sftp", "SFTP", new ImageIcon(), Slot.LEFT_BOTTOM, site -> new JLabel("sftp"));
+            var heard = new java.util.concurrent.atomic.AtomicInteger();
+            owner.onMinimumSizeChanged = heard::incrementAndGet;
+            int split = UIScale.scale(2 * 120 + 6);
+
+            toggle(model, owner, "dev.x.sessions");
+            int alone = owner.getMinimumSize().height, heardAlone = heard.get();
+            assertThat(heardAlone).as("showing a window tells the window").isPositive();
+            toggle(model, owner, "dev.x.sftp");
+            assertThat(heard.get()).as("so does the second half of a side").isGreaterThan(heardAlone);
+            assertThat(owner.area().getMinimumSize().height).isGreaterThanOrEqualTo(split);
+            assertThat(owner.getMinimumSize().height).as("the window's minimum grows with the split")
+                .isGreaterThan(alone).isGreaterThanOrEqualTo(split);
+
+            int heardSplit = heard.get();
+            toggle(model, owner, "dev.x.sftp");
+            assertThat(heard.get()).as("and so does hiding it again").isGreaterThan(heardSplit);
+            assertThat(owner.getMinimumSize().height).isEqualTo(alone);
+        });
+    }
 }

@@ -223,6 +223,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         leftStripe.dragSource = dockDrag::install;
         rightStripe.dragSource = dockDrag::install;
         area.dragSource = dockDrag::install;
+        // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
+        area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {

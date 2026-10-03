@@ -101,9 +101,9 @@
   `./gradlew check --continue`: 7,994 tests, 1 failure, 0 errors, 6 skipped; the one failure is
   `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
   "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite
-  load (it did not fail in this run and passes alone). Open: the window's minimum height does not yet count a split
-  side's two halves, so a window made very short can still squeeze them under 120px. No GUI launched. GUI checks
-  for the user: the plan's section
+  load (it did not fail in this run and passes alone). The window's minimum height now counts a split side's two
+  halves (one shared rule, `DockGeometry.upperMinimum`; follow-up on `claude/dock-followups`). No GUI launched. GUI
+  checks for the user: the plan's section
   "GUI checks for the user". Plan 2 (drag and drop) was executed on top of it; see the entry above.
 
 - **No FlatLaf SEVERE at start-up with Nord** (branch `fix/theme-lazy-border`, user report 2026-10-02): Nord sets

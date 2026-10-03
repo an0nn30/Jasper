@@ -179,6 +179,8 @@ final class ToolWindowArea extends JPanel {
     /** A divider drag in progress lays out this copy of the state. */
     private DockState preview;
     private boolean stripesVisible, statusVisible, headerVisible;
+    /** Hears that a sync changed which windows show, and with them the area's minimum size. */
+    Runnable onMinimumSizeChanged = () -> { };
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
     Consumer<String> onHide = id -> { };
     /** Hears of each header a sync creates (and its title label), so that a drag can start from it. */
@@ -261,6 +263,8 @@ final class ToolWindowArea extends JPanel {
         }
         refreshGutters();
         revalidate(); repaint();
+        // A split appearing or going away, or a side showing or hiding, changes the window's minimum size.
+        onMinimumSizeChanged.run();
     }
 
     private ToolWindowHeader header(String id, String title) {
@@ -327,7 +331,8 @@ final class ToolWindowArea extends JPanel {
     private Dimension size(Dimension terminal, boolean preferred) {
         var metrics = metrics();
         int gap = metrics.scaled(metrics.divider()), floor = metrics.scaled(metrics.toolWindowMinimum());
-        int width = terminal.width, height = terminal.height;
+        // The upper area is the terminal column's size, or a split side's two halves when those need more height.
+        int width = terminal.width, height = Math.max(terminal.height, DockGeometry.upperMinimum(state, metrics));
         for (Side side : List.of(Side.LEFT, Side.RIGHT))
             if (state.showing(side)) width += gap + (preferred ? Math.max(floor, metrics.scaled(state.size(side))) : floor);
         if (state.showing(Side.BOTTOM))

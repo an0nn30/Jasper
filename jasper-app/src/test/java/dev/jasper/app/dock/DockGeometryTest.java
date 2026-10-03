@@ -296,6 +296,21 @@ class DockGeometryTest {
         assertThat(limit.slot(Slot.BOTTOM_LEFT)).as("rounding back up to 623 pixels is squeezed away").hasValue(rect(0, 378, 1500, 622));
     }
 
+    @Test void theUpperMinimumIsTheTerminalsWhenNoSideIsSplit() {
+        assertThat(DockGeometry.upperMinimum(new DockState(), Metrics.DEFAULT)).isEqualTo(120);
+        assertThat(DockGeometry.upperMinimum(showing(Slot.LEFT_TOP, Slot.RIGHT_BOTTOM, Slot.BOTTOM_LEFT, Slot.BOTTOM_RIGHT),
+            Metrics.DEFAULT)).as("one window per side, and a split bottom row, do not split a side").isEqualTo(120);
+        assertThat(DockGeometry.upperMinimum(new DockState(), Metrics.at(1.5))).as("scaled").isEqualTo(180);
+    }
+
+    @Test void theUpperMinimumCountsASplitSidesTwoHalvesAtTheUiScale() {
+        assertThat(DockGeometry.upperMinimum(showing(Slot.LEFT_TOP, Slot.LEFT_BOTTOM), Metrics.DEFAULT)).isEqualTo(2 * 120 + 6);
+        assertThat(DockGeometry.upperMinimum(showing(Slot.RIGHT_TOP, Slot.RIGHT_BOTTOM, Slot.BOTTOM_LEFT), Metrics.DEFAULT))
+            .isEqualTo(2 * 120 + 6);
+        assertThat(DockGeometry.upperMinimum(showing(Slot.LEFT_TOP, Slot.LEFT_BOTTOM), Metrics.at(1.5)))
+            .as("180 + 9 + 180 scaled pixels").isEqualTo(2 * 180 + 9);
+    }
+
     @Test void aWideSplitsDividerRangeStaysWithinTheRatioLimits() {
         DockState state = showing(Slot.BOTTOM_LEFT, Slot.BOTTOM_RIGHT);
         Layout layout = DockGeometry.compute(new Rectangle(0, 0, 1512, 982), state, Metrics.DEFAULT);

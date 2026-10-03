@@ -121,6 +121,47 @@ class ToolWindowAreaTest {
         assertThat(area.divider(DockGeometry.Handle.LEFT_RATIO).getCursor().getType()).isEqualTo(Cursor.N_RESIZE_CURSOR);
     }
 
+    @Test void aSplitSidesMinimumHeightCountsBothHalves() {
+        var deck = new JPanel();
+        var area = new ToolWindowArea(deck, new DockState());
+        deck.setMinimumSize(new Dimension(300, 150));
+        DockTestSupport.show(area, Slot.LEFT_TOP, new JLabel("upper"), 260);
+        assertThat(area.getMinimumSize()).as("one window on a side leaves the minimum as it was")
+            .isEqualTo(new Dimension(300 + 6 + 120, 150));
+        DockTestSupport.show(area, Slot.RIGHT_TOP, new JLabel("right"), 260);
+        assertThat(area.getMinimumSize().height).as("one window per side is not a split").isEqualTo(150);
+
+        DockTestSupport.show(area, Slot.LEFT_BOTTOM, new JLabel("lower"), 260);
+        assertThat(area.getMinimumSize().height).as("two minimum frames and the divider between them").isEqualTo(2 * 120 + 6);
+        assertThat(area.getPreferredSize().height).isEqualTo(2 * 120 + 6);
+        assertThat(area.getMinimumSize().width).as("the width is unchanged").isEqualTo(300 + 2 * (6 + 120));
+
+        DockTestSupport.show(area, Slot.BOTTOM_LEFT, new JLabel("bottom"), 200);
+        assertThat(area.getMinimumSize().height).as("the bottom row adds its divider and minimum").isEqualTo(2 * 120 + 6 + 6 + 120);
+        assertThat(area.getPreferredSize().height).as("or its saved size, for the preferred size")
+            .isEqualTo(2 * 120 + 6 + 6 + 200);
+
+        deck.setMinimumSize(new Dimension(300, 400));
+        assertThat(area.getMinimumSize().height).as("a taller terminal column still wins").isEqualTo(400 + 6 + 120);
+        deck.setMinimumSize(new Dimension(300, 150));
+        DockTestSupport.hide(area, Slot.LEFT_BOTTOM);
+        assertThat(area.getMinimumSize().height).as("the minimum follows the split away").isEqualTo(150 + 6 + 120);
+        DockTestSupport.show(area, Slot.RIGHT_BOTTOM, new JLabel("right lower"), 260);
+        assertThat(area.getMinimumSize().height).as("either side splits it").isEqualTo(2 * 120 + 6 + 6 + 120);
+    }
+
+    @Test void theAreaTellsItsWindowWhenWhatShowsChanges() {
+        var area = new ToolWindowArea(new JPanel(), new DockState());
+        int[] told = {0};
+        area.onMinimumSizeChanged = () -> told[0]++;
+        DockTestSupport.show(area, Slot.LEFT_TOP, new JLabel("upper"), 260);
+        assertThat(told[0]).isEqualTo(1);
+        DockTestSupport.show(area, Slot.LEFT_BOTTOM, new JLabel("lower"), 260);
+        assertThat(told[0]).isEqualTo(2);
+        DockTestSupport.hide(area, Slot.LEFT_BOTTOM);
+        assertThat(told[0]).isEqualTo(3);
+    }
+
     @Test void hiddenStripesGiveFramesTheirOuterGutterAndTheTerminalNone() {
         var deck = new JPanel();
         var area = new ToolWindowArea(deck, new DockState());

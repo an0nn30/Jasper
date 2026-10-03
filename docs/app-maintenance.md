@@ -352,7 +352,11 @@ host derives its minimum size from the terminal column; plugin hosts retain thei
 minimum. The center reserves an 8px lower inset (the corner radius) below the terminal
 grid, so terminal cells stay rectangular and unclipped. The inset uses the resolved
 terminal palette, including independent terminal-color changes. Its height contributes
-to the workspace minimum and scales with the UI. Keep clipping and hit testing in the
+to the workspace minimum and scales with the UI. The area's minimum height is the larger of the
+terminal column's minimum and `DockGeometry.upperMinimum` (two tool window minimums and a divider
+when the left or the right side shows both halves), plus the bottom row; `DockGeometry.compute`
+uses the same rule, and `ToolWindowArea.sync` tells the window (`onMinimumSizeChanged`) so the
+frame's minimum follows a split appearing or going away. Keep clipping and hit testing in the
 host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
