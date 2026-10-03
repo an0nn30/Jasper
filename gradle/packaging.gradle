@@ -227,7 +227,7 @@ def stage = tasks.register('stagePackage', Sync) {
     duplicatesStrategy = DuplicatesStrategy.FAIL
 }
 
-apply from: rootProject.file('gradle/mac-notifications.gradle')
+apply from: rootProject.file('gradle/mac-native.gradle')
 
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'
@@ -294,8 +294,8 @@ def packageApp = tasks.register('packageApp') {
                     'dev.jasper.app', macLauncherTemplate(context.sdkHome)))
                 // jpackage re-signs native inputs. Restore our already-signed bridge so the
                 // same staged payload is verified byte-for-byte, then sign the outer bundle.
-                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-notifications.dylib').toPath(),
-                    new File(image, 'Contents/app/libjasper-notifications.dylib').toPath(),
+                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-macos.dylib').toPath(),
+                    new File(image, 'Contents/app/libjasper-macos.dylib').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 resignImage(image)
             } else if (context.host.os == 'linux') {
@@ -444,14 +444,19 @@ def verifyPackage = tasks.register('verifyPackage') {
             }
         }
         if (context.host.os == 'macos') {
-            File notificationBridge = new File(appDir, 'libjasper-notifications.dylib')
-            if (!notificationBridge.isFile()) throw new GradleException('Package verification failed: notification bridge missing')
-            String bridgeArchitecture = executeNative(['/usr/bin/lipo', '-archs', notificationBridge.absolutePath],
-                'notification bridge architecture').stdout.trim()
+            File nativeBridge = new File(appDir, 'libjasper-macos.dylib')
+            if (!nativeBridge.isFile()) throw new GradleException('Package verification failed: native bridge missing')
+            String bridgeArchitecture = executeNative(['/usr/bin/lipo', '-archs', nativeBridge.absolutePath],
+                'native bridge architecture').stdout.trim()
             String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
-            if (bridgeArchitecture != expectedBridgeArchitecture) throw new GradleException('Package verification failed: notification bridge architecture mismatch')
-            executeNative(['/usr/bin/codesign', '--verify', '--strict', notificationBridge.absolutePath],
-                'notification bridge signature')
+            if (bridgeArchitecture != expectedBridgeArchitecture) throw new GradleException('Package verification failed: native bridge architecture mismatch')
+            executeNative(['/usr/bin/codesign', '--verify', '--strict', nativeBridge.absolutePath],
+                'native bridge signature')
+            String bridgeSymbols = executeNative(['/usr/bin/nm', '-gU', nativeBridge.absolutePath], 'native bridge symbols').stdout
+            ['Java_dev_jasper_app_platform_MacNotifications_post', 'Java_dev_jasper_app_platform_MacDock_setRegular',
+             'Java_dev_jasper_app_platform_MacDock_watchPowerOff', 'Java_dev_jasper_app_platform_MacDock_poweringOffNow'].each { symbol ->
+                if (!bridgeSymbols.contains('_' + symbol)) throw new GradleException("Package verification failed: native bridge lacks ${symbol}")
+            }
             File plist = new File(image, 'Contents/Info.plist')
             if (!plist.isFile()) throw new GradleException("Package verification failed: missing ${plist}")
             def identifier = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath], 'plutil identifier').stdout.trim()

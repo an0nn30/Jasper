@@ -251,17 +251,18 @@ See [Remote](remote.md) for settings and native acceptance.
 ### macOS notification identity
 
 `platform.NativeNotifier` dispatches off the EDT to `MacNotifications`, which loads
-`Contents/app/libjasper-notifications.dylib` beside the current jpackage launcher.
+`Contents/app/libjasper-macos.dylib` (through `MacNative`, shared with `MacDock`) beside the current jpackage launcher.
 The Objective-C bridge uses `UNUserNotificationCenter` in Jasper's process: identity,
 icon and permission belong to `dev.jasper.app`. Never restore an `osascript` fallback;
 its notices carry AppleScript's icon. Java text is copied as UTF-16, never evaluated.
 The native delegate allows banners for hidden panes while Jasper is foreground;
 the existing Java notification policy decides which completions qualify.
 
-`gradle/mac-notifications.gradle` compiles the bridge with the JBR JNI headers and
-Apple's command line tools on macOS. `check` runs its headless fake-center harness
-(permission granted/denied/error, deferred delivery, literal Unicode, unique requests,
-foreground presentation, non-bundle guard). Other platforms skip native compilation.
+`gradle/mac-native.gradle` compiles the one bridge library from `MacNotifications.m` and `MacDock.m` with the JBR JNI
+headers and Apple's command line tools on macOS. `check` runs one headless harness per source: `testMacNotifications`
+(permission granted/denied/error, deferred delivery, literal Unicode, unique requests, foreground presentation,
+non-bundle guard) and `testMacDock` (the activation policy on a fake NSApp, the main-thread hop, the power-off flag on
+a private notification center, non-bundle guard). Other platforms skip native compilation.
 Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it.
 Gradle/IDE runs intentionally send no system notifications because they lack Jasper's
 bundle identity. Test a packaged app manually: run `sleep 12`, switch to another app,
