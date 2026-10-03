@@ -328,4 +328,21 @@ class PluginRuntimeTest {
         assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
         onEdt(runtime::stop);
     }
+
+    @Test void aPluginWhoseNameShowsNothingIsAProblemAndJasperStillStarts() throws Exception {
+        Path bundled = root.resolve("bundled");
+        probe(bundled, "dev.example.probe");
+        String invisible = new String(new int[] {0x200B, 0x202E}, 0, 2);
+        PluginJars.build(bundled.resolve("dev.example.ghost"), "ghost.jar",
+            "id = \"dev.example.ghost\"\nname = \"" + invisible + "\"\nversion = \"1.0.0\"\nentry = \"fix.ghost.Main\"\nsdk = \">=0.1\"\n",
+            Map.of("fix.ghost.Main", PluginJars.emptyPlugin("fix.ghost", "Main")), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("absent"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        assertThat(runtime.problems()).singleElement().satisfies(problem -> {
+            assertThat(problem.kind()).isEqualTo(PluginRuntime.Problem.Kind.UNREADABLE);
+            assertThat(problem.detail()).contains("dev.example.ghost", "name");
+        });
+        assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
+        onEdt(runtime::stop);
+    }
 }

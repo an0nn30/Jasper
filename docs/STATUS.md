@@ -13,11 +13,16 @@
   plugin and unreadable plugin directory in Plugin problems with Open Plugins. The model now strips bidi controls,
   treats invisible-only text as blank, fits poster icons to 16 px and bounds group names. Snippets, Editor, File
   Server, Vault and Remote post titled notifications with their causes; Remote declares `dev.jasper.remote.tunnels`.
-  Spec interpretations: see the plan's list (1 to 17). `./gradlew check --continue`: **8,331 tests, 0 failures, 0
-  errors, 6 skipped** (37 new), all four architecture gates and doclint included; the source hygiene check and `git
-  diff --check c02673cd` are clean. No GUI launched. GUI checks for the user: a plugin error card with Show more…
-  opening the Errors window; a Remote upload that fails, posted in "Remote activities"; a plugin directory without
-  `plugin.toml` in the user plugins folder, reported at launch with Open Plugins.
+  Spec interpretations: see the plan's list (1 to 17). `./gradlew check --continue`: **8,333 tests, 0 failures, 0
+  errors, 6 skipped** (39 new, after the final-review fix; one run in between failed only the known
+  `TerminalAppIntegrationTest` "reflow" row-reset flake, which passed in three isolated reruns and in the full rerun),
+  all four architecture gates and doclint included; the source hygiene check and `git diff --check c02673cd` are
+  clean. Final review: one important finding fixed (a plugin whose manifest `name` showed nothing stopped Jasper from
+  launching; `DescriptorParser` now rejects such a name, making it an unreadable-plugin problem); seven minor findings
+  are deferred in the plan's status banner. No GUI launched. GUI checks for the user: a plugin error card with Show
+  more… opening the Errors window; a long File Server transfer (one that runs past the activity threshold), whose
+  outcome is posted in "File Server activities" as "Sending <file>" or "Receiving <file>" (an interrupted one as an
+  error); a plugin directory without `plugin.toml` in the user plugins folder, reported at launch with Open Plugins.
 
 - **Merged `main` into `claude/dock-layout`** (2026-10-03; `main` at `63e3b95c`, merge base `cc0429f5`): main's
   features that touch the dock now use it. Unread badges are on the stripes: `ToolStripe.Button` carries the

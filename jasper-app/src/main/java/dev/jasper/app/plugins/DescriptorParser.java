@@ -30,6 +30,16 @@ final class DescriptorParser {
 
     private DescriptorParser() { }
 
+    /**
+     * Whether the text shows anything: some character that is not white space, a space separator (no-break spaces
+     * included), a formatting mark (zero-width characters, bidi controls) or another control character. A plugin's name
+     * titles its notification groups, which must show something.
+     */
+    private static boolean visible(String text) {
+        return text.codePoints().anyMatch(point -> !Character.isWhitespace(point) && !Character.isSpaceChar(point)
+            && Character.getType(point) != Character.FORMAT && !Character.isISOControl(point));
+    }
+
     static PluginDescriptor parse(String text) throws InvalidDescriptor {
         TomlParseResult toml = Toml.parse(text);
         if (toml.hasErrors()) throw new InvalidDescriptor("plugin.toml is not valid TOML: " + toml.errors().get(0).getMessage());
@@ -37,7 +47,7 @@ final class DescriptorParser {
         String id = text(toml, "id", true);
         if (!PluginInfo.validId(id)) throw new InvalidDescriptor("id is malformed or reserved: " + id);
         String name = text(toml, "name", true);
-        if (name.isBlank()) throw new InvalidDescriptor("name must not be blank");
+        if (!visible(name)) throw new InvalidDescriptor("name must show something: not only spaces, zero-width or bidi characters");
         Version version = version(text(toml, "version", true), "version");
         String entry = text(toml, "entry", true);
         if (!entry.matches(CLASS_NAME)) throw new InvalidDescriptor("entry is not a class name: " + entry);

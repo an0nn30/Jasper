@@ -4,8 +4,8 @@
 
 **Status:** Implemented on branch `claude/notifications-3` (worktree `.worktrees/notifications-3`, cut from main
 `c02673cd`, where plans 1 and 2 are merged), executed natively (one context, TDD per task) at the user's choice, with
-one independent whole-branch review at the end. `./gradlew check --continue`: 8,331 tests, 0 failures, 0 errors, 6
-skipped (37 new). Deviations from the plan text:
+one independent whole-branch review at the end. `./gradlew check --continue`: 8,333 tests, 0 failures, 0 errors, 6
+skipped (39 new, after the final-review fix). Deviations from the plan text:
 - Task 5: the contract test's second plugin takes its context as `broken`, because a lambda parameter named `context`
   would shadow the test's local of the same name and not compile.
 - Task 12: Step 4's `grep -rnw "Notices"` also matches the English verb in three existing comments (`FakePluginHost`,
@@ -14,7 +14,25 @@ skipped (37 new). Deviations from the plan text:
 - Process: escapes typed into the executor's tool calls arrived as raw characters, so every Java file written was put
   through an escape pass before compiling; the source hygiene check is clean.
 
-Final review: see the list below this paragraph once it has run.
+Final review (one independent reviewer on the whole branch): no critical findings, one important, seven minor.
+- Fixed: a plugin whose manifest `name` showed nothing (only zero-width, no-break or bidi characters) stopped Jasper
+  from launching, because its notification group could not be named. `DescriptorParser` now rejects such a name, so the
+  plugin is an unreadable-plugin problem (`DescriptorParserTest.aNameThatShowsNothingIsRejected`,
+  `PluginRuntimeTest.aPluginWhoseNameShowsNothingIsAProblemAndJasperStillStarts`).
+- Fixed: the GUI check in `docs/STATUS.md` named "Remote activities", but Remote begins no activities; it now uses a
+  long File Server transfer. Task 13's text above still has the old wording.
+- Deferred (minor):
+  - clearing the Errors window, or the 100-incident cap, expires a plugin's notifications that carried a cause, links
+    included;
+  - an expiring action that posts the same failure again within 60 s is coalesced into the entry it expires, so the
+    new failure is not shown (plan 1's center; no bundled plugin posts actions yet);
+  - a plugin whose id is a prefix of another's can declare groups under the other's id;
+  - the fake rejects an activity title over 200 characters (the application cuts it) and expires activity outcomes
+    when the plugin stops (the application leaves them live, with a body that does nothing);
+  - `docs/notifications.md` says the Tunnels group carries tunnel failures, but it carries only the Tunnels panel's
+    operation failures; `docs/plugin-authoring.md` omits some expiry triggers (an expiring action, Clear All, the
+    Errors window);
+  - the fake records a plugin's raw name for its groups, where the application's model cuts it to one line of 80.
 
 **Goal:** Give plugins notifications through the SDK (`dev.jasper.sdk.notifications`, SDK 0.14.0). Replace `Notices` in
 every bundled plugin with titled notifications that carry their causes. Announce plugin problems and activity outcomes
