@@ -590,6 +590,35 @@ and add `--plugin-dir <its build/plugin/<id> directory>` to that configuration's
 user-plugin path itself, unzip or copy a plugin directory into `jasper-app/build/dev-home/plugins/`
 and review it in File → Manage Plugins… as a user would, still without touching your system Jasper.
 
+## The Java runtime
+
+Packaged Jasper runs on its own trimmed JetBrains Runtime 25, not on every JDK module. The runtime has exactly these
+modules, and a plugin may rely on them; `verifyPackage` checks every packaged runtime against this list:
+
+<!-- runtime-modules:start -->
+`java.base`, `java.compiler`, `java.datatransfer`, `java.desktop`, `java.instrument`, `java.logging`,
+`java.management`, `java.management.rmi`, `java.naming`, `java.net.http`, `java.prefs`, `java.rmi`,
+`java.scripting`, `java.se`, `java.security.jgss`, `java.security.sasl`, `java.smartcardio`, `java.sql`,
+`java.sql.rowset`, `java.transaction.xa`, `java.xml`, `java.xml.crypto`, `jdk.accessibility`, `jdk.attach`,
+`jdk.charsets`, `jdk.crypto.cryptoki`, `jdk.httpserver`, `jdk.internal.jvmstat`, `jdk.jfr`, `jdk.localedata`,
+`jdk.management`, `jdk.management.agent`, `jdk.management.jfr`, `jdk.naming.dns`, `jdk.naming.rmi`, `jdk.net`,
+`jdk.security.auth`, `jdk.security.jgss`, `jdk.unsupported`, `jdk.unsupported.desktop`, `jdk.zipfs`
+<!-- runtime-modules:end -->
+
+On Windows it also has `jdk.crypto.mscapi`, the Windows certificate stores. That is all of Java SE (`java.se`) plus
+the charsets, locale data, ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and
+RMI naming, `jdk.net`'s socket options, the JDK HTTP server, `sun.misc.Unsafe` (`jdk.unsupported`), and JFR, JMX and
+attach for diagnostics.
+
+Not there: the compiler and the other development tools (`jdk.compiler`, so `ToolProvider.getSystemJavaCompiler()`
+returns null; `jdk.javadoc`, `jdk.jshell`, `jdk.jlink`, `jdk.jpackage`, `jdk.jdeps`, `jdk.jartool`, `jdk.jconsole`,
+`jdk.jstatd`, `jdk.editpad`), the debugger (`jdk.jdi`, `jdk.jdwp.agent`, so `-agentlib:jdwp` does not work in the
+packaged app), `jdk.dynalink` (a bundled Nashorn cannot run), `jdk.incubator.vector`, `jdk.sctp`, `jdk.xml.dom`,
+`jdk.jsobject`, `jdk.nio.mapmode`, and the JetBrains Runtime's JCEF and JOGL (`jcef`, `jogl.all`, `gluegen.rt`). A
+library that needs one of them fails with `NoClassDefFoundError` in the packaged app although it works under
+`./gradlew :jasper-app:run`, which uses the full SDK. Bundle a jar instead, or ask for the module to be added
+(`runtimeRootModules` in `gradle/packaging-support.gradle`).
+
 ## Distributing a plugin
 
 Zip your plugin's jars, either at the root of the zip or inside one folder; everything else in the

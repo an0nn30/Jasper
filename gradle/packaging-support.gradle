@@ -1,0 +1,40 @@
+import groovy.json.JsonException
+import groovy.json.JsonSlurper
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.util.concurrent.TimeUnit
+
+// What packaging decides, as pure helpers: the runtime's modules, the native libraries copied into the app, the
+// launcher configuration and the AOT training launch. gradle/packaging.gradle applies this file;
+// gradle/packaging-support-test.gradle checks it with fixtures (verifyPackagingSupport, part of check). The imports
+// serve helpers further down: Groovy accepts imports only before the first statement.
+
+// The Java runtime packaged Jasper ships; docs/plugin-authoring.md ("The Java runtime") lists it for plugin authors.
+// jpackage's default for a class-path application is every module, and --bind-services then also bound javac,
+// jshell, jlink, jpackage and the JetBrains Runtime's JCEF and JOGL (192 MB). These roots keep all of Java SE for
+// plugins, the providers a desktop application needs (charsets, locale data, ZIP file system, PKCS#11, smart cards,
+// Kerberos, JAAS, DNS and RMI naming, socket options, the JDK HTTP server that File Server uses, sun.misc.Unsafe and
+// Swing interop) and the field diagnostics (JFR, JMX, attach). Windows adds its certificate stores. jdk.crypto.ec is
+// left out: it has been empty since JDK 22. jlink adds what the roots require.
+ext.runtimeRootModules = { String os ->
+    List<String> roots = ['java.se', 'java.smartcardio', 'jdk.accessibility', 'jdk.attach', 'jdk.charsets',
+        'jdk.crypto.cryptoki', 'jdk.httpserver', 'jdk.jfr', 'jdk.localedata', 'jdk.management', 'jdk.management.agent',
+        'jdk.management.jfr', 'jdk.naming.dns', 'jdk.naming.rmi', 'jdk.net', 'jdk.security.auth', 'jdk.security.jgss',
+        'jdk.unsupported', 'jdk.unsupported.desktop', 'jdk.zipfs']
+    os == 'windows' ? roots + ['jdk.crypto.mscapi'] : roots
+}
+
+// Every module of the packaged runtime, sorted: the roots and what they require (java.se's Java SE modules and
+// jdk.attach's jvmstat support). verifyPackage compares this with the MODULES line of the runtime's release file.
+ext.runtimeModules = { String os ->
+    (runtimeRootModules(os) + ['java.base', 'java.compiler', 'java.datatransfer', 'java.desktop', 'java.instrument',
+        'java.logging', 'java.management', 'java.management.rmi', 'java.naming', 'java.net.http', 'java.prefs',
+        'java.rmi', 'java.scripting', 'java.security.jgss', 'java.security.sasl', 'java.sql', 'java.sql.rowset',
+        'java.transaction.xa', 'java.xml', 'java.xml.crypto', 'jdk.internal.jvmstat']).toSorted()
+}
+
+// No --bind-services: the roots name every provider Jasper wants. --generate-cds-archive writes the runtime's default
+// CDS archive (lib/server/classes.jsa), the fallback whenever the AOT cache is unusable. No --compress: jlink's
+// default leaves lib/modules uncompressed, which loads classes faster. No --strip-native-commands: bin/java stays,
+// because the JVM runs it to assemble the AOT cache at the end of a training launch.
+ext.jlinkOptions = '--strip-debug --no-man-pages --no-header-files --generate-cds-archive'

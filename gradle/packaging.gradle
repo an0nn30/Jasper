@@ -10,6 +10,8 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 
 apply from: rootProject.file('gradle/mac-launcher-identity.gradle')
 apply from: rootProject.file('gradle/mac-launcher-identity-test.gradle')
+apply from: rootProject.file('gradle/packaging-support.gradle')
+apply from: rootProject.file('gradle/packaging-support-test.gradle')
 
 def app = extensions.getByType(JavaApplication)
 def toolchains = extensions.getByType(JavaToolchainService)
@@ -200,6 +202,8 @@ def packageApp = tasks.register('packageApp') {
     }
     inputs.property('mainClass', app.mainClass)
     inputs.property('jvmArgs', providers.provider { app.applicationDefaultJvmArgs.collect { it.toString() } })
+    inputs.property('runtimeRootModules', providers.provider { runtimeRootModules(normalizedHost().os) })
+    inputs.property('jlinkOptions', jlinkOptions)
     inputs.property('localNetworkUsage', localNetworkUsage)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
@@ -221,7 +225,8 @@ def packageApp = tasks.register('packageApp') {
             '--main-jar', jarTask.get().archiveFile.get().asFile.name,
             '--main-class', app.mainClass.get(),
             '--icon', nativeIcon.get().absolutePath,
-            '--jlink-options', '--strip-debug --no-man-pages --no-header-files --bind-services']
+            '--add-modules', runtimeRootModules(context.host.os).join(','),
+            '--jlink-options', jlinkOptions]
         app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
         if (context.host.os == 'macos') {
             args.addAll(['--mac-package-identifier', 'dev.jasper.app', '--mac-package-name', 'Jasper'])
@@ -319,6 +324,37 @@ def verifyPackage = tasks.register('verifyPackage') {
         String normalizedReleaseArchitecture = releaseArchitecture in ['aarch64', 'arm64'] ? 'aarch64' :
                 (releaseArchitecture in ['amd64', 'x86_64', 'x64'] ? 'x64' : releaseArchitecture)
         if (releaseArchitecture && normalizedReleaseArchitecture != context.host.architecture) throw new GradleException("Package verification failed: runtime architecture is ${releaseArchitecture}")
+        // The trimmed runtime: exactly the documented modules, with a default CDS archive.
+        def modulesMatcher = releaseText =~ /(?m)^MODULES="([^"]*)"/
+        List<String> packagedModules = modulesMatcher.find() ? modulesMatcher.group(1).tokenize(' ').toSorted() : []
+        List<String> expectedModules = runtimeModules(context.host.os)
+        if (packagedModules != expectedModules) {
+            throw new GradleException("Package verification failed: the runtime's modules differ from runtimeModules in gradle/packaging-support.gradle\n" +
+                "missing: ${expectedModules - packagedModules}\nunexpected: ${packagedModules - expectedModules}")
+        }
+        File cdsArchive = new File(runtimeHome, context.host.os == 'windows' ? 'bin/server/classes.jsa' : 'lib/server/classes.jsa')
+        if (!cdsArchive.isFile() || cdsArchive.length() == 0) {
+            throw new GradleException("Package verification failed: the runtime has no default CDS archive at ${cdsArchive}")
+        }
+        // jdeps sees each jar's static module needs. Without this, a bundled plugin needing a module the runtime lacks
+        // would fail with NoClassDefFoundError only in the packaged app.
+        File jdeps = new File(context.sdkHome, "bin/jdeps${context.host.os == 'windows' ? '.exe' : ''}")
+        List<File> applicationJars = appDir.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
+        def requireModules = { List<File> jars, List<File> classPath, String what ->
+            String output = executeNative([jdeps.absolutePath, '--multi-release', '25', '--ignore-missing-deps', '--print-module-deps',
+                '--class-path', classPath*.absolutePath.join(File.pathSeparator)] + jars*.absolutePath, "jdeps for ${what}").stdout
+            List<String> needed = output.readLines().findAll { it.trim() }.last().tokenize(',')*.trim()
+            List<String> missing = needed - expectedModules
+            if (missing) {
+                throw new GradleException("Package verification failed: ${what} needs ${missing}, which the runtime lacks; " +
+                    'add them to runtimeRootModules (gradle/packaging-support.gradle) and docs/plugin-authoring.md')
+            }
+        }
+        requireModules(applicationJars, applicationJars, 'the application class path')
+        new File(appDir, 'plugins').eachDir { plugin ->
+            List<File> pluginJars = plugin.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
+            requireModules(pluginJars, pluginJars + applicationJars, "bundled plugin ${plugin.name}")
+        }
         File ptyJar = appDir.listFiles().find { it.name.startsWith('pty4j-') && it.name.endsWith('.jar') }
         File jnaJar = appDir.listFiles().find { it.name.startsWith('jna-') && !it.name.startsWith('jna-platform') && it.name.endsWith('.jar') }
         if (ptyJar == null || jnaJar == null) throw new GradleException('Package verification failed: pty4j or JNA dependency is missing')
@@ -431,6 +467,14 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (runtimeArchitecture != context.host.architecture) {
             throw new GradleException("Package verification failed: bundled Java architecture is ${runtimeArchitecture ?: 'unknown'}")
         }
+        def sharing = executeNative([bundledJava.absolutePath, '-Xshare:on', '-version'], 'bundled java with its default CDS archive (-Xshare:on)')
+        if (!(sharing.stdout + sharing.stderr).contains('sharing')) {
+            throw new GradleException("Package verification failed: the bundled java reports no class data sharing\n${sharing.stderr}")
+        }
+        long runtimeBytes = 0
+        runtimeHome.eachFileRecurse(groovy.io.FileType.FILES) { runtimeBytes += it.length() }
+        logger.lifecycle("Runtime: ${packagedModules.size()} modules, ${runtimeBytes.intdiv(1024 * 1024)} MB, " +
+            "default CDS archive ${cdsArchive.length().intdiv(1024 * 1024)} MB")
         logger.lifecycle("Verified Jasper ${context.version} ${context.host.os}-${context.host.architecture} image at ${image}")
     }
 }

@@ -1,0 +1,30 @@
+// Portable fixtures for gradle/packaging-support.gradle, in the style of mac-launcher-identity-test.gradle: no
+// jpackage, window, signing identity or network. Each plan task adds its own doLast block through verifySupport.
+def verifySupport = tasks.register('verifyPackagingSupport') {
+    group = 'verification'
+    description = 'Checks the packaging helpers with fixtures: runtime modules, bundled natives, launcher configuration and AOT training.'
+    doLast {
+        List<String> roots = runtimeRootModules('macos')
+        assert roots.containsAll(['java.se', 'jdk.httpserver', 'jdk.unsupported', 'jdk.jfr', 'jdk.attach', 'jdk.zipfs'])
+        assert roots.intersect(['jcef', 'jogl.all', 'gluegen.rt', 'jdk.compiler', 'jdk.jshell', 'jdk.jlink', 'jdk.jpackage',
+            'jdk.jdi', 'jdk.jdwp.agent', 'jdk.incubator.vector', 'jdk.dynalink']).isEmpty()
+        assert runtimeRootModules('linux') == roots
+        assert runtimeRootModules('windows') == roots + ['jdk.crypto.mscapi']
+        List<String> modules = runtimeModules('macos')
+        assert modules == modules.toSorted() && modules == modules.toUnique() && modules.size() == 41
+        assert modules.containsAll(roots + ['java.base', 'java.desktop', 'java.sql', 'jdk.internal.jvmstat'])
+        assert runtimeModules('linux') == modules
+        assert runtimeModules('windows') == (modules + ['jdk.crypto.mscapi']).toSorted()
+        assert jlinkOptions.tokenize(' ').containsAll(['--generate-cds-archive', '--strip-debug'])
+        assert !jlinkOptions.contains('--bind-services') && !jlinkOptions.contains('--compress') &&
+            !jlinkOptions.contains('--strip-native-commands')
+        // The list plugin authors may rely on is the list the build ships.
+        String guide = rootProject.file('docs/plugin-authoring.md').getText('UTF-8')
+        def block = guide =~ /(?s)<!-- runtime-modules:start -->(.*?)<!-- runtime-modules:end -->/
+        assert block.find() : 'docs/plugin-authoring.md has no runtime-modules block'
+        assert (block.group(1) =~ /`([a-z][a-z0-9.]*)`/).collect { it[1] } == modules :
+            'docs/plugin-authoring.md lists other runtime modules than gradle/packaging-support.gradle'
+        logger.lifecycle('Verified the runtime module list')
+    }
+}
+tasks.named('check') { dependsOn(verifySupport) }
