@@ -63,8 +63,9 @@
   on this Mac only (its `java.io.tmpdir` contains "zz") and predates the branch, and
   `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load (it did not fail in this run and
   passes when run alone). Open: the GUI checks are pending; any dock change or stripe render cancels a running drag
-  (an action's enable or title change now refreshes the stripe in place, so only adding or removing an action, or a
-  dock or panel change, re-renders it; follow-up on `claude/dock-followups`); on stripes shorter than about 200px the
+  (an action's enable or title change now refreshes the stripe in place, so only adding or removing an action or a
+  rail placement, or a dock or panel change, re-renders it; follow-up on `claude/dock-followups`; GUI check: lock the
+  vault, or otherwise change an action, while dragging a tool window, and the drag carries on); on stripes shorter than about 200px the
   foot can clip by one step during a drag; and the overlay repaints the whole window on each drag event, which may
   lag on large HiDPI windows (the GUI checks will tell). No GUI launched; GUI checks for the user are the plan's last
   section.

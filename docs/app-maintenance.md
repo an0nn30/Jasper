@@ -333,7 +333,7 @@ claims only an Esc from its own window. A panel badge change is not a render: it
 arriving mid-drag leaves the drag alone. An action's enable or title change is not a render either:
 `WindowContributions` calls `ToolStripe.refreshActions`, which renames the existing rail action buttons
 (a button follows the action's enabled state itself) and repaints them. Only adding or removing an
-action, or a dock or panel change, renders the stripes again. Keep the layout-only terminal
+action or a rail placement, or a dock or panel change, renders the stripes again. Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
