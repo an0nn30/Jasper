@@ -74,3 +74,94 @@ verifySupport.configure {
 
 // BundledNativesProbeTest runs the probe with the packaged launcher's own native-library options.
 tasks.named('test', Test) { systemProperty('jasper.bundledNativeOptions', bundledNativeJvmOptions('macos').join('\n')) }
+
+verifySupport.configure {
+    doLast {
+        String config = '[Application]\napp.classpath=$APPDIR/jasper-app.jar\napp.classpath=$APPDIR/flatlaf-3.7.jar\n\n' +
+            '[JavaOptions]\njava-options=-Djpackage.app-version=1.0.0\n'
+        String trained = withJavaOption(config, aotCacheOption)
+        assert trained == config + 'java-options=-XX:AOTCache=$APPDIR/jasper.aot\n'
+        assert withJavaOption(trained, aotCacheOption) == trained
+        assert withJavaOption(trained.replace('jasper.aot', 'old.aot'), aotCacheOption) == trained
+        assert withJavaOption('[Application]\napp.mainclass=dev.jasper.app.Main\n', '-Dx=y') ==
+            '[Application]\napp.mainclass=dev.jasper.app.Main\n\n[JavaOptions]\njava-options=-Dx=y\n'
+        assert withJavaOption('[JavaOptions]\njava-options=-Da=1\n\n[Other]\nkey=v\n', '-Db=2') ==
+            '[JavaOptions]\njava-options=-Da=1\njava-options=-Db=2\n\n[Other]\nkey=v\n'
+
+        File appDir = new File(temporaryDir, 'My Apps/Jasper.app/Contents/app')
+        File javaBinary = new File(temporaryDir, 'runtime/bin/java')
+        String root = appDir.absolutePath
+        assert aotCheckCommand(javaBinary, trained, appDir) == [javaBinary.absolutePath, '-Djpackage.app-version=1.0.0',
+            "-XX:AOTCache=${root}/jasper.aot", '-XX:AOTMode=on', '-cp',
+            ["${root}/jasper-app.jar", "${root}/flatlaf-3.7.jar"].join(File.pathSeparator), '-version']*.toString()
+
+        assert javaToolOptions(['-Da=b c', "-Dq=it's", '-Dd="x"', '-Dplain']) == '''-Da=b' 'c -Dq=it"'"s -Dd='"'x'"' -Dplain'''
+
+        Map good = [pid: 42, kind: 'cold', settled: true, milestones: [WINDOW_SHOWN: 1.0, OUTPUT_PAINTED: 2.0, PLUGINS_BOUND: 3.0]]
+        assert trainingTraceProblem(good, 42L) == null
+        assert trainingTraceProblem(good + [pid: 7], 42L) == 'the trace belongs to process 7, not the training launch 42'
+        assert trainingTraceProblem(good + [kind: 'background'], 42L) == "the launch was 'background', not a cold start with a window"
+        assert trainingTraceProblem(good + [milestones: [WINDOW_SHOWN: 1.0]], 42L) == 'start-up settled without OUTPUT_PAINTED, PLUGINS_BOUND'
+        assert trainingTraceProblem(good + [milestones: null], 42L) == 'start-up settled without WINDOW_SHOWN, OUTPUT_PAINTED, PLUGINS_BOUND'
+        logger.lifecycle('Verified launcher configuration edits and the AOT checks')
+    }
+}
+
+// runAotTraining against stand-ins for the launcher: /bin/sh scripts that read JAVA_TOOL_OPTIONS the way the JVM does,
+// write Plan 1's trace JSON and, on SIGTERM, the cache. Windows has no /bin/sh, and AOT training is macOS-only.
+verifySupport.configure {
+    doLast {
+        if (System.getProperty('os.name').startsWith('Windows')) return
+        File fakes = new File(temporaryDir, 'aot training')   // a space, as in a checkout under "My Projects"
+        fakes.deleteDir()
+        fakes.mkdirs()
+        String readOptions = '''eval "set -- $JAVA_TOOL_OPTIONS"
+for option in "$@"; do
+  case "$option" in
+    -Djasper.startupTrace=*) trace=${option#-Djasper.startupTrace=} ;;
+    -XX:AOTCacheOutput=*) cache=${option#-XX:AOTCacheOutput=} ;;
+  esac
+done
+printf '%s\\n' "$@" > "${cache%/*}/options.txt"
+'''
+        def settles = { String milestones, boolean writesCache ->
+            (writesCache ? 'trap \'printf cache > "$cache"; exit 143\' TERM\n' : 'trap \'exit 143\' TERM\n') +
+                'printf \'{"schema":1,"pid":%s,"kind":"cold","settled":true,"milestones":{' + milestones + '}}\' "$$" > "$trace.part"\n' +
+                'mv "$trace.part" "$trace"\n' +
+                'while :; do sleep 1; done\n'
+        }
+        def fake = { String name, String body ->
+            File script = new File(fakes, "${name}.sh")
+            script.setText('#!/bin/sh\n' + readOptions + body, 'UTF-8')
+            script.setExecutable(true, false)
+            script
+        }
+        def expectFailure = { String expected, Closure action ->
+            try {
+                action()
+                assert false : "expected a failure mentioning: ${expected}"
+            } catch (GradleException failure) {
+                assert failure.message.contains(expected) : failure.message
+            }
+        }
+        String complete = '"WINDOW_SHOWN":1.0,"OUTPUT_PAINTED":2.0,"PLUGINS_BOUND":3.0'
+        File work = new File(fakes, 'work')
+        File cache = runAotTraining(fake('trains', settles(complete, true)), work, 20, 20)
+        assert cache == new File(work, 'jasper.aot') && cache.getText('UTF-8') == 'cache'
+        assert new File(work, 'options.txt').readLines('UTF-8') == ["-XX:AOTCacheOutput=${cache.absolutePath}",
+            "-Duser.home=${new File(work, 'home').absolutePath}", "-Djasper.startupTrace=${new File(work, 'startup-trace.json').absolutePath}",
+            '-Dapple.awt.UIElement=true']*.toString()
+        String trainingConfig = new File(work, 'home/.config/jasper/config.toml').getText('UTF-8')
+        assert trainingConfig.contains('run_in_background = false') && trainingConfig.contains('program = "/bin/sh"')
+        assert trainingConfig.contains('args = ["' + new File(work, 'training-shell.sh').absolutePath + '"]')
+        assert new File(work, 'training-shell.sh').canExecute()
+        assert aotTrainingConfig(new File('/w/say "hi"/s.sh')).contains('args = ["/w/say \\"hi\\"/s.sh"]')
+        expectFailure('Jasper exited (3) before start-up settled') { runAotTraining(fake('exits', 'exit 3\n'), work, 20, 20) }
+        expectFailure('start-up settled without OUTPUT_PAINTED, so the cache would miss') {
+            runAotTraining(fake('no-output', settles('"WINDOW_SHOWN":1.0,"PLUGINS_BOUND":3.0', true)), work, 20, 20)
+        }
+        expectFailure('start-up did not settle within 1 s') { runAotTraining(fake('stalls', 'while :; do sleep 1; done\n'), work, 1, 20) }
+        expectFailure('the JVM wrote no cache') { runAotTraining(fake('no-cache', settles(complete, false)), work, 20, 20) }
+        logger.lifecycle('Verified AOT training orchestration against stand-in launchers')
+    }
+}

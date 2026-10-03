@@ -96,3 +96,125 @@ ext.launcherJavaOptions = { String config, File appDir ->
 
 // The files -Xlog:library reports as loaded ("Loaded library <path>, handle 0x...").
 ext.loadedLibraries = { String log -> (log =~ /Loaded library (.+), handle 0x\p{XDigit}+/).collect { it[1] } }
+
+// The launcher option that makes the JVM use the trained cache; trainAotCache adds it to Jasper.cfg.
+ext.aotCacheOption = '-XX:AOTCache=$APPDIR/jasper.aot'
+
+// config with option as a java-options line at the end of [JavaOptions] (a new section if there is none), replacing
+// every earlier line for the same option name (the text up to its first '=').
+ext.withJavaOption = { String config, String option ->
+    String line = 'java-options=' + option
+    boolean named = option.contains('=')
+    String name = named ? line.substring(0, line.indexOf('=', 'java-options='.length()) + 1) : line
+    List<String> lines = config.readLines().findAll { it != line && !(named && it.startsWith(name)) }
+    int section = lines.indexOf('[JavaOptions]')
+    if (section < 0) return (lines + ['', '[JavaOptions]', line]).join('\n') + '\n'
+    int insert = section + 1
+    for (int index = section + 1; index < lines.size() && !lines[index].startsWith('['); index++) {
+        if (lines[index].startsWith('java-options=')) insert = index + 1
+    }
+    lines.add(insert, line)
+    lines.join('\n') + '\n'
+}
+
+// JAVA_TOOL_OPTIONS for options that may contain spaces or quotes, quoted the way the JDK quotes them for its own AOT
+// assembly child (jdk.internal.misc.CDS.ProcessLauncher): a whitespace or double-quote character inside single
+// quotes, a single quote inside double quotes. The JVM's parser and a POSIX shell's eval both undo it.
+ext.javaToolOptions = { List<String> options ->
+    options.collect { String option ->
+        StringBuilder quoted = new StringBuilder()
+        for (char c : option.toCharArray()) {
+            String text = String.valueOf(c)
+            if (text == '"' || Character.isWhitespace(c)) quoted.append("'").append(text).append("'")
+            else if (text == "'") quoted.append('"').append(text).append('"')
+            else quoted.append(text)
+        }
+        quoted.toString()
+    }.join(' ')
+}
+
+// The stand-in for the login shell while training: one prompt, then it reads and discards input (anything typed into
+// the training window) until the terminal closes.
+ext.aotTrainingShell = "#!/bin/sh\nprintf 'jasper-aot-training\$ '\nexec /bin/cat >/dev/null\n"
+
+// The training launch's config.toml: the stand-in shell instead of the login shell, and no resident process.
+ext.aotTrainingConfig = { File shell ->
+    String path = shell.absolutePath.replace('\\', '\\\\').replace('"', '\\"')
+    '# trainAotCache: a short-lived Jasper with a stand-in shell and no resident process.\n' +
+        '[system]\nrun_in_background = false\n\n' +
+        '[terminal.shell]\nprogram = "/bin/sh"\nargs = ["' + path + '"]\n'
+}
+
+// Why a settled start-up trace (Plan 1's JSON) is unfit to train from, or null: it must be this launch's, and a cold
+// start that showed its window, painted the shell's output and bound every plugin.
+ext.trainingTraceProblem = { Map trace, long pid ->
+    if (((trace.pid ?: -1) as long) != pid) return "the trace belongs to process ${trace.pid}, not the training launch ${pid}".toString()
+    if (trace.kind != 'cold') return "the launch was '${trace.kind}', not a cold start with a window".toString()
+    Map milestones = (trace.milestones ?: [:]) as Map
+    List<String> missing = ['WINDOW_SHOWN', 'OUTPUT_PAINTED', 'PLUGINS_BOUND'].findAll { !milestones.containsKey(it) }
+    missing ? "start-up settled without ${missing.join(', ')}".toString() : null
+}
+
+// One training launch of launcher (the image's Contents/MacOS/Jasper, so jpackage's launcher sets everything a real
+// launch has) in work, isolated like startupBench: user.home is work/home with the training configuration, and
+// JAVA_TOOL_OPTIONS asks for the cache, the start-up trace and no Dock icon. Once the trace has settled, SIGTERM; the
+// JVM assembles the cache while it exits, running the runtime's bin/java (whose output lands in the same log, and
+// whose JAVA_TOOL_OPTIONS the JVM replaces). Returns the cache; throws with the log's tail on any failure. The
+// seconds are boxed: Groovy 4.0.32 compiles a closure with two primitive long parameters to bytecode the verifier rejects.
+ext.runAotTraining = { File launcher, File work, Long settleSeconds, Long exitSeconds ->
+    work.deleteDir()
+    File home = new File(work, 'home')
+    File config = new File(home, '.config/jasper/config.toml')
+    config.parentFile.mkdirs()
+    File shell = new File(work, 'training-shell.sh')
+    shell.setText(aotTrainingShell, 'UTF-8')
+    shell.setExecutable(true, false)
+    config.setText(aotTrainingConfig(shell), 'UTF-8')
+    File trace = new File(work, 'startup-trace.json')
+    File cache = new File(work, 'jasper.aot')
+    File log = new File(work, 'training.log')
+    def builder = new ProcessBuilder(launcher.absolutePath).directory(work).redirectErrorStream(true)
+        .redirectOutput(ProcessBuilder.Redirect.to(log))
+    Map<String, String> environment = builder.environment()
+    ['JASPER_HOME', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH'].each { environment.remove(it) }
+    environment.put('JAVA_TOOL_OPTIONS', javaToolOptions(["-XX:AOTCacheOutput=${cache.absolutePath}",
+        "-Duser.home=${home.absolutePath}", "-Djasper.startupTrace=${trace.absolutePath}", '-Dapple.awt.UIElement=true']*.toString()))
+    def tail = { log.isFile() ? log.readLines('UTF-8').takeRight(40).join('\n') : '(no output)' }
+    Process process = builder.start()
+    try {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(settleSeconds)
+        String problem
+        while (true) {
+            Map settled = null
+            if (trace.isFile()) {
+                try { settled = new JsonSlurper().parse(trace, 'UTF-8') as Map } catch (JsonException ignored) { }
+            }
+            if (settled?.settled == true) {
+                problem = trainingTraceProblem(settled, process.pid())
+                break
+            }
+            if (!process.isAlive()) throw new GradleException("AOT training: Jasper exited (${process.exitValue()}) before start-up settled\n${tail()}")
+            if (System.nanoTime() > deadline) throw new GradleException("AOT training: start-up did not settle within ${settleSeconds} s\n${tail()}")
+            Thread.sleep(200)
+        }
+        process.destroy()
+        if (!process.waitFor(exitSeconds, TimeUnit.SECONDS)) {
+            throw new GradleException("AOT training: Jasper did not exit within ${exitSeconds} s of SIGTERM\n${tail()}")
+        }
+        if (problem != null) throw new GradleException("AOT training: ${problem}, so the cache would miss that part of start-up\n${tail()}")
+        if (!cache.isFile() || cache.length() == 0) throw new GradleException("AOT training: the JVM wrote no cache to ${cache}\n${tail()}")
+        return cache
+    } finally {
+        if (process.isAlive()) {
+            process.destroyForcibly()
+            process.waitFor(10, TimeUnit.SECONDS)
+        }
+    }
+}
+
+// The headless acceptance check: the image's java with the launcher's JVM options and class path, in file order, and
+// -XX:AOTMode=on, which exits with an error instead of running without a stale or broken cache.
+ext.aotCheckCommand = { File java, String config, File appDir ->
+    ([java.absolutePath] + launcherJavaOptions(config, appDir) +
+        ['-XX:AOTMode=on', '-cp', launcherClasspath(config, appDir).join(File.pathSeparator), '-version'])*.toString()
+}
