@@ -39,20 +39,6 @@ class NotificationValuesTest {
         assertThatThrownBy(() -> titled("t").withSource(" ")).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test void aMessageOfUnknownShapeBecomesATitleAndContent() {
-        var shortOne = NotificationRequest.message("jasper.general", Severity.ERROR, "Remote: Could not connect");
-        assertThat(shortOne.title()).isEqualTo("Remote: Could not connect");
-        assertThat(shortOne.content()).isEmpty();
-        String wordy = "Vault: " + "word ".repeat(40);
-        var cut = NotificationRequest.message("jasper.general", Severity.ERROR, wordy);
-        assertThat(cut.title()).hasSize(NotificationRequest.SHORT_TITLE).endsWith("…");
-        assertThat(cut.content()).isEqualTo(wordy.strip());
-        var lines = NotificationRequest.message("jasper.general", Severity.ERROR, "Could not start terminal in /tmp:\nNo such file");
-        assertThat(lines.title()).isEqualTo("Could not start terminal in /tmp:");
-        assertThat(lines.content()).isEqualTo("Could not start terminal in /tmp:\nNo such file");
-        assertThat(NotificationRequest.message("jasper.general", Severity.ERROR, "  ").title()).isEqualTo("No message");
-    }
-
     @Test void groupIdsArePluginIdShapedAndNamesAreOneBoundedLine() {
         for (String good : List.of("jasper.general", "sample", "dev.example.tool.activities", "dev.example-tool_x"))
             assertThat(new NotificationGroup(good, "Name", "jasper", DisplayMode.CARD).id()).isEqualTo(good);

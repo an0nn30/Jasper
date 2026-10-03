@@ -29,7 +29,7 @@ final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser,
                        java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
@@ -39,22 +39,22 @@ final class PluginHost {
         Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser,
                        java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
                        java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber) {
-            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notice,
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
                 editor, settingsFiles, clearReports, profiles, browser, appearance, appearanceSubscriber, failure -> { });
         }
 
         Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser) {
-            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notice,
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
                 editor, settingsFiles, clearReports, profiles, browser, null, null, failure -> { });
         }
     }

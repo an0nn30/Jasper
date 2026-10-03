@@ -12,6 +12,9 @@ import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.events.Topic;
+import dev.jasper.sdk.notifications.NotificationSpec;
+import dev.jasper.sdk.notifications.Notifications;
+import dev.jasper.sdk.notifications.Severity;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
@@ -65,6 +68,7 @@ final class HostedContext implements PluginContext {
     final HostedTerminals terminals;
     final HostedPalette palette;
     final HostedFileSources fileSources;
+    final HostedNotifications notifications;
     private boolean observing;
     Plugin plugin;
 
@@ -85,6 +89,8 @@ final class HostedContext implements PluginContext {
             host.environment.windows(), terminals, host.environment.appearance(), host.environment.appearanceSubscriber());
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
+        this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,
+            host.environment.ui(), host.environment.onUi());
     }
 
     private void requireOpen() {
@@ -101,6 +107,7 @@ final class HostedContext implements PluginContext {
         state = State.CLOSED;
         ui.closeAll();
         terminals.closeAll();
+        notifications.close();
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
@@ -150,12 +157,15 @@ final class HostedContext implements PluginContext {
         @Override public Palette palette() { return palette; }
         @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
 
+        @Override public Notifications notifications() { return notifications; }
+
         @Override public Notices notices() {
             return message -> {
                 requireOpen();
                 Objects.requireNonNull(message, "message");
-                String shown = hosted.info().name() + ": " + message;
-                host.environment.ui().accept(() -> host.environment.notice().accept(shown));
+                // Notices is replaced by notifications(): its error becomes one titled with the plugin's name.
+                notifications.group().post(NotificationSpec.of(Severity.ERROR, hosted.info().name())
+                    .withContent(message.length() <= 4_000 ? message : message.substring(0, 3_999) + "…"));
             };
         }
 
@@ -168,7 +178,7 @@ final class HostedContext implements PluginContext {
                         try { host.environment.editor().accept(file); }
                         catch (RuntimeException failure) {
                             log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
-                            notices().error("Could not open " + file.getFileName() + " in an editor.");
+                            notifications.group().error("Could not open a file in an editor", String.valueOf(file.getFileName()), failure);
                         }
                     });
                 }
@@ -179,7 +189,7 @@ final class HostedContext implements PluginContext {
                         try { host.environment.browser().accept(address); }
                         catch (RuntimeException failure) {
                             log().log(System.Logger.Level.WARNING, "Could not open " + address + " in a browser", failure);
-                            notices().error("Could not open " + address + " in a browser.");
+                            notifications.group().error("Could not open a web address", address.toString(), failure);
                         }
                     });
                 }

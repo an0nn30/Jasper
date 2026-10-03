@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class HostedPaletteTest {
     static final PaletteVerb PASTE = new PaletteVerb("paste", "Paste"), BOOM = new PaletteVerb("boom", "Boom");
-    final List<String> notices = new CopyOnWriteArrayList<>();
+    final NotificationsFixture notifications = new NotificationsFixture();
     final List<Path> edited = new CopyOnWriteArrayList<>();
     Contributions contributions = onEdtValue(Contributions::new);
     TerminalFixture fixture = onEdtValue(TerminalFixture::new);
@@ -45,7 +45,7 @@ class HostedPaletteTest {
         host = onEdtValue(() -> new PluginHost(new PluginHost.Environment(javax.swing.SwingUtilities::invokeLater,
             javax.swing.SwingUtilities::isEventDispatchThread, data::resolve, diagnostic -> { },
             Duration.ofMillis(200), contributions, () -> true, AppContractTest.headlessWindows(), fixture.registry,
-            notices::add, edited::add, new PluginSettingsFiles(data, diagnostic -> { }), file -> { }, PluginRuntime.ShellProfiles.NONE, uri -> { })));
+            notifications.host, edited::add, new PluginSettingsFiles(data, diagnostic -> { }), file -> { }, PluginRuntime.ShellProfiles.NONE, uri -> { })));
         return host;
     }
 
@@ -157,10 +157,10 @@ class HostedPaletteTest {
             @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) { }
             @Override public dev.jasper.sdk.Subscription onChanged(Runnable listener) { return () -> { }; }
         })));
-        onEdt(() -> { other.get().notices().error("Broken"); other.get().platform().openInEditor(Path.of("/tmp/s.toml")); });
+        onEdt(() -> { other.get().notifications().group().error("Broken", ""); other.get().platform().openInEditor(Path.of("/tmp/s.toml")); });
         for (int i = 0; i < 50 && edited.isEmpty(); i++) Thread.sleep(20);
         onEdt(() -> { });
-        assertThat(notices).containsExactly("B: Broken");
+        assertThat(notifications.lines()).containsExactly("test.b|ERROR|Broken||-|-|-|live");
         assertThat(edited).containsExactly(Path.of("/tmp/s.toml"));
     }
 }

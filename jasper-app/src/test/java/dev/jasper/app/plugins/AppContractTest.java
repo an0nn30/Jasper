@@ -59,44 +59,44 @@ class AppContractTest extends PluginContractTest {
 
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, new CopyOnWriteArrayList<>());
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited) {
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, problems, edited, new CopyOnWriteArrayList<>());
     }
 
     /** As above; configuration problems land in {@code diagnostics}, and a file's reload or save clears that file's. */
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, PluginRuntime.ShellProfiles.NONE);
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, problems, edited, diagnostics, PluginRuntime.ShellProfiles.NONE);
     }
 
     /** As above, with the shell profiles plugins list and open. */
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, new CopyOnWriteArrayList<>());
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, problems, edited, diagnostics, profiles, new CopyOnWriteArrayList<>());
     }
 
     /** As above; the web addresses plugins ask to open land in {@code browsed}. */
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
                            List<java.net.URI> browsed) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, browsed, null);
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, new NotificationsFixture(problems), edited, diagnostics, profiles, browsed, null);
     }
 
     private static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, NotificationsFixture notifications, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
                            List<java.net.URI> browsed, WorkspaceAppearanceFixture appearance) {
         var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
-            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles,
+            notifications.host, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles,
             browsed::add, appearance == null ? null : appearance::current, appearance == null ? null : appearance::subscribe)));
     }
 
@@ -136,13 +136,13 @@ class AppContractTest extends PluginContractTest {
                 }, () -> {}));
             return id;
         }));
-        List<String> notices = new CopyOnWriteArrayList<>();
+        var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
         List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
         List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
         var appearance = onEdtValue(WorkspaceAppearanceFixture::new);
-        PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
+        PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notifications, edited,
             diagnostics, shells.source(), browsed, appearance);
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
@@ -368,7 +368,10 @@ class AppContractTest extends PluginContractTest {
                             onEdt(() -> { var scope = scope(scopeId); scope.execute(row(scopeId, rowId), verb(scope, verbId), context(windowId, paneIdOrNull)); });
                         }
                         @Override public List<String> paletteOpens() { return List.copyOf(opens); }
-                        @Override public List<String> notices() { return List.copyOf(notices); }
+                        @Override public List<String> notifications() { return notifications.lines(); }
+                        @Override public List<String> notificationGroups() { return notifications.groups(); }
+                        @Override public boolean runNotificationAction(String title, String label) { return notifications.runAction(title, label); }
+                        @Override public boolean clickNotification(String title) { return notifications.click(title); }
                         @Override public List<Path> openedInEditor() { return List.copyOf(edited); }
                         @Override public List<java.net.URI> browsed() { return List.copyOf(browsed); }
             @Override public void close() { stopAll(); flush(); }

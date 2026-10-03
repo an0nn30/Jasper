@@ -466,7 +466,11 @@ public final class JasperApplication {
             new PluginRuntime.SettingsReports(
                 diagnostic -> { if (configuration != null) configuration.report(diagnostic); },
                 file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
-            this::notice, new dev.jasper.app.platform.ConfigEditor()::open,
+            new PluginRuntime.NotificationHost(notificationCenter,
+                caused -> incidentNotices.pluginNotice(caused.pluginId(), caused.request(), caused.cause(), caused.posted()),
+                (title, details) -> notificationCenter.submit(NotificationRequest.of(IncidentNotices.PLUGINS.id(), Severity.ERROR, title)
+                    .withContent(details))),
+            new dev.jasper.app.platform.ConfigEditor()::open,
             new PluginRuntime.ShellProfiles(shellProfiles::current, shellProfiles::onChanged));
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
@@ -570,11 +574,6 @@ public final class JasperApplication {
                 try { Desktop.getDesktop().browse(uri); }
                 catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
             });
-        }
-
-        /** A plugin's error notice, until plugins post notifications themselves: one message, split into title and details. */
-        void notice(String message) {
-            notificationCenter.submit(NotificationRequest.message(NotificationsFeature.GENERAL.id(), Severity.ERROR, message));
         }
 
     /** Where Jasper stands for notifications: focused, in the background, or with no window open. */

@@ -80,6 +80,7 @@ public final class FakePluginHost implements AutoCloseable {
         final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
     final List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
+    final FakeNotifications notifications = new FakeNotifications(this);
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
@@ -175,6 +176,7 @@ public final class FakePluginHost implements AutoCloseable {
                 return context;
             }
         }
+        notifications.declareDefaults(info.id(), info.name());
         for (var provider : committed.entrySet()) {
             if (!context.requires.contains(provider.getValue().pluginId())) continue;
             try { context.services.put(provider.getKey(), provider.getValue().factory().apply(info)); }
@@ -332,6 +334,14 @@ public final class FakePluginHost implements AutoCloseable {
      * @return the events in delivery order
      */
     public List<ConnectionEvent> connectionLog() { return List.copyOf(connectionLog); }
+
+    /**
+     * What plugins posted and the groups declared for them.
+     *
+     * @return the host's notifications
+     * @since 0.14.0
+     */
+    public FakeNotifications notifications() { return notifications; }
 
     /**
      * Contained failures: throwing starts, stops, handlers, factories and background tasks.
@@ -511,6 +521,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.ui.closeAll();
         context.palette.closeAll();
         context.fileSources.closeAll();
+        notifications.stopped(context.plugin().id());
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
         for (ActivityEvent open : List.copyOf(running.values())) {

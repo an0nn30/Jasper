@@ -14,6 +14,12 @@ import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
+import dev.jasper.sdk.notifications.DisplayMode;
+import dev.jasper.sdk.notifications.GroupSpec;
+import dev.jasper.sdk.notifications.NotificationAction;
+import dev.jasper.sdk.notifications.NotificationHandle;
+import dev.jasper.sdk.notifications.NotificationSpec;
+import dev.jasper.sdk.notifications.Severity;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
@@ -1285,21 +1291,100 @@ public abstract class PluginContractTest {
             assertThat(h.paletteOpens()).containsExactly(window + " test.a.things - -", window + " jasper.commands new new_tab");
         }
 
-        @Test void noticesAndTheEditorReachTheHostAndAPaneKnowsItsShell() {
+        @Test void theEditorReachesTheHostAndAPaneKnowsItsShell() {
             UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "t");
             UUID pane = h.addTerminalPane(tab, "zsh", Path.of("/src"));
             var a = new AtomicReference<PluginContext>();
             h.start(info("test.a", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), a::set);
             h.ui(() -> {
-                a.get().notices().error("It broke");
                 a.get().platform().openInEditor(Path.of("/tmp/x.toml"));
                 assertThat(a.get().terminals().pane(pane).orElseThrow().info().shell()).isEqualTo("zsh");
             });
             h.flush();
             for (int i = 0; i < 100 && h.openedInEditor().isEmpty(); i++) { try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }
-            assertThat(h.notices()).containsExactly("test.a: It broke");
             assertThat(h.openedInEditor()).containsExactly(Path.of("/tmp/x.toml"));
         }
+
+    @Test void notificationsReachTheHostInTheirGroups() {
+        PluginContext a = started("test.a", Set.of());
+        UUID window = h.addTerminalWindow();
+        h.ui(() -> {
+            var plugin = a.notifications();
+            var tunnels = plugin.group(new GroupSpec("test.a.tunnels", "Tunnels", DisplayMode.HISTORY));
+            assertThat(plugin.group().id()).isEqualTo("test.a");
+            assertThat(plugin.group(new GroupSpec("test.a.tunnels", "Again", DisplayMode.OFF))).isSameAs(tunnels);
+            assertThat(plugin.group(new GroupSpec("test.a", "Mine", DisplayMode.OFF))).isSameAs(plugin.group());
+            plugin.group().info("Saved", "Three hosts");
+            plugin.group().warning("Slow", "");
+            tunnels.post(NotificationSpec.of(Severity.ERROR, "Tunnel down").withContent("db:5432")
+                .withAction(NotificationAction.of("Restart", () -> { })).withWindow(a.terminals().window(window).orElseThrow()));
+        });
+        h.flush();
+        assertThat(h.notificationGroups()).containsExactly("test.a|test.a|CARD", "test.a.activities|test.a activities|CARD",
+            "test.a.tunnels|Tunnels|HISTORY");
+        assertThat(h.notifications()).containsExactly(
+            "test.a|INFO|Saved|Three hosts|-|-|-|live",
+            "test.a|WARNING|Slow||-|-|-|live",
+            "test.a.tunnels|ERROR|Tunnel down|db:5432|Restart|-|" + window + "|live");
+    }
+
+    @Test void groupsStayInThePluginsNamespace() {
+        PluginContext a = started("test.a", Set.of());
+        h.ui(() -> {
+            assertThatIllegalArgumentException().isThrownBy(() -> a.notifications().group(new GroupSpec("test.b.x", "X", DisplayMode.CARD)));
+            assertThatIllegalArgumentException().isThrownBy(() -> a.notifications().group(new GroupSpec("test.ab.x", "X", DisplayMode.CARD)));
+            assertThatIllegalArgumentException().as("the host's")
+                .isThrownBy(() -> a.notifications().group(new GroupSpec("test.a.activities", "Mine", DisplayMode.CARD)));
+        });
+    }
+
+    @Test void actionsAndTheBodyRunAndExpireWhenTheySay() {
+        PluginContext a = started("test.a", Set.of());
+        var ran = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        h.ui(() -> a.notifications().group().post(NotificationSpec.of(Severity.INFO, "Update ready")
+            .withAction(NotificationAction.of("Install", () -> ran.add("install")))
+            .withAction(new NotificationAction("Later", () -> ran.add("later"), false))
+            .withAction(new NotificationAction("Break", () -> { throw new IllegalStateException("broken action"); }, false))
+            .withActivate(() -> ran.add("body"))));
+        h.flush();
+        assertThat(h.runNotificationAction("Update ready", "Later")).isTrue();
+        assertThat(h.runNotificationAction("Update ready", "Break")).as("contained, not thrown").isTrue();
+        assertThat(h.clickNotification("Update ready")).isTrue();
+        assertThat(h.notifications()).singleElement().asString().endsWith("|live");
+        assertThat(h.runNotificationAction("Update ready", "Install")).isTrue();
+        assertThat(h.notifications()).singleElement().asString().endsWith("|expired");
+        assertThat(h.runNotificationAction("Update ready", "Later")).as("an expired notification's links stop working").isFalse();
+        assertThat(ran).containsExactly("later", "body", "install");
+    }
+
+    @Test void aHandleExpiresItsNotificationAndStoppingExpiresTheRest() {
+        PluginContext a = started("test.a", Set.of());
+        var handle = new AtomicReference<NotificationHandle>();
+        h.ui(() -> {
+            handle.set(a.notifications().group().info("First", ""));
+            a.notifications().group().info("Second", "");
+        });
+        h.flush();
+        handle.get().expire();
+        h.flush();
+        assertThat(handle.get().expired()).isTrue();
+        assertThat(h.notifications()).containsExactly("test.a|INFO|First||-|-|-|expired", "test.a|INFO|Second||-|-|-|live");
+        h.stopAll();
+        h.flush();
+        assertThat(h.notifications()).allSatisfy(line -> assertThat(line).endsWith("|expired"));
+        assertThatIllegalStateException().as("a closed context refuses posts").isThrownBy(() -> a.notifications().group().info("Late", ""));
+    }
+
+    @Test void aPostFromAnyThreadArrivesAndItsCauseIsMarked() throws Exception {
+        PluginContext a = started("test.a", Set.of());
+        Thread worker = Thread.ofPlatform().start(() ->
+            a.notifications().group().error("Could not copy the address", new IllegalStateException("clipboard busy")));
+        worker.join();
+        h.flush();
+        assertThat(h.notifications())
+            .containsExactly("test.a|ERROR|Could not copy the address|IllegalStateException: clipboard busy|-|cause|-|live");
+    }
+
     @Test void browseOpensOnlyWebAddressesAndReachesTheHost() {
         PluginContext a = started("test.a", Set.of());
         h.ui(() -> {
