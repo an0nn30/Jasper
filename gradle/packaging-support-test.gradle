@@ -28,3 +28,49 @@ def verifySupport = tasks.register('verifyPackagingSupport') {
     }
 }
 tasks.named('check') { dependsOn(verifySupport) }
+
+verifySupport.configure {
+    doLast {
+        def mac = bundledNatives('macos', 'aarch64')
+        assert mac*.path == ['native/libflatlaf-macos-arm64.dylib', 'native/libjnidispatch.jnilib',
+            'native/darwin/libpty.dylib', 'native/darwin/pty4j-unix-spawn-helper']
+        assert mac*.entry == ['com/formdev/flatlaf/natives/libflatlaf-macos-arm64.dylib',
+            'com/sun/jna/darwin-aarch64/libjnidispatch.jnilib', 'resources/com/pty4j/native/darwin/libpty.dylib',
+            'resources/com/pty4j/native/darwin/pty4j-unix-spawn-helper']
+        assert mac.findAll { it.executable }*.path == ['native/darwin/pty4j-unix-spawn-helper']
+        assert mac.findAll { it.loaded }*.path == ['native/libflatlaf-macos-arm64.dylib', 'native/libjnidispatch.jnilib']
+        assert bundledNatives('macos', 'x64')*.entry.take(2) == ['com/formdev/flatlaf/natives/libflatlaf-macos-x86_64.dylib',
+            'com/sun/jna/darwin-x86-64/libjnidispatch.jnilib']
+        assert bundledNatives('windows', 'x64')*.path == ['native/flatlaf-windows-x86_64.dll', 'native/jnidispatch.dll',
+            'native/win/x86-64/conpty.dll', 'native/win/x86-64/OpenConsole.exe', 'native/win/x86-64/cyglaunch.exe',
+            'native/win/x86-64/win-helper.dll', 'native/win/x86-64/winpty-agent.exe', 'native/win/x86-64/winpty.dll']
+        assert bundledNatives('windows', 'x64').findAll { it.loaded }*.path == ['native/flatlaf-windows-x86_64.dll', 'native/jnidispatch.dll']
+        assert bundledNatives('linux', 'x64').isEmpty() && bundledNatives('linux', 'aarch64').isEmpty()
+        // Each pattern names exactly its own jar among the packaged ones.
+        List<String> jars = ['flatlaf-3.7.jar', 'flatlaf-extras-3.7.jar', 'jna-5.14.0.jar', 'jna-platform-5.14.0.jar', 'pty4j-0.13.10.jar']
+        assert mac.collect { nativeFile -> jars.findAll { it ==~ nativeFile.jar } } ==
+            [['flatlaf-3.7.jar'], ['jna-5.14.0.jar'], ['pty4j-0.13.10.jar'], ['pty4j-0.13.10.jar']]
+        assert bundledNativeJvmOptions('macos') == ['-Dflatlaf.nativeLibraryPath=$APPDIR/native',
+            '-Djna.boot.library.path=$APPDIR/native', '-Djna.nosys=true', '-Dpty4j.preferred.native.folder=$APPDIR/native']
+        assert bundledNativeJvmOptions('windows') == bundledNativeJvmOptions('macos')
+        assert bundledNativeJvmOptions('linux').isEmpty()
+
+        // An app folder with a space, as under "/Applications/My Apps"; Windows writes CRLF.
+        File spaced = new File(temporaryDir, 'My Apps/Jasper.app/Contents/app')
+        String root = spaced.absolutePath
+        String config = '[Application]\napp.classpath=$APPDIR/jasper-app.jar\napp.mainclass=dev.jasper.app.Main\n' +
+            'app.classpath=$APPDIR/flatlaf-3.7.jar\n\n[JavaOptions]\njava-options=-Djpackage.app-version=1.0.0\n' +
+            'java-options=-Dflatlaf.nativeLibraryPath=$APPDIR/native\n'
+        assert launcherClasspath(config, spaced) == ["${root}/jasper-app.jar", "${root}/flatlaf-3.7.jar"]*.toString()
+        assert launcherJavaOptions(config, spaced) == ['-Djpackage.app-version=1.0.0', "-Dflatlaf.nativeLibraryPath=${root}/native".toString()]
+        assert launcherClasspath(config.replace('\n', '\r\n'), spaced) == launcherClasspath(config, spaced)
+        String log = '[0.212s][info][library] Loaded library /a b/native/libjnidispatch.jnilib, handle 0x000000007549ce80\n' +
+            '[0.212s][info][library] Found JNI_OnLoad in library with handle 0x000000007549ce80\n' +
+            '[0.300s][info][library] Loaded library C:\\J\\app\\native\\jnidispatch.dll, handle 0x00007ffa12340000\n'
+        assert loadedLibraries(log) == ['/a b/native/libjnidispatch.jnilib', 'C:\\J\\app\\native\\jnidispatch.dll']
+        logger.lifecycle('Verified bundled natives and launcher configuration parsing')
+    }
+}
+
+// BundledNativesProbeTest runs the probe with the packaged launcher's own native-library options.
+tasks.named('test', Test) { systemProperty('jasper.bundledNativeOptions', bundledNativeJvmOptions('macos').join('\n')) }

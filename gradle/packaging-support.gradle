@@ -38,3 +38,61 @@ ext.runtimeModules = { String os ->
 // default leaves lib/modules uncompressed, which loads classes faster. No --strip-native-commands: bin/java stays,
 // because the JVM runs it to assemble the AOT cache at the end of a training launch.
 ext.jlinkOptions = '--strip-debug --no-man-pages --no-header-files --generate-cds-archive'
+
+// Native libraries the packaged app loads from its app directory's native/ folder instead of extracting a copy with
+// a new random name on every launch, which also defeats macOS's code-signature cache and the endpoint-security
+// agent's. Each is copied byte for byte from its jar, so it keeps its vendor signature. Linux keeps extraction:
+// FlatLaf's Linux library links GTK 3, which would become a package dependency. Keys: jar, the jar's file-name pattern;
+// entry, the resource in it; path, where it goes under the app directory; executable, needs the execute bit; loaded,
+// the JVM's System.load opens it, so -Xlog:library lists it (JNA opens pty4j's libraries with its own dlopen).
+ext.bundledNatives = { String os, String architecture ->
+    String flatLaf = 'flatlaf-[0-9][^/]*[.]jar', jna = 'jna-[0-9][^/]*[.]jar', pty4j = 'pty4j-[0-9][^/]*[.]jar'
+    if (os == 'macos') {
+        String flatLafArchitecture = architecture == 'aarch64' ? 'arm64' : 'x86_64'
+        String jnaArchitecture = architecture == 'aarch64' ? 'aarch64' : 'x86-64'
+        return [
+            [jar: flatLaf, entry: "com/formdev/flatlaf/natives/libflatlaf-macos-${flatLafArchitecture}.dylib".toString(),
+             path: "native/libflatlaf-macos-${flatLafArchitecture}.dylib".toString(), executable: false, loaded: true],
+            [jar: jna, entry: "com/sun/jna/darwin-${jnaArchitecture}/libjnidispatch.jnilib".toString(),
+             path: 'native/libjnidispatch.jnilib', executable: false, loaded: true],
+            [jar: pty4j, entry: 'resources/com/pty4j/native/darwin/libpty.dylib', path: 'native/darwin/libpty.dylib',
+             executable: false, loaded: false],
+            [jar: pty4j, entry: 'resources/com/pty4j/native/darwin/pty4j-unix-spawn-helper',
+             path: 'native/darwin/pty4j-unix-spawn-helper', executable: true, loaded: false],
+        ]
+    }
+    if (os == 'windows') {
+        return [
+            [jar: flatLaf, entry: 'com/formdev/flatlaf/natives/flatlaf-windows-x86_64.dll',
+             path: 'native/flatlaf-windows-x86_64.dll', executable: false, loaded: true],
+            [jar: jna, entry: 'com/sun/jna/win32-x86-64/jnidispatch.dll', path: 'native/jnidispatch.dll',
+             executable: false, loaded: true],
+        ] + ['conpty.dll', 'OpenConsole.exe', 'cyglaunch.exe', 'win-helper.dll', 'winpty-agent.exe', 'winpty.dll'].collect { String name ->
+            [jar: pty4j, entry: "resources/com/pty4j/native/win/x86-64/${name}".toString(),
+             path: "native/win/x86-64/${name}".toString(), executable: false, loaded: false]
+        }
+    }
+    []
+}
+
+// The launcher options that point FlatLaf, JNA and pty4j at those files ($APPDIR is the launcher's app directory).
+// pty4j looks in native/darwin or native/win/x86-64 below its folder. jna.nosys keeps JNA off java.library.path.
+// No jna.noclasspath or jna.nounpack: JNA's properties are process-wide, and a plugin that bundles its own JNA must
+// still be able to extract its own copy (docs/plugin-authoring.md, "The Java runtime").
+ext.bundledNativeJvmOptions = { String os ->
+    os in ['macos', 'windows'] ? ['-Dflatlaf.nativeLibraryPath=$APPDIR/native', '-Djna.boot.library.path=$APPDIR/native',
+        '-Djna.nosys=true', '-Dpty4j.preferred.native.folder=$APPDIR/native'] : []
+}
+
+// A jpackage launcher configuration's class path and JVM options, in file order, with $APPDIR resolved to appDir.
+ext.launcherClasspath = { String config, File appDir ->
+    config.readLines().findAll { it.startsWith('app.classpath=') }
+        .collect { it.substring('app.classpath='.length()).replace('$APPDIR', appDir.absolutePath) }
+}
+ext.launcherJavaOptions = { String config, File appDir ->
+    config.readLines().findAll { it.startsWith('java-options=') }
+        .collect { it.substring('java-options='.length()).replace('$APPDIR', appDir.absolutePath) }
+}
+
+// The files -Xlog:library reports as loaded ("Loaded library <path>, handle 0x...").
+ext.loadedLibraries = { String log -> (log =~ /Loaded library (.+), handle 0x\p{XDigit}+/).collect { it[1] } }

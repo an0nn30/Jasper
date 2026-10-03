@@ -173,6 +173,27 @@ def resignImage = { File image ->
         image.absolutePath], 'codesign after bundle edits')
 }
 
+// The bytes of one bundled native library (gradle/packaging-support.gradle), read from its jar in the image's app directory.
+def bundledNativeBytes = { File appDir, Map nativeFile ->
+    List<File> jars = (appDir.listFiles() ?: [] as File[]).findAll { it.name ==~ nativeFile.jar }
+    if (jars.size() != 1) throw new GradleException("Expected one jar matching ${nativeFile.jar} in ${appDir}, found ${jars*.name}")
+    new ZipFile(jars[0]).withCloseable { zip ->
+        def entry = zip.getEntry(nativeFile.entry)
+        if (entry == null) throw new GradleException("${jars[0].name} has no ${nativeFile.entry}; update bundledNatives in gradle/packaging-support.gradle")
+        zip.getInputStream(entry).withCloseable { it.readAllBytes() }
+    }
+}
+
+// Copies the host's bundled native libraries into the image's app directory, byte for byte.
+def installBundledNatives = { File appDir, Map host ->
+    bundledNatives(host.os, host.architecture).each { Map nativeFile ->
+        File target = new File(appDir, nativeFile.path)
+        target.parentFile.mkdirs()
+        target.bytes = bundledNativeBytes(appDir, nativeFile)
+        if (nativeFile.executable) target.setExecutable(true, false)
+    }
+}
+
 def stage = tasks.register('stagePackage', Sync) {
     group = 'distribution'
     description = 'Stages the application JAR, runtime dependencies, configuration example and package guide.'
@@ -204,6 +225,8 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('jvmArgs', providers.provider { app.applicationDefaultJvmArgs.collect { it.toString() } })
     inputs.property('runtimeRootModules', providers.provider { runtimeRootModules(normalizedHost().os) })
     inputs.property('jlinkOptions', jlinkOptions)
+    inputs.property('bundledNatives', providers.provider { bundledNatives(normalizedHost().os, normalizedHost().architecture).collect { it.toString() } })
+    inputs.property('bundledNativeOptions', providers.provider { bundledNativeJvmOptions(normalizedHost().os) })
     inputs.property('localNetworkUsage', localNetworkUsage)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
@@ -228,6 +251,7 @@ def packageApp = tasks.register('packageApp') {
             '--add-modules', runtimeRootModules(context.host.os).join(','),
             '--jlink-options', jlinkOptions]
         app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
+        bundledNativeJvmOptions(context.host.os).each { args.addAll(['--java-options', it]) }
         if (context.host.os == 'macos') {
             args.addAll(['--mac-package-identifier', 'dev.jasper.app', '--mac-package-name', 'Jasper'])
         }
@@ -236,6 +260,8 @@ def packageApp = tasks.register('packageApp') {
             if (context.host.os == 'macos') {
                 File image = new File(imageDir, 'Jasper.app')
                 removePluginClasspath(new File(image, 'Contents/app/Jasper.cfg'))
+                // After jpackage, which re-signs native inputs: these keep their vendor signatures, sealed by resignImage below.
+                installBundledNatives(new File(image, 'Contents/app'), context.host)
                 Files.copy(macIconCatalog.toPath(), new File(image, 'Contents/Resources/Assets.car').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleIconName', '-string', macIconName,
@@ -256,6 +282,7 @@ def packageApp = tasks.register('packageApp') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
+                installBundledNatives(new File(imageDir, 'Jasper/app'), context.host)
             }
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
@@ -269,6 +296,8 @@ def verifyPackage = tasks.register('verifyPackage') {
     group = 'verification'
     description = 'Verifies the generated native image and bundled runtime without launching Jasper.'
     dependsOn(packageApp)
+    // BundledNativesProbe lives in the test sources: verification tooling, never in the application jar.
+    if (normalizedHost().os in ['macos', 'windows']) dependsOn(tasks.named('testClasses'))
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.upToDateWhen { false }
@@ -305,6 +334,14 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (!cfg.contains("app.mainclass=${app.mainClass.get()}")) throw new GradleException('Package verification failed: wrong main class in Jasper.cfg')
         if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Jasper')) {
             throw new GradleException('Package verification failed: required JVM options are missing from Jasper.cfg')
+        }
+        // Part 2 adds no JVM tuning flags: only the application's own options, the bundled-native options and
+        // jpackage's app version may appear (trainAotCache adds -XX:AOTCache on macOS).
+        List<String> cfgOptions = cfg.readLines().findAll { it.startsWith('java-options=') }.collect { it.substring('java-options='.length()) }
+        List<String> requiredOptions = app.applicationDefaultJvmArgs.collect { it.toString() } + bundledNativeJvmOptions(context.host.os)
+        List<String> permittedOptions = requiredOptions + ["-Djpackage.app-version=${context.version}".toString()]
+        if (cfgOptions != cfgOptions.toUnique() || !cfgOptions.containsAll(requiredOptions) || !(cfgOptions - permittedOptions).isEmpty()) {
+            throw new GradleException("Package verification failed: Jasper.cfg's JVM options are ${cfgOptions}; expected ${requiredOptions} and jpackage's app version")
         }
         String normalizedCfg = cfg.replace('\\', '/')
         configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
@@ -371,6 +408,19 @@ def verifyPackage = tasks.register('verifyPackage') {
                 boolean hasPayload = zip.entries().any { entry -> !entry.directory && entry.name.startsWith(expected.prefix) }
                 if (!hasPayload) throw new GradleException("Package verification failed: ${nativeJar.name} lacks a host native payload")
             } finally { zip.close() }
+        }
+        // Bundled native libraries: present, byte-identical to their jar entries (so their vendor signatures hold),
+        // executable where needed and, on macOS, validly signed.
+        List<Map> natives = bundledNatives(context.host.os, context.host.architecture)
+        natives.each { Map nativeFile ->
+            File packaged = new File(appDir, nativeFile.path)
+            if (!packaged.isFile() || !Arrays.equals(bundledNativeBytes(appDir, nativeFile), Files.readAllBytes(packaged.toPath()))) {
+                throw new GradleException("Package verification failed: ${nativeFile.path} is missing or differs from ${nativeFile.entry}")
+            }
+            if (nativeFile.executable && !packaged.canExecute()) throw new GradleException("Package verification failed: ${nativeFile.path} is not executable")
+            if (context.host.os == 'macos') {
+                executeNative(['/usr/bin/codesign', '--verify', '--strict', packaged.absolutePath], "signature of ${nativeFile.path}")
+            }
         }
         if (context.host.os == 'macos') {
             File notificationBridge = new File(appDir, 'libjasper-notifications.dylib')
@@ -475,6 +525,40 @@ def verifyPackage = tasks.register('verifyPackage') {
         runtimeHome.eachFileRecurse(groovy.io.FileType.FILES) { runtimeBytes += it.length() }
         logger.lifecycle("Runtime: ${packagedModules.size()} modules, ${runtimeBytes.intdiv(1024 * 1024)} MB, " +
             "default CDS archive ${cdsArchive.length().intdiv(1024 * 1024)} MB")
+        if (natives) {
+            // Headless: the image's java, launcher options and class path load every bundled library and start one
+            // process through pty4j. -Xlog:library shows where the JVM loaded each library from, the probe prints the
+            // files pty4j resolved, and the scratch home and temporary folders must stay empty (nothing extracted).
+            File scratch = new File(temporaryDir, 'natives-probe')
+            delete(scratch)
+            ['home', 'tmp'].each { new File(scratch, it).mkdirs() }
+            List<String> probe = ([bundledJava.absolutePath] +
+                launcherJavaOptions(cfg, appDir).findAll { !it.startsWith('-XX:AOTCache=') } +
+                ['-Djava.awt.headless=true', "-Duser.home=${new File(scratch, 'home')}", "-Djava.io.tmpdir=${new File(scratch, 'tmp')}",
+                 "-Djna.tmpdir=${new File(scratch, 'jna')}", "-Dpty4j.tmpdir=${new File(scratch, 'pty4j')}", '-Xlog:library=info:stdout',
+                 '-cp', (launcherClasspath(cfg, appDir) + sourceSets.test.output.classesDirs.files*.absolutePath).join(File.pathSeparator),
+                 'dev.jasper.app.architecture.BundledNativesProbe'])*.toString()
+            String output = executeNative(probe, 'bundled natives probe (headless)').stdout
+            if (!output.contains('bundled natives probe passed')) throw new GradleException("Package verification failed: the natives probe did not finish\n${output}")
+            Set<File> loaded = loadedLibraries(output).collect { new File(it).canonicalFile } as Set
+            natives.findAll { it.loaded }.each { Map nativeFile ->
+                if (!loaded.contains(new File(appDir, nativeFile.path).canonicalFile)) {
+                    throw new GradleException("Package verification failed: the JVM did not load ${nativeFile.path} from the image; it loaded\n${loaded.join('\n')}")
+                }
+            }
+            File nativeRoot = new File(appDir, 'native').canonicalFile
+            def resolved = (output =~ /(?m)^pty4j (\S+) (.+)$/).collect { [name: it[1], file: new File(it[2].trim()).canonicalFile] }
+            if (!resolved) throw new GradleException("Package verification failed: the natives probe reported no pty4j files\n${output}")
+            resolved.each { pty ->
+                if (!pty.file.isFile() || !pty.file.path.startsWith(nativeRoot.path + File.separator)) {
+                    throw new GradleException("Package verification failed: pty4j resolved ${pty.name} to ${pty.file}, not a file under ${nativeRoot}")
+                }
+            }
+            List<File> extracted = []
+            scratch.eachFileRecurse(groovy.io.FileType.FILES) { extracted << it }
+            if (extracted) throw new GradleException("Package verification failed: loading the natives extracted ${extracted}")
+            logger.lifecycle("Bundled natives load from ${nativeRoot}")
+        }
         logger.lifecycle("Verified Jasper ${context.version} ${context.host.os}-${context.host.architecture} image at ${image}")
     }
 }
