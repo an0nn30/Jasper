@@ -16,10 +16,13 @@ WiX.
 On macOS:
 
 ```bash
-./gradlew check :jasper-app:packageDist
+./gradlew check :jasper-app:packageDist   # trains the AOT cache: a Jasper window for a few seconds
 ./gradlew :jasper-app:verifyPackage
 ./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
 ```
+
+On macOS, `packageDist` launches the packaged app once to train its start-up cache; run it from your desktop session.
+See [Start-up performance](#start-up-performance).
 
 On Windows:
 
@@ -176,6 +179,62 @@ failed with `ExceptionInInitializerError`. `packageApp` removes the `plugins/` e
 `Jasper.cfg` (then re-signs on macOS), and `verifyPackage` fails if any remain.
 `./gradlew :jasper-app:run` never had them on the classpath.
 
+## Start-up performance
+
+Part 2 of the [start-up design](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) makes the packaged app
+start faster without application code. `gradle/packaging-support.gradle` holds the lists and helpers;
+`verifyPackagingSupport` (part of `check`) tests them with fixtures, and `verifyPackage` checks a built image.
+
+- **Trimmed runtime.** jpackage gets an explicit module list (`runtimeRootModules`) instead of every module with
+  `--bind-services`, which also bound javac, jshell, jlink, jpackage and JBR's JCEF and JOGL. The list is the runtime
+  plugins may rely on ([The Java runtime](plugin-authoring.md#the-java-runtime)): 41 modules, 42 on Windows.
+  `verifyPackage` fails when the packaged runtime has other modules or when `jdeps` finds that the application or a
+  bundled plugin needs one it lacks, and logs the runtime's size. `lib/modules` stays uncompressed (jlink's default),
+  which loads classes faster; `bin/java` stays because the AOT cache assembly runs it. This does not shrink the
+  runtime on disk: `lib/modules` fell from 146 MB to 96 MB, but jlink now writes two default CDS archives
+  (`classes.jsa`, 31 MB, and `classes_nocoops.jsa`, 32 MB), so the runtime is 189 MB against 192 MB before.
+- **Default CDS archive.** jlink's `--generate-cds-archive` writes `lib/server/classes.jsa` (`bin\server` on Windows),
+  the fallback whenever the AOT cache cannot be used, and `classes_nocoops.jsa` for heaps too large for compressed
+  object pointers. `verifyPackage` runs the bundled `java -Xshare:on`.
+- **Native libraries in the app (macOS and Windows).** FlatLaf's window library, JNA's dispatch library and pty4j's
+  `libpty` and spawn helper (its ConPTY files on Windows) are copied byte for byte from their jars into
+  `Contents/app/native/` (`app\native\`), keeping their vendor signatures, and `Jasper.cfg` points the libraries there
+  (`flatlaf.nativeLibraryPath`, `jna.boot.library.path` with `jna.nosys`, `pty4j.preferred.native.folder`). No launch
+  extracts a copy under a new name, so macOS can reuse its signature checks. `verifyPackage` compares each file with its
+  jar, checks its signature on macOS and runs `BundledNativesProbe` headless with the image's runtime, options and class
+  path: `-Xlog:library` must show each library loaded from the image, and the probe's temporary folders must stay
+  empty. Linux keeps extraction: FlatLaf's Linux library links GTK 3, which would become a package dependency.
+- **AOT cache (macOS).** `trainAotCache` launches the freshly built image once and records a JDK 25 AOT cache,
+  `Contents/app/jasper.aot` (60 MB), then adds `-XX:AOTCache=$APPDIR/jasper.aot` to `Jasper.cfg` and re-signs.
+  `packageDist` always trains; `packageApp` trains only with `-Pjasper.aot=true`. The cache holds the JDK's and the
+  application class path's classes, not plugin classes, which come from their own class loaders. `verifyPackage` runs
+  the image's `java -XX:AOTMode=on` with the launcher's options and class path, which fails for a stale or broken cache
+  and reports the JVM's output. `Jasper.cfg` carries no other JVM tuning: C1-only compilation and SerialGC measured no
+  gain.
+
+### Training the AOT cache
+
+The training launch is isolated like `startupBench`: a temporary `user.home` under
+`jasper-app/build/packaging/aot-training/` whose configuration replaces the login shell with a stand-in that prints
+one prompt and discards input, keeps residency off and enables the bundled plugins, plus `-Dapple.awt.UIElement=true`
+(no Dock icon or menu bar) and `-Djasper.startupTrace`. It needs your desktop session: a Jasper window appears for a
+few seconds where macOS places new windows, and anything typed into it goes to the stand-in. When the trace reports
+start-up settled with the shell's output painted and every plugin bound, the task sends SIGTERM and the JVM assembles
+the cache as it exits; the launch takes about 13 s, then the assembly. A launch that exits early, never settles, or
+settles without its window, output or plugins fails the task. The trace, the log and the isolated home stay in
+`aot-training/` for diagnosis.
+
+### Keeping the cache valid
+
+The JVM uses the cache only while every class-path jar keeps the size and modification time it had at training;
+otherwise it logs an error and starts without the cache and without the CDS archive, slower than an untrained app.
+The JVM prints that error on standard output, not standard error, so capture stdout when you run the image's `java`
+with `-XX:AOTMode=on` by hand.
+Moving the app or copying it with Finder, `ditto` or the DMG keeps the times; `cp -R` and some sync tools do not.
+jpackage's own DMG step copies without times, so `packageDist` builds the DMG with `ditto` and `hdiutil`, mounts it
+read-only and hidden from Finder, and checks the installed copy's times, signature and cache. The DMG holds
+`Jasper.app` and an `Applications` link, without jpackage's background picture; it is about 156 MB.
+
 ## macOS Local Network access
 
 macOS asks before a Finder-launched app connects to the local network. A blocked connection
@@ -231,6 +290,9 @@ acceptance remain unexecuted on macOS.
 ### macOS
 
 - [ ] Open the DMG, drag Jasper to Applications, and launch it from Finder and from the Dock.
+- [ ] After installing from the DMG with Finder, launch Jasper from the Dock: the start-up line in `~/.config/jasper/logs` reports the AOT cache as used.
+- [ ] After several launches, no new `pty4j` folders or `libflatlaf-macos-*` files appear in `$TMPDIR` and nothing new appears in `~/Library/Caches/JNA/temp`.
+- [ ] Copy the installed app with `cp -R` to another folder and launch the copy: it starts, and its start-up line reports the cache as stale.
 - [ ] Confirm the Ember Jasper icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
 - [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
 - [ ] Confirm native title controls and switching between the bundled Light and Dark themes.
@@ -259,6 +321,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Install a higher version over an existing installation; confirm one Installed apps entry and preserved settings, Vault data, and plugins.
 - [ ] Uninstall through Windows Installed apps; confirm program files and shortcuts are removed while Jasper's user data remains.
 - [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Jasper.exe` from Explorer.
+- [ ] Confirm `app\native\` holds FlatLaf's DLL, `jnidispatch.dll` and pty4j's `win\x86-64` files, and that launching Jasper creates no `flatlaf-windows-*` file, `jna*.tmp` file or `pty4j` folder under `%TEMP%`.
 - [ ] Confirm the Ember Jasper icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
 - [ ] Confirm clipboard operations and tab shortcuts.

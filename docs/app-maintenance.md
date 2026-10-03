@@ -159,6 +159,24 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*StartupResourcesTest" --tests "*ApplicationBootstrapRollbackTest" --tests "*MacTitleBarTest"
 ```
 
+## Packaged runtime, bundled natives and the AOT cache
+
+`gradle/packaging-support.gradle` holds what packaging decides: the runtime's modules, the native libraries copied into
+the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with fixtures; `verifyPackage`
+checks a built image ([start-up performance](packaging.md#start-up-performance)).
+
+- **A plugin or library needs another JDK module.** Add it to `runtimeRootModules` (and to the required list in
+  `runtimeModules` when it pulls in a module not yet listed), add it to the `runtime-modules` block of
+  [The Java runtime](plugin-authoring.md#the-java-runtime), and rebuild: `verifyPackagingSupport` fails until the
+  documented list matches, and `verifyPackage`'s `jdeps` check names any module a bundled plugin still lacks.
+- **Upgrading FlatLaf, JNA or pty4j.** Check that the resources in `bundledNatives` still exist under the same names
+  and that the properties in `bundledNativeJvmOptions` still apply. `BundledNativesProbeTest` (macOS, in `check`)
+  loads them from a folder laid out like the image; `verifyPackage` fails when a jar lacks an entry or the image loads
+  a library from elsewhere.
+- **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
+  trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
+  `-Pjasper.aot=true`.
+
 ## Session lifecycle change
 
 Begin with [SessionLaunchCoordinator](../jasper-app/src/main/java/dev/jasper/app/application/SessionLaunchCoordinator.java), [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/launch/ShellLauncher.java) and [TerminalPane](../jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java). Capture launch settings when requested, start off EDT, and validate lifetime after delivery to EDT. Close a late returned session and never attach it. Pane close owns admitted sessions; application shutdown stops admission and waits off EDT via ApplicationShutdown. Keep the coordinator drain future in that wait so accepted launch workers and their late children remain tracked even if no session existed at shutdown start. Register endpoint/process cleanup through JasperApplication.onShutdown: it runs on a daemon worker within the bounded application wait, so callbacks must not touch Swing. Keep TERM/COLORTERM and the terminal library threading contract. This example builds options only; it launches no shell.

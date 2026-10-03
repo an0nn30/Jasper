@@ -38,3 +38,11 @@ package no longer matches its jars (for example after a copy that did not keep m
 having none. Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …, output painted …
 after the request`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the start-up benchmark
 uses it.
+
+## Start-up cache (packaged macOS app)
+
+The packaged macOS app starts with an AOT cache (`Contents/app/jasper.aot`) trained when it was built, and the start-up
+line in the log says whether the JVM used it. If it reports the cache as stale, a copy changed the application's file
+modification times (for example `cp -R`): Jasper works, but starts slower than an app without a cache, because the JVM
+then also skips the runtime's default CDS archive. Reinstall from the DMG with Finder. See
+[keeping the cache valid](packaging.md#keeping-the-cache-valid).

@@ -2,6 +2,22 @@
 
 ## Current state — 2026-10-02
 
+- **Start-up Part 2: JVM and packaging** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
+  plan `docs/superpowers/plans/2026-10-02-startup-2-jvm-packaging.md`): packaged Jasper ships a trimmed runtime (41
+  modules, 42 on Windows; `runtimeRootModules` in `gradle/packaging-support.gradle`, documented in plugin-authoring
+  "The Java runtime"; 189 MB, was 192 MB: `lib/modules` fell from 146 to 96 MB, but jlink's two default CDS archives
+  add 63 MB, so there is no disk-size win) with jlink's default CDS archive; loads FlatLaf's, JNA's and pty4j's
+  native libraries from `Contents/app/native` on macOS and Windows (Linux keeps extraction: FlatLaf's Linux library
+  links GTK 3); and on macOS carries a JDK 25 AOT cache (60 MB) from `trainAotCache` (`packageDist` always trains,
+  `packageApp` with `-Pjasper.aot=true`; AGENTS.md: ask first, it opens a window). `packageDist` builds the DMG
+  (155.7 MB) with `ditto` and `hdiutil` because jpackage's DMG copy resets modification times, which invalidates the
+  cache, and checks the mounted copy. `verifyPackage` checks modules, CDS, natives (bytes, signatures, a headless load
+  probe), JVM options and the cache (`-XX:AOTMode=on`). The JVM prints AOT cache errors on stdout, not stderr. Full
+  check: **7,991/0/0/6**. Not done: the before/after start-up comparison (`startupBench`, 10 cold launches of the
+  Plan 1 image and of the trained image; pending, run by the controller with the user's approval, then recorded in
+  `docs/benchmarks/2026-10-02-startup-baseline.md`), Windows packaging run (not verifiable on the Mac), the GUI
+  checklist items in `docs/packaging.md`, push.
+
 - **Start-up speed: designed, measured and planned; Plan 1 executed** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, from local `main@91400d29`; user request in chat 2026-10-02).
   [Spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) approved section by section. Measured Dock click

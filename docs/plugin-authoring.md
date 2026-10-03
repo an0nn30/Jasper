@@ -619,6 +619,11 @@ library that needs one of them fails with `NoClassDefFoundError` in the packaged
 `./gradlew :jasper-app:run`, which uses the full SDK. Bundle a jar instead, or ask for the module to be added
 (`runtimeRootModules` in `gradle/packaging-support.gradle`).
 
+The packaged JVM loads JNA's native library from Jasper's own copy (`jna.boot.library.path`, JNA 5.14.0) and points
+pty4j at Jasper's bundled files (`pty4j.preferred.native.folder`). Both properties are process-wide. A plugin that
+bundles JNA should bundle the same version: another version fails to load its native part if it is the first in the
+process to initialise JNA. Start terminals through `context.terminals()` rather than a pty4j of your own.
+
 ## Distributing a plugin
 
 Zip your plugin's jars, either at the root of the zip or inside one folder; everything else in the

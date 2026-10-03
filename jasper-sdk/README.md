@@ -24,6 +24,9 @@ Start with the [authoring guide](../docs/plugin-authoring.md); the
 [architecture](../docs/sdk-architecture.md) explains loading, threading and lifetimes.
 Unit-test a plugin with `dev.jasper.sdk.testing.FakePluginHost` from `jasper-sdk-testkit`.
 
+Packaged Jasper ships a trimmed Java runtime: [The Java runtime](../docs/plugin-authoring.md#the-java-runtime) lists
+the JDK modules a plugin may rely on.
+
 ## Icons (SDK 0.8)
 
 ```java
