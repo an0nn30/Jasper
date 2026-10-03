@@ -169,12 +169,12 @@ class ResidentIndicatorTest {
         StartupTrace trace = StartupTrace.detached();
         JasperApplication application = application(() -> { }, indicator, trace);
         try {
-            fallback(application, Duration.ofMillis(50));
+            fallback(application, Duration.ofMillis(250));
             resident(application);
             trace.mark(StartupTrace.Milestone.FIRST_PAINT);
             edt(() -> { });
             edt(() -> application.residency(false));
-            Thread.sleep(200);
+            Thread.sleep(500);
             edt(() -> { });
             assertThat(indicator.shown()).hasValue(0);
         } finally {

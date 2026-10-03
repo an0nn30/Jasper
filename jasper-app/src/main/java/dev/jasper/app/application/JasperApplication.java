@@ -77,6 +77,8 @@ public final class JasperApplication {
     private final ConfigurationController configuration;
     private boolean quitting;
     private boolean resident;
+    /** A packaged macOS Jasper's Dock presence while resident; null where Quit really quits (Windows, Linux, development runs). */
+    private volatile DockPresence dock;
     private volatile StartupTrace trace = StartupTrace.current();
     private int windowsOpened;
     /**
@@ -220,14 +222,7 @@ public final class JasperApplication {
             updateMigrateAction();
         });
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
-            Desktop.getDesktop().setQuitHandler((event, response) -> {
-                response.cancelQuit();
-                SwingUtilities.invokeLater(() -> {
-                    var focused = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
-                    var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.META_DOWN_MASK);
-                    if (!dev.jasper.app.platform.WindowInput.captureShortcut(focused, stroke)) quit();
-                });
-            });
+            Desktop.getDesktop().setQuitHandler((event, response) -> nativeQuitRequested(response));
             quitHandlerInstalled = true;
         }
         // Clicking the Dock icon of a running Jasper creates no process: AppKit sends this instead.
@@ -310,37 +305,53 @@ public final class JasperApplication {
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
             () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem);
-        TerminalWindow window = new TerminalWindow(new WindowCallbacks(
-            requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quit,
-            this::windowActivated, this::windowClosed,
-            state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-            launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
-        if (configuration != null) configuration.register(window.content());
-        window.content().connectContributions(contributions, uiState);
-        window.content().connectTerminals(terminals, window::toFront);
-        window.content().onToggleBuddy = this::toggleBuddy;
-        window.content().onFirstTerminal(pane -> timeFirstTerminal(pane, windowTrace));
-        window.content().buddyEnabled = this::buddyEnabled;
-        window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
-        window.content().activity(event -> {
-            switch (event) {
-                case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
-                    value.elapsedNanos(), value.activate(), value.watched());
-                case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
-                    value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
-                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), value.activate());
-                case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
-                case WorkspaceActivity.PaneState value -> {
-                    switch (value.state()) {
-                        case OPENED -> notifications.opened(value.id());
-                        case CLOSED -> notifications.closed(value.id());
-                        case FOCUSED -> notifications.looked(value.id());
-                        case BLURRED -> notifications.hidden(value.id());
+        // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
+        // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
+        windowOpening();
+        TerminalWindow window = null;
+        try {
+            window = new TerminalWindow(new WindowCallbacks(
+                requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quitRequested,
+                this::windowActivated, this::windowClosed,
+                state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
+                launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
+            if (configuration != null) configuration.register(window.content());
+            window.content().connectContributions(contributions, uiState);
+            window.content().connectTerminals(terminals, window::toFront);
+            window.content().onToggleBuddy = this::toggleBuddy;
+            window.content().onFirstTerminal(pane -> timeFirstTerminal(pane, windowTrace));
+            window.content().buddyEnabled = this::buddyEnabled;
+            window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
+            window.content().activity(event -> {
+                switch (event) {
+                    case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
+                        value.elapsedNanos(), value.activate(), value.watched());
+                    case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
+                        value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
+                            value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), value.activate());
+                    case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
+                    case WorkspaceActivity.PaneState value -> {
+                        switch (value.state()) {
+                            case OPENED -> notifications.opened(value.id());
+                            case CLOSED -> notifications.closed(value.id());
+                            case FOCUSED -> notifications.looked(value.id());
+                            case BLURRED -> notifications.hidden(value.id());
+                        }
                     }
                 }
+            });
+            windows.add(window); window.show();
+        } catch (RuntimeException | Error failure) {
+            // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
+            try {
+                if (window != null) window.close();
+            } catch (RuntimeException | Error closing) {
+                failure.addSuppressed(closing);
+            } finally {
+                presence();
             }
-        });
-        windows.add(window); window.show();
+            throw failure;
+        }
         windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
         return window;
@@ -377,6 +388,17 @@ public final class JasperApplication {
         residentIndicator = Objects.requireNonNull(install, "install");
     }
 
+    /**
+     * macOS, a packaged Jasper: while resident, Quit closes every window and keeps the process, hidden from the Dock and
+     * Cmd+Tab until the next window opens. Install before {@link #residency}.
+     *
+     * @param control switches the Dock presence and watches for a log-out or shutdown
+     * @param visibleAtLaunch false for a {@code --background} launch, which starts hidden
+     */
+    public void backgroundOnQuit(DockControl control, boolean visibleAtLaunch) {
+        dock = new DockPresence(control, visibleAtLaunch);
+    }
+
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
             removeIndicator = residentIndicator.apply(new dev.jasper.app.platform.ResidentTray.Actions(
@@ -401,13 +423,15 @@ public final class JasperApplication {
     }
 
     /**
-     * Start-up has settled while resident: the indicator appears. Runs once per process, whichever of the first output
-     * painted, a finished warm-up or the fallback after the first paint comes first. EDT.
+     * Start-up has settled while resident: the macOS bridge loads, so a log-out is recognised from here on, and the
+     * indicator appears. Runs once per process, whichever of the first output painted, a finished warm-up or the
+     * fallback after the first paint comes first. EDT.
      */
     private void residencySettled() {
         if (startupSettled || !resident || quitting || stopped) return;
         startupSettled = true;
         stopSettleFallback();
+        if (dock != null) dock.prepare();
         showIndicator(true);
     }
 
@@ -508,7 +532,11 @@ public final class JasperApplication {
         shells = new NativeShells(themes, uiState, this::nativeWindow,
             () -> newWindow(), this::quit);
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
-        auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
+        auxiliary.onAllClosed = () -> {
+            if (windows.isEmpty() && !resident && !quitting) requestShutdown();
+            else presence();
+        };
+        auxiliary.onFirstOpened = this::windowOpening;
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
             new PluginRuntime.SettingsReports(
@@ -792,7 +820,10 @@ public final class JasperApplication {
         // Quit still terminates.
         boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
         if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
-        else updateBuddyActions();
+        else {
+            updateBuddyActions();
+            presence();
+        }
     }
 
     void windowStateChanged(TerminalWindow window, boolean showing, boolean iconified) {
@@ -910,9 +941,101 @@ public final class JasperApplication {
 
     /** Plugin windows', content tabs' and quit guards, asked before quit or restart changes anything and before the exit deadline is armed. */
     private boolean pluginWindowsMayClose() {
+        return windowsMayClose() && contributions.quitGuards().mayQuit();
+    }
+
+    /** Content tabs' and plugin windows' closing guards: what closing every window asks. Quit guards are not asked. EDT. */
+    private boolean windowsMayClose() {
         var requested = contributions.content().entries();
         return contributions.content().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
-            && requested.equals(contributions.content().entries()) && contributions.quitGuards().mayQuit();
+            && requested.equals(contributions.content().entries());
+    }
+
+    /**
+     * macOS's quit request (Cmd+Q, the application menu, the Dock's Quit, a log-out or a shutdown). A system quit is
+     * answered by quitting for real and never cancelled; anything else is cancelled here and goes through
+     * {@link #quitRequested} unless a window that is recording shortcuts takes the Cmd+Q. Any thread.
+     */
+    void nativeQuitRequested(java.awt.desktop.QuitResponse response) {
+        if (quitIsSystemQuit()) {
+            SwingUtilities.invokeLater(() -> quitForSystem(response));
+            return;
+        }
+        response.cancelQuit();
+        SwingUtilities.invokeLater(() -> {
+            var focused = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
+            var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.META_DOWN_MASK);
+            if (!dev.jasper.app.platform.WindowInput.captureShortcut(focused, stroke)) quitRequested();
+        });
+    }
+
+    /**
+     * Whether a native quit request is, or must be treated as, the system's (a log-out, restart or shutdown): with Dock
+     * presence, until start-up has settled and the bridge is prepared, and from the moment macOS is powering off.
+     * Before the bridge exists a log-out cannot be told from a user's Quit, so both quit for real and never cancel;
+     * the request is never interrupted. Without Dock presence (development runs, Windows, Linux) it is always false.
+     * Any thread.
+     */
+    boolean quitIsSystemQuit() {
+        DockPresence presence = dock;
+        // The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a cancelled log-out a
+        // later Cmd+Q quits for real, which is the safe direction.
+        return presence != null && (!presence.prepared() || presence.poweringOff());
+    }
+
+    /**
+     * Cmd+Q, Jasper \u203a Quit, the Dock's Quit and Jasper's own Quit action: on a resident macOS Jasper with Dock presence
+     * whose bridge is prepared, every window closes and the process stays in the background; anywhere else, and before
+     * start-up has settled, it quits. EDT.
+     */
+    void quitRequested() {
+        DockPresence presence = dock;
+        if (presence != null && resident && presence.prepared()) toBackground();
+        else quit();
+    }
+
+    /**
+     * macOS asked every application to quit (a log-out, restart or shutdown): a real quit. The request stays unanswered
+     * so the exiting process ends it and the log-out goes on; a plugin refusing the quit cancels it. EDT.
+     */
+    void quitForSystem(java.awt.desktop.QuitResponse response) {
+        quit();
+        if (!quitting && !stopped) response.cancelQuit();
+    }
+
+    /**
+     * Closes every window through the guards closing them asks (content tabs, plugin windows) and keeps the process, its
+     * plugins and configuration; with Dock presence Jasper leaves the Dock. A refusal leaves everything open. EDT.
+     */
+    public void toBackground() {
+        if (quitting || stopped) return;
+        if (!windowsMayClose()) return;
+        for (TerminalWindow window : List.copyOf(windows)) window.close();
+        if (auxiliary != null) auxiliary.close();
+        presence();
+    }
+
+    /** Whether any Jasper window, terminal or plugin, is open. EDT. */
+    private boolean windowsOpen() {
+        return !windows.isEmpty() || (auxiliary != null && !auxiliary.open().isEmpty());
+    }
+
+    /**
+     * Whether this process switches its Dock presence now: a resident macOS Jasper that is not quitting. Quitting for
+     * real never touches the Dock, so a log-out or shutdown never waits on AppKit. EDT.
+     */
+    private boolean dockFollowsWindows() {
+        return dock != null && resident && !quitting && !stopped;
+    }
+
+    /** Foreground with a window open, Background with none; only a resident process with Dock presence switches. EDT. */
+    private void presence() {
+        if (dockFollowsWindows()) dock.windows(windowsOpen());
+    }
+
+    /** A window is about to open: Foreground first. EDT. */
+    private void windowOpening() {
+        if (dockFollowsWindows()) dock.windows(true);
     }
 
     /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
