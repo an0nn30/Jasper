@@ -153,16 +153,13 @@ class ZenModeTest {
         });
     }
 
-    @Test void viewMenuGroupsVisibilityFontAndAppearanceWhileKeepingContributedTools() throws Exception {
+    @Test void viewMenuGroupsVisibilityAndFontWhileKeepingContributedTools() throws Exception {
         edt(() -> {
             var owner = window(); var model = new Contributions(); owner.connectContributions(model);
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
             var view = view(owner);
             assertThat(item(view, "Zoom Pane").getAction()).isSameAs(owner.action(ActionId.ZOOM_PANE));
             assertThat(item(child(view, "Font Size"), "Increase Font Size").getAction()).isSameAs(owner.action(ActionId.FONT_BIGGER));
-            var appearance = child(view, "Appearance");
-            assertThat(child(appearance, "UI Theme")).isNotNull(); assertThat(child(appearance, "Workspace Scheme")).isNotNull();
-            assertThat(item(appearance, "Window Settings\u2026")).isNotNull();
             item(child(view, "Tools"), "Toggle Panel").doClick();
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
             toggle(owner);

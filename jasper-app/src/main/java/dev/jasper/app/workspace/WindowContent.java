@@ -570,8 +570,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (!closed) themeCatalog = java.util.Objects.requireNonNull(catalog);
     }
     dev.jasper.app.appearance.ThemeCatalog.Snapshot availableThemes() { return themeCatalog.get(); }
-    String requestedUiTheme() { return configurationState == null ? themes.choice().name() : configurationState.values().get(dev.jasper.app.config.CoreSettings.UI_THEME_NAME); }
-    String requestedWorkspaceTheme() { return configurationState == null ? themes.workspaceChoice().name() : configurationState.values().get(dev.jasper.app.config.CoreSettings.UI_THEME_WORKSPACE); }
     void chooseUiTheme(String name) {
         choose(dev.jasper.app.config.CoreSettings.UI_THEME_NAME, name, () -> selectTheme(availableThemes().find(name).orElse(themes.choice().dark() ? Theme.DARK : Theme.JASPER_LIGHT)));
     }
@@ -586,7 +584,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
         saveSettings = null; openSettingsAt = null; configurationState = null;
-        themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest(); chrome.clearThemeMenus();
+        themeCatalog = () -> dev.jasper.app.appearance.ThemeCatalog.builtIn().latest();
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
@@ -1346,7 +1344,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         dockDrag.cancel();
         paletteKeys.close();
         if (contributed != null) { contributed.close(); contributed = null; }
-        commandPalette.close(); windowCommands.close(); chrome.closeThemeMenus(); commands.close();
+        commandPalette.close(); windowCommands.close(); commands.close();
         scopes.close();
         closed = true;
         if (contentHost != null) { contentHost.close(); contentHost = null; }

@@ -72,7 +72,7 @@ public final class CoreSettings {
     public static final Setting<Boolean> BUDDY_ENABLED = Setting.of("buddy.enabled", SettingKind.bool(), false)
         .label("Show Jasper").keywords("buddy", "desk buddy", "mascot")
         .description("Show the pixel-art Jasper floating above your windows while a terminal is open; off by default,\n"
-            + "updates live. View > Show Jasper and a right-click on Jasper toggle him for this session only.").build();
+            + "updates live. The Show/Hide Jasper command and a right-click on Jasper toggle him for this session only.").build();
     public static final Setting<Integer> NOTIFICATIONS_LONG_COMMAND_SECONDS = Setting.of("notifications.long_command_seconds",
             SettingKind.integer(0, 3600, DEFAULT), 10)
         .label("Notify after (seconds)").keywords("notification", "long command", "finished", "alert")

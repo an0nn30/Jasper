@@ -3,13 +3,8 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.TerminalColors;
-import dev.jasper.app.config.UiFontConfig;
-import dev.jasper.terminal.config.Palette;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
 import javax.swing.*;
-import javax.swing.event.MenuEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -68,17 +63,6 @@ class TerminalColorsTest {
                 owner.windowCommands().view("view.terminal_colors." + entry.getKey()).actionPerformed(new java.awt.event.ActionEvent(owner,0,""));
                 assertThat(owner.workspaceChoice().name()).isEqualTo(entry.getValue());
             }
-        });
-    }
-    @Test void namedWorkspaceIsCheckedByNameAndMissingNamesCheckNothing() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController(Theme.DARK);var owner=content(launcher(new ArrayDeque<>()),themes);
-            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Nord"),dev.jasper.app.appearance.ThemeCatalog.builtIn().scan().find("Nord").orElseThrow(),UiFontConfig.defaults());
-            var menu=WindowThemeMenuTest.workspace(owner);
-            assertThat(WindowThemeMenuTest.item(menu,"Nord").isSelected()).isTrue();
-            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Light"),dev.jasper.app.appearance.ThemeCatalog.builtIn().scan().find("Nord").orElseThrow(),UiFontConfig.defaults());
-            menu=WindowThemeMenuTest.workspace(owner);
-            assertThat(WindowThemeMenuTest.leaves(menu)).noneMatch(JMenuItem::isSelected);
         });
     }
 }

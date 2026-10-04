@@ -2,6 +2,17 @@
 
 ## Current state — 2026-10-03
 
+- **View menu cleanup** (2026-10-04; `codex/refine-bundled-themes`, updated from local main `79232532`):
+  removed the user-selected Show/Hide Jasper, UI Theme, Workspace Scheme, Themes… and Window Settings… entries
+  from View, including the now-empty Appearance submenu. Settings and command-palette access remain; Zen,
+  toolbar/status/rail visibility, font controls and contributed Tools remain. Removed obsolete theme-menu
+  listeners/caches and lifecycle hooks, updated existing tests and current help/docs. Bounded inline cleanup;
+  no architecture or historical-plan changes. The recursive absence regression failed before the removal and
+  passed afterward in both Buddy visibility states. Focused checks and independent review passed; all review
+  documentation findings corrected. Full `./gradlew check`: **8,485 tests, 0 failures/errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. No GUI launched. Kept in this worktree
+  for review; this follow-up has not been merged or pushed.
+
 - **Bundled theme shortlist** (2026-10-04; `codex/refine-bundled-themes`, based on local main `ccd4868f`):
   Jasper now ships only **Jasper Light, Jasper Dark, Nord, Clear Dark and Clear Light**. Their existing palettes
   are unchanged, ready for individual refinement. The catalog, packaged TOMLs and offline generator agree on
