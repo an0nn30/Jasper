@@ -171,6 +171,10 @@ supplies the terminal's console background, text, cursor, selection and 16 ANSI 
 
 Scheme colours are used exactly as the theme author chose them.
 
+The terminal tab strip is part of the workspace surface: it always shows the terminal background, whatever the
+theme's `tab_bar` token says, so terminals, their tabs and hosted content read as one space (and, in a translucent
+window, as one sheet of glass). `tab_bar` still colours tabbed panes inside plugin panes.
+
 ## Converted terminal palettes
 
 The offline catalog includes 168 Alacritty variants after native-family precedence and explicit exclusions; all 177

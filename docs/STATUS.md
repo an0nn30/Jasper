@@ -202,6 +202,10 @@
   and `abab`, Vim's `:b ab` selects `abab` where Jasper reports E93.
 
 - **Workspace glass, plans 1 (foundation) and 2 (editor)** (branch `claude/workspace-glass`, user request 2026-10-02):
+  2026-10-03 (user request): the terminal tab strip now always shows the workspace background instead of the theme's
+  `tab_bar` colour (called a bug by the user) and, being non-opaque over the centre host, is the same glass as the
+  terminal in a translucent window; pills, hover, close buttons and the list button stay solid. GUI check: the strip
+  reads as one surface with the terminal, opaque and glass, in Clear Dark and a theme with a distinct tab bar.
   [spec](superpowers/specs/2026-10-02-jasper-workspace-glass-design.md),
   [plan 1](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md),
   [plan 2](superpowers/plans/2026-10-02-workspace-glass-2-editor.md). Themes gain `[workspace] opacity/blur`; Settings

@@ -261,3 +261,12 @@ rows (no "Choose workspace theme…" button, since the theme pickers are rows) a
 fill moved from the deleted `WorkspaceRegions.Host` to `ToolWindowArea`'s centre host.
 A second merge (main at `43894416`, SDK 0.14.0, notifications replacing Notices) moved the method to `@since 0.14.1`;
 the Editor needs `>=0.14.1, <0.15`.
+
+## Amendment 2026-10-03: the tab strip is part of the workspace surface
+
+User decision: the terminal tab strip always shows the workspace (terminal) background, whatever the theme's
+`tab_bar` token, so terminals, tabs and hosted content read as one space; the old `tab_bar` strip colour was a bug.
+The strip no longer paints a background: the centre host beneath it paints the workspace surface, opaque or as glass,
+so in a translucent window the strip is the same glass as the terminal. Tab pills, hover, close buttons and the tab
+list button stay solid; the overflow fade blends into the workspace colour at the window's opacity
+(`WindowContent.workspaceSurface()`). This supersedes "pane tabs stay solid" in §1 and §3.

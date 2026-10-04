@@ -1174,8 +1174,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         area.setGlass(value);
         tabs.setOpaque(!glass);
         for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
+        windowTabs.refresh();
         repaint();
         glassListener.run();
+    }
+
+    /**
+     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The tab
+     * strip shares it (whatever the theme's tab bar colour), so terminals, tabs and hosted content read as one space.
+     */
+    java.awt.Color workspaceSurface() {
+        java.awt.Color background = themes.current().palette().background();
+        if (backgroundOpacity >= 1) return background;
+        return new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
+            (int) Math.round(255 * backgroundOpacity));
     }
 
     /** The opacity in effect for this window, as last applied; 1 is opaque. EDT only.

@@ -183,6 +183,36 @@ class WorkspaceGlassTest {
         });
     }
 
+    @Test void theTabStripIsTheWorkspaceSurfaceWhetherOpaqueOrGlass() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController();
+            // Clear Dark's generated tab-bar colour differs from its terminal background, so the colour check bites.
+            var clear = ThemeCatalog.builtIn().scan().find("Clear Dark").orElseThrow();
+            themes.configureWorkspace(new WorkspaceThemeChoice("Clear Dark"), clear);
+            assertThat(themes.current().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_BAR))
+                .isNotEqualTo(themes.current().palette().background());
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
+            owner.setSize(900, 600);
+            LayoutTestSupport.layoutTree(owner);
+            LayoutTestSupport.layoutTree(owner);
+            var strip = owner.windowTabs();
+            assertThat(strip.getHeight()).as("the tab strip is laid out").isPositive();
+            Color workspace = owner.currentPane().getBackground();
+            int x = strip.getWidth() * 2 / 3, y = strip.getHeight() / 2;
+            Point at = SwingUtilities.convertPoint(strip, x, y, owner);
+
+            Color opaque = new Color(render(owner).getRGB(at.x, at.y), true);
+            assertThat(opaque.getAlpha()).as("opaque strip").isEqualTo(255);
+            assertThat(opaque.getRGB() & 0xffffff).as("the strip shows the workspace background, not the theme's tab bar")
+                .isEqualTo(workspace.getRGB() & 0xffffff);
+
+            owner.applyBackgroundOpacity(0.5);
+            Color glass = new Color(render(owner).getRGB(at.x, at.y), true);
+            assertThat(glass.getAlpha()).as("glass strip").isEqualTo(128);
+            assertThat(glass.getRGB() & 0xffffff).isEqualTo(workspace.getRGB() & 0xffffff);
+        });
+    }
+
     @Test void newTabsFollowTheWindowsOpacity() throws Exception {
         edt(() -> {
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
