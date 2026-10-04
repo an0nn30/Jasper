@@ -28,6 +28,13 @@
   Task 1 pulls forward base ThemeToml parsing into `themeio` so the resolver tests retain real TOML
   fixtures. Module `GlassLevels` retains independent value/validation behavior; app `GlassSettings`
   translation remains in the existing app until the Plan 2 adapter.
+  Task 2 now supplies all 47 canonical semantic colors, final-parent dependent defaults and native
+  authored-only `[semantic]` round trips. Unknown top-level string metadata remains preserved;
+  unknown tables/non-string fields remain invalid. Additional pure color mapping helpers omit theme
+  geometry/delegates from generated UI data, and generated snapshots reuse the document's bounded
+  deep-freeze logic. Headless `:jasper-ui:test verifyUiArchitecture`: **40 tests, 0 failures/errors/skips**.
+  The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
+  application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`
   passed all 91 tasks: **8,743 tests, 0 failures, 0 errors, 6 skipped**. Documentation link and
   placeholder checks passed; source attachments are preserved unchanged. No GUI or AOT training.

@@ -1,0 +1,108 @@
+name = "Quoted \"theme\" and Frappé"
+dark = false
+ui_complete = false
+author = "Author\nLine\tTab\\Path"
+license = "MIT"
+source = "https://example.test/theme"
+commit = "0123456789012345678901234567890123456789"
+[colors]
+background = "#ffffff"
+foreground = "#010203"
+accent = "#123456"
+cursor = "#01020380"
+selection = "#fedcba"
+[colors.normal]
+black = "#010203"
+red = "#010203"
+green = "#010203"
+yellow = "#010203"
+blue = "#010203"
+magenta = "#010203"
+cyan = "#010203"
+white = "#010203"
+[colors.bright]
+black = "#010203"
+red = "#010203"
+green = "#010203"
+yellow = "#010203"
+blue = "#010203"
+magenta = "#010203"
+cyan = "#010203"
+white = "#010203"
+[tokens]
+surface = "#abcdef80"
+surface_raised = "#abcdef80"
+surface_sunken = "#abcdef80"
+title_bar = "#abcdef80"
+status_bar = "#abcdef80"
+sidebar = "#abcdef80"
+text = "#abcdef80"
+text_muted = "#abcdef80"
+text_disabled = "#abcdef80"
+text_on_accent = "#abcdef80"
+link = "#abcdef80"
+border = "#abcdef80"
+separator = "#abcdef80"
+divider = "#abcdef80"
+focus_ring = "#abcdef80"
+hover = "#abcdef80"
+pressed = "#abcdef80"
+selection = "#abcdef80"
+selection_text = "#abcdef80"
+selection_inactive = "#abcdef80"
+text_selection = "#abcdef80"
+text_selection_text = "#abcdef80"
+tab_bar = "#abcdef80"
+tab_active = "#abcdef80"
+tab_active_text = "#abcdef80"
+tab_active_border = "#abcdef80"
+tab_hover = "#abcdef80"
+tab_underline = "#abcdef80"
+tab_underline_inactive = "#abcdef80"
+input_background = "#abcdef80"
+button_background = "#abcdef80"
+button_border = "#abcdef80"
+button_text = "#abcdef80"
+button_default = "#abcdef80"
+scrollbar_thumb = "#abcdef80"
+scrollbar_track = "#abcdef80"
+accent = "#abcdef80"
+success = "#abcdef80"
+warning = "#abcdef80"
+error = "#abcdef80"
+error_background = "#abcdef80"
+editor_background = "#abcdef80"
+editor_foreground = "#abcdef80"
+editor_caret = "#abcdef80"
+editor_selection = "#abcdef80"
+editor_current_line = "#abcdef80"
+editor_gutter = "#abcdef80"
+editor_line_numbers = "#abcdef80"
+[syntax]
+keyword = { color = "#334455", bold = true, italic = false }
+type = { color = "#334455", bold = true, italic = false }
+function = { color = "#334455", bold = true, italic = false }
+variable = { color = "#334455", bold = true, italic = false }
+constant = { color = "#334455", bold = true, italic = false }
+number = { color = "#334455", bold = true, italic = false }
+string = { color = "#334455", bold = true, italic = false }
+comment = { color = "#334455", bold = true, italic = false }
+doc_comment = { color = "#334455", bold = true, italic = false }
+annotation = { color = "#334455", bold = true, italic = false }
+operator = { color = "#334455", bold = true, italic = false }
+punctuation = { color = "#334455", bold = true, italic = false }
+tag = { color = "#334455", bold = true, italic = false }
+attribute = { color = "#334455", bold = true, italic = false }
+regex = { color = "#334455", bold = true, italic = false }
+error = { color = "#334455", bold = true, italic = false }
+[ui]
+"*.background" = "#123456"
+"Panel.background" = { "os.mac" = "#234567", "os.default" = "#345678" }
+"Button.arc" = 7
+"Component.focusWidth" = 1.5
+"Button.paintShadow" = false
+"Label.text" = ""
+[icons]
+ColorPalette = { "Actions.Red" = "#ff0000", "Actions.Red.Dark" = "#ee0000" }
+empty = {}
+list = [false, 1, 2.5, "a.svg"]

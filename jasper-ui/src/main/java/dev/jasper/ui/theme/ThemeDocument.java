@@ -17,7 +17,8 @@ import java.util.Optional;
 public record ThemeDocument(String origin, String name, Optional<Boolean> dark, Optional<String> parent, int parentLine,
                             Optional<Boolean> uiComplete, Map<String, String> metadata, Map<Seed, Color> seeds,
                             Map<Integer, Color> ansi, Map<Token, Color> tokens, Map<SyntaxRole, SyntaxStyle> syntax,
-                            Map<String, Object> ui, Map<String, Object> icons, WorkspaceGlass workspace) {
+                            Map<String, Object> ui, Map<String, Object> icons, WorkspaceGlass workspace,
+                            Map<SemanticColor, Color> semanticOverrides) {
     /** The TOML names of the eight ANSI colours, in index order. */
     public static final List<String> ANSI_NAMES = List.of("black", "red", "green", "yellow", "blue", "magenta", "cyan", "white");
 
@@ -29,6 +30,7 @@ public record ThemeDocument(String origin, String name, Optional<Boolean> dark, 
         seeds = Map.copyOf(seeds);
         ansi = Map.copyOf(ansi);
         tokens = Map.copyOf(tokens);
+        semanticOverrides = Map.copyOf(semanticOverrides);
         syntax = Map.copyOf(syntax);
         ui = data(ui);
         icons = data(icons);
@@ -40,7 +42,16 @@ public record ThemeDocument(String origin, String name, Optional<Boolean> dark, 
                          Map<Integer, Color> ansi, Map<Token, Color> tokens, Map<SyntaxRole, SyntaxStyle> syntax,
                          Map<String, Object> ui, Map<String, Object> icons) {
         this(origin, name, dark, parent, parentLine, uiComplete, metadata, seeds, ansi, tokens, syntax, ui, icons,
-            WorkspaceGlass.NONE);
+            WorkspaceGlass.NONE, Map.of());
+    }
+
+    /** Legacy authored document without canonical semantic overrides. */
+    public ThemeDocument(String origin, String name, Optional<Boolean> dark, Optional<String> parent, int parentLine,
+                         Optional<Boolean> uiComplete, Map<String, String> metadata, Map<Seed, Color> seeds,
+                         Map<Integer, Color> ansi, Map<Token, Color> tokens, Map<SyntaxRole, SyntaxStyle> syntax,
+                         Map<String, Object> ui, Map<String, Object> icons, WorkspaceGlass workspace) {
+        this(origin, name, dark, parent, parentLine, uiComplete, metadata, seeds, ansi, tokens, syntax, ui, icons,
+            workspace, Map.of());
     }
 
     /**
@@ -54,7 +65,7 @@ public record ThemeDocument(String origin, String name, Optional<Boolean> dark, 
         return new ThemeDocument(origin, name, dark.or(base::dark), base.parent, base.parentLine,
             uiComplete.or(base::uiComplete), metadata, merged(base.seeds, seeds), merged(base.ansi, ansi),
             merged(base.tokens, tokens), merged(base.syntax, syntax), layered, icons.isEmpty() ? base.icons : icons,
-            workspace.over(base.workspace));
+            workspace.over(base.workspace), merged(base.semanticOverrides, semanticOverrides));
     }
 
     private static <K, V> Map<K, V> merged(Map<K, V> base, Map<K, V> top) {
@@ -66,7 +77,8 @@ public record ThemeDocument(String origin, String name, Optional<Boolean> dark, 
     private static <V> Map<String, V> ordered(Map<String, V> map) {
         return Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(map)));
     }
-    private static Map<String, Object> data(Map<String, Object> source) {
+    /** Shared bounded deep snapshot for authored and generated theme data. */
+    static Map<String, Object> data(Map<String, Object> source) {
         var result = new LinkedHashMap<String, Object>();
         int[] count = {0};
         source.forEach((key, value) -> result.put(Objects.requireNonNull(key), freeze(value, 1, count)));

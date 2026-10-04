@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Shared contracts:** [Exact paths, types, signatures, defaults and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** Execution approved on 2026-10-04; in progress. Baseline: 8,743 tests, zero failures/errors, six skipped. Sequencing adjustments: Tasks 4–5 and 11–12 are each integrated implementation/review units because their initial APIs are mutually dependent; Task 14 supplies the single final whole-branch review. Task 1 pulls forward base ThemeToml into themeio to retain real resolver fixtures; Task 2 adds canonical semantics and serialization. GlassLevels retains its independent value/validation API; the app-specific GlassSettings resolve overload stays in the existing app pending Plan 2 adapter translation.
+**Status:** Execution approved on 2026-10-04; in progress. Baseline: 8,743 tests, zero failures/errors, six skipped. Sequencing adjustments: Tasks 4–5 and 11–12 are each integrated implementation/review units because their initial APIs are mutually dependent; Task 14 supplies the single final whole-branch review. Task 1 pulls forward base ThemeToml into themeio to retain real resolver fixtures; Task 2 adds canonical semantics and serialization. GlassLevels retains its independent value/validation API; the app-specific GlassSettings resolve overload stays in the existing app pending Plan 2 adapter translation. Task 2 retains unknown top-level string metadata (other unknown types remain invalid), extracts color-only UiTemplate/UiColorKeys helpers, filters authored geometry from generated UI data, and reuses the bounded document deep snapshot for generated nested data. Task 2 verification: 40 module tests, zero failures/errors/skips; verifyUiArchitecture passed.
 
 ## Global Constraints
 
@@ -51,7 +51,7 @@ permanent copies of a generator. Keep old app behavior until its explicit migrat
 **Files:** Create `jasper-ui/build.gradle.kts`, `UI/theme/{TerminalColors,ThemeDocument,ThemeFileException,Seed,Token,SyntaxRole,SyntaxStyle,WorkspaceGlass,GlassLevels,ThemeResolver}.java`, `UT/theme/ThemeResolverTest.java`, `gradle/ui-architecture.gradle.kts`; modify `settings.gradle.kts`, `build.gradle.kts`, `jasper-app/build.gradle.kts`; add all initial package-info files and module README.
 **Interfaces:** Consume current app classes with the same basenames. Produce the model/resolver signatures in the shared contracts; no app or terminal imports.
 
-- [ ] Copy the existing `ThemeResolverTest` and theme fixture data into the new package, retaining inheritance, same-name overrides, missing seed and cycle assertions. Add a complete defensive-copy test:
+- [x] Copy the existing `ThemeResolverTest` and theme fixture data into the new package, retaining inheritance, same-name overrides, missing seed and cycle assertions. Add a complete defensive-copy test:
   ```java
   @Test void terminalColorsCopyTheAnsiList() {
       var colors = new java.util.ArrayList<java.awt.Color>();
@@ -63,17 +63,17 @@ permanent copies of a generator. Keep old app behavior until its explicit migrat
       assertThatThrownBy(() -> value.ansi().clear()).isInstanceOf(UnsupportedOperationException.class);
   }
   ```
-- [ ] Run `./gradlew :jasper-ui:test --tests '*ThemeResolverTest'`; first observe missing module/classes, then retain the failing test after registering the module.
-- [ ] Add `java-library`, `implementation("org.tomlj:tomlj:1.1.1")`, `implementation("com.formdev:flatlaf:3.7")`, `implementation("com.formdev:flatlaf-extras:3.7")`; inherit root test/toolchain conventions. Port the listed model classes without behavior changes; substitute module `TerminalColors` for terminal palette references. Add app `implementation(project(":jasper-ui"))` so distribution resolution includes the jar.
-- [ ] Implement `verifyUiArchitecture` using the existing jdeps/JBR pattern: ban all other Jasper modules from UI bytecode, ban Swing in theme/model/themeio, check every package edge for cycles. Wire it into UI `check`; do not let app tests depend on a circular check task.
-- [ ] Run `./gradlew :jasper-ui:check verifyUiArchitecture`; expect green resolver/value tests and dependency gate. Review then commit `Extract independent UI theme values and resolver` with the required trailer.
+- [x] Run `./gradlew :jasper-ui:test --tests '*ThemeResolverTest'`; first observe missing module/classes, then retain the failing test after registering the module.
+- [x] Add `java-library`, `implementation("org.tomlj:tomlj:1.1.1")`, `implementation("com.formdev:flatlaf:3.7")`, `implementation("com.formdev:flatlaf-extras:3.7")`; inherit root test/toolchain conventions. Port the listed model classes without behavior changes; substitute module `TerminalColors` for terminal palette references. Add app `implementation(project(":jasper-ui"))` so distribution resolution includes the jar.
+- [x] Implement `verifyUiArchitecture` using the existing jdeps/JBR pattern: ban all other Jasper modules from UI bytecode, ban Swing in theme/model/themeio, check every package edge for cycles. Wire it into UI `check`; do not let app tests depend on a circular check task.
+- [x] Run `./gradlew :jasper-ui:check verifyUiArchitecture`; expect green resolver/value tests and dependency gate. Review then commit `Extract independent UI theme values and resolver` with the required trailer.
 
 ## Task 2 — Canonical colors, fallback graph and TOML round-trip
 
 **Files:** Create `UI/theme/{SemanticColor,SemanticPalette,SemanticDefaults,ColorMath,GeneratedTheme,ThemeGenerator}.java`, `UI/themeio/{ThemeToml,ThemeTomlWriter}.java`; tests `UT/theme/{SemanticPaletteTest,ThemeGeneratorTest}.java`, `UT/themeio/ThemeTomlTest.java`.
 **Interfaces:** Consume Task 1 model; produce complete `SemanticPalette`, generated values and parse/write signatures from the appendix. Move pure contrast/mix functions out of app `ChromeKeys`; no UIManager in this algorithm.
 
-- [ ] Port existing generator/TOML round-trip tests and add the complete-coverage guard:
+- [x] Port existing generator/TOML round-trip tests and add the complete-coverage guard:
   ```java
   @Test void incompleteSemanticPaletteIsRejected() {
       assertThatThrownBy(() -> new SemanticPalette(java.util.Map.of()))
@@ -85,10 +85,10 @@ permanent copies of a generator. Keep old app behavior until its explicit migrat
   }
   ```
   Add a fixture with legacy accent red and canonical accent green: focus must be green and hover must derive from green. Assert canonical `surface.card` overrides its old alias, partial legacy files resolve all keys, and a read/write/read preserves ANSI/syntax/glass/alpha.
-- [ ] Run `./gradlew :jasper-ui:test --tests '*Semantic*Test' --tests '*ThemeGeneratorTest' --tests '*ThemeTomlTest'`; confirm red missing semantic support.
-- [ ] Implement the exact token set, `[semantic]` format and precedence table from the appendix. Derive in topological order from final canonical parents. Reuse tested legacy generation for old roles; keep explicit authored colors unchanged and preserve its contrast behavior for generated values. Writers add canonical values only when present in the authored document; reading does not write files.
-- [ ] Add scrim/derived-alpha tests: 55% is applied once at paint, not stored twice; tile alpha is 16%, focus is 25%. Invalid/missing base values include origin in diagnostics. Run the command above plus `verifyUiArchitecture`; expect no null token or Swing model dependency.
-- [ ] Review then commit `Resolve canonical semantic colors and preserve legacy theme input`.
+- [x] Run `./gradlew :jasper-ui:test --tests '*Semantic*Test' --tests '*ThemeGeneratorTest' --tests '*ThemeTomlTest'`; confirm red missing semantic support.
+- [x] Implement the exact token set, `[semantic]` format and precedence table from the appendix. Derive in topological order from final canonical parents. Reuse tested legacy generation for old roles; keep explicit authored colors unchanged and preserve its contrast behavior for generated values. Writers add canonical values only when present in the authored document; reading does not write files.
+- [x] Add scrim/derived-alpha tests: 55% is applied once at paint, not stored twice; tile alpha is 16%, focus is 25%. Invalid/missing base values include origin in diagnostics. Run the command above plus `verifyUiArchitecture`; expect no null token or Swing model dependency.
+- [x] Review then commit `Resolve canonical semantic colors and preserve legacy theme input`.
 
 ## Task 3 — Extract import conversion without weakening input checks
 

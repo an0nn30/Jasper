@@ -1,6 +1,7 @@
 package dev.jasper.ui.themeio;
 
 import dev.jasper.ui.theme.GlassLevels;
+import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.Seed;
 import dev.jasper.ui.theme.SyntaxRole;
 import dev.jasper.ui.theme.SyntaxStyle;
@@ -27,11 +28,11 @@ import org.tomlj.TomlTable;
 /** Reads a Jasper theme file. Every problem is a {@link ThemeFileException} naming the file and line. */
 public final class ThemeToml {
     private static final Set<String> TOP = Set.of("name", "dark", "extends", "author", "license", "source", "commit",
-        "ui_complete", "colors", "tokens", "syntax", "ui", "icons", "workspace");
+        "ui_complete", "colors", "tokens", "semantic", "syntax", "ui", "icons", "workspace");
     private static final List<String> METADATA = List.of("author", "license", "source", "commit");
     private static final Set<String> STYLE_FIELDS = Set.of("color", "bold", "italic");
     private static final Pattern COLOR = Pattern.compile("#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?");
-    /** A full Java class name: FlatLaf or Swing would load it. FlatLaf's own classes are allowed. */
+    /** A full Java class name: color-only themes must not load vendor or application classes. */
     private static final Pattern CLASS_NAME = Pattern.compile("(?:[a-z_$][\\w$]*\\.)+[A-Z][\\w$]*");
 
     private ThemeToml() {}
@@ -52,13 +53,16 @@ public final class ThemeToml {
             throw new ThemeFileException(origin, error.position().line(), error.getMessage());
         }
         var file = new Reader(toml, origin);
-        for (String key : toml.keySet()) if (!TOP.contains(key)) throw file.error(List.of(key), "unknown key \"" + key + "\"");
+        for (String key : toml.keySet()) if (!TOP.contains(key) && !(toml.get(List.of(key)) instanceof String))
+            throw file.error(List.of(key), "unknown key \"" + key + "\"");
         String name = file.string(List.of("name")).orElseThrow(() -> new ThemeFileException(origin, 0, "a theme needs a \"name\""));
         if (name.isBlank()) throw file.error(List.of("name"), "\"name\" must not be blank");
         Optional<String> parent = file.string(List.of("extends"));
         if (parent.isPresent() && parent.get().isBlank()) throw file.error(List.of("extends"), "\"extends\" must not be blank");
         var metadata = new LinkedHashMap<String, String>();
-        for (String key : METADATA) file.string(List.of(key)).ifPresent(value -> metadata.put(key, value));
+        for (String key : toml.keySet())
+            if (METADATA.contains(key) || !TOP.contains(key))
+                file.string(List.of(key)).ifPresent(value -> metadata.put(key, value));
         var seeds = new EnumMap<Seed, Color>(Seed.class);
         var ansi = new HashMap<Integer, Color>();
         TomlTable colors = file.table(List.of("colors"));
@@ -83,6 +87,12 @@ public final class ThemeToml {
             List<String> path = List.of("tokens", key);
             tokens.put(Token.of(key).orElseThrow(() -> file.error(path, "unknown token \"" + key + "\"")), file.color(path));
         }
+        var semantic = new EnumMap<SemanticColor, Color>(SemanticColor.class);
+        TomlTable semanticTable = file.table(List.of("semantic"));
+        if (semanticTable != null) for (String key : semanticTable.keySet()) {
+            List<String> path = List.of("semantic", key);
+            semantic.put(SemanticColor.of(key).orElseThrow(() -> file.error(path, "unknown semantic color \"" + key + "\"")), file.color(path));
+        }
         var syntax = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
         TomlTable syntaxTable = file.table(List.of("syntax"));
         if (syntaxTable != null) for (String key : syntaxTable.keySet()) {
@@ -95,7 +105,7 @@ public final class ThemeToml {
         if (uiTable != null) file.flatten(List.of("ui"), "", uiTable, ui);
         return new ThemeDocument(origin, name.strip(), file.bool(List.of("dark")), parent.map(String::strip),
             parent.isPresent() ? file.line(List.of("extends")) : 0, file.bool(List.of("ui_complete")), metadata, seeds,
-            ansi, tokens, syntax, ui, file.icons(), file.workspace());
+            ansi, tokens, syntax, ui, file.icons(), file.workspace(), semantic);
     }
 
     /** Typed reads from one parsed file, each failure naming the key's line. */
@@ -221,7 +231,7 @@ public final class ThemeToml {
         private Object scalar(List<String> at, String name, Object value) {
             if (value instanceof String text) {
                 String stripped = text.strip();
-                if (CLASS_NAME.matcher(stripped).matches() && !stripped.startsWith("com.formdev.flatlaf."))
+                if (CLASS_NAME.matcher(stripped).matches())
                     throw error(at, "\"" + name + "\" names a Java class; themes cannot load classes");
                 return text;
             }
