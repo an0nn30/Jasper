@@ -88,7 +88,7 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme);
                 var strip = owner.windowTabs(); layout(strip, 800, 30);
                 Container selected = named(strip, "select:second").getParent();
@@ -114,7 +114,7 @@ class WindowTabsTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme);
                 var strip = owner.windowTabs(); layout(strip, 800, 30);
                 var selected = named(strip, "select:second").getParent();
@@ -175,7 +175,7 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
-            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (Theme chrome : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 owner.selectTheme(chrome);
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
@@ -196,7 +196,7 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
-            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (Theme chrome : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 owner.selectTheme(chrome);
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
@@ -238,7 +238,7 @@ class WindowTabsTest {
             owner.reorderTab(1, 0);
             assertThat(owner.currentTab()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
-            owner.selectTheme(Theme.INTELLIJ_LIGHT);
+            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             assertThat(named(strip, "select:<html>literal title")).isSameAs(control);
             assertThat(control.getClientProperty("html.disable")).isEqualTo(true);
             assertThat(control.getToolTipText()).startsWith("<html>literal title");
@@ -392,7 +392,7 @@ class WindowTabsTest {
                 owner.currentTab().rename("wide selected tab " + i);
             }
             var strip = owner.windowTabs();
-            for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme); owner.invoke(ActionId.SELECT_TAB_1); owner.update();
                 layout(strip, 380, 38);
                 var first = named(strip, "select:wide selected tab 0");

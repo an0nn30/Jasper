@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class GraphiteChromeTest {
     @Test void hiddenRailLetsTheTerminalReachEveryWorkspaceEdge() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
                 var root = new javax.swing.JRootPane();
@@ -57,7 +57,7 @@ class GraphiteChromeTest {
     }
 
     @Test void partialRepaintsKeepAllFourWorkspaceCornersRounded() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
                 showRail(owner);
@@ -103,7 +103,7 @@ class GraphiteChromeTest {
         }
     }
     @Test void terminalBottomCornersRoundOutsideTheCellGridAndFollowTerminalColors() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
                 showRail(owner);
@@ -129,7 +129,7 @@ class GraphiteChromeTest {
         }
     }
     @Test void roundedWorkspaceSurfacesMeetContinuousChromeWithoutRules() throws Exception {
-        for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+        for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
                 var root = new javax.swing.JRootPane();

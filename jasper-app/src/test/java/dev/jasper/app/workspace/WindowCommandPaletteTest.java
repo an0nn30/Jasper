@@ -38,6 +38,91 @@ class WindowCommandPaletteTest {
             @Override public void actionPerformed(ActionEvent event) { run.run(); }
         }, List.of());
     }
+    @Test void normalAndCompactKeepTheSameActivatedWidthAndClampToNarrowWorkspaces() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            for (var mode : dev.jasper.app.config.ViewMode.values()) {
+                try (var owner = owner(new CommandHistory())) {
+                    owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder().viewMode(mode).build(), true);
+                    var root = install(owner);
+                    root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                    owner.action(ActionId.COMMAND_PALETTE).actionPerformed(new ActionEvent(owner, 0, "fixture"));
+                    LayoutTestSupport.layoutTree(root);
+                    var card = owner.commandPalette().component();
+                    assertThat(card.getWidth()).as("roomy activated card in %s", mode)
+                        .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(560));
+                    for (int width : new int[] {350, 80}) {
+                        root.setSize(com.formdev.flatlaf.util.UIScale.scale(width), 210);
+                        LayoutTestSupport.layoutTree(root);
+                        root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED));
+                        LayoutTestSupport.layoutTree(root);
+                        assertThat(card.getWidth()).as("clamped card in %s, workspace width %d", mode, width)
+                            .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(width - 32));
+                        var overlay = (JComponent) card.getParent();
+                        var workspace = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
+                        assertThat(workspace.contains(card.getBounds())).isTrue();
+                    }
+                }
+            }
+        });
+    }
+
+    @Test void normalWithoutAnAnchorKeepsItsExistingFloatingPreferredWidth() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                owner.chrome().search().setVisible(false);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(owner.commandPalette().component().getWidth())
+                    .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(680));
+            }
+        });
+    }
+
+    @Test void compactActionUsesFloatingWorkspaceBoundsWithDockPanelsAndDismissesNormally() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder()
+                    .viewMode(dev.jasper.app.config.ViewMode.COMPACT).build(), true);
+                DockTestSupport.show(owner, dev.jasper.app.dock.Slot.LEFT_TOP, new JPanel(), 240);
+                DockTestSupport.show(owner, dev.jasper.app.dock.Slot.RIGHT_TOP, new JPanel(), 170);
+                var root = install(owner);
+                root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                var card = owner.commandPalette().component();
+                owner.action(ActionId.COMMAND_PALETTE).actionPerformed(new ActionEvent(owner, 0, "fixture"));
+                assertThat(owner.commandPalette().isOpen()).isTrue();
+                assertThat(owner.commandPalette().component()).isSameAs(card);
+                LayoutTestSupport.layoutTree(root);
+                var overlay = (JComponent) card.getParent();
+                var workspace = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
+                assertThat(card.getBounds()).isEqualTo(WindowCommandPalette.positioned(workspace,
+                    new Dimension(com.formdev.flatlaf.util.UIScale.scale(560), card.getPreferredSize().height), com.formdev.flatlaf.util.UIScale.scale(16)));
+                assertThat(card.getX() + card.getWidth() / 2).isEqualTo(workspace.x + workspace.width / 2);
+                assertThat(card.getY()).isEqualTo(workspace.y + workspace.height / 5);
+                int top = card.getY(); int initialHeight = card.getHeight();
+                card.queryField().setText("no matching commands anywhere"); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getY()).isEqualTo(top);
+                assertThat(card.getHeight()).isLessThan(initialHeight);
+                card.queryField().setText(""); LayoutTestSupport.layoutTree(root);
+                assertThat(card.getY()).isEqualTo(top);
+                for (Dimension size : List.of(new Dimension(350, 210), new Dimension(80, 65))) {
+                    root.setSize(size); LayoutTestSupport.layoutTree(root);
+                    root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED));
+                    LayoutTestSupport.layoutTree(root);
+                    workspace = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
+                    assertThat(card.getBounds()).isEqualTo(WindowCommandPalette.positioned(workspace,
+                        new Dimension(com.formdev.flatlaf.util.UIScale.scale(560), card.getPreferredSize().height), com.formdev.flatlaf.util.UIScale.scale(16)));
+                    assertThat(workspace.contains(card.getBounds())).isTrue();
+                }
+                owner.commandPalette().escape();
+                assertThat(owner.commandPalette().isOpen()).isFalse();
+                root.setSize(900, 600); LayoutTestSupport.layoutTree(root);
+                owner.action(ActionId.COMMAND_PALETTE).actionPerformed(new ActionEvent(owner, 0, "fixture"));
+                overlay.dispatchEvent(new MouseEvent(overlay, MouseEvent.MOUSE_PRESSED, 0, 0, 1, 1, 1, false, MouseEvent.BUTTON1));
+                assertThat(owner.commandPalette().isOpen()).isFalse();
+            }
+        });
+    }
+
     @Test void theCardTopIsFixedSoTheInputRowNeverMovesAsResultsChange() {
         var deck = new Rectangle(0, 100, 900, 600);
         int anchor = deck.y + deck.height / 5;
@@ -238,7 +323,7 @@ class WindowCommandPaletteTest {
             assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(toggle.get()).isEqualTo("Show Status Bar");
-            owner.selectTheme(Theme.INTELLIJ_LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
+            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);
             assertThat(owner.commands().entries()).isEmpty();

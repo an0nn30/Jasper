@@ -84,7 +84,23 @@ wait, not a promise that every cleanup succeeds or the JVM exits within two seco
 The process shutdown hook backs up endpoint cleanup and drains logging separately.
 Residency retains indexes/config/history after the last window,
 and does not intentionally retain pane sessions; asynchronous child cleanup may
-briefly continue after the last window closes. Quit closes all owners.
+briefly continue after the last window closes. On a packaged macOS Jasper that is
+resident, Quit (`JasperApplication.quitRequested`) closes every window through the
+windows' closing guards and keeps every owner (`toBackground`); `DockPresence` hides
+Jasper from the Dock while no window is open and brings it back before the next window
+is composed, through the injected `DockControl` (`platform.MacDock`). `quit()` asks the
+plugin quit guards and then closes all owners. It is reached by Quit Jasper Completely in
+the menu bar item and Quit Jasper in the Windows notification-area icon
+(`platform.ResidentTray`), the Plugin Manager's Quit Jasper button (shown when a restart
+cannot be planned), a plugin window's File › Quit, a retire request from another
+launch, and macOS logging out, restarting or shutting down; a restart asks the same
+guards and then quits through `quitNow()`. Any Quit before start-up has settled, and any
+Quit by a process that is not resident or has no Dock presence, quits the same way. The
+indicator and the macOS bridge arrive once start-up has settled (the
+first output painted, a finished `--background` warm-up, or 2 s after the first paint).
+A reopen with no window open relaunches the process when its application jar changed on
+disk. A `--background` launch rehearses one window (`application.Rehearsal`): composed
+with a canned terminal and no shell, painted once into an image, disposed unseen; one explicit collection follows it.
 
 ## Threading and cancellation
 
@@ -160,6 +176,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `themesui` | The Appearance page's Import theme…: a serial import worker and its dialogs over Settings. The Appearance page owns each ThemeImport and closes it when disposed. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
+| `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`); JDK-only, depended on by bootstrap, application, plugins and benchmark. Safe from any thread; `mark` and `phase` are non-blocking and run on the caller's thread; settling, logging and file writes run on virtual threads, never on the EDT. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
 
 Buddy's supported packages are `view`, `notice` and `config`; its internal model and

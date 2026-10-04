@@ -78,6 +78,8 @@ public final class CorePages {
                 .section("Interface font")
                 .row(UI_FONT_FAMILY, Editors.font(false))
                 .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt"))
+                .section("View mode")
+                .row(WINDOW_VIEW_MODE)
                 .section("Animations")
                 .row(UI_ANIMATIONS_ENABLED),
             SchemaPage.page("window", "Window").parent("appearance-behavior")

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.CoreSettings;
+import dev.jasper.app.config.ViewMode;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,14 +22,63 @@ class AppearancePageTest {
     private final PageContext context = new PageContext(draft, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("config.toml"),
         () -> { }, () -> { }, () -> { }, () -> { }, () -> false);
-    private final SchemaPage page = CorePages.specs(themes, system, ShellChoices.NONE, id -> { }).stream()
-        .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow().build(context);
+    private final SchemaPage.Spec spec = CorePages.specs(themes, system, ShellChoices.NONE, id -> { }).stream()
+        .filter(spec -> spec.id().equals("appearance")).findFirst().orElseThrow();
+    private final SchemaPage page = spec.build(context);
 
     private Editors.ThemePick editor(int row) { page.component(); return (Editors.ThemePick) page.rows().get(row).editor(); }
     private static List<String> items(JComboBox<String> box) {
         var items = new ArrayList<String>();
         for (int i = 0; i < box.getItemCount(); i++) items.add(box.getItemAt(i));
         return items;
+    }
+
+    @Test void viewModeOffersNormalAndCompact() {
+        page.component();
+        var setting = spec.settings().stream().filter(item -> item.name().equals("window.view_mode"))
+            .findFirst().orElseThrow();
+        var row = page.rows().get(spec.settings().indexOf(setting));
+        @SuppressWarnings("unchecked")
+        var box = (JComboBox<String>) row.editor().component();
+        assertThat(items(box)).containsExactly("Normal", "Compact");
+        assertThat(box.getSelectedItem()).isEqualTo("Normal");
+        assertThat(String.join(" ", page.searchTerms()).toLowerCase(java.util.Locale.ROOT)).contains("compact");
+    }
+
+    @Test void choosingCompactStagesItForApplyAndResetRestoresNormal() {
+        page.component();
+        var setting = spec.settings().stream().filter(item -> item.name().equals("window.view_mode"))
+            .findFirst().orElseThrow();
+        var row = page.rows().get(spec.settings().indexOf(setting));
+        var box = (JComboBox<?>) row.editor().component();
+        assertThat(row.comment().getText()).contains("Takes effect after restart");
+        assertThat(draft.modified()).isFalse();
+        box.setSelectedItem("Compact");
+        assertThat(draft.value(CoreSettings.WINDOW_VIEW_MODE)).isEqualTo(ViewMode.COMPACT);
+        assertThat(draft.edit().changes()).containsEntry(CoreSettings.WINDOW_VIEW_MODE, Optional.of(ViewMode.COMPACT));
+        assertThat(page.modified()).isTrue();
+        assertThat(row.reset().isVisible()).isTrue();
+        row.reset().doClick();
+        assertThat(draft.value(CoreSettings.WINDOW_VIEW_MODE)).isEqualTo(ViewMode.NORMAL);
+        assertThat(box.getSelectedItem()).isEqualTo("Normal");
+        assertThat(draft.modified()).isFalse();
+        assertThat(row.reset().isVisible()).isFalse();
+    }
+
+    @Test void resettingASavedCompactModeStagesRemovalOfTheKey() {
+        draft.rebase(ConfigLoader.parse(Path.of("config.toml"), "window.view_mode = 'compact'", true).values());
+        page.component();
+        var setting = spec.settings().stream().filter(item -> item.name().equals("window.view_mode"))
+            .findFirst().orElseThrow();
+        var row = page.rows().get(spec.settings().indexOf(setting));
+        var box = (JComboBox<?>) row.editor().component();
+        assertThat(box.getSelectedItem()).isEqualTo("Compact");
+        assertThat(draft.modified()).isFalse();
+        row.reset().doClick();
+        assertThat(box.getSelectedItem()).isEqualTo("Normal");
+        assertThat(draft.edit().changes()).containsEntry(CoreSettings.WINDOW_VIEW_MODE, Optional.empty());
+        assertThat(draft.edit().expected()).containsEntry(CoreSettings.WINDOW_VIEW_MODE, Optional.of(ViewMode.COMPACT));
+        assertThat(draft.modified()).isTrue();
     }
 
     @Test void theThemeAndWorkspaceSchemeAreDropdownsOfEveryThemeName() {

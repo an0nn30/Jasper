@@ -18,7 +18,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
                       Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
                       int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
-                      WorkspaceThemeChoice workspaceTheme, GlassSettings glass, AnimationSettings animations) {
+                      WorkspaceThemeChoice workspaceTheme, ViewMode viewMode, GlassSettings glass, AnimationSettings animations) {
     /** The theme a configuration without {@code ui.theme.name} uses. */
     public static final String DEFAULT_THEME = "Jasper Dark";
     /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
@@ -48,6 +48,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         Objects.requireNonNull(theme, "theme");
         Objects.requireNonNull(terminalColors, "terminalColors");
         Objects.requireNonNull(workspaceTheme, "workspaceTheme");
+        Objects.requireNonNull(viewMode, "viewMode");
         Objects.requireNonNull(glass, "glass");
         Objects.requireNonNull(animations, "animations");
         keybindings = Map.copyOf(keybindings);
@@ -73,23 +74,46 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                           int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
                           Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
                           int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
-                          WorkspaceThemeChoice workspaceTheme, GlassSettings glass) {
+                          WorkspaceThemeChoice workspaceTheme, ViewMode viewMode, GlassSettings glass) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
             visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth,
-            toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, glass, AnimationSettings.defaults());
+            toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, viewMode, glass, AnimationSettings.defaults());
     }
 
-    /** Every field but the workspace glass, which defers to the theme. */
-    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
-                          FontConfig font, String theme, Map<String, String> keybindings,
-                          int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                          int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
+    /** Compatibility constructor for callers that predate saved view modes and workspace glass. */
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar, FontConfig font, String theme,
+                          Map<String, String> keybindings, int columns, int lines, TerminalConfig terminal,
+                          boolean buddyEnabled, int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
                           Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
                           int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
                           WorkspaceThemeChoice workspaceTheme) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
             visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth,
-            toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, GlassSettings.UNSET);
+            toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, ViewMode.NORMAL, GlassSettings.UNSET);
+    }
+
+    /** Compatibility constructor for saved view modes before workspace glass. */
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar, FontConfig font, String theme,
+                          Map<String, String> keybindings, int columns, int lines, TerminalConfig terminal,
+                          boolean buddyEnabled, int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
+                          Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
+                          int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
+                          WorkspaceThemeChoice workspaceTheme, ViewMode viewMode) {
+        this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
+            visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth,
+            toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, viewMode, GlassSettings.UNSET);
+    }
+
+    /** Compatibility constructor for workspace glass before saved view modes. */
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar, FontConfig font, String theme,
+                          Map<String, String> keybindings, int columns, int lines, TerminalConfig terminal,
+                          boolean buddyEnabled, int visibleRows, int longCommandSeconds, boolean backgroundEnabled,
+                          Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
+                          int railWidth, int toolbarHeight, int statusBarHeight, boolean nativeDecorations,
+                          WorkspaceThemeChoice workspaceTheme, GlassSettings glass) {
+        this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
+            visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth,
+            toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, ViewMode.NORMAL, glass);
     }
 
     /** Compatibility constructor for callers that still supply the terminal palette choice. */
@@ -162,14 +186,14 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     }
 
     /**
-     * Every constructor that predates long-command notifications and background residency: the
-     * default notification threshold, and never resident, because residency is opt-in.
+     * Every constructor that predates long-command notifications and background residency: the default notification
+     * threshold, and the platform's residency default ({@link CoreSettings#SYSTEM_RUN_IN_BACKGROUND}).
      */
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, String theme, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, int visibleRows) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal,
-            buddyEnabled, visibleRows, 10, false);
+            buddyEnabled, visibleRows, 10, CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue());
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -219,7 +243,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             terminalFromWorkspace(WorkspaceThemeChoice.parse(values.get(CoreSettings.UI_THEME_WORKSPACE))), values.get(CoreSettings.WINDOW_RAIL_WIDTH),
             values.get(CoreSettings.WINDOW_TOOLBAR_HEIGHT), values.get(CoreSettings.WINDOW_STATUS_BAR_HEIGHT),
             values.get(CoreSettings.WINDOW_NATIVE_DECORATIONS),
-            WorkspaceThemeChoice.parse(values.get(CoreSettings.UI_THEME_WORKSPACE)),
+            WorkspaceThemeChoice.parse(values.get(CoreSettings.UI_THEME_WORKSPACE)), values.get(CoreSettings.WINDOW_VIEW_MODE),
             new GlassSettings(values.get(CoreSettings.UI_WORKSPACE_OPACITY), values.get(CoreSettings.UI_WORKSPACE_BLUR)),
             new AnimationSettings(values.get(CoreSettings.UI_ANIMATIONS_ENABLED), AnimationSettings.DEFAULT_OPEN_MILLIS,
                 AnimationSettings.DEFAULT_CLOSE_MILLIS, AnimationSettings.DEFAULT_SWITCH_MILLIS));
@@ -257,6 +281,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private int toolbarHeight;
         private int statusBarHeight;
         private boolean nativeDecorations;
+        private ViewMode viewMode;
         private Builder(ConfigSnapshot source) {
             tabHeight = source.tabHeight();
             toolbar = source.toolbar();
@@ -281,11 +306,13 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             toolbarHeight = source.toolbarHeight();
             statusBarHeight = source.statusBarHeight();
             nativeDecorations = source.nativeDecorations();
+            viewMode = source.viewMode();
         }
         public Builder tabHeight(int value) { tabHeight = value; return this; }
         public Builder railWidth(int value) { railWidth = value; return this; }
         public Builder toolbarHeight(int value) { toolbarHeight = value; return this; }
         public Builder statusBarHeight(int value) { statusBarHeight = value; return this; }
+        public Builder viewMode(ViewMode value) { viewMode = value; return this; }
         public Builder nativeDecorations(boolean value) { nativeDecorations = value; return this; }
         public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
         public Builder statusBar(boolean value) { statusBar = value; return this; }
@@ -306,7 +333,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder workspaceTheme(WorkspaceThemeChoice value) { workspaceTheme = value; terminalColors = terminalFromWorkspace(value); return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth, toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, glass, animations);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, visibleRows, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth, toolbarHeight, statusBarHeight, nativeDecorations, workspaceTheme, viewMode, glass, animations);
         }
     }
 }

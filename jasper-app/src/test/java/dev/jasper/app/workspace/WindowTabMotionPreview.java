@@ -22,7 +22,7 @@ public final class WindowTabMotionPreview {
             edt(() -> {
                 for (String appearance : new String[]{"dark", "light", "glass"}) {
                     var owner = content(launcher(new ArrayDeque<>()));
-                    owner.selectTheme(appearance.equals("light") ? Theme.INTELLIJ_LIGHT : Theme.DARK);
+                    owner.selectTheme(appearance.equals("light") ? dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT : Theme.DARK);
                     if (appearance.equals("glass")) owner.applyBackgroundOpacity(.55);
                     var model = new Contributions(); owner.connectContributions(model);
                     owner.closeTab(owner.currentTab());

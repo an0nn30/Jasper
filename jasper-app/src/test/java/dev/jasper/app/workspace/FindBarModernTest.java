@@ -44,7 +44,7 @@ class FindBarModernTest {
     @Test void modernBarIsOneRowWithInFieldTogglesAndIconOnlyNavigation() throws Exception {
         try (TerminalSession session = shell(HOME)) {
             edt(() -> {
-                new ThemeController(Theme.INTELLIJ_LIGHT);
+                new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
                 var query = bar.queryField();
                 assertThat(query.getAccessibleContext().getAccessibleName()).isEqualTo("Find in terminal");
@@ -85,7 +85,7 @@ class FindBarModernTest {
             until(() -> session.title().equals("ready"));
             FindBar[] bar = new FindBar[1];
             edt(() -> {
-                new ThemeController(Theme.INTELLIJ_LIGHT);
+                new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 var view = new TerminalView(session, TerminalOptions.defaults());
                 view.setSize(view.getPreferredSize());
                 bar[0] = attached(view); bar[0].open();
@@ -101,8 +101,8 @@ class FindBarModernTest {
                 SwingUtilities.updateComponentTreeUI(bar[0]);
                 assertThat(query.getBackground()).as("a theme switch keeps the no-match tint")
                     .isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
-                var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
-                themes.configure(Theme.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
+                var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
                     Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
                 WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
                 var tokens = themes.current().workspace().tokens();

@@ -19,7 +19,7 @@ public final class NativeNotifier implements AutoCloseable {
     }
 
     public NativeNotifier(boolean supported) {
-        this(supported && MacNotifications.libraryPath(System.getProperty("jpackage.app-path")) != null,
+        this(supported && MacNative.libraryPath(System.getProperty("jpackage.app-path")) != null,
             MacNotifications::send);
     }
 

@@ -31,4 +31,23 @@ class BenchmarkScriptTest {
             assertThat(output.lines().toList()).contains(prefix.replace('/', '.') + "Bench");
         }
     }
+
+    @Test void macScriptRunsTheStartupBenchWithTheImagePath() throws Exception {
+        Path image = temp.resolve("image with spaces/Jasper.app");
+        Path runtime = image.resolve("Contents/runtime/Contents/Home/bin/java");
+        Files.createDirectories(runtime.getParent());
+        Files.writeString(runtime, "#!/bin/sh\nprintf '%s\\n' \"$@\"\n");
+        assertThat(runtime.toFile().setExecutable(true)).isTrue();
+        Path jar = image.resolve("Contents/app/jasper-app.jar"); Files.createDirectories(jar.getParent());
+        try (var out = new JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new JarEntry("dev/jasper/app/benchmark/StartupBench.class")); out.closeEntry();
+        }
+        var process = new ProcessBuilder("/bin/sh", Path.of(System.getProperty("jasper.repoRoot"),
+            "tools/benchmarks/run-macos.sh").toString(), image.toString(), "startup", "revision",
+            temp.resolve("output.json").toString(), "--mode", "warm").redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(process.waitFor()).as(output).isZero();
+        assertThat(output.lines().toList()).contains("dev.jasper.app.benchmark.StartupBench", "--app", image.toString(),
+            "--mode", "warm");
+    }
 }

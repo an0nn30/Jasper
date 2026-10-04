@@ -10,10 +10,10 @@ import static org.assertj.core.api.Assertions.*;
 
 class NativeNotifierTest {
     @Test
-    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "jasper.testNotificationLibrary", matches = ".+")
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "jasper.testNativeLibrary", matches = ".+")
     @SuppressWarnings("restricted")
     void realNativeBridgeLoadsAndDeclinesAnUnbundledJvm() throws Exception {
-        System.load(System.getProperty("jasper.testNotificationLibrary"));
+        System.load(System.getProperty("jasper.testNativeLibrary"));
         var post = MacNotifications.class.getDeclaredMethod("post", String.class, String.class);
         post.setAccessible(true);
         // Exercises real JNI linkage without a permission prompt or notification side effect.
@@ -63,16 +63,16 @@ class NativeNotifierTest {
     }
 
     @Test void nativeLibraryBelongsToTheRunningBundleIncludingRenamedApps() {
-        assertThat(MacNotifications.libraryPath("/Applications/Jasper Preview.app/Contents/MacOS/Jasper"))
-            .isEqualTo(Path.of("/Applications/Jasper Preview.app/Contents/app/libjasper-notifications.dylib")
+        assertThat(MacNative.libraryPath("/Applications/Jasper Preview.app/Contents/MacOS/Jasper"))
+            .isEqualTo(Path.of("/Applications/Jasper Preview.app/Contents/app/libjasper-macos.dylib")
                 .toAbsolutePath());
     }
 
     @Test void unpackagedLaunchesDoNotUseAnotherApplicationsIdentity() {
-        assertThat(MacNotifications.libraryPath(null)).isNull();
-        assertThat(MacNotifications.libraryPath(" ")).isNull();
-        assertThat(MacNotifications.libraryPath("/usr/bin/java")).isNull();
-        assertThat(MacNotifications.libraryPath("/tmp/Contents/MacOS/Jasper")).isNull();
-        assertThat(MacNotifications.libraryPath("/Contents/MacOS/Jasper")).isNull();
+        assertThat(MacNative.libraryPath(null)).isNull();
+        assertThat(MacNative.libraryPath(" ")).isNull();
+        assertThat(MacNative.libraryPath("/usr/bin/java")).isNull();
+        assertThat(MacNative.libraryPath("/tmp/Contents/MacOS/Jasper")).isNull();
+        assertThat(MacNative.libraryPath("/Contents/MacOS/Jasper")).isNull();
     }
 }

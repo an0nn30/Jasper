@@ -141,6 +141,10 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             }
         }
         int remaining = slots.stream().mapToInt(slot -> slot.width.remainingMillis(now)).max().orElse(0);
+        // Shell/plugin metadata can arrive during a switch after all slot widths have settled.
+        // Preserve that transition's remaining time instead of snapping it or restarting its deadline.
+        remaining = Math.max(remaining, Math.max(folderX.remainingMillis(now),
+            Math.max(folderWidth.remainingMillis(now), folderAlpha.remainingMillis(now))));
         if (changed || switched || retitled) retargetFolder(now,
             changed ? duration : switched ? animations.tabSwitchMillis() : remaining);
         if (layoutWidth >= 0 && (changed || retitled)) doLayout();
@@ -309,7 +313,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     void setAnimations(AnimationSettings settings) {
         if (disposed || animations.equals(settings)) return;
         animations = settings;
-        // Config edits, including temporary duration edits, settle consistently across all windows.
+        // Config edits settle consistently across all windows.
         settle(); doLayout(); repaint();
     }
 

@@ -8,8 +8,8 @@ import dev.jasper.app.contributions.MenuTarget;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.config.ConfigSnapshot;
-import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
+import dev.jasper.app.config.ViewMode;
 
 import java.awt.*;
 import com.formdev.flatlaf.util.UIScale;
@@ -30,18 +30,8 @@ final class WindowChrome {
     private final WindowHeader header;
     private final WindowStatusBar status = new WindowStatusBar();
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
-    private final JMenu uiThemes = new JMenu("UI Theme");
-    private final JMenu workspaceThemes = new JMenu("Workspace Scheme");
-    private dev.jasper.app.appearance.ThemeCatalog.Snapshot displayedThemes;
-    private String displayedUi, displayedWorkspace;
-    private final MenuListener themeMenuListener = new MenuListener() {
-        @Override public void menuSelected(MenuEvent event) { rebuildThemeMenus(); }
-        @Override public void menuDeselected(MenuEvent event) {}
-        @Override public void menuCanceled(MenuEvent event) {}
-    };
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new MenuBarItems.CheckBox("Status Bar", true);
-    private final JCheckBoxMenuItem buddyVisible = new MenuBarItems.CheckBox("Show Jasper", false);
     private final JCheckBoxMenuItem railVisible = new MenuBarItems.CheckBox("Rail", true);
     private final java.util.EnumMap<MenuTarget.Slot, JMenu> standardMenus = new java.util.EnumMap<>(MenuTarget.Slot.class);
     private final List<Component> contributedToolbar = new ArrayList<>();
@@ -69,8 +59,18 @@ final class WindowChrome {
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);
-        JMenu view = menu("View", ActionId.COMMAND_PALETTE, ActionId.ZOOM_PANE, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET);
-        view.insertSeparator(1);
+        JMenu view = menu("View", ActionId.COMMAND_PALETTE);
+        view.addSeparator();
+        JMenu viewModes = menu("View Modes");
+        var zen = new MenuBarItems.CheckBox("Zen", false);
+        zen.setAction(owner.action(ActionId.TOGGLE_ZEN_MODE));
+        viewModes.add(zen);
+        view.add(viewModes);
+        view.add(new MenuBarItems.Item(owner.action(ActionId.ZOOM_PANE)));
+        view.addSeparator();
+        JMenu visibility = menu("Show/Hide");
+        view.add(visibility);
+        view.add(menu("Font Size", ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET));
         JMenu pane = menu("Pane", ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
             ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
             ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT);
@@ -87,15 +87,9 @@ final class WindowChrome {
             item.setActionCommand(mode.name());
             toolbarModes.add(item); modes.add(item);
         }
-        view.addSeparator(); view.add(modes); view.add(statusVisible); view.add(railVisible); view.add(buddyVisible);
+        visibility.add(modes); visibility.add(statusVisible); visibility.add(railVisible);
         statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
-        buddyVisible.setAction(owner.windowCommands().view("view.buddy"));
         railVisible.setAction(owner.windowCommands().view("view.rail"));
-        view.add(uiThemes); view.add(workspaceThemes);
-        view.add(new MenuBarItems.Item(owner.windowCommands().view("view.themes")));
-        view.addMenuListener(themeMenuListener);
-        uiThemes.addMenuListener(themeMenuListener); workspaceThemes.addMenuListener(themeMenuListener);
-        view.add(new MenuBarItems.Item(owner.windowCommands().view("view.window_settings")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
@@ -423,39 +417,8 @@ final class WindowChrome {
         return menu;
     }
 
-    void clearThemeMenus() { uiThemes.removeAll(); workspaceThemes.removeAll(); displayedThemes = null; }
-    void closeThemeMenus() {
-        clearThemeMenus(); uiThemes.removeMenuListener(themeMenuListener); workspaceThemes.removeMenuListener(themeMenuListener);
-        standardMenus.get(MenuTarget.Slot.VIEW).removeMenuListener(themeMenuListener);
-    }
-    private void rebuildThemeMenus() {
-        var catalog = owner.availableThemes(); String ui = owner.requestedUiTheme(), workspace = owner.requestedWorkspaceTheme();
-        if (catalog.equals(displayedThemes) && ui.equals(displayedUi) && workspace.equals(displayedWorkspace)) return;
-        displayedThemes = catalog; displayedUi = ui; displayedWorkspace = workspace;
-        fillThemes(uiThemes, catalog.names(), ui, false); fillThemes(workspaceThemes, catalog.names(), workspace, true);
-    }
-    private void fillThemes(JMenu menu, List<String> names, String selected, boolean workspace) {
-        menu.removeAll(); var group = new ButtonGroup();
-        if (workspace) addTheme(menu, group, "Same as UI theme", "match", selected, true);
-        for (int start = 0; start < names.size(); start += 30) {
-            int end = Math.min(start + 30, names.size());
-            JMenu destination = menu;
-            if (names.size() > 30) { destination = new JMenu((start + 1) + "–" + end); menu.add(destination); }
-            for (String name : names.subList(start, end)) addTheme(destination, group, name, name, selected, workspace);
-        }
-    }
-    private void addTheme(JMenu menu, ButtonGroup group, String label, String value, String selected, boolean workspace) {
-        var item = new JRadioButtonMenuItem(label); item.putClientProperty("html.disable", Boolean.TRUE);
-        item.setSelected(value.equalsIgnoreCase(selected)); group.add(item); menu.add(item);
-        item.addActionListener(event -> {
-            if (!owner.isActiveAndOpen() || owner.commandPalette().isOpen() || dev.jasper.app.platform.WindowInput.blocked(owner)) return;
-            if (workspace) owner.chooseWorkspaceTheme(value); else owner.chooseUiTheme(value);
-            // An attempted write may be rejected; the next open must rebuild the actual selection.
-            displayedThemes = null;
-        });
-    }
     void setToolbarMode(ToolbarMode mode) {
-        toolbar.setVisible(mode != ToolbarMode.HIDDEN);
+        toolbar.setVisible(owner.viewMode() == ViewMode.NORMAL && mode != ToolbarMode.HIDDEN);
         toolbar.setLabelsWanted(mode == ToolbarMode.ICONS_AND_LABELS);
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }

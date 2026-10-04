@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.*;
 class NamedIconsTest {
     @Test void catalogRendersEveryNameAndDistinctLockStates() {
         try {
-            new ThemeController(Theme.INTELLIJ_LIGHT);
+            new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME",
                 "SPLIT", "ZOOM", "TERMINAL", "SERVER");
             for (String name : NamedIcons.NAMES) {
@@ -30,7 +30,7 @@ class NamedIconsTest {
     }
 
     @Test void allSemanticIconsUseTheNewCatalogAndLockStatesFollowLiveThemes() {
-        var theme = new ThemeController(Theme.INTELLIJ_LIGHT);
+        var theme = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             for (String name : NamedIcons.NAMES)
                 if (!name.equals("KEY")) assertThat(AppIcons.bundledIds()).contains(NamedIcons.id(name));
@@ -54,7 +54,7 @@ class NamedIconsTest {
                     .digest(svg.readAllBytes()))).isEqualTo(fields[2]);
             }
         }
-        var theme = new ThemeController(Theme.INTELLIJ_LIGHT);
+        var theme = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             var key = AppIcons.named("KEY");
             var before = pixels(key, 1);

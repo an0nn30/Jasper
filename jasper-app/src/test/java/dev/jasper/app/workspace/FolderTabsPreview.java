@@ -57,14 +57,14 @@ public final class FolderTabsPreview {
                 var owner = owners[0]; var root = roots[0];
                 String[] titles = {"tmux", "amp", "pve-root", "dustin-vm"};
                 for (int i = 0; i < titles.length; i++) owner.terminalTabs().get(i).rename(titles[i]);
-                for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     owner.selectTheme(theme);
                     String name = theme.dark() ? "dark" : "light";
                     owner.selectTab(owner.terminalTabs().get(0)); render(root, owner, output, name + "-first", 1040);
                     owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, name + "-middle", 1040);
                     owner.selectTab(owner.terminalTabs().get(3)); render(root, owner, output, name + "-overflow", 350);
                 }
-                owner.selectTheme(Theme.INTELLIJ_LIGHT); owner.selectTerminalColors(TerminalColors.DARK);
+                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); owner.selectTerminalColors(TerminalColors.DARK);
                 owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, "light-chrome-dark-workspace", 1040);
                 owner.applyBackgroundOpacity(.5); render(root, owner, output, "glass", 1040);
             });

@@ -27,6 +27,6 @@ class NativeThemeNavigationTest {
         var ids = pages.stream().map(SettingsPage::id).toList();
         assertThat(ids).doesNotContain("themes", "themes.intellij", "themes.alacritty").contains("appearance", "terminal.font");
         for (var page : pages) page.parent().ifPresent(parent -> assertThat(ids).contains(parent));
-        assertThat(names).contains("Studio Dark", "Catppuccin Mocha");
+        assertThat(names).containsExactlyInAnyOrder("Jasper Light", "Jasper Dark", "Nord", "Clear Dark", "Clear Light");
     }
 }

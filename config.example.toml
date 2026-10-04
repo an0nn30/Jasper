@@ -23,10 +23,14 @@ lines = 35
 # Restart required. Windows and Linux only: true uses the operating system's title bar, with the menus and
 # the toolbar in rows of their own, instead of Jasper's title bar. macOS ignores it.
 native_decorations = false
+# Restart required. "normal" keeps the current workspace; "compact" uses the native title bar,
+# hides the title search field and all toolbar buttons, and floats the existing command palette.
+# Compact retains the saved toolbar preference for a return to Normal.
+view_mode = "normal"
 
 [buddy]
 # Live. Show the pixel-art Jasper floating above your windows while a terminal is open.
-# View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
+# Show/Hide Jasper in the command palette and right-click > Hide Jasper toggle him for the session.
 enabled = false
 
 [notifications]
@@ -35,11 +39,12 @@ enabled = false
 long_command_seconds = 10
 
 [system]
-# Restart required for residency; the login item updates on reload. Keep Jasper running with no
-# windows after the last one closes so the next launch can reuse the warm process, and start it in the background
-# at login. Quit (Cmd+Q) still exits completely. Autostart requires an installed Jasper: a
+# Keep Jasper running with no windows so a new window opens instantly, and start it in the background at login.
+# On by default on macOS and Windows and off on Linux, so it is commented out here: uncomment it to choose.
+# On macOS, Quit (Cmd+Q) closes every window and keeps Jasper in the menu bar; its Quit Jasper Completely ends it.
+# Restart required for residency; the login item updates on reload. Autostart requires an installed Jasper: a
 # ./gradlew run development session stays resident but never registers a login item.
-run_in_background = false
+# run_in_background = true
 
 [palette]
 # Live. Result rows the palette list shows before it scrolls. Range: 1-20.
@@ -114,7 +119,7 @@ family = "system"
 # size = 14.0
 
 [ui.theme]
-# Live across open windows: "Jasper Dark", "Jasper Light", "IntelliJ Light", "Darcula", or a theme in the themes folder.
+# Live across open windows: "Jasper Dark", "Jasper Light", "Nord", "Clear Dark", "Clear Light", or a theme in the themes folder.
 name = "Jasper Dark"
 # Workspace scheme, live: "match" follows the UI theme; or name a native theme.
 workspace = "match"
@@ -131,6 +136,8 @@ blur = "theme"
 enabled = true
 
 [keybindings]
+# Zen mode is unassigned by default. Assign it here or in Settings > Keymap.
+# toggle_zen_mode = "none"
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
 # On macOS, cmd is Command and alt/option is Option. Example:
 # new_tab = "cmd+t"

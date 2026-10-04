@@ -12,13 +12,23 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class CoreSettingsTest {
+    @Test void viewModeIsARestartOnlyChoiceWithNormalAsItsDefault() {
+        var setting = CoreSettings.WINDOW_VIEW_MODE;
+        assertThat(setting.name()).isEqualTo("window.view_mode");
+        assertThat(setting.label()).isEqualTo("View mode");
+        assertThat(setting.defaultValue()).isEqualTo(ViewMode.NORMAL);
+        assertThat(setting.applies()).isEqualTo(Applies.RESTART);
+        assertThat(((SettingKind.Choice<ViewMode>) setting.kind()).tokens()).containsExactly(
+            Map.entry("normal", ViewMode.NORMAL), Map.entry("compact", ViewMode.COMPACT));
+    }
+
     @Test void defaultsBuildTheBuiltInSnapshot() {
         assertThat(ConfigSnapshot.from(SettingValues.defaults(CoreSettings.SCHEMA), Map.of(), Map.of()))
             .isEqualTo(ConfigSnapshot.defaults());
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(38);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(39);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();
@@ -64,6 +74,17 @@ class CoreSettingsTest {
         assertThat(snapshot.terminal().env()).containsExactly(Map.entry("A", "1"));
         assertThat(snapshot.statusBarHeight()).isEqualTo(30);
         assertThat(snapshot.keybindings()).containsExactly(Map.entry("copy", "none"));
+    }
+
+    @Test void residencyIsOnByDefaultWhereAWindowlessJasperStaysReachable() {
+        assertThat(CoreSettings.runsInBackgroundByDefault("Mac OS X")).as("menu bar item and Dock").isTrue();
+        assertThat(CoreSettings.runsInBackgroundByDefault("Windows 11")).as("notification-area icon").isTrue();
+        assertThat(CoreSettings.runsInBackgroundByDefault("Linux")).as("no tray").isFalse();
+        assertThat(CoreSettings.runsInBackgroundByDefault("FreeBSD")).isFalse();
+        assertThat(CoreSettings.runsInBackgroundByDefault(null)).isFalse();
+        assertThat(CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue())
+            .isEqualTo(CoreSettings.runsInBackgroundByDefault(System.getProperty("os.name")));
+        assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isEqualTo(CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue());
     }
 
     @org.junit.jupiter.api.Test void nativeDecorationsIsARestartOnlyWindowSettingOffByDefault() {

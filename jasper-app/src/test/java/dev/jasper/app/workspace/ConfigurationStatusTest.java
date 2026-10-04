@@ -17,7 +17,7 @@ class ConfigurationStatusTest {
     @Test void statusKeepsConfigAndMetadataBoundedAndReadableInBothThemes() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
-            for (Theme theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 themes.configure(theme);
                 var status = new WindowStatusBar();
                 status.applyPalette(theme.palette());
@@ -46,7 +46,7 @@ class ConfigurationStatusTest {
         edt(() -> {
             var themes = new ThemeController();
             var status = new WindowStatusBar();
-            for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 themes.configure(theme);
                 status.applyPalette(theme.palette());
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
@@ -60,7 +60,7 @@ class ConfigurationStatusTest {
         edt(() -> {
             var themes = new ThemeController();
             try {
-                for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     themes.configure(theme);
                     var status = new WindowStatusBar();
                     status.setSize(600, 30); status.doLayout();

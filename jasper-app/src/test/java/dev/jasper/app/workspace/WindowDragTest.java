@@ -154,6 +154,66 @@ class WindowDragTest {
         });
     }
 
+    @Test void theGuideForALowerHalfShowsThatHalfEvenWhenTheWindowWillFillTheSide() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.sessions", Contributions.PanelRequest.Op.SHOW));
+            f.layout();
+            Rectangle wholeSide = frame(f, Slot.LEFT_TOP);
+            assertThat(wholeSide.height).as("alone on the left, Sessions fills the side").isEqualTo(f.workspace().height);
+
+            var sessions = f.drag(f.button("Sessions"), f.zone(Slot.LEFT_BOTTOM));
+            assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.workspace(Slot.LEFT_BOTTOM));
+            Rectangle guide = SwingUtilities.convertRectangle(f.root.getLayeredPane(), f.owner.dockDrag().overlay().highlight(), f.owner);
+            assertThat(guide.height).as("the guide is the lower half, not the whole side").isLessThan(wholeSide.height * 6 / 10);
+            assertThat(guide.y).isGreaterThan(wholeSide.y + wholeSide.height * 4 / 10);
+            assertThat(guide.y + guide.height).as("down to the side's foot").isEqualTo(wholeSide.y + wholeSide.height);
+            assertThat(guide.x).isEqualTo(wholeSide.x);
+            assertThat(guide.width).isEqualTo(wholeSide.width);
+            assertThat(f.owner.area().content(Slot.LEFT_BOTTOM)).as("the real layout does not reflow").isNull();
+            assertThat(frame(f, Slot.LEFT_TOP)).as("Sessions still fills the side while the guide shows").isEqualTo(wholeSide);
+
+            f.mouse(sessions, MouseEvent.MOUSE_RELEASED, f.zone(Slot.LEFT_BOTTOM));
+            f.layout();
+            assertThat(f.owner.dock().slot("dev.x.sessions")).hasValue(Slot.LEFT_BOTTOM);
+            assertThat(f.owner.dock().visible("dev.x.sessions")).isTrue();
+            assertThat(f.owner.area().content(Slot.LEFT_TOP)).as("nothing left above it").isNull();
+            assertThat(frame(f, Slot.LEFT_BOTTOM)).as("alone in its slot, the window still fills the whole side").isEqualTo(wholeSide);
+
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.files", Contributions.PanelRequest.Op.SHOW));
+            f.layout();
+            assertThat(frame(f, Slot.LEFT_BOTTOM)).as("a window above splits the side: the lower frame is the guide that showed")
+                .isEqualTo(guide);
+            assertThat(f.events).containsExactly("sessions:true", "files:true");
+        });
+    }
+
+    @Test void theGuideForTheBottomAreasRightHalfShowsThatHalfWhenAHiddenPanelWillFillTheBottomArea() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            f.model.addPanel("dev.x.logs", "Logs", new ImageIcon(), Slot.BOTTOM_LEFT, site -> new JLabel("logs"));
+            Rectangle workspace = f.workspace();
+            var files = f.drag(f.button("Files"), f.zone(Slot.BOTTOM_RIGHT));
+            assertThat(f.owner.dockDrag().target()).hasValue(DockDropResolver.Target.workspace(Slot.BOTTOM_RIGHT));
+            Rectangle guide = SwingUtilities.convertRectangle(f.root.getLayeredPane(), f.owner.dockDrag().overlay().highlight(), f.owner);
+            assertThat(guide.width).as("the right half of the bottom area, not all of it").isLessThan(workspace.width * 6 / 10);
+            assertThat(guide.x).isGreaterThan(workspace.x + workspace.width * 4 / 10);
+            assertThat(guide.x + guide.width).as("out to the right stripe").isEqualTo(workspace.x + workspace.width);
+            assertThat(f.owner.area().content(Slot.BOTTOM_RIGHT)).as("the real layout does not reflow").isNull();
+
+            f.mouse(files, MouseEvent.MOUSE_RELEASED, f.zone(Slot.BOTTOM_RIGHT));
+            f.layout();
+            assertThat(f.owner.dock().slot("dev.x.files")).hasValue(Slot.BOTTOM_RIGHT);
+            Rectangle alone = frame(f, Slot.BOTTOM_RIGHT);
+            assertThat(alone.x).as("alone in the bottom area, Files fills its whole width").isEqualTo(workspace.x);
+            assertThat(alone.width).isEqualTo(workspace.width);
+
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.logs", Contributions.PanelRequest.Op.SHOW));
+            f.layout();
+            assertThat(frame(f, Slot.BOTTOM_RIGHT)).as("with Logs beside it, Files is the half the guide showed").isEqualTo(guide);
+        });
+    }
+
     @Test void withABottomAreaShowingASideSplitsAtHalfOfTheSidePanelsVisibleHeight() throws Exception {
         edt(() -> {
             var f = new Fixture();

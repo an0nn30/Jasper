@@ -17,8 +17,8 @@ class ThemeStateTest {
 
     @Test void explicitWorkspaceSurvivesChromeChangesAndMissingResetsToMatch() {
         var choice = new WorkspaceThemeChoice("Darcula");
-        var state = new ThemeState(Theme.DARK, choice, Theme.DARCULA);
-        assertThat(state.resolve().workspace()).isSameAs(ThemeManager.generated(Theme.DARCULA));
+        var state = new ThemeState(Theme.DARK, choice, dev.jasper.app.appearance.ThemeFixtures.DARCULA);
+        assertThat(state.resolve().workspace()).isSameAs(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA));
         assertThat(state.configure(Theme.JASPER_LIGHT).workspaceChoice()).isEqualTo(choice);
         assertThat(state.configure(Theme.JASPER_LIGHT).resolve().workspace()).isSameAs(state.resolve().workspace());
         var missing = new ThemeState(Theme.DARK, new WorkspaceThemeChoice("Missing"), null).resolve();

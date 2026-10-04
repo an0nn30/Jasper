@@ -266,6 +266,32 @@ failure leaves an opaque window.
 ./gradlew :jasper-app:testMacGlass :jasper-terminal:test --tests "*TerminalPainterTest"
 ```
 
+## Packaged runtime, bundled natives and the AOT cache
+
+`gradle/packaging-support.gradle` holds what packaging decides: the runtime's modules, the native libraries copied into
+the app and the AOT training launch. `verifyPackagingSupport` (in `check`) tests it with fixtures; `verifyPackage`
+checks a built image ([start-up performance](packaging.md#start-up-performance)).
+
+- **A plugin or library needs another JDK module.** Add it to `runtimeRootModules` (and to the required list in
+  `runtimeModules` when it pulls in a module not yet listed), add it to the `runtime-modules` block of
+  [The Java runtime](plugin-authoring.md#the-java-runtime), and rebuild: `verifyPackagingSupport` fails until the
+  documented list matches, and `verifyPackage`'s `jdeps` check names any module a bundled plugin still lacks.
+- **Upgrading FlatLaf, JNA or pty4j.** Check that the resources in `bundledNatives` still exist under the same names
+  and that the properties in `bundledNativeJvmOptions` still apply. `BundledNativesProbeTest` (macOS, in `check`)
+  loads them from a folder laid out like the image; `verifyPackage` fails when a jar lacks an entry or the image loads
+  a library from elsewhere.
+- **A new JVM option.** `verifyPackage` accepts only the application's own options (`applicationDefaultJvmArgs`, which
+  on macOS include the workspace glass `--add-opens`/`--add-exports`), `bundledNativeJvmOptions`, jpackage's app
+  version and, once trained, `-XX:AOTCache`. Add an option to one of those lists, never to `Jasper.cfg` alone; the AOT
+  training launch and `aotCheckCommand` read the same `Jasper.cfg`, so a trained cache always matches its options.
+- **Jasper's own macOS bridges** (`libjasper-macos.dylib` from `gradle/mac-native.gradle`, `libjasper-glass.dylib`
+  from `gradle/mac-glass.gradle`) are not bundled natives: each is staged by `stagePackage`, copied back after jpackage
+  re-signs it in `packageApp` (so the staged bytes and their ad-hoc signature survive), and listed in `verifyPackage`'s
+  bridge check with the JNI symbols it must export. A new bridge needs all three.
+- **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
+  trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
+  `-Pjasper.aot=true`.
+
 ## Session lifecycle change
 
 Begin with [SessionLaunchCoordinator](../jasper-app/src/main/java/dev/jasper/app/application/SessionLaunchCoordinator.java), [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/launch/ShellLauncher.java) and [TerminalPane](../jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java). Capture launch settings when requested, start off EDT, and validate lifetime after delivery to EDT. Close a late returned session and never attach it. Pane close owns admitted sessions; application shutdown stops admission and waits off EDT via ApplicationShutdown. Keep the coordinator drain future in that wait so accepted launch workers and their late children remain tracked even if no session existed at shutdown start. Register endpoint/process cleanup through JasperApplication.onShutdown: it runs on a daemon worker within the bounded application wait, so callbacks must not touch Swing. Keep TERM/COLORTERM and the terminal library threading contract. This example builds options only; it launches no shell.
@@ -302,8 +328,9 @@ change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 
 
 `tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
 refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
-assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 286 native files, index, legacy
-aliases and third-party notices entirely offline. Normal build/test never fetches. Do not normalize upstream bytes.
+assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates the five shipped native files (Jasper Light/Dark, Clear Dark/Light and Nord), index, legacy
+aliases and third-party notices entirely offline. The wider source lock remains for import/converter coverage; it does not expand the shipped catalog.
+Normal build/test never fetches. Do not normalize upstream bytes.
 Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
 colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
 
@@ -341,17 +368,19 @@ See [Remote](remote.md) for settings and native acceptance.
 ### macOS notification identity
 
 `platform.NativeNotifier` dispatches off the EDT to `MacNotifications`, which loads
-`Contents/app/libjasper-notifications.dylib` beside the current jpackage launcher.
+`Contents/app/libjasper-macos.dylib` (through `MacNative`, shared with `MacDock`) beside the current jpackage launcher.
 The Objective-C bridge uses `UNUserNotificationCenter` in Jasper's process: identity,
 icon and permission belong to `dev.jasper.app`. Never restore an `osascript` fallback;
 its notices carry AppleScript's icon. Java text is copied as UTF-16, never evaluated.
 The native delegate allows banners for hidden panes while Jasper is foreground;
 the existing Java notification policy decides which completions qualify.
 
-`gradle/mac-notifications.gradle` compiles the bridge with the JBR JNI headers and
-Apple's command line tools on macOS. `check` runs its headless fake-center harness
-(permission granted/denied/error, deferred delivery, literal Unicode, unique requests,
-foreground presentation, non-bundle guard). Other platforms skip native compilation.
+`gradle/mac-native.gradle` compiles the one bridge library from `MacNotifications.m` and `MacDock.m` with the JBR JNI
+headers and Apple's command line tools on macOS. `check` runs one headless harness per source: `testMacNotifications`
+(permission granted/denied/error, deferred delivery, literal Unicode, unique requests, foreground presentation,
+non-bundle guard) and `testMacDock` (the activation policy on a fake NSApp, the main-thread helper called on the main
+thread, where it runs inline; the hop from another thread is not covered, the power-off flag on a private
+notification center, non-bundle guard). Other platforms skip native compilation.
 Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it.
 Gradle/IDE runs intentionally send no system notifications because they lack Jasper's
 bundle identity. Test a packaged app manually: run `sleep 12`, switch to another app,
@@ -362,6 +391,52 @@ is user-run; headless tests never show a prompt or banner.
 API references: [Apple UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter),
 [requesting permission](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).
 
+### macOS Dock presence and the menu bar item
+
+`platform.MacDock` switches the activation policy through `libjasper-macos.dylib` (`MacDock.m`): regular (Dock icon,
+Cmd+Tab, Jasper's menu bar) while a window is open, accessory with none. The switch runs on the AppKit thread and the
+EDT waits for it, in AWT's run loop mode too, so a window shown next always meets the policy. `MacDock.show` is called
+only on the EDT, with no AWT lock held (the EDT blocks until AppKit's main thread has run the block), and never on the
+quit-for-real path. The same bridge watches `NSWorkspaceWillPowerOffNotification`: a quit request during a log-out or
+shutdown quits for real and is not cancelled. `JasperApplication` holds the state (`DockPresence`) and receives the
+bridge as a `DockControl`, so tests use a recording stand-in. A `--background` launch sets `apple.awt.UIElement` before
+the toolkit initialises, only when `MacDock.available(osName, appPath)` holds (macOS, and the bundle carries the
+library), so a development run or an image without the bridge never starts hidden. `platform.ResidentTray` is the macOS
+menu bar item (a template image of the TERMINAL artwork; `apple.awt.enableTemplateImages` is set with the desktop
+properties) and the Windows notification-area icon.
+
+Start-up does not wait for any of this. The bridge is prepared, and the menu bar item or notification-area icon
+appears, in one idempotent step once start-up has settled (`residencySettled`: the first output painted, a finished
+`--background` warm-up, or 2 s after the first paint, whichever comes first), and never at the first paint itself.
+`DockControl.prepare` is a `BooleanSupplier`: `MacDock.prepare()` returns whether the bridge loaded and the power-off
+observer is installed, and `DockPresence.prepared()` holds only then. Until it does, and whenever preparation reported
+failure, Jasper cannot tell a log-out from a user's Quit, so a quit is a real quit: it never goes to the background.
+`quitIsSystemQuit()` is that decision: a resident process with a Dock presence that is not prepared or whose power-off
+flag is set. A process that is not resident keeps the ordinary quit (cancel, then `quit()`) even with a presence
+installed, as does one with no presence (a development run, Windows, Linux). On the system branch the request is a real
+quit, and only two things cancel it: the Shortcuts recorder holding Cmd+Q (when macOS is not powering off), or a
+refusing guard, because `quit()` goes through `pluginWindowsMayClose()` (a content tab's or a plugin window's closing
+guard, or a plugin quit guard). The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a
+cancelled log-out a later Cmd+Q quits for real, which is the safe direction. One behaviour is accepted: during a log-out
+with Jasper hidden, a plugin quit guard that opens a window or an ownerless dialog brings Jasper back into the Dock
+first (the dialog needs the menu bar and focus to be answered).
+
+The `--background` warm-up rehearses a window (`JasperApplication.warmUp`, `application.Rehearsal`) as well as
+building the fonts. The window is composed with the configured grid, theme and contributions around a canned terminal
+session fed from memory, so it starts no shell, PTY or child process; it is painted once into an image and disposed,
+never shown. It must stay invisible to everything else: it opens no `WindowTrace` and marks no `FIRST_PAINT` or
+`OUTPUT_PAINTED` (those would settle residency for a window nobody sees), only `WARMED_UP`, which the `done` callback
+passed to `warmUp` marks whether the rehearsal succeeded, failed or threw; it is not registered with the terminal registry and is not a
+content host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it;
+and its error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as
+incidents (`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved window layout and is
+discarded rather than closed (`TerminalWindow.discard`, also used for a window that failed to compose), so its default
+size and layout never become the last window closed, which the next window restores. A process that has warmed up labels its first plain window
+`menu` rather than `cold`. Once `done` has run, on every path (a played rehearsal, a failed one, an `Error`, and the
+headless early return), `warmUp` starts one `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's
+garbage does not stay in the resident heap (user decision 2026-10-03); `JasperApplication.collector` is the test seam.
+GUI behaviour is on the packaging checklist; `testMacDock` covers the native code
+headlessly, and a headless JVM cannot build a `TerminalWindow`, so some failure paths here are covered by reading only.
 
 ### Unified workspace header
 
@@ -407,7 +482,10 @@ while the stripes are visible, matching rounded corners for the terminal/tab col
 the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
-tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
+on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
+partner held a window (a stand-in in the copy of the state), even where the dropped window will really fill the side or
+the bottom area because its partner is empty. The first slots keep the true landing.
 What a drop over the workspace targets is `DockDropResolver`'s job: the nearest of the left, right and
 bottom edges (each distance a share of the workspace's own width or height, so the zones keep their shape
 at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height

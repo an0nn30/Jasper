@@ -89,7 +89,7 @@ class MacTitleBarTest {
             DockTestSupport.show(owner, dev.jasper.app.dock.Slot.RIGHT_TOP, right, 200);
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(1400, 600);
-                for (Theme theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     owner.selectTheme(theme);
                     for (int height : new int[] {28, 30, 64}) {
                         owner.setToolbarHeight(height); layoutTree(root);
@@ -146,7 +146,7 @@ class MacTitleBarTest {
             assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
             assertThat(root.getClientProperty("apple.awt.transparentTitleBar")).isNull();
             assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isNull();
-            owner.selectTheme(Theme.INTELLIJ_LIGHT);
+            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isNull();
             owner.currentTab().rename("plain window"); owner.update();
             assertThat(metadata.get()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
@@ -200,7 +200,7 @@ class MacTitleBarTest {
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0xa7b2bf));
                 bar.setActive(false);
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0xa7b2bf));
-                owner.selectTheme(Theme.INTELLIJ_LIGHT);
+                owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
                 assertThat(pixel(bar)).isEqualTo(new Color(0xf2f2f2));
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x8a8a8a));
@@ -227,7 +227,7 @@ class MacTitleBarTest {
             owner.onMinimumSizeChanged = changed::incrementAndGet;
             root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(100, 80));
             assertThat(changed.get()).isZero();
-            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(Theme.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(Theme.INTELLIJ_LIGHT)));
+            owner.onThemeChanged.accept(new ResolvedTheme(dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT), dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)));
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
         });
     }
@@ -238,9 +238,9 @@ class MacTitleBarTest {
             var root = new JRootPane();
             try (var bar = MacTitleBar.install(root, new JPanel(), () -> { }, true)) {
                 bar.setTitle("Credential Vault");
-                for (Theme theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     themes.configure(theme); SwingUtilities.updateComponentTreeUI(root);
-                    bar.setLight(theme == Theme.INTELLIJ_LIGHT); bar.setSize(800, 28); bar.doLayout();
+                    bar.setLight(theme == dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); bar.setSize(800, 28); bar.doLayout();
                     var image = new BufferedImage(800, 28, BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics();
                     try { bar.paint(graphics); } finally { graphics.dispose(); }

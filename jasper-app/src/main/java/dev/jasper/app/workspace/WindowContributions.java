@@ -232,21 +232,32 @@ final class WindowContributions implements AutoCloseable {
     private void docked(DockState.Change change) {
         // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
         owner.dockDrag().cancel();
-        for (String id : change.shown()) build(id);
+        if (!owner.zenMode()) for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
         // Hiding a window by any route returns focus to the terminal.
         if (!change.hidden().isEmpty()) owner.focusSelected();
-        for (String id : change.shown()) notifyVisibility(id, true);
+        for (String id : change.shown()) notifyVisibility(id, !owner.zenMode());
         persist();
     }
+
+    /** Sends actual visibility to plugins while leaving the normal dock layout (and its saved state) alone. */
+    void viewModeChanged() {
+        if (!owner.zenMode()) {
+            for (String id : List.copyOf(panels.keySet())) if (dock.visible(id)) build(id);
+            owner.area().sync();
+        }
+        for (String id : List.copyOf(panels.keySet())) notifyVisibility(id, visible(id));
+    }
+
+    private boolean visible(String id) { return !owner.zenMode() && dock.visible(id); }
 
     /** Builds the panel's instance the first time it shows in this window; a failing factory yields a placeholder. */
     private void build(String id) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.component != null) return;
-        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id));
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> visible(id));
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
@@ -260,7 +271,7 @@ final class WindowContributions implements AutoCloseable {
     /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
     private void notifyVisibility(String id, boolean visible) {
         PanelInstance panel = panels.get(id);
-        if (panel == null || panel.site == null || dock.visible(id) != visible || panel.notified == visible) return;
+        if (panel == null || panel.site == null || visible(id) != visible || panel.notified == visible) return;
         panel.notified = visible;
         panel.site.notifyVisibility(visible);
     }
@@ -286,6 +297,7 @@ final class WindowContributions implements AutoCloseable {
             }
         }
         state.setRailVisible(owner.railVisible());
+        state.setZenMode(owner.zenMode());
         state.setDock(new UiState.Dock(dock.size(Side.LEFT), dock.size(Side.RIGHT), dock.size(Side.BOTTOM),
             dock.ratio(Side.LEFT), dock.ratio(Side.RIGHT), dock.ratio(Side.BOTTOM)));
         state.save();
@@ -324,7 +336,7 @@ final class WindowContributions implements AutoCloseable {
     /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
     void refreshTheme() {
         for (PanelInstance panel : panels.values())
-            if (panel.component != null && !dock.visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
+            if (panel.component != null && !visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
     }
 
     private void changed(Contributions.Kind kind) {
@@ -387,9 +399,15 @@ final class WindowContributions implements AutoCloseable {
         return structural;
     }
 
-    @Override public void close() {
+    @Override public void close() { close(true); }
+
+    /**
+     * As {@link #close()}. With {@code remember} false the window's layout is not saved first: the window is discarded
+     * (it failed to compose, or it is the warm-up rehearsal's), so it must not become the last window closed.
+     */
+    void close(boolean remember) {
         if (listening == null) return;
-        persist();
+        if (remember) persist();
         listening.close();
         listening = null;
         // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.

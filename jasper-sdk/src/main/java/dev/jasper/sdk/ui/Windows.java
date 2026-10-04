@@ -39,6 +39,11 @@ public interface Windows {
      * cancels the quit. A guard that throws, returns {@code null} or whose future fails allows the quit. The guard
      * runs on the UI thread and may show a modal dialog before completing its future.
      *
+     * <p>It is asked on a real quit or restart only. A resident macOS Jasper answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's
+     * Quit and a terminal window's File &rsaquo; Quit by closing its windows through the content tabs' and plugin windows'
+     * closing guards and going to the background. That does not ask this guard, and the plugin keeps running until Jasper
+     * really quits (Quit Jasper Completely, a log-out or restart, or a request from another launch to retire).
+     *
      * @param guard returns the decision, possibly after asking the user
      * @return the registration; closing it removes the guard
      * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread

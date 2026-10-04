@@ -22,6 +22,17 @@ class AuxiliaryWindowsTest {
             () -> shellEvents.add("dispose"), title -> shellEvents.add("title:" + title), () -> new Rectangle(10, 20, 640, 480), (title, initial) -> java.util.Optional.empty());
     });
 
+    @Test void reportsWhenASurfaceOpensWhileNoneIsOpen() {
+        List<String> events = new ArrayList<>();
+        windows.onFirstOpened = () -> events.add("first");
+        windows.window("dev.x.a", "A", new Dimension(10, 10), false);
+        windows.window("dev.x.b", "B", new Dimension(10, 10), false);
+        assertThat(events).containsExactly("first");
+        windows.close();
+        windows.window("dev.x.c", "C", new Dimension(10, 10), false);
+        assertThat(events).containsExactly("first", "first");
+    }
+
     @Test void onlyOneOverlayCanOwnATerminalWindow() {
         UUID owner = UUID.randomUUID();
         var first = windows.overlay("Connecting", owner);

@@ -188,7 +188,7 @@ final class ToolWindowArea extends JPanel {
         @Override public Dimension minimumLayoutSize(Container parent) { return size(center.getMinimumSize(), false); }
 
         @Override public void layoutContainer(Container parent) {
-            var layout = DockGeometry.compute(new Rectangle(0, 0, getWidth(), getHeight()), preview != null ? preview : state, metrics());
+            var layout = DockGeometry.compute(new Rectangle(0, 0, getWidth(), getHeight()), layoutState(), metrics());
             center.setBounds(layout.terminal());
             hosts.forEach((slot, host) -> host.setBounds(layout.slot(slot).orElseGet(Rectangle::new)));
             dividers.values().forEach(divider -> {
@@ -199,6 +199,8 @@ final class ToolWindowArea extends JPanel {
     }
 
     private final DockState state;
+    private final DockState emptyLayout = new DockState();
+    private boolean toolsSuppressed;
     private final Host center = new Host(false);
     private final JPanel lowerInset = new JPanel() {
         @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(SURFACE_ARC / 2)); }
@@ -270,7 +272,7 @@ final class ToolWindowArea extends JPanel {
      */
     void sync() {
         for (Slot slot : Slot.values()) {
-            String id = state.active(slot).orElse(null);
+            String id = toolsSuppressed ? null : state.active(slot).orElse(null);
             Content wanted = id == null ? null : contents.get(id);
             Host host = hosts.get(slot);
             if (host != null && (wanted == null || host.content != wanted.component())) {
@@ -296,6 +298,17 @@ final class ToolWindowArea extends JPanel {
         revalidate(); repaint();
         onMinimumSizeChanged.run();
     }
+
+    /** Zen changes the presentation only: no dock mutation, persistence or disposal of plugin content. */
+    void setToolsSuppressed(boolean suppressed) {
+        if (toolsSuppressed == suppressed) return;
+        toolsSuppressed = suppressed;
+        preview = null;
+        dividers.values().forEach(divider -> { divider.dragging = null; divider.moved = false; });
+        sync();
+    }
+
+    private DockState layoutState() { return toolsSuppressed ? emptyLayout : preview != null ? preview : state; }
 
     private ToolWindowHeader header(String id, String title) {
         return new ToolWindowHeader(title,
@@ -353,7 +366,7 @@ final class ToolWindowArea extends JPanel {
      */
     private void refreshGutters() {
         int top = headerVisible ? 0 : GUTTER, edge = stripesVisible ? 0 : GUTTER, bottom = statusVisible ? 0 : GUTTER;
-        boolean bottomShown = state.showing(Side.BOTTOM);
+        boolean bottomShown = layoutState().showing(Side.BOTTOM);
         center.rounded = stripesVisible;
         lowerInset.setVisible(stripesVisible);
         if (stripesVisible) center.gutters(top, 0, bottomShown ? 0 : bottom, 0);
@@ -368,7 +381,7 @@ final class ToolWindowArea extends JPanel {
         });
     }
 
-    private Dimension size(Dimension terminal, boolean preferred) { return size(terminal, state, metrics(), preferred); }
+    private Dimension size(Dimension terminal, boolean preferred) { return size(terminal, toolsSuppressed ? emptyLayout : state, metrics(), preferred); }
 
     /**
      * The area's preferred or minimum size around a terminal column of the given size. Only a split side raises the

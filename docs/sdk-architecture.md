@@ -97,7 +97,9 @@ header with plain mouse events: `DockDropResolver` finds the target under the cu
 group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
 bottom edges, a side split at half the side panels' visible height and the bottom at half its
 width), the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews
-the landing with `DockGeometry.landing`, the same function as the layout. A stripe drop moves the
+the landing with `DockGeometry.landing`, the layout's function on a copy of the state, except that the guide for a
+second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, even where the window will fill the
+side or the bottom area. A stripe drop moves the
 window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
 drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
 Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
@@ -387,7 +389,10 @@ records no relaunch. Start-up rollback, a `--background` launch that cannot stay
 benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
 launch goes through `quit()` and does. Since SDK 0.11.0 the same check then asks `Windows.onQuitting` guards, kept in
 `Contributions.quitGuards()` (`QuitGuards`), one at a time, pumping UI events while a decision is pending; a refusal
-cancels, and a guard that throws or fails allows the quit.
+cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper's Cmd+Q does not go through `quit()`:
+`quitRequested()` calls `toBackground()`, which asks only `windowsMayClose()` (content tabs and plugin windows), so
+`Windows.onQuitting` guards are not asked and plugin background work keeps running until `quit()` (Quit Jasper
+Completely, a log-out or a retire request).
 
 `Windows.chooseSaveFile` is the save-target twin of `chooseFiles`: `PathChoice.Mode.SAVE` makes
 `NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and

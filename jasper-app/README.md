@@ -7,8 +7,8 @@ recents, residency and native desktop integration; shell history and snippets ar
 ## First checkout
 
 ```sh
-git clone https://github.com/an0nn30/moray.git
-cd moray
+git clone https://github.com/an0nn30/Jasper.git
+cd Jasper
 ./gradlew check
 ./gradlew :jasper-app:installDist
 ```
@@ -80,7 +80,7 @@ updating reflective class names in `.properties` files.
 
 ## Native theme engine
 
-The app ships 286 native TOML themes and reads user TOMLs from `themes/` beside the selected config. Appearance
+The app ships five native TOML themes and reads user TOMLs from `themes/` beside the selected config. Appearance
 and Terminal > Font & Colors share the catalog. `themeimport` owns offline conversion, locked generation, safe
 import operations and legacy-file recovery; `application.ThemeUpgrade` runs before ConfigService. The old stores
 are retired. See [themes](../docs/themes.md), [maintenance](../docs/app-maintenance.md#themes) and

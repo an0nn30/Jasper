@@ -13,11 +13,13 @@ on:
   push:
     paths:
       - gradle/packaging.gradle
+      - gradle/packaging-support.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
   pull_request:
     paths:
       - gradle/packaging.gradle
+      - gradle/packaging-support.gradle
       - packaging/**
       - .github/workflows/linux-packages.yml
 

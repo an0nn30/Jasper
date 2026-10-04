@@ -53,6 +53,11 @@ public final class AppIcons {
         return id.equals("standard/KEY") ? KEY : bundled(id);
     }
 
+    /** The authored light SVG behind a semantic name, for a surface that renders it itself (the macOS menu bar glyph). */
+    static java.net.URL artwork(String name) {
+        return Objects.requireNonNull(AppIcons.class.getClassLoader().getResource(BASE + NamedIcons.id(name) + ".svg"), name);
+    }
+
     /** Select authored host artwork for an independently coloured surface; custom icons stay intact. */
     public static Icon forBackground(Icon icon, Color background) {
         if (!(icon instanceof ZoneIcon zone)) return icon;

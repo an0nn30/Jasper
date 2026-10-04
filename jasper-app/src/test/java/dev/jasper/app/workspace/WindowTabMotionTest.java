@@ -81,6 +81,43 @@ class WindowTabMotionTest {
         });
     }
 
+    @Test void anUnrelatedTitleUpdatePreservesTheSwitchPositionAndDeadline() throws Exception {
+        edt(() -> {
+            var fixture = fixture();
+            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second");
+            fixture.strip.refresh(); fixture.advance(150);
+            var second = fixture.owner.currentTab();
+            fixture.owner.selectTab(fixture.owner.tabStrip().getComponentAt(0)); fixture.strip.refresh();
+            fixture.advance(65);
+            var before = fixture.strip.folderBounds();
+            assertThat(before.getX()).isGreaterThan(0);
+            second.rename("third"); fixture.strip.refresh();
+            assertThat(fixture.strip.folderBounds()).as("metadata must not snap the selected folder").isEqualTo(before);
+            fixture.advance(64);
+            assertThat(fixture.strip.motionRunning()).isTrue();
+            fixture.advance(1);
+            assertThat(fixture.strip.folderBounds().getX()).isZero();
+            assertThat(fixture.strip.motionRunning()).as("metadata must not extend the switch deadline").isFalse();
+        });
+    }
+
+    @Test void aTitleChangingTheSwitchDestinationRetargetsWithoutExtendingItsDeadline() throws Exception {
+        edt(() -> {
+            var fixture = fixture();
+            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second");
+            fixture.strip.refresh(); fixture.advance(150);
+            var first = fixture.owner.terminalTabs().get(0);
+            fixture.owner.selectTab(first); fixture.strip.refresh(); fixture.advance(65);
+            var before = fixture.strip.folderBounds();
+            first.rename("a shell title with enough characters to use the maximum tab width"); fixture.strip.refresh();
+            assertThat(fixture.strip.folderBounds()).isEqualTo(before);
+            fixture.advance(65);
+            assertThat(fixture.strip.folderBounds().getX()).isZero();
+            assertThat(fixture.strip.folderBounds().getWidth()).isEqualTo(240);
+            assertThat(fixture.strip.motionRunning()).isFalse();
+        });
+    }
+
     @Test void rapidMouseClicksRetargetTheMovingFolderWithoutSnapping() throws Exception {
         edt(() -> {
             var fixture = fixture(); fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second");

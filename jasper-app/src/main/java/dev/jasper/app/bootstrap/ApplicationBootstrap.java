@@ -1,5 +1,6 @@
 package dev.jasper.app.bootstrap;
 
+import dev.jasper.app.application.DockControl;
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.commands.CommandHistory;
@@ -8,11 +9,14 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.AppLog;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.LoginItem;
+import dev.jasper.app.platform.MacDock;
 import dev.jasper.app.platform.ResidentTray;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
+import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.bootstrap.StartupResources;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -28,6 +32,7 @@ public final class ApplicationBootstrap {
     private ApplicationBootstrap() {}
 
     public static void main(String[] args) {
+        StartupTrace.current().mark(StartupTrace.Milestone.MAIN_ENTERED);
         int result = start(args, System.out, System.err, ApplicationBootstrap::prepareDesktop);
         if (result != 0) System.exit(result);
     }
@@ -54,7 +59,8 @@ public final class ApplicationBootstrap {
             configureDesktopProperties();
             // Before the look and feel and any window: a restart-only choice, like residency.
             dev.jasper.app.platform.TitleBarStyle.choose(System.getProperty("os.name").startsWith("Mac"),
-                service.initialState().snapshot().nativeDecorations()).configure();
+                service.initialState().snapshot().nativeDecorations(),
+                service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT).configure();
             // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
             JasperApplication.preparePlugins(dirs);
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint));
@@ -70,12 +76,25 @@ public final class ApplicationBootstrap {
     static void configureDesktopProperties() {
         System.setProperty("apple.awt.application.appearance", "system");
         System.setProperty("apple.laf.useScreenMenuBar", "true");
+        // Read once when the first tray icon is created: the macOS menu bar glyph is a template image.
+        System.setProperty("apple.awt.enableTemplateImages", "true");
+    }
+
+    /**
+     * Properties a launch sets before anything touches AWT. A packaged macOS {@code --background} launch (the login item)
+     * starts as an accessory application, so no Dock icon appears at login; the bridge brings Jasper back when a window
+     * opens. A development run, or a packaged image without its bridge, has nothing to bring it back, so it never starts
+     * hidden.
+     */
+    static Map<String, String> launchProperties(boolean background, String osName, String appPath) {
+        return background && MacDock.available(osName, appPath) ? Map.of("apple.awt.UIElement", "true") : Map.of();
     }
 
     private static void startDesktop(Startup startup, AppDirs dirs, AppLog log,
                                      UnexpectedExceptions exceptions, Thread shutdown, AtomicReference<HandoffSocket> endpoint) {
         ConfigService service = startup.service(); AppArguments options = startup.options();
         try {
+            StartupTrace.current().mark(StartupTrace.Milestone.TOOLKIT_READY);
             boolean resident = service.initialState().snapshot().backgroundEnabled();
             Path home = Path.of(System.getProperty("user.home"));
             String appPath = System.getProperty("jpackage.app-path");
@@ -101,13 +120,20 @@ public final class ApplicationBootstrap {
                     endpoint.set(bound);
                     return bound;
                 }, application -> {
-                    if (!options.background()) { application.newWindow(); return; }
+                    if (!options.background()) {
+                        long window = System.nanoTime();
+                        application.newWindow();
+                        StartupTrace.current().phase("first window", window);
+                        return;
+                    }
                     if (!application.resident()) {
                         LOG.log(System.Logger.Level.WARNING, standalone
                             ? "Started with --background, but a --config, --safe-mode, --plugin-dir or --standalone launch is always standalone and cannot be resident; exiting"
                             : "Started with --background but the handoff endpoint is unavailable; exiting");
                         application.quitNow();
-                    } else application.warmUp();
+                    } else {
+                        application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
+                    }
                 });
         } catch (RuntimeException | Error failure) {
             // Also covers failure before composition took ownership (for example initial role resolution).
@@ -119,6 +145,7 @@ public final class ApplicationBootstrap {
 
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
                                                        AppArguments options, java.util.List<dev.jasper.app.appearance.ThemeCatalog.Problem> themeProblems) {
+        long began = System.nanoTime();
         var acquired = new StartupResources();
         try {
             ApplicationIcon.installTaskbarIcon();
@@ -134,9 +161,14 @@ public final class ApplicationBootstrap {
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
                 replacementHandsOff(options), standaloneNotice(options));
-            // Shown only once startup settles residency, and only on Windows.
+            application.staleBuild(replacedOnDisk(source, HandoffSocket.lastModified(source)));
+            // The macOS menu bar item and the Windows notification-area icon, once start-up has settled.
             application.residentIndicator(ResidentTray::install);
+            // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
+            if (MacDock.available())
+                application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
+            StartupTrace.current().phase("application", began);
             acquired.transfer();
             return application;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }
@@ -232,6 +264,8 @@ public final class ApplicationBootstrap {
         catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
         if (options.help()) { out.println(AppArguments.USAGE); return 0; }
         String os = System.getProperty("os.name");
+        // AppKit reads this as the toolkit initialises, and the theme upgrade below may already initialise it.
+        launchProperties(options.background(), os, System.getProperty("jpackage.app-path")).forEach(System::setProperty);
         Path home = Path.of(System.getProperty("user.home"));
         AppDirs dirs = AppDirs.resolve(os, System.getenv(), home, System.getProperty("jasper.home"));
         options = options.withHomeOverride(dirs.overridden());
@@ -239,9 +273,14 @@ public final class ApplicationBootstrap {
         // not settle a second icon into the Dock on its way out.
         if (handsOff(options, dirs)) return 0;
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
+        long upgrade = System.nanoTime();
         var problems = dev.jasper.app.application.ThemeUpgrade.prepare(file, os.startsWith("Mac"));
+        StartupTrace.current().phase("theme upgrade", upgrade);
         var acquired = new StartupResources();
+        long read = System.nanoTime();
         ConfigService service = acquired.own(new ConfigService(file, os.startsWith("Mac")));
+        StartupTrace.current().phase("config", read);
+        StartupTrace.current().mark(StartupTrace.Milestone.CONFIG_LOADED);
         try {
             launch.accept(new Startup(service, options, problems));
             acquired.transfer();
@@ -290,6 +329,14 @@ public final class ApplicationBootstrap {
     }
 
     /**
+     * True once the application jar this process was loaded from has changed on disk (a new build was installed under
+     * it) or gone. An unknown code source never counts. Any thread; one file stat per call.
+     */
+    static java.util.function.BooleanSupplier replacedOnDisk(Path source, long modified) {
+        return () -> source != null && HandoffSocket.lastModified(source) != modified;
+    }
+
+    /**
      * The resident process's side of a handoff. A stale request also ends residency: the endpoint
      * goes away with the reply, so the last window closing must run the normal bounded shutdown
      * rather than leaving a process with nothing to reach it and no cleanup on the way out. A retire
@@ -307,7 +354,7 @@ public final class ApplicationBootstrap {
                 SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;
             }
-            SwingUtilities.invokeLater(application::openOrRaise);
+            SwingUtilities.invokeLater(() -> application.openOrRaise("handoff"));
             return LaunchRequest.Response.OK;
         };
     }

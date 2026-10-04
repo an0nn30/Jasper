@@ -7,6 +7,16 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TitleBarStyleTest {
+    @Test void compactUsesNativeDecorationsAndNormalPreservesEveryExistingChoice() {
+        for (boolean macOs : new boolean[] {false, true}) {
+            for (boolean nativeDecorations : new boolean[] {false, true}) {
+                assertThat(TitleBarStyle.choose(macOs, nativeDecorations, true)).isEqualTo(TitleBarStyle.NATIVE);
+                assertThat(TitleBarStyle.choose(macOs, nativeDecorations, false))
+                    .isEqualTo(TitleBarStyle.choose(macOs, nativeDecorations));
+            }
+        }
+    }
+
     @Test void macOsAlwaysUsesItsOwnTitleRow() {
         assertThat(TitleBarStyle.choose(true, false)).isEqualTo(TitleBarStyle.MAC_UNIFIED);
         assertThat(TitleBarStyle.choose(true, true)).isEqualTo(TitleBarStyle.MAC_UNIFIED);

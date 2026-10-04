@@ -163,6 +163,18 @@ public final class TerminalWindow implements AutoCloseable {
 
     public void show() { frame.setVisible(true); reportState(); content.focusSelected(); }
 
+    /**
+     * Closes this window without remembering it: neither its bounds nor its dock layout are saved, so a window that
+     * failed to compose, or the warm-up rehearsal's (never shown, at the default size), never becomes the last window
+     * closed, whose layout the next window restores. EDT.
+     */
+    public void discard() {
+        if (closed) return;
+        placement = null;
+        content.forgetLayout();
+        close();
+    }
+
     @Override public void close() {
         if (closed) return;
         rememberBounds();

@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.*;
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.persistence.UiState;
 import java.util.*;
 import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;
@@ -47,6 +48,42 @@ class HostedContentTest {
             assertThat(saves[0]).isEqualTo(1);
             owner.selectTab(terminal);
             assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke)).isNull();
+        });
+    }
+    @Test void aWindowConnectedWithoutHostingContentNeverReceivesPluginContent() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var real = content(launcher(new ArrayDeque<>()));
+            real.connectContributions(model, UiState.inMemory());
+            // The warm-up rehearsal: composed and wired like a window, but not a place where content opens.
+            var rehearsal = content(launcher(new ArrayDeque<>()));
+            rehearsal.connectContributions(model, UiState.inMemory(), false);
+            rehearsal.setActive(true);
+            var entry = model.content().open("dev.editor", "a", "A", null, new JPanel());
+            assertThat(entry.window()).as("the main host stays the real window").isEqualTo(real.id());
+            assertThat(real.selectedContent()).isSameAs(entry);
+            assertThat(rehearsal.selectedContent()).isNull();
+            assertThat(rehearsal.mayClose()).isTrue();
+            rehearsal.close();
+            assertThat(model.content().entries()).as("closing the rehearsal takes nothing with it").containsExactly(entry);
+            assertThat(real.selectedContent()).isSameAs(entry);
+        });
+    }
+    @Test void contentOpenedWhileOnlyAnUnhostedWindowExistsAsksTheApplicationForAHost() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var rehearsal = content(launcher(new ArrayDeque<>()));
+            rehearsal.connectContributions(model, UiState.inMemory(), false);
+            var created = new WindowContent[1];
+            model.content().setFactory(separate -> {
+                created[0] = content(launcher(new ArrayDeque<>()));
+                created[0].connectContributions(model, UiState.inMemory());
+                return created[0].id();
+            });
+            var entry = model.content().open("dev.editor", "a", "A", null, new JPanel());
+            assertThat(created[0]).as("a real window was asked for").isNotNull();
+            assertThat(entry.window()).isEqualTo(created[0].id());
+            assertThat(rehearsal.selectedContent()).isNull();
         });
     }
     @Test void detachedWorkspaceDoesNotScheduleATerminalLaunch() throws Exception {
