@@ -1,6 +1,6 @@
 # Normal and Compact view modes
 
-Status: implementation requested by the user with SDD, in an isolated worktree based on main `43894416`. The user supplied the visual contract; remaining choices below are implementation assumptions open to correction.
+Status: Tasks 1 and 2 implemented with SDD in an isolated worktree based on main `43894416`; independent Task 2 review and final full check are pending. Focused headless verification passed 97 tests with no failures/errors/skips. Native acceptance remains [user-run](../plans/2026-10-03-jasper-view-modes-manual-check.md). The user supplied the visual contract; restart-required remains an implementation assumption open to correction.
 
 ## Intent
 

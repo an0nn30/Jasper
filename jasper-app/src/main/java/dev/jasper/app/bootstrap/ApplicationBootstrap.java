@@ -54,7 +54,8 @@ public final class ApplicationBootstrap {
             configureDesktopProperties();
             // Before the look and feel and any window: a restart-only choice, like residency.
             dev.jasper.app.platform.TitleBarStyle.choose(System.getProperty("os.name").startsWith("Mac"),
-                service.initialState().snapshot().nativeDecorations()).configure();
+                service.initialState().snapshot().nativeDecorations(),
+                service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT).configure();
             // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
             JasperApplication.preparePlugins(dirs);
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint));

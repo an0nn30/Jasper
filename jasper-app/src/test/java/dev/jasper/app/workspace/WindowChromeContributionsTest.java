@@ -44,6 +44,23 @@ class WindowChromeContributionsTest {
         return null;
     }
 
+    @Test void compactSuppressesNewPluginControlsAndOverflowAfterReload() throws Exception {
+        edt(() -> {
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder()
+                .viewMode(dev.jasper.app.config.ViewMode.COMPACT).build(), true);
+            var model = new Contributions(); owner.connectContributions(model);
+            model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), invocation -> {});
+            model.addToolbar(new ToolbarEntry.Button("dev.x.run"));
+            model.addToolbar(new ToolbarEntry.Dropdown(new javax.swing.ImageIcon(), "Tool", List.of("dev.x.run")));
+            assertThat(buttons(owner)).contains("Run Tool", "Tool", "More actions");
+            owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults(), true);
+            assertThat(owner.toolbar().isVisible()).isFalse();
+            assertThat(owner.chrome().header().getParent()).isNull();
+            assertThat(javax.swing.SwingUtilities.getRootPane(owner.toolbar())).isNull();
+        });
+    }
+
     @Test void toolbarControlsFollowBuiltinsAndFollowModeAndRemoval() throws Exception {
         edt(() -> {
             var model = new Contributions();

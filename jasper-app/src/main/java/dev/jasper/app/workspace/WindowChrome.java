@@ -10,6 +10,7 @@ import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
+import dev.jasper.app.config.ViewMode;
 
 import java.awt.*;
 import com.formdev.flatlaf.util.UIScale;
@@ -455,7 +456,7 @@ final class WindowChrome {
         });
     }
     void setToolbarMode(ToolbarMode mode) {
-        toolbar.setVisible(mode != ToolbarMode.HIDDEN);
+        toolbar.setVisible(owner.viewMode() == ViewMode.NORMAL && mode != ToolbarMode.HIDDEN);
         toolbar.setLabelsWanted(mode == ToolbarMode.ICONS_AND_LABELS);
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
