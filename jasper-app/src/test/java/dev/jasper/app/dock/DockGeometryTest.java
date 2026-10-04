@@ -6,6 +6,8 @@ import dev.jasper.app.dock.DockGeometry.Metrics;
 import java.awt.Rectangle;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
@@ -223,6 +225,106 @@ class DockGeometryTest {
         var bar = DockGeometry.compute(new Rectangle(0, 0, 2000, 1200), state, doubled).divider(Handle.LEFT_WIDTH).orElseThrow();
         DockGeometry.drag(state, bar, 700, doubled);
         assertThat(state.size(Side.LEFT)).isEqualTo(350);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "LEFT_TOP, LEFT_WIDTH, 1, 260", "RIGHT_TOP, RIGHT_WIDTH, 1, 260", "BOTTOM_LEFT, BOTTOM_HEIGHT, 1, 200",
+        "LEFT_TOP, LEFT_WIDTH, 1.5, 260", "RIGHT_TOP, RIGHT_WIDTH, 1.5, 260", "BOTTOM_LEFT, BOTTOM_HEIGHT, 1.5, 200",
+        "LEFT_TOP, LEFT_WIDTH, 2, 260", "RIGHT_TOP, RIGHT_WIDTH, 2, 260", "BOTTOM_LEFT, BOTTOM_HEIGHT, 2, 200"
+    })
+    void sizeDividersSnapFromBothDirectionsAndReleaseOutsideEightLogicalPixels(
+            Slot slot, Handle handle, double scale, int defaultSize) {
+        var metrics = Metrics.at(scale);
+        var bounds = new Rectangle(17, 23, metrics.scaled(1000), metrics.scaled(600));
+        var state = showing(slot);
+        var defaultBar = DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow();
+        int target = defaultBar.position();
+        state.resize(slot.side(), 350);
+        var bar = DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow();
+        for (int offset : new int[]{-8, -1, 0, 1, 8}) {
+            DockGeometry.drag(state, bar, target + metrics.scaled(offset), metrics);
+            assertThat(state.size(slot.side())).as("snapped at offset %s, scale %s", offset, scale).isEqualTo(defaultSize);
+            assertThat(DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow().position()).isEqualTo(target);
+        }
+        for (int direction : new int[]{-1, 1}) {
+            int distance = metrics.scaled(8) + 1;
+            DockGeometry.drag(state, bar, target + direction * distance, metrics);
+            assertThat(state.size(slot.side())).as("free immediately outside the snap zone").isNotEqualTo(defaultSize);
+            assertThat(DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow().position())
+                .isCloseTo(target + direction * distance, within(1));
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "LEFT_TOP, LEFT_WIDTH, 461, 600, 255",
+        "RIGHT_TOP, RIGHT_WIDTH, 461, 600, 255",
+        "BOTTOM_LEFT, BOTTOM_HEIGHT, 1000, 321, 195"
+    })
+    void anUnreachableDefaultDoesNotSnapPastTheTerminalMinimum(
+            Slot slot, Handle handle, int width, int height, int expectedSize) {
+        var state = showing(slot);
+        var bar = layout(width, height, state).divider(handle).orElseThrow();
+        DockGeometry.drag(state, bar, bar.position(), Metrics.DEFAULT);
+        assertThat(state.size(slot.side())).isEqualTo(expectedSize);
+        var result = layout(width, height, state);
+        assertThat(result.divider(handle).orElseThrow().position()).isEqualTo(bar.position());
+        assertThat(result.terminal().width).isGreaterThanOrEqualTo(200);
+        assertThat(result.terminal().height).isGreaterThanOrEqualTo(120);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "LEFT_TOP, LEFT_RATIO, 1", "RIGHT_TOP, RIGHT_RATIO, 1", "BOTTOM_LEFT, BOTTOM_RATIO, 1",
+        "LEFT_TOP, LEFT_RATIO, 1.5", "RIGHT_TOP, RIGHT_RATIO, 1.5", "BOTTOM_LEFT, BOTTOM_RATIO, 1.5",
+        "LEFT_TOP, LEFT_RATIO, 2", "RIGHT_TOP, RIGHT_RATIO, 2", "BOTTOM_LEFT, BOTTOM_RATIO, 2"
+    })
+    void splitDividersSnapToEqualSharesAndReleaseOutsideEightLogicalPixels(Slot slot, Handle handle, double scale) {
+        var metrics = Metrics.at(scale);
+        var bounds = new Rectangle(17, 23, metrics.scaled(1000), metrics.scaled(600));
+        var state = showing(slot, slot.partner());
+        int target = DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow().position();
+        state.setRatio(slot.side(), 0.25);
+        var bar = DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow();
+        for (int offset : new int[]{-8, -1, 0, 1, 8}) {
+            DockGeometry.drag(state, bar, target + metrics.scaled(offset), metrics);
+            assertThat(state.ratio(slot.side())).as("equal shares even when the available pixel count is odd").isEqualTo(0.5);
+            assertThat(DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow().position()).isEqualTo(target);
+        }
+        for (int direction : new int[]{-1, 1}) {
+            int position = target + direction * (metrics.scaled(8) + 1);
+            DockGeometry.drag(state, bar, position, metrics);
+            assertThat(state.ratio(slot.side())).isNotEqualTo(0.5);
+            assertThat(DockGeometry.compute(bounds, state, metrics).divider(handle).orElseThrow().position()).isEqualTo(position);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"LEFT_TOP, LEFT_RATIO", "RIGHT_TOP, RIGHT_RATIO", "BOTTOM_LEFT, BOTTOM_RATIO"})
+    void aSqueezedPairDoesNotSnapToAnUnreachableMidpoint(Slot slot, Handle handle) {
+        var state = showing(slot, slot.partner());
+        state.setRatio(slot.side(), 0.49);
+        var bar = layout(244, 244, state).divider(handle).orElseThrow();
+        assertThat(bar.position()).isEqualTo(117);
+        assertThat(bar.minimum()).isEqualTo(bar.maximum());
+        DockGeometry.drag(state, bar, 119, Metrics.DEFAULT);
+        assertThat(layout(244, 244, state).divider(handle).orElseThrow().position()).isEqualTo(117);
+        assertThat(state.ratio(slot.side())).isNotEqualTo(0.5);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "LEFT_TOP, LEFT_WIDTH, 471, 600, 1000, 265",
+        "RIGHT_TOP, RIGHT_WIDTH, 471, 600, -1000, 265",
+        "BOTTOM_LEFT, BOTTOM_HEIGHT, 1000, 331, -1000, 205"
+    })
+    void draggingFarPastALimitNearTheDefaultKeepsTheLimit(
+            Slot slot, Handle handle, int width, int height, int position, int expectedSize) {
+        var state = showing(slot);
+        var bar = layout(width, height, state).divider(handle).orElseThrow();
+        DockGeometry.drag(state, bar, position, Metrics.DEFAULT);
+        assertThat(state.size(slot.side())).isEqualTo(expectedSize);
     }
 
     @Test void aLayoutHandsOutCopies() {

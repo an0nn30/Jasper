@@ -16,6 +16,8 @@ import java.util.Optional;
  * both go under theirs. The sizes in the state are never changed by that squeeze.
  */
 public final class DockGeometry {
+    private static final int DEFAULT_SNAP_DISTANCE = 8;
+
     private DockGeometry() { }
 
     /**
@@ -184,25 +186,37 @@ public final class DockGeometry {
     }
 
     /**
-     * Applies dragging a divider: its leading edge moves to position, kept within the divider's range. A width or
-     * height is stored unscaled; a ratio is the first slot's share of the split.
+     * Applies dragging a divider: its leading edge moves to position, kept within the divider's range, and snaps
+     * to its default within eight logical pixels when that default fits the range. Widths and heights are stored
+     * unscaled; a ratio is the first slot's share of the split and snaps to exactly equal shares.
      */
     public static void drag(DockState state, Divider divider, int position, Metrics metrics) {
         int at = Math.clamp(position, divider.minimum(), divider.maximum());
         Rectangle span = divider.span();
         int gap = metrics.scaled(metrics.divider());
+        int target = switch (divider.handle()) {
+            case LEFT_WIDTH -> span.x + metrics.scaled(DockState.DEFAULT_SIDE);
+            case RIGHT_WIDTH -> span.x + span.width - gap - metrics.scaled(DockState.DEFAULT_SIDE);
+            case BOTTOM_HEIGHT -> span.y + span.height - gap - metrics.scaled(DockState.DEFAULT_BOTTOM);
+            case LEFT_RATIO, RIGHT_RATIO -> span.y + (int) Math.round(Math.max(0, span.height - gap) * DockState.DEFAULT_RATIO);
+            case BOTTOM_RATIO -> span.x + (int) Math.round(Math.max(0, span.width - gap) * DockState.DEFAULT_RATIO);
+        };
+        // Use the requested position: clamping a far-away pointer near the default must not cause a snap.
+        boolean snapped = target >= divider.minimum() && target <= divider.maximum()
+            && Math.abs((long) position - target) <= metrics.scaled(DEFAULT_SNAP_DISTANCE);
+        if (snapped) at = target;
         switch (divider.handle()) {
             case LEFT_WIDTH -> state.resize(Side.LEFT, metrics.unscaled(at - span.x));
             case RIGHT_WIDTH -> state.resize(Side.RIGHT, metrics.unscaled(span.x + span.width - at - gap));
             case BOTTOM_HEIGHT -> state.resize(Side.BOTTOM, metrics.unscaled(span.y + span.height - at - gap));
-            case LEFT_RATIO -> ratio(state, Side.LEFT, at - span.y, span.height - gap);
-            case RIGHT_RATIO -> ratio(state, Side.RIGHT, at - span.y, span.height - gap);
-            case BOTTOM_RATIO -> ratio(state, Side.BOTTOM, at - span.x, span.width - gap);
+            case LEFT_RATIO -> ratio(state, Side.LEFT, at - span.y, span.height - gap, snapped);
+            case RIGHT_RATIO -> ratio(state, Side.RIGHT, at - span.y, span.height - gap, snapped);
+            case BOTTOM_RATIO -> ratio(state, Side.BOTTOM, at - span.x, span.width - gap, snapped);
         }
     }
 
-    private static void ratio(DockState state, Side side, int first, int total) {
-        if (total > 0) state.setRatio(side, (double) first / total);
+    private static void ratio(DockState state, Side side, int first, int total, boolean snapped) {
+        if (total > 0) state.setRatio(side, snapped ? DockState.DEFAULT_RATIO : (double) first / total);
     }
 
     /**
