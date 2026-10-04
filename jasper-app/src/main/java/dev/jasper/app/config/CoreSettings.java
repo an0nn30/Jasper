@@ -195,7 +195,8 @@ public final class CoreSettings {
     public static final Setting<Map<String, String>> TERMINAL_ENV = Setting.of("terminal.env", SettingKind.stringMap(new SettingKind.MapRules(
             TerminalConfig::validEnvName, "Use a portable environment name; entry omitted.",
             Set.of("TERM", "COLORTERM"), "Jasper sets this environment variable; entry omitted.",
-            CoreSettings::noNul, "Environment values must contain no NUL; entry omitted.", "a string environment value")), Map.<String, String>of())
+            CoreSettings::noNul, "Environment values must contain no NUL; entry omitted.", "a string environment value",
+            dev.jasper.app.settings.Reading.Severity.ERROR)), Map.<String, String>of())
         .label("Environment variables").keywords("environment", "env", "variables", "PATH").applies(Applies.NEW_PANES)
         .description("New panes only: add string values to the inherited environment.\n"
             + "Names use letters, digits and underscore, starting with a letter or underscore.\n"

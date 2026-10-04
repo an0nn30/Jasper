@@ -19,7 +19,8 @@ public final class SettingWriter {
         for (List<String> key : document.keysUnder(setting.key())) next = next.remove(key);
         @SuppressWarnings("unchecked")
         Map<String, String> entries = (Map<String, String>) value.orElse(null);
-        if (entries == null) return next;
+        // A table with no entries left goes too: an empty [table] header would read back as an empty table.
+        if (entries == null) return next.removeTableIfEmpty(setting.key());
         for (var entry : new TreeMap<>(entries).entrySet()) {
             var path = new ArrayList<>(setting.key());
             path.add(entry.getKey());

@@ -199,7 +199,7 @@ public final class ConfigService implements AutoCloseable {
                     if (parsed.rejected()) throw new IllegalArgumentException("Fix config.toml's errors before saving settings.");
                     for (var change : edit.changes().entrySet()) {
                         Setting<?> setting = change.getKey();
-                        if (!parsed.values().saved(setting).equals(edit.expected().get(setting)))
+                        if (!comparable(setting, parsed.values().saved(setting)).equals(comparable(setting, edit.expected().get(setting))))
                             throw new StaleSetting(setting.name() + " changed on disk. Review the new value and try again.");
                         change.getValue().ifPresent(value -> check(setting, value));
                     }
@@ -212,7 +212,8 @@ public final class ConfigService implements AutoCloseable {
                     String updated = document.text();
                     var checked = ConfigLoader.parse(file, updated, macOs);
                     if (checked.rejected() || edit.changes().entrySet().stream()
-                            .anyMatch(change -> !checked.values().saved(change.getKey()).equals(change.getValue())))
+                            .anyMatch(change -> !comparable(change.getKey(), checked.values().saved(change.getKey()))
+                                .equals(comparable(change.getKey(), change.getValue()))))
                         throw new IllegalArgumentException("Cannot safely save these settings; review config.toml.");
                     return updated;
                 });
@@ -221,6 +222,15 @@ public final class ConfigService implements AutoCloseable {
                 throw stale;
             }
         });
+    }
+
+    /**
+     * A table setting with no entries reads the same as an absent one: an empty {@code [table]} header (the template
+     * has them uncommented) holds nothing, so it must not count as a change made on disk.
+     */
+    private static Optional<?> comparable(Setting<?> setting, Optional<?> value) {
+        if (!(setting.kind() instanceof dev.jasper.app.settings.SettingKind.StringMap)) return value;
+        return value.filter(map -> !((java.util.Map<?, ?>) map).isEmpty());
     }
 
     /**
