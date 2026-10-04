@@ -51,13 +51,13 @@ class BuddyCardTest {
     @Test void aDetailSupplierThatThrowsIsSurvived() {
         assertThat(BuddyCard.detailOf(new BuddyNotice(new BuddyNoticeId("s", "k"), BuddyNotice.Kind.TASK, "t", BuddyNotice.State.RUNNING, () -> { throw new IllegalStateException("boom"); }, () -> { })))
             .isEmpty();
-        assertThat(BuddyCard.detailOf(notice(BuddyNotice.State.DONE, null))).isEmpty();
-        assertThat(BuddyCard.detailOf(notice(BuddyNotice.State.DONE, "Finished in 3s")))
+        assertThat(BuddyCard.detailOf(notice(BuddyNotice.State.NEEDS_INPUT, null))).isEmpty();
+        assertThat(BuddyCard.detailOf(notice(BuddyNotice.State.NEEDS_INPUT, "Finished in 3s")))
             .isEqualTo("Finished in 3s");
     }
 
     @Test void paintingIsSafeWithADismissTargetAndWithACount() {
-        paint(notice(BuddyNotice.State.DONE, "Finished in 3s"), true, 0);
+        paint(notice(BuddyNotice.State.NEEDS_INPUT, "Finished in 3s"), true, 0);
         paint(notice(BuddyNotice.State.RUNNING, "Running · 3s"), false, 7);
     }
     @Test void bothThemesMatchTheRecordedMaterialAndRemainTranslucent() throws Exception {

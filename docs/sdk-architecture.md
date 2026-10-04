@@ -51,16 +51,17 @@ Every outcome is a `PluginStatus` line in the log.
 - **Events.** `EventBus.publish` always enqueues through `SwingUtilities.invokeLater`: one
   global order, never re-entrant. `jasper.*` topics belong to the application.
 - **Activities.** `ActivityHub` stamps the source, coalesces progress and ends each activity
-  once. `PluginRuntime` forwards them to `notifications.ActivityNotifier`, which posts Buddy
-  cards keyed by `BuddyNoticeId(pluginId, activityId)`.
+  once. `PluginRuntime` forwards them to `notifications.ActivityNotifier`, which shows a running
+  activity as a Buddy card keyed by `BuddyNoticeId(pluginId, activityId)` and dismisses it when
+  the activity ends; `PluginHost` posts the outcome as a notification.
 - **Connections** (SDK 0.10.2). `ConnectionHub` stamps the source, delivers every state change in
   order, joins a detail-only report to the delivery still queued for that state and publishes one
   `CLOSED`. `PluginRuntime` forwards `Activities.CONNECTIONS` to `ActivityNotifier.connection`, which
-  posts a `Kind.CONNECTION` card on each new state (new news, even after it was acknowledged),
+  posts a `Kind.CONNECTION` card on each new state (new news),
   updates only the detail otherwise, and dismisses it on `CLOSED`.
 - **Card activation.** Every activity and connection card raises the application when clicked.
   When its `activateActionId` names an action the source plugin registered (`PluginHost.ownsAction`),
-  the click then invokes it in the last active window and acknowledges the card.
+  the click then invokes it in the last active window.
 - **Services.** Staged during `start`, committed on success. Per-consumer factories run on
   the EDT just before each consumer starts; lookups are cache reads.
 - **State.** `PluginStateStore` changes `plugins.toml` only inside a `FileLock` transaction
@@ -84,24 +85,28 @@ plugin default.
 ## Panels, the rail and plugin windows
 
 Panels and rail actions are part of the `Contributions` model; each panel carries its default
-`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0). Each
-window's `WindowContributions` keeps one lazily built instance per panel and docks the panels in the
-window's `DockState` (per slot an ordered list with at most one active window; per-side sizes and
-ratios). One listener on that state builds what starts showing, lays out `ToolWindowArea` (the terminal
-column, the tab strip over the deck, and a rounded frame with a `ToolWindowHeader` for each showing
-slot, placed by the pure `DockGeometry`: the bottom area spans the full width, the sides and the
-terminal column run from the toolbar to it), renders the two `ToolStripe`s, tells the panels and
-saves. `DockDrag` drags a window from its stripe button or its header with plain mouse events:
-`DockDropResolver` finds the target under the cursor (a stripe group and a position, or a cell of
-the workspace's 3 × 2 grid), the stripes open a gap, and `DockDropOverlay` on the layered pane's
-`DRAG_LAYER` previews the landing with `DockGeometry.landing`, the same function as the layout. A
-stripe drop moves the window and keeps its visibility; a workspace drop moves and shows it. A window
-with nothing contributed has no stripes and its old layout. Requests to show, hide or toggle a panel
-travel through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
-window. Every panel gets a View → Tools entry for its toggle action: the application-registered
-`<panel id>.toggle`, or, since SDK 0.8.1, the plugin's own action named by
-`PanelSpec.toggleActionId` (which must already be registered by that plugin), so a plugin action
-that toggles a panel appears once in the menu and the palette.
+`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0).
+Each window's `WindowContributions` keeps one lazily built instance per panel and docks the panels
+in the window's `DockState` (per slot an ordered list with at most one active window; per-side
+sizes and ratios). One listener on that state builds what starts showing, lays out
+`ToolWindowArea` (the terminal column, the tab strip over the deck, and a rounded frame with a
+`ToolWindowHeader` for each showing slot, placed by the pure `DockGeometry`: the bottom area spans
+the full width, the sides and the terminal column run from the toolbar to it), renders the two
+`ToolStripe`s, tells the panels and saves. `DockDrag` drags a window from its stripe button or its
+header with plain mouse events: `DockDropResolver` finds the target under the cursor (a stripe
+group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
+bottom edges, a side split at half the side panels' visible height and the bottom at half its
+width), the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews
+the landing with `DockGeometry.landing`, the layout's function on a copy of the state, except that the guide for a
+second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, even where the window will fill the
+side or the bottom area. A stripe drop moves the
+window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
+drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
+Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
+action or a `PanelHost` reaches exactly one window. Every panel gets a View → Tools entry for its
+toggle action: the application-registered `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's
+own action named by `PanelSpec.toggleActionId` (which must already be registered by that plugin),
+so a plugin action that toggles a panel appears once in the menu and the palette.
 
 Plugin windows follow the `TerminalWindow`/`WindowContent` split: `AuxiliarySurface` holds the
 content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`

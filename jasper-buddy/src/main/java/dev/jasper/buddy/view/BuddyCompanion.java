@@ -31,7 +31,7 @@ public final class BuddyCompanion implements AutoCloseable {
             throw new IllegalStateException("Buddy operations require the EDT");
     }
     private void refresh() { if (window != null) window.refreshDeck(); }
-    /** Posts or replaces a nonnull validated notice, promotes it to newest and resets acknowledgement. The oldest notice is dropped beyond 50. */
+    /** Posts or replaces a nonnull validated notice and promotes it to newest. The oldest notice is dropped beyond 50. */
     public void post(BuddyNotice notice) {
         requireEdt(); if (closed) return; deck.post(java.util.Objects.requireNonNull(notice)); refresh();
     }
@@ -39,21 +39,9 @@ public final class BuddyCompanion implements AutoCloseable {
     public void updateTitle(BuddyNoticeId id, String title) {
         requireEdt(); if (closed) return; deck.updateTitle(id, title); refresh();
     }
-    /** Marks an existing nonnull ID seen; live notices remain visible until they finish or become orphaned. */
-    public void acknowledge(BuddyNoticeId id) {
-        requireEdt(); if (closed) return; deck.acknowledge(id); refresh();
-    }
-    /** Removes an existing nonnull ID and its retained callbacks. */
+    /** Removes an existing nonnull ID and its retained callbacks; a producer calls it when the work ends. */
     public void dismiss(BuddyNoticeId id) {
         requireEdt(); if (closed) return; deck.dismiss(id); refresh();
-    }
-    /** Disconnects activation for an existing nonnull ID, preserving its state and detail supplier. Use the detail overload for an unfinished producer. */
-    public void orphan(BuddyNoticeId id) {
-        requireEdt(); if (closed) return; deck.orphan(id); refresh();
-    }
-    /** Disconnects activation and replaces an existing notice's detail supplier with nonnull final text, regardless of state. The caller must choose this overload only when replacing the detail is intended; state and acknowledgement are preserved. */
-    public void orphan(BuddyNoticeId id, String finalDetail) {
-        requireEdt(); if (closed) return; deck.orphan(id, finalDetail); refresh();
     }
     /** Drops every notice and its callbacks, retaining presentation ownership. */
     public void clear() { requireEdt(); if (closed) return; deck.clear(); refresh(); }

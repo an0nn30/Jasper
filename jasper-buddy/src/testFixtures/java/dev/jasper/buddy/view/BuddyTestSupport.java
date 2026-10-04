@@ -15,12 +15,9 @@ public final class BuddyTestSupport {
         BuddyOptions.builder(new Font("Dialog", Font.PLAIN, 13)).build(), deck));
     public BuddyCompanion companion() { return companion; }
     public List<BuddyNotice> notices() { return edt(deck::notices); }
-    public List<BuddyNotice> column() { return edt(deck::column); }
     public int generation() { return edt(deck::generation); }
     public int size() { return edt(deck::size); }
     public boolean isEmpty() { return edt(deck::isEmpty); }
-    public boolean acknowledged(BuddyNoticeId id) { return edt(() -> deck.acknowledged(id)); }
-    public void acknowledge(BuddyNoticeId id) { edt(() -> { companion.acknowledge(id); return null; }); }
     public void dismiss(BuddyNoticeId id) { edt(() -> { companion.dismiss(id); return null; }); }
     private static <T> T edt(Supplier<T> action) {
         if (SwingUtilities.isEventDispatchThread()) return action.get();

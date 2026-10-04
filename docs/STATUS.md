@@ -6,6 +6,31 @@
 
 - **Appearance view modes: SDD complete, native acceptance remains user-run** on `codex/appearance-view-modes`, based on `43894416`, in `/Users/dustin/.codex/worktrees/appearance-view-modes/moray`. User requested Normal (unchanged) and Compact (native macOS title, no toolbar, existing palette floating). [Design](superpowers/specs/2026-10-03-jasper-view-modes-design.md), [SDD plan](superpowers/plans/2026-10-03-jasper-view-modes.md). Restart-required is the announced implementation default; the optional preference question is unanswered. Plan text specifies existing-method changes by exact contracts/tests rather than copying large classes. Tasks 1 and 2 are implemented and independently approved; whole-branch code review approved with no critical or important findings. Its one minor docs finding, a stale reference to a nonexistent Task 3 in the manual checklist, is corrected. Compact captures startup mode, uses native workspace chrome, suppresses the complete header through reloads/menu actions/plugin contributions, and uses the existing floating palette fallback. Focused Task 2 tests: **97 tests, 0 failures, 0 errors, 0 skipped**; existing compiler warnings only. Final controller `./gradlew check` on `713b53b5`: **8,373 tests, 0 failures, 0 errors, 6 skipped**, 85 tasks (9 executed, 76 up-to-date), architecture/doc checks included. Source hygiene covered 1,747 Java files; diff checks passed. The controller inspected dark/default-font and light/18pt headless Appearance renders: the row and restart notice fit. `settingsPreview` was intentionally stopped after those renders with SIGTERM (exit 143) because it enumerates all bundled themes; full preview-matrix completion is not claimed. [Native manual checks](superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md) remain user-run. Task 2 deviations: `TerminalWindow` and `WindowCommandPalette` needed no edits; their existing menu/root ownership and fallback geometry satisfy the contract. Without a config service, the existing null initial window config and sizing are preserved (controller clarification). User explicitly authorized implementation with SDD; no GUI, merge or push authorized.
 
+- **Dock guides: a second slot's guide always shows its half; pushed to `main`, awaiting the user's GUI check**
+  (2026-10-03; spec §3 "Guides" amended at the user's request). The user: the guides should show the bottom
+  half left or right when a tool panel moves there, "regardless if doing so would make the tool full screen or not",
+  because the guide only showed a bottom half while a tool already held the top half. Rule: `DockGeometry.landing`, for
+  a pair's second slot (Left Bottom, Right Bottom, Bottom Right; extended to Bottom Right by the same principle, since
+  its home is the right half of the bottom area), puts a stand-in window into the partner slot of its what-if copy
+  whenever the partner would show nothing, so the guide is the lower half of the side or the right half of the bottom
+  area. This covers a hidden partner window and the dragged window being the partner's only one (Sessions alone in Left
+  Top, dragged to Left Bottom). The stand-in id has spaces, so no panel id can equal it, and it exists only in the copy:
+  the real state and layout do not change, and a dropped lone window still fills its side or the bottom area (spec §1,
+  as in IntelliJ), so the guide and the first frame differ on purpose until a window shows in the partner. The first
+  slots (Left Top, Right Top, Bottom Left) keep the true landing. `DockDropModelTest` 5 → 10 (the three second slots
+  against a real split and the explicit rectangles, a hidden partner, the partner's only window moving over, the first
+  slots unchanged, the state passed in untouched; the one existing assertion that expected the full-width bottom preview
+  now expects the right half) and `WindowDragTest` 15 → 17 (Sessions alone on the left dragged toward Left Bottom: the
+  guide is the lower half and equals the lower frame once Files splits the side, while the real layout stays full height
+  before and after the drop; a hidden Files dragged toward Bottom Right likewise). Tests: **+7**. `./gradlew check
+  --continue`: **8,456 tests, 0 failures, 0 errors, 6 skipped**, all architecture gates and doclint included. No GUI
+  launched. GUI check for the user: with only one tool window showing on the left (or right) side, drag it, or a hidden
+  one, toward that side's lower half and see the highlight cover the lower half, not the whole side; the same toward the
+  right half of the bottom with no bottom window showing. After the drop the window fills the whole side or bottom area,
+  as before. A drag toward an upper half or Bottom Left still previews the whole side or bottom area. Also expect this:
+  a window already alone in a lower half shows the lower-half guide as soon as its drag starts, while the window itself
+  still fills the side.
+
 - **Window layout restoration fix** (2026-10-03; `codex/restore-window-layout`, based on `main` at `f450112b`):
   main terminal frames previously never saved or restored their bounds; dock persistence intentionally used the
   last layout edit rather than the last window closed. Each window now snapshots its tool-panel slots/order,
@@ -26,8 +51,59 @@
   fullscreen is distinct from AWT maximization and is not restored by this change. Terminal sessions/editor
   documents are not resurrected by this layout state.
 
-- **Notifications plan 3: SDK notifications, reviewed on branch `claude/notifications-3`; awaiting the user's GUI
-  checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
+- **Notifications plan 4: long commands and Buddy, merged to local `main` 2026-10-03 (not pushed); awaiting the user's
+  GUI checks and their call on a background finish's route to its pane** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
+  [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
+  did not finish in the pane you were typing in is posted in "Long-running commands" (`jasper.commands`, CARD), in the
+  pane's window, with a click that focuses the pane; a closed pane expires its notifications. Buddy keeps live work
+  only: `BuddyNotice` lost `DONE` and `FAILED`, its activation is required, and `acknowledge` and both `orphan`
+  overloads are gone; `CommandNotifier` and `ActivityNotifier` dismiss a card when its work ends. A coalesced repeat
+  now carries the newest post's actions, default action and target, and its card moves to that window; an expiring
+  action expires its entry before it runs. The macOS banner for long commands stays, background only, until plan 5.
+  Spec interpretations: see the plan's list (1 to 12). Final review (Opus): three important findings fixed —
+  closing the older of two panes whose identical outcomes coalesced expired the newer pane's entry (`b35fc8db`); an
+  expired entry kept its poster's callbacks, and with them a closed pane, its buffers and its window (`28810afb`;
+  expiry now keeps text, labels and target only, which also releases a stopped plugin); clicking a running capsule hid
+  the whole column until the deck next changed (`be5a344d`). A fourth is a decision for the user: a command that
+  finishes while Jasper is in the background has no click route to its pane until plan 5 (a history row has no click
+  of its own; options: a "Show pane" action, a clickable history row, or wait for plan 5's clickable OS notification).
+  Seven minor findings are deferred in the plan's status banner. `./gradlew check --continue`: **8,435 tests, 0
+  failures, 0 errors, 6 skipped** (merged with main `be3b593d`; 8,339 on the branch before). No GUI launched. GUI checks for the
+  user: a long command finishing in another tab shows a card in its window and a click focuses the pane; with Buddy
+  on, the capsule shows while it runs and goes when it ends, and clicking it focuses the pane and keeps the column; the
+  drawer lists only running work; in the packaged app with Jasper in the background, the macOS banner still arrives
+  and the notification waits unread.
+
+- **Dock drop zones: six edge zones replace the 3 × 2 grid; pushed to `main`, awaiting the user's GUI check**
+  (2026-10-03; spec §3 "Targets" and "Guides" amended
+  at the user's request). The user could not drop a tool window on the lower half of the left or right side and named
+  six zones: left up, left down, bottom left, bottom right, right up, right down. Root cause: the workspace target was
+  a grid of thirds (rows) and halves (columns), which gave Left Bottom and Right Bottom only the middle third of each
+  half; most of the lower left and right fell in the full-width bottom row (a headless probe of a 1144 × 746
+  workspace: 130 px in and 560 px down resolved to Bottom Left). Fix: `DockDropResolver` takes the nearest of the
+  left, right and bottom edges, each distance a share of the workspace's own width (sides) or height (bottom); a side
+  splits into its top and bottom slot at half of the side panels' visible height, the bottom at half the width; a side
+  wins a tie with the bottom and left wins over right; exact `long` cross-multiplication. The user's refinement before
+  pushing: with a bottom area showing the side panels end above it, so the review found about 38% of a side panel's
+  lower half still resolving to the top slot at the workspace's half; `DockDrag.sideSplit` now gives
+  `DockDropResolver.resolve` a `splitY` at half of the visible height in the real layout (above the bottom area while
+  it shows, else the workspace's half, which the three-argument `resolve` keeps). The probe also showed a stripe drop
+  of a hidden window previewing a frame that never appears, because the stripe drop keeps it hidden: `DockDrag` now
+  shows no area highlight for it (the placeholder and the ghost stay). Unchanged: a window alone in a side's bottom
+  slot still fills that side (spec §1, as in IntelliJ), so its preview looks like the top zone until the top slot
+  shows a window (superseded the same day by the entry above: the guide now shows the lower half).
+  Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
+  diagonal, the half splits, ties, a wide and a tall workspace and the split line; `DockDragTest` 21 → 24 and
+  `WindowDragTest` 12 → 15, including a lower-left drop beside a showing Sessions, the same under a showing bottom
+  area and the hidden-window preview); the drag tests aim with `DockTestSupport.zone(workspace, slot)` instead of a
+  grid cell, and `WindowCornerLayerTest` aims lower in the cards. `./gradlew check --continue`: **8,369 tests, 0
+  failures, 0 errors, 6 skipped**, all architecture gates and doclint included. No GUI launched. GUI check for the
+  user: drag a tool window toward each of the six edges (the upper and lower halves of the left and right sides, and
+  the left and right halves of the bottom) and see the highlight. The split sits exactly at half of the side panels'
+  visible height (the terminal column's height), pinned one pixel either side by `DockDragTest`.
+
+- **Notifications plan 3: SDK notifications, merged to `main` (`3c64ea5c`) and pushed; awaiting the user's GUI
+  checks** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
   [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
   (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
   removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15` (Editor `>=0.14.1` since the workspace-glass merge). `plugins.HostedNotifications` posts into the
@@ -75,10 +151,10 @@
 
 - **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe
-  buttons and headers. `DockDropResolver` (pure) resolves a stripe group and position or a cell of the workspace's 3 × 2
-  grid; `DockGeometry.landing` previews the landing on a copy of the state; during a drag both stripes show all three
-  groups, lift the dragged button and open a gap; `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the
-  placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
+  buttons and headers. `DockDropResolver` (pure) resolves a stripe group and position or one of the workspace's six edge
+  zones (a 3 × 2 grid until 2026-10-03; see the first entry); `DockGeometry.landing` previews the landing on a copy of
+  the state; during a drag both stripes show all three groups, lift the dragged button and open a gap;
+  `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
   drop moves and keeps visibility; a workspace drop moves and shows (`DockState.moveAndShow`). Any dock change, View ›
   Rail, or the window closing or being deactivated cancels a drag. Deviations from the plan text: before execution
   (`728167c4`) the expected test counts and Task 6's `close()` anchor were aligned with plan 1 as executed; Task 4,

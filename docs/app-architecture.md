@@ -101,7 +101,7 @@ UI publication; they do not undo provider work already submitted, such as a snip
 append. Subscriptions close once and detach from the actual owner.
 
 Workspace OPENED precedes command events; app notification wiring registers opaque pane
-IDs. CLOSED removes the active ID before timer cancellation/orphaning. A saved delayed
+IDs. CLOSED removes the active ID before timer cancellation and card dismissal. A saved delayed
 callback or late finished event cannot resurrect that pane. There is no growing tombstone
 set. App closes notifier before Buddy. Hiding Buddy retains its model and stops animation;
 closing clears model closures and all presentation resources.

@@ -1,10 +1,9 @@
 package dev.jasper.buddy.internal.model;
 
-import dev.jasper.buddy.notice.BuddyNoticeId;
 import dev.jasper.buddy.notice.BuddyNotice;
-
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import java.util.List;
 import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
@@ -12,98 +11,76 @@ class BuddyDeckTest {
     private final BuddyDeck deck = new BuddyDeck();
 
     private static BuddyNotice running(String source, Object key, String title) {
-        return new BuddyNotice(new BuddyNoticeId(source, key), BuddyNotice.Kind.TASK, title, BuddyNotice.State.RUNNING, () -> "running", () -> { });
-    }
-
-    private static BuddyNotice notice(String source, Object key, String title) {
-        return new BuddyNotice(new BuddyNoticeId(source, key), BuddyNotice.Kind.TASK, title, BuddyNotice.State.DONE, () -> "done", () -> { });
+        return new BuddyNotice(new BuddyNoticeId(source, key), BuddyNotice.Kind.TASK, title, BuddyNotice.State.RUNNING,
+            () -> "running", () -> { });
     }
 
     @Test void noticesComeBackNewestFirst() {
-        deck.post(notice("terminal", "a", "first"));
-        deck.post(notice("terminal", "b", "second"));
-
+        deck.post(running("terminal", "a", "first"));
+        deck.post(running("terminal", "b", "second"));
         assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("second", "first");
     }
 
     @Test void postingOverTheSameKeyReplacesInPlaceAndPromotesToTheTop() {
-        deck.post(notice("terminal", "a", "first"));
-        deck.post(notice("terminal", "b", "second"));
-        deck.post(notice("terminal", "a", "first again"));
-
+        deck.post(running("terminal", "a", "first"));
+        deck.post(running("terminal", "b", "second"));
+        deck.post(running("terminal", "a", "first again"));
         assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("first again", "second");
     }
 
     /** The whole point of the source being part of the identity: producers cannot collide. */
     @Test void twoProducersWithTheSameKeyAreTwoNotices() {
-        deck.post(notice("terminal", "1", "a build"));
-        deck.post(notice("sftp", "1", "a transfer"));
-
+        deck.post(running("terminal", "1", "a build"));
+        deck.post(running("sftp", "1", "a transfer"));
         assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("a transfer", "a build");
     }
 
+    /** What a producer does when its work ends. */
     @Test void dismissingRemovesOneAndSaysWhetherThereWasOne() {
-        deck.post(notice("terminal", "a", "first"));
-
+        deck.post(running("terminal", "a", "first"));
         assertThat(deck.dismiss(new BuddyNoticeId("terminal", "a"))).isTrue();
         assertThat(deck.dismiss(new BuddyNoticeId("terminal", "a"))).isFalse();
         assertThat(deck.isEmpty()).isTrue();
     }
 
     @Test void clearingEmptiesTheDrawer() {
-        deck.post(notice("terminal", "a", "first"));
-        deck.post(notice("terminal", "b", "second"));
-
+        deck.post(running("terminal", "a", "first"));
+        deck.post(running("terminal", "b", "second"));
         deck.clear();
-
         assertThat(deck.notices()).isEmpty();
     }
 
-    /**
-     * The regression this design is shaped to avoid: a pane closed after a successful build must
-     * still say the build succeeded. Orphaning is a lost action, not a lost outcome.
-     */
-    @Test void orphaningKeepsTheOutcomeAndOnlyTakesAwayTheAction() {
-        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE, () -> "Finished in 1m 12s", () -> { }));
-
-        deck.orphan(new BuddyNoticeId("terminal", "a") , "Finished in 1m 12s");
-
-        BuddyNotice orphan = deck.notices().getFirst();
-        assertThat(orphan.state()).isEqualTo(BuddyNotice.State.DONE);
-        assertThat(orphan.title()).isEqualTo("./gradlew build");
-        assertThat(orphan.detail().get()).isEqualTo("Finished in 1m 12s");
-        assertThat(orphan.orphaned()).isTrue();
-        assertThat(orphan.activate()).isNull();
+    @Test void aNewStateOverTheSameKeyIsANewPost() {
+        deck.post(running("terminal", "a", "a build"));
+        int generation = deck.generation();
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "a build",
+            BuddyNotice.State.NEEDS_INPUT, () -> "waiting", () -> { }));
+        assertThat(deck.generation()).isEqualTo(generation + 1);
+        assertThat(deck.notices()).singleElement().extracting(BuddyNotice::state).isEqualTo(BuddyNotice.State.NEEDS_INPUT);
     }
 
-    @Test void orphaningFreezesARunningNoticeSoItStopsTicking() {
-        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "sleep 600", BuddyNotice.State.RUNNING, () -> "Running · " + System.nanoTime(), () -> { }));
-
-        deck.orphan(new BuddyNoticeId("terminal", "a") , "Stopped after 1m 12s");
-
-        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Stopped after 1m 12s");
+    @Test void aTitleChangeIsNotAPost() {
+        deck.post(running("terminal", "a", "worker"));
+        deck.post(running("terminal", "b", "other"));
+        int generation = deck.generation();
+        assertThat(deck.updateTitle(new BuddyNoticeId("terminal", "a"), "Reviewing")).isTrue();
+        assertThat(deck.updateTitle(new BuddyNoticeId("terminal", "a"), "Reviewing")).isFalse();
+        assertThat(deck.updateTitle(new BuddyNoticeId("terminal", "missing"), "Reviewing")).isFalse();
+        assertThat(deck.generation()).isEqualTo(generation);
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("other", "Reviewing");
     }
 
-    @Test void orphaningKeepsThePlaceRatherThanPromotingToTheTop() {
-        deck.post(notice("terminal", "a", "older"));
-        deck.post(notice("terminal", "b", "newer"));
-
-        deck.orphan(new BuddyNoticeId("terminal", "a") , "gone");
-
-        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("newer", "older");
-    }
-
-    @Test void orphaningSomethingThatIsNotThereDoesNothing() {
-        deck.post(notice("terminal", "a", "only"));
-
-        deck.orphan(new BuddyNoticeId("terminal", "missing") , "gone");
-
-        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("only");
+    @Test void aSnapshotKeepsWhatItSawWhenTheDeckChanges() {
+        deck.post(running("terminal", "a", "first"));
+        List<BuddyNotice> before = deck.notices();
+        assertThat(deck.notices()).isSameAs(before);
+        deck.post(running("terminal", "b", "second"));
+        assertThat(before).extracting(BuddyNotice::title).containsExactly("first");
+        assertThat(deck.notices()).hasSize(2);
     }
 
     @Test void theOldestFallOffOnceTheDrawerIsFull() {
-        for (int i = 0; i < BuddyDeck.MAX_NOTICES + 5; i++) deck.post(notice("terminal", i, "n" + i));
-
+        for (int i = 0; i < BuddyDeck.MAX_NOTICES + 5; i++) deck.post(running("terminal", i, "n" + i));
         assertThat(deck.size()).isEqualTo(BuddyDeck.MAX_NOTICES);
         assertThat(deck.notices().getFirst().title()).isEqualTo("n" + (BuddyDeck.MAX_NOTICES + 4));
         assertThat(deck.notices().getLast().title()).isEqualTo("n5");
@@ -111,92 +88,6 @@ class BuddyDeckTest {
 
     @Test void aNoticeNeedsAnIdentityAndSomethingToSay() {
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "  ", BuddyNotice.State.DONE, () -> "d", () -> { }));
-    }
-
-    /** The two-argument form is for a running notice only; this one must not rewrite what it said. */
-    @Test void orphaningWithoutAReplacementKeepsWhatTheNoticeSaid() {
-        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE, () -> "Finished in 1m 12s", () -> { }));
-
-        deck.orphan(new BuddyNoticeId("terminal", "a"));
-
-        BuddyNotice orphan = deck.notices().getFirst();
-        assertThat(orphan.detail().get()).isEqualTo("Finished in 1m 12s");
-        assertThat(orphan.state()).isEqualTo(BuddyNotice.State.DONE);
-        assertThat(orphan.orphaned()).isTrue();
-    }
-
-    /** The column's whole rule: still happening, or you have not looked at it yet. */
-    @Test void theColumnHoldsWhatIsLiveOrUnseen() {
-        deck.post(running("terminal", "a", "a build"));
-        deck.post(notice("terminal", "b", "a finished thing"));
-
-        assertThat(deck.column()).extracting(BuddyNotice::title)
-            .containsExactly("a finished thing", "a build");
-    }
-
-    @Test void lookingAtAFinishedNoticeTakesItOutOfTheColumnButNotTheDrawer() {
-        deck.post(notice("terminal", "b", "a finished thing"));
-
-        deck.acknowledge(new BuddyNoticeId("terminal", "b"));
-
-        assertThat(deck.column()).isEmpty();
-        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("a finished thing");
-        assertThat(deck.acknowledged(new BuddyNoticeId("terminal", "b"))).isTrue();
-    }
-
-    /** It is live, so looking at it changes nothing until it stops being live. */
-    @Test void lookingAtSomethingStillRunningLeavesItInTheColumn() {
-        deck.post(running("terminal", "a", "a build"));
-
-        deck.acknowledge(new BuddyNoticeId("terminal", "a"));
-
-        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("a build");
-    }
-
-    /** Or a flapping tunnel would go quiet after the first drop. */
-    @Test void aNewStateOverAnAcknowledgedKeyAsksForAttentionAgain() {
-        deck.post(running("terminal", "a", "a build"));
-        deck.acknowledge(new BuddyNoticeId("terminal", "a"));
-
-        deck.post(notice("terminal", "a", "a build"));
-
-        assertThat(deck.acknowledged(new BuddyNoticeId("terminal", "a"))).isFalse();
-        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("a build");
-    }
-
-    @Test void acknowledgingSomethingThatIsNotThereIsHarmless() {
-        deck.acknowledge(new BuddyNoticeId("terminal", "missing"));
-
-        assertThat(deck.acknowledged(new BuddyNoticeId("terminal", "missing"))).isFalse();
-    }
-
-    @Test void dismissingForgetsTheAcknowledgementToo() {
-        deck.post(notice("terminal", "a", "one"));
-        deck.acknowledge(new BuddyNoticeId("terminal", "a"));
-
-        deck.dismiss(new BuddyNoticeId("terminal", "a"));
-        deck.post(notice("terminal", "a", "one again"));
-
-        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("one again");
-    }
-
-    @Test void clearingForgetsEveryAcknowledgement() {
-        deck.post(notice("terminal", "a", "one"));
-        deck.acknowledge(new BuddyNoticeId("terminal", "a"));
-
-        deck.clear();
-        deck.post(notice("terminal", "a", "one again"));
-
-        assertThat(deck.column()).hasSize(1);
-    }
-
-    /** The oldest falling off must not leave its acknowledgement behind to leak forever. */
-    @Test void aNoticePushedOutByTheBoundTakesItsAcknowledgementWithIt() {
-        deck.post(notice("terminal", "first", "first"));
-        deck.acknowledge(new BuddyNoticeId("terminal", "first"));
-        for (int i = 0; i < BuddyDeck.MAX_NOTICES; i++) deck.post(notice("terminal", "k" + i, "n" + i));
-
-        assertThat(deck.acknowledged(new BuddyNoticeId("terminal", "first"))).isFalse();
+            new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "  ", BuddyNotice.State.RUNNING, () -> "d", () -> { }));
     }
 }

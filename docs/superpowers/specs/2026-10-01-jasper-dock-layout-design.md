@@ -150,29 +150,48 @@ group bounds, button bounds and workspace bounds:
 - **Over a stripe:** the group under the cursor (top, second, foot) and the insertion index from button midpoints.
   During a drag both stripes show all three groups with their separators; an empty group gets one button's height
   of drop space.
-- **Over the workspace** (between the stripes, from below the header to above the status bar): a 3 × 2 grid that
-  mirrors the stripes. Rows are thirds of the height, columns halves of the width:
+- **Over the workspace** (between the stripes, from below the header to above the status bar): six edge zones, one
+  for each slot. The target is the nearest of the workspace's left, right and bottom edges, each distance taken as a
+  share of the workspace's own width (left, right) or height (bottom), so a wide or a tall workspace splits like any
+  other. There is no top edge, because there are no top slots. The left and right edges split at half of the side
+  panels' visible height: above the bottom area when it shows, because the sides end there, otherwise at half the
+  workspace's height. The upper part is the side's top slot, the lower part its bottom slot. The bottom edge splits at
+  half the width, into Bottom Left and Bottom Right. The three edges meet at the middle: a diagonal runs from each
+  lower corner to it, and, with no bottom area showing, the half-height lines run across to it (the diagram). A tie
+  goes to a side over the bottom, and to the left over the right.
 
   ```
-  ┌──────────────┬──────────────┐
-  │  LEFT_TOP    │  RIGHT_TOP   │
-  ├──────────────┼──────────────┤
-  │  LEFT_BOTTOM │  RIGHT_BOTTOM│
-  ├──────────────┼──────────────┤
-  │  BOTTOM_LEFT │  BOTTOM_RIGHT│
-  └──────────────┴──────────────┘
+  ┌─────────────────────┬─────────────────────┐
+  │                     │                     │
+  │      LEFT_TOP       │     RIGHT_TOP       │
+  │                     │                     │
+  ├─────────────────────┼─────────────────────┤
+  │ LEFT_BOTTOM      ╱     ╲     RIGHT_BOTTOM │
+  │              ╱      │      ╲              │
+  │          ╱          │          ╲          │
+  │       ╱             │             ╲       │
+  │    ╱    BOTTOM_LEFT │   BOTTOM_RIGHT ╲    │
+  │                     │                     │
+  └─────────────────────┴─────────────────────┘
   ```
 
-  A workspace drop appends the window to that slot's group.
+  A workspace drop appends the window to that slot's group. Amended 2026-10-03 at the user's request: six edge zones
+  replace the 3 × 2 grid, whose middle-third bottom halves were hard to hit, and the sides split at the side panels'
+  visible half.
 - **Anywhere else** (title bar, status bar, outside the window): no target, no highlight; release cancels.
 
 ### Guides
 
 `DockDropOverlay`, a transparent component on the layered pane's `DRAG_LAYER`, paints:
 
-1. **Area highlight:** a translucent filled rectangle with a 1px border, exactly where the window would land,
+1. **Area highlight:** a translucent filled rectangle with a 1px border where the window would land (with the
+   second-slot exception below),
    computed by `DockGeometry.compute` on a "what if" copy of the state (the dragged window active in the target
-   slot). The real layout does not reflow during the drag.
+   slot). The real layout does not reflow during the drag. A stripe drop of a hidden window shows no area highlight,
+   because the window stays hidden and no frame would appear; the placeholder and the ghost still show. Amended
+   2026-10-03 at the user's request: for Left Bottom, Right Bottom and Bottom Right, the area highlight always shows
+   that half, as if its partner held a window, so the guide shows the slot's place even when the window will fill the
+   side or the bottom area because its partner is empty.
 2. **Stripe placeholder:** the target group's buttons part to open a gap at the insertion index, holding a
    highlighted rounded square. The source button is lifted out of its old place.
 3. **Ghost:** the dragged window's icon follows the cursor.
@@ -255,8 +274,8 @@ takes a minor version bump and declares the new SDK floor. Sessions, Tunnels, Fi
 
 - Pure `dock` tests: `DockStateTest` (one active per slot, order, move and index, events), `DockGeometryTest`
   (every combination of active slots, ratios, minimums, squeezed windows, full-width bottom),
-  `DockDropResolverTest` (grid thirds and halves, stripe groups and indices, empty groups during a drag, no target
-  outside).
+  `DockDropResolverTest` (the six edge zones, their ties and boundaries, stripe groups and indices, empty groups during
+  a drag, no target outside).
 - `UiStateTest`: version 2 round trip, v1 migration, per-entry fallback.
 - Headless Swing tests in the `DesktopTestSupport` style: stripe layout (foot pinned, separator only when needed,
   rail actions after the second group), header buttons and menus, area layout against the geometry, divider drag,

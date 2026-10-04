@@ -22,8 +22,8 @@ class BuddyCompanionTest {
             assertThat(buddy.show()).isFalse();
             buddy.clear(); assertThat(deck.notices()).isEmpty();
             buddy.post(notice); buddy.close(); buddy.close();
-            buddy.post(notice); buddy.updateTitle(id,"later"); buddy.acknowledge(id); buddy.dismiss(id);
-            buddy.orphan(id); buddy.orphan(id,"done"); buddy.clear(); buddy.setWorking(true);
+            buddy.post(notice); buddy.updateTitle(id,"later"); buddy.dismiss(id);
+            buddy.clear(); buddy.setWorking(true);
             buddy.hide(); buddy.greet(); buddy.poke(); buddy.applyOptions(options());
             assertThat(buddy.show()).isFalse(); assertThat(deck.notices()).isEmpty();
             assertThatNullPointerException().isThrownBy(() -> new BuddyCompanion(null));
@@ -35,7 +35,7 @@ class BuddyCompanionTest {
         SwingUtilities.invokeAndWait(() -> holder[0] = new BuddyCompanion(options()));
         var b = holder[0]; var id = new BuddyNoticeId("test",1);
         for (Runnable call : java.util.List.<Runnable>of(() -> b.post(null), () -> b.updateTitle(id,"title"),
-            () -> b.acknowledge(id), () -> b.dismiss(id), () -> b.orphan(id), () -> b.orphan(id,"done"),
+            () -> b.dismiss(id),
             b::clear, () -> b.setWorking(true), () -> b.show(), b::hide, b::greet, b::poke,
             () -> b.applyOptions(options()), b::close)) assertThatIllegalStateException().isThrownBy(call::run);
         SwingUtilities.invokeAndWait(b::close);

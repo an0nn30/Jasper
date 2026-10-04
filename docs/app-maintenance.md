@@ -116,7 +116,7 @@ touches the real keychain under a throwaway item.
 
 ## New Buddy notice producer
 
-Follow [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java) and the app translation of [WorkspaceActivity](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActivity.java). Allocate a source-qualified stable opaque ID. Pair opened and closed registration; remove the active identity before cancelling delayed work. Every delayed callback and event checks the current producer lifetime. Suppliers and activation callbacks run on EDT and must not block. At producer close, orphan and freeze only unfinished details; preserve completed outcomes. At app shutdown cancel producer work before closing the companion. Workspace reports events and never imports notice policy.
+Follow [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java) and the app translation of [WorkspaceActivity](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActivity.java). Allocate a source-qualified stable opaque ID. Pair opened and closed registration; remove the active identity before cancelling delayed work. Every delayed callback and event checks the current producer lifetime. Suppliers and activation callbacks run on EDT and must not block. When the work ends, and at producer close, dismiss the card; report how the work ended as a notification (see Posting a notification below), never through Buddy. At app shutdown cancel producer work before closing the companion. Workspace reports events and never imports notice policy.
 
 <!-- example:producer -->
 ```java
@@ -125,9 +125,8 @@ try (var buddy = new BuddyCompanion(options)) {
     var id = new BuddyNoticeId("example.transfer", UUID.randomUUID());
     buddy.post(new BuddyNotice(id, BuddyNotice.Kind.TASK, "Copy logs", BuddyNotice.State.RUNNING,
         () -> "3 files remaining", () -> {}));
-    // At producer close: cancel queued work first, then freeze and disconnect the notice.
-    buddy.orphan(id, "Stopped after 3 files");
-    buddy.acknowledge(id);
+    // When the work ends or the producer closes: cancel queued work first, then remove the card.
+    buddy.dismiss(id);
 }
 ```
 
@@ -408,7 +407,17 @@ while the stripes are visible, matching rounded corners for the terminal/tab col
 the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
-tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
+on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
+partner held a window (a stand-in in the copy of the state), even where the dropped window will really fill the side or
+the bottom area because its partner is empty. The first slots keep the true landing.
+What a drop over the workspace targets is `DockDropResolver`'s job: the nearest of the left, right and
+bottom edges (each distance a share of the workspace's own width or height, so the zones keep their shape
+at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height
+(`DockDrag.sideSplit`: above the bottom area while it shows, else the workspace's half) and the bottom at half
+its width; a side wins a tie. `DockDrag` previews no area for a stripe drop of a hidden window, which stays
+hidden. Change the zones in the resolver and its tests first; the window tests aim with
+`DockTestSupport.zone(workspace, slot)`.
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
 components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
 headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged

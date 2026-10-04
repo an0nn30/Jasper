@@ -152,8 +152,7 @@ class PluginRuntimeTest {
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
         settle();
         assertThat(data.resolve("stopped")).hasContent("yes");
-        onEdt(() -> assertThat(deck.notices()).singleElement()
-            .satisfies(notice -> assertThat(notice.state()).isEqualTo(BuddyNotice.State.FAILED)));
+        onEdt(() -> assertThat(deck.notices()).as("the activity it left open ends with it, and so does its card").isEmpty());
     }
 
     @Test void connectionCardsFollowTheirPluginAndRunOnlyItsOwnAction() throws Exception {
@@ -181,10 +180,8 @@ class PluginRuntimeTest {
             assertThat(stray.state()).isEqualTo(BuddyNotice.State.DOWN);
             link.activate().run();
             assertThat(raised).hasValue(1);
-            assertThat(deck.acknowledged(link.id())).isTrue();
             stray.activate().run();
             assertThat(raised).as("another plugin's action only raises the application").hasValue(2);
-            assertThat(deck.acknowledged(stray.id())).isFalse();
         });
         assertThat(root.resolve("absent/dev.example.link/data/shown")).hasContent(window.toString());
 

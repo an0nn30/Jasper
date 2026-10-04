@@ -1,34 +1,41 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.notifications.ActivityNotifier;
-import dev.jasper.buddy.notice.BuddyNotice;
+import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.buddy.view.BuddyTestSupport;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The real sample jar, staged the way the application image bundles it, through the real runtime to Buddy. */
+/** The real sample jar, staged the way the application image bundles it, through the real runtime to Buddy and the notification center. */
 class BundledSamplePluginTest {
     @TempDir Path root;
 
-    @Test void theStagedSampleLoadsFromItsJarAndItsActivityReachesBuddy() throws Exception {
+    @Test void theStagedSampleLoadsFromItsJarAndItsActivityEndsAsANotification() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
         assertThat(staged.resolve("dev.jasper.sample")).isDirectory();
         var deck = new BuddyTestSupport();
+        var center = AppContractTest.onEdtValue(() -> new NotificationCenter(SwingUtilities::invokeLater, Clock.systemUTC(),
+            () -> Delivery.Presence.FOCUSED));
+        var notifications = new PluginRuntime.NotificationHost(center,
+            caused -> SwingUtilities.invokeLater(() -> caused.posted().accept(center.post(caused.request()))), (title, details) -> { });
         var runtime = new AtomicReference<PluginRuntime>();
         dev.jasper.app.contributions.Contributions contributions = AppContractTest.onEdtValue(dev.jasper.app.contributions.Contributions::new);
         onEdt(() -> {
             runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")),
                 new ActivityNotifier(deck.companion(), () -> { }), PluginRuntime.SettingsReports.IGNORED, contributions,
-                AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry()));
+                AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry(), notifications, path -> { }));
             runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_ui", true, "demo_step_millis", 0L)), true);
         });
         onEdt(() -> {
@@ -60,18 +67,16 @@ class BundledSamplePluginTest {
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.remote", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.editor", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.fileserver", "BUNDLED", "ACTIVE"));
-        var state = new AtomicReference<BuddyNotice.State>();
+        String outcome = "dev.jasper.sample.activities|INFO|Sample plugin|Ready";
+        var lines = new AtomicReference<List<String>>(List.of());
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (state.get() != BuddyNotice.State.DONE && System.nanoTime() < deadline) {
-            onEdt(() -> state.set(deck.notices().isEmpty() ? null : deck.notices().get(0).state()));
+        while (!lines.get().contains(outcome) && System.nanoTime() < deadline) {
+            onEdt(() -> lines.set(center.history().stream().map(entry -> String.join("|", entry.request().group(),
+                entry.request().severity().name(), entry.request().title(), entry.request().content())).toList()));
             Thread.sleep(20);
         }
-        onEdt(() -> assertThat(deck.notices()).singleElement().satisfies(notice -> {
-            assertThat(notice.id().source()).isEqualTo("dev.jasper.sample");
-            assertThat(notice.title()).isEqualTo("Sample plugin");
-            assertThat(notice.state()).isEqualTo(BuddyNotice.State.DONE);
-            assertThat(notice.detail().get()).isEqualTo("Ready");
-        }));
+        assertThat(lines.get()).contains(outcome);
+        onEdt(() -> assertThat(deck.notices()).as("Buddy keeps live work only").isEmpty());
         var pending = new AtomicReference<List<CompletableFuture<?>>>();
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);

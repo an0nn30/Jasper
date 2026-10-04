@@ -132,7 +132,10 @@ final class NotificationsFeature implements AutoCloseable {
         Attached target = notification.request().target().map(windows::get).orElse(null);
         if (target == null && lastActive != null) target = windows.get(lastActive);
         if (target == null && !windows.isEmpty()) target = windows.values().iterator().next();
-        if (target != null) target.layer().show(notification);
+        if (target == null) return;
+        // A repeat may come from another window than its first post: one card, in the window it last came from.
+        for (Attached other : windows.values()) if (other != target) other.layer().withdraw(notification.id());
+        target.layer().show(notification);
     }
 
     private void updateBadge() {

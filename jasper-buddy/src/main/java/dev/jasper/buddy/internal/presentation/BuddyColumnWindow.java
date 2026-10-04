@@ -135,7 +135,7 @@ final class BuddyColumnWindow {
 
     private void layout() {
         if (disposed || anchor == null) return;
-        if (deck.column().isEmpty()) { frames.stop(); window.setVisible(false); return; }
+        if (deck.isEmpty()) { frames.stop(); window.setVisible(false); return; }
         Rectangle screen = screenFor(anchor);
         // The stack keeps the same window size while its direction and anchor-relative offset animate.
         Dimension size = panel.getPreferredSize();

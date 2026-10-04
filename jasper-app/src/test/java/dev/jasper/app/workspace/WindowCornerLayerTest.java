@@ -156,7 +156,8 @@ class WindowCornerLayerTest {
             // A dock drag's guides go on the drag layer above the cards, and a release over the cards still drops.
             AbstractButton sessions = owner.leftStripe().buttons().getFirst();
             Point start = center(owner, sessions);
-            Point over = new Point(layer.getX() + layer.getWidth() / 2, layer.getY() + layer.getHeight() / 2);
+            // Over the cards and clearly nearer the area's bottom edge than its right edge: the bottom right zone.
+            Point over = new Point(layer.getX() + layer.getWidth() / 2, layer.getY() + layer.getHeight() - 10);
             over = SwingUtilities.convertPoint(pane, over, owner);
             mouse(owner, sessions, MouseEvent.MOUSE_PRESSED, start);
             mouse(owner, sessions, MouseEvent.MOUSE_DRAGGED, new Point(start.x + 10, start.y));

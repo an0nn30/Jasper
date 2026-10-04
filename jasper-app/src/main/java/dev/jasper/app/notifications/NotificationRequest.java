@@ -34,6 +34,16 @@ public record NotificationRequest(String group, Severity severity, String title,
         Objects.requireNonNull(target, "target");
     }
 
+    /**
+     * The same text, action labels and target without the poster's callbacks: what an expired entry keeps, since those
+     * callbacks capture the poster (a closed pane and its window, a stopped plugin) and can never run again.
+     */
+    NotificationRequest released() {
+        List<NotificationAction> inert = actions.stream()
+            .map(action -> new NotificationAction(action.label(), () -> {}, action.expires())).toList();
+        return new NotificationRequest(group, severity, title, content, icon, inert, Optional.empty(), source, target);
+    }
+
     /** A notification of Jasper's own with only a title. */
     public static NotificationRequest of(String group, Severity severity, String title) {
         return new NotificationRequest(group, severity, title, "", Optional.empty(), List.of(), Optional.empty(), JASPER, Optional.empty());
