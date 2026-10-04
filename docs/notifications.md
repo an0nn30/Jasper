@@ -21,9 +21,10 @@ card and while the window is in the background. A hidden card stays unread in th
 configuration problems, stay until you close them. When three sticky cards are showing, more wait behind a
 **+N more** link that opens the panel.
 
-When Jasper is in the background, notifications collect in the panel; sticky ones show their card when you come
-back. A resident Jasper with no window open (after Quit on macOS, once the last window closed on Windows, or after a
-login launch) works the same way, however long it stays so: what arrives goes to the panel as unread, and only sticky
+When Jasper is in the background, notifications collect in the panel and the operating system shows them too (see
+[System notifications](#system-notifications)); sticky ones show their card when you come back. A resident Jasper with
+no window open (after Quit on macOS, once the last window closed on Windows, or after a login launch) works the same
+way, however long it stays so: what arrives goes to the panel as unread, the operating system shows it, and only sticky
 notifications show their card when the next window opens. A notification that arrives while a window is opening,
 before the first window of a normal start, or while a login launch is still starting up, waits and shows its card when
 that window is focused.
@@ -60,8 +61,9 @@ and **Open config.toml**. It goes away by itself once every problem is fixed.
 
 A command that ran at least `notifications.long_command_seconds` (10 seconds by default) and finished anywhere but the
 pane you were typing in is posted in Long-running commands: the command, and "Finished in 2m 03s" or "Exited 1 · 2m
-03s". Its card shows in the pane's window, and clicking the card focuses the pane (a history row has no click of its
-own, so a command that finished while Jasper was in the background is found by its tab); closing the pane expires it.
+03s". Its card shows in the pane's window, and clicking the card focuses the pane; while Jasper is in the background
+its [system notification](#system-notifications) does (a history row has no click of its own). Closing the pane
+expires it.
 The same command finishing the same way within a minute counts on one entry, which then points at the pane it last
 came from. While a command runs, Buddy (when it is on) shows it above his head; Buddy keeps only work that is still
 going. See [configuration](configuration.md#finished-command-notifications).
@@ -103,6 +105,31 @@ Incidents are kept in memory only, at most the latest 100, and are gone when Jas
 Jasper that Cmd+Q only sent to the background keeps them, like the panel's history). Incidents add nothing to the
 log: an incident's message and stack trace are never written to it, and the log keeps the same short, scrubbed records
 as before.
+
+## System notifications
+
+While Jasper is in the background, or idle as a resident Jasper with every window closed, a notification whose group
+shows cards also appears as the operating system's own: a banner on macOS, a balloon from Jasper's notification-area
+icon on Windows, and a desktop notification through `notify-send` on Linux. Clicking it brings its window to the front
+(opening one when none is open) and does what clicking its card would; a notification with nothing to run opens the
+Errors window for an internal error, a plugin problem or a plugin's notification that carries a cause, or else the
+Notifications panel. Reading a notification in Jasper, its expiry and its removal take the system notification away
+where the system allows it. While Jasper starts or a window opens nothing is sent, since the card is about to show;
+that includes a login launch until its start-up has settled.
+
+- **macOS**: only the packaged `Jasper.app` sends banners, with Jasper's icon. The first one asks for permission; allow
+  Jasper in System Settings → Notifications. Gradle and IDE runs send none.
+- **Windows**: the balloon comes from Jasper's icon in the notification area: a resident Jasper's own icon, or one
+  added for the balloon that goes when Jasper is focused again. A click on the balloon or on the icon opens the most
+  recent notification, if it is still unread; once it is read, a click on the resident icon opens a window, and a
+  click on the icon shown only for balloons does nothing, even if an older notification is unread.
+- **Linux**: Jasper runs `notify-send` from `PATH` when there is one. When it supports actions, a click on the
+  notification comes back to Jasper; otherwise the notification only informs.
+
+An internal error, a plugin problem and a plugin's own notification that carries a cause (the ones that offer
+**Show more…**) send only their title and open the Errors window when clicked, since their details can name files and
+hosts and system notifications show on a locked screen. Turn system notifications off with `notifications.system = false`, or in
+Settings › Notifications ([configuration](configuration.md#finished-command-notifications)).
 
 ## Shortcuts
 

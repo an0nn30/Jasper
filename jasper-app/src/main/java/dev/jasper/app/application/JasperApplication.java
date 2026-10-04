@@ -30,9 +30,9 @@ import dev.jasper.app.notifications.Severity;
 import dev.jasper.app.notificationui.ErrorsView;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
-import dev.jasper.app.platform.NativeNotifier;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.platform.SystemFonts;
+import dev.jasper.app.platform.SystemNotifier;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.startup.WindowTrace;
 import dev.jasper.app.windows.AuxiliaryWindows;
@@ -130,7 +130,7 @@ public final class JasperApplication {
     private final Path shellIntegrationDir;
     private final BuddyIntegration buddy;
     private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
-    private final NativeNotifier nativeNotifier = new NativeNotifier();
+    private final SystemNotices systemNotices;
     private final CommandNotifier notifications;
     private PluginRuntime plugins;
     private ActionEntry migrateAction;
@@ -231,6 +231,8 @@ public final class JasperApplication {
         themes = created;
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions);
+        systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
+            new SystemNotices.Windows(this::raiseFor, notificationViews::showHistory, this::showErrors));
         incidents = new Incidents(notificationCenter.clock());
         incidentNotices = new IncidentNotices(notificationCenter, incidents, SwingUtilities::invokeLater,
             JasperApplication::afterDelay, this::pluginName, this::disablePlugin, this::showErrors);
@@ -244,7 +246,7 @@ public final class JasperApplication {
             themes.current().chrome().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
-            buddy.companion(), notificationCenter, nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
+            buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
@@ -490,6 +492,14 @@ public final class JasperApplication {
      */
     public void residentIndicator(Function<dev.jasper.app.platform.ResidentTray.Actions, Runnable> install) {
         residentIndicator = Objects.requireNonNull(install, "install");
+    }
+
+    /**
+     * Where notifications go while Jasper is away: this desktop's banners, balloons or {@code notify-send}. Injected,
+     * like {@link #residentIndicator}, so tests never reach the real operating system; the application closes it.
+     */
+    public void systemNotifier(SystemNotifier notifier) {
+        systemNotices.use(Objects.requireNonNull(notifier, "notifier"));
     }
 
     /**
@@ -881,9 +891,10 @@ public final class JasperApplication {
     /**
      * The rule behind {@link #presence()}. A resident Jasper whose start-up has settled, with no window open and none
      * being opened, is idle ({@code residentIdle}), however long that lasts: an ordinary card would only pile up, so it
-     * goes to history. Otherwise a window counts only once it has been activated: a failure raised while the first
-     * window opens is queued ahead of the native activation event, and judging it "background" would keep its card out
-     * of sight for good. Until then the card waits, as it does with no window at all, and shows on activation.
+     * goes to history, and the operating system shows it meanwhile. Otherwise a window counts only once it has been
+     * activated: a failure raised while the first window opens is queued ahead of the native activation event, and
+     * judging it "background" would keep its card out of sight for good. Until then the card waits, as it does with no
+     * window at all, and shows on activation; the operating system is left alone, since the card is about to show.
      */
     static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive, boolean residentIdle) {
         if (residentIdle) return Delivery.Presence.IDLE;
@@ -1131,6 +1142,7 @@ public final class JasperApplication {
         lastActive = window;
         activatedSinceOpen = true;
         notificationViews.activated(window.content());
+        systemNotices.focused();
         terminals.windowActivated(window.content().id());
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
@@ -1148,6 +1160,45 @@ public final class JasperApplication {
         TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive
             : windows.isEmpty() ? null : windows.iterator().next();
         if (target != null) target.toFront();
+    }
+
+    /**
+     * Brings a terminal window to the front for a click on an OS notification: the notification's own window while it
+     * is open, else the one used last, and with none open a new one. Names the window; empty while Jasper quits.
+     */
+    private Optional<UUID> raiseFor(Optional<UUID> target) {
+        if (quitting || stopped) return Optional.empty();
+        TerminalWindow window = target.flatMap(this::openWindowWith).orElse(null);
+        if (window == null && lastActive != null && windows.contains(lastActive)) window = lastActive;
+        if (window == null && !windows.isEmpty()) window = windows.iterator().next();
+        if (window == null) window = newWindow();
+        if (window == null) return Optional.empty();
+        window.toFront();
+        return Optional.of(window.content().id());
+    }
+
+    private Optional<TerminalWindow> openWindowWith(UUID id) {
+        for (TerminalWindow window : windows) if (window.content().id().equals(id)) return Optional.of(window);
+        return Optional.empty();
+    }
+
+    /**
+     * {@code notifications.system}, live: whether the operating system shows notifications while Jasper is away; never
+     * once Jasper quits.
+     */
+    private boolean systemNotificationsEnabled() {
+        return systemNotificationsEnabled(
+            configuration == null || configuration.state().values().get(dev.jasper.app.config.CoreSettings.NOTIFICATIONS_SYSTEM),
+            quitting, stopped);
+    }
+
+    /**
+     * The rule behind {@link #systemNotificationsEnabled()}. Quitting closes every window, so Jasper then looks away,
+     * but a banner raised while windows close or a plugin stops would outlive the process, and on macOS a click on it
+     * would relaunch Jasper with nothing to route to.
+     */
+    static boolean systemNotificationsEnabled(boolean configured, boolean quitting, boolean stopped) {
+        return configured && !quitting && !stopped;
     }
 
     private void updateBuddyActions() {
@@ -1395,6 +1446,7 @@ public final class JasperApplication {
         buddy.close();
         incidentNotices.close();
         notificationViews.close();
+        systemNotices.close();
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }

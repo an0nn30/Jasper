@@ -256,6 +256,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
                 refresh();
             }
             case NotificationCenter.Change.CardRequested requested -> { }
+            case NotificationCenter.Change.SystemRequested requested -> { }
         }
     }
 

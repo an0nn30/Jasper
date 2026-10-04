@@ -16,10 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class CommandNotifierTest {
-    private record Sent(String title, String detail) {}
 
     private final BuddyTestSupport deck = new BuddyTestSupport();
-    private final List<Sent> os = new ArrayList<>();
     private final List<Boolean> working = new ArrayList<>();
     private final List<Runnable> scheduled = new ArrayList<>();
     private Delivery.Presence presence = Delivery.Presence.FOCUSED;
@@ -30,7 +28,7 @@ class CommandNotifierTest {
     private CommandNotifier notifier(int seconds) {
         center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> presence);
         var notifier = new CommandNotifier(() -> Duration.ofSeconds(seconds), deck.companion(), center,
-            (title, detail) -> os.add(new Sent(title, detail)), working::add,
+            working::add,
             (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); });
         for (String key : List.of("pane", "a", "b")) notifier.opened(key);
         return notifier;
@@ -70,7 +68,6 @@ class CommandNotifierTest {
             assertThat(notice.state()).isEqualTo(BuddyNotice.State.RUNNING);
         });
         assertThat(center.history()).isEmpty();
-        assertThat(os).isEmpty();
         assertThat(working).containsExactly(true);
     }
 
@@ -118,7 +115,6 @@ class CommandNotifierTest {
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72), FOCUSED_PANE, window, () -> {});
         assertThat(center.history()).isEmpty();
         assertThat(deck.notices()).isEmpty();
-        assertThat(os).isEmpty();
     }
 
     /** The deliberate widening: a visible split pane you are not typing in still notifies. */
@@ -128,13 +124,19 @@ class CommandNotifierTest {
         assertThat(center.history()).hasSize(1);
     }
 
-    @Test void theOperatingSystemHearsOnlyWhileJasperIsInTheBackground() {
+    /** The operating system hears through the center's delivery (spec section 7), not from this class. */
+    @Test void inTheBackgroundTheOutcomeAsksTheOperatingSystemThroughTheCenter() {
         CommandNotifier notifier = notifier(10);
+        var asked = new ArrayList<String>();
+        center.onChange(change -> {
+            if (change instanceof NotificationCenter.Change.SystemRequested requested)
+                asked.add(requested.notification().request().title());
+        });
         notifier.finished("a", "make", OptionalInt.of(0), Duration.ofSeconds(30), HIDDEN_TAB, window, () -> {});
-        assertThat(os).as("the card says it in the foreground").isEmpty();
+        assertThat(asked).as("the card says it in the foreground").isEmpty();
         presence = Delivery.Presence.BACKGROUND;
         notifier.finished("b", "./gradlew build", OptionalInt.of(1), Duration.ofSeconds(72), HIDDEN_TAB, window, () -> {});
-        assertThat(os).containsExactly(new Sent("./gradlew build", "Exited 1 · 1m 12s"));
+        assertThat(asked).containsExactly("./gradlew build");
         assertThat(center.history()).as("history and unread either way").hasSize(2);
         assertThat(center.unread()).isEqualTo(2);
     }
@@ -145,7 +147,6 @@ class CommandNotifierTest {
         notifier.finished("pane", "ls", OptionalInt.of(0), Duration.ofSeconds(2), HIDDEN_TAB, window, () -> {});
         assertThat(deck.notices()).isEmpty();
         assertThat(center.history()).isEmpty();
-        assertThat(os).isEmpty();
         assertThat(working).as("it never passed the threshold").isEmpty();
         assertThat(scheduled).as("its timer was cancelled").isEmpty();
     }
@@ -157,7 +158,6 @@ class CommandNotifierTest {
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofHours(1), HIDDEN_TAB, window, () -> {});
         assertThat(deck.notices()).isEmpty();
         assertThat(center.history()).isEmpty();
-        assertThat(os).isEmpty();
     }
 
     @Test void aSecondLongCommandDoesNotRestartTheTypingAndTheLastOneEndsIt() {
@@ -308,7 +308,7 @@ class CommandNotifierTest {
         notifier.titleChanged("pane", "/tmp/project");
         presence = Delivery.Presence.BACKGROUND;
         notifier.finished("pane", command, OptionalInt.of(2), Duration.ofSeconds(12), HIDDEN_TAB, window, () -> {});
-        assertThat(os).containsExactly(new Sent("printf 'hello' ↵ echo goodbye", "Exited 2 · 12s"));
+        assertThat(center.history().getFirst().request().content()).isEqualTo("Exited 2 · 12s");
         assertThat(center.history().getFirst().request().title()).isEqualTo("printf 'hello' ↵ echo goodbye");
     }
 
@@ -343,13 +343,12 @@ class CommandNotifierTest {
                 notifier.finished(key, "build", OptionalInt.of(0), Duration.ofSeconds(20), HIDDEN_TAB, window, () -> {});
             }
             if (scenario == 3) notifier.close(); else notifier.closed(key);
-            int generation = deck.generation(), sent = os.size(), changes = working.size(), posted = center.history().size();
+            int generation = deck.generation(), changes = working.size(), posted = center.history().size();
             saved.run();
             notifier.started(key, "late", () -> 20_000_000_000L, () -> {}, UNWATCHED);
             notifier.finished(key, "late", OptionalInt.of(0), Duration.ofSeconds(20), HIDDEN_TAB, window, () -> {});
             notifier.hidden(key); notifier.titleChanged(key, "late");
             assertThat(deck.generation()).isEqualTo(generation);
-            assertThat(os).hasSize(sent);
             assertThat(working).hasSize(changes);
             assertThat(center.history()).hasSize(posted);
             notifier.close(); notifier.close();

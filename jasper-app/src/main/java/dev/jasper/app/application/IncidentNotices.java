@@ -149,7 +149,7 @@ final class IncidentNotices implements AutoCloseable {
         if (closed) return;
         String text = details == null ? "" : details;
         if (capture(NotificationRequest.JASPER, LAUNCH, failure, false,
-                incident -> launchRequest(window, text).withAction(showMore(incident)), UNHEARD)) return;
+                incident -> linked(launchRequest(window, text), incident), UNHEARD)) return;
         try { center.submit(launchRequest(window, text)); }
         catch (RuntimeException unannounced) {
             LOG.log(System.Logger.Level.WARNING, "A shell launch failure could not be announced", unannounced);
@@ -173,7 +173,7 @@ final class IncidentNotices implements AutoCloseable {
      */
     void pluginNotice(String pluginId, NotificationRequest request, Throwable cause, Consumer<Optional<UUID>> posted) {
         if (closed) return;
-        if (capture(pluginId, request.title(), unwrapped(cause), false, incident -> request.withAction(showMore(incident)), posted))
+        if (capture(pluginId, request.title(), unwrapped(cause), false, incident -> linked(request, incident), posted))
             return;
         try { ui.execute(() -> posted.accept(center.post(request))); }
         catch (RuntimeException unannounced) {
@@ -400,13 +400,20 @@ final class IncidentNotices implements AutoCloseable {
     /** An internal error, or a plugin problem with Disable Plugin; Show more… comes last (spec section 3). */
     private NotificationRequest announcement(Incident incident) {
         if (!incident.fromPlugin())
-            return NotificationRequest.of(ERRORS.id(), Severity.ERROR, "Unexpected error in Jasper")
-                .withContent(incident.summary()).withAction(showMore(incident));
+            return linked(NotificationRequest.of(ERRORS.id(), Severity.ERROR, "Unexpected error in Jasper")
+                .withContent(incident.summary()), incident);
         String plugin = incident.source();
-        return NotificationRequest.of(PLUGINS.id(), Severity.ERROR, pluginTitle(nameOf(plugin), incident.operation()))
+        return linked(NotificationRequest.of(PLUGINS.id(), Severity.ERROR, pluginTitle(nameOf(plugin), incident.operation()))
             .withContent(incident.summary())
-            .withAction(new NotificationAction(DISABLE_PLUGIN, () -> disablePlugin(plugin), false))
-            .withAction(showMore(incident));
+            .withAction(new NotificationAction(DISABLE_PLUGIN, () -> disablePlugin(plugin), false)), incident);
+    }
+
+    /**
+     * The request with Show more… last, naming its incident: the operating system then shows only the title, and two
+     * incidents never share a notification.
+     */
+    private NotificationRequest linked(NotificationRequest request, Incident incident) {
+        return request.withAction(showMore(incident)).withIncident(incident.id());
     }
 
     private NotificationAction showMore(Incident incident) {

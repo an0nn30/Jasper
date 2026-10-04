@@ -5,11 +5,14 @@ package dev.jasper.app.notifications;
  * <ul>
  *   <li>focused: a card shows now;
  *   <li>in the background: an auto-hiding card would be stale on return, so it only enters history; a sticky one waits
- *       for Jasper to be focused;
+ *       for Jasper to be focused; and the operating system shows either, which is how a person away from Jasper hears
+ *       of it;
  *   <li>no window yet (before the first window of a start, while one opens, or until it is activated): both wait for
- *       the window to be focused, so a failure raised while it opens shows its card;
+ *       the window to be focused, so a failure raised while it opens shows its card, and the operating system is left
+ *       alone, since the card is about to show;
  *   <li>idle (a resident Jasper with no window open and none being opened, which can last for hours): an auto-hiding
- *       card goes to history, as in the background; only a sticky one waits for the next window.
+ *       card goes to history, as in the background; only a sticky one waits for the next window; and the operating
+ *       system shows either, as in the background.
  * </ul>
  */
 public final class Delivery {
@@ -31,12 +34,15 @@ public final class Delivery {
      * @param record whether it enters the history
      * @param card whether a card shows now
      * @param pending whether a card waits until Jasper is next focused
+     * @param system whether the operating system shows it now
      */
-    public record Outcome(boolean record, boolean card, boolean pending) {
-        static final Outcome DROP = new Outcome(false, false, false);
-        static final Outcome HISTORY = new Outcome(true, false, false);
-        static final Outcome CARD = new Outcome(true, true, false);
-        static final Outcome PENDING = new Outcome(true, false, true);
+    public record Outcome(boolean record, boolean card, boolean pending, boolean system) {
+        static final Outcome DROP = new Outcome(false, false, false, false);
+        static final Outcome HISTORY = new Outcome(true, false, false, false);
+        static final Outcome CARD = new Outcome(true, true, false, false);
+        static final Outcome PENDING = new Outcome(true, false, true, false);
+        static final Outcome HISTORY_AND_SYSTEM = new Outcome(true, false, false, true);
+        static final Outcome PENDING_AND_SYSTEM = new Outcome(true, false, true, true);
     }
 
     public static Outcome route(DisplayMode mode, Presence presence) {
@@ -45,10 +51,14 @@ public final class Delivery {
             case HISTORY -> Outcome.HISTORY;
             case CARD -> switch (presence) {
                 case FOCUSED -> Outcome.CARD;
-                case BACKGROUND, IDLE -> Outcome.HISTORY;
+                case BACKGROUND, IDLE -> Outcome.HISTORY_AND_SYSTEM;
                 case NO_WINDOW -> Outcome.PENDING;
             };
-            case STICKY -> presence == Presence.FOCUSED ? Outcome.CARD : Outcome.PENDING;
+            case STICKY -> switch (presence) {
+                case FOCUSED -> Outcome.CARD;
+                case BACKGROUND, IDLE -> Outcome.PENDING_AND_SYSTEM;
+                case NO_WINDOW -> Outcome.PENDING;
+            };
         };
     }
 }

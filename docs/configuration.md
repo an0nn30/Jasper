@@ -83,6 +83,7 @@ enabled = false
 
 [notifications]
 long_command_seconds = 10
+system = true
 
 [system]
 run_in_background = true  # false on Linux
@@ -146,6 +147,7 @@ workspace = "match"
 | `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
+| `notifications.system` | `true` | Boolean | Live |
 | `system.run_in_background` | `true` on macOS and Windows, `false` on Linux | Boolean | Next start (residency); live (login item) |
 | `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
@@ -220,8 +222,9 @@ never hides from the Dock, and Quit there still exits.
 
 **Windows.** Once start-up has settled, the resident process shows a Jasper icon in the notification area (it may sit
 in the taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens a window
-or raises the open one; **Quit Jasper** exits completely, the same as Quit from a window. Launching Jasper again also
-reveals a window.
+or raises the open one, except that while a notification's balloon is waiting unread, double-clicking the icon opens
+that notification instead; **Quit Jasper** exits completely, the same as Quit from a window. Launching Jasper again
+also reveals a window.
 
 Residency also registers Jasper to start in the background at login:
 
@@ -296,10 +299,11 @@ is too near the top of the screen, and the order inverts so the newest is still 
 to dismiss one and **Clear all** to empty it. Double-clicking him still raises the terminal and
 right-clicking still opens his menu.
 
-In the packaged macOS `Jasper.app`, a command that finishes while Jasper is in the background also
-sends a **system notification**, with Jasper's app icon and notification settings. The first eligible
-notice asks for permission; allow Jasper in System Settings → Notifications. Other launches (Gradle
-and IDE runs included) send none.
+While Jasper is in the background a long command's outcome is also a **system notification**: a banner from the
+packaged macOS `Jasper.app`, a balloon from Jasper's notification-area icon on Windows, or `notify-send`
+on Linux, and clicking it focuses the pane. `notifications.system = false` turns system notifications
+off for everything (Settings › Notifications › Show system notifications). See
+[Notifications](notifications.md#system-notifications).
 
 ### Automatic tab and notification titles
 

@@ -11,6 +11,7 @@ import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.LoginItem;
 import dev.jasper.app.platform.MacDock;
 import dev.jasper.app.platform.ResidentTray;
+import dev.jasper.app.platform.SystemNotifier;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.startup.StartupTrace;
@@ -162,8 +163,11 @@ public final class ApplicationBootstrap {
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
                 replacementHandsOff(options), standaloneNotice(options));
             application.staleBuild(replacedOnDisk(source, HandoffSocket.lastModified(source)));
-            // The macOS menu bar item and the Windows notification-area icon, once start-up has settled.
-            application.residentIndicator(ResidentTray::install);
+            // The macOS menu bar item and the Windows notification-area icon, once start-up has settled. On Windows the
+            // same icon carries the system notifications' balloons, and one is added for them when Jasper is not resident.
+            ResidentTray tray = ResidentTray.forThisDesktop();
+            application.residentIndicator(tray::install);
+            application.systemNotifier(SystemNotifier.forThisPlatform(System.getProperty("os.name"), dirs, tray));
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
             if (MacDock.available())
                 application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());

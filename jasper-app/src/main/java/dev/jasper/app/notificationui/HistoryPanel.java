@@ -169,6 +169,7 @@ public final class HistoryPanel extends JPanel {
                 rebuild();
             }
             case NotificationCenter.Change.CardRequested requested -> { }
+            case NotificationCenter.Change.SystemRequested requested -> { }
         }
     }
 

@@ -626,4 +626,27 @@ class IncidentNoticesTest {
         assertThat(center.history()).isEmpty();
         assertThat(posted).containsExactly(Optional.empty());
     }
+
+    @Test void everyNotificationAnIncidentAnnouncesNamesThatIncident() {
+        var notices = notices();
+        declareRemote();
+        notices.jasperFailure("thread worker", new IllegalStateException("broken"));
+        notices.pluginFailure("dev.jasper.remote", "panel remote.sftp", new UnsupportedOperationException("no route"));
+        notices.launchFailure(UUID.randomUUID(), "in /tmp", new IllegalArgumentException("no shell"));
+        notices.pluginNotice("dev.jasper.remote", pluginRequest("dev.jasper.remote", "Clipboard busy"),
+            new ArithmeticException("busy"), id -> { });
+        assertThat(center.history()).hasSize(4).allSatisfy(entry -> assertThat(entry.request().incident()).isPresent());
+        assertThat(center.history()).extracting(entry -> entry.request().incident().orElseThrow())
+            .containsExactlyInAnyOrderElementsOf(incidents.list().stream().map(Incident::id).toList());
+    }
+
+    /** Two incidents are two notifications, however alike they read: each Show more… opens its own. */
+    @Test void differentIncidentsThatReadTheSameAreNeverOneNotification() {
+        var notices = notices();
+        UUID window = UUID.randomUUID();
+        notices.launchFailure(window, "in /tmp", new IllegalStateException("no shell"));
+        notices.launchFailure(window, "in /tmp", new IllegalArgumentException("no shell"));
+        assertThat(incidents.list()).hasSize(2);
+        assertThat(center.history()).hasSize(2).allSatisfy(entry -> assertThat(entry.count()).isEqualTo(1));
+    }
 }
