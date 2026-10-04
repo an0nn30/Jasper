@@ -8,6 +8,7 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.AppLog;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.LoginItem;
+import dev.jasper.app.platform.SystemNotifier;
 import dev.jasper.app.platform.WindowsTray;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
@@ -137,6 +138,7 @@ public final class ApplicationBootstrap {
             // Shown only once startup settles residency, and only on Windows.
             WindowsTray tray = WindowsTray.forThisDesktop();
             application.residentIndicator(tray::resident);
+            application.systemNotifier(SystemNotifier.forThisPlatform(System.getProperty("os.name"), dirs, tray));
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
             acquired.transfer();
             return application;

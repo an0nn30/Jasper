@@ -76,6 +76,7 @@ enabled = false
 
 [notifications]
 long_command_seconds = 10
+system = true
 
 [system]
 run_in_background = false
@@ -138,6 +139,7 @@ workspace = "match"
 | `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
+| `notifications.system` | `true` | Boolean | Live |
 | `system.run_in_background` | `false` | Boolean | Next start (residency); live (login item) |
 | `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |

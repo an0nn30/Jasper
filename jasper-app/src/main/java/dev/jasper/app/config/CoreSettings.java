@@ -72,6 +72,10 @@ public final class CoreSettings {
         .description("Live. Notify when a command that ran at least this long finishes in a pane you are not\n"
             + "looking at. Needs shell integration: the duration comes from its command marks.\n"
             + "Zero disables notifications. Range 0-3600.").build();
+    public static final Setting<Boolean> NOTIFICATIONS_SYSTEM = Setting.of("notifications.system", SettingKind.bool(), true)
+        .label("Show system notifications").keywords("notification", "system", "banner", "balloon", "desktop", "tray")
+        .description("Live. While Jasper is in the background, also show its notifications as the operating system's\n"
+            + "own: banners from the packaged macOS app, Windows tray balloons, or notify-send on Linux.").build();
     public static final Setting<Boolean> SYSTEM_RUN_IN_BACKGROUND = Setting.of("system.run_in_background", SettingKind.bool(), false)
         .alias("background.enabled").label("Run in background").keywords("resident", "login", "autostart", "background")
         .applies(Applies.RESTART)
@@ -211,7 +215,7 @@ public final class CoreSettings {
         .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows the workspace theme.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
-            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
+            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
@@ -221,7 +225,7 @@ public final class CoreSettings {
         Map.ofEntries(
             Map.entry(List.of("window"), "Workspace chrome. Heights and widths are logical pixels."),
             Map.entry(List.of("buddy"), "The desk buddy."),
-            Map.entry(List.of("notifications"), "Desktop notifications for finished commands."),
+            Map.entry(List.of("notifications"), "Finished commands, and what the operating system shows while Jasper is away."),
             Map.entry(List.of("system"), "How Jasper runs when no window is open."),
             Map.entry(List.of("palette"), "The command palette."),
             Map.entry(List.of("terminal"), "Terminal behaviour shared by every pane."),

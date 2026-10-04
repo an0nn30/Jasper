@@ -100,6 +100,12 @@ final class NotificationsFeature implements AutoCloseable {
 
     void info(String title, String details, UUID window) { post(Severity.INFO, title, details, window); }
 
+    /** Shows the Notifications panel in that window: what clicking an OS notification with nothing else to do does. */
+    void showHistory(UUID window) {
+        if (closed || !windows.containsKey(window)) return;
+        contributions.requestPanel(new Contributions.PanelRequest(window, PANEL_ID, Contributions.PanelRequest.Op.SHOW));
+    }
+
     CardLayer layer(UUID windowId) {
         Attached attached = windows.get(windowId);
         return attached == null ? null : attached.layer();

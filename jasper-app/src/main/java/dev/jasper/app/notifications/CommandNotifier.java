@@ -14,7 +14,6 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -27,8 +26,8 @@ import java.util.function.Supplier;
  * title, "Finished in 2m 03s" (INFO) or "Exited 1 · 2m 03s" (WARNING) as the content, a click that focuses the pane, and
  * a card in the pane's window. A pane closing expires its notifications, since there is no pane left to focus.
  *
- * <p>Until plan 5's OS notifiers, the outcome also goes to the operating system while Jasper is in the background; in
- * the foreground the card says it.
+ * <p>While Jasper is in the background the center's delivery also has the operating system show the outcome (spec
+ * section 7); this class does not talk to it.
  *
  * <p>Holds no Swing state. Every seam is a standard functional type, including {@code schedule}, which is Swing's
  * {@code Timer} in the application and a list a test runs by hand. EDT only.
@@ -48,7 +47,6 @@ public final class CommandNotifier implements AutoCloseable {
     private Supplier<Duration> threshold;
     private BuddyCompanion deck;
     private NotificationCenter center;
-    private BiConsumer<String, String> operatingSystem;
     private Consumer<Boolean> onWorkingChanged;
     private BiFunction<Duration, Runnable, Runnable> schedule;
     /** Commands that have been running past the threshold. */
@@ -69,18 +67,14 @@ public final class CommandNotifier implements AutoCloseable {
      * @param threshold how long a command must run to be worth telling; zero turns the feature off
      * @param deck shows running commands
      * @param center receives the outcomes
-     * @param operatingSystem receives an outcome's title and content while Jasper is in the background (plan 5 replaces
-     *     it with the OS notifiers)
      * @param onWorkingChanged hears whether any long command is running, for Buddy's typing
      * @param schedule runs a task after a delay and returns the way to cancel it
      */
     public CommandNotifier(Supplier<Duration> threshold, BuddyCompanion deck, NotificationCenter center,
-                           BiConsumer<String, String> operatingSystem, Consumer<Boolean> onWorkingChanged,
-                           BiFunction<Duration, Runnable, Runnable> schedule) {
+                           Consumer<Boolean> onWorkingChanged, BiFunction<Duration, Runnable, Runnable> schedule) {
         this.threshold = Objects.requireNonNull(threshold, "threshold");
         this.deck = Objects.requireNonNull(deck, "deck");
         this.center = Objects.requireNonNull(center, "center");
-        this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
         this.onWorkingChanged = Objects.requireNonNull(onWorkingChanged, "onWorkingChanged");
         this.schedule = Objects.requireNonNull(schedule, "schedule");
         center.register(GROUP);
@@ -167,7 +161,6 @@ public final class CommandNotifier implements AutoCloseable {
             outcomes.values().forEach(ids -> ids.remove(id));
             outcomes.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(id);
         });
-        if (center.presence() != Delivery.Presence.FOCUSED) operatingSystem.accept(title, detail);
     }
 
     /** The pane is gone: its running card goes, and its notifications expire, since there is no pane to focus. */
@@ -210,7 +203,6 @@ public final class CommandNotifier implements AutoCloseable {
         threshold = () -> Duration.ZERO;
         deck = null;
         center = null;
-        operatingSystem = (title, detail) -> {};
         onWorkingChanged = value -> {};
         schedule = (delay, action) -> () -> {};
     }
