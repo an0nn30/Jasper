@@ -103,15 +103,18 @@ public final class SystemNotifier implements AutoCloseable {
     }
 
     /**
-     * The notifier for this desktop: banners from a packaged macOS {@code Jasper.app}; nothing elsewhere, including
-     * Gradle and IDE runs on macOS, which lack Jasper's bundle identity.
+     * The notifier for this desktop: banners from a packaged macOS {@code Jasper.app}, {@code notify-send} on Linux,
+     * and nothing elsewhere, including Gradle and IDE runs on macOS, which lack Jasper's bundle identity.
      *
      * @param osName the {@code os.name} property
+     * @param dirs where Jasper keeps the icon {@code notify-send} shows
      */
-    public static SystemNotifier forThisPlatform(String osName) {
+    public static SystemNotifier forThisPlatform(String osName, AppDirs dirs) {
         String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
         if (os.startsWith("mac"))
             return MacNotifications.libraryPath(System.getProperty("jpackage.app-path")) == null ? none() : onWorker(SystemNotifier::mac);
+        if (os.startsWith("linux"))
+            return onWorker(clicked -> LinuxNotifications.backend(dirs.notificationIcon(), clicked));
         return none();
     }
 

@@ -124,12 +124,21 @@ class SystemNotifierTest {
         notifier.close();
     }
 
-    @Test void anUnpackagedMacAndUnknownSystemsShowNothing() {
+    @Test void anUnpackagedMacAndUnknownSystemsShowNothing(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) {
+        var dirs = new AppDirs(root, root.resolve("config.toml"), root.resolve("logs"));
         // A test JVM has no jpackage.app-path, so no Jasper.app bundle to speak for.
-        assertThat(SystemNotifier.forThisPlatform("Mac OS X").silent()).isTrue();
-        assertThat(SystemNotifier.forThisPlatform("FreeBSD").silent()).isTrue();
-        assertThat(SystemNotifier.forThisPlatform(null).silent()).isTrue();
+        assertThat(SystemNotifier.forThisPlatform("Mac OS X", dirs).silent()).isTrue();
+        assertThat(SystemNotifier.forThisPlatform("FreeBSD", dirs).silent()).isTrue();
+        assertThat(SystemNotifier.forThisPlatform(null, dirs).silent()).isTrue();
         assertThat(SystemNotifier.none().silent()).isTrue();
         assertThat(notifier().silent()).isFalse();
+    }
+
+    @Test void linuxHasNotifySend(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) {
+        var dirs = new AppDirs(root, root.resolve("config.toml"), root.resolve("logs"));
+        // Nothing is looked up or started until the first notification.
+        try (var linux = SystemNotifier.forThisPlatform("Linux", dirs)) {
+            assertThat(linux.silent()).isFalse();
+        }
     }
 }
