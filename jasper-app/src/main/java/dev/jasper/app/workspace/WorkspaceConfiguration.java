@@ -15,6 +15,7 @@ final class WorkspaceConfiguration {
         if (owner.closed()) return;
         ConfigSnapshot previous = configured;
         configured = next;
+        owner.setAnimations(next.animations());
         owner.setTabHeight(next.tabHeight());
         owner.setRailWidth(next.railWidth());
         owner.setToolbarHeight(next.toolbarHeight());

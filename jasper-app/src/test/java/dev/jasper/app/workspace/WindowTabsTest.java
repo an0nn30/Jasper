@@ -21,6 +21,7 @@ class WindowTabsTest {
     @Test void stripIsAlwaysVisibleAndSelectsAndClosesRealTabs() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             JComponent strip = named(owner, "windowTabs");
             assertThat(strip).isNotNull();
             assertThat(strip.getPreferredSize().height).isEqualTo(30);
@@ -41,6 +42,7 @@ class WindowTabsTest {
     @Test void tabsAreContentSizedLeftAlignedWithIconTitleAndTrailingClose() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second");
             var strip = owner.windowTabs(); layout(strip, 800, 38);
             var first = (AbstractButton) named(strip, "select:first");
@@ -70,6 +72,7 @@ class WindowTabsTest {
     @Test void tooltipsCarryTheTitleAndTheLiveSelectShortcut() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()), true);
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
             var strip = owner.windowTabs();
             assertThat(named(strip, "select:second").getToolTipText()).isEqualTo("second (⌘2)");
@@ -83,6 +86,7 @@ class WindowTabsTest {
     @Test void selectedFolderJoinsTheWorkspaceWithConcaveShouldersAndNoOutline() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
             for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme);
@@ -109,6 +113,7 @@ class WindowTabsTest {
     @Test void newTabAtTheFarRightOpensAndSelectsATabAndStopsAfterClosure() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("first"); owner.update();
             var strip = owner.windowTabs(); layout(strip, 330, 30);
             var add = (AbstractButton) named(strip, "newTab");
@@ -130,6 +135,7 @@ class WindowTabsTest {
     @Test void foldersRemainFlushAndControlsFitAtTheMinimumConfiguredHeight() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
             var strip = owner.windowTabs();
             for (int height : new int[]{20, 30, 72}) {
@@ -149,6 +155,7 @@ class WindowTabsTest {
     @Test void selectedTabUsesActualWorkspaceColorsWithIndependentTerminalPalettes() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
             for (Theme chrome : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(chrome);
@@ -169,6 +176,7 @@ class WindowTabsTest {
     @Test void recessedStripKeepsReadableTitlesWhateverTheUiTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
             for (Theme chrome : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(chrome);
@@ -204,6 +212,7 @@ class WindowTabsTest {
     @Test void controlsRetainIdentityAcrossMetadataSelectionReorderAndTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             JComponent strip = named(owner, "windowTabs");
             var first = owner.currentTab(); first.rename("first"); owner.update();
             JComponent control = named(strip, "select:first");
@@ -222,6 +231,7 @@ class WindowTabsTest {
     @Test void tooltipsAndTheTabListStayLiteralAndBounded() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()), true);
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             String title = "<html><img src=http://example.invalid/x.png>" + "x".repeat(1000);
             owner.currentTab().rename(title); owner.update();
             var strip = owner.windowTabs();
@@ -241,6 +251,7 @@ class WindowTabsTest {
     @Test void aGrowingSelectedTitleStaysVisibleInOverflow() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             var strip = owner.windowTabs();
             owner.currentTab().rename("a");
             for (String name : new String[] {"b", "c", "d", "e"}) { owner.newTab(HOME); owner.currentTab().rename(name); }
@@ -258,6 +269,7 @@ class WindowTabsTest {
     @Test void middleClickAndDragUseTheSameSelectionAndOrderModel() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             JComponent strip = named(owner, "windowTabs");
             var first = owner.currentTab(); first.rename("first"); owner.newTab(HOME);
             var second = owner.currentTab(); second.rename("second"); owner.update();
@@ -277,6 +289,7 @@ class WindowTabsTest {
     @Test void overflowScrollsKeepsSelectionVisibleAndTheListReachesEveryLiteralTitle() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             var tabs = owner.windowTabs();
             Dimension minimum = tabs.getMinimumSize();
             for (int i = 0; i < 12; i++) { owner.currentTab().rename("<b>long name ".repeat(100) + i); owner.newTab(HOME); }
@@ -305,6 +318,7 @@ class WindowTabsTest {
     @Test void narrowingTheWindowKeepsTheSelectedTabVisible() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             JComponent strip = named(owner, "windowTabs");
             for (int i = 0; i < 4; i++) owner.newTab(HOME);
             owner.currentTab().rename("selected"); owner.update();
@@ -318,6 +332,7 @@ class WindowTabsTest {
     @Test void preciseWheelScrollsPartialTabsOverLabelsAndCloseButtonsAndClampsAtEnds() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             for (int i = 0; i < 8; i++) {
                 if (i > 0) owner.newTab(HOME);
                 owner.currentTab().rename("Tab " + i + " with a longer title");
@@ -353,6 +368,7 @@ class WindowTabsTest {
     @Test void overflowFadesOnlyClippedEdgesIntoTheRecessedStrip() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             for (int i = 0; i < 5; i++) {
                 if (i > 0) owner.newTab(HOME);
                 owner.currentTab().rename("wide selected tab " + i);
@@ -385,6 +401,7 @@ class WindowTabsTest {
     @Test void scrolledTabsKeepDragCloseAndSelectionGeometry() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             for (int i = 0; i < 6; i++) {
                 if (i > 0) owner.newTab(HOME);
                 owner.currentTab().rename("tab-" + i);
@@ -413,6 +430,7 @@ class WindowTabsTest {
     @Test void droppingOverFixedControlsDoesNotTargetAClippedTab() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             for (int i = 0; i < 5; i++) {
                 if (i > 0) owner.newTab(HOME);
                 owner.currentTab().rename("long tab title number " + i);
@@ -441,6 +459,7 @@ class WindowTabsTest {
     @Test void closedOwnerDisablesTheTabList() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
             JComponent strip = named(owner, "windowTabs");
             owner.close();
             assertThat(named(strip, "tabList").isEnabled()).isFalse();

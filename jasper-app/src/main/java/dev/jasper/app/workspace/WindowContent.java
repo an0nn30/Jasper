@@ -1255,6 +1255,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onMinimumSizeChanged.run();
     }
 
+    void setAnimations(dev.jasper.app.config.AnimationSettings settings) {
+        if (!closed && windowTabs != null) windowTabs.setAnimations(settings);
+    }
+
     void setTabHeight(int height) {
         requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;

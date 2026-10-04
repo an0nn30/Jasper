@@ -44,6 +44,7 @@ public final class FolderTabsPreview {
                     } catch (Exception failure) { throw new CompletionException(failure); }
                 }, "sh");
                 var owner = content(launcher); owners[0] = owner;
+                owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
                 for (int i = 1; i < 4; i++) owner.newTab(HOME);
                 roots[0] = new JRootPane();
                 WindowContent.installTitleBar(roots[0], owner, true, title -> {});
