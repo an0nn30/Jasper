@@ -179,7 +179,8 @@ group bounds, button bounds and workspace bounds:
 
 `DockDropOverlay`, a transparent component on the layered pane's `DRAG_LAYER`, paints:
 
-1. **Area highlight:** a translucent filled rectangle with a 1px border, exactly where the window would land,
+1. **Area highlight:** a translucent filled rectangle with a 1px border where the window would land (with the
+   second-slot exception below),
    computed by `DockGeometry.compute` on a "what if" copy of the state (the dragged window active in the target
    slot). The real layout does not reflow during the drag. A stripe drop of a hidden window shows no area highlight,
    because the window stays hidden and no frame would appear; the placeholder and the ghost still show. Amended

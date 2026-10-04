@@ -168,10 +168,10 @@ class DockDropModelTest {
             before.resize(Side.LEFT, 300);
             before.setRatio(Side.BOTTOM, 0.3);
             before.addListener(changes::add);
+            var untouched = before.copy();
             DockGeometry.landing(BOUNDS, before, "m", target, Metrics.DEFAULT);
             DockGeometry.landing(BOUNDS, before, "k", target.partner(), Metrics.DEFAULT);
             assertThat(changes).as("no listener hears the what-if").isEmpty();
-            var untouched = before.copy();
             for (Slot slot : Slot.values()) {
                 assertThat(before.ids(slot)).as(target + " " + slot).isEqualTo(untouched.ids(slot));
                 assertThat(before.active(slot)).isEqualTo(untouched.active(slot));

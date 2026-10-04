@@ -14,13 +14,13 @@ import javax.swing.JComponent;
 import javax.swing.UIManager;
 
 /**
- * The drag guides, on the layered pane's DRAG_LAYER: a translucent highlight with a 1px border exactly where the
- * dragged tool window would land, a highlighted rounded square in the stripe's gap, and the window's icon at the
- * cursor. It takes no mouse input. Colours: {@code DragAndDrop.areaBackground} and {@code DragAndDrop.borderColor}
- * when the theme defines them, otherwise {@code Component.accentColor} at 25 % for the fill and 60 % for the border.
- * Both the highlight and the placeholder draw their fill inside their 1px border, so the translucent colours never
- * stack. {@link #show} repaints only the regions of the guides that changed, never the whole window under this
- * transparent component. EDT only.
+ * The drag guides, on the layered pane's DRAG_LAYER: a translucent highlight with a 1px border where the dragged tool
+ * window would land (for a second slot, always that slot's half; see {@link dev.jasper.app.dock.DockGeometry#landing}),
+ * a highlighted rounded square in the stripe's gap, and the window's icon at the cursor. It takes no mouse input.
+ * Colours: {@code DragAndDrop.areaBackground} and {@code DragAndDrop.borderColor} when the theme defines them,
+ * otherwise {@code Component.accentColor} at 25 % for the fill and 60 % for the border. Both the highlight and the
+ * placeholder draw their fill inside their 1px border, so the translucent colours never stack. {@link #show} repaints
+ * only the regions of the guides that changed, never the whole window under this transparent component. EDT only.
  */
 final class DockDropOverlay extends JComponent {
     private static final int FILL_ALPHA = 64, BORDER_ALPHA = 153, ARC = 10;
