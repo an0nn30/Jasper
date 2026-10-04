@@ -384,6 +384,12 @@ final class HostedUi {
     private PanelHost host(PanelSite site) {
         return new PanelHost() {
             @Override public WindowHandle window() { return terminals.windowHandle(site.windowId()); }
+            @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader header) {
+                requireUi("setHeader");
+                site.setHeader(new dev.jasper.app.contributions.PanelHeaderState(header.detail(), header.active(),
+                    header.actions().stream().map(action -> new dev.jasper.app.contributions.PanelHeaderState.Action(
+                        action.label(), action.icon(), () -> containment.run(pluginId, "panel header action", action.invoke()))).toList()));
+            }
             @Override public void show() { requireUi("show"); site.show(); }
             @Override public void hide() { requireUi("hide"); site.hide(); }
             @Override public boolean visible() { return site.visible(); }

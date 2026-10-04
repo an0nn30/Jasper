@@ -501,3 +501,13 @@ reaches `dev.jasper.app.plugins` as `PluginRuntime.ShellProfiles`, a supplier an
 registration, so the plugin runtime depends only on the `launch.ShellProfile` value; listener
 registrations close with the plugin. Plugins open only shells the application detected: explicit
 commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL group.
+
+### Per-window panel header metadata (SDK 0.14.2)
+
+`PanelHeader` is an immutable title-detail/status/action description sent through `PanelHost.setHeader`.
+`HostedUi` translates it to application-owned `PanelHeaderState`; SDK types remain within app.plugins.
+`PanelSite` guards callback lifetime, and `WindowContributions` forwards changes to the owning
+`ToolWindowArea`, which retains metadata while hidden and updates live headers without rebuilding
+plugin content. Header actions use the normal plugin containment boundary. Closing a site clears
+its metadata and invalidates retained callbacks. The testkit exposes `panelHeader(id, windowId)`
+for inspecting and invoking the same per-window contract.

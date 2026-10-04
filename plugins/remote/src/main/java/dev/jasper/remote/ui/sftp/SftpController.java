@@ -19,6 +19,7 @@ public final class SftpController implements AutoCloseable {
     }
     private static final class State {
         final UUID pane;final ConnectionIdentity identity;String path,reported;boolean follow=true;
+        final List<String> history=new ArrayList<>();int historyIndex=-1;
         State(UUID pane,ConnectionIdentity identity,String reported) { this.pane=pane;this.identity=identity;this.path=reported;this.reported=reported; }
     }
     private record View(ConnectionIdentity identity,String path) {}
@@ -47,6 +48,7 @@ public final class SftpController implements AutoCloseable {
         panel.actions(new SftpPanel.Actions(this::manual,this::up,this::refresh,this::following,
             ()->operations.upload().run(),()->operations.uploadFolder().run(),()->operations.download().run(),()->operations.newFolder().run(),
             ()->operations.delete().run(),()->operations.copyPath().run(),()->operations.copyToHost().run(),()-> { cancel();operations.cancel().run(); },this::page));
+        panel.navigation(this::back,this::forward);
         background.execute(this::loop);
     }
     public void operations(Operations operations) { this.operations=operations; }
@@ -65,6 +67,8 @@ public final class SftpController implements AutoCloseable {
         if(remembered==null || !remembered.identity.equals(identity)) { remembered=new State(pane,identity,hint);states.put(pane,remembered); }
         remembered.reported=hint;if(remembered.follow && !hint.isBlank()) remembered.path=hint;
         boolean changed=state!=remembered;state=remembered;panel.following(state.follow);
+        if(changed) { displayed=null;panel.clear(""); }
+        navigationAvailable();
         if(visible && (changed || explicit || displayed==null)) load(state.path,explicit);requestFollow();
     }
     public void follow(UUID pane,String reported) {
@@ -90,6 +94,25 @@ public final class SftpController implements AutoCloseable {
             state.follow=false;panel.following(false);state.path=target;if(visible) load(target,true);
         } catch(IOException invalid) { panel.error(invalid.getMessage()); }
     }
+    /** Browses a successfully visited directory in this connection's own history. */
+    public void back() { history(-1); }
+    public void forward() { history(1); }
+    private void history(int direction) {
+        if(closed || loading || !visible || state==null) return;
+        int target=state.historyIndex+direction;if(target<0 || target>=state.history.size()) return;
+        state.follow=false;panel.following(false);load(state.history.get(target),true,target);
+    }
+    private void navigationAvailable() {
+        panel.navigationAvailable(state!=null && state.historyIndex>0,state!=null && state.historyIndex+1<state.history.size());
+    }
+    private void visited(State visiting,String directory,int target) {
+        if(target>=0) { visiting.history.set(target,directory);visiting.historyIndex=target; }
+        else if(visiting.historyIndex<0 || !visiting.history.get(visiting.historyIndex).equals(directory)) {
+            while(visiting.history.size()>visiting.historyIndex+1) visiting.history.removeLast();
+            visiting.history.add(directory);visiting.historyIndex=visiting.history.size()-1;
+        }
+        navigationAvailable();
+    }
     public void up() { if(displayed==null) return;try { manual(FilePaths.parent(displayed.path())); } catch(IOException failure) { panel.error(failure.getMessage()); } }
     public void refresh() { if(state!=null && visible && !closed) load(state.path,false); }
     public void visible(boolean value) {
@@ -101,11 +124,12 @@ public final class SftpController implements AutoCloseable {
         generation++;loading=false;if(opening!=null) { opening.thenAccept(FileEndpoint::abort);opening.cancel(true); }var endpoint=active.getAndSet(null);if(endpoint!=null) endpoint.abort();pending.set(null);
         if(!closed) panel.busy(false,"Cancelled");
     }
-    private void load(String target,boolean focus) {
+    private void load(String target,boolean focus) { load(target,focus,-1); }
+    private void load(String target,boolean focus,int historyTarget) {
         cancel();long token=generation;var requestedState=state;
         loading=true;panel.busy(true,"Loading folder…");
         try { opening=opener.apply(requestedState.identity); }
-        catch(RuntimeException failure) { panel.error(message(failure));return; }
+        catch(RuntimeException failure) { loading=false;panel.error(message(failure));return; }
         var future=opening;
         future.whenComplete((endpoint,failure)-> { if(endpoint!=null && (closed || generation!=token)) endpoint.abort(); });
         submit(()-> {
@@ -122,7 +146,7 @@ public final class SftpController implements AutoCloseable {
                 if(!batch.isEmpty()) fresh.append(batch);check(token);
                 closeCache();cache=fresh;fresh=null;cachedView=new View(requestedState.identity,directory);
                 var rows=cache.page(0,200,foldersOnly);long count=cache.count(foldersOnly);var view=cachedView;
-                publish(token,()-> { loading=false;displayed=view;requestedState.path=directory;panel.showPage(view.identity().host().name()+" — "+view.identity().username()+"@"+view.identity().host().hostname(),directory,rows,0,count,focus); });
+                publish(token,()-> { loading=false;displayed=view;requestedState.path=directory;visited(requestedState,directory,historyTarget);panel.showPage(view.identity().host().name(),directory,rows,0,count,focus); });
             } catch(Exception failure) { publish(token,()-> { loading=false;panel.error(message(failure)); }); }
             finally {
                 if(fresh!=null) try { fresh.close(); } catch(IOException ignored) { }
@@ -131,7 +155,7 @@ public final class SftpController implements AutoCloseable {
         });
     }
     public void page(long offset) {
-        if(closed || loading) return;long token=generation;
+        if(closed || loading || displayed==null || state==null || !displayed.identity().equals(state.identity)) return;long token=generation;
         submit(()-> { try { if(cache==null || cachedView==null) return;var rows=cache.page(offset,200,foldersOnly);var view=cachedView;long count=cache.count(foldersOnly);publish(token,()-> { displayed=view;panel.showPage(view.identity().host().name(),view.path(),rows,offset,count,false); }); }
             catch(IOException failure) { publish(token,()-> { loading=false;panel.error(message(failure)); }); } });
     }

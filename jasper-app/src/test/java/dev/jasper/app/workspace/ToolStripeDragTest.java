@@ -167,11 +167,11 @@ class ToolStripeDragTest {
         assertThat(seen).containsExactly("X:x", "Y:y");
     }
 
-    @Test void theAreaOffersEachHeaderAndItsTitleAsADragSource() {
+    @Test void theAreaOffersEveryNonControlHeaderSurfaceAsADragSource() {
         List<String> seen = new ArrayList<>();
         var area = new ToolWindowArea(new JPanel(), new DockState());
-        area.dragSource = (component, id) -> seen.add((component instanceof ToolWindowHeader ? "header" : component instanceof JLabel ? "title" : "other") + ":" + id);
+        area.dragSource = (component, id) -> seen.add((component instanceof ToolWindowHeader ? "header" : component instanceof JLabel ? "label" : "empty-space") + ":" + id);
         DockTestSupport.show(area, Slot.LEFT_TOP, new JLabel("hosts"), 260);
-        assertThat(seen).containsExactly("header:test.left-top", "title:test.left-top");
+        assertThat(seen).containsExactly("header:test.left-top", "label:test.left-top", "label:test.left-top", "empty-space:test.left-top");
     }
 }

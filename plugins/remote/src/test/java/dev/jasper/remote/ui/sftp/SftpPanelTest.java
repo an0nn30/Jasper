@@ -45,30 +45,61 @@ class SftpPanelTest {
         });
     }
 
-    @Test void toolbarsAreFlatIconOnlyAndTheBottomRowsAlignLeft() throws Exception {
+    @Test void compactBrowserKeepsSizeColumnAtNarrowWidthsAndPagesOnlyWhenNeeded() throws Exception {
         SwingUtilities.invokeAndWait(()-> {
             var panel=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);var pages=new ArrayList<Long>();
             panel.actions(new SftpPanel.Actions(p->{},()->{},()->{},f->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},pages::add));
-            for(String name:List.of("Up","Download selected","Upload files","Refresh","New folder","Delete selected","Copy paths","Previous page","Next page")) {
-                var button=named(panel,name);
-                assertThat(button.getParent()).as(name+" sits in a toolbar").isInstanceOf(JToolBar.class);
-                assertThat(button.getText()).as(name+" is icon-only").isNullOrEmpty();
-                assertThat(button.getAccessibleContext().getAccessibleName()).isEqualTo(name);
-            }
-            var toolbar=(JToolBar)named(panel,"Up").getParent();
-            assertThat(toolbar.isFloatable()).isFalse();assertThat(toolbar.isRollover()).isTrue();assertThat(toolbar.isBorderPainted()).isFalse();
-            assertThat(named(panel,"Previous page").getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(IconName.PREVIOUS));
-            assertThat(named(panel,"Next page").getIcon().getIconWidth()).isEqualTo(16);
-            panel.showPage("prod","/srv",List.of(new FileEntry("a",FileEntry.Kind.FILE,1,1000,0644,"")),200,450,false);
+            panel.setSize(220,400);panel.dispatchEvent(new java.awt.event.ComponentEvent(panel,java.awt.event.ComponentEvent.COMPONENT_RESIZED));
+            panel.showPage("amp","/home/ubuntu",List.of(
+                new FileEntry("Documents",FileEntry.Kind.DIRECTORY,0,0,0755,""),
+                new FileEntry(".bashrc",FileEntry.Kind.FILE,3700,0,0644,""),
+                new FileEntry(".profile",FileEntry.Kind.FILE,1200,0,0644,""),
+                new FileEntry(".bash_logout",FileEntry.Kind.FILE,840,0,0644,"")),0,4,false);
+            assertThat(panel.table().getColumnCount()).isEqualTo(2);
+            assertThat(panel.table().getValueAt(0,1)).isEqualTo("—");
+            assertThat(panel.table().getValueAt(1,1)).isEqualTo("3.7 KB");
+            assertThat(panel.table().getValueAt(2,1)).isEqualTo("1.2 KB");
+            assertThat(panel.table().getValueAt(3,1)).isEqualTo("840 B");
+            assertThat(panel.table().getRowHeight()).isGreaterThanOrEqualTo(27);
+            assertThat(visible(named(panel,"Previous page"))).isFalse();
+            panel.showPage("amp","/home/ubuntu",List.of(new FileEntry("a",FileEntry.Kind.FILE,1,0,0644,"")),200,450,false);
             named(panel,"Next page").doClick();named(panel,"Previous page").doClick();
             assertThat(pages).containsExactly(400L,0L);
-            var follow=find(panel,JCheckBox.class,box->"Follow terminal folder".equals(box.getAccessibleContext().getAccessibleName())).orElseThrow();
-            assertThat(follow.getParent().getLayout()).isInstanceOf(BorderLayout.class);
-            assertThat(((BorderLayout)follow.getParent().getLayout()).getLayoutComponent(BorderLayout.EAST)).isSameAs(follow);
-            assertThat(named(panel,"Next page").getIcon())
-                .isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(IconName.NEXT));
+            var size=(JLabel)panel.table().prepareRenderer(panel.table().getCellRenderer(0,1),0,1);
+            assertThat(size.getHorizontalAlignment()).isEqualTo(SwingConstants.RIGHT);
+            panel.table().setSize(220,200);panel.table().doLayout();
+            assertThat(panel.table().getColumnModel().getColumn(1).getWidth()).isGreaterThanOrEqualTo(size.getPreferredSize().width);
+            for(String name:List.of("Back","Forward","Upload files","Refresh")) {
+                var button=named(panel,name);
+                assertThat(button.getText()).isNullOrEmpty();
+                assertThat(button.getParent()).isInstanceOf(JToolBar.class);
+            }
+            var menu=panel.table().getComponentPopupMenu();
+            for(String action:List.of("Up","New folder…","Upload folder…","Download selected…","Copy paths","Copy to host…","Delete selected…"))
+                assertThat(menuItem(menu,action)).isNotNull();
         });
     }
+    @Test void headerAndNavigationTrackLoadedStateWithoutChangingTheEditablePath() throws Exception {
+        SwingUtilities.invokeAndWait(()-> {
+            var panel=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);
+            var headers=new ArrayList<dev.jasper.sdk.ui.PanelHeader>();var commands=new ArrayList<String>();
+            panel.onHeaderChanged(headers::add);panel.navigation(()->commands.add("back"),()->commands.add("forward"));
+            panel.actions(new SftpPanel.Actions(commands::add,()->{},()->{},f->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},p->{}));
+            panel.busy(true,"Connecting…");assertThat(headers.getLast().active()).isFalse();
+            panel.showPage("amp","/home/ubuntu",List.of(),0,0,false);panel.navigationAvailable(true,true);
+            assertThat(headers.getLast().active()).isTrue();assertThat(headers.getLast().detail()).isEqualTo("amp");
+            assertThat(find(panel,JLabel.class,label->"amp".equals(label.getText()))).isEmpty();
+            named(panel,"Back").doClick();named(panel,"Forward").doClick();
+            var field=find(panel,JTextField.class,item->true).orElseThrow();field.postActionEvent();
+            assertThat(commands).containsExactly("back","forward","/home/ubuntu");
+            assertThat(panel.directory()).isEqualTo("/home/ubuntu");
+            panel.busy(true,"Loading folder…");named(panel,"Back").doClick();
+            assertThat(commands).hasSize(3);assertThat(named(panel,"Upload files").isEnabled()).isFalse();
+            panel.clear("Closed");assertThat(headers.getLast().active()).isFalse();assertThat(headers.getLast().detail()).isEmpty();
+            assertThat(named(panel,"Back").isEnabled()).isFalse();
+        });
+    }
+
     @Test void disconnectedStateHidesBrowserAndRestoresItAfterLoading() throws Exception {
         SwingUtilities.invokeAndWait(()-> {
             var panel=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);
@@ -76,13 +107,13 @@ class SftpPanelTest {
             assertThat(visible(choose)).isTrue();
             assertThat(find(panel,JLabel.class,label->"Not Connected".equals(label.getText()))).isPresent();
             assertThat(visible(panel.table())).isFalse();
-            assertThat(visible(named(panel,"Up"))).isFalse();
+            assertThat(visible(named(panel,"Back"))).isFalse();
             assertThat(visible(named(panel,"Next page"))).isFalse();
             assertThat(visible(find(panel,JTextField.class,field->true).orElseThrow())).isFalse();
             panel.showPage("prod","/data",List.of(new FileEntry("a",FileEntry.Kind.FILE,1,0,0644,"")),0,1,false);
             assertThat(visible(choose)).isFalse();
             assertThat(visible(panel.table())).isTrue();
-            assertThat(visible(named(panel,"Up"))).isTrue();
+            assertThat(visible(named(panel,"Back"))).isTrue();
             panel.clear("SSH session closed");
             assertThat(visible(choose)).isTrue();
             assertThat(panel.selection()).isEmpty();

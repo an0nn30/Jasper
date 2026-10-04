@@ -1,6 +1,7 @@
 package dev.jasper.remote.ui.tunnels;
 
 import dev.jasper.sdk.ui.WorkspacePalette;
+import dev.jasper.sdk.ui.PanelHeader;
 import dev.jasper.remote.ui.PanelStyle;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelState;
@@ -26,7 +27,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
-import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.Icon;
@@ -51,7 +51,7 @@ import javax.swing.event.DocumentListener;
 
 /**
  * The "Tunnels" rail panel: a filter, saved tunnels by name, then quick forwards under their own heading. Each row
- * shows a state dot, the name, the mapping, a live detail line and a start/stop button at its end. One per window.
+ * shows a state dot, name and host, mapping and start/stop switch. Problems remain visible and live counters are in the tooltip. One per window.
  */
 public final class TunnelsPanel extends JPanel {
     /** What the panel asks for; the plugin decides how. */
@@ -68,10 +68,13 @@ public final class TunnelsPanel extends JPanel {
     /** The broken-file message. */
     record Problem(String message) implements Row { }
 
-    /** How wide the start/stop button at the end of a row is, for hit testing. */
-    static final int BUTTON_WIDTH = 30;
-
-    final JTextField filter = new JTextField();
+    final JTextField filter = new JTextField() {
+        @Override public Color getBackground() { return WorkspacePalette.current(this).surfaceSunken(); }
+        @Override public Dimension getPreferredSize() {
+            var size = super.getPreferredSize();
+            return new Dimension(size.width, Math.max(PanelStyle.scale(this, 28), getFontMetrics(getFont()).getHeight() + 8));
+        }
+    };
     final JButton add = new JButton("+");
     final JTextArea empty = new WrappedNote();
     final JList<Row> list;
@@ -88,6 +91,7 @@ public final class TunnelsPanel extends JPanel {
     private Function<UUID, TunnelState> states = id -> TunnelState.STOPPED;
     private Function<UUID, Optional<String>> hostNames = id -> Optional.empty();
     private Supplier<Instant> clock = Instant::now;
+    private Consumer<PanelHeader> headerChanged;
 
     public TunnelsPanel(Actions actions, Function<BundledIcon, Icon> icons) {
         this(actions, icons, icons.apply(BundledIcon.ACTIONS_SWAP_PANELS));
@@ -97,17 +101,16 @@ public final class TunnelsPanel extends JPanel {
         super(new BorderLayout(0, 6));
         this.actions = actions;
         this.icons = icons;
-        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(this, 7), PanelStyle.scale(this, 10), 8, PanelStyle.scale(this, 10)));
         // The tool window header carries the title.
-        var header = new JPanel();
-        header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        header.add(Box.createHorizontalGlue()); header.add(add);
         add.setToolTipText("New Tunnel…");
         add.putClientProperty("JButton.buttonType", "toolBarButton");
-        filter.putClientProperty("JTextField.placeholderText", "Filter tunnels…");
+        filter.putClientProperty("JTextField.placeholderText", "Filter tunnels");
+        filter.putClientProperty("JTextField.leadingIcon", icons.apply(BundledIcon.GENERAL_SEARCH));
+        filter.putClientProperty("FlatLaf.style", "arc: 8");
+        filter.getAccessibleContext().setAccessibleName("Filter tunnels");
 
-        north.add(header, BorderLayout.NORTH);
-        north.add(filter, BorderLayout.SOUTH);
+        north.add(filter, BorderLayout.CENTER);
         add(north, BorderLayout.NORTH);
         list = new JList<>(model) {
             @Override public boolean getScrollableTracksViewportWidth() { return true; }
@@ -151,16 +154,34 @@ public final class TunnelsPanel extends JPanel {
                 if (SwingUtilities.isRightMouseButton(event)) {
                     JPopupMenu menu = menuFor(index);
                     if (menu != null) menu.show(list, event.getX(), event.getY());
-                } else if (event.getX() >= cell.x + cell.width - BUTTON_WIDTH) toggle(index);
-                else if (event.getClickCount() == 2) activate(index);
+                } else if (SwingUtilities.isLeftMouseButton(event)) {
+                    if (event.getX() >= cell.x + cell.width - PanelStyle.scale(list, 42)) {
+                        if (event.getClickCount() == 1) toggle(index);
+                    } else if (event.getClickCount() == 2) activate(index);
+                }
             }
         });
         bind("ENTER", "toggleTunnel", () -> toggle(list.getSelectedIndex()));
         bind("SPACE", "toggleTunnel", () -> toggle(list.getSelectedIndex()));
+        bind("shift F10", "tunnelMenu", () -> {
+            int index = list.getSelectedIndex();
+            JPopupMenu menu = menuFor(index);
+            Rectangle cell = index < 0 ? null : list.getCellBounds(index, index);
+            if (menu != null && cell != null) menu.show(list, cell.x + 8, cell.y + cell.height);
+        });
         bind("DELETE", "deleteTunnel", () -> delete(list.getSelectedIndex()));
         bind("BACK_SPACE", "deleteTunnel", () -> delete(list.getSelectedIndex()));
         add.addActionListener(event -> actions.add().run());
         rebuild();
+    }
+
+    /** Supplies the window-owned count and add action. Called on the UI thread. */
+    public void onHeaderChanged(Consumer<PanelHeader> listener) { headerChanged = listener; publishHeader(); }
+
+    private void publishHeader() {
+        if (headerChanged == null) return;
+        headerChanged.accept(new PanelHeader(saved.isEmpty() && quick.isEmpty() ? "" : String.valueOf(saved.size() + quick.size()), false,
+            List.of(new PanelHeader.Action("New Tunnel…", icons.apply(BundledIcon.GENERAL_ADD), actions.add()))));
     }
 
     /** Replaces what the panel lists: saved tunnels by name, then quick forwards under their own heading. */
@@ -171,6 +192,7 @@ public final class TunnelsPanel extends JPanel {
         this.error = error;
         this.states = states;
         this.hostNames = hostNames;
+        publishHeader();
         rebuild();
     }
 
@@ -273,6 +295,7 @@ public final class TunnelsPanel extends JPanel {
         label.setBorder(BorderFactory.createEmptyBorder(8, 4, 4, 4));
         label.setFont(owner.getFont().deriveFont(Font.BOLD));
         label.setText(value instanceof Heading heading ? heading.text() : ((Problem) value).message());
+        if (value instanceof Problem) label.setToolTipText(label.getText());
         return label;
     }
 
@@ -281,10 +304,16 @@ public final class TunnelsPanel extends JPanel {
         Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
         Color muted = selected ? foreground : WorkspacePalette.current(owner).textMuted();
         Font font = owner.getFont();
-        var row = new JPanel(new BorderLayout(8, 0));
+        var row = new JPanel(new BorderLayout(PanelStyle.scale(owner, 8), 0)) {
+                @Override public java.awt.Dimension getPreferredSize() {
+                    var size = super.getPreferredSize();
+                    size.height = Math.max(size.height, PanelStyle.scale(owner, 46));
+                    return size;
+                }
+            };
         row.setOpaque(true);
         row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-        row.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 6));
+        row.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 5), PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 4)));
         var dot = text("●", dotColor(state, WorkspacePalette.current(owner)), font.deriveFont(Math.max(8f, font.getSize2D() - 2f)));
         dot.setVerticalAlignment(SwingConstants.TOP);
         row.add(dot, BorderLayout.WEST);
@@ -294,13 +323,38 @@ public final class TunnelsPanel extends JPanel {
         var lines = new JPanel();
         lines.setLayout(new BoxLayout(lines, BoxLayout.Y_AXIS));
         lines.setOpaque(false);
-        lines.add(text(title, foreground, font.deriveFont(Font.BOLD)));
-        lines.add(text(tunnel.kind().letter() + "  " + mapping, foreground, font));
-        lines.add(text(detail, state instanceof TunnelState.Failed && !selected ? WorkspacePalette.current(owner).error() : muted, font));
+        var titleLabel = text(title, foreground, font);
+        var viaLabel = text(hostNames.apply(tunnel.hostId()).map(host -> "via " + host).orElse("Host missing"), muted,
+            font.deriveFont(Math.max(10f, font.getSize2D() - 1)));
+        var titleLine = new JPanel(null) {
+            @Override public Dimension getPreferredSize() {
+                return new Dimension(titleLabel.getPreferredSize().width + PanelStyle.scale(owner, 6) + viaLabel.getPreferredSize().width,
+                    Math.max(titleLabel.getPreferredSize().height, viaLabel.getPreferredSize().height));
+            }
+            @Override public void doLayout() {
+                int gap = PanelStyle.scale(owner, 6);
+                int titleWidth = Math.min(titleLabel.getPreferredSize().width, Math.max(0, getWidth() - Math.min(viaLabel.getPreferredSize().width, getWidth() / 3) - gap));
+                titleLabel.setBounds(0, 0, titleWidth, getHeight());
+                viaLabel.setBounds(titleWidth + gap, 0, Math.max(0, getWidth() - titleWidth - gap), getHeight());
+            }
+        };
+        titleLine.setOpaque(false);
+        titleLine.add(titleLabel);
+        titleLine.add(viaLabel);
+        titleLine.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lines.add(titleLine);
+        String shortMapping = tunnel.bindAddress().equals(Tunnel.LOCALHOST) && tunnel.kind() != dev.jasper.remote.tunnels.TunnelKind.REMOTE
+            ? mapping.substring(tunnel.bindAddress().length()) : mapping;
+        lines.add(text(shortMapping, muted, new Font(Font.MONOSPACED, Font.PLAIN, font.getSize()).deriveFont(Math.max(10f, font.getSize2D() - 1))));
+        if (state instanceof TunnelState.Failed failed) lines.add(text(failed.reason(), selected ? foreground : WorkspacePalette.current(owner).error(), font));
+        else if (state instanceof TunnelState.Starting starting) lines.add(text(starting.stage(), muted, font));
+        else if (hostNames.apply(tunnel.hostId()).isEmpty()) lines.add(text("Edit to choose a host", muted, font));
+        else if (state instanceof TunnelState.Up up && up.counters().warning().isPresent())
+            lines.add(text(up.counters().warning().orElseThrow(), selected ? foreground : WorkspacePalette.current(owner).warning(), font));
         row.add(lines, BorderLayout.CENTER);
-        var button = new JLabel(icons.apply(state.running() ? BundledIcon.RUN_STOP : BundledIcon.RUN_RUN));
-        button.setVerticalAlignment(SwingConstants.TOP);
-        button.setPreferredSize(new Dimension(BUTTON_WIDTH - 8, button.getPreferredSize().height));
+        var button = new JLabel(new TunnelSwitch(state instanceof TunnelState.Up, state instanceof TunnelState.Starting));
+        button.setPreferredSize(new Dimension(PanelStyle.scale(owner, 34), PanelStyle.scale(owner, 16)));
+        button.getAccessibleContext().setAccessibleName(state.running() ? "Stop tunnel" : "Start tunnel");
         row.add(button, BorderLayout.EAST);
         String description = title + ", " + mapping + ", " + detail;
         row.setToolTipText(description);
@@ -309,11 +363,13 @@ public final class TunnelsPanel extends JPanel {
     }
 
     private static Color dotColor(TunnelState state, WorkspacePalette palette) {
+        Color background = palette.background();
+        boolean dark = background.getRed() * .299 + background.getGreen() * .587 + background.getBlue() * .114 < 128;
         return switch (state) {
-            case TunnelState.Up up -> up.counters().warning().isPresent() ? palette.warning() : palette.success();
+            case TunnelState.Up up -> up.counters().warning().isPresent() ? palette.warning() : new Color(dark ? 0x38ba54 : 0x248943);
             case TunnelState.Starting starting -> palette.warning();
             case TunnelState.Failed failed -> palette.error();
-            case TunnelState.Stopped stopped -> palette.textMuted();
+            case TunnelState.Stopped stopped -> new Color(dark ? 0x49515c : 0x858d97);
         };
     }
 

@@ -27,6 +27,13 @@ final class PanelStyle {
         return Math.max(1, Math.round(value * (font == null ? 1f : font.getSize2D() / 13f)));
     }
 
+    /** The rail's blue action accent in the active palette. */
+    public static Color accent(Component component) {
+        Color background = WorkspacePalette.current(component).background();
+        return background.getRed() * .299 + background.getGreen() * .587 + background.getBlue() * .114 < 128
+            ? new Color(0x3274f6) : new Color(0x2467de);
+    }
+
     public static void button(AbstractButton button) {
         button.putClientProperty("FlatLaf.style", "arc: 10");
         button.putClientProperty("JButton.minimumWidth", 0);

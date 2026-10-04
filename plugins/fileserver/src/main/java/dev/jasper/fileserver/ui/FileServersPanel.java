@@ -1,6 +1,7 @@
 package dev.jasper.fileserver.ui;
 
 import dev.jasper.sdk.ui.WorkspacePalette;
+import dev.jasper.sdk.ui.PanelHeader;
 import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.runtime.ActivityLog;
@@ -51,9 +52,8 @@ import javax.swing.ToolTipManager;
 import javax.swing.UIManager;
 
 /**
- * The "File Servers" rail panel: one row per server with its state and a start/stop control at the right edge, and
- * below the list the selected server's details, addresses and activity. One per window; the plugin supplies the
- * servers and the actions.
+ * The "File Servers" rail panel: compact rows with protocol, address, copy and start/stop controls. Details and
+ * activity open through the row menu, double-click or D. One per window; the plugin supplies the servers and actions.
  */
 public final class FileServersPanel extends JPanel {
     public record Actions(Consumer<UUID> toggle, Consumer<Optional<UUID>> edit, Consumer<UUID> duplicate, Consumer<UUID> delete,
@@ -61,7 +61,9 @@ public final class FileServersPanel extends JPanel {
                           Consumer<UUID> fingerprints) { }
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
-    private static final int CONTROL_WIDTH = 28;
+    private static final int CONTROL_WIDTH = 42;
+    private Consumer<PanelHeader> headerChanged = header -> { };
+    private boolean detailsOpen;
 
     final JButton add = new JButton("+");
     final JList<ServerRows.Row> list;
@@ -70,7 +72,14 @@ public final class FileServersPanel extends JPanel {
     private final JTextArea emptyProblem = note("", true);
     private final JPanel cards = new JPanel(new CardLayout());
     private final JPanel header = new JPanel();
-    final JPanel details = new JPanel(new BorderLayout(0, 6));
+    final JPanel details = new JPanel(new BorderLayout(0, 6)) {
+        @Override public java.awt.Dimension getPreferredSize() {
+            return isVisible() ? super.getPreferredSize() : new java.awt.Dimension(0, 0);
+        }
+        @Override public java.awt.Dimension getMinimumSize() {
+            return isVisible() ? super.getMinimumSize() : new java.awt.Dimension(0, 0);
+        }
+    };
     final JLabel cardName = label(""), cardState = label(""), cardFolder = label(""), cardAccess = label(""), cardWarnings = label("");
     final JTextArea cardTls = note("");
     final JPanel addresses = new JPanel();
@@ -106,10 +115,15 @@ public final class FileServersPanel extends JPanel {
         add.setToolTipText("New file server");
         add.putClientProperty("JButton.buttonType", "toolBarButton");
         header.add(add);
-        add(header, BorderLayout.NORTH);
+        // Add is owned by the window header; no second toolbar row.
 
         list = new JList<>(model) {
             @Override public boolean getScrollableTracksViewportWidth() { return true; }
+            @Override public javax.swing.JToolTip createToolTip() {
+                var tip = super.createToolTip();
+                tip.putClientProperty("html.disable", true);
+                return tip;
+            }
             @Override public String getToolTipText(MouseEvent event) {
                 int index = locationToIndex(event.getPoint());
                 Rectangle cell = index < 0 ? null : getCellBounds(index, index);
@@ -185,25 +199,72 @@ public final class FileServersPanel extends JPanel {
                     return;
                 }
                 if (!(model.get(index) instanceof ServerRows.Server row)) return;
-                boolean onControl = event.getX() >= cell.x + cell.width - CONTROL_WIDTH;
-                if (onControl ? event.getClickCount() == 1 : event.getClickCount() == 2) actions.toggle().accept(row.view().definition().id());
+                if (!SwingUtilities.isLeftMouseButton(event)) return;
+                list.setSelectedIndex(index);
+                int trailing = cell.x + cell.width - event.getX();
+                if (trailing <= PanelStyle.scale(list, CONTROL_WIDTH)) {
+                    if (event.getClickCount() == 1) toggleSelected();
+                } else if (trailing <= PanelStyle.scale(list, CONTROL_WIDTH + 28)) {
+                    if (event.getClickCount() == 1) copyAddress(row.view());
+                } else if (event.getClickCount() == 2) showDetails(true);
             }
         });
         list.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "toggleServer");
+        list.getInputMap().put(KeyStroke.getKeyStroke("SPACE"), "toggleServer");
         list.getActionMap().put("toggleServer", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { selectedView().ifPresent(view -> actions.toggle().accept(view.definition().id())); }
+            @Override public void actionPerformed(ActionEvent event) { toggleSelected(); }
         });
+        bind("D", "serverDetails", () -> showDetails(!detailsOpen));
+        bind("ESCAPE", "hideDetails", () -> showDetails(false));
+        bind("shift F10", "serverMenu", () -> {
+            int index = list.getSelectedIndex();
+            JPopupMenu menu = menuFor(index);
+            Rectangle bounds = index < 0 ? null : list.getCellBounds(index, index);
+            if (menu != null && bounds != null) menu.show(list, bounds.x + 8, bounds.y + bounds.height);
+        });
+        bind(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("mac") ? "meta C" : "ctrl C",
+            "copyAddress", () -> selectedView().ifPresent(this::copyAddress));
         add.addActionListener(event -> actions.edit().accept(Optional.empty()));
-        toggle.addActionListener(event -> selectedView().ifPresent(view -> actions.toggle().accept(view.definition().id())));
+        toggle.addActionListener(event -> toggleSelected());
         edit.addActionListener(event -> selectedView().ifPresent(view -> actions.edit().accept(Optional.of(view.definition().id()))));
         clearActivity.addActionListener(event -> selectedView().ifPresent(view -> actions.clearActivity().accept(view.definition().id())));
         copyActivity.addActionListener(event -> actions.copy().accept(activity.getText()));
         rebuild();
     }
 
+    /** Supplies the window-owned count and add action. Called on the UI thread. */
+    public void onHeaderChanged(Consumer<PanelHeader> listener) { headerChanged = listener; publishHeader(); }
+
+    private void publishHeader() {
+        headerChanged.accept(new PanelHeader(views.isEmpty() ? "" : String.valueOf(views.size()), false,
+            List.of(new PanelHeader.Action("New File Server…", new RowArtwork(RowArtwork.Kind.ADD, false, false),
+                () -> actions.edit().accept(Optional.empty())))));
+    }
+
+    private void bind(String stroke, String name, Runnable action) {
+        list.getInputMap().put(KeyStroke.getKeyStroke(stroke), name);
+        list.getActionMap().put(name, new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent event) { action.run(); }
+        });
+    }
+
+    private void toggleSelected() {
+        selectedView().filter(view -> view.state().phase() != Phase.STOPPING).ifPresent(view -> actions.toggle().accept(view.definition().id()));
+    }
+
+    private void copyAddress(ServerRegistry.View view) {
+        view.addresses().stream().findFirst().ifPresent(uri -> actions.copy().accept(uri.toString()));
+    }
+
+    void showDetails(boolean open) {
+        detailsOpen = open;
+        refreshCard();
+    }
+
     public void setServers(List<ServerRegistry.View> views, Optional<String> problem) {
         this.views = List.copyOf(views);
         this.problem = problem;
+        publishHeader();
         rebuild();
     }
 
@@ -262,6 +323,11 @@ public final class FileServersPanel extends JPanel {
         var fingerprints = item("Show Fingerprints…", () -> actions.fingerprints().accept(id));
         fingerprints.setEnabled(view.definition().tls());
         menu.add(fingerprints);
+        menu.addSeparator();
+        menu.add(item(detailsOpen ? "Hide Details" : "Show Details", () -> {
+            select(id);
+            showDetails(!detailsOpen);
+        }));
         return menu;
     }
 
@@ -295,8 +361,12 @@ public final class FileServersPanel extends JPanel {
 
     private void refreshCard() {
         Optional<ServerRegistry.View> chosen = selectedView();
-        details.setVisible(chosen.isPresent());
-        split.setDividerSize(chosen.isPresent() ? dividerSize : 0);
+        boolean showing = detailsOpen && chosen.isPresent();
+        details.setVisible(showing);
+        split.setResizeWeight(showing ? .5 : 1);
+        split.setDividerSize(showing ? dividerSize : 0);
+        if (showing && split.getDividerLocation() >= split.getHeight() - dividerSize) split.setDividerLocation(.5);
+        else if (!showing) split.setDividerLocation(1.0);
         addresses.removeAll();
         addressCopies.clear();
         if (chosen.isPresent()) {
@@ -412,11 +482,12 @@ public final class FileServersPanel extends JPanel {
     private final class Renderer implements ListCellRenderer<ServerRows.Row> {
         @Override public Component getListCellRendererComponent(JList<? extends ServerRows.Row> owner, ServerRows.Row value, int index,
                                                                 boolean isSelected, boolean focused) {
-            Color background = isSelected ? owner.getSelectionBackground() : owner.getBackground();
-            Color foreground = isSelected ? owner.getSelectionForeground() : owner.getForeground();
+            boolean highlighted = isSelected && (focused || owner.hasFocus());
+            Color background = highlighted ? owner.getSelectionBackground() : owner.getBackground();
+            Color foreground = highlighted ? owner.getSelectionForeground() : owner.getForeground();
             return switch (value) {
-                case ServerRows.Problem problem -> plain("servers.toml: " + problem.message(), isSelected ? foreground : WorkspacePalette.current(owner).error(), background, owner.getFont());
-                case ServerRows.Header header -> plain(header.title(), isSelected ? foreground : WorkspacePalette.current(owner).textMuted(), background, owner.getFont().deriveFont(Font.BOLD));
+                case ServerRows.Problem problem -> plain("servers.toml: " + problem.message(), highlighted ? foreground : WorkspacePalette.current(owner).error(), background, owner.getFont());
+                case ServerRows.Header header -> plain(header.title(), highlighted ? foreground : WorkspacePalette.current(owner).textMuted(), background, owner.getFont().deriveFont(Font.BOLD));
                 case ServerRows.Server server -> serverRow(owner, server.view(), foreground, background);
             };
         }
@@ -428,28 +499,65 @@ public final class FileServersPanel extends JPanel {
             label.setForeground(foreground);
             label.setFont(font);
             label.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
+            label.setToolTipText(text);
             return label;
         }
 
         private Component serverRow(JList<?> owner, ServerRegistry.View view, Color foreground, Color background) {
             ServerDefinition definition = view.definition();
             Phase phase = view.state().phase();
-            var row = new JPanel(new BorderLayout(6, 0));
+            var row = new JPanel(new BorderLayout(PanelStyle.scale(owner, 9), 0)) {
+                @Override public java.awt.Dimension getPreferredSize() {
+                    var size = super.getPreferredSize();
+                    size.height = Math.max(size.height, PanelStyle.scale(owner, 48));
+                    return size;
+                }
+            };
             row.setOpaque(true);
             row.setBackground(background);
-            row.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
-            Color dot = switch (phase) {
-                case RUNNING -> WorkspacePalette.current(owner).success();
-                case STARTING, STOPPING, WAITING_FOR_VAULT -> WorkspacePalette.current(owner).warning();
-                case FAILED -> WorkspacePalette.current(owner).error();
-                case STOPPED -> WorkspacePalette.current(owner).textMuted();
-            };
-            row.add(text("●", dot, owner.getFont()), BorderLayout.WEST);
+            row.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 4), PanelStyle.scale(owner, 7), PanelStyle.scale(owner, 4)));
+            var folder = new JLabel(new RowArtwork(RowArtwork.Kind.FOLDER, false, false));
+            row.add(folder, BorderLayout.WEST);
             Font font = view.temporary() ? owner.getFont().deriveFont(Font.ITALIC) : owner.getFont();
-            row.add(text(definition.name() + "   " + definition.protocol().label() + " :" + definition.port(), foreground, font), BorderLayout.CENTER);
-            String control = (ServerRows.warnings(definition).isEmpty() ? "" : "⚠ ") + (phase == Phase.RUNNING || phase == Phase.STARTING ? "■" : "▶");
-            row.add(text(control, foreground, owner.getFont()), BorderLayout.EAST);
-            row.getAccessibleContext().setAccessibleName(definition.name() + ", " + ServerRows.state(view.state()));
+            var lines = new JPanel();
+            lines.setLayout(new BoxLayout(lines, BoxLayout.Y_AXIS));
+            lines.setOpaque(false);
+            lines.setForeground(foreground);
+            var name = text(definition.name(), foreground, font);
+            name.setAlignmentX(LEFT_ALIGNMENT);
+            lines.add(name);
+            var address = new JPanel(new BorderLayout(PanelStyle.scale(owner, 6), 0));
+            address.setOpaque(false);
+            address.setAlignmentX(LEFT_ALIGNMENT);
+            address.add(new ProtocolChip(definition.protocol(), font, WorkspacePalette.current(owner).background()), BorderLayout.WEST);
+            address.add(text(ServerRows.address(view), WorkspacePalette.current(owner).textMuted(),
+                new Font(Font.MONOSPACED, Font.PLAIN, font.getSize()).deriveFont(Math.max(10f, font.getSize2D() - 1))), BorderLayout.CENTER);
+            lines.add(address);
+            if (phase != Phase.RUNNING && phase != Phase.STOPPED) {
+                var status = text(ServerRows.state(view.state()), phase == Phase.FAILED ? WorkspacePalette.current(owner).error() : WorkspacePalette.current(owner).warning(), font);
+                status.setAlignmentX(LEFT_ALIGNMENT);
+                lines.add(status);
+            } else if (!ServerRows.warnings(definition).isEmpty()) {
+                var warning = text("Warning · " + ServerRows.warnings(definition).getFirst(), WorkspacePalette.current(owner).warning(), font);
+                warning.setAlignmentX(LEFT_ALIGNMENT);
+                lines.add(warning);
+            }
+            row.add(lines, BorderLayout.CENTER);
+            var controls = new JPanel(new BorderLayout(PanelStyle.scale(owner, 8), 0));
+            controls.setOpaque(false);
+            var copy = new JLabel(new RowArtwork(RowArtwork.Kind.COPY, false, false));
+            copy.setEnabled(!view.addresses().isEmpty());
+            copy.getAccessibleContext().setAccessibleName("Copy address");
+            controls.add(copy, BorderLayout.WEST);
+            var control = new JLabel(new RowArtwork(RowArtwork.Kind.SWITCH, phase == Phase.RUNNING,
+                phase == Phase.STARTING || phase == Phase.STOPPING));
+            control.setEnabled(phase != Phase.STOPPING);
+            control.getAccessibleContext().setAccessibleName(phase == Phase.STARTING ? "Cancel start" : phase == Phase.STOPPING ? "Stopping" : phase == Phase.RUNNING ? "Stop server" : "Start server");
+            controls.add(control, BorderLayout.EAST);
+            row.add(controls, BorderLayout.EAST);
+            String description = definition.name() + ", " + definition.protocol().label() + ", " + ServerRows.address(view) + ", " + tooltip(view);
+            row.setToolTipText(description);
+            row.getAccessibleContext().setAccessibleName(description);
             return row;
         }
 

@@ -166,6 +166,7 @@ public final class TunnelsUi implements AutoCloseable {
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::duplicate, tunnel -> delete(window, tunnel),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::browse, this::copyAddress,
             () -> edit(window, Optional.empty(), Optional.empty())), context.appearance()::icon, icon);
+        panel.onHeaderChanged(panelHost::setHeader);
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), panelHost);
         panelHost.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });

@@ -14,7 +14,81 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class HostsPanelTest {
-    @Test void mountedHostAndDistroRenderersUseSemanticColors() throws Exception {
+    @Test void connectedFooterActivatesExistingShellAndUpdatesWhenSessionsEnd() {
+        var panel = new HostsPanel(actions);
+        panel.onActivate(host -> events.add("activate " + host.name()));
+        panel.setCredentialLabels(host -> "Vault locked");
+        panel.setHosts(List.of(prod), Optional.empty());
+        panel.setHostDetails(host -> "Ubuntu", host -> 1);
+        assertThat(panel.connect.getText()).isEqualTo("Open Shell");
+        assertThat(panel.cardCredential.getText()).isEqualTo("Connected");
+        assertThat(panel.cardInfo.isVisible()).as("OS metadata is retained in the tooltip").isFalse();
+        panel.connect.doClick();
+        panel.setHostDetails(host -> "Ubuntu", host -> 0);
+        assertThat(panel.connect.getText()).isEqualTo("Connect");
+        assertThat(panel.cardCredential.getText()).isEqualTo("Vault locked");
+        panel.connect.doClick();
+        assertThat(events).containsExactly("activate prod", "connect prod");
+    }
+
+    @Test void searchOccupiesTheOnlyTopRowAndUsesTheReferencePlaceholder() {
+        var panel = new HostsPanel(actions);
+        assertThat(panel.search.getClientProperty("JTextField.placeholderText")).isEqualTo("Search sessions");
+        assertThat(panel.add.getParent()).as("new/import actions belong in the app header").isNull();
+        assertThat(panel.importButton.getParent()).isNull();
+    }
+
+    @Test void appHeaderPublishesTotalSessionsAndAccessibleAddAndImportActions() {
+        var panel = new HostsPanel(actions, dev.jasper.sdk.testing.FakeBundledIcon::new);
+        var headers = new ArrayList<dev.jasper.sdk.ui.PanelHeader>();
+        panel.onHeaderChanged(headers::add);
+        assertThat(headers.getLast().detail()).isEqualTo("0");
+        panel.setHosts(List.of(nas, prod), Optional.empty());
+        panel.setDistros(List.of(ubuntu, pwsh), profile -> 0);
+        panel.search.setText("no match");
+        var header = headers.getLast();
+        assertThat(header.detail()).as("filtering doesn't change the saved-session count").isEqualTo("3");
+        assertThat(header.active()).isFalse();
+        assertThat(header.actions()).extracting(dev.jasper.sdk.ui.PanelHeader.Action::label).containsExactly("New session", "Import sessions");
+        header.actions().forEach(action -> action.invoke().run());
+        assertThat(events).containsExactly("edit new", "import");
+        panel.setHosts(List.of(nas), Optional.empty());
+        assertThat(headers.getLast().detail()).isEqualTo("2");
+    }
+
+    @Test void compactRowsRevealNonfavoriteStarsOnHoverAndKeyboardFocus() {
+        var panel = new HostsPanel(actions);
+        panel.setHosts(List.of(nas), Optional.empty());
+        panel.list.setSize(300, 100);
+        assertThat(render(panel, 0).getPreferredSize().height).isEqualTo(PanelStyle.scale(panel, 30));
+        assertThat(labels(render(panel, 0))).doesNotContain("\u2606");
+        var bounds = panel.list.getCellBounds(0, 0);
+        var move = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_MOVED, 0, 0,
+            288, bounds.y + bounds.height / 2, 0, false);
+        for (var listener : panel.list.getMouseMotionListeners()) listener.mouseMoved(move);
+        assertThat(labels(render(panel, 0))).contains("\u2606");
+        var exit = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_EXITED, 0, 0, -1, -1, 0, false);
+        for (var listener : panel.list.getMouseListeners()) listener.mouseExited(exit);
+        assertThat(labels(render(panel, 0))).doesNotContain("\u2606");
+        assertThat(labels(panel.list.getCellRenderer().getListCellRendererComponent(panel.list,
+            panel.list.getModel().getElementAt(0), 0, true, true))).contains("\u2606");
+    }
+
+    @Test void selectedFooterKeepsTheShellAndEditControlsReachableInANarrowPanel() {
+        var panel = new HostsPanel(actions, name -> new dev.jasper.sdk.testing.FakeBundledIcon(name));
+        panel.setHostDetails(host -> "Ubuntu", host -> 1);
+        panel.setHosts(List.of(prod), Optional.empty());
+        panel.setSize(220, 400); layout(panel);
+        assertThat(panel.edit.getText()).isEmpty();
+        assertThat(panel.edit.getAccessibleContext().getAccessibleName()).isEqualTo("Edit session");
+        for (var button : List.of(panel.edit, panel.connect)) {
+            var bounds = javax.swing.SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), panel);
+            assertThat(bounds.width).isPositive();
+            assertThat(bounds.x).isGreaterThanOrEqualTo(0);
+            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(panel.getWidth());
+        }
+    }
+    @Test void mountedHostRowsUseReferenceStateColorsAndDistrosUseSemanticColors() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try (var colors = new ZoneColors()) {
                 var panel = withDistros(icon -> null);
@@ -25,7 +99,9 @@ class HostsPanelTest {
                     for (int i = 0; i < panel.list.getModel().getSize(); i++) {
                         var row = panel.list.getModel().getElementAt(i);
                         var labels = ZoneColors.labels(render(panel, i));
-                        if (row instanceof HostRows.Host || row instanceof HostRows.Distro distro && distro.sessions() > 0)
+                        if (row instanceof HostRows.Host)
+                            assertThat(labels.stream().filter(l -> "\u25CF".equals(l.getText())).findFirst().orElseThrow().getForeground()).isEqualTo(new java.awt.Color(0x38ba54));
+                        if (row instanceof HostRows.Distro distro && distro.sessions() > 0)
                             assertThat(labels.stream().filter(l -> "\u25CF".equals(l.getText())).findFirst().orElseThrow().getForeground()).isEqualTo(palette.success());
                         if (row instanceof HostRows.Distro) {
                             assertThat(labels.stream().filter(l -> l.getText() != null && l.getText().startsWith("WSL ")).findFirst().orElseThrow().getForeground()).isEqualTo(palette.textMuted());
@@ -97,7 +173,7 @@ class HostsPanelTest {
         assertThat(panel.empty.isVisible()).isTrue();
         assertThat(panel.empty.getText()).as("without WSL the panel holds only hosts")
             .isEqualTo("No hosts yet \u2014 Add or Import from ~/.ssh/config");
-        assertThat(panel.search.getClientProperty("JTextField.placeholderText")).isEqualTo("Search sessions\u2026");
+        assertThat(panel.search.getClientProperty("JTextField.placeholderText")).isEqualTo("Search sessions");
         panel.setHosts(List.of(prod), Optional.empty());
         assertThat(rows(panel)).containsExactly(new HostRows.Group("Production", 1, false), new HostRows.Host(prod));
     }
@@ -340,7 +416,7 @@ class HostsPanelTest {
         assertThat(action).isNotNull();
         panel.list.getActionMap().get(action).actionPerformed(new java.awt.event.ActionEvent(panel.list, 0, ""));
         panel.list.setSize(300, 100);
-        var bounds = panel.list.getCellBounds(1, 1);
+        var bounds = panel.list.getCellBounds(0, 0);
         var click = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 288, bounds.y + bounds.height / 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
         for (var listener : panel.list.getMouseListeners()) listener.mouseClicked(click);
         assertThat(events).containsExactly("connect nas", "favorite nas true");
@@ -353,8 +429,8 @@ class HostsPanelTest {
         panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu \u00B7 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
         panel.setHosts(List.of(nas, prod), Optional.empty());
         panel.search.setText("ubuntu");
-        assertThat(panel.list.getModel().getSize()).isEqualTo(2);
-        var component = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(1), 1, false, false);
+        assertThat(panel.list.getModel().getSize()).isEqualTo(1);
+        var component = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(0), 0, false, false);
         assertThat(labels(component)).contains("nas");
         assertThat(component.getAccessibleContext().getAccessibleName()).contains("2 sessions");
         assertThat(((javax.swing.JComponent) component).getToolTipText()).contains("me@nas.local:2222", "Ubuntu \u00B7 10.0.0.2");
@@ -367,7 +443,8 @@ class HostsPanelTest {
             var panel = new HostsPanel(actions);
             panel.setHosts(List.of(prod), Optional.empty());
             panel.list.setSize(300, 100);
-            var row = (javax.swing.JPanel) render(panel, 1);
+            var row = (javax.swing.JPanel) panel.list.getCellRenderer().getListCellRendererComponent(panel.list,
+                panel.list.getModel().getElementAt(1), 1, true, true);
             row.setSize(300, row.getPreferredSize().height);
             layout(row);
             var address = ZoneColors.labels(row).stream().filter(label -> prod.hostname().equals(label.getText())).findFirst();
@@ -403,12 +480,12 @@ class HostsPanelTest {
         var panel = new HostsPanel(actions);
         panel.setHostDetails(host -> "Ubuntu", host -> 1);
         panel.setHosts(List.of(nas), Optional.empty());
-        var row = panel.list.getAccessibleContext().getAccessibleChild(1).getAccessibleContext();
+        var row = panel.list.getAccessibleContext().getAccessibleChild(0).getAccessibleContext();
         assertThat(row.getAccessibleName()).contains("nas", "me@nas.local:2222", "Ubuntu", "1 session");
     }
 
     @Test void keyboardSelectionIsVisibleOnGroupHeaders() {
-        var panel = new HostsPanel(actions); panel.setHosts(List.of(nas), Optional.empty());
+        var panel = new HostsPanel(actions); panel.setHosts(List.of(nas), Optional.empty()); panel.setCollapsed(Set.of(HostRows.OTHER));
         var renderer = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(0), 0, true, true);
         assertThat(((javax.swing.JComponent) renderer).isOpaque()).isTrue();
         assertThat(renderer.getBackground()).isEqualTo(panel.list.getSelectionBackground());

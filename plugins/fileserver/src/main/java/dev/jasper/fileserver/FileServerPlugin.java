@@ -220,6 +220,7 @@ public final class FileServerPlugin implements Plugin {
             id -> showFingerprints(window, id)),
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
             context.appearance().icon(IconName.SERVER));
+        panel.onHeaderChanged(host::setHeader);
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
         panels.put(window.id(), panel);

@@ -2,6 +2,28 @@
 
 ## Current state — 2026-10-04
 
+- **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
+  second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
+  Sessions has header-only Add/Import icons and count, flat alphabetical ungrouped hosts, a pencil-only edit action,
+  and a blue Open Shell action for connected hosts. SFTP places its connection in the header, uses compact
+  back/forward/path/refresh/upload controls and Name/Size rows, and preserves operation menus and destination picking.
+  Successful navigation history is scoped to each pane and connection identity. Tunnel/server rows use explicit
+  on/off switches; server rows add protocol chips, address/copy controls and an optional details view.
+  Supported chips are HTTP/SFTP/FTP/TFTP; the mock's RSYNC sample does not add an unsupported transport.
+  SDK **0.14.2** adds per-window `PanelHeader` via `PanelHost.setHeader`; the app translates it at the plugin boundary,
+  retains metadata while hidden/moved, contains action failures, and invalidates callbacks on close. Remote and
+  File Server now require that patch version. The screenshot-directed scope continues the bounded parallel
+  implementation/independent-review workflow rather than re-running historical feature plans. This follow-up
+  intentionally supersedes the earlier pass's default Other group/favorites-first order and app-only title bars.
+  Independent review approved after fixing header drag registration for the new label/detail surfaces. Regression
+  tests cover header action isolation/containment/disposal, hidden/moved headers, navigation history and row actions.
+  Final `./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview check --continue` passed:
+  **8,709 tests, 0 failures, 0 errors, 6 existing skips**; architecture, documentation and native headless gates passed.
+  Changed-source hygiene and whitespace checks passed. Refreshed empty/populated dark/light previews at 220/300px
+  and 18pt UI-font layouts were inspected, including narrow size-column and switch-contrast corrections.
+  Previews remain under `jasper-app/build/plugin-panel-preview/` (populated variants end in `-populated.png`).
+  Native desktop acceptance remains user-run. No GUI, benchmark, AOT training, merge or push has been run.
+
 - **Plugin panel visual refresh** (2026-10-04; `codex/plugin-panel-redesign`, isolated worktree
   `/Users/dustin/.codex/worktrees/plugin-panel-redesign/moray`): implements the user's supplied mock as the direction
   for Remote's Sessions panel and disconnected SFTP / empty Tunnels and File Servers. Sessions shows addresses beside

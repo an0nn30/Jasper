@@ -16,9 +16,18 @@ class HostRowsTest {
 
     final List<RemoteHost> hosts = List.of(host("web", "Production", false), host("api", "Production", true), host("nas", "", false), host("app", "Staging", false));
 
-    @Test void groupsSortFavoritesFirstAndOtherLast() {
+    @Test void groupsSortNamesAndOtherLast() {
         List<HostRows.Row> rows = HostRows.rows(hosts, "", Set.of());
         assertThat(rows).extracting(HostRowsTest::describe).containsExactly("Production(2)", "api*", "web", "Staging(1)", "app", "Other(1)", "nas");
+    }
+
+    @Test void plainUngroupedHostsAreFlatAndAlphabeticalRegardlessOfFavorites() {
+        var alpha = host("alpha", "", false);
+        var zulu = host("zulu", "", true);
+        assertThat(HostRows.rows(List.of(zulu, alpha), "", Set.of())).containsExactly(new HostRows.Host(alpha), new HostRows.Host(zulu));
+        assertThat(HostRows.rows(List.of(zulu, alpha), "", Set.of(), "Servers")).extracting(HostRowsTest::describe)
+            .containsExactly("Servers(2)", "alpha", "zulu*");
+        assertThat(HostRows.rows(List.of(zulu, alpha), "", Set.of(HostRows.OTHER))).containsExactly(new HostRows.Group(HostRows.OTHER, 2, true));
     }
 
     @Test void collapsedGroupsHideTheirHostsUnlessSearching() {
