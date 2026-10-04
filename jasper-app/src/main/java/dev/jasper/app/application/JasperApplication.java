@@ -213,7 +213,7 @@ public final class JasperApplication {
             themes.current().chrome().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
-            buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
+            buddy.companion(), notificationCenter, nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
@@ -344,13 +344,13 @@ public final class JasperApplication {
                     value.elapsedNanos(), value.activate(), value.watched());
                 case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
                     value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
-                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), value.activate());
+                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), windowId, value.activate());
                 case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
                 case WorkspaceActivity.PaneState value -> {
                     switch (value.state()) {
                         case OPENED -> notifications.opened(value.id());
                         case CLOSED -> notifications.closed(value.id());
-                        case FOCUSED -> notifications.looked(value.id());
+                        case FOCUSED -> { }
                         case BLURRED -> notifications.hidden(value.id());
                     }
                 }

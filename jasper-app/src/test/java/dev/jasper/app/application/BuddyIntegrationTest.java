@@ -33,7 +33,7 @@ class BuddyIntegrationTest {
         var fixture = new BuddyTestSupport(); var registrations = new AtomicInteger(); var removals = new AtomicInteger();
         var integration = new BuddyIntegration(BuddyOptions.builder(font).build(), fixture.companion(), new BuddyVisibility(),
             () -> true, source -> true, listener -> { registrations.incrementAndGet(); return removals::incrementAndGet; });
-        var notice = new BuddyNotice(new BuddyNoticeId("test", 1), BuddyNotice.Kind.TASK, "build", BuddyNotice.State.DONE, () -> "done", () -> {});
+        var notice = new BuddyNotice(new BuddyNoticeId("test", 1), BuddyNotice.Kind.TASK, "build", BuddyNotice.State.RUNNING, () -> "busy", () -> {});
         integration.companion().post(notice);
         integration.window("window", true, false); integration.window("window", true, true);
         integration.appearance(font.deriveFont(18f), false);

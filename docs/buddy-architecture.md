@@ -11,7 +11,7 @@ the other; the application composes their supported APIs.
 | --- | --- |
 | `config` | Resource-free options, builder and position values; JDK only. |
 | `notice` | Resource-free identity and validated notice values; JDK only. |
-| `internal.model` | EDT notice ordering, acknowledgement and orphaning; depends on `notice`. |
+| `internal.model` | EDT live-work notice ordering and bounds; depends on `notice`. |
 | `internal.animation` | Caller-confined frame selection and spring calculations; JDK only, no Swing timers. |
 | `internal.presentation` | EDT painting, layout, native surfaces and scheduling; depends on `config`, `notice`, model and animation. |
 | `view` | Supported EDT facade over options, notice model and lazy presentation. |
@@ -28,15 +28,14 @@ its actual sprite. Test fixtures are a separate test-only artifact.
 
 [BuddyCompanion](../jasper-buddy/src/main/java/dev/jasper/buddy/view/BuddyCompanion.java)
 owns one [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java).
-The deck retains up to 50 notices by source-qualified ID, newest first. Posts replace,
-promote and reset acknowledgement; title changes preserve order and acknowledgement.
-Snapshots are cached immutable lists, invalidated by mutations. The post generation
-counter is model bookkeeping exposed only internally; it is not a public subscription API.
+The deck retains up to 50 notices by source-qualified ID, newest first. Posts replace and
+promote; title changes preserve order. Snapshots are cached immutable lists, invalidated by
+mutations. The post generation counter is model bookkeeping exposed only internally; it is
+not a public subscription API.
 
-The column filters for `notice.live() || !acknowledged`. The drawer includes all retained
-notices. Orphaning removes activation without changing the state; the final-detail
-overload also replaces the supplier unconditionally. A producer chooses whether its
-outcome needs freezing. Orphaning and acknowledgement are independent operations.
+Every retained notice is live work: the column shows the newest three and the drawer all of
+them. A producer dismisses its notice when the work ends; Buddy keeps no outcomes. Jasper
+posts how work ended as a notification instead ([guide](notifications.md)).
 
 A notice retains its key, detail supplier and activation closure. Avoid UI objects in
 keys and unnecessary captures in callbacks. Replacement, dismissal, capacity eviction
