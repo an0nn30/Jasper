@@ -13,7 +13,7 @@ Only these top-level types and their nested values/builders are supported:
 - [BuddyCompanion](src/main/java/dev/jasper/buddy/view/BuddyCompanion.java): notice model
   and lazy presentation, closed by the host.
 - [BuddyNotice](src/main/java/dev/jasper/buddy/notice/BuddyNotice.java): validated kind/state,
-  title, nonblocking detail supplier and nullable activation callback.
+  title, nonblocking detail supplier and activation callback.
 - [BuddyNoticeId](src/main/java/dev/jasper/buddy/notice/BuddyNoticeId.java): source plus
   stable opaque key. A source does not have to be a terminal.
 - [BuddyOptions](src/main/java/dev/jasper/buddy/config/BuddyOptions.java): explicit resolved
@@ -65,7 +65,7 @@ live terminal buffer or wait for a worker from one of these callbacks.
 | Operation | Model and resource effect |
 | --- | --- |
 | Construction | Allocates the model only: no native window, timer or worker. |
-| `post`, `updateTitle`, `acknowledge`, `dismiss`, `orphan`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. |
+| `post`, `updateTitle`, `dismiss`, `clear` | Update the model and refresh existing presentation; never create a native window. Posting while hidden is supported. |
 | `show` | Lazily creates presentation; returns whether it is available. Repeated calls while visible reuse it. |
 | `hide` | Stops presentation timers and pending drag frames, hides dependent windows, retains notices, options and working intent. |
 | `setWorking` | Sets host-supplied typing intent, including before first show; no threshold policy lives in Buddy. |
@@ -86,24 +86,18 @@ for each producer family, and a stable nonnull key within that source. Keys must
 stable equality/hashCode and should not retain UI objects. Reusing an ID deliberately
 replaces that notice; `BuddyNotice.equals` also compares callbacks and is not notice identity.
 
-| Kind | Accepted states | Live while activation is nonnull |
+| Kind | Accepted states | Wants attention |
 | --- | --- | --- |
-| `TASK` | `RUNNING`, `NEEDS_INPUT`, `DONE`, `FAILED` | `RUNNING`, `NEEDS_INPUT` |
-| `CONNECTION` | `UP`, `DEGRADED`, `DOWN` | `UP`, `DEGRADED` |
+| `TASK` | `RUNNING`, `NEEDS_INPUT` | `NEEDS_INPUT` |
+| `CONNECTION` | `UP`, `DEGRADED`, `DOWN` | `DEGRADED`, `DOWN` |
 
-A post promotes its ID to newest and resets acknowledgement. The model holds at most
-50 notices, dropping the oldest beyond that limit. Updating a title does neither.
-The collapsed column contains live or unacknowledged notices and shows at most three;
-the drawer provides the retained history. Acknowledgement marks a notice seen without
-removing it or changing its state. Dismiss removes one notice; clear removes all.
-
-Null activation means orphaned, even if the state remains `RUNNING` or `UP`. An orphan
-is never live. `orphan(id)` removes activation but retains state and the existing detail
-supplier. `orphan(id, finalDetail)` also replaces the supplier with fixed text **regardless
-of state**. The producer must choose the overload: freeze unfinished details, preserve
-completed outcome wording. Cancel producer work first, orphan, then acknowledge if the
-notice should leave the column. Acknowledgement is separate; an unseen orphan remains
-in the column until acknowledged. Hide and disable do not close producers.
+Buddy shows live work only. A post promotes its ID to newest; updating a title does not.
+The model holds at most 50 notices, dropping the oldest beyond that limit. The collapsed
+column shows at most three of them; the drawer lists them all. A producer dismisses its
+notice when the work ends, and the user may dismiss one from the drawer or clear them all.
+Buddy keeps no outcomes: a host that wants to report how work ended does so elsewhere
+(Jasper posts a notification). Activation is required. Cancel producer work first, then
+dismiss. Hide and disable do not close producers.
 
 ## Host appearance and position
 

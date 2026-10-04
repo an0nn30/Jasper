@@ -42,6 +42,7 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 |---|---|---|
 | Jasper | errors and results of Jasper's own commands: a shell that could not start, a theme that could not be applied, Migrate Config | card |
 | Configuration | problems in `config.toml`, themes and plugin settings files | sticky card |
+| Long-running commands | a command that ran at least `notifications.long_command_seconds` and finished anywhere but the pane you were typing in | card |
 | Plugin problems | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
 | Internal errors | unexpected errors in Jasper itself | card |
 | *Plugin name*, one per plugin | the plugin's own messages, such as a host that could not be saved | card |
@@ -50,6 +51,15 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 
 A configuration notification offers **Show Problems** (the same list as the status bar's configuration indicator)
 and **Open config.toml**. It goes away by itself once every problem is fixed.
+
+## Long-running commands
+
+A command that ran at least `notifications.long_command_seconds` (10 seconds by default) and finished anywhere but the
+pane you were typing in is posted in Long-running commands: the command, and "Finished in 2m 03s" or "Exited 1 · 2m
+03s". Its card shows in the pane's window, and clicking it focuses the pane; closing the pane expires it. The same
+command finishing the same way within a minute counts on one entry, which then points at the pane it last came from.
+While a command runs, Buddy (when it is on) shows it above his head; Buddy keeps only work that is still going. See
+[configuration](configuration.md#finished-command-notifications).
 
 ## Plugin notifications
 

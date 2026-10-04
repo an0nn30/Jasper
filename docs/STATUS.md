@@ -2,8 +2,22 @@
 
 ## Current state — 2026-10-03
 
-- **Notifications plan 3: SDK notifications, reviewed on branch `claude/notifications-3`; awaiting the user's GUI
-  checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
+- **Notifications plan 4: long commands and Buddy, reviewed on branch `claude/notifications-4`; awaiting the user's GUI
+  checks and merge decision** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
+  [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
+  did not finish in the pane you were typing in is posted in "Long-running commands" (`jasper.commands`, CARD), in the
+  pane's window, with a click that focuses the pane; a closed pane expires its notifications. Buddy keeps live work
+  only: `BuddyNotice` lost `DONE` and `FAILED`, its activation is required, and `acknowledge` and both `orphan`
+  overloads are gone; `CommandNotifier` and `ActivityNotifier` dismiss a card when its work ends. A coalesced repeat
+  now carries the newest post's actions, default action and target, and its card moves to that window; an expiring
+  action expires its entry before it runs. The macOS banner for long commands stays, background only, until plan 5.
+  Spec interpretations: see the plan's list (1 to 12). `./gradlew check --continue`: **8,337 tests, 0 failures, 0
+  errors, 6 skipped** (on the branch with main `43894416` merged in). No GUI launched. GUI checks for the user: a long
+  command finishing in another tab shows a card in its window and a click focuses the pane; with
+  Buddy on, the capsule shows while it runs and goes when it ends; the drawer lists only running work; in the packaged
+  app with Jasper in the background, the macOS banner still arrives and the notification waits unread.
+- **Notifications plan 3: SDK notifications, merged to `main` (`3c64ea5c`) and pushed; awaiting the user's GUI
+  checks** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
   [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
   (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
   removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15`. `plugins.HostedNotifications` posts into the

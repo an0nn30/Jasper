@@ -2,8 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/notifications-4` (worktree `.worktrees/notifications-4`, cut from main
-`3c64ea5c`, where plans 1–3 are merged).
+**Status:** Implemented on branch `claude/notifications-4` (worktree `.worktrees/notifications-4`, cut from main
+`3c64ea5c`, where plans 1–3 are merged). Main moved to `43894416` during execution (the dock polish round; plans 2 and 3
+pushed) and is merged in at `81f71fe2`. Deviations from the plan text: Task 3, the closing fence after Step 3's
+`PluginRuntime.forward` block had a period glued to it and so never closed (fixed here; no code change); Task 4, the three
+`BuddyTestSupport` lines Step 4 removes are not adjacent in the file, so each was deleted on its own; Task 5, main was
+merged before the full check so the counts cover the tree that will land, and STATUS's plan 3 heading says "merged to
+`main` (`3c64ea5c`) and pushed" rather than "merged to local `main`". Final review: pending. `./gradlew check
+--continue`: **8,337 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
 
 **Goal:** Finished long commands become notifications in "Long-running commands", and Buddy keeps only live work:
 running commands and activities, input requests and connections.

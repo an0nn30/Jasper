@@ -235,7 +235,7 @@ an open palette.
 
 ### Finished-command notifications
 
-`notifications.long_command_seconds` sets how long a command must run before it is worth remembering.
+`notifications.long_command_seconds` sets how long a command must run before it is worth telling you about.
 The default is 10 seconds; `0` turns the feature off entirely.
 
 **This needs [shell integration](#shell-integration).** The duration is measured between the
@@ -243,35 +243,34 @@ command-start and command-end marks the integration scripts emit, so a shell tha
 produces no notifications and no cards at all — Jasper cannot know how long anything took. There is
 no fallback guess.
 
-A running command shows a **capsule above the buddy's head**, and he sits down and types while it runs. The bubble appears **the moment you look away** —
-switching tab, switching window, or sending Jasper to the background — because out of sight is the
-whole reason it exists. If you stay in the pane and watch, it appears once the command passes
-`long_command_seconds` instead. It shows the app-supplied terminal title (or the command when no title is supplied),
-how long it has been running, and when the command ends a check or a cross with the final time.
+When a command that ran at least `long_command_seconds` finishes anywhere except the pane you were
+typing in (a visible but unfocused split pane included), Jasper posts a notification in **Long-running
+commands**: the command as its title, and "Finished in 2m 03s" or "Exited 1 · 2m 03s" below it. While
+Jasper is focused it shows as a card in the pane's window; otherwise it waits, unread, in the
+Notifications panel. Clicking it focuses the pane, and closing the pane expires it. See
+[Notifications](notifications.md#long-running-commands).
 
-**Looking at it clears it.** Focusing the pane a bubble came from takes it out of the column, so the
-column empties as you work rather than needing to be tidied. A command that finishes in the pane you
-were already typing in never produces a bubble at all — you watched it happen. When nothing is
-running and nothing is unseen there is nothing above his head, which is the resting state.
+While a command runs, a **capsule above the buddy's head** shows it, and he sits down and types. The
+capsule appears **the moment you look away** — switching tab, switching window, or sending Jasper to
+the background — because out of sight is the whole reason it exists. If you stay in the pane and
+watch, it appears once the command passes `long_command_seconds` instead. It shows the app-supplied
+terminal title (or the command when no title is supplied) and how long it has been running, and it
+goes when the command ends.
 
-At most three bubbles are shown, newest nearest his head, with a count on the newest when there are
+At most three capsules are shown, newest nearest his head, with a count on the newest when there are
 more. A new capsule slides down into place with a small spring settle; existing capsules move
 smoothly to make room. Its size stays fixed, and status changes update the text in place. The
-translucent material and text follow the light or dark app theme. The column flips below him when he is too near the top of the screen, and the order inverts so
-the newest is still the one closest to him.
+translucent material and text follow the light or dark app theme. The column flips below him when he
+is too near the top of the screen, and the order inverts so the newest is still the one closest to him.
 
-**Single-clicking him opens the drawer**: everything from this run, newest first, whether or not you
-have seen it, with the × on a card to dismiss one and **Clear all** to empty it. At most 50 are kept,
-the oldest falling off, and the drawer starts empty each time Jasper starts. A card whose pane you
-have closed stays readable but dims and no longer responds — there is nowhere left for it to take
-you. Double-clicking him still raises the terminal and right-clicking still opens his menu.
+**Single-clicking him opens the drawer**: everything still going, newest first, with the × on a card
+to dismiss one and **Clear all** to empty it. Double-clicking him still raises the terminal and
+right-clicking still opens his menu.
 
-A **system notification** is sent as well, unless the command finished in the pane you were actually
-typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to
-miss. System notifications require the packaged macOS `Jasper.app`; elsewhere (including Gradle/IDE
-launches) the drawer is the only channel. macOS uses Jasper's app icon and notification settings.
-The first eligible notice asks for permission; allow Jasper in System Settings → Notifications.
-Denied permission leaves the drawer available.
+In the packaged macOS `Jasper.app`, a command that finishes while Jasper is in the background also
+sends a **system notification**, with Jasper's app icon and notification settings. The first eligible
+notice asks for permission; allow Jasper in System Settings → Notifications. Other launches (Gradle
+and IDE runs included) send none.
 
 ### Automatic tab and notification titles
 
@@ -313,10 +312,10 @@ Buddy bubbles use the program-supplied title without the tab's job suffix; shell
 integration provides the current command as their fallback. Running subtext shimmers from left to right. Dragging the buddy smoothly moves
 the bubbles between above/below positions while keeping them on screen. Live title changes
 update a bubble in place, without moving it to the front or replaying its arrival.
-Once the command finishes, its bubble and native notification show the completed
-command, including its arguments (for example, `sleep 12`), instead of the live terminal
-title. Later prompt titles do not rewrite the result. Title reception works without shell
-integration, but buddy notifications still need command-start/end marks.
+Once the command finishes, its notification shows the completed command, including its
+arguments (for example, `sleep 12`), instead of the live terminal title. Later prompt titles
+do not rewrite it. Title reception works without shell integration, but long-command
+notifications still need command-start/end marks.
 
 Inside tmux, the multiplexer must forward titles to its outer terminal. If tmux's
 `set-titles` option is off, Jasper cannot see titles applications set inside its
