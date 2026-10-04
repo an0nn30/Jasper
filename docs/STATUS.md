@@ -2,6 +2,20 @@
 
 ## Current state — 2026-10-04
 
+- **Theme engine/UI kit overhaul: draft spec awaiting user review** (2026-10-04), on
+  `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.
+  [Draft specification](superpowers/specs/2026-10-04-jasper-theme-engine-design.md);
+  [preserved source and eight mocks](design/theme-engine/reference/README.md).
+  Brainstorming decisions: standalone engine/kit module; evolve the existing engine; fixed design
+  geometry with theme colors and retained user font/scaling settings; mocks prevail for depicted
+  non-color detail; SDK/host adapters isolate plugins; **all plugins must migrate**, with no supported
+  legacy raw-Swing compatibility route after cutover. Three agreed delivery boundaries: engine/kit,
+  consumer and SDK migration, then surface composition and screenshot matching. The written spec is
+  not yet approved; plans and implementation have not started. Next: user reviews the written spec,
+  then write three detailed plans. No workflow deviation. Fresh headless baseline `./gradlew check`
+  passed all 91 tasks: **8,743 tests, 0 failures, 0 errors, 6 skipped**. Documentation link and
+  placeholder checks passed; source attachments are preserved unchanged. No GUI or AOT training.
+
 - **Tab width correction** (2026-10-04): clarified that only the starting size should double. Tabs now
   have a 160-pixel minimum, normal measured title growth, and the original 240-pixel maximum. Removed the
   content-width multiplier; the 64 × 2 accent pill and hidden-rail corners are unchanged. The regression
