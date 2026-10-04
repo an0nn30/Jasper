@@ -4,7 +4,7 @@
 notices. The `osascript` transport below is superseded by an in-process UserNotifications
 bridge in the packaged macOS app, with Jasper's own permission. Gradle/IDE launches have
 no Jasper bundle identity and do not send native notices. Threshold and visibility rules
-are unchanged. See [maintenance](../../app-maintenance.md#macos-notification-identity).
+are unchanged. See [maintenance](../../app-maintenance.md#system-notifications).
 
 **2026-09-27 completed-command wording:** Per the user's follow-up, completed Buddy
 notices and native notifications use the shell integration's captured command, including

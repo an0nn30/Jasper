@@ -2,6 +2,31 @@
 
 ## Current state — 2026-10-03
 
+- **Notifications plan 5: OS notifiers, reviewed on branch `claude/notifications-5`; awaiting the user's GUI checks and
+  merge decision** (plan `docs/superpowers/plans/2026-10-03-notifications-5-os-notifiers.md`,
+  [guide](notifications.md#system-notifications)): while Jasper is in the background, or a resident Jasper has every
+  window closed, card and sticky notifications are also the operating system's own (`Change.SystemRequested`,
+  `application.SystemNotices`, `platform.SystemNotifier`):
+  - macOS banners keyed by the notification's id, withdrawn when read, with clicks back through a cached `JavaVM`;
+  - Windows balloons from one `WindowsTray` icon shared with residency;
+  - Linux `notify-send` with `--action` when supported, at most 8 waiting.
+
+  A click raises the notification's window and runs its default action, or opens the Errors window for an incident,
+  or shows the Notifications panel. An incident's notification names its incident (title only to the operating
+  system; two incidents never coalesce). `notifications.system` (default `true`, live) is on Settings ›
+  Notifications. `Delivery.Presence` gains `OPENING`, so start-up posts send no banners. `CommandNotifier`'s interim
+  sink and `NativeNotifier` are gone. Spec interpretations: see the plan's list (1 to 18); plan 4's open decision is
+  answered with option (c). `./gradlew check --continue`: **8,495 tests, 0 failures, 0 errors, 6 skipped**. No GUI
+  launched.
+
+  GUI checks for the user:
+  - macOS (packaged app): a long command finishing with Jasper in the background shows a banner with Jasper's icon,
+    and a click focuses the pane; reading it in Jasper removes the banner; an internal error's banner shows only its
+    title, and a click opens the Errors window.
+  - Windows: a balloon from the tray icon, the icon gone once Jasper is focused, a click on the balloon focusing the
+    pane, and the resident icon carrying balloons with no window open.
+  - Linux (GNOME or KDE): a notification with Jasper's icon, and a click focusing the pane.
+  - `notifications.system = false` sends nothing.
 - **Notifications plan 4: long commands and Buddy, merged to local `main` 2026-10-03 (not pushed); awaiting the user's
   GUI checks and their call on a background finish's route to its pane** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
   [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
@@ -1705,7 +1730,7 @@ s
   `packageDist` and strict package signature checks passed. Independent review found
   no actionable issues. Native icon/permission acceptance remains user-run; no GUI
   launched. Not merged or pushed.
-  See [maintenance and acceptance](app-maintenance.md#macos-notification-identity).
+  See [maintenance and acceptance](app-maintenance.md#system-notifications).
 - **Editable keyboard shortcuts** (branch `codex/shortcut-editor`, worktree
   `/Users/dustin/.codex/worktrees/shortcut-editor/moray`, 2026-09-27): approved bounded
   in-chat design, implemented inline with test-first coverage; no plan document.

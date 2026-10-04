@@ -2,8 +2,28 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/notifications-5` (worktree `.worktrees/notifications-5`, cut from main
-`a23d0f15`, where plans 1–4 are merged).
+**Status:** Implemented on branch `claude/notifications-5` (worktree `.worktrees/notifications-5`, cut from main
+`a23d0f15`, where plans 1–4 are merged), executed with subagent-driven development (an implementer and a reviewer
+per task); awaiting the user's GUI checks and merge decision. Deviations from the plan text, and per-task review
+fixes:
+
+- Task 1: three existing `NotificationCenterTest` cases that post card or sticky notifications in the background
+  (`backgroundCardsOnlyEnterHistory`, now `backgroundCardsShowNoCardAndAskTheOperatingSystem`;
+  `stickyCardsWaitForFocusOnce`; `aRepeatThatShowsItsCardNoLongerWaitsForFocus`) now also expect `SystemRequested`;
+  the plan had missed them.
+- Task 3 review: `JNI_OnLoad` returns `JNI_ERR` when it cannot bind `MacNotifications.clicked`, so a broken binding
+  fails the library load (and the real-library test) instead of silently dropping clicks (`7d420d6c`).
+- Task 5 review: the "a killed process is no click" tests now kill processes that have already printed `default`,
+  and `SystemNotifier`'s worker stop waits up to 1 s so the backend's own close (which kills waiting `notify-send`
+  processes) runs before Jasper exits (`077800ec`).
+- Task 6 review: the Windows backend test asserts that every tray call made through the backend runs on the EDT
+  (`673d6410`).
+- Task 8: removing the heading "macOS notification identity" from `docs/app-maintenance.md` broke the two dated
+  records that linked to its anchor (STATUS's 2026-09-27 entry and the finished-command notifications design); both
+  links now point at `app-maintenance.md#system-notifications` and their text is unchanged. STATUS names the plan's
+  interpretations as 1 to 18, since the plan lists 18 (the task text said 17).
+
+Final review: pending. `./gradlew check --continue`: **8,495 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
 
 **Goal:** While Jasper is not focused, its notifications appear as the operating system's own (macOS banners, Windows
 tray balloons, Linux `notify-send`), a click on one takes you to what it is about, and reading it in Jasper withdraws it.

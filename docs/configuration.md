@@ -271,10 +271,11 @@ is too near the top of the screen, and the order inverts so the newest is still 
 to dismiss one and **Clear all** to empty it. Double-clicking him still raises the terminal and
 right-clicking still opens his menu.
 
-In the packaged macOS `Jasper.app`, a command that finishes while Jasper is in the background also
-sends a **system notification**, with Jasper's app icon and notification settings. The first eligible
-notice asks for permission; allow Jasper in System Settings → Notifications. Other launches (Gradle
-and IDE runs included) send none.
+While Jasper is in the background the outcome is also a **system notification**: a banner from the
+packaged macOS `Jasper.app`, a balloon from Jasper's notification-area icon on Windows, or `notify-send`
+on Linux, and clicking it focuses the pane. `notifications.system = false` turns system notifications
+off for everything (Settings › Notifications › Show system notifications). See
+[Notifications](notifications.md#system-notifications).
 
 ### Automatic tab and notification titles
 

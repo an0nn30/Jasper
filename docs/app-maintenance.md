@@ -338,30 +338,43 @@ panels and the palette scope. The plugin consumes only `dev.jasper.vault.api`.
 Run `./gradlew :jasper-plugin-remote:test` for unit and embedded loopback-server tests.
 See [Remote](remote.md) for settings and native acceptance.
 
-### macOS notification identity
+### System notifications
 
-`platform.NativeNotifier` dispatches off the EDT to `MacNotifications`, which loads
-`Contents/app/libjasper-notifications.dylib` beside the current jpackage launcher.
-The Objective-C bridge uses `UNUserNotificationCenter` in Jasper's process: identity,
-icon and permission belong to `dev.jasper.app`. Never restore an `osascript` fallback;
-its notices carry AppleScript's icon. Java text is copied as UTF-16, never evaluated.
-The native delegate allows banners for hidden panes while Jasper is foreground;
-the existing Java notification policy decides which completions qualify.
+`application.SystemNotices` listens to the center. A `Change.SystemRequested` goes to `platform.SystemNotifier` when
+`notifications.system` is on, an incident's notification with its title only. A read, expired or removed entry, and
+Clear All, withdraw what the operating system shows. A click raises the notification's window, then runs its default
+action, opens the Errors window for an incident, or shows the Notifications panel. `Delivery` decides when the
+operating system is asked: in `BACKGROUND` and `NO_WINDOW`, never in `OPENING`.
 
-`gradle/mac-notifications.gradle` compiles the bridge with the JBR JNI headers and
-Apple's command line tools on macOS. `check` runs its headless fake-center harness
-(permission granted/denied/error, deferred delivery, literal Unicode, unique requests,
-foreground presentation, non-bundle guard). Other platforms skip native compilation.
-Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it.
-Gradle/IDE runs intentionally send no system notifications because they lack Jasper's
-bundle identity. Test a packaged app manually: run `sleep 12`, switch to another app,
-allow Jasper's notification request, then repeat and verify the Jasper icon. Also
-check a hidden tab with Jasper foreground, and denial in System Settings. GUI acceptance
-is user-run; headless tests never show a prompt or banner.
+`SystemNotifier` runs every backend call on one daemon worker (`jasper-system-notifications`, closed at shutdown),
+makes text plain (no control, bidirectional-control or lone-surrogate characters; a one-line title of at most 120
+characters, a body of at most 300) and hands clicks back on the EDT as notification ids. A backend is a record of
+functions, so tests bring their own; `SystemNotifier.using(Runnable::run, …)` runs it on the calling thread. The
+bootstrap injects the real notifier, as it does the resident icon, so tests never reach the operating system.
+
+- **macOS**: `MacNotifications` loads `Contents/app/libjasper-notifications.dylib` beside the current jpackage
+  launcher. The Objective-C bridge uses `UNUserNotificationCenter` in Jasper's process: identity, icon and permission
+  belong to `dev.jasper.app`. Each banner's identifier is its notification's id, so a repeat replaces it and
+  withdrawal removes it. The delegate's `didReceiveNotificationResponse` calls `MacNotifications.clicked` through the
+  `JavaVM` that `JNI_OnLoad` cached, on a thread attached as a daemon. Never restore an `osascript` fallback; its
+  notices carry AppleScript's icon. Java text is copied as UTF-16, never evaluated.
+- **Windows**: `WindowsTray` owns Jasper's one notification-area icon, the resident icon and the balloons' icon alike;
+  a click on a balloon or the icon activates the most recent unread notification.
+- **Linux**: `LinuxNotifications` runs `notify-send` without a shell, asks `--help` about `--action` once (waiting at
+  most 2 s), keeps at most 8 processes waiting for a click and kills one when its notification is read; tests inject
+  the process starter.
+
+`gradle/mac-notifications.gradle` compiles the bridge with the JBR JNI headers and Apple's command line tools on
+macOS. `check` runs its headless fake-center harness (permission granted/denied/error, deferred delivery, literal
+Unicode, identifiers, withdrawal, the click callback, foreground presentation, non-bundle guard). Other platforms skip
+native compilation. Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it. Gradle/IDE
+runs intentionally send no macOS notifications because they lack Jasper's bundle identity. Test a packaged app
+manually: run `sleep 12`, switch to another app, allow Jasper's notification request, click the banner and check that
+the pane is focused; then let another finish, read it in Jasper and check that its banner goes. GUI acceptance is
+user-run; headless tests never show a prompt, banner or balloon.
 
 API references: [Apple UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter),
 [requesting permission](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).
-
 
 ### Unified workspace header
 
