@@ -30,7 +30,7 @@ view_mode = "normal"
 
 [buddy]
 # Live. Show the pixel-art Jasper floating above your windows while a terminal is open.
-# View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
+# Show/Hide Jasper in the command palette and right-click > Hide Jasper toggle him for the session.
 enabled = false
 
 [notifications]

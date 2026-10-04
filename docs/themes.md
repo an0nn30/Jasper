@@ -61,9 +61,8 @@ finish and refresh the app without reopening Settings.
 To copy, change or remove a theme, edit its file in the `themes` folder beside `config.toml`; see
 [Writing a theme](#writing-a-theme). Jasper notices the change within a second.
 
-View › **UI Theme** and **Workspace Scheme** offer the current catalog. Large catalogs are grouped into numbered
-submenus of at most 30 themes. View › **Themes…** opens Settings at Appearance; the command palette also finds it.
-These View choices save immediately, whereas Settings choices stay staged until Apply/OK.
+Choose UI and workspace themes in Settings › Appearance. The command palette’s **Themes…** command opens that
+page. Settings choices stay staged until Apply/OK.
 
 ## Writing a theme
 
