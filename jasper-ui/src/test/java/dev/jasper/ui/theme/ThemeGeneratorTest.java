@@ -219,4 +219,54 @@ class ThemeGeneratorTest {
             .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test void generatedUiDataRejectsLiteralVariableAndPlatformBorderGeometry() {
+        var theme = generate(SEEDS + """
+            [ui]
+            "Button.border" = "20,20,20,20,#ff0000,4,30"
+            "*.border" = "20,20,20,20,#ff0000,4,30"
+            "Button.selectedBorder" = "#ff0000"
+            "@geometry" = "20,20,20,20,#ff0000,4,30"
+            "@geometryAlias" = "$Button.border"
+            "Button.toolbar.border" = "@geometry"
+            "Panel.border" = { "os.mac" = "20,20,20,20,#ff0000,4,30", "os.default" = "@geometry" }
+            "@platformGeometry" = { "os.mac" = "20,20,20,20,#ff0000,4,30", "os.default" = "#ff0000" }
+            "@typedBorder" = "{border}20,20,20,20,#ff0000,4,30"
+            "@nestedGeometry" = "lighten(20,20,20,20,#ff0000,4,30)"
+            "@font" = "16 Arial"
+            "Button.borderColor" = "#ff0000"
+            "*.borderColor" = "#00ff00"
+            """
+        );
+        assertThat(theme.uiKeys()).doesNotContainKeys("Button.border", "*.border", "Button.selectedBorder",
+            "@geometry", "@geometryAlias", "Button.toolbar.border", "Panel.border", "@platformGeometry",
+            "@typedBorder", "@nestedGeometry", "@font")
+            .containsEntry("Button.borderColor", "#ff0000").containsEntry("*.borderColor", "#00ff00");
+    }
+
+    @Test void generatedUiDataPreservesValidatedColorReferencesAndFunctions() {
+        var theme = generate(SEEDS + """
+            [ui]
+            "@base" = "#1234"
+            "@alias" = "@base"
+            "@hover" = "lighten(@base, 8%, relative derived)"
+            "@platformColor" = { "os.mac" = "rgba(1, 2, 3, 50%)", "os.default" = "mix(#12345680, darken(@base, 10%), 25%)" }
+            "Button.borderColor" = "@hover"
+            "Panel.background" = "$Button.borderColor"
+            "Label.foreground" = "contrast(@base, #000, #fff, 43%)"
+            "List.background" = "hsl(200, 80%, 40%)"
+            "List.selectionBackground" = "over(#1234, #fff)"
+            "*.disabledForeground" = "fade($Label.foreground, 42%)"
+            """
+        );
+        assertThat(theme.uiKeys()).containsEntry("@base", "#1234").containsEntry("@alias", "@base")
+            .containsEntry("@hover", "lighten(@base, 8%, relative derived)")
+            .containsEntry("Button.borderColor", "@hover").containsEntry("Panel.background", "$Button.borderColor")
+            .containsEntry("Label.foreground", "contrast(@base, #000, #fff, 43%)")
+            .containsEntry("List.background", "hsl(200, 80%, 40%)")
+            .containsEntry("List.selectionBackground", "over(#1234, #fff)")
+            .containsEntry("*.disabledForeground", "fade($Label.foreground, 42%)");
+        assertThat(theme.uiKeys().get("@platformColor")).isEqualTo(java.util.Map.of(
+            "os.mac", "rgba(1, 2, 3, 50%)", "os.default", "mix(#12345680, darken(@base, 10%), 25%)"));
+    }
+
 }
