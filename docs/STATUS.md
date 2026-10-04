@@ -6,13 +6,13 @@
   `/Users/dustin/.codex/worktrees/connection-overlay/moray`, based on fetched `origin/main` at `4c3c6bb0`.
   Window overlays now use the workspace's scaled 16px corner arc, clip opaque plugin content and repaint their
   border with the current theme. Remote connection progress replaces the loading bar with an accent-colored
-  dot that stretches into three bouncing dots and rejoins over a two-second loop. The timer runs only while
+  dot that stretches into three bouncing dots and rejoins over a 1.6-second loop (sped up at the user’s request). The timer runs only while
   working and showing; ancestor hiding, removal, failure and completion stop it, and retry restarts it.
   This is a bounded follow-up implemented inline with independent final review; no historical plan changed.
   Both original visual regressions were observed failing before the fixes. Focused rendering/lifecycle tests
-  pass, and independent review found no actionable issues. Full `./gradlew check` passed all 88 tasks:
+  pass, and independent review found no actionable issues. Initial full `./gradlew check` passed all 88 tasks:
   **8,476 tests, 0 failures/errors, 6 skipped**. Changed-source hygiene and diff checks passed. Actual-component dark/light
-  headless renders were inspected; the local animation preview is `build/connection-preview/connection-overlay.gif`.
+  headless renders were inspected; the local animation preview is `build/connection-preview/connection-overlay-faster.gif`. The speed-only follow-up passed all four focused connection tests.
   Native motion acceptance remains user-run. No GUI or benchmark launched, and no merge or push performed.
 
 - **View modes: adversarial review complete, integration authorized** (2026-10-04). Updated `codex/appearance-view-modes` through origin/main `857f3020`. First adversarial review found one P2: Compact widened the activated palette from 560 to 680 logical pixels. Fixed in `c92cdf3e`: Compact retains scaled 560 width with existing floating geometry and clamps; Normal's fallback stays unchanged. Paired roomy/narrow regressions demonstrated RED then GREEN (29 focused tests). A second independent adversarial review approved spec compliance and code quality with no remaining findings. Full `./gradlew check` on the fix: **8,471 tests, 0 failures/errors, 6 skipped**, 88 tasks (10 executed, 78 up-to-date); changed-source hygiene and diff checks passed. The original position-only requirement takes precedence over the derived fallback-only plan. Native tabs were explicitly abandoned; built-in tabs remain. User authorized merge to main and push after review/fixes; final merged verification and publication follow this record. No GUI or benchmark launched; [native acceptance](superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md) remains user-run.

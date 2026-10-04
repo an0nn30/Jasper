@@ -14,7 +14,7 @@ import javax.swing.UIManager;
 
 /** EDT-owned connection motion: a soft dot splits, bounces and gathers again. */
 final class ConnectionDots extends JPanel {
-    private static final long CYCLE_NANOS = 2_000_000_000L;
+    private static final long CYCLE_NANOS = 1_600_000_000L;
     private final LongSupplier clock;
     final Timer timer;
     private boolean working;

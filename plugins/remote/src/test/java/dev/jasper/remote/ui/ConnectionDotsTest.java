@@ -17,12 +17,12 @@ class ConnectionDotsTest {
                 dots.setSize(88, 36); dots.setWorking(true);
                 var single = render(dots);
                 assertThat(columnGroups(single)).isEqualTo(1);
-                time.set(1_000_000_000L);
+                time.set(800_000_000L);
                 var separated = render(dots);
                 assertThat(columnGroups(separated)).isEqualTo(3);
-                time.set(1_100_000_000L);
+                time.set(880_000_000L);
                 assertThat(pixels(render(dots))).as("dots bounce between separated frames").isNotEqualTo(pixels(separated));
-                time.set(2_000_000_000L);
+                time.set(1_600_000_000L);
                 assertThat(pixels(render(dots))).as("one full cycle joins back into the original dot").isEqualTo(pixels(single));
             } finally { host.removeNotify(); }
         });
