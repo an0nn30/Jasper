@@ -2,8 +2,8 @@
 
 ## Current state — 2026-10-03
 
-- **Dock guides: a second slot's guide always shows its half; on branch `claude/dock-guide-halves`, awaiting the user's
-  GUI check** (2026-10-03; spec §3 "Guides" amended at the user's request). The user: the guides should show the bottom
+- **Dock guides: a second slot's guide always shows its half; pushed to `main`, awaiting the user's GUI check**
+  (2026-10-03; spec §3 "Guides" amended at the user's request). The user: the guides should show the bottom
   half left or right when a tool panel moves there, "regardless if doing so would make the tool full screen or not",
   because the guide only showed a bottom half while a tool already held the top half. Rule: `DockGeometry.landing`, for
   a pair's second slot (Left Bottom, Right Bottom, Bottom Right; extended to Bottom Right by the same principle, since
