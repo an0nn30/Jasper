@@ -2,8 +2,8 @@
 
 ## Current state — 2026-10-03
 
-- **Dock drop zones: six edge zones replace the 3 × 2 grid, on branch `claude/dock-bottom-halves` (from `main` at
-  `43894416`); awaiting the user's GUI check and merge decision** (2026-10-03; spec §3 "Targets" and "Guides" amended
+- **Dock drop zones: six edge zones replace the 3 × 2 grid; pushed to `main`, awaiting the user's GUI check**
+  (2026-10-03; spec §3 "Targets" and "Guides" amended
   at the user's request). The user could not drop a tool window on the lower half of the left or right side and named
   six zones: left up, left down, bottom left, bottom right, right up, right down. Root cause: the workspace target was
   a grid of thirds (rows) and halves (columns), which gave Left Bottom and Right Bottom only the middle third of each
@@ -26,7 +26,8 @@
   grid cell, and `WindowCornerLayerTest` aims lower in the cards. `./gradlew check --continue`: **8,369 tests, 0
   failures, 0 errors, 6 skipped**, all architecture gates and doclint included. No GUI launched. GUI check for the
   user: drag a tool window toward each of the six edges (the upper and lower halves of the left and right sides, and
-  the left and right halves of the bottom) and see the highlight.
+  the left and right halves of the bottom) and see the highlight. The split sits exactly at half of the side panels'
+  visible height (the terminal column's height), pinned one pixel either side by `DockDragTest`.
 
 - **Notifications plan 3: SDK notifications, reviewed on branch `claude/notifications-3`; awaiting the user's GUI
   checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
