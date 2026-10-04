@@ -148,11 +148,12 @@ group bounds, button bounds and workspace bounds:
 - **Over the workspace** (between the stripes, from below the header to above the status bar): six edge zones, one
   for each slot. The target is the nearest of the workspace's left, right and bottom edges, each distance taken as a
   share of the workspace's own width (left, right) or height (bottom), so a wide or a tall workspace splits like any
-  other. There is no top edge, because there are no top slots. The left and right edges split at half the height:
-  the upper half is the side's top slot, the lower half its bottom slot. The bottom edge splits at half the width,
-  into Bottom Left and Bottom Right. The three edges meet at the middle: a diagonal runs from each lower corner to
-  it, and the half-height lines run across to it. A tie goes to a side over the bottom, and to the left over the
-  right.
+  other. There is no top edge, because there are no top slots. The left and right edges split at half of the side
+  panels' visible height: above the bottom area when it shows, because the sides end there, otherwise at half the
+  workspace's height. The upper part is the side's top slot, the lower part its bottom slot. The bottom edge splits at
+  half the width, into Bottom Left and Bottom Right. The three edges meet at the middle: a diagonal runs from each
+  lower corner to it, and, with no bottom area showing, the half-height lines run across to it (the diagram). A tie
+  goes to a side over the bottom, and to the left over the right.
 
   ```
   ┌─────────────────────┬─────────────────────┐
@@ -170,7 +171,8 @@ group bounds, button bounds and workspace bounds:
   ```
 
   A workspace drop appends the window to that slot's group. Amended 2026-10-03 at the user's request: six edge zones
-  replace the 3 × 2 grid, whose middle-third bottom halves were hard to hit.
+  replace the 3 × 2 grid, whose middle-third bottom halves were hard to hit, and the sides split at the side panels'
+  visible half.
 - **Anywhere else** (title bar, status bar, outside the window): no target, no highlight; release cancels.
 
 ### Guides
