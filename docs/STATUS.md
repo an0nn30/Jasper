@@ -5,12 +5,16 @@
 - **Theme engine/UI kit overhaul: draft spec awaiting user review** (2026-10-04), on
   `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.
   [Draft specification](superpowers/specs/2026-10-04-jasper-theme-engine-design.md);
-  [preserved source and eight mocks](design/theme-engine/reference/README.md).
+  [preserved source and nine visual references](design/theme-engine/reference/README.md).
   Brainstorming decisions: standalone engine/kit module; evolve the existing engine; fixed design
   geometry with theme colors and retained user font/scaling settings; mocks prevail for depicted
   non-color detail; SDK/host adapters isolate plugins; **all plugins must migrate**, with no supported
   legacy raw-Swing compatibility route after cutover. Three agreed delivery boundaries: engine/kit,
   consumer and SDK migration, then surface composition and screenshot matching. The written spec is
+  updated with the user's additional panel reference: inline title/counts, mixed-content rows with
+  protocol chips and interactive switches, persistent detail/settings footers, and full-body empty
+  states with centered button/dropdown actions are required kit and SDK capabilities. Plan 1 must prove
+  all four panel compositions in its gallery; Plan 3 matches the depicted panel areas. The spec is
   not yet approved; plans and implementation have not started. Next: user reviews the written spec,
   then write three detailed plans. No workflow deviation. Fresh headless baseline `./gradlew check`
   passed all 91 tasks: **8,743 tests, 0 failures, 0 errors, 6 skipped**. Documentation link and

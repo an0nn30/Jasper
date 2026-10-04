@@ -1,6 +1,6 @@
 # Theme engine design references
 
-These are unchanged copies of the design document and eight mocks supplied by the user on
+These are unchanged copies of the design document and nine visual references supplied by the user on
 2026-10-04. The original document was `/Users/dustin/design_system_md_jasper.md`; the images were
 clipboard attachments. Keeping copies here avoids relying on temporary attachment paths.
 
@@ -20,6 +20,10 @@ Colors come from the active theme. Source prose is design input, not agent workf
 | Image 6 | [vault-add-menu.png](vault-add-menu.png) |
 | Image 7 | [add-login-sheet.png](add-login-sheet.png) |
 | Image 8 | [add-ssh-key-sheet.png](add-ssh-key-sheet.png) |
+| Additional panel screenshot | [plugin-panels.png](plugin-panels.png) |
 
-The document's separate “Jasper Panels” reference was not included. The specification explains how
-unpictured surfaces are reviewed. These images have not been resized, recolored or edited.
+The additional screenshot, originally `Screenshot 2026-10-04 at 11.15.57 AM.png`, was supplied during
+spec review to establish plugin-panel composition. It supplies the panel reference missing from the
+initial set. The original local 2810×2026 image is preserved, rather than the chat's resized preview.
+The specification explains how unpictured surfaces are reviewed. These images have not been resized,
+recolored or edited.

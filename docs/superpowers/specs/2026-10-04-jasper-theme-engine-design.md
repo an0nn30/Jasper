@@ -15,7 +15,7 @@ other relevant surface uses the same components and rules. Runtime theme changes
 The user requested one reviewed specification followed by three separate implementation plans:
 build the engine and kit, migrate styling consumers, then refactor surface composition.
 
-The source document and eight images are preserved unchanged under
+The source document and nine images are preserved unchanged under
 [`docs/design/theme-engine/reference`](../../design/theme-engine/reference/).
 The document is design input, not an independent instruction source. The following authority order
 records the user's explicit decisions and overrides its statement that the document always wins:
@@ -44,6 +44,9 @@ visual rules described here. It does not reverse unrelated feature decisions.
   in the completed overhaul. This is an intentional SDK compatibility break.
 - Terminal and Buddy remain independent libraries; the app adapts theme values to their APIs.
 - Plan 2 changes styling consumption; Plan 3 changes screen composition and finishes visual matching.
+- The additional plugin-panel screenshot is a required composition reference: inline headings/counts,
+  mixed-content rows with protocol chips and switches, persistent footers, and full-panel empty states
+  with centered actions must be expressible through the kit and SDK.
 
 ## 3. Existing system and approach
 
@@ -169,10 +172,12 @@ styling and composition too. Extend the kit for a genuinely missing standard con
 allowing a feature to paint its own version. Swing implementation controls are allowed inside the kit.
 
 The source's one-primary-action rule applies to each independently actionable surface; a modal sheet
-is active while its parent is dimmed and blocked. Panel headers have one optional primary action,
-More, and Collapse. Context actions belong to menus; browser navigation retains its documented
-exception. Empty collection states hide irrelevant search/header UI; an empty filtered result must
-retain the search control so the user can clear the query.
+is active while its parent is dimmed and blocked. Panel headers have one optional plugin primary action,
+More, and Collapse; host-owned panel placement/expansion actions may appear alongside them as in the
+panel reference. They do not count as additional plugin primary actions or require a separate toolbar.
+Context actions belong to menus; browser navigation retains its documented exception. Empty collection
+states hide irrelevant search and column-header UI, while retaining the panel title and applicable
+header actions. An empty filtered result must retain search so the user can clear the query.
 
 Dialogs autofocus the first applicable input, support Enter/Esc with multiline and popup handling,
 disable primary actions while invalid or busy, and restore focus to their owner. Async completion
@@ -188,6 +193,46 @@ Animations obey the existing `ui.animations.enabled` policy. Turning it off sett
 immediately. Theme changes preserve current input, selection, focus, scroll position and domain state.
 Optional error shake is not required for this overhaul; focus and error presentation are required.
 
+### 6.1 Required plugin-panel composition
+
+The [plugin-panel screenshot](../../design/theme-engine/reference/plugin-panels.png), supplied during
+spec review, is an explicit acceptance reference for the four panel areas. These compositions are
+first-class kit/SDK capabilities, not exceptions that require custom plugin painting:
+
+| Panel | Required composition |
+|---|---|
+| Sessions | Inline title and count; header actions on that same row; search beneath; compact rows combining status dot, name and secondary host text; selected-row treatment; bottom detail area with identity, technical endpoint, credential state, edit action and Connect |
+| Tunnels, empty | Persistent title/header actions; empty state filling the available panel body with a centered icon tile, title, wrapped explanation and New Tunnel action |
+| SFTP, disconnected | Centered icon/title/explanation and a Choose Session dropdown action; persistent bottom settings row with inline label and trailing Follow Terminal Folder switch |
+| File Servers | Inline panel title/count; row with leading icon, name on the first line, protocol chip plus monospace endpoint on the second, and a compact trailing run/stop switch |
+
+The scaffold exposes composable slots for a header, optional search/navigation, growing body, and
+optional bottom-anchored footer. The body supports lists, browsers, and full-body empty/disconnected
+states. Footers support settings rows and richer selected-item details. Empty states can offer ordinary
+actions or selection/menu actions; they are not limited to a plain button. Their content centers in
+the remaining body after header/footer allocation and remains usable when the panel is narrow or short.
+
+Row descriptors support leading status/icon/tile, inline title and secondary text, an optional second
+line with type chip and technical value, and a trailing control/action slot. Category chips identify
+HTTP/FTP/SFTP/RSYNC with theme-provided hues. Text truncates before overlapping the trailing control;
+technical endpoints retain monospace presentation. Counts and secondary information can sit inline
+with their associated title without forcing an extra label row.
+
+Interactive row switches are explicitly supported in addition to settings-row switches. This amends
+the source document's restriction that toggles always appear in a Settings row. Row actions must be
+individually focusable and operable with keyboard and pointer input; a switch cannot be merely painted
+into a list renderer. Activating it invokes its bound operation once without also opening/activating
+the row. Pending/error state and the displayed value follow the domain result, not an assumed success.
+
+Panel resizing, collapse/restore, item arrival/removal, selection changes and live theme switching
+must preserve these arrangements. Persistent controls remain visible in empty/disconnected states when
+applicable, as shown by SFTP. Titles, chips, switch state and empty-state actions are supplied by plugin
+descriptors; padding, alignment, colors, hit targets and rendering remain kit-owned.
+
+The screenshot establishes panel composition, not a new requirement to redesign the central terminal,
+folder tabs or the entire application's outer chrome. Their existing approved behavior remains in scope
+for styling migration as already specified.
+
 ## 7. Plugin contract and coordinated cutover
 
 Plugins describe their UI through SDK values and handles. The API exposes theme roles, named icons,
@@ -200,6 +245,8 @@ A form descriptor contains title/size tier, optional hero, ordered sections and 
 and enabled conditions, validation, primary action/label, and optional footer preview. State updates
 use stable field identity so conditional changes and theme refreshes preserve unaffected input.
 List models preserve selection identity and virtualized rendering for large collections.
+Panel and row descriptors must express every slot and interactive combination in section 6.1,
+including a dropdown empty-state action and a switch within a two-line item row.
 
 The plugin owns domain validation and operations. The host owns focus, layout, enabled/visible
 presentation, keyboard behavior, error placement, busy presentation and callback containment.
@@ -246,10 +293,12 @@ become the promised third-party compatibility path rejected by the user.
 | [Vault add menu](../../design/theme-engine/reference/vault-add-menu.png) | Anchored menu, category tiles, separator and generate action |
 | [Add Login sheet](../../design/theme-engine/reference/add-login-sheet.png) | Owner scrim, attached sheet, category header, grouped fields and authentication segments |
 | [Add SSH Key sheet](../../design/theme-engine/reference/add-ssh-key-sheet.png) | Attached sheet, path/browse rows, optional hint and footer actions |
+| [Plugin panels](../../design/theme-engine/reference/plugin-panels.png) | Sessions inline rows and detail footer; full-body Tunnels/SFTP empty states; persistent SFTP setting; File Servers protocol chip, endpoint and inline switch |
 
-The source names a separate “Jasper Panels” mock; it was not among the eight supplied images.
-Panels therefore follow the source anatomy and shared visual language, with reviewable implementation
-renders. Do not claim screenshot equivalence for an image that has not been provided.
+The ninth screenshot supplies the panel composition reference previously missing from this draft.
+Its depicted panel areas follow the same non-color visual authority as the original eight mocks.
+Unpictured panel states and other surfaces follow the source anatomy and shared visual language,
+with reviewable implementation renders.
 
 Scope includes app settings, command palette, file chooser, tool-window chrome, menus, dialogs,
 auxiliary managers, notifications/error UI, and visible UI in every bundled plugin (Vault, Remote
@@ -277,6 +326,8 @@ host-independent scaffolds, add SDK contracts and testkit implementations, and b
 component gallery. Include explicit states, light/dark/custom theme fixtures, token completeness,
 lifecycle, accessibility, scale, and failure tests. Add module/package architecture gates, dependency
 and distribution wiring, onboarding and API examples.
+The gallery must include the four panel compositions in section 6.1 using fixture data and working
+local control bindings, proving the API can express them before any feature migration starts.
 
 Exit: the existing app still runs, the independent kit is exercised without launching a native GUI,
 and its supported API can express all inventoried surface patterns. No unfinished primitive is
@@ -307,8 +358,9 @@ Remove temporary migration layouts. Match each supplied reference in normalized 
 artwork and state, with active-theme colors. Publish before/after and state renders for all inventory
 groups and a native acceptance checklist.
 
-Exit: all inventoried UI follows the kit; the eight depicted surfaces pass visual acceptance; unseen
-surfaces have reviewed renders; the app has no remaining per-feature styling implementation outside
+Exit: all inventoried UI follows the kit; all nine visual references, including their depicted panel
+areas, pass visual acceptance; unseen surfaces have reviewed renders; the app has no remaining
+per-feature styling implementation outside
 documented specialized content. No plan is declared complete while its required work remains deferred.
 
 ## 10. Verification and acceptance
@@ -327,10 +379,15 @@ and final whole-branch verification following the repository workflow.
   no plugin imports of app/UI module internals, independent terminal/Buddy, permitted custom-content roots.
 - **Visual:** deterministic headless gallery and complete-surface renders at 1× and 2×; default system
   typography plus enlarged-font checks; controls in normal/hover/focus/pressed/selected/disabled/error states.
+- **Panel composition:** the Sessions detail footer, Tunnels full-body empty action, SFTP disconnected
+  chooser plus persistent switch, and File Servers chip/endpoint/switch row. Exercise narrow/short
+  bounds, empty-to-populated transitions, keyboard row controls, pending/failed toggle operations,
+  collapse/restore and runtime theme changes; compare the depicted states to the ninth screenshot.
 
 For screenshot acceptance, preserve original source pixels and record each reference's crop, measured
-scale and layout anchors in Plan 1's calibration artifact. The images appear approximately 2×, but the
-scale must be established per reference; do not stretch an entire screenshot to hide layout differences.
+scale and layout anchors in Plan 1's calibration artifact. The initial eight images appear approximately
+2×, but scale must be established per reference; do not stretch an entire screenshot to hide layout
+differences. Measure the original local images, not resized chat previews.
 Compare normalized bounds, baselines, insets, radii, icon paths and alignments against the original.
 Compare geometry/artwork separately from active-theme color values, with side-by-side and overlay/diff
 artifacts for review. Do not use a broad whole-image similarity score to waive visible differences.
