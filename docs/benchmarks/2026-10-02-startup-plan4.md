@@ -29,10 +29,13 @@ Decisions:
   starting `open` itself), about 116 ms is composing the window (reopen received to shown) and about 43 ms is painting
   it (shown to first paint), so composing dominates what Jasper controls. No speculative code was written. The user
   decided on 2026-10-03 to design the pre-built hidden window as its own spec amendment and plan, after Plan 4.
-- **G1 periodic collection: not needed.** B − A is −267.0 MiB, far under the 200 MiB threshold, so the flag was not
-  added and `jasper-app/build.gradle.kts` is unchanged. A sits above B because the benchmark reads it two seconds
-  after the warm-up settles, while the rehearsal's allocations are still uncollected; sixty seconds after a heavy
-  session the resident is down to about 190 MiB.
+- **G1 periodic collection: not added; one collection after the warm-up instead (user decision 2026-10-03).** B − A
+  is −267.0 MiB, under the 200 MiB threshold, so the `-XX:G1PeriodicGCInterval` flag was not added and
+  `jasper-app/build.gradle.kts` is unchanged. The first reading of that number ("not needed") misread the data: A was
+  taken two seconds after the settle and included the rehearsal's garbage, which is why it sits above B (sixty seconds
+  after a heavy session the resident is down to about 190 MiB). So `JasperApplication.warmUp` now ends with one
+  `System.gc()` on a daemon thread, after the warm-up's `done` has run, on every path. A after that collection:
+  re-measurement pending (user-run).
 - **Spike answers (Task 1, user-run 2026-10-03).** Q1 (a): the Dock tile, Spotlight and `open -a` each delivered a
   reopen event to the one running process (no second process), also after a launchd-style `--background` exec and
   after `open -a … --args --background`. Q2: variant A (the menu bar, Cmd+Tab and typing were right after each

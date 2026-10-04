@@ -199,7 +199,9 @@ output painted, a finished `--background` warm-up, or 2 s after the first paint)
 
 **Quit (Cmd+Q, Jasper › Quit, File › Quit, the palette's Quit or the Dock's Quit) closes every window and keeps Jasper
 running in the background.** Content tabs and plugin windows are asked first, exactly as when you close them, and a
-refusal leaves everything open. Only **Quit Jasper Completely** ends the process. Until start-up has settled, Quit
+refusal leaves everything open. Plugins keep running, so a plugin's background work (a File Server share, for example)
+carries on after Cmd+Q, and a plugin's quit confirmation is not asked. Only **Quit Jasper Completely** ends the process
+and stops that work. Until start-up has settled, Quit
 still exits completely, as it does when residency is off. Logging out, restarting or shutting down quits Jasper by
 itself. Clicking the Dock icon, Spotlight or `open -a Jasper` opens a window in the running process; no new process
 starts. At login Jasper starts with no window and no Dock icon. A development run (`./gradlew run`) stays resident but

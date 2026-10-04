@@ -343,7 +343,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
 - [ ] Confirm `AF_UNIX` sockets work: with the default configuration, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
 - [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident.
-- [ ] Confirm Quit exits completely, that the notification-area icon appears only once start-up has settled (the first output painted, or 2 s after the first paint) rather than at launch, and that setting `run_in_background = false` removes the Run value.
+- [ ] Confirm Quit exits completely, that the notification-area icon appears only once start-up has settled (the first output painted, a finished `--background` warm-up, or 2 s after the first paint) rather than at launch, and that setting `run_in_background = false` removes the Run value.
 
 ### Linux
 

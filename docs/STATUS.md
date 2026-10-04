@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-02
+## Current state — 2026-10-03
 
 - **Start-up speed Plan 4 (Resident by default)** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) Part 4,
@@ -12,22 +12,36 @@
   update relaunches the new build; the `--background` warm-up rehearses one unseen window (`application.Rehearsal`).
   The indicator (the menu bar item, and the Windows tray icon) and the bridge arrive once start-up has settled: the
   first output painted, a finished warm-up, or 2 s after the first paint. Until the bridge is prepared, and whenever its
-  preparation failed, a quit is a real quit that is never cancelled, so a log-out is never blocked
-  (`quitIsSystemQuit()`; `MacDock.prepare()` returns whether the power-off observer is installed). Spike (user-run
+  preparation failed, a quit is a real quit that never goes to the background (`quitIsSystemQuit()`;
+  `MacDock.prepare()` returns whether the power-off observer is installed); only the Shortcuts recorder holding Cmd+Q
+  or a refusing guard (content tab, plugin window or plugin quit guard) can cancel it. Spike (user-run
   2026-10-03): Q1 (a), the Dock tile, Spotlight and `open -a` each reopen the one running process, also after a
   launchd-style `--background` exec; Q2 variant A; Q3 yes. Warm reopen: first paint 252 ms median from the click (target
   150, **missed**; window shown 209 ms, output painted 1,246 ms), see the
   [Plan 4 benchmark record](benchmarks/2026-10-02-startup-plan4.md); idle RSS 455.3 MiB (2 s after settle), 188.3 MiB
-  60 s after a heavy session; G1 periodic collection not needed. Full check: 8,067/0/0/6
-  (Plan 2's 7,991 plus 76 new tests; the plan counted 35, and the rulings and the fix rounds added the rest).
+  60 s after a heavy session; one collection after the warm-up (user decision 2026-10-03), because A included the
+  rehearsal's garbage; A after that collection: re-measurement pending (user-run). Full check: 8,073/0/0/6
+  (Plan 2's 7,991 plus the plan's new tests; the plan counted 35, and the rulings, the fix rounds and the final-review
+  fixes added the rest).
   The other Plan 1 leftover, "a resident's first plain window is labelled `cold`", is fixed here: a warmed-up process
   labels it `menu`. Cold numbers from here on include residency, so they are not strictly comparable with the Plan 1
-  and Plan 2 baselines. Next: a spec amendment and plan for a pre-built hidden window (user decision 2026-10-03), then
-  Plans 3A and 3B. Not done: the macOS and Windows checklist items in `docs/packaging.md` (user-run), the final
-  whole-branch review, push. Known and deferred: some failure paths are covered by reading only, because a headless
-  JVM cannot build a `TerminalWindow`; a hidden start whose bridge fails to prepare shows no Dock icon (the menu bar
-  item, the reopen and the handoff still reach it) and logs nothing loud yet; a nested reopen during a slow plugin quit
-  guard can close the window it opened.
+  and Plan 2 baselines. **Cmd+Q and plugin work, as built:** on a resident macOS Jasper, Cmd+Q, Jasper › Quit, the Dock's
+  Quit and a terminal window's File › Quit close the windows through their closing guards and do not ask
+  `Windows.onQuitting` guards, so plugin background work (for example File Server shares) keeps running until Quit Jasper
+  Completely, a log-out or a retire request. The user decided on 2026-10-03 that Cmd+Q must close every window and stop
+  all plugin background work, with one global confirmation when work is running and a Settings switch to turn it off,
+  keeping the JVM warm; that needs an SDK change, so it is its own spec amendment and plan. Next: a spec amendment and
+  plan for Cmd+Q stopping all work (user decision 2026-10-03), then the pre-built hidden window, then Plans 3A and 3B.
+  The final whole-branch review is done and its fixes are in. Not done: the macOS and Windows checklist items in
+  `docs/packaging.md` (user-run), the A re-measurement above (user-run), push. Known and deferred: some failure paths
+  are covered by reading only, because a headless JVM cannot build a `TerminalWindow`; a hidden start whose bridge fails
+  to prepare shows no Dock icon (the menu bar item, the reopen and the handoff still reach it) and logs nothing loud
+  yet; a nested reopen during a slow plugin quit guard can close the window it opened. Follow-ups from the final review:
+  **log-out ordering is unverified on hardware** (run the `docs/packaging.md` log-out/restart checklist item, hidden and
+  with a window open, before shipping); **opting out still interrupts a log-out once** (this predates Plan 4; a cheap
+  follow-up is to prepare the bridge whenever a presence exists); **before the pre-built window plan,** add trace phases
+  around `windowOpening()` and `residencySettled` (the 116 ms "reopen to shown" includes the synchronous Dock policy
+  switch). A plugin window's File › Quit is a real quit (`NativeShells` calls `quit()`), unlike a terminal window's.
 
 - **Start-up Part 2: JVM and packaging** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
   plan `docs/superpowers/plans/2026-10-02-startup-2-jvm-packaging.md`): packaged Jasper ships a trimmed runtime (41

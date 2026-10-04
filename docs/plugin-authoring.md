@@ -222,7 +222,9 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
   can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
 - `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after plugin windows and
   content tabs, even when your plugin has no window: a background server can ask "stop the running servers?".
-  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit.
+  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit. It is not asked
+  when a resident macOS Jasper only goes to the background (Cmd+Q closes the windows through their closing guards and
+  keeps the process), so a background server keeps running until Jasper really quits.
 - In SDK 0.8.4+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
   Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
   window close. The close button is not affected.

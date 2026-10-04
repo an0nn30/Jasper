@@ -261,8 +261,9 @@ the existing Java notification policy decides which completions qualify.
 `gradle/mac-native.gradle` compiles the one bridge library from `MacNotifications.m` and `MacDock.m` with the JBR JNI
 headers and Apple's command line tools on macOS. `check` runs one headless harness per source: `testMacNotifications`
 (permission granted/denied/error, deferred delivery, literal Unicode, unique requests, foreground presentation,
-non-bundle guard) and `testMacDock` (the activation policy on a fake NSApp, the main-thread hop, the power-off flag on
-a private notification center, non-bundle guard). Other platforms skip native compilation.
+non-bundle guard) and `testMacDock` (the activation policy on a fake NSApp, the main-thread helper called on the main
+thread, where it runs inline; the hop from another thread is not covered, the power-off flag on a private
+notification center, non-bundle guard). Other platforms skip native compilation.
 Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it.
 Gradle/IDE runs intentionally send no system notifications because they lack Jasper's
 bundle identity. Test a packaged app manually: run `sleep 12`, switch to another app,
@@ -292,15 +293,16 @@ appears, in one idempotent step once start-up has settled (`residencySettled`: t
 `--background` warm-up, or 2 s after the first paint, whichever comes first), and never at the first paint itself.
 `DockControl.prepare` is a `BooleanSupplier`: `MacDock.prepare()` returns whether the bridge loaded and the power-off
 observer is installed, and `DockPresence.prepared()` holds only then. Until it does, and whenever preparation reported
-failure, Jasper cannot tell a log-out from a user's Quit, so a quit is a real quit that is never cancelled and a log-out
-is never blocked. `quitIsSystemQuit()` is that decision: a resident process with a Dock presence that is not prepared or
-whose power-off flag is set. A process that is not resident keeps the ordinary quit (cancel, then `quit()`) even with a
-presence installed, as does one with no presence (a development run, Windows, Linux). On the system branch only two
-things cancel: a user recording Cmd+Q in the Shortcuts panel while macOS is not powering off, and a plugin quit guard
-that refuses. The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a cancelled log-out
-a later Cmd+Q quits for real, which is the safe direction. One exception is accepted: during a log-out with Jasper
-hidden, a plugin quit guard that opens a window or an ownerless dialog brings Jasper back into the Dock first (the
-dialog needs the menu bar and focus to be answered).
+failure, Jasper cannot tell a log-out from a user's Quit, so a quit is a real quit: it never goes to the background.
+`quitIsSystemQuit()` is that decision: a resident process with a Dock presence that is not prepared or whose power-off
+flag is set. A process that is not resident keeps the ordinary quit (cancel, then `quit()`) even with a presence
+installed, as does one with no presence (a development run, Windows, Linux). On the system branch the request is a real
+quit, and only two things cancel it: the Shortcuts recorder holding Cmd+Q (when macOS is not powering off), or a
+refusing guard, because `quit()` goes through `pluginWindowsMayClose()` (a content tab's or a plugin window's closing
+guard, or a plugin quit guard). The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a
+cancelled log-out a later Cmd+Q quits for real, which is the safe direction. One behaviour is accepted: during a log-out
+with Jasper hidden, a plugin quit guard that opens a window or an ownerless dialog brings Jasper back into the Dock
+first (the dialog needs the menu bar and focus to be answered).
 
 The `--background` warm-up rehearses a window (`JasperApplication.warmUp`, `application.Rehearsal`) as well as
 building the fonts. The window is composed with the configured grid, theme and contributions around a canned terminal
@@ -310,7 +312,10 @@ never shown. It must stay invisible to everything else: it opens no `WindowTrace
 passed to `warmUp` marks whether the rehearsal succeeded, failed or threw; it is not registered with the terminal registry and is not a
 content host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it;
 and its error and info callbacks are logged, never shown. A process that has warmed up labels its first plain window
-`menu` rather than `cold`. GUI behaviour is on the packaging checklist; `testMacDock` covers the native code
+`menu` rather than `cold`. Once `done` has run, on every path (a played rehearsal, a failed one, an `Error`, and the
+headless early return), `warmUp` starts one `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's
+garbage does not stay in the resident heap (user decision 2026-10-03); `JasperApplication.collector` is the test seam.
+GUI behaviour is on the packaging checklist; `testMacDock` covers the native code
 headlessly, and a headless JVM cannot build a `TerminalWindow`, so some failure paths here are covered by reading only.
 
 ### Unified workspace header

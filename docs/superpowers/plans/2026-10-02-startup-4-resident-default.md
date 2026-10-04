@@ -45,12 +45,13 @@ spike was assembled in the session scratchpad instead of `/tmp/jasper-spike`.
 every edit quotes the text it replaces.
 
 **Executed 2026-10-03** on `claude/startup-speed` with subagent-driven development (per-task implementer and review; the
-final whole-branch review follows this task). Final `./gradlew check`: BUILD SUCCESSFUL, 8,067 tests (Plan 2's 7,991
-plus 76: the plan counted 35, and the controller's rulings and the fix rounds added the rest), 0 failures,
-0 errors, 6 skips; the native harnesses print "all headless checks passed". Measured on the trained
+final whole-branch review followed, and its fix wave is deviation 11). Final `./gradlew check`: BUILD SUCCESSFUL, 8,073 tests (Plan 2's 7,991
+plus 82: the plan counted 35, and the controller's rulings, the fix rounds and the final review's fixes added the
+rest; 8,067 before those fixes), 0 failures, 0 errors, 6 skips; the native harnesses print "all headless checks passed". Measured on the trained
 image built at `0f3138b1` (Task 9): warm reopen first paint 252 ms median from the click (target 150, missed; window
 shown 209 ms, output painted 1,246 ms); idle resident RSS 455.3 MiB (A, 2 s after settle) and 188.3 MiB (B, 60 s after a
-heavy session); G1 periodic collection not needed (see the
+heavy session); one collection after the warm-up (user decision 2026-10-03), because A included the rehearsal's
+garbage; A after that collection: re-measurement pending (user-run) (see the
 [Plan 4 benchmark record](../../benchmarks/2026-10-02-startup-plan4.md)). The task text below is unchanged; the result
 differs from it in these ways:
 
@@ -78,7 +79,8 @@ Deviations:
    - `ResidentIndicatorTest` has 12 tests, not 9.
 4. Task 5 (`746a7b91`, fix round `181b6a2f`):
    - the native quit handler's decision is `quitIsSystemQuit()`, defined as resident and (not prepared or powering off);
-   - before the bridge is prepared, a quit is a real quit that is never cancelled;
+   - before the bridge is prepared, a quit is a real quit that never goes to the background (a refusing guard or the
+     Shortcuts recorder can still cancel it);
    - the Shortcuts recorder keeps Cmd+Q unless macOS is powering off;
    - `nativeQuitRequested(QuitResponse)` is extracted for tests, and the composition failure path disposes the window
      (`discard`);
@@ -96,7 +98,9 @@ Deviations:
    - the image lives under `~/jasper-bench/startup-plan4`, and the raw JSON is not committed;
    - the target was missed (252 ms against 150), so the pre-built hidden window will be planned separately: the user
      decided on 2026-10-03 on its own spec amendment and plan after this one, ahead of Plans 3A and 3B;
-   - G1 periodic collection was not needed.
+   - G1 periodic collection was not added. The first reading, "not needed", misread the data: A (455.3 MiB, 2 s after
+     settle) included the rehearsal's garbage, so the user decided on 2026-10-03 on one collection after the warm-up
+     instead (see deviation 11); A after that collection: re-measurement pending (user-run).
 9. GUI steps: the controller ran Task 3's `verifyPackage`, Task 9's training, the warm benchmark and the idle-memory
    reading after the user approved each one. The user ran the spike and the heavy session.
 10. Known and deferred (the final review triages these):
@@ -104,6 +108,21 @@ Deviations:
     - a hidden start whose bridge fails to prepare shows no Dock icon, although the menu bar item, the reopen and the
       handoff still reach it, and there is no loud log line yet;
     - a nested reopen during a slow plugin quit guard can close the window it opened.
+11. Final whole-branch review fix wave (2026-10-03; the user decided the two Important findings):
+    - **R21, one collection after the warm-up.** `JasperApplication.warmUp` wraps `done` (`collectingAfter`): once `done`
+      has run, on every path (a played rehearsal, a failed one, an `Error`, the headless early return), one
+      `System.gc()` starts on a daemon thread from a later EDT event. The collector is the package-private
+      `JasperApplication.collector` seam. Replaces "G1 periodic collection not needed" (deviation 8).
+    - **R22, Cmd+Q and plugin background work.** On a resident macOS Jasper, Cmd+Q, Jasper › Quit, the Dock's Quit and a
+      terminal window's File › Quit close the windows through their closing guards (`toBackground`); they do not ask
+      `Windows.onQuitting` guards, so plugin background work (File Server shares) keeps running until Quit Jasper
+      Completely, a log-out or a retire request. The docs and the `onQuitting` Javadoc now say so. The user decided on
+      2026-10-03 that Cmd+Q must close every window and stop all plugin background work, with one global confirmation
+      when work is running and a Settings switch to turn that off, keeping the JVM warm. That needs an SDK change, so it
+      is its own spec amendment and plan, before the pre-built hidden window and Plans 3A and 3B.
+    - A throwing `DockControl.prepare` no longer skips the indicator (`residencySettled` shows it in a `finally`);
+      `ApplicationBootstrapTest` restores every desktop property it sets; documentation corrections.
+    - Counts: `RehearsalTest` 19 tests, `ResidentIndicatorTest` 13, `JasperApplicationResidencyTest` 11.
 
 ## Global Constraints
 
