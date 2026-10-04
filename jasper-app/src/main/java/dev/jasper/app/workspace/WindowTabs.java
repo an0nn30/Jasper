@@ -21,7 +21,7 @@ import javax.swing.*;
  * surface; the recessed strip and fixed controls frame it independently of the surrounding chrome.
  */
 final class WindowTabs extends JPanel implements AutoCloseable {
-    private static final int MIN_TAB = 160, MAX_TAB = 480, LIST_WIDTH = 24, EDGE = 8, GAP = 6;
+    private static final int MIN_TAB = 160, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6;
     /** Titles come from remote programs; tooltips and the tab list show at most this many characters. */
     private static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
@@ -518,7 +518,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         int tabWidth() {
             FontMetrics metrics = select.getFontMetrics(select.getFont());
             int content = UIScale.scale(EDGE + 16 + GAP) + metrics.stringWidth(owner.tabTitle(tab)) + UIScale.scale(GAP + 16 + EDGE);
-            return Math.max(UIScale.scale(MIN_TAB), Math.min(UIScale.scale(MAX_TAB), content * 2));
+            return Math.max(UIScale.scale(MIN_TAB), Math.min(UIScale.scale(MAX_TAB), content));
         }
 
         /** Returns whether the title changed. */

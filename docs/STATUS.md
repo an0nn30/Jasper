@@ -2,6 +2,13 @@
 
 ## Current state — 2026-10-04
 
+- **Tab width correction** (2026-10-04): clarified that only the starting size should double. Tabs now
+  have a 160-pixel minimum, normal measured title growth, and the original 240-pixel maximum. Removed the
+  content-width multiplier; the 64 × 2 accent pill and hidden-rail corners are unchanged. The regression
+  reproduced the SSH title consuming 390 pixels before correction and now covers short, SSH and long titles,
+  including shrinking back to the starting size. Full `./gradlew check --continue` passed: **8,682 tests,
+  0 failures, 0 errors, 6 skipped**. Headless previews refreshed; no native GUI launched.
+
 - **Wider folder tabs** (2026-10-04; user follow-up): doubled each tab's calculated width, including its
   bounds (now 160–480 logical pixels). Fonts, control sizes, tab height and motion timings are unchanged.
   The next user follow-up also doubles the active accent pill to 64 × 2 logical pixels.

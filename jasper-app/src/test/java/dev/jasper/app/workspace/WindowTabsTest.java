@@ -39,6 +39,26 @@ class WindowTabsTest {
         });
     }
 
+    @Test void widerStartingSizeDoesNotDoubleLongerTitles() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 80, 100, 130));
+            var strip = owner.windowTabs();
+            owner.currentTab().rename("~"); owner.update(); layout(strip, 800, 30);
+            assertThat(named(strip, "select:~").getParent().getWidth()).as("short titles use the larger starting size")
+                .isEqualTo(160);
+            String sshTitle = "ubuntu@amp-mc-1: ~";
+            owner.currentTab().rename(sshTitle); owner.update(); layout(strip, 800, 30);
+            assertThat(named(strip, "select:" + sshTitle).getParent().getWidth())
+                .as("SSH titles grow normally instead of multiplying their measured width").isBetween(160, 240);
+            String longTitle = "a very long terminal title ".repeat(4);
+            owner.currentTab().rename(longTitle); owner.update(); layout(strip, 800, 30);
+            assertThat(named(strip, "select:" + longTitle).getParent().getWidth()).isEqualTo(240);
+            owner.currentTab().rename("~"); owner.update(); layout(strip, 800, 30);
+            assertThat(named(strip, "select:~").getParent().getWidth()).isEqualTo(160);
+        });
+    }
+
     @Test void tabsAreContentSizedLeftAlignedWithIconTitleAndTrailingClose() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
@@ -54,7 +74,7 @@ class WindowTabsTest {
             Container one = first.getParent(), two = second.getParent();
             assertThat(one.getX()).isZero();
             assertThat(two.getX()).isEqualTo(one.getWidth());
-            assertThat(one.getWidth()).isBetween(160, 480);
+            assertThat(one.getWidth()).isBetween(160, 240);
             assertThat(one.getWidth() + two.getWidth()).isLessThan(800 - 24);
             var close = named(strip, "close:second");
             assertThat(close.isVisible()).as("the selected tab always offers close").isTrue();
