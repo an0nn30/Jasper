@@ -18,7 +18,7 @@ class AppearanceContractTest {
     }
 
     @Test void appearanceOffersOneIconFamilyInSdkZeroEight() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.14.0");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.14.1");
         assertThat(Arrays.stream(Appearance.class.getMethods()).filter(method -> method.getName().equals("icon"))
             .map(method -> method.getParameterCount())).containsOnly(1);
     }
@@ -35,6 +35,8 @@ class AppearanceContractTest {
         assertThatNullPointerException().isThrownBy(() -> legacy.icon((IconName) null));
         assertThatThrownBy(() -> legacy.icon(BundledIcon.GENERAL_ADD)).isInstanceOf(UnsupportedOperationException.class);
         assertThatNullPointerException().isThrownBy(() -> legacy.icon((BundledIcon) null));
+        assertThat(legacy.workspaceOpacity(new javax.swing.JPanel())).isEqualTo(1.0);
+        assertThatNullPointerException().isThrownBy(() -> legacy.workspaceOpacity(null));
     }
 
     @Test void theCatalogHoldsFortySevenMeaningsIncludingTheChromeNames() {

@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.GlassLevels;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
@@ -10,6 +11,7 @@ import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.DockState;
@@ -32,6 +34,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
@@ -109,6 +112,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private boolean closed;
+    // Kept as given, so callers read back exactly what was applied; terminal components take it as a float.
+    private double backgroundOpacity = 1;
+    private Runnable glassListener = () -> {};
+    private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
     private boolean rearranging;
     private WindowTerminals terminals;
     private boolean active = true;
@@ -705,6 +712,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             WorkspaceTheme.clear(component);
             throw failure;
         }
+        // After the mount stands: a failing glass handler must not roll it back.
+        if (backgroundOpacity < 1) glassListener.run();
     }
     private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
         if (!hosted.containsKey(entry.component()) && !hostedStylers.containsKey(entry.component())) return;
@@ -714,6 +723,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (styler != null) styler.close();
         hosted.remove(entry.component()); tabs.remove(entry.component());
         WorkspaceTheme.clear(entry.component()); update();
+        if (backgroundOpacity < 1) glassListener.run();
         if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
     }
     public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
@@ -811,6 +821,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
         WorkspaceTheme.apply(tab, themes.current());
         tab.setBackground(themes.current().palette().background());
+        tab.setBackgroundOpacity((float) backgroundOpacity);
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
@@ -1124,12 +1135,80 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
             onThemeChanged.accept(theme); update();
+            requestGlass();
             revalidate(); repaint();
         } finally {
             for (var styler : suspended) styler.afterUiUpdate();
             retained.forEach(TerminalTab::endThemeUpdate);
         }
     }
+
+    /**
+     * Where this window's requested workspace glass goes, with whether the workspace theme is dark (it picks the blur
+     * material); the native window boundary installs it.
+     */
+    void setGlassRequests(BiConsumer<GlassLevels, Boolean> requests) {
+        glassRequests = Objects.requireNonNull(requests);
+        requestGlass();
+    }
+
+    /** Asks for the saved glass over the workspace theme's; called after every theme or configuration change. */
+    void requestGlass() {
+        if (closed) return;
+        ConfigSnapshot configured = workspaceConfiguration.snapshot();
+        var workspace = themes.current().workspace();
+        glassRequests.accept(GlassLevels.resolve(configured == null ? GlassSettings.UNSET : configured.glass(), workspace.glass()),
+            workspace.dark());
+    }
+
+    /**
+     * The opacity actually in effect for this window, 1 being opaque. The terminal surface and each pane paint the
+     * terminal background at that opacity, each replacing what lies beneath; chrome, tab strips and dividers stay
+     * solid.
+     */
+    void applyBackgroundOpacity(double opacity) {
+        if (closed || opacity == backgroundOpacity) return;
+        backgroundOpacity = opacity;
+        float value = (float) opacity;
+        boolean glass = value < 1f;
+        area.setGlass(value);
+        tabs.setOpaque(!glass);
+        for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
+        windowTabs.refresh();
+        repaint();
+        glassListener.run();
+    }
+
+    /**
+     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The tab
+     * strip shares it (whatever the theme's tab bar colour), so terminals, tabs and hosted content read as one space.
+     */
+    java.awt.Color workspaceSurface() {
+        java.awt.Color background = themes.current().palette().background();
+        if (backgroundOpacity >= 1) return background;
+        return new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
+            (int) Math.round(255 * backgroundOpacity));
+    }
+
+    /** The opacity in effect for this window, as last applied; 1 is opaque. EDT only.
+     * @return from 0.1 to 1
+     */
+    public double backgroundOpacity() { return backgroundOpacity; }
+
+    /** The opacity behind {@code component}: this window's opacity when it sits in the workspace centre, where the
+     * terminal tabs and hosted content live, and 1 anywhere else (chrome, the stripes and the tool windows). EDT only.
+     * @param component a component that may be in this window
+     * @return from 0.1 to 1
+     */
+    public double workspaceOpacity(Component component) {
+        return component != null && SwingUtilities.isDescendingFrom(component, tabs) ? backgroundOpacity : 1;
+    }
+
+    /** Runs when this window's background opacity changes, or hosted content enters or leaves it while translucent.
+     * EDT only; replaces any earlier listener.
+     * @param listener the callback
+     */
+    public void setGlassListener(Runnable listener) { glassListener = Objects.requireNonNull(listener); }
 
     int tabHeight() { return tabHeight; }
 

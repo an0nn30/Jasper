@@ -12,18 +12,19 @@ import java.util.Optional;
 /**
  * One Jasper theme as written: only what its file sets, nothing derived. {@code ansi} maps 0-7 to
  * {@code [colors.normal]} and 8-15 to {@code [colors.bright]}. {@code ui} keeps the file's order, which matters for
- * IntelliJ's {@code *.} wildcard keys. {@code icons} is IntelliJ's icon table, preserved by the native {@code [icons]} section. {@code parentLine} is the line of {@code extends}, 0 without one.
+ * IntelliJ's {@code *.} wildcard keys. {@code icons} is IntelliJ's icon table, preserved by the native {@code [icons]} section. {@code workspace} is the {@code [workspace]} table. {@code parentLine} is the line of {@code extends}, 0 without one.
  */
 public record ThemeDocument(String origin, String name, Optional<Boolean> dark, Optional<String> parent, int parentLine,
                             Optional<Boolean> uiComplete, Map<String, String> metadata, Map<Seed, Color> seeds,
                             Map<Integer, Color> ansi, Map<Token, Color> tokens, Map<SyntaxRole, SyntaxStyle> syntax,
-                            Map<String, Object> ui, Map<String, Object> icons) {
+                            Map<String, Object> ui, Map<String, Object> icons, WorkspaceGlass workspace) {
     /** The TOML names of the eight ANSI colours, in index order. */
     public static final List<String> ANSI_NAMES = List.of("black", "red", "green", "yellow", "blue", "magenta", "cyan", "white");
 
     public ThemeDocument {
         Objects.requireNonNull(origin); Objects.requireNonNull(name); Objects.requireNonNull(dark);
         Objects.requireNonNull(parent); Objects.requireNonNull(uiComplete);
+        Objects.requireNonNull(workspace);
         metadata = ordered(metadata);
         seeds = Map.copyOf(seeds);
         ansi = Map.copyOf(ansi);
@@ -31,6 +32,15 @@ public record ThemeDocument(String origin, String name, Optional<Boolean> dark, 
         syntax = Map.copyOf(syntax);
         ui = data(ui);
         icons = data(icons);
+    }
+
+    /** A document without a {@code [workspace]} table. */
+    public ThemeDocument(String origin, String name, Optional<Boolean> dark, Optional<String> parent, int parentLine,
+                         Optional<Boolean> uiComplete, Map<String, String> metadata, Map<Seed, Color> seeds,
+                         Map<Integer, Color> ansi, Map<Token, Color> tokens, Map<SyntaxRole, SyntaxStyle> syntax,
+                         Map<String, Object> ui, Map<String, Object> icons) {
+        this(origin, name, dark, parent, parentLine, uiComplete, metadata, seeds, ansi, tokens, syntax, ui, icons,
+            WorkspaceGlass.NONE);
     }
 
     /**
@@ -43,7 +53,8 @@ public record ThemeDocument(String origin, String name, Optional<Boolean> dark, 
         ui.forEach((key, value) -> { layered.remove(key); layered.put(key, value); });
         return new ThemeDocument(origin, name, dark.or(base::dark), base.parent, base.parentLine,
             uiComplete.or(base::uiComplete), metadata, merged(base.seeds, seeds), merged(base.ansi, ansi),
-            merged(base.tokens, tokens), merged(base.syntax, syntax), layered, icons.isEmpty() ? base.icons : icons);
+            merged(base.tokens, tokens), merged(base.syntax, syntax), layered, icons.isEmpty() ? base.icons : icons,
+            workspace.over(base.workspace));
     }
 
     private static <K, V> Map<K, V> merged(Map<K, V> base, Map<K, V> top) {

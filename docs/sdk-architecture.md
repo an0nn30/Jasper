@@ -85,24 +85,26 @@ plugin default.
 ## Panels, the rail and plugin windows
 
 Panels and rail actions are part of the `Contributions` model; each panel carries its default
-`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0). Each
-window's `WindowContributions` keeps one lazily built instance per panel and docks the panels in the
-window's `DockState` (per slot an ordered list with at most one active window; per-side sizes and
-ratios). One listener on that state builds what starts showing, lays out `ToolWindowArea` (the terminal
-column, the tab strip over the deck, and a rounded frame with a `ToolWindowHeader` for each showing
-slot, placed by the pure `DockGeometry`: the bottom area spans the full width, the sides and the
-terminal column run from the toolbar to it), renders the two `ToolStripe`s, tells the panels and
-saves. `DockDrag` drags a window from its stripe button or its header with plain mouse events:
-`DockDropResolver` finds the target under the cursor (a stripe group and a position, or a cell of
-the workspace's 3 × 2 grid), the stripes open a gap, and `DockDropOverlay` on the layered pane's
-`DRAG_LAYER` previews the landing with `DockGeometry.landing`, the same function as the layout. A
-stripe drop moves the window and keeps its visibility; a workspace drop moves and shows it. A window
-with nothing contributed has no stripes and its old layout. Requests to show, hide or toggle a panel
-travel through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
-window. Every panel gets a View → Tools entry for its toggle action: the application-registered
-`<panel id>.toggle`, or, since SDK 0.8.1, the plugin's own action named by
-`PanelSpec.toggleActionId` (which must already be registered by that plugin), so a plugin action
-that toggles a panel appears once in the menu and the palette.
+`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0).
+Each window's `WindowContributions` keeps one lazily built instance per panel and docks the panels
+in the window's `DockState` (per slot an ordered list with at most one active window; per-side
+sizes and ratios). One listener on that state builds what starts showing, lays out
+`ToolWindowArea` (the terminal column, the tab strip over the deck, and a rounded frame with a
+`ToolWindowHeader` for each showing slot, placed by the pure `DockGeometry`: the bottom area spans
+the full width, the sides and the terminal column run from the toolbar to it), renders the two
+`ToolStripe`s, tells the panels and saves. `DockDrag` drags a window from its stripe button or its
+header with plain mouse events: `DockDropResolver` finds the target under the cursor (a stripe
+group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
+bottom edges, a side split at half the side panels' visible height and the bottom at half its
+width), the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews
+the landing with `DockGeometry.landing`, the same function as the layout. A stripe drop moves the
+window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
+drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
+Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
+action or a `PanelHost` reaches exactly one window. Every panel gets a View → Tools entry for its
+toggle action: the application-registered `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's
+own action named by `PanelSpec.toggleActionId` (which must already be registered by that plugin),
+so a plugin action that toggles a panel appears once in the menu and the palette.
 
 Plugin windows follow the `TerminalWindow`/`WindowContent` split: `AuxiliarySurface` holds the
 content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`
@@ -421,6 +423,17 @@ and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `Synta
 `SyntaxStyle`. `Appearance.workspaceVariant` is a safe immutable snapshot; palette getters require the UI thread.
 `onWorkspaceChanged` compares the complete workspace generated value, skips initial replay, contains handler failures,
 and removes registrations on disposal or stop. Chrome `variant` and `onChanged` retain their existing meaning.
+
+SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0, UI thread, null rejected); `onWorkspaceChanged` also
+reports its changes. The method takes a component because opacity is per window and content moves between windows (the
+design's no-argument form was changed for that reason). `dev.jasper.app.plugins.GlassSource` is the per-component lookup
+plus change subscription; `JasperApplication` builds it from its `TerminalWindow`s (`owns(component)`, then the window
+content's `workspaceOpacity(component)`: the window's opacity inside the centre deck that holds terminal and hosted
+content tabs, 1.0 for chrome, the stripes and the tool windows), `PluginRuntime.glass(GlassSource)` hands it to `PluginHost.Environment` and `HostedUi`,
+and `WindowContent.setGlassListener(Runnable)` fires on a real opacity change and when hosted content mounts or unmounts
+while the window is translucent. A component outside a translucent window reports 1.0. `FakePluginHost.setWorkspaceOpacity`
+announces on `flush()` and reports one value for every component; the contract case
+`workspaceOpacityStartsOpaqueAndChangesAreWorkspaceChanges` runs on the fake and on the app.
 
 `PluginRuntime.appearance` accepts app-native `ResolvedTheme` suppliers and subscriptions. The `plugins` package
 alone adapts native tokens and syntax to SDK values (its allowed dependencies include `appearance`). The appearance

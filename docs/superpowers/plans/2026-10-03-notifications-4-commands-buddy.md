@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Implemented on branch `claude/notifications-4` (worktree `.worktrees/notifications-4`, cut from main
+**Status:** Merged to local main on 2026-10-03, with main `be3b593d` merged in first (not pushed; `./gradlew check
+--continue` on the merge: **8,435 tests, 0 failures, 0 errors, 6 skipped**). Implemented on
+branch `claude/notifications-4` (worktree `.worktrees/notifications-4`, cut from main
 `3c64ea5c`, where plans 1–3 are merged). Main moved to `43894416` during execution (the dock polish round; plans 2 and 3
 pushed) and is merged in at `81f71fe2`. Deviations from the plan text: Task 3, the closing fence after Step 3's
 `PluginRuntime.forward` block had a period glued to it and so never closed (fixed here; no code change); Task 4, the three

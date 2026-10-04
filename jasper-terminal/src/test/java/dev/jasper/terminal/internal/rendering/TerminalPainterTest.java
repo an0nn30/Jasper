@@ -126,6 +126,41 @@ class TerminalPainterTest {
         }
     }
 
+    @Test
+    void translucentBackgroundReplacesWhatIsUnderneathAndKeepsCellsSolid() throws Exception {
+        BufferedImage image = new BufferedImage(COLUMNS * cw, ROWS * ch, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = image.createGraphics();
+        try {
+            g.setColor(Color.RED);
+            g.fillRect(0, 0, image.getWidth(), image.getHeight());
+            painter.paint(g, snapshotAfter("\033[41m \033[0m\033[32m\u2588\033[0m", 2), cursorOff(), List.of(),
+                image.getWidth(), image.getHeight(), 0.5f);
+        } finally {
+            g.dispose();
+        }
+        Color empty = new Color(image.getRGB(5 * cw + cw / 2, ch / 2), true);
+        assertThat(empty.getAlpha()).isEqualTo(128);
+        assertThat(rgb(empty)).isEqualTo(rgb(palette.background()));
+        Color explicit = new Color(image.getRGB(cw / 2, ch / 2), true);
+        assertThat(explicit.getAlpha()).isEqualTo(255);
+        assertThat(rgb(explicit)).isEqualTo(rgb(palette.ansi().get(1)));
+        Color glyph = new Color(image.getRGB(cw + cw / 2, ch / 2), true);
+        assertThat(glyph.getAlpha()).isEqualTo(255);
+        assertThat(rgb(glyph)).isEqualTo(rgb(palette.ansi().get(2)));
+    }
+
+    @Test
+    void fullOpacityPaintsAsBefore() throws Exception {
+        BufferedImage image = new BufferedImage(COLUMNS * cw, ROWS * ch, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = image.createGraphics();
+        try {
+            painter.paint(g, snapshotAfter("", 0), cursorOff(), List.of(), image.getWidth(), image.getHeight(), 1f);
+        } finally {
+            g.dispose();
+        }
+        assertThat(new Color(image.getRGB(cw / 2, ch / 2), true).getAlpha()).isEqualTo(255);
+    }
+
     private ScreenSnapshot snapshotAfter(String output, int expectedCursorColumn) throws Exception {
         FakeConnector connector = new FakeConnector();
         TerminalSession session = EmulationFixture.unstarted(connector, COLUMNS, ROWS, 10);

@@ -6,7 +6,7 @@ same day. [Plan 1 (core)](../plans/2026-10-02-notifications-1-core.md) is implem
 records the execution deviations and the final-review fixes. Plan 1 is merged to main (`63e3b95c`). [Plan 2
 (incidents)](../plans/2026-10-02-notifications-2-incidents.md) is merged to main (`c02673cd`). [Plan 3
 (SDK)](../plans/2026-10-03-notifications-3-sdk.md) is merged to main (`3c64ea5c`). [Plan 4 (long commands and
-Buddy)](../plans/2026-10-03-notifications-4-commands-buddy.md) is implemented on branch `claude/notifications-4`.
+Buddy)](../plans/2026-10-03-notifications-4-commands-buddy.md) is merged to main.
 
 **Replaces, once implemented:** the modal `JOptionPane` defaults of `WindowContent.onError` / `onInfo`, the SDK's
 `Notices` (`PluginContext.notices()`), `CommandNotifier`'s private OS sink, and Buddy's finished-card history

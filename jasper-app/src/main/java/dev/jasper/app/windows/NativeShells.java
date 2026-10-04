@@ -203,14 +203,15 @@ public final class NativeShells {
     public Optional<Path> chooseFile(AuxiliarySurface owner, String title, String suffix) {
         Window parent = natives.get(owner);
         if (parent == null || !owner.shown()) throw new IllegalStateException("File selection needs a shown, open window");
-        Optional<Path> selected = chooseFile(parent, title, Optional.empty(), Optional.of(suffix));
+        Optional<Path> selected = chooseFile(TopModal.over(parent), title, Optional.empty(), Optional.of(suffix));
         return owner.closed() ? Optional.empty() : selected;
     }
 
-    /** Owner-based file, folder or save-target selection in Jasper's own chooser. */
+    /** Owner-based file, folder or save-target selection in Jasper's own chooser, over any modal dialog the owner shows. */
     public List<Location> choosePaths(PathChoice choice, Consumer<Runnable> cancellation) {
         Window owner = choice.terminalOwner() != null ? terminalWindows.apply(choice.terminalOwner()) : natives.get(choice.auxiliaryOwner());
         if (owner == null || !owner.isShowing()) throw new IllegalArgumentException("Picker requires a shown owner");
+        owner = TopModal.over(owner); // over a modal dialog showing on the owner, not blocked and covered by it
         ChooserRequest.Mode mode = switch (choice.mode()) {
             case OPEN -> ChooserRequest.Mode.OPEN;
             case DIRECTORY -> ChooserRequest.Mode.DIRECTORY;

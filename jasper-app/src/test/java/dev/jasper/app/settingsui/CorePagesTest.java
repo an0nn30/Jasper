@@ -26,6 +26,76 @@ class CorePagesTest {
         assertThat(shown).doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(CoreSettings.SCHEMA.settings());
     }
 
+    @Test void appearanceHasAWorkspaceSectionForOpacityAndBlur() {
+        var appearance = CorePages.specs(JASPER_DARK, system).getFirst();
+        assertThat(appearance.id()).isEqualTo("appearance");
+        assertThat(appearance.settings()).containsSubsequence(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
+    }
+
+    private static SchemaPage.Spec appearance(boolean glass) {
+        return CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, glass).getFirst();
+    }
+
+    private static CorePages.SystemActions system() {
+        return new CorePages.SystemActions(() -> Path.of("config.toml"), () -> { }, () -> { }, () -> { }, () -> { }, () -> true);
+    }
+
+    private static List<Setting<?>> builtSettings(SchemaPage page) {
+        return page.rows().stream().<Setting<?>>map(SchemaPage.Row::setting).toList();
+    }
+
+    @Test void offMacOsTheGlassRowsAreHiddenButStillOnThePage() {
+        var spec = appearance(false);
+        assertThat(spec.settings()).contains(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
+        var page = spec.build(context);
+        page.component();
+        assertThat(builtSettings(page)).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR)
+            .contains(CoreSettings.UI_FONT_FAMILY, CoreSettings.UI_FONT_SIZE);
+        assertThat(page.searchTerms()).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
+        assertThat(page.searchTerms()).doesNotContain("Workspace");
+        assertThat(SchemaPageTest.sectionTitles(page.component())).containsExactly("Theme", "Interface font");
+        page.dispose();
+    }
+
+    @Test void onMacOsTheGlassRowsAreShownAndEnabledWithoutANote() {
+        var page = appearance(true).build(context);
+        page.component();
+        assertThat(builtSettings(page)).contains(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
+        for (var row : page.rows()) {
+            if (row.setting() != CoreSettings.UI_WORKSPACE_OPACITY && row.setting() != CoreSettings.UI_WORKSPACE_BLUR) continue;
+            assertThat(row.editor().component().isEnabled()).as(row.setting().label()).isTrue();
+        }
+        assertThat(page.searchTerms()).contains(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
+        page.dispose();
+    }
+
+    @Test void theWorkspaceSectionFollowsTheThemeSectionOnlyOnMacOs() {
+        assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface font");
+        assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface font");
+        assertThat(appearance(true).settings()).containsSubsequence(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE,
+            CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR, CoreSettings.UI_FONT_FAMILY);
+    }
+
+    private static List<String> sectionTitles(SchemaPage.Spec spec) {
+        var page = spec.build(new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
+            id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
+        var titles = SchemaPageTest.sectionTitles(page.component());
+        page.dispose();
+        return titles;
+    }
+
+    @Test void theBlurRowNamesTheThemeChoiceLikeOpacity() {
+        var spec = appearance(true);
+        var page = spec.build(context);
+        page.component();
+        int index = spec.settings().indexOf(CoreSettings.UI_WORKSPACE_BLUR);
+        assertThat(page.rows()).hasSameSizeAs(spec.settings());
+        @SuppressWarnings("unchecked") var box = (javax.swing.JComboBox<String>) page.rows().get(index).editor().component();
+        var items = new ArrayList<String>();
+        for (int i = 0; i < box.getItemCount(); i++) items.add(box.getItemAt(i));
+        assertThat(items).containsExactly("Use theme's value", "On", "Off");
+    }
+
     @Test void theTreeIsTheApprovedOne() {
         var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "window", "notifications",

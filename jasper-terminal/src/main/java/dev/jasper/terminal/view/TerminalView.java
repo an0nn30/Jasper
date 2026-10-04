@@ -78,6 +78,7 @@ public final class TerminalView extends JComponent {
     private volatile boolean exited;
     private float fontSize;
     private float inactiveDim;
+    private float backgroundOpacity = 1f;
     private Runnable onCloseRequest = () -> { };
     private Predicate<KeyEvent> shortcutHandler;
     private Consumer<MouseEvent> contextMenuHandler = event -> { };
@@ -372,6 +373,32 @@ public final class TerminalView extends JComponent {
         }
     }
 
+    /**
+     * Sets how opaque the default background is: 1 (the default) is opaque, 0 is fully clear. Below 1 this view is
+     * not opaque, so its owner must not paint over what lies behind it; explicitly coloured cells, the selection and
+     * the cursor stay solid. Values are clamped to 0–1, and NaN means 1.
+     *
+     * @param opacity the default background's opacity
+     */
+    public void setBackgroundOpacity(float opacity) {
+        float bounded = Float.isNaN(opacity) ? 1f : Math.max(0f, Math.min(1f, opacity));
+        if (bounded == backgroundOpacity) {
+            return;
+        }
+        backgroundOpacity = bounded;
+        setOpaque(bounded >= 1f);
+        repaint();
+    }
+
+    /**
+     * The default background's opacity.
+     *
+     * @return 0–1, where 1 is opaque
+     */
+    public float backgroundOpacity() {
+        return backgroundOpacity;
+    }
+
     /** Scrolls so the nearest prompt above the view is at the top. */
     public void scrollToPreviousPrompt() {
         ScreenSnapshot snapshot = access.snapshot(viewport.topRow());
@@ -416,7 +443,7 @@ public final class TerminalView extends JComponent {
         reconcileBlink();
         boolean on = exited || !blinks || !focused || rendering.blinkOn();
         painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused),
-            highlights(snapshot), getWidth(), getHeight());
+            highlights(snapshot), getWidth(), getHeight(), backgroundOpacity);
         if (bells.visual()) {
             Color foreground = palette.foreground();
             g.setColor(new Color(foreground.getRed(), foreground.getGreen(), foreground.getBlue(),

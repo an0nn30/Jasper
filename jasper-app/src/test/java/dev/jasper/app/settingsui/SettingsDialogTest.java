@@ -147,6 +147,41 @@ class SettingsDialogTest {
         });
     }
 
+    @Test void changingANumberWithItsSpinnerEnablesApply() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
+            var spinner = (javax.swing.JSpinner) find(dialog.view(), javax.swing.JSpinner.class);
+            spinner.setValue(spinner.getNextValue());
+            assertThat(dialog.view().apply.isEnabled()).as("Apply after a spinner step").isTrue();
+        });
+    }
+
+    @Test void turningBlurOnAndChangingOpacityEnableApply() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "appearance");
+            javax.swing.SwingUtilities.updateComponentTreeUI(dialog.view());
+            var boxes = new java.util.ArrayList<javax.swing.JComboBox<?>>();
+            collect(dialog.view(), javax.swing.JComboBox.class, boxes);
+            var blur = boxes.stream().filter(box -> box.getItemCount() == 3).findFirst().orElseThrow();
+            blur.setSelectedIndex(1);
+            assertThat(dialog.view().apply.isEnabled()).as("Apply after Blur: On").isTrue();
+            var checks = new java.util.ArrayList<javax.swing.JCheckBox>();
+            collect(dialog.view(), javax.swing.JCheckBox.class, checks);
+            var useTheme = checks.stream().filter(box -> box.getText().equals("Use theme's value")).findFirst().orElseThrow();
+            useTheme.doClick();
+            assertThat(dialog.view().apply.isEnabled()).as("Apply after unticking Use theme's value").isTrue();
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    static <T> void collect(java.awt.Component c, Class<?> type, java.util.List<T> out) {
+        if (type.isInstance(c)) out.add((T) c);
+        if (c instanceof java.awt.Container k) for (var x : k.getComponents()) collect(x, type, out);
+    }
+
     static java.awt.Component find(java.awt.Component c, Class<?> type) {
         if (type.isInstance(c)) return c;
         if (c instanceof java.awt.Container k) for (var x : k.getComponents()) { var f = find(x, type); if (f != null) return f; }

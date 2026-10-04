@@ -19,6 +19,7 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     private final Map<UUID, TerminalPane> panes = new LinkedHashMap<>();
     private final SplitTree tree;
     private final Map<UUID, JSplitPane> splits = new LinkedHashMap<>();
+    private float backgroundOpacity = 1f;
     private long themeGeneration;
     private boolean updatingTheme;
     private long renderGeneration;
@@ -55,6 +56,7 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     private TerminalPane createPane(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
         TerminalPane pane = new TerminalPane(directory, launcher, requestOrNull, profile);
         panes.put(pane.id(), pane);
+        pane.setBackgroundOpacity(backgroundOpacity);
         pane.onChanged = () -> onChanged.run();
         pane.onFocused = () -> focus(pane);
         pane.onClose = () -> closePane(pane);
@@ -145,12 +147,44 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
         refreshActive(); revalidate(); repaint();
     }
 
+    /** Below 1 this tab and its splits paint nothing behind the panes, except the solid dividers. */
+    void setBackgroundOpacity(float opacity) {
+        backgroundOpacity = opacity;
+        setOpaque(opacity >= 1f);
+        for (TerminalPane pane : panes.values()) pane.setBackgroundOpacity(opacity);
+        for (JSplitPane split : splits.values()) if (split instanceof PaneSplit glass) glass.setGlass(opacity < 1f);
+        repaint();
+    }
+
+    /** A split between panes whose divider stays solid while the panes beside it are translucent. */
+    static final class PaneSplit extends JSplitPane {
+        private boolean glass;
+
+        PaneSplit(int orientation, java.awt.Component first, java.awt.Component second) { super(orientation, first, second); }
+
+        void setGlass(boolean value) {
+            glass = value;
+            setOpaque(!value);
+            repaint();
+        }
+
+        @Override protected void paintComponent(java.awt.Graphics graphics) {
+            if (!glass) { super.paintComponent(graphics); return; }
+            if (getUI() instanceof javax.swing.plaf.basic.BasicSplitPaneUI ui) {
+                var divider = ui.getDivider();
+                graphics.setColor(getBackground());
+                graphics.fillRect(divider.getX(), divider.getY(), divider.getWidth(), divider.getHeight());
+            }
+        }
+    }
+
     private JComponent renderNode(SplitTree.Node node, long generation) {
         if (node instanceof SplitTree.Leaf leaf) return panes.get(leaf.paneId());
         SplitTree.Branch branch = (SplitTree.Branch) node;
-        JSplitPane split = new JSplitPane(branch.axis() == SplitTree.Axis.RIGHT
+        PaneSplit split = new PaneSplit(branch.axis() == SplitTree.Axis.RIGHT
             ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT,
             renderNode(branch.first(), generation), renderNode(branch.second(), generation));
+        split.setGlass(backgroundOpacity < 1f);
         splits.put(branch.id(), split);
         split.setContinuousLayout(true); split.setBorder(null);
         split.setResizeWeight(branch.ratio());

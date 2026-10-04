@@ -78,6 +78,43 @@ class HostedUiTest {
         assertThat(seen).hasSize(1);
     }
 
+    @Test void workspaceOpacityFollowsTheGlassSourceAndItsChangesAreWorkspaceChanges() {
+        var themes = new dev.jasper.app.appearance.ThemeController();
+        double[] value = {0.6};
+        var listeners = new ArrayList<Runnable>();
+        var glass = new GlassSource(component -> value[0], listener -> {
+            listeners.add(listener);
+            return new dev.jasper.app.lifecycle.Subscription(() -> listeners.remove(listener));
+        });
+        var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
+            javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
+            handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals,
+            themes::current, handler -> themes.subscribe((next, changed) -> handler.accept(next)), glass);
+        var appearance = hosted.appearance();
+        var component = new javax.swing.JPanel();
+        assertThat(listeners).hasSize(1);
+        assertThat(appearance.workspaceOpacity(component)).isEqualTo(0.6);
+        assertThatNullPointerException().isThrownBy(() -> appearance.workspaceOpacity(null));
+        var chrome = new java.util.concurrent.atomic.AtomicInteger();
+        var seen = new ArrayList<Double>();
+        appearance.onChanged(variant -> chrome.incrementAndGet());
+        var subscription = appearance.onWorkspaceChanged(variant -> seen.add(appearance.workspaceOpacity(component)));
+        value[0] = 0.4;
+        List.copyOf(listeners).forEach(Runnable::run);
+        assertThat(seen).containsExactly(0.4);
+        assertThat(chrome).hasValue(0);
+        subscription.close();
+        List.copyOf(listeners).forEach(Runnable::run);
+        assertThat(seen).containsExactly(0.4);
+        var late = new java.util.concurrent.atomic.AtomicInteger();
+        appearance.onWorkspaceChanged(variant -> late.incrementAndGet());
+        open.set(false);
+        List.copyOf(listeners).forEach(Runnable::run);
+        assertThat(late).hasValue(0);
+        hosted.closeAll();
+        assertThat(listeners).isEmpty();
+    }
+
     @Test void bothVariantsReadThePublishedNativeSnapshotInsideWorkspaceCallbacks() {
         var themes = new dev.jasper.app.appearance.ThemeController();
         var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
