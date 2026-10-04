@@ -11,6 +11,56 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class WindowOverlayTest {
+    @Test void repaintingOpaqueContentPreservesTheRoundedCornerFill() {
+        var root = new JRootPane(); root.setSize(800, 600);
+        root.getContentPane().setBackground(java.awt.Color.WHITE);
+        root.doLayout(); root.getLayeredPane().doLayout();
+        var content = new JPanel(); content.setBackground(java.awt.Color.RED);
+        content.setPreferredSize(new Dimension(400, 190));
+        var overlay = new WindowOverlay(root, content); overlay.show();
+        try {
+            var card = (JPanel) content.getParent(); card.doLayout();
+            for (int scale : new int[] {1, 2}) {
+                var image = new java.awt.image.BufferedImage(800 * scale, 600 * scale, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                var g = image.createGraphics();
+                try { g.scale(scale, scale); root.paint(g); } finally { g.dispose(); }
+                int[] before = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+                g = image.createGraphics();
+                try {
+                    g.scale(scale, scale);
+                    g.setClip(SwingUtilities.convertRectangle(card, content.getBounds(), root));
+                    root.paint(g);
+                } finally { g.dispose(); }
+                int[] after = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+                int changed = 0;
+                for (int i = 0; i < before.length; i++) if (before[i] != after[i]) changed++;
+                assertThat(changed).as("pixels changed by partial child repaint at %sx", scale).isZero();
+            }
+        } finally { overlay.close(); }
+    }
+
+    @Test void roundedCardClipsOpaqueContentAndKeepsItsBorderAfterThemeChanges() {
+        var root = new JRootPane(); root.getLayeredPane().setSize(800, 600);
+        var content = new JPanel(); content.setPreferredSize(new Dimension(400, 190));
+        content.setBackground(java.awt.Color.RED);
+        var overlay = new WindowOverlay(root, content);
+        Object previous = UIManager.get("Component.borderColor");
+        try {
+            overlay.show();
+            var card = (JPanel) content.getParent(); card.doLayout();
+            for (var border : new java.awt.Color[] {java.awt.Color.BLUE, java.awt.Color.GREEN}) {
+                UIManager.put("Component.borderColor", border);
+                SwingUtilities.updateComponentTreeUI(card);
+                var image = new java.awt.image.BufferedImage(card.getWidth(), card.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics();
+                try { card.paint(graphics); } finally { graphics.dispose(); }
+                assertThat(image.getRGB(1, 1) >>> 24).as("opaque plugin content must not square off the card").isZero();
+                assertThat(image.getRGB(card.getWidth() / 2, card.getHeight() / 2)).isEqualTo(java.awt.Color.RED.getRGB());
+                assertThat(image.getRGB(card.getWidth() / 2, 0)).isEqualTo(border.getRGB());
+            }
+        } finally { UIManager.put("Component.borderColor", previous); overlay.close(); }
+    }
+
     @Test void centersClampsAndReleasesTheRootAfterRepeatedUse() {
         var root = new JRootPane(); root.getLayeredPane().setSize(800, 600);
         var card = new JPanel(); card.setPreferredSize(new Dimension(400, 190));
