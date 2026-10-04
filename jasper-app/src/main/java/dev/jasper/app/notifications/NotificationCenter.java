@@ -25,8 +25,8 @@ import javax.swing.SwingUtilities;
  * entries, oldest dropped), read and expired state, and cards waiting for Jasper to be focused. Nothing is persisted.
  *
  * <p>EDT-confined; {@link #submit} is the any-thread entry point. Listeners hear changes in the order they happened; a
- * change a listener makes is delivered after the one it is reacting to, and a card is never requested for an entry
- * that is read, expired or gone by the time the request is delivered.
+ * change a listener makes is delivered after the one it is reacting to, and neither a card nor the operating system is
+ * asked to show an entry that is read, expired or gone by the time the request is delivered.
  */
 public final class NotificationCenter {
     public static final int HISTORY_LIMIT = 500;
@@ -40,6 +40,11 @@ public final class NotificationCenter {
         record Upserted(Notification notification) implements Change {}
         /** A card should show now for this entry, or refresh if one is showing. */
         record CardRequested(Notification notification) implements Change {}
+        /**
+         * The operating system should show this entry now, Jasper not being focused; for an entry it already shows, the
+         * newer post replaces it.
+         */
+        record SystemRequested(Notification notification) implements Change {}
         record Removed(UUID id) implements Change {}
         record Cleared() implements Change {}
     }
@@ -272,15 +277,21 @@ public final class NotificationCenter {
         return new Subscription(() -> listeners.remove(listener));
     }
 
-    /** Emits the entry's change, with its card when the outcome shows one now, or remembers that the card waits. */
+    /**
+     * Emits the entry's change, with its card when the outcome shows one now, or remembers that the card waits; then
+     * asks the operating system when the outcome says so.
+     */
     private void announce(Notification entry, Delivery.Outcome outcome) {
+        var changes = new ArrayList<Change>(3);
+        changes.add(new Change.Upserted(entry));
         if (outcome.card()) {
             pending.remove(entry.id()); // a repeat may still wait from an earlier background post; its card shows now
-            emit(new Change.Upserted(entry), new Change.CardRequested(entry));
-        } else {
-            if (outcome.pending()) pending.add(entry.id());
-            emit(new Change.Upserted(entry));
+            changes.add(new Change.CardRequested(entry));
+        } else if (outcome.pending()) {
+            pending.add(entry.id());
         }
+        if (outcome.system()) changes.add(new Change.SystemRequested(entry));
+        emit(changes.toArray(Change[]::new));
     }
 
     private Notification repeatOf(NotificationRequest request, Instant now) {
@@ -314,9 +325,13 @@ public final class NotificationCenter {
         try {
             for (Change next = queue.poll(); next != null; next = queue.poll()) {
                 if (next instanceof Change.CardRequested requested) {
-                    Notification latest = history.get(requested.notification().id());
-                    if (latest == null || latest.read() || latest.expired()) continue;
+                    Notification latest = live(requested.notification());
+                    if (latest == null) continue;
                     next = new Change.CardRequested(latest);
+                } else if (next instanceof Change.SystemRequested requested) {
+                    Notification latest = live(requested.notification());
+                    if (latest == null) continue;
+                    next = new Change.SystemRequested(latest);
                 }
                 for (Consumer<Change> listener : List.copyOf(listeners)) {
                     try { listener.accept(next); }
@@ -324,6 +339,12 @@ public final class NotificationCenter {
                 }
             }
         } finally { delivering = false; }
+    }
+
+    /** The entry as it is now, or null when it was read, expired or removed since it was asked for. */
+    private Notification live(Notification asked) {
+        Notification latest = history.get(asked.id());
+        return latest == null || latest.read() || latest.expired() ? null : latest;
     }
 
     private void contained(Runnable task, String failed) {

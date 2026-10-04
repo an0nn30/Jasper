@@ -240,7 +240,7 @@ public final class PluginRuntime {
          * @return the host
          */
         public static NotificationHost detached() {
-            var center = new NotificationCenter(SwingUtilities::invokeLater, Clock.systemDefaultZone(), () -> Delivery.Presence.NO_WINDOW);
+            var center = new NotificationCenter(SwingUtilities::invokeLater, Clock.systemDefaultZone(), () -> Delivery.Presence.OPENING);
             return new NotificationHost(center,
                 caused -> SwingUtilities.invokeLater(() -> caused.posted().accept(center.post(caused.request()))),
                 (title, details) -> LOG.log(System.Logger.Level.WARNING, "A plugin problem: " + title));

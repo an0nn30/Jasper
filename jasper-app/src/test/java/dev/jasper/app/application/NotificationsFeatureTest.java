@@ -128,7 +128,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void notificationsFromBeforeTheFirstWindowShowWhenItIsFocused() {
-        presence = Delivery.Presence.NO_WINDOW;
+        presence = Delivery.Presence.OPENING;
         var feature = new NotificationsFeature(center, contributions);
         feature.error("Startup problem", "details");
         center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING, "config.toml has warnings"));
@@ -141,8 +141,8 @@ class NotificationsFeatureTest {
     }
 
     @Test void aCardPostedWhileAWindowOpensWaitsForItsFirstActivation() {
-        // The window is attached but the native activation event has not arrived yet: the application reports NO_WINDOW.
-        presence = Delivery.Presence.NO_WINDOW;
+        // The window is attached but the native activation event has not arrived yet: the application reports OPENING.
+        presence = Delivery.Presence.OPENING;
         var feature = new NotificationsFeature(center, contributions);
         var window = window();
         feature.attach(window);

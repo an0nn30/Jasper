@@ -80,6 +80,8 @@ public final class JasperApplication {
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
+    /** Whether start-up has settled: a terminal window was activated, or a resident Jasper warmed up with none. */
+    private boolean settled;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -448,6 +450,8 @@ public final class JasperApplication {
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
         }
+        // A resident Jasper with no window has finished starting: its notifications reach the operating system now.
+        settled = true;
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
@@ -594,19 +598,23 @@ public final class JasperApplication {
             });
         }
 
-    /** Where Jasper stands for notifications: focused, in the background, or with no window open. */
+    /** Where Jasper stands for notifications: focused, in the background, windowless, or still opening. */
     private Delivery.Presence presence() {
         return presence(!windows.isEmpty(), activatedSinceOpen,
-            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null);
+            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null, settled);
     }
 
     /**
      * The rule behind {@link #presence()}. A window counts only once it has been activated: a failure raised while the
      * first window opens is queued ahead of the native activation event, and judging it "background" would keep its
-     * card out of sight for good. Until then the card waits, as it does with no window at all, and shows on activation.
+     * card out of sight for good. Until then the card waits, and so does one posted while Jasper starts. Once start-up
+     * has settled, no window open is a resident Jasper with every window closed: its cards wait for the next window and
+     * the operating system shows them meanwhile.
      */
-    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive) {
-        if (!windowsOpen || !activatedSinceOpen) return Delivery.Presence.NO_WINDOW;
+    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive,
+                                      boolean settled) {
+        if (!windowsOpen) return settled ? Delivery.Presence.NO_WINDOW : Delivery.Presence.OPENING;
+        if (!activatedSinceOpen) return Delivery.Presence.OPENING;
         return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
     }
 
@@ -801,6 +809,7 @@ public final class JasperApplication {
         if (!windows.contains(window)) return;
         lastActive = window;
         activatedSinceOpen = true;
+        settled = true;
         notificationViews.activated(window.content());
         terminals.windowActivated(window.content().id());
         if (buddy != null && !quitting && !stopped) buddy.greet();

@@ -55,28 +55,28 @@ class NotificationCenterTest {
         assertThat(center.unread()).isEqualTo(1);
     }
 
-    @Test void backgroundCardsOnlyEnterHistory() {
+    @Test void backgroundCardsShowNoCardAndAskTheOperatingSystem() {
         var center = center();
         presence = Delivery.Presence.BACKGROUND;
         center.post(request(CARDS, "a"));
         center.focusReturned();
-        assertThat(kinds()).containsExactly("Upserted");
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested");
     }
 
     @Test void stickyCardsWaitForFocusOnce() {
         var center = center();
         presence = Delivery.Presence.BACKGROUND;
         center.post(request(STICKY, "s"));
-        assertThat(kinds()).containsExactly("Upserted");
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested");
         presence = Delivery.Presence.FOCUSED;
         center.focusReturned();
         center.focusReturned();
-        assertThat(kinds()).containsExactly("Upserted", "CardRequested");
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "CardRequested");
     }
 
-    @Test void cardsPostedWithNoWindowWaitForTheFirstFocus() {
+    @Test void cardsPostedWhileJasperOpensWaitForTheFirstFocus() {
         var center = center();
-        presence = Delivery.Presence.NO_WINDOW;
+        presence = Delivery.Presence.OPENING;
         center.post(request(CARDS, "early"));
         center.focusReturned();
         assertThat(kinds()).containsExactly("Upserted", "CardRequested");
@@ -86,14 +86,14 @@ class NotificationCenterTest {
         var center = center();
         presence = Delivery.Presence.BACKGROUND;
         UUID id = center.post(request(STICKY, "s")).orElseThrow();
-        assertThat(kinds()).containsExactly("Upserted");
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested");
         presence = Delivery.Presence.FOCUSED;
         clock.advance(Duration.ofSeconds(5));
         assertThat(center.post(request(STICKY, "s"))).contains(id);
-        assertThat(kinds()).containsExactly("Upserted", "Upserted", "CardRequested");
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "Upserted", "CardRequested");
         center.focusReturned();
         assertThat(kinds()).as("the card was requested once; focus does not request it again")
-            .containsExactly("Upserted", "Upserted", "CardRequested");
+            .containsExactly("Upserted", "SystemRequested", "Upserted", "CardRequested");
     }
 
     @Test void aWaitingCardReadMeanwhileNeverShows() {
@@ -390,5 +390,53 @@ class NotificationCenterTest {
         assertThat(kept.activate()).isEmpty();
         kept.actions().getFirst().run().run();
         assertThat(ran).isEmpty();
+    }
+
+    @Test void inTheBackgroundCardAndStickyGroupsAskTheOperatingSystem() {
+        var center = center();
+        presence = Delivery.Presence.BACKGROUND;
+        center.post(request(CARDS, "c"));
+        center.post(request(STICKY, "s"));
+        center.post(request(QUIET, "q"));
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "Upserted", "SystemRequested", "Upserted");
+    }
+
+    @Test void withNoWindowOpenTheOperatingSystemHearsAndTheCardStillWaits() {
+        var center = center();
+        presence = Delivery.Presence.NO_WINDOW;
+        center.post(request(CARDS, "c"));
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested");
+        center.focusReturned();
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "CardRequested");
+    }
+
+    @Test void whileJasperOpensNothingGoesToTheOperatingSystem() {
+        var center = center();
+        presence = Delivery.Presence.OPENING;
+        center.post(request(CARDS, "c"));
+        center.post(request(STICKY, "s"));
+        assertThat(kinds()).containsExactly("Upserted", "Upserted");
+    }
+
+    /** A listener that reads the entry as it is posted must not leave the operating system showing it. */
+    @Test void anEntryReadBeforeItsRequestIsDeliveredIsNotSentToTheOperatingSystem() {
+        var center = center();
+        presence = Delivery.Presence.BACKGROUND;
+        center.onChange(change -> {
+            if (change instanceof NotificationCenter.Change.Upserted upserted && !upserted.notification().read())
+                center.markRead(upserted.notification().id());
+        });
+        center.post(request(CARDS, "c"));
+        assertThat(kinds()).containsExactly("Upserted", "Upserted");
+    }
+
+    @Test void aRepeatInTheBackgroundAsksTheOperatingSystemAgainForTheSameEntry() {
+        var center = center();
+        presence = Delivery.Presence.BACKGROUND;
+        UUID first = center.post(request(CARDS, "c")).orElseThrow();
+        assertThat(center.post(request(CARDS, "c"))).contains(first);
+        assertThat(changes).filteredOn(NotificationCenter.Change.SystemRequested.class::isInstance)
+            .extracting(change -> ((NotificationCenter.Change.SystemRequested) change).notification().id())
+            .containsExactly(first, first);
     }
 }
