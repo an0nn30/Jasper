@@ -4,6 +4,8 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.contributions.PanelEntry;
+import dev.jasper.app.notifications.NotificationRequest;
+import dev.jasper.app.notifications.Severity;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -38,19 +40,19 @@ class JasperApplicationNotificationsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
-    @Test void aPluginNoticeBecomesAnUnreadErrorAndShutdownStopsTheBadge() throws Exception {
+    @Test void anErrorBecomesAnUnreadErrorAndShutdownStopsTheBadge() throws Exception {
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
             assertThat(badge(application[0])).isEmpty();
-            application[0].notice("Remote: Could not connect");
+            application[0].notificationCenter().submit(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, "Could not connect"));
         });
         edt(() -> assertThat(badge(application[0]))
             .contains(new PanelBadge(1, PanelBadge.Tone.ERROR, "1 unread notification, 1 error")));
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
-        edt(() -> application[0].notice("Remote: After shutdown"));
+        edt(() -> application[0].notificationCenter().submit(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, "After shutdown")));
         edt(() -> assertThat(badge(application[0])).as("the feature stopped listening at shutdown")
             .contains(new PanelBadge(1, PanelBadge.Tone.ERROR, "1 unread notification, 1 error")));
     }

@@ -1,9 +1,13 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.notifications.NotificationRequest;
+import dev.jasper.app.notifications.Severity;
 import dev.jasper.app.settingsui.PageContext;
 import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.windows.AuxiliaryWindows;
+import dev.jasper.sdk.activity.Activities;
+import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.plugin.Plugin;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -14,11 +18,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import dev.jasper.app.terminals.PaneEntry;
 import dev.jasper.app.terminals.TerminalRegistry;
 
 /**
@@ -29,7 +35,7 @@ final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser,
                        java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
@@ -39,22 +45,22 @@ final class PluginHost {
         Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser,
                        java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
                        java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber) {
-            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notice,
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
                 editor, settingsFiles, clearReports, profiles, browser, appearance, appearanceSubscriber, failure -> { });
         }
 
         Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser) {
-            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notice,
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
                 editor, settingsFiles, clearReports, profiles, browser, null, null, failure -> { });
         }
     }
@@ -65,6 +71,7 @@ final class PluginHost {
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
     final CleanupWorker cleanup = new CleanupWorker();
     private final dev.jasper.app.lifecycle.Subscription terminalBridge;
+    private final dev.jasper.sdk.Subscription outcomes;
     final Containment containment;
     final EventBus bus;
     final ActivityHub activities;
@@ -80,6 +87,7 @@ final class PluginHost {
         this.activities = new ActivityHub(bus);
         this.connections = new ConnectionHub(bus);
         this.terminalBridge = TerminalBridge.connect(environment.terminals(), bus);
+        this.outcomes = bus.subscribe(EventBus.APP, Activities.TOPIC, this::outcome);
     }
 
     private void requireUi() {
@@ -158,6 +166,7 @@ final class PluginHost {
     List<CompletableFuture<?>> stop() {
         requireUi();
         terminalBridge.close();
+        outcomes.close();
         List<CompletableFuture<?>> pending = new ArrayList<>();
         List<HostedContext> order = new ArrayList<>(contexts.values());
         for (int i = order.size() - 1; i >= 0; i--) {
@@ -194,6 +203,39 @@ final class PluginHost {
         HostedContext hosted = contexts.get(pluginId);
         return hosted != null && hosted.state == HostedContext.State.ACTIVE
             && (hosted.declared.panel().isPresent() || hosted.declared.declaresAnything());
+    }
+
+    /**
+     * An activity ended (spec section 7, producer 4). One that succeeded or failed is posted in its plugin's
+     * {@code <plugin-id>.activities} group, titled after the activity, with its detail as content and its action as the
+     * body's; a cancelled one posts nothing. Nor does an activity of a plugin that is no longer running: the host failed
+     * it because the plugin stopped or failed to start, and that plugin's incident already says why. UI thread.
+     */
+    private void outcome(ActivityEvent event) {
+        if (event.state() != ActivityEvent.State.SUCCEEDED && event.state() != ActivityEvent.State.FAILED) return;
+        String source = event.sourcePluginId();
+        if (!active(source)) return;
+        try {
+            var request = NotificationRequest.of(source + HostedNotifications.ACTIVITIES,
+                    event.state() == ActivityEvent.State.SUCCEEDED ? Severity.INFO : Severity.ERROR, event.title())
+                .withContent(event.detail()).withSource(source);
+            Optional<Runnable> activate = activation(source, event.activateActionId());
+            environment.notifications().center().post(activate.map(request::withActivate).orElse(request));
+        } catch (IllegalArgumentException unshowable) {
+            Containment.logger(source).log(System.Logger.Level.WARNING, "An activity's outcome could not be shown", unshowable);
+        }
+    }
+
+    /**
+     * An activity's own activation: the source plugin's action, invoked in the window the user used last. Empty when
+     * the id names no action that plugin registered. UI thread.
+     */
+    Optional<Runnable> activation(String source, Optional<String> actionId) {
+        return actionId.filter(id -> ownsAction(source, id)).<Runnable>map(id -> () -> {
+            if (!ownsAction(source, id)) return;
+            environment.terminals().activeWindow().ifPresent(window -> environment.contributions().action(id).ifPresent(entry ->
+                entry.invoke(new Contributions.Invocation(window.id(), environment.terminals().activePane().map(PaneEntry::id)))));
+        });
     }
 
     String executing() { return containment.executing(); }

@@ -40,8 +40,9 @@ import java.util.function.Function;
  * the EDT together are recorded once, with their count, and a repeat updates the incident's notification at most once
  * a second (the count catches up) and shows its card again at most once a minute. A shell launch failure is the
  * exception: it is announced in its own window on every occurrence, because each says where it happened. A failure of
- * the notification system itself is left to the log, and capture never throws or re-enters. The three failure entry
- * points are safe from any thread; everything else is EDT only.
+ * the notification system itself is left to the log, and capture never throws or re-enters. A plugin's own
+ * notification that carries a cause becomes the plugin's incident too, and is posted with Show more…. The four entry
+ * points that take a failure are safe from any thread; everything else is EDT only.
  */
 final class IncidentNotices implements AutoCloseable {
     static final NotificationGroup PLUGINS = new NotificationGroup("jasper.plugins", "Plugin problems", NotificationRequest.JASPER, DisplayMode.CARD);
@@ -56,6 +57,8 @@ final class IncidentNotices implements AutoCloseable {
     static final String LAUNCH = "starting a shell";
     static final String LAUNCH_TITLE = "Could not start the terminal";
     private static final System.Logger LOG = System.getLogger(IncidentNotices.class.getName());
+    /** For an announcement whose posted id nobody needs. */
+    private static final Consumer<Optional<UUID>> UNHEARD = id -> { };
     /** The notification system: a failure whose first Jasper frame is in one of these is only logged. */
     private static final List<String> OWN_PACKAGES = List.of("dev.jasper.app.notifications.", "dev.jasper.app.notificationui.");
     private static final List<String> OWN_CLASSES = List.of(IncidentNotices.class.getName(), NotificationsFeature.class.getName(),
@@ -127,12 +130,12 @@ final class IncidentNotices implements AutoCloseable {
 
     /** A failure of Jasper's own; {@code operation} says what it was doing, such as "thread main". Any thread. */
     void jasperFailure(String operation, Throwable failure) {
-        capture(NotificationRequest.JASPER, operation, failure, true, this::announcement);
+        capture(NotificationRequest.JASPER, operation, failure, true, this::announcement, UNHEARD);
     }
 
     /** A plugin callback failed while the host asked it to do {@code operation}. Any thread. */
     void pluginFailure(String pluginId, String operation, Throwable failure) {
-        capture(pluginId, operation, failure, true, this::announcement);
+        capture(pluginId, operation, failure, true, this::announcement, UNHEARD);
     }
 
     /**
@@ -146,7 +149,7 @@ final class IncidentNotices implements AutoCloseable {
         if (closed) return;
         String text = details == null ? "" : details;
         if (capture(NotificationRequest.JASPER, LAUNCH, failure, false,
-                incident -> launchRequest(window, text).withAction(showMore(incident)))) return;
+                incident -> launchRequest(window, text).withAction(showMore(incident)), UNHEARD)) return;
         try { center.submit(launchRequest(window, text)); }
         catch (RuntimeException unannounced) {
             LOG.log(System.Logger.Level.WARNING, "A shell launch failure could not be announced", unannounced);
@@ -157,6 +160,36 @@ final class IncidentNotices implements AutoCloseable {
         NotificationRequest request = NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, LAUNCH_TITLE)
             .withContent(details);
         return window == null ? request : request.withTarget(window);
+    }
+
+    /**
+     * A plugin's own notification that carries a cause (spec section 6). The cause is captured here, on the posting
+     * thread, and recorded as an incident attributed to the plugin and named after the notification's title. The
+     * notification is posted as the plugin asked, with Show more… last. Every post is announced on its own, never
+     * folded into an earlier one. A cause that cannot be recorded (the notification system's own, or raised while an
+     * incident is announced) still gets the notification, without Show more…. A future's wrapper is recorded as the
+     * failure behind it. {@code posted} hears the notification's id on the EDT, or empty when its group dropped it.
+     * Any thread.
+     */
+    void pluginNotice(String pluginId, NotificationRequest request, Throwable cause, Consumer<Optional<UUID>> posted) {
+        if (closed) return;
+        if (capture(pluginId, request.title(), unwrapped(cause), false, incident -> request.withAction(showMore(incident)), posted))
+            return;
+        try { ui.execute(() -> posted.accept(center.post(request))); }
+        catch (RuntimeException unannounced) {
+            LOG.log(System.Logger.Level.WARNING, "A plugin's notification could not be posted", unannounced);
+        }
+    }
+
+    /** The failure behind a CompletionException or ExecutionException, as far as it can be read. Never throws. */
+    private static Throwable unwrapped(Throwable cause) {
+        Throwable inner = cause;
+        try {
+            for (int depth = 0; depth < 16 && (inner instanceof java.util.concurrent.CompletionException
+                    || inner instanceof java.util.concurrent.ExecutionException) && inner.getCause() != null; depth++)
+                inner = inner.getCause();
+        } catch (RuntimeException unreadable) { /* keep what was read */ }
+        return inner;
     }
 
     /** Disable Plugin on an incident: the plugin is disabled from the next launch and the outcome is posted. EDT. */
@@ -233,10 +266,11 @@ final class IncidentNotices implements AutoCloseable {
      *
      * @param repeatable whether a repeat updates the incident's earlier notification (Jasper's and plugins' failures)
      *     or every occurrence posts its own
+     * @param posted hears a non-repeatable announcement's id on the EDT, or empty when its group dropped it
      * @return false when the failure was not handed over for recording, so the caller may announce it another way
      */
     private boolean capture(String source, String operation, Throwable failure, boolean repeatable,
-                            Function<Incident, NotificationRequest> announce) {
+                            Function<Incident, NotificationRequest> announce, Consumer<Optional<UUID>> posted) {
         if (closed) return true;
         if (failure == null || Boolean.TRUE.equals(capturing.get())) return false;
         Capture capture;
@@ -254,7 +288,7 @@ final class IncidentNotices implements AutoCloseable {
         } finally {
             capturing.remove();
         }
-        if (!repeatable) return queue(() -> record(source, operation, thread, capture, 1, false, announce));
+        if (!repeatable) return queue(() -> record(source, operation, thread, capture, 1, false, announce, posted));
         Waiting first = new Waiting(source, operation, thread, capture, new AtomicInteger(1));
         if (waiting.compute(key, (ignored, earlier) -> earlier == null ? first : earlier.again()) != first) return true;
         if (queue(() -> recordWaiting(key, announce))) return true;
@@ -276,18 +310,21 @@ final class IncidentNotices implements AutoCloseable {
     private void recordWaiting(String key, Function<Incident, NotificationRequest> announce) {
         Waiting taken = waiting.remove(key);
         if (taken == null) return;
-        record(taken.source(), taken.operation(), taken.thread(), taken.capture(), taken.count().get(), true, announce);
+        record(taken.source(), taken.operation(), taken.thread(), taken.capture(), taken.count().get(), true, announce, UNHEARD);
     }
 
     private void record(String source, String operation, String thread, Capture capture, int times, boolean repeatable,
-                        Function<Incident, NotificationRequest> announce) {
+                        Function<Incident, NotificationRequest> announce, Consumer<Optional<UUID>> posted) {
         if (closed || Boolean.TRUE.equals(capturing.get())) return;
         capturing.set(Boolean.TRUE);
         try {
             Incident incident = incidents.record(source, operation, thread, capture, times);
             if (repeatable) announceRepeatable(incident, times, announce);
-            else center.post(announce.apply(incident)).ifPresent(id ->
-                occurrences.computeIfAbsent(incident.id(), key -> new LinkedHashSet<>()).add(id));
+            else {
+                Optional<UUID> landed = center.post(announce.apply(incident));
+                landed.ifPresent(id -> occurrences.computeIfAbsent(incident.id(), key -> new LinkedHashSet<>()).add(id));
+                posted.accept(landed);
+            }
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "An incident could not be announced", failure);
         } finally {

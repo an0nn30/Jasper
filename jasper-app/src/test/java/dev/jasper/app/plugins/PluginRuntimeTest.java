@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class PluginRuntimeTest {
     static final String FIXTURE = """
@@ -297,4 +298,51 @@ class PluginRuntimeTest {
             onEdt(() -> pending.set(runtime.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
         }
+
+    @Test void whatKeptPluginsFromRunningIsListedAsProblems() throws Exception {
+        Path bundled = root.resolve("bundled");
+        probe(bundled, "dev.example.probe");
+        PluginJars.build(bundled.resolve("dev.example.future"), "future.jar",
+            "id = \"dev.example.future\"\nname = \"Future\"\nversion = \"1.0.0\"\nentry = \"fix.future.Main\"\nsdk = \">=9.0.0\"\n",
+            Map.of("fix.future.Main", PluginJars.emptyPlugin("fix.future", "Main")), List.of());
+        PluginJars.build(bundled.resolve("dev.example.reserved"), "reserved.jar",
+            PluginJars.descriptor("dev.example.reserved", "1.0.0", "dev.jasper.app.evil.Main"),
+            Map.of("dev.jasper.app.evil.Main", PluginJars.emptyPlugin("dev.jasper.app.evil", "Main")), List.of());
+        PluginJars.build(bundled.resolve("dev.example.nameless"), "nameless.jar", null,
+            Map.of("fix.nameless.Main", PluginJars.emptyPlugin("fix.nameless", "Main")), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("absent"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        assertThat(runtime.problems()).extracting(PluginRuntime.Problem::kind, problem -> problem.name().orElse("-"))
+            .containsExactlyInAnyOrder(
+                tuple(PluginRuntime.Problem.Kind.UNREADABLE, "-"),
+                tuple(PluginRuntime.Problem.Kind.NOT_STARTED, "Future"),
+                tuple(PluginRuntime.Problem.Kind.NOT_LOADED, "dev.example.reserved"));
+        assertThat(runtime.problems()).filteredOn(problem -> problem.kind() == PluginRuntime.Problem.Kind.NOT_STARTED)
+            .singleElement().satisfies(problem -> assertThat(problem.detail()).contains("needs SDK"));
+        assertThat(runtime.problems()).filteredOn(problem -> problem.kind() == PluginRuntime.Problem.Kind.NOT_LOADED)
+            .singleElement().satisfies(problem -> {
+                assertThat(problem.pluginId()).contains("dev.example.reserved");
+                assertThat(problem.detail()).contains("reserved package dev.jasper.app.evil");
+                assertThat(problem.cause()).as("no exception lies behind it").isEmpty();
+            });
+        assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
+        onEdt(runtime::stop);
+    }
+
+    @Test void aPluginWhoseNameShowsNothingIsAProblemAndJasperStillStarts() throws Exception {
+        Path bundled = root.resolve("bundled");
+        probe(bundled, "dev.example.probe");
+        String invisible = new String(new int[] {0x200B, 0x202E}, 0, 2);
+        PluginJars.build(bundled.resolve("dev.example.ghost"), "ghost.jar",
+            "id = \"dev.example.ghost\"\nname = \"" + invisible + "\"\nversion = \"1.0.0\"\nentry = \"fix.ghost.Main\"\nsdk = \">=0.1\"\n",
+            Map.of("fix.ghost.Main", PluginJars.emptyPlugin("fix.ghost", "Main")), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("absent"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        assertThat(runtime.problems()).singleElement().satisfies(problem -> {
+            assertThat(problem.kind()).isEqualTo(PluginRuntime.Problem.Kind.UNREADABLE);
+            assertThat(problem.detail()).contains("dev.example.ghost", "name");
+        });
+        assertThat(runtime.statusLines()).anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));
+        onEdt(runtime::stop);
+    }
 }

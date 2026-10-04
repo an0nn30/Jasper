@@ -461,9 +461,10 @@ class EditorWindowTest {
         assertThat(vimrc).isEqualTo(home.resolve("plugins/dev.jasper.editor/data/vimrc"));
         Files.writeString(vimrc, "nnoremap x dd\nbogus\nNERDTreeToggle\n");
         EditorTab tab = opened(file("rc.txt", "one\ntwo\nthree\n"));
-        assertThat(host.notices()).as("Vim is off: nothing is read").isEmpty();
+        assertThat(host.notifications().lines()).as("Vim is off: nothing is read").isEmpty();
         window.toggleVim();
-        assertThat(host.notices()).containsExactly("dev.jasper.editor: vimrc: 2 lines were skipped; see :messages");
+        assertThat(host.notifications().lines())
+            .containsExactly("dev.jasper.editor|WARNING|Some vimrc lines were skipped|2 lines were skipped; see :messages.");
         vimKeys(tab, "x");
         assertThat(tab.area().getText()).isEqualTo("two\nthree\n");
         vimKeys(tab, ":messages<CR>");
@@ -478,15 +479,16 @@ class EditorWindowTest {
         assertThat(tab.area().getText()).as("the new vimrc's y, and register a kept").isEqualTo("three\ntwo\n");
         window.toggleVim();
         window.toggleVim();
-        assertThat(host.notices()).as("read once, and again only on Reload vimrc").hasSize(1);
+        assertThat(host.notifications().lines()).as("read once, and again only on Reload vimrc").hasSize(1);
     }
 
     @Test void aVimrcThatCannotBeReadIsReported() throws Exception {
         Files.createDirectories(window.vimrcFile());
         settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
         opened(file("rc.txt", "one\n"));
-        assertThat(host.notices()).singleElement().asString()
-            .startsWith("dev.jasper.editor: vimrc: could not read " + window.vimrcFile()).endsWith("; Vim runs with its defaults.");
+        assertThat(host.notifications().lines()).singleElement().asString()
+            .startsWith("dev.jasper.editor|WARNING|Could not read the vimrc|" + window.vimrcFile() + ": ")
+            .endsWith(". Vim runs with its defaults.");
     }
 
     @Test void theOpenCommandHasNoKeyButVimStillRunsIt() throws Exception {

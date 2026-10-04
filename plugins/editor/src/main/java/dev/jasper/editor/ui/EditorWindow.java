@@ -293,13 +293,16 @@ public final class EditorWindow {
         Path file;
         try { file = vimrcFile(); }
         catch (RuntimeException unavailable) {
-            context.notices().error("vimrc: the Editor's data folder is not available; Vim runs with its defaults.");
+            context.notifications().group().error("Could not read the vimrc",
+                "The Editor's data folder is not available; Vim runs with its defaults.", unavailable);
             return;
         }
         Vimrc.Result read = Vimrc.read(editor.get(), file);
-        if (read.error() != null) context.notices().error("vimrc: could not read " + file + " (" + read.error() + "); Vim runs with its defaults.");
+        if (read.error() != null)
+            context.notifications().group().warning("Could not read the vimrc", file + ": " + read.error() + ". Vim runs with its defaults.");
         else if (read.skipped() > 0)
-            context.notices().error("vimrc: " + read.skipped() + (read.skipped() == 1 ? " line was" : " lines were") + " skipped; see :messages");
+            context.notifications().group().warning("Some vimrc lines were skipped",
+                read.skipped() + (read.skipped() == 1 ? " line was" : " lines were") + " skipped; see :messages.");
     }
 
     /** The Editor's commands for Vim's {@code <Action>(id)}, {@code :action} and {@code :actionlist}, run for the tab Vim is in. */
@@ -375,8 +378,8 @@ public final class EditorWindow {
                     try {
                         open(resolver.document(sourced, owner), owner);
                     } catch (RuntimeException failure) {
-                        context.notices().error("Could not open " + sourced.path() + ": "
-                            + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+                        context.notifications().group().error("Could not open a file", sourced.path() + ": "
+                            + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
                     }
                 });
             }
@@ -603,8 +606,8 @@ public final class EditorWindow {
         try {
             return Optional.of(resolver.get().document(location, owner));
         } catch (RuntimeException failure) {
-            context.notices().error("Could not save to " + location.path() + ": "
-                + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            context.notifications().group().error("Could not save a file", location.path() + ": "
+                + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
             return Optional.empty();
         }
     }

@@ -39,27 +39,27 @@ class NotificationValuesTest {
         assertThatThrownBy(() -> titled("t").withSource(" ")).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test void aMessageOfUnknownShapeBecomesATitleAndContent() {
-        var shortOne = NotificationRequest.message("jasper.general", Severity.ERROR, "Remote: Could not connect");
-        assertThat(shortOne.title()).isEqualTo("Remote: Could not connect");
-        assertThat(shortOne.content()).isEmpty();
-        String wordy = "Vault: " + "word ".repeat(40);
-        var cut = NotificationRequest.message("jasper.general", Severity.ERROR, wordy);
-        assertThat(cut.title()).hasSize(NotificationRequest.SHORT_TITLE).endsWith("…");
-        assertThat(cut.content()).isEqualTo(wordy.strip());
-        var lines = NotificationRequest.message("jasper.general", Severity.ERROR, "Could not start terminal in /tmp:\nNo such file");
-        assertThat(lines.title()).isEqualTo("Could not start terminal in /tmp:");
-        assertThat(lines.content()).isEqualTo("Could not start terminal in /tmp:\nNo such file");
-        assertThat(NotificationRequest.message("jasper.general", Severity.ERROR, "  ").title()).isEqualTo("No message");
-    }
-
-    @Test void groupIdsAreNamespaced() {
-        assertThat(new NotificationGroup("jasper.general", "Jasper", "jasper", DisplayMode.CARD).id()).isEqualTo("jasper.general");
-        for (String bad : List.of("jasper", "Jasper.general", "jasper..x", ".x", "x.y z"))
+    @Test void groupIdsArePluginIdShapedAndNamesAreOneBoundedLine() {
+        for (String good : List.of("jasper.general", "sample", "dev.example.tool.activities", "dev.example-tool_x"))
+            assertThat(new NotificationGroup(good, "Name", "jasper", DisplayMode.CARD).id()).isEqualTo(good);
+        for (String bad : List.of("", ".x", "Jasper.general", "x.y z", "a".repeat(161)))
             assertThatThrownBy(() -> new NotificationGroup(bad, "Name", "jasper", DisplayMode.CARD)).as(bad)
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new NotificationGroup("jasper.x", " ", "jasper", DisplayMode.CARD))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new NotificationGroup("jasper.x", "  Two\nlines  ", "jasper", DisplayMode.CARD).name()).isEqualTo("Two lines");
+        assertThat(new NotificationGroup("jasper.x", "n".repeat(100), "jasper", DisplayMode.CARD).name())
+            .hasSize(NotificationGroup.MAX_NAME).endsWith("…");
+        for (String blank : List.of(" ", "\u00A0", "\u200B\u2060"))
+            assertThatThrownBy(() -> new NotificationGroup("jasper.x", blank, "jasper", DisplayMode.CARD))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void invisibleTextIsBlankAndBidiControlsAreDropped() {
+        for (String invisible : List.of("\u00A0\u2007", "\u200B\u2060", "\uFEFF", "\u202E"))
+            assertThatThrownBy(() -> titled(invisible)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> NotificationAction.of("\u00A0", () -> {})).isInstanceOf(IllegalArgumentException.class);
+        assertThat(titled("a\u202Eb\u2066c\u200Fd").title()).isEqualTo("abcd");
+        assertThat(titled("t").withContent("x\u2067y\u2069\nz\u061C").content()).isEqualTo("xy\nz");
+        assertThat(titled("a\u200Db").title()).as("a zero-width joiner joins emoji, so it stays").isEqualTo("a\u200Db");
     }
 
     @Test void entriesTrackRepeatsReadAndExpiry() {

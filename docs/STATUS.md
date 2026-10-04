@@ -2,6 +2,28 @@
 
 ## Current state — 2026-10-03
 
+- **Notifications plan 3: SDK notifications, reviewed on branch `claude/notifications-3`; awaiting the user's GUI
+  checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
+  [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
+  (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
+  removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15`. `plugins.HostedNotifications` posts into the
+  center with the plugin id as source and contained links; a cause becomes the plugin's incident with Show more…
+  (`IncidentNotices.pluginNotice`); a plugin's notifications expire when it stops. `PluginHost` posts succeeded and
+  failed activities in `<plugin-id>.activities`. After launch, `PluginProblemNotices` posts each load failure, skipped
+  plugin and unreadable plugin directory in Plugin problems with Open Plugins. The model now strips bidi controls,
+  treats invisible-only text as blank, fits poster icons to 16 px and bounds group names. Snippets, Editor, File
+  Server, Vault and Remote post titled notifications with their causes; Remote declares `dev.jasper.remote.tunnels`.
+  Spec interpretations: see the plan's list (1 to 17). `./gradlew check --continue`: **8,333 tests, 0 failures, 0
+  errors, 6 skipped** (39 new, after the final-review fix; one run in between failed only the known
+  `TerminalAppIntegrationTest` "reflow" row-reset flake, which passed in three isolated reruns and in the full rerun),
+  all four architecture gates and doclint included; the source hygiene check and `git diff --check c02673cd` are
+  clean. Final review: one important finding fixed (a plugin whose manifest `name` showed nothing stopped Jasper from
+  launching; `DescriptorParser` now rejects such a name, making it an unreadable-plugin problem); seven minor findings
+  are deferred in the plan's status banner. No GUI launched. GUI checks for the user: a plugin error card with Show
+  more… opening the Errors window; a long File Server transfer (one that runs past the activity threshold), whose
+  outcome is posted in "File Server activities" as "Sending <file>" or "Receiving <file>" (an interrupted one as an
+  error); a plugin directory without `plugin.toml` in the user plugins folder, reported at launch with Open Plugins.
+
 - **Merged `main` into `claude/dock-layout`** (2026-10-03; `main` at `63e3b95c`, merge base `cc0429f5`): main's
   features that touch the dock now use it. Unread badges are on the stripes: `ToolStripe.Button` carries the
   `PanelBadge`, a badged button shows a `BadgedIcon` and names the badge in its tooltip and accessible description, and
@@ -237,8 +259,8 @@
   flake, not a regression (the branch does not touch File Server). Pushed to `origin` on 2026-10-03 with the dock
   layout, at the user's choice; the GUI checks are still the user's.
 
-- **Notifications plan 2: incidents and the Errors window, reviewed on branch `claude/notifications-2`; awaiting the
-  user's GUI checks and merge decision** (2026-10-02 to 2026-10-03; plan
+- **Notifications plan 2: incidents and the Errors window, merged to local `main` (`c02673cd`); awaiting the user's
+  GUI checks** (2026-10-02 to 2026-10-03; plan
   `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-window)):
   uncaught exceptions on any thread, contained plugin failures, failed shell launches and failing notification
   actions are in-memory incidents (at most 100, coalesced by source, class and root-cause frames, traces taken on the

@@ -3,6 +3,7 @@ package dev.jasper.vault.service;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.vault.api.Credential;
 import dev.jasper.vault.api.CredentialDescriptor;
 import dev.jasper.vault.api.Kind;
@@ -53,7 +54,7 @@ class VaultServiceTest {
     final List<UnlockPrompt> unlocks = new ArrayList<>();
     final List<GrantPrompt> grants = new ArrayList<>();
     final List<PickPrompt> picks = new ArrayList<>();
-    final List<String> notices = new ArrayList<>();
+    final FakeNotifications notifications = new FakeNotifications();
     final List<LockState> states = new ArrayList<>();
     final WindowHandle window = window();
     java.util.concurrent.Executor importBackground = Runnable::run;
@@ -65,7 +66,7 @@ class VaultServiceTest {
         var keychain = new KeychainStore("Linux", command -> { throw new UncheckedIOException(new IOException("none")); }, dir.resolve("x"));
         var secrets = new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret")));
         lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), secrets, Runnable::run, Runnable::run, state -> { states.add(state); if (service != null) service.lockStateChanged(state); });
-        service = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notices::add, importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
+        service = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notifications.group("dev.jasper.vault"), importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
         return service;
     }
 
@@ -300,7 +301,8 @@ class VaultServiceTest {
         assertThat(api.ensureUnlocked(window)).isCompletedWithValue(false);
         assertThat(api.credential(PROD)).isCompletedWithValue(Optional.empty());
         assertThat(api.pick(window)).isCompletedWithValue(Optional.empty());
-        assertThat(notices).hasSize(3).allSatisfy(notice -> assertThat(notice).contains("Create a vault"));
+        String noVault = "dev.jasper.vault|WARNING|No vault yet|Create a vault in Credential Vault first (Open Vault...)";
+        assertThat(notifications.lines()).containsExactly(noVault, noVault, noVault);
         assertThat(unlocks).isEmpty();
         populate();
         CompletableFuture<Optional<Credential>> fetch = api.credential(PROD);
@@ -313,10 +315,10 @@ class VaultServiceTest {
 
     @Test void withoutAnyWindowARequestFails(@TempDir Path dir) {
         service(dir);
-        service = new VaultService(lock, Optional::empty, unlocks::add, grants::add, picks::add, notices::add, importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
+        service = new VaultService(lock, Optional::empty, unlocks::add, grants::add, picks::add, notifications.group("dev.jasper.vault"), importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
         populate();
         lock.lock();
         assertThat(service.forConsumer(SSH).credential(PROD)).isCompletedWithValue(Optional.empty());
-        assertThat(notices).singleElement().satisfies(notice -> assertThat(notice).contains("window"));
+        assertThat(notifications.lines()).containsExactly("dev.jasper.vault|WARNING|Credential Vault has no window to ask in|");
     }
 }

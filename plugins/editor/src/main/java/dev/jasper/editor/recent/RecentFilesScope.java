@@ -3,6 +3,7 @@ package dev.jasper.editor.recent;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteResults;
 import dev.jasper.sdk.palette.PaletteRow;
@@ -20,7 +21,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -46,7 +46,7 @@ public final class RecentFilesScope implements PaletteScope {
     private final Reopeners reopeners;
     private final Supplier<Instant> clock;
     private final BiConsumer<EditorDocument, WindowOwner> open;
-    private final Consumer<String> error;
+    private final NotificationGroup notifications;
     private final Icon icon;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
@@ -55,13 +55,13 @@ public final class RecentFilesScope implements PaletteScope {
      * @param reopeners who reopens each key
      * @param clock the current time
      * @param open opens a document in the Editor for a window
-     * @param error shows an error notice
+     * @param notifications where a file that cannot be reopened is posted
      * @param icon the tab icon, or null
      */
     public RecentFilesScope(RecentFiles recent, Reopeners reopeners, Supplier<Instant> clock, BiConsumer<EditorDocument, WindowOwner> open,
-                            Consumer<String> error, Icon icon) {
+                            NotificationGroup notifications, Icon icon) {
         this.recent = Objects.requireNonNull(recent); this.reopeners = Objects.requireNonNull(reopeners);
-        this.clock = Objects.requireNonNull(clock); this.open = Objects.requireNonNull(open); this.error = Objects.requireNonNull(error);
+        this.clock = Objects.requireNonNull(clock); this.open = Objects.requireNonNull(open); this.notifications = Objects.requireNonNull(notifications);
         this.icon = icon;
         recent.onChanged(this::changed);
         reopeners.onChanged(this::changed);
@@ -93,12 +93,15 @@ public final class RecentFilesScope implements PaletteScope {
         if (!(row.token() instanceof RecentFile entry)) return;
         if (verb.equals(REMOVE)) { recent.remove(entry.key()); return; }
         Optional<Function<WindowOwner, EditorDocument>> factory = reopeners.resolve(entry.key());
-        if (factory.isEmpty()) { error.accept("Could not reopen " + entry.location() + ": the host or plugin is unavailable."); return; }
+        if (factory.isEmpty()) {
+            notifications.error("Could not reopen a recent file", entry.location() + ": the host or plugin that opened it is unavailable.");
+            return;
+        }
         try {
             open.accept(factory.get().apply(context.window()), context.window());
         } catch (RuntimeException failure) {
-            error.accept("Could not reopen " + entry.location() + ": "
-                + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            notifications.error("Could not reopen a recent file", entry.location() + ": "
+                + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
         }
     }
 

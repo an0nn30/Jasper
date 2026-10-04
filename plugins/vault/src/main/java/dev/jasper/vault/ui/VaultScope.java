@@ -1,6 +1,7 @@
 package dev.jasper.vault.ui;
 
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteResults;
 import dev.jasper.sdk.palette.PaletteRow;
@@ -21,7 +22,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /** Palette rows for vault accounts and SSH keys. */
 public final class VaultScope implements PaletteScope {
@@ -36,17 +36,13 @@ public final class VaultScope implements PaletteScope {
     private final VaultService service;
     private final SecretClipboard clipboard;
     private final BiConsumer<WindowHandle, Optional<UUID>> openManager;
-    private final Consumer<String> notice;
+    private final NotificationGroup notifications;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
     public VaultScope(LockManager lock, VaultService service, SecretClipboard clipboard,
-                      BiConsumer<WindowHandle, Optional<UUID>> openManager) {
-        this(lock, service, clipboard, openManager, message -> { });
-    }
-
-    public VaultScope(LockManager lock, VaultService service, SecretClipboard clipboard,
-                      BiConsumer<WindowHandle, Optional<UUID>> openManager, Consumer<String> notice) {
-        this.lock = lock; this.service = service; this.clipboard = clipboard; this.openManager = openManager; this.notice = notice;
+                      BiConsumer<WindowHandle, Optional<UUID>> openManager, NotificationGroup notifications) {
+        this.lock = lock; this.service = service; this.clipboard = clipboard; this.openManager = openManager;
+        this.notifications = notifications;
     }
 
     @Override public ScopeSpec spec() {
@@ -100,7 +96,7 @@ public final class VaultScope implements PaletteScope {
                     case Auth.Key key -> null;
                 };
                 if (password != null) clipboard.copySecret(new String(password));
-            } catch (RuntimeException failure) { notice.accept("Could not copy from the vault: " + failure.getMessage()); }
+            } catch (RuntimeException failure) { notifications.error("Could not copy from the vault", failure); }
         });
     }
 

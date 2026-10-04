@@ -111,4 +111,25 @@ class JasperApplicationIncidentsTest {
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
+
+    @DisabledOnOs(OS.WINDOWS)
+    @Test void aPluginThatWasNotStartedIsAPluginProblemWithOpenPlugins() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "future.jar",
+            "id = \"dev.example.future\"\nname = \"Future\"\nversion = \"1.0.0\"\nentry = \"fix.future.Main\"\nsdk = \">=9.0.0\"\n",
+            Map.of("fix.future.Main", PluginJars.emptyPlugin("fix.future", "Main")), List.of());
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = application(terminated);
+            application[0].startPlugins(null, dev, false, dirs);
+            var notice = application[0].notificationCenter().history().stream()
+                .filter(entry -> entry.request().group().equals("jasper.plugins")).findFirst().orElseThrow();
+            assertThat(notice.request().title()).isEqualTo("Future was not started");
+            assertThat(notice.request().actions()).extracting(NotificationAction::label).containsExactly("Open Plugins");
+        });
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
 }

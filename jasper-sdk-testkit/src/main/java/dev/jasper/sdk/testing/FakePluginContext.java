@@ -57,6 +57,7 @@ public final class FakePluginContext implements PluginContext {
     final FakePalette palette;
     final FakeFileSources fileSources;
     final FakePluginSettings settings;
+    final dev.jasper.sdk.notifications.Notifications notifications;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
@@ -65,6 +66,7 @@ public final class FakePluginContext implements PluginContext {
         this.palette = new FakePalette(host, this);
         this.fileSources = new FakeFileSources(host, this);
         this.settings = new FakePluginSettings(host, info.id(), host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
+        this.notifications = host.notifications.of(info.id(), () -> state != State.CLOSED);
     }
 
     void requireOpen() {
@@ -104,7 +106,7 @@ public final class FakePluginContext implements PluginContext {
     @Override public dev.jasper.sdk.terminal.Terminals terminals() { return terminals; }
         @Override public dev.jasper.sdk.palette.Palette palette() { return palette; }
     @Override public dev.jasper.sdk.files.FileSources fileSources() { return fileSources; }
-        @Override public dev.jasper.sdk.ui.Notices notices() { return message -> { requireOpen(); host.notices.add(info.id() + ": " + Objects.requireNonNull(message, "message")); }; }
+    @Override public dev.jasper.sdk.notifications.Notifications notifications() { return notifications; }
         @Override public dev.jasper.sdk.ui.Platform platform() {
             return new dev.jasper.sdk.ui.Platform() {
                 @Override public void openInEditor(Path file) { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }

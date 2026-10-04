@@ -53,7 +53,7 @@ public final class VaultManagerWindow implements AutoCloseable {
         if (window == null) {
             window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(800, 600), true));
             panel = new ManagerPanel(manager::entry, this::add, this::edit, this::delete, this::copyPublic,
-                grant -> report(manager.revoke(grant)), generate, this::changePassword, lock::lock,
+                grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, this::changePassword, lock::lock,
                 () -> service.requestUnlock(this.owner), context.appearance()::icon);
             panel.closeButton.addActionListener(event -> close());
             panel.cancelButton.addActionListener(event -> close());
@@ -93,7 +93,11 @@ public final class VaultManagerWindow implements AutoCloseable {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(title, window, true));
         EditorForm form;
         try { form = factory.apply(dialog::close); }
-        catch (RuntimeException failure) { dialog.close(); context.notices().error(EditorForm.message(failure)); return; }
+        catch (RuntimeException failure) {
+            dialog.close();
+            context.notifications().group().error("Could not open the form", title + ": " + EditorForm.message(failure), failure);
+            return;
+        }
         form.setFileChooser(dialog::chooseFile);
         dialogs.put(dialog, form); dialog.setContent(form);
         dialog.onClosed(() -> { form.close(); dialogs.remove(dialog); });
@@ -138,16 +142,16 @@ public final class VaultManagerWindow implements AutoCloseable {
     }
     private void changePassword() {
         dialog("Change Master Password", close -> new ChangePasswordForm(lock, close, failure -> {
-            if (failure != null) context.notices().error("Master password was not changed: " + EditorForm.message(failure));
+            if (failure != null) context.notifications().group().error("Master password was not changed", EditorForm.message(failure), failure);
         }));
     }
     private void copyPublic(UUID id) {
         CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(clipboard::copy);
-        report(copied);
+        report("Could not copy the public key", copied);
     }
-    private void report(CompletableFuture<Void> operation) {
+    private void report(String title, CompletableFuture<Void> operation) {
         operation.whenComplete((ignored, failure) -> {
-            if (failure != null) context.notices().error(EditorForm.message(failure));
+            if (failure != null) context.notifications().group().error(title, EditorForm.message(failure), failure);
             changed();
         });
     }

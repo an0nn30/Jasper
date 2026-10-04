@@ -127,6 +127,23 @@ class EditorPluginTest {
         }
     }
 
+    @Test void aRecentFileThatCannotBeReopenedIsPostedWithItsCause() throws Exception {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID terminal = host.addTerminalWindow();
+            var consumer = new AtomicReference<PluginContext>();
+            host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
+            Editor editor = consumer.get().services().require(Editor.class);
+            editor.open(new StubDocument("stub:/srv/app.conf", "app.conf", "dustin@prod:/srv/app.conf", "prod"));
+            drain(host);
+            editor.reopener("stub:", key -> Optional.of(owner -> { throw new IllegalStateException("the host is gone"); }));
+            List<String> rows = host.searchScope(RECENT, "", terminal, null);
+            host.executeInScope(RECENT, rowId(rows), "open", terminal, null);
+            assertThat(host.notifications().lines()).containsExactly(
+                "dev.jasper.editor|ERROR|Could not reopen a recent file|dustin@prod:/srv/app.conf: the host is gone|IllegalStateException");
+        }
+    }
+
     @Test void openInEditorShowsTheLocalChooserWhenNoOpenerAnswers() throws Exception {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
             host.start(INFO, Set.of(), Set.of(), plugin());

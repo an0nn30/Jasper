@@ -11,7 +11,7 @@ public record NotificationAction(String label, Runnable run, boolean expires) {
 
     public NotificationAction {
         label = NotificationText.line(Objects.requireNonNull(label, "label"), MAX_LABEL);
-        if (label.isEmpty()) throw new IllegalArgumentException("An action needs a label");
+        if (!NotificationText.visible(label)) throw new IllegalArgumentException("An action needs a label");
         Objects.requireNonNull(run, "run");
     }
 

@@ -7,6 +7,9 @@ import dev.jasper.remote.tunnels.TunnelState;
 import dev.jasper.remote.tunnels.TunnelStore;
 import dev.jasper.remote.ui.ConfirmPanel;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.notifications.DisplayMode;
+import dev.jasper.sdk.notifications.GroupSpec;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -55,6 +58,8 @@ public final class TunnelsUi implements AutoCloseable {
     public static final String PANEL = "dev.jasper.remote.tunnels.panel", TOGGLE = "dev.jasper.remote.tunnels",
         SHOW = "dev.jasper.remote.tunnels.show", NEW = "dev.jasper.remote.tunnels.new", FORWARD = "dev.jasper.remote.tunnels.forward",
         STOP_ALL = "dev.jasper.remote.tunnels.stop-all", STATUS = "dev.jasper.remote.tunnels.status";
+    /** The notification group for tunnel failures, which the user can mute apart from Remote's own. */
+    public static final String NOTIFICATIONS = "dev.jasper.remote.tunnels";
 
     private final PluginContext context;
     private final Executor ui;
@@ -64,6 +69,7 @@ public final class TunnelsUi implements AutoCloseable {
     private final Function<UUID, Optional<RemoteHost>> host;
     private final Consumer<String> clipboard;
     private final Icon icon;
+    private final NotificationGroup notifications;
     private Icon warningIcon;
     private final Map<UUID, TunnelsPanel> panels = new HashMap<>();
     private final Map<UUID, PanelHost> panelHosts = new HashMap<>();
@@ -93,6 +99,7 @@ public final class TunnelsUi implements AutoCloseable {
                      Function<UUID, Optional<RemoteHost>> host, Function<UUID, Optional<RemoteHost>> paneHost, Consumer<String> clipboard) {
         this.context = context; this.ui = ui; this.store = store; this.manager = manager; this.hosts = hosts; this.host = host;
         this.clipboard = clipboard;
+        notifications = context.notifications().group(new GroupSpec(NOTIFICATIONS, "Tunnels", DisplayMode.CARD));
         icon = context.appearance().icon(BundledIcon.ACTIONS_SWAP_PANELS);
         // Actions first: the panel names its toggle, and menus may only name registered actions.
         context.actions().register(ActionSpec.of(TOGGLE, "Toggle Tunnels").withIcon(icon)
@@ -293,7 +300,7 @@ public final class TunnelsUi implements AutoCloseable {
         // The tunnel stops when the store reports its entry gone (storeChanged), so a refused removal leaves it running.
         var confirm = new ConfirmPanel("Delete the tunnel " + tunnel.name() + "?" + (running ? " It is running; deleting it stops it." : ""), "Delete", () -> {
             store.remove(tunnel.id()).whenComplete((ignored, failure) -> ui.execute(() -> {
-                if (failure != null && !closed) context.notices().error(message(failure));
+                if (failure != null && !closed) notifications.error("Could not delete the tunnel", message(failure), failure);
                 dialog.close();
             }));
         }, dialog::close);
@@ -307,7 +314,7 @@ public final class TunnelsUi implements AutoCloseable {
         String base = tunnel.name() + " copy";
         String name = base;
         for (int i = 2; taken(name); i++) name = base + " " + i;
-        report(store.put(Tunnel.create(name, tunnel.hostId(), tunnel.kind(), tunnel.bindAddress(), tunnel.bindPort(), tunnel.targetHost(), tunnel.targetPort())));
+        report("Could not duplicate the tunnel", store.put(Tunnel.create(name, tunnel.hostId(), tunnel.kind(), tunnel.bindAddress(), tunnel.bindPort(), tunnel.targetHost(), tunnel.targetPort())));
     }
 
     private boolean taken(String name) { return store.tunnels().stream().anyMatch(tunnel -> tunnel.name().equalsIgnoreCase(name)); }
@@ -319,7 +326,7 @@ public final class TunnelsUi implements AutoCloseable {
     private void copyAddress(Tunnel tunnel) {
         TunnelRows.address(tunnel, manager.state(tunnel.id()), host.apply(tunnel.hostId()).map(RemoteHost::hostname)).ifPresent(text -> {
             try { clipboard.accept(text); }
-            catch (RuntimeException unavailable) { context.notices().error("Could not copy the address: " + message(unavailable)); }
+            catch (RuntimeException unavailable) { notifications.error("Could not copy the address", message(unavailable), unavailable); }
         });
     }
 
@@ -330,8 +337,8 @@ public final class TunnelsUi implements AutoCloseable {
         return dialog;
     }
 
-    private void report(CompletableFuture<Void> mutation) {
-        mutation.whenComplete((ignored, failure) -> ui.execute(() -> { if (failure != null && !closed) context.notices().error(message(failure)); }));
+    private void report(String title, CompletableFuture<Void> mutation) {
+        mutation.whenComplete((ignored, failure) -> ui.execute(() -> { if (failure != null && !closed) notifications.error(title, message(failure), failure); }));
     }
 
     /** Whether nothing listens on this computer's loopback at {@code port}. */

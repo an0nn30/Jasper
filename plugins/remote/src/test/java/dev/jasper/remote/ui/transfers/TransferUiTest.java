@@ -76,7 +76,7 @@ class TransferUiTest {
                 coordinator.clear(clean, false).get(5, TimeUnit.SECONDS); // the fade gets there first
                 strip.view(clean).orElseThrow().closeButton().doClick();
                 awaitGone(transfers, strip, clean);
-                assertThat(host.notices()).as("an already cleared job is not an error").isEmpty();
+                assertThat(host.notifications().lines()).as("an already cleared job is not an error").isEmpty();
                 var again = coordinator.enqueue(new TransferRequest(EndpointRef.local(), List.of(source.toString()), EndpointRef.local(), root.resolve("dest").toString()).withExisting(ConflictDecision.REPLACE), null).get(5, TimeUnit.SECONDS);
                 awaitView(transfers, strip, again, view -> view.statusText().equals("Done"));
                 strip.view(again).orElseThrow().closeButton().doClick();
@@ -95,7 +95,7 @@ class TransferUiTest {
                 assertThat(host.windowContent("dev.jasper.remote", "Clear transfer history")).isEmpty();
                 assertThat(coordinator.snapshot(0, 50).get(5, TimeUnit.SECONDS).jobs()).isEmpty();
                 assertThat(host.failures()).isEmpty();
-                assertThat(host.notices()).isEmpty();
+                assertThat(host.notifications().lines()).isEmpty();
             } finally {
                 if (transfers != null) transfers.close();
                 coordinator.close();
@@ -137,7 +137,7 @@ class TransferUiTest {
                 awaitView(transfers, strip, failed, view -> view.statusText().equals("Done"));
                 assertThat(Files.readString(dest.resolve("pipe"))).isEqualTo("fixed");
                 assertThat(host.failures()).isEmpty();
-                assertThat(host.notices()).isEmpty();
+                assertThat(host.notifications().lines()).isEmpty();
             } finally {
                 if (transfers != null) transfers.close();
                 coordinator.close();

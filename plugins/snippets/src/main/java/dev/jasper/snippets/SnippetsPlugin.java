@@ -46,7 +46,7 @@ public class SnippetsPlugin implements Plugin {
         });
         context.actions().register(ActionSpec.of(OPEN, "Snippets…").withKeywords(java.util.List.of("snippet", "palette")).withDefaultBinding("cmd+j"),
             invoked -> context.palette().open(invoked.window(), SnippetService.SCOPE_ID, Optional.empty(), Optional.empty()));
-        context.palette().register(new SnippetsScope(store, context.notices()::error, OPEN));
+        context.palette().register(new SnippetsScope(store, context.notifications().group(), OPEN));
         context.events().subscribe(AppEvents.CONFIG_RELOADED, event -> store.reload());
         store.reload();
     }

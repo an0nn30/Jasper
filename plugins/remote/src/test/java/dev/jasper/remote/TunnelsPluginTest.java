@@ -81,6 +81,7 @@ class TunnelsPluginTest {
         try (var host = new FakePluginHost()) {
             host.start(RemotePluginTest.INFO, Set.of(), Set.of(), plugin(dir.resolve("ssh")));
             assertThat(host.failures()).isEmpty();
+            assertThat(host.notifications().groups()).contains("dev.jasper.remote.tunnels|Tunnels|CARD");
             assertThat(host.actions()).contains(TunnelsUi.TOGGLE + "|Toggle Tunnels|true", TunnelsUi.SHOW + "|Show Tunnels|true",
                 TunnelsUi.NEW + "|New Tunnel...|true", TunnelsUi.FORWARD + "|Forward a Port...|true", TunnelsUi.STOP_ALL + "|Stop All Tunnels|false");
             assertThat(host.panels()).contains(TunnelsUi.PANEL + "|Tunnels|LEFT|" + TunnelsUi.TOGGLE);
