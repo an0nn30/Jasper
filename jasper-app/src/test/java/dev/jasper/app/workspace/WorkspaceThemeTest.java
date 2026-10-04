@@ -30,13 +30,13 @@ class WorkspaceThemeTest {
             var background = new java.awt.Color(authored ? 0x314159 : 0x17232f);
             assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(authored ? background : null);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            // The tab strip is part of the workspace surface: the terminal background, whatever the tab bar colour.
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
+            // The selected folder joins this workspace; the rest of the strip is recessed.
+            assertStripSurfaces(owner);
             themes.configure(chrome, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
+            assertStripSurfaces(owner);
             themes.configure(chrome, WorkspaceThemeChoice.MATCH, null, UiFontConfig.defaults());
             owner.update();
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
+            assertStripSurfaces(owner);
             owner.windowTabs().setSize(600, 32);
             owner.windowTabs().doLayout();
             var image = new java.awt.image.BufferedImage(600, 32, java.awt.image.BufferedImage.TYPE_INT_RGB);
@@ -44,6 +44,26 @@ class WorkspaceThemeTest {
             try { owner.windowTabs().paint(graphics); }
             finally { graphics.dispose(); }
         });
+    }
+
+    private static void assertStripSurfaces(WindowContent owner) {
+        var strip = owner.windowTabs(); WindowTabsTest.layout(strip, 600, 30);
+        var image = new java.awt.image.BufferedImage(600, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var g = image.createGraphics();
+        try { strip.paint(g); } finally { g.dispose(); }
+        var viewport = (java.awt.Container) WindowTabsTest.named(strip, "tabViewport");
+        java.awt.Container entry = null;
+        for (var child : viewport.getComponents()) {
+            var candidate = (java.awt.Container) child;
+            for (var control : candidate.getComponents())
+                if (control instanceof AbstractButton button && button.isSelected()) entry = candidate;
+        }
+        assertThat(entry).as("one real selected tab").isNotNull();
+        assertThat(new java.awt.Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 29)))
+            .as("active folder follows the actual workspace palette").isEqualTo(owner.theme().palette().background());
+        assertThat(new java.awt.Color(image.getRGB(500, 15)))
+            .as("negative space follows the workspace-derived recess").isEqualTo(strip.getBackground())
+            .isNotEqualTo(owner.theme().palette().background());
     }
 
     @Test void independentWorkspaceMarksNewTabsAndPaintsStripWithoutChangingChrome() throws Exception {
@@ -55,7 +75,7 @@ class WorkspaceThemeTest {
             var root = owner.currentPane();
             assertThat(root.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
             assertThat(((JLabel) root.getComponent(0)).getForeground()).isEqualTo(themes.current().palette().foreground());
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
+            assertStripSurfaces(owner);
             assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             assertThat(new JPopupMenu().getBackground()).isEqualTo(UIManager.getColor("PopupMenu.background"));
             themes.configureTerminal(TerminalColors.MATCH);

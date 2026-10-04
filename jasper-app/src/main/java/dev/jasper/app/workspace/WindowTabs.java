@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.appearance.Token;
 import dev.jasper.app.platform.SystemFonts;
 import com.formdev.flatlaf.util.UIScale;
@@ -12,8 +13,8 @@ import java.util.List;
 import javax.swing.*;
 
 /**
- * IntelliJ-style editor tabs over WindowContent's retained Swing selection model. The strip sits on the
- * workspace tab surface, independently of the surrounding chrome.
+ * Folder tabs over WindowContent's retained Swing selection model. The selected folder joins the workspace
+ * surface; the recessed strip and fixed controls frame it independently of the surrounding chrome.
  */
 final class WindowTabs extends JPanel implements AutoCloseable {
     private static final int MIN_TAB = 80, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6;
@@ -23,6 +24,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     private final IdentityHashMap<Component, Entry> entries = new IdentityHashMap<>();
     private final List<Component> order = new ArrayList<>();
     private final JButton list = new JButton();
+    private final JButton add = new JButton();
     private final JPanel viewport = new JPanel(null) {
         // Child hover/close repaints must also repaint the fade above them.
         @Override protected boolean isPaintingOrigin() { return true; }
@@ -43,7 +45,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         super(null);
         this.owner = owner;
         setName("windowTabs");
-        flat(list);
+        flat(list); flat(add);
+        add.setName("newTab");
+        add.setIcon(AppIcons.named("ADD"));
+        add.setToolTipText("New tab"); add.getAccessibleContext().setAccessibleName("New tab");
+        add.addActionListener(event -> { if (!disposed) owner.invoke(ActionId.NEW_TAB); });
         list.setName("tabList");
         list.setIcon(AppIcons.named("DROPDOWN"));
         list.setToolTipText("Show all tabs"); list.getAccessibleContext().setAccessibleName("Show all tabs");
@@ -51,15 +57,16 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         setOpaque(false);
         viewport.setOpaque(false);
         viewport.setName("tabViewport");
-        add(viewport); add(list);
+        add(viewport); add(list); add(add);
         addMouseWheelListener(this::wheel);
         viewport.addMouseWheelListener(this::wheel);
         list.addMouseWheelListener(this::wheel);
+        add.addMouseWheelListener(this::wheel);
     }
 
     void refresh() {
         var updated = new ArrayList<Component>();
-        for (int i = 0; i < owner.tabStrip().getTabCount(); i++) updated.add((Component) owner.tabStrip().getComponentAt(i));
+        for (int i = 0; i < owner.tabStrip().getTabCount(); i++) updated.add(owner.tabStrip().getComponentAt(i));
         if (!updated.equals(order)) {
             for (Component tab : List.copyOf(order)) if (!updated.contains(tab)) viewport.remove(entries.remove(tab));
             order.clear(); order.addAll(updated);
@@ -69,15 +76,19 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             revealSelection = true;
         }
         if (selected != owner.selectedComponent()) { selected = owner.selectedComponent(); revealSelection = true; }
-        // The strip is part of the workspace surface, which the centre host paints beneath it (opaque or glass);
-        // this colour is only what the overflow fade blends into.
-        setBackground(owner.workspaceSurface());
+        Color background = owner.theme().palette().background();
+        // A small workspace-derived recess works with independently light or dark terminal palettes.
+        float shade = owner.theme().workspace().dark() ? .78f : .94f;
+        setBackground(new Color(Math.round(background.getRed() * shade), Math.round(background.getGreen() * shade),
+            Math.round(background.getBlue() * shade)));
+        list.setIcon(AppIcons.forBackground(AppIcons.named("DROPDOWN"), getBackground()));
+        add.setIcon(AppIcons.forBackground(AppIcons.named("ADD"), getBackground()));
         boolean retitled = false;
         for (Component tab : order) retitled |= entries.get(tab).refresh();
         // A tab that grows can push the selected tab out; keep it shown if it was shown.
         Entry current = entries.get(selected);
         if (retitled && current != null && current.isVisible()) revealSelection = true;
-        list.setEnabled(!disposed);
+        list.setEnabled(!disposed); add.setEnabled(!disposed);
         revalidate(); repaint();
     }
 
@@ -112,8 +123,9 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     @Override public void doLayout() {
         int width = getWidth(), height = getHeight();
         if (width != layoutWidth) { layoutWidth = width; revealSelection = true; }
-        int listWidth = Math.min(width, UIScale.scale(LIST_WIDTH));
-        int space = Math.max(0, width - listWidth);
+        int addWidth = Math.min(width, UIScale.scale(LIST_WIDTH));
+        int listWidth = Math.min(Math.max(0, width - addWidth), UIScale.scale(LIST_WIDTH));
+        int space = Math.max(0, width - listWidth - addWidth);
         int[] widths = new int[order.size()];
         for (int i = 0; i < widths.length; i++) widths[i] = entries.get(order.get(i)).tabWidth();
         contentWidth = sum(widths, 0, widths.length);
@@ -135,10 +147,56 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             if (entry.isVisible()) entry.doLayout();
             x += widths[i];
         }
-        list.setBounds(width - listWidth, 0, listWidth, height);
+        list.setBounds(space, 0, listWidth, height);
+        add.setBounds(width - addWidth, 0, addWidth, height);
     }
 
-    /** Fade clipped tabs into the active surface; the tab-list button stays outside the viewport. */
+    // Hover/close repaints reconstruct the strip before its children, including shoulders outside the entry.
+    @Override protected boolean isPaintingOrigin() { return true; }
+
+    @Override protected void paintComponent(Graphics graphics) {
+        var g = (Graphics2D) graphics.create();
+        try {
+            // Replace the parent's glass once with the same workspace alpha. Paint only opaque negative space
+            // over it: translucent antialiased Src shapes cause expensive Metal readbacks on macOS.
+            g.setComposite(AlphaComposite.Src);
+            g.setColor(owner.workspaceSurface());
+            g.fillRect(0, 0, getWidth(), getHeight());
+            var recess = new java.awt.geom.Area(new Rectangle(0, 0, getWidth(), getHeight()));
+            Entry entry = entries.get(selected);
+            if (entry != null && entry.isVisible()) {
+                var folder = new java.awt.geom.Area(folder(entry));
+                folder.intersect(new java.awt.geom.Area(viewport.getBounds()));
+                recess.subtract(folder);
+            }
+            g.setComposite(AlphaComposite.SrcOver);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(getBackground());
+            g.fill(recess);
+        } finally { g.dispose(); }
+    }
+
+    /** Soft top corners with quarter-circle cutouts forming broad outward bottom shoulders. */
+    private java.awt.Shape folder(Entry entry) {
+        double x = entry.getX(), w = entry.getWidth(), h = getHeight(), top = topInset();
+        double r = Math.min(UIScale.scale(10f), Math.max(0, (h - top) / 2));
+        double k = r * .5522847498;
+        var shape = new java.awt.geom.Path2D.Double();
+        shape.moveTo(x - r, h);
+        shape.curveTo(x - r + k, h, x, h - r + k, x, h - r);
+        shape.lineTo(x, top + r);
+        shape.curveTo(x, top + r - k, x + r - k, top, x + r, top);
+        shape.lineTo(x + w - r, top);
+        shape.curveTo(x + w - r + k, top, x + w, top + r - k, x + w, top + r);
+        shape.lineTo(x + w, h - r);
+        shape.curveTo(x + w, h - r + k, x + w + r - k, h, x + w + r, h);
+        shape.closePath();
+        return shape;
+    }
+
+    private int topInset() { return Math.min(UIScale.scale(3), Math.max(0, getHeight() - UIScale.scale(16))); }
+
+    /** Fade clipped tabs into the recessed strip; the tab-list button stays outside the viewport. */
     private void paintOverflow(Graphics2D graphics) {
         int width = viewport.getWidth(), height = viewport.getHeight();
         int fade = Math.min(UIScale.scale(16), width / 2);
@@ -171,7 +229,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         return total;
     }
 
-    @Override public void close() { disposed = true; list.setEnabled(false); }
+    @Override public void close() { disposed = true; list.setEnabled(false); add.setEnabled(false); }
 
     private static void flat(JButton button) {
         button.putClientProperty("html.disable", true);
@@ -267,14 +325,13 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             String shortcut = owner.tabShortcut(order.indexOf(tab));
             String tip = capped(owner.tabTooltip(tab));
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
-            Color surface = WorkspaceTheme.color(this, Token.TAB_ACTIVE, "Jasper.tabSelectedBackground");
-            select.setIcon(tab == selected ? AppIcons.forBackground(owner.tabIcon(tab), surface) : owner.tabIcon(tab));
-            close.setIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE"), surface) : AppIcons.named("CLOSE"));
-            close.setRolloverIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface)
-                : AppIcons.named("CLOSE_HOVERED"));
+            Color surface = tab == selected ? owner.theme().palette().background() : WindowTabs.this.getBackground();
+            select.setIcon(tab == selected ? AppIcons.forBackground(owner.tabIcon(tab), surface) : null);
+            close.setIcon(AppIcons.forBackground(AppIcons.named("CLOSE"), surface));
+            close.setRolloverIcon(AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface));
             select.setSelected(tab == selected);
             select.setFont(SystemFonts.ui(Font.PLAIN, 13f));
-            select.setForeground(tab == selected ? WorkspaceTheme.color(this, Token.TAB_ACTIVE_TEXT, "Jasper.tabSelectedForeground")
+            select.setForeground(tab == selected ? owner.theme().palette().foreground()
                 : WorkspaceTheme.color(this, Token.TEXT_MUTED, !active ? "Jasper.titleInactiveForeground" : "Jasper.titleForeground"));
             close.setVisible(tab == selected || hovered);
             return retitled;
@@ -283,30 +340,12 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         @Override public void doLayout() {
             int edge = UIScale.scale(EDGE), closeWidth = Math.min(UIScale.scale(16), getWidth());
             int closeX = Math.max(0, getWidth() - edge - closeWidth);
-            close.setBounds(closeX, 0, closeWidth, getHeight());
-            select.setBounds(Math.min(edge, getWidth()), 0, Math.max(0, closeX - UIScale.scale(GAP) - edge), getHeight());
-        }
-
-        @Override protected void paintComponent(Graphics graphics) {
-            super.paintComponent(graphics);
-            if (tab != selected && !hovered) return;
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                float stroke = UIScale.scale(1f), horizontal = UIScale.scale(2f);
-                float vertical = Math.min(UIScale.scale(4f), Math.max(0, (getHeight() - UIScale.scale(20f)) / 2));
-                float width = getWidth() - 2 * horizontal - stroke, height = getHeight() - 2 * vertical - stroke;
-                if (width <= 0 || height <= 0) return;
-                var shape = new java.awt.geom.RoundRectangle2D.Float(horizontal + stroke / 2, vertical + stroke / 2,
-                    width, height, UIScale.scale(8f), UIScale.scale(8f));
-                g.setColor(WorkspaceTheme.color(this, tab == selected ? Token.TAB_ACTIVE : Token.TAB_HOVER, tab == selected ? "Jasper.tabSelectedBackground" : "Jasper.tabHoverBackground"));
-                g.fill(shape);
-                if (tab == selected) {
-                    g.setStroke(new BasicStroke(stroke));
-                    g.setColor(WorkspaceTheme.color(this, active ? Token.TAB_UNDERLINE : Token.TAB_UNDERLINE_INACTIVE, active ? "Jasper.tabSelectedBorder" : "Jasper.tabSelectedBorderInactive"));
-                    g.draw(shape);
-                }
-            } finally { g.dispose(); }
+            int top = topInset(), height = Math.max(0, getHeight() - top);
+            close.setBounds(closeX, top, closeWidth, height);
+            // Reserve the icon's space even on plain inactive labels, so selecting never changes the tab width.
+            int leading = edge + (tab == selected ? 0 : UIScale.scale(16 + GAP));
+            select.setBounds(Math.min(leading, getWidth()), top,
+                Math.max(0, closeX - UIScale.scale(GAP) - leading), height);
         }
     }
 }

@@ -32,7 +32,7 @@ class WindowTabsTest {
             ((AbstractButton) named(strip, "close:second")).doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
             assertThat(strip.isVisible()).isTrue();
-            assertThat(named(strip, "newTab")).as("New tab lives in the toolbar").isNull();
+            assertThat(named(strip, "newTab")).as("New tab stays reachable at the strip end").isNotNull();
             owner.tabStrip().setSize(600, 300); owner.tabStrip().doLayout();
             assertThat(owner.tabStrip().getComponentAt(0).getY()).isLessThanOrEqualTo(1);
         });
@@ -45,8 +45,9 @@ class WindowTabsTest {
             var strip = owner.windowTabs(); layout(strip, 800, 38);
             var first = (AbstractButton) named(strip, "select:first");
             var second = (AbstractButton) named(strip, "select:second");
-            assertThat(first.getIcon()).isNotNull();
-            assertThat(first.getIcon().getIconWidth()).isEqualTo(16);
+            assertThat(first.getIcon()).as("inactive tabs are plain labels").isNull();
+            assertThat(second.getIcon()).isNotNull();
+            assertThat(second.getIcon().getIconWidth()).isEqualTo(16);
             assertThat(first.getHorizontalAlignment()).isEqualTo(SwingConstants.LEADING);
             Container one = first.getParent(), two = second.getParent();
             assertThat(one.getX()).isZero();
@@ -62,7 +63,7 @@ class WindowTabsTest {
             assertThat(otherClose.isVisible()).isTrue();
             mouse(first, MouseEvent.MOUSE_EXITED, -100, -100, MouseEvent.NOBUTTON);
             assertThat(otherClose.isVisible()).isFalse();
-            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(776, 0, 24, 38));
+            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(752, 0, 24, 38));
         });
     }
 
@@ -79,32 +80,73 @@ class WindowTabsTest {
         });
     }
 
-    @Test void selectedTabHasAnInsetRoundedThemeFillAndOutline() throws Exception {
+    @Test void selectedFolderJoinsTheWorkspaceWithConcaveShouldersAndNoOutline() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
             for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
                 owner.selectTheme(theme);
-                var strip = owner.windowTabs(); layout(strip, 800, 38);
+                var strip = owner.windowTabs(); layout(strip, 800, 30);
                 Container selected = named(strip, "select:second").getParent();
-                int middle = selected.getWidth() / 2;
-                assertThat(pixel(selected, middle, 4)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBorder"));
-                assertThat(pixel(selected, middle, 6)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
-                for (var point : java.util.List.of(new Point(2, 4), new Point(middle, 0), new Point(middle, 37)))
-                    assertThat(pixel(selected, point.x, point.y)).as("outside the rounded selection")
-                        .isEqualTo(owner.theme().palette().background());
+                int x = selected.getX(), right = x + selected.getWidth(), middle = x + selected.getWidth() / 2;
+                Color surface = owner.theme().palette().background();
+                Color recessed = pixel(strip, 650, 15);
+                assertThat(recessed).as("a recessed strip separates inactive titles from the workspace").isNotEqualTo(surface);
+                assertThat(pixel(strip, middle, 5)).as("top body has workspace fill, with no accent outline").isEqualTo(surface);
+                assertThat(pixel(strip, middle, 29)).as("folder bottom joins the terminal without a gap").isEqualTo(surface);
+                assertThat(pixel(strip, x - 5, 29)).as("left shoulder spreads outward at the bottom").isEqualTo(surface);
+                assertThat(pixel(strip, right + 4, 29)).as("right shoulder spreads outward at the bottom").isEqualTo(surface);
+                assertThat(pixel(strip, x - 5, 20)).as("left shoulder is concave above the bottom").isEqualTo(recessed);
+                assertThat(pixel(strip, right + 4, 20)).as("right shoulder is concave above the bottom").isEqualTo(recessed);
+                assertThat(pixel(strip, x + 1, 3)).as("soft top corner exposes the recess").isEqualTo(recessed);
                 owner.setActive(false);
-                assertThat(pixel(selected, middle, 4)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBorderInactive"));
+                assertThat(pixel(strip, middle, 5)).as("window activation adds no outline").isEqualTo(surface);
                 owner.setActive(true);
-                try {
-                    var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
-                    javax.imageio.ImageIO.write(render(strip), "png", output.resolve("rounded-tabs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
-                } catch (java.io.IOException error) { throw new java.io.UncheckedIOException(error); }
             }
         });
     }
 
-    @Test void selectedTabUsesWorkspaceTokensWithIndependentTerminalPalettes() throws Exception {
+    @Test void newTabAtTheFarRightOpensAndSelectsATabAndStopsAfterClosure() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.currentTab().rename("first"); owner.update();
+            var strip = owner.windowTabs(); layout(strip, 330, 30);
+            var add = (AbstractButton) named(strip, "newTab");
+            assertThat(add).isNotNull();
+            assertThat(add.getBounds()).isEqualTo(new Rectangle(306, 0, 24, 30));
+            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(282, 0, 24, 30));
+            assertThat(SwingUtilities.getDeepestComponentAt(strip, 318, 15)).isSameAs(add);
+            var first = owner.currentTab();
+            add.doClick(); layout(strip, 330, 30);
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.currentTab()).isNotSameAs(first);
+            owner.close();
+            assertThat(add.isEnabled()).isFalse();
+            add.doClick();
+            assertThat(owner.tabStrip().getTabCount()).isZero();
+        });
+    }
+
+    @Test void foldersRemainFlushAndControlsFitAtTheMinimumConfiguredHeight() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            var strip = owner.windowTabs();
+            for (int height : new int[]{20, 30, 72}) {
+                owner.setTabHeight(height); layout(strip, 800, height);
+                var label = named(strip, "select:second");
+                var close = named(strip, "close:second");
+                int middle = label.getParent().getX() + label.getParent().getWidth() / 2;
+                assertThat(pixel(strip, middle, height - 1)).as("no seam at height %s", height)
+                    .isEqualTo(owner.theme().palette().background());
+                assertThat(close.getHeight()).isGreaterThanOrEqualTo(16);
+                assertThat(label.getY() + label.getHeight()).isEqualTo(height);
+                assertThat(close.getY() + close.getHeight()).isEqualTo(height);
+            }
+        });
+    }
+
+    @Test void selectedTabUsesActualWorkspaceColorsWithIndependentTerminalPalettes() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
@@ -114,17 +156,17 @@ class WindowTabsTest {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
                     JComponent label = named(strip, "select:selected");
-                    assertThat(pixel(label.getParent(), label.getParent().getWidth() / 2, 6)).isEqualTo((owner.theme().matching() ? UIManager.getColor("Jasper.tabSelectedBackground") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_ACTIVE)));
-                    assertThat(label.getForeground()).isEqualTo((owner.theme().matching() ? UIManager.getColor("Jasper.tabSelectedForeground") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_ACTIVE_TEXT)));
+                    assertThat(pixel(label.getParent(), label.getParent().getWidth() / 2, 6)).isEqualTo(owner.theme().palette().background());
+                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
                     owner.setActive(false);
-                    assertThat(label.getForeground()).isEqualTo((owner.theme().matching() ? UIManager.getColor("Jasper.tabSelectedForeground") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_ACTIVE_TEXT)));
+                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
                     owner.setActive(true);
                 }
             }
         });
     }
 
-    @Test void stripUsesTheWorkspaceSurfaceWithReadableTitlesWhateverTheUiTheme() throws Exception {
+    @Test void recessedStripKeepsReadableTitlesWhateverTheUiTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
@@ -133,7 +175,7 @@ class WindowTabsTest {
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo(owner.theme().palette().background());
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isNotEqualTo(owner.theme().palette().background());
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();
@@ -297,8 +339,8 @@ class WindowTabsTest {
             wheel(strip, 1000); layout(strip, 430, 38);
             var last = named(strip, "select:Tab 7 with a longer title").getParent();
             assertThat(last.getX() + last.getWidth()).isEqualTo(last.getParent().getWidth());
-            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(406, 0, 24, 38));
-            assertThat(SwingUtilities.getDeepestComponentAt(strip, 418, 19)).isSameAs(named(strip, "tabList"));
+            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(382, 0, 24, 38));
+            assertThat(SwingUtilities.getDeepestComponentAt(strip, 394, 19)).isSameAs(named(strip, "tabList"));
             ((JMenuItem) strip.tabList().getComponent(0)).doClick(); layout(strip, 430, 38);
             assertThat(entry.getX()).as("choosing the already-selected tab reveals it again").isZero();
             layout(strip, 2200, 38);
@@ -308,7 +350,7 @@ class WindowTabsTest {
         });
     }
 
-    @Test void overflowFadesOnlyClippedEdgesIntoTheTerminalSurface() throws Exception {
+    @Test void overflowFadesOnlyClippedEdgesIntoTheRecessedStrip() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             for (int i = 0; i < 5; i++) {
@@ -322,10 +364,10 @@ class WindowTabsTest {
                 var first = named(strip, "select:wide selected tab 0");
                 wheel(first, 0.5); layout(strip, 380, 38);
                 var viewport = first.getParent().getParent();
-                Color surface = owner.theme().palette().background();
-                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the terminal surface").isEqualTo(surface);
+                Color surface = strip.getBackground();
+                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the recessed strip").isEqualTo(surface);
                 assertThat(pixel(viewport, 24, 6)).as("selection beyond the fade is unchanged")
-                    .isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
+                    .isEqualTo(owner.theme().palette().background());
                 var output = java.nio.file.Path.of("build/render-preview");
                 try {
                     java.nio.file.Files.createDirectories(output);
@@ -335,7 +377,7 @@ class WindowTabsTest {
                 ((JMenuItem) strip.tabList().getComponent(4)).doClick(); layout(strip, 380, 38);
                 wheel(strip, -0.5); layout(strip, 380, 38);
                 assertThat(pixel(viewport, viewport.getWidth() - 1, 6)).isEqualTo(surface);
-                assertThat(pixel(viewport, viewport.getWidth() - 25, 6)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
+                assertThat(pixel(viewport, viewport.getWidth() - 25, 6)).isEqualTo(owner.theme().palette().background());
             }
         });
     }
@@ -358,17 +400,17 @@ class WindowTabsTest {
             layout(strip, 330, 38);
             var bounds = SwingUtilities.convertRectangle(source.getParent(), source.getBounds(), source.getParent().getParent());
             assertThat(bounds.x).isGreaterThanOrEqualTo(0);
-            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(306);
+            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(282);
             ((AbstractButton) named(strip, "close:tab-5")).doClick(); layout(strip, 330, 38);
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(5);
             var remaining = named(strip, "select:" + owner.currentTab().title()).getParent();
             assertThat(remaining.isVisible()).isTrue();
             assertThat(remaining.getX()).isGreaterThanOrEqualTo(0);
-            assertThat(remaining.getX() + remaining.getWidth()).isLessThanOrEqualTo(306);
+            assertThat(remaining.getX() + remaining.getWidth()).isLessThanOrEqualTo(282);
         });
     }
 
-    @Test void droppingOverTheFixedListDoesNotTargetAClippedTab() throws Exception {
+    @Test void droppingOverFixedControlsDoesNotTargetAClippedTab() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             for (int i = 0; i < 5; i++) {
@@ -379,7 +421,7 @@ class WindowTabsTest {
             var first = owner.currentTab();
             var strip = owner.windowTabs(); layout(strip, 330, 38);
             var source = named(strip, "select:" + first.title());
-            for (int x : new int[] {318, 345, -8}) {
+            for (int x : new int[] {294, 318, 345, -8}) {
                 Point end = SwingUtilities.convertPoint(strip, x, 19, source);
                 mouse(source, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
                 mouse(source, MouseEvent.MOUSE_RELEASED, end.x, end.y, MouseEvent.BUTTON1);
@@ -424,11 +466,14 @@ class WindowTabsTest {
     }
     private static Color pixel(Container entry, int x, int y) { return new Color(render(entry).getRGB(x, y)); }
     private static BufferedImage render(Container entry) {
+        // Folder shoulders are painted by the strip across entry boundaries; crop the real whole strip.
+        var ancestor = SwingUtilities.getAncestorOfClass(WindowTabs.class, entry);
+        if (ancestor instanceof WindowTabs strip) {
+            Point at = SwingUtilities.convertPoint(entry, 0, 0, strip);
+            return render(strip).getSubimage(at.x, at.y, entry.getWidth(), entry.getHeight());
+        }
         var image = new BufferedImage(entry.getWidth(), entry.getHeight(), BufferedImage.TYPE_INT_RGB);
         var g = image.createGraphics();
-        // The strip's parent paints the terminal surface behind its non-opaque tabs.
-        var strip = SwingUtilities.getAncestorOfClass(WindowTabs.class, entry);
-        g.setColor((strip != null ? strip : entry).getBackground()); g.fillRect(0, 0, image.getWidth(), image.getHeight());
         try { entry.paint(g); } finally { g.dispose(); }
         return image;
     }
