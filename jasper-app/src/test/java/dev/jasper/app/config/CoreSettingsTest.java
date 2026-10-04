@@ -12,13 +12,23 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class CoreSettingsTest {
+    @Test void viewModeIsARestartOnlyChoiceWithNormalAsItsDefault() {
+        var setting = CoreSettings.WINDOW_VIEW_MODE;
+        assertThat(setting.name()).isEqualTo("window.view_mode");
+        assertThat(setting.label()).isEqualTo("View mode");
+        assertThat(setting.defaultValue()).isEqualTo(ViewMode.NORMAL);
+        assertThat(setting.applies()).isEqualTo(Applies.RESTART);
+        assertThat(((SettingKind.Choice<ViewMode>) setting.kind()).tokens()).containsExactly(
+            Map.entry("normal", ViewMode.NORMAL), Map.entry("compact", ViewMode.COMPACT));
+    }
+
     @Test void defaultsBuildTheBuiltInSnapshot() {
         assertThat(ConfigSnapshot.from(SettingValues.defaults(CoreSettings.SCHEMA), Map.of(), Map.of()))
             .isEqualTo(ConfigSnapshot.defaults());
     }
 
     @Test void everySettingIsDescribedAndItsTemplateValueRoundTrips() {
-        assertThat(CoreSettings.SCHEMA.settings()).hasSize(35);
+        assertThat(CoreSettings.SCHEMA.settings()).hasSize(36);
         for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
             assertThat(setting.label()).as(setting.name()).isNotBlank();
             assertThat(setting.description()).as(setting.name()).isNotBlank();

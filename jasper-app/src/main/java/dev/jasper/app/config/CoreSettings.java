@@ -62,6 +62,13 @@ public final class CoreSettings {
         .applies(Applies.RESTART)
         .description("Windows and Linux only: use the operating system's title bar, with the menus and the toolbar in\n"
             + "rows of their own, instead of Jasper's title bar. macOS always uses its own title bar.").build();
+    public static final Setting<ViewMode> WINDOW_VIEW_MODE = Setting.of("window.view_mode", SettingKind.choice(List.of(
+            Map.entry("normal", ViewMode.NORMAL), Map.entry("compact", ViewMode.COMPACT))), ViewMode.NORMAL)
+        .label("View mode").keywords("title bar", "compact", "normal", "command palette")
+        .applies(Applies.RESTART)
+        .description("View mode: \"normal\" keeps the current workspace; \"compact\" uses the native title bar, hides the\n"
+            + "toolbar and title search field, and opens the command palette as a floating card. Takes effect after restart.\n"
+            + "The saved toolbar preference is retained for Normal.").build();
     public static final Setting<Boolean> BUDDY_ENABLED = Setting.of("buddy.enabled", SettingKind.bool(), false)
         .label("Show Jasper").keywords("buddy", "desk buddy", "mascot")
         .description("Show the pixel-art Jasper floating above your windows while a terminal is open; off by default,\n"
@@ -201,7 +208,7 @@ public final class CoreSettings {
             + "\"Darcula\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
-            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
+            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
