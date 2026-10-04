@@ -19,7 +19,8 @@
   all four architecture gates and doclint included; the source hygiene check and `git diff --check c02673cd` are
   clean. Final review: one important finding fixed (a plugin whose manifest `name` showed nothing stopped Jasper from
   launching; `DescriptorParser` now rejects such a name, making it an unreadable-plugin problem); seven minor findings
-  are deferred in the plan's status banner. No GUI launched. GUI checks for the user: a plugin error card with Show
+  are deferred in the plan's status banner. No GUI launched. Pushed to `origin` on 2026-10-03 with the dock polish
+  round, at the user's choice. GUI checks for the user: a plugin error card with Show
   more… opening the Errors window; a long File Server transfer (one that runs past the activity threshold), whose
   outcome is posted in "File Server activities" as "Sending <file>" or "Receiving <file>" (an interrupted one as an
   error); a plugin directory without `plugin.toml` in the user plugins folder, reported at launch with Open Plugins.
@@ -95,7 +96,7 @@
   lever is in `jasper-terminal`: `TerminalView.paintComponent` takes a full snapshot and paints every row whatever its
   clip, so a terminal under a small dirty rectangle still pays the whole snapshot. No GUI launched; GUI checks for the
   user are the plan's last section.
-  Polish round (2026-10-03, pushed to `main` with notifications plan 2 at the user's choice): the overlay repaints only what changed, the placeholder's
+  Polish round (2026-10-03, pushed to `main` with notifications plans 2 and 3 at the user's choice): the overlay repaints only what changed, the placeholder's
   border no longer stacks over its fill, and the placeholder's fill is concentric with its border (its corner
   diameter is `arc - 1`, where the border's inner edge lies); `DockState.dropIndex` is the one drop-index rule shared
   by the preview and the drop. 8 new tests pin behaviour that was already there: `HostedUiTest` maps all six anchor and
