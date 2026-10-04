@@ -67,12 +67,13 @@ class BuddyColumnPanelTest {
         assertThat(paintDoesNotThrow()).isTrue();
     }
 
-    @Test void clickingABubbleRunsItsActionAndSaysTheColumnShouldGo() {
+    /** Every capsule is work still going, so the one you clicked, and the others, stay above his head. */
+    @Test void clickingABubbleRunsItsActionAndKeepsTheColumn() {
         post("a", "one", BuddyNotice.State.RUNNING);
         post("b", "two", BuddyNotice.State.RUNNING);
         layout();
 
-        assertThat(panel.handleClick(inBubble(0))).isFalse();
+        assertThat(panel.handleClick(inBubble(0))).isTrue();
 
         assertThat(activated).containsExactly("two");
         assertThat(drawerOpened).isZero();
@@ -115,7 +116,7 @@ class BuddyColumnPanelTest {
         assertThat(inBubble(0)).as("the flip starts at its current painted position").isEqualTo(newestAbove);
         now += java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(900);
         assertThat(inBubble(0)).as("the newest moved to the other end").isNotEqualTo(newestAbove);
-        assertThat(panel.handleClick(inBubble(0))).isFalse();
+        assertThat(panel.handleClick(inBubble(0))).isTrue();
         assertThat(activated).containsExactly("newer");
     }
 
@@ -202,7 +203,7 @@ class BuddyColumnPanelTest {
         Rectangle bounds = panel.cardBounds(0);
         panel.handleMove(new Point(bounds.x + 1, bounds.y + 1));
         assertThat(panel.hovered()).isEqualTo(-1);
-        assertThat(panel.handleClick(inBubble(0))).isFalse();
+        assertThat(panel.handleClick(inBubble(0))).isTrue();
         assertThat(activated).containsExactly("one");
         now += BubbleMotion.IN_NANOS;
         assertThat(panel.cardBounds(0).y - bounds.y).isEqualTo((int) BubbleMotion.IN_TRAVEL);

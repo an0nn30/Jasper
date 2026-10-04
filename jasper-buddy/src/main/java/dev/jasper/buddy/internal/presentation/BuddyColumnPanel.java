@@ -171,6 +171,10 @@ final class BuddyColumnPanel extends JComponent {
         onLayoutChanged.run();
     }
 
+    /**
+     * A click on a capsule runs its activation; a click beside them opens the drawer. Returns whether the column stays,
+     * and it always does now: every capsule is work still going, the clicked one included.
+     */
     boolean handleClick(Point point) {
         List<BuddyNotice> column = deck.notices();
         if (column.isEmpty()) return true;
@@ -181,7 +185,7 @@ final class BuddyColumnPanel extends JComponent {
         }
         BuddyNotice notice = column.get(index);
         notice.activate().run();
-        return false;
+        return true;
     }
 
     private int indexAt(Point point) {
