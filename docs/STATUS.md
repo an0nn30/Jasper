@@ -2,6 +2,26 @@
 
 ## Current state — 2026-10-04
 
+- **Merged `main` into `claude/startup-speed` again** (2026-10-04; `main` at `857f3020`, 11 commits past the first
+  merge's `a23d0f15`): the dock guide halves, the window layout restoration (`ad1eb65a`: `[main_window]` bounds, the
+  last window closed wins) and the repository rename to `an0nn30/Jasper`. Conflicts: `AGENTS.md` keeps the AOT
+  training rule with the new URL; `JasperApplication.openWindow` calls `restoreLayout(uiState)` before `show()` inside
+  Plan 4's guarded composition. Semantics checked against Plan 4: Quit to the background closes every window through
+  `TerminalWindow.close()` in the order they opened, exactly as a real Quit does, so each saves its bounds and dock
+  layout and the newest window's win in both; a reopen, the menu bar item's New Window or a handoff then restores
+  them from the same in-memory `UiState`. Fixed: a window that failed to compose, or the `--background` warm-up's
+  rehearsal (never shown, at the default size), would have counted as the last window closed. Both are now discarded
+  (`TerminalWindow.discard()`: no placement save, and `WindowContent.forgetLayout()` makes `WindowContributions` skip
+  its closing snapshot); the rehearsal also keeps its own in-memory `UiState` and never restores the saved layout.
+  New tests in `WindowPanelsTest`: a discarded window saves nothing, so the last window closed still wins (checked to
+  fail without `forgetLayout`), and a window opened after every window closed in the same process gets the last layout
+  without reloading. `TerminalWindow` itself cannot be built headless, so its `discard()` and the order of saves in
+  `close()` are covered by reading. `./gradlew check --continue`: **8,569 tests, 0 failures, 0 errors, 6 skipped** (the
+first merge's 8,554, main's 13 new and these 2); `:jasper-app:verifyPackage` passes; source hygiene clean. No GUI
+launched, no AOT training. GUI checks for the user: move and resize a window, Cmd+Q on a resident Mac, click
+  the Dock icon, and the window comes back where it was with its tool windows; a `--background` (login) launch's first
+  window opens at the saved place, not the default size.
+
 - **Merged `main` into `claude/startup-speed`** (2026-10-04; `main` at `a23d0f15`, merge base `91400d29`, 176
   commits): start-up Plans 1, 2 and 4 now sit on notifications plans 1–4, the six-slot dock and its edge zones,
   workspace glass and the chooser fix. The 13 conflict hunks kept both sides (this file keeps every entry, start-up's
@@ -141,6 +161,51 @@
   (Plan 3B); no test drives `watchOutput`→`timeFirstTerminal` end to end; the diagnostics example's phase numbers
   contradict "phases overlap" and the benchmark doc's cleanup sentence is loose (docs pass).
 
+- **Dock guides: a second slot's guide always shows its half; pushed to `main`, awaiting the user's GUI check**
+  (2026-10-03; spec §3 "Guides" amended at the user's request). The user: the guides should show the bottom
+  half left or right when a tool panel moves there, "regardless if doing so would make the tool full screen or not",
+  because the guide only showed a bottom half while a tool already held the top half. Rule: `DockGeometry.landing`, for
+  a pair's second slot (Left Bottom, Right Bottom, Bottom Right; extended to Bottom Right by the same principle, since
+  its home is the right half of the bottom area), puts a stand-in window into the partner slot of its what-if copy
+  whenever the partner would show nothing, so the guide is the lower half of the side or the right half of the bottom
+  area. This covers a hidden partner window and the dragged window being the partner's only one (Sessions alone in Left
+  Top, dragged to Left Bottom). The stand-in id has spaces, so no panel id can equal it, and it exists only in the copy:
+  the real state and layout do not change, and a dropped lone window still fills its side or the bottom area (spec §1,
+  as in IntelliJ), so the guide and the first frame differ on purpose until a window shows in the partner. The first
+  slots (Left Top, Right Top, Bottom Left) keep the true landing. `DockDropModelTest` 5 → 10 (the three second slots
+  against a real split and the explicit rectangles, a hidden partner, the partner's only window moving over, the first
+  slots unchanged, the state passed in untouched; the one existing assertion that expected the full-width bottom preview
+  now expects the right half) and `WindowDragTest` 15 → 17 (Sessions alone on the left dragged toward Left Bottom: the
+  guide is the lower half and equals the lower frame once Files splits the side, while the real layout stays full height
+  before and after the drop; a hidden Files dragged toward Bottom Right likewise). Tests: **+7**. `./gradlew check
+  --continue`: **8,456 tests, 0 failures, 0 errors, 6 skipped**, all architecture gates and doclint included. No GUI
+  launched. GUI check for the user: with only one tool window showing on the left (or right) side, drag it, or a hidden
+  one, toward that side's lower half and see the highlight cover the lower half, not the whole side; the same toward the
+  right half of the bottom with no bottom window showing. After the drop the window fills the whole side or bottom area,
+  as before. A drag toward an upper half or Bottom Left still previews the whole side or bottom area. Also expect this:
+  a window already alone in a lower half shows the lower-half guide as soon as its drag starts, while the window itself
+  still fills the side.
+
+- **Window layout restoration fix** (2026-10-03; `codex/restore-window-layout`, based on `main` at `f450112b`):
+  main terminal frames previously never saved or restored their bounds; dock persistence intentionally used the
+  last layout edit rather than the last window closed. Each window now snapshots its tool-panel slots/order,
+  visibility, dock sizes/ratios and its own rail visibility before teardown. `ui-state.toml` version 2 also stores
+  `[main_window]` normal pixel bounds and maximized axes. The app restores these after configuration and panel
+  attachment, before showing the frame. Minimized state is not restored; unavailable display space is fitted to a
+  current usable display, while intentional spans across adjacent displays remain exact. Auxiliary windows and
+  file-chooser state are preserved. The original dock spec is amended to the user's last-closed-wins requirement.
+  This is a bounded bug-fix follow-up with inline TDD and independent final review, not a re-execution of the
+  historical dock plans. Regressions cover close order, all six open slots with exact terminal-area restoration,
+  rail ownership, persistence across reload, maximized/minimized normal bounds, removed monitors, spanning displays,
+  and malformed main-window data. Independent review's spanning-display finding was fixed with a failing/passing
+  regression and approved in re-review. Final `./gradlew check --continue`: **8,439 tests, 0 failures, 0 errors, 6 skipped**; architecture gates and
+  native headless checks passed. Changed Java source hygiene and `git diff --check` passed. No GUI launched, merge
+  or push performed.
+  User-run acceptance: resize/reposition a window, open/move/resize panels, quit/relaunch; repeat with two differently
+  arranged windows closed in both orders, and with maximization/minimization and multiple displays. Native macOS
+  fullscreen is distinct from AWT maximization and is not restored by this change. Terminal sessions/editor
+  documents are not resurrected by this layout state.
+
 - **Notifications plan 4: long commands and Buddy, merged to local `main` 2026-10-03 (not pushed); awaiting the user's
   GUI checks and their call on a background finish's route to its pane** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
   [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
@@ -163,6 +228,7 @@
   on, the capsule shows while it runs and goes when it ends, and clicking it focuses the pane and keeps the column; the
   drawer lists only running work; in the packaged app with Jasper in the background, the macOS banner still arrives
   and the notification waits unread.
+
 - **Dock drop zones: six edge zones replace the 3 × 2 grid; pushed to `main`, awaiting the user's GUI check**
   (2026-10-03; spec §3 "Targets" and "Guides" amended
   at the user's request). The user could not drop a tool window on the lower half of the left or right side and named
@@ -180,7 +246,8 @@
   of a hidden window previewing a frame that never appears, because the stripe drop keeps it hidden: `DockDrag` now
   shows no area highlight for it (the placeholder and the ghost stay). Unchanged: a window alone in a side's bottom
   slot still fills that side (spec §1, as in IntelliJ), so its preview looks like the top zone until the top slot
-  shows a window. Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
+  shows a window (superseded the same day by the entry above: the guide now shows the lower half).
+  Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
   diagonal, the half splits, ties, a wide and a tall workspace and the split line; `DockDragTest` 21 → 24 and
   `WindowDragTest` 12 → 15, including a lower-left drop beside a showing Sessions, the same under a showing bottom
   area and the hidden-window preview); the drag tests aim with `DockTestSupport.zone(workspace, slot)` instead of a
@@ -314,7 +381,8 @@
   stripe, and a `ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3,
   4, 6 and 9 none; final review: `WindowContributions.close()` no longer saves, because every dock change is saved as
   it happens and saving again on close overwrote other windows' later changes (new test
-  `closingAWindowKeepsTheChangesAnotherWindowSaved`); `DockGeometry` reserves above the bottom area the larger of the
+  `closingAWindowKeepsTheChangesAnotherWindowSaved`; superseded on 2026-10-03 by the user's correction that the last
+  window closed wins, so `close()` saves again: see the window layout restoration entry); `DockGeometry` reserves above the bottom area the larger of the
   terminal's minimum height and two tool window minimums plus a divider when the left or the right side shows both
   halves, in the squeeze and in the bottom divider's range (new tests
   `theBottomAreaGrowsOnlyUntilASplitSidesHalvesReachTheirMinimum`,

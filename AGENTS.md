@@ -16,7 +16,7 @@ Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferr
   and any packaging task with `-Pjasper.aot=true` launch the packaged app once (a window for a few seconds, no Dock icon)
   to record `Contents/app/jasper.aot`. Ask the user first. `packageApp` and `verifyPackage` without that property stay
   headless.
-- Do not commit directly on `main`: work on a branch and merge when the user agrees. End commit messages with a `Co-Authored-By:` trailer. The user authorized `origin` at `https://github.com/an0nn30/moray.git`; ask before pushing unless the session already authorizes it.
+- Do not commit directly on `main`: work on a branch and merge when the user agrees. End commit messages with a `Co-Authored-By:` trailer. The user authorized `origin` at `https://github.com/an0nn30/Jasper.git`; ask before pushing unless the session already authorizes it.
 
 ## Architecture rules (from the spec and the plans' Global Constraints)
 

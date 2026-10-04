@@ -2,8 +2,8 @@
 
 A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP and tunnels, which are now bundled plugins (tunnels: plan 7b-2 on `claude/tunnels-7b2`, 7b-3 to follow); a plugin SDK already hosts bundled and user-installed plugins.
 
-Formerly Moray. The app and Java packages are now Jasper; the Git repository
-remains [an0nn30/moray](https://github.com/an0nn30/moray). Existing settings can be
+Formerly Moray. The app, the Java packages and the Git repository
+([an0nn30/Jasper](https://github.com/an0nn30/Jasper)) are now Jasper. Existing settings can be
 carried over using the [rebrand migration notes](docs/rebranding.md).
 
 Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. Coordinated Atom-inspired dark/light themes update the complete window.

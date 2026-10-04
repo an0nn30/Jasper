@@ -594,7 +594,7 @@ class WindowPanelsTest {
         });
     }
 
-    @Test void closingAWindowKeepsTheChangesAnotherWindowSaved() throws Exception {
+    @Test void theLastWindowClosedWinsEvenWhenAnotherWindowWasEditedLast() throws Exception {
         Path file = dir.resolve("ui-state.toml");
         edt(() -> {
             var model = new Contributions();
@@ -607,11 +607,90 @@ class WindowPanelsTest {
             ToolWindowHeaderTest.item(menu, "Right Top").doClick();
             assertThat(UiState.load(file).panel("dev.x.hosts")).hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
             second.close();
-            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the untouched window saves nothing as it closes")
-                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the closing window saves its own layout")
+                .hasValue(new UiState.Panel(Slot.LEFT_TOP, 0, false));
             first.close();
-            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the last change saved wins")
+            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the last window closed wins")
                 .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+        });
+    }
+
+    @Test void aDiscardedWindowSavesNothingSoTheLastWindowClosedStillWins() throws Exception {
+        // A window that failed to compose, or the warm-up rehearsal's, is discarded rather than closed.
+        Path file = dir.resolve("ui-state.toml");
+        edt(() -> {
+            var model = new Contributions();
+            var state = UiState.load(file);
+            WindowContent kept = window(), discarded = window();
+            kept.connectContributions(model, state);
+            discarded.connectContributions(model, state);
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            var menu = kept.leftStripe().buttons().getFirst().getComponentPopupMenu();
+            ToolWindowHeaderTest.item(menu, "Right Top").doClick();
+            kept.close();
+            discarded.forgetLayout();
+            discarded.close();
+            assertThat(discarded.closed()).isTrue();
+            assertThat(UiState.load(file).panel("dev.x.hosts")).as("the discarded window wrote nothing")
+                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+            assertThat(state.panel("dev.x.hosts")).as("nor changed the shared state")
+                .hasValue(new UiState.Panel(Slot.RIGHT_TOP, 0, false));
+        });
+    }
+
+    @Test void aWindowOpenedAfterEveryWindowClosedInTheSameProcessGetsTheLastLayout() throws Exception {
+        // Quit, and a resident Jasper's Quit to the background, close every window in the order they opened; a resident
+        // process then opens its next window from the same state, without reading the file again.
+        Path file = dir.resolve("ui-state.toml");
+        edt(() -> {
+            var model = new Contributions();
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            var state = UiState.load(file);
+            WindowContent older = window(), newer = window();
+            older.connectContributions(model, state);
+            newer.connectContributions(model, state);
+            toggle(model, newer, "dev.x.hosts");
+            newer.dock().resize(Side.LEFT, 243);
+            older.close();
+            newer.close();
+            WindowContent reopened = window();
+            reopened.connectContributions(model, state);
+            assertThat(reopened.dock().visible("dev.x.hosts")).isTrue();
+            assertThat(reopened.dock().size(Side.LEFT)).isEqualTo(243);
+        });
+    }
+
+    @Test void closingAndReloadingRestoresTheWholeDockAndTerminalArea() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        edt(() -> {
+            var model = new Contributions();
+            for (Slot slot : Slot.values())
+                model.addPanel("dev.x." + slot.name().toLowerCase(java.util.Locale.ROOT), slot.name(), new ImageIcon(),
+                    slot, site -> new JLabel("tool"));
+            var state = UiState.load(file);
+            WindowContent first = window(), last = window();
+            first.connectContributions(model, state);
+            last.connectContributions(model, state);
+            last.setSize(1403, 907);
+            for (var entry : model.panels()) toggle(model, last, entry.id());
+            last.dock().resize(Side.LEFT, 243); last.dock().resize(Side.RIGHT, 317); last.dock().resize(Side.BOTTOM, 211);
+            last.dock().setRatio(Side.LEFT, .37); last.dock().setRatio(Side.RIGHT, .64); last.dock().setRatio(Side.BOTTOM, .43);
+            LayoutTestSupport.layoutTree(last);
+            var terminal = new Rectangle(last.tabStrip().getBounds());
+            var panels = state.panels(); var dock = state.dock();
+            // The other window edits last, but closes first.
+            first.dock().resize(Side.LEFT, 499);
+            first.setRailVisible(false);
+            first.close(); last.close();
+            var loaded = UiState.load(file);
+            assertThat(loaded.dock()).isEqualTo(dock);
+            assertThat(loaded.panels()).isEqualTo(panels);
+            assertThat(loaded.railVisible()).isTrue();
+            WindowContent restored = window(); restored.setSize(1403, 907);
+            restored.connectContributions(model, loaded);
+            LayoutTestSupport.layoutTree(restored);
+            assertThat(restored.tabStrip().getBounds()).isEqualTo(terminal);
+            for (var entry : model.panels()) assertThat(restored.dock().visible(entry.id())).isTrue();
         });
     }
 

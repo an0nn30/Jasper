@@ -7,8 +7,8 @@ recents, residency and native desktop integration; shell history and snippets ar
 ## First checkout
 
 ```sh
-git clone https://github.com/an0nn30/moray.git
-cd moray
+git clone https://github.com/an0nn30/Jasper.git
+cd Jasper
 ./gradlew check
 ./gradlew :jasper-app:installDist
 ```

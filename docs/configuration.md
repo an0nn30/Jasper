@@ -561,7 +561,14 @@ settings file and data there too; their jars are in the application image). A zi
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
 launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
-dock's sizes, stripe visibility and plugin window bounds; it is written by Jasper and is not meant to be edited.
+dock's sizes and split ratios, which panels are open, stripe visibility, main-window size/position and maximized
+state, and plugin window bounds. The last main window closed supplies the layout for the next launch, including
+the terminal area left between its panels; a resident Jasper (see [Background residency](#background-residency))
+uses it for its next window too, also after Quit sent it to the background, which closes every window as a real
+Quit does. Normal bounds are retained while maximized or minimized; relaunch
+never starts minimized. If a saved window no longer fits an available display, its bounds are fitted to a usable
+display. This file is written by Jasper and is not meant to be edited. Terminal sessions and editor documents
+are not recreated by this layout state.
 
 ## Shortcuts
 

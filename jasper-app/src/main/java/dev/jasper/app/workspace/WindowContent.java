@@ -88,6 +88,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
     private UiState uiState = UiState.inMemory();
+    private boolean railVisible = true;
+    /** False once {@link #forgetLayout} ran: closing then saves nothing. */
+    private boolean rememberLayout = true;
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
     private final ThemeController themes;
@@ -693,6 +696,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void connectContributions(Contributions model, UiState state) { connectContributions(model, state, true); }
 
     /**
+     * Closing this window will not save its dock layout or stripe visibility: it is being discarded (it failed to
+     * compose, or it is the warm-up rehearsal's), not closed by the user, so it never becomes the last window closed,
+     * whose layout the next window restores. EDT.
+     */
+    public void forgetLayout() { rememberLayout = false; }
+
+    /**
      * As {@link #connectContributions(Contributions, UiState)}. A window that does not {@code hostsContent} is wired to
      * the model but never registered as a place where plugin content opens, so the content registry cannot choose it as
      * the main window: the warm-up rehearsal is such a window, and content opened in it would vanish when it closes.
@@ -700,6 +710,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
+        railVisible = state.railVisible();
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         if (hostsContent) {
             contentRegistry = model.content();
@@ -771,11 +782,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     ToolStripe leftStripe() { return leftStripe; }
     ToolStripe rightStripe() { return rightStripe; }
     DockDrag dockDrag() { return dockDrag; }
-    boolean railVisible() { return uiState.railVisible(); }
+    boolean railVisible() { return railVisible; }
 
     void setRailVisible(boolean value) {
         // A drag shows its view on the stripes that showed when it began; showing or hiding them ends it.
         dockDrag.cancel();
+        railVisible = value;
         uiState.setRailVisible(value);
         uiState.save();
         syncRailVisibility();
@@ -787,7 +799,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * place to move windows to), unless the user hid them with View > Rail.
      */
     void syncRailVisibility() {
-        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && uiState.railVisible();
+        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && railVisible;
         area.setStripesVisible(wanted);
         if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
             leftStripe.setVisible(wanted);
@@ -1310,7 +1322,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         dockDrag.cancel();
         paletteKeys.close();
-        if (contributed != null) { contributed.close(); contributed = null; }
+        if (contributed != null) { contributed.close(rememberLayout); contributed = null; }
         commandPalette.close(); windowCommands.close(); chrome.closeThemeMenus(); commands.close();
         scopes.close();
         closed = true;

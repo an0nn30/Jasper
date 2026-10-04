@@ -794,7 +794,7 @@ if (normalizedHost().os == 'windows') {
                     writeInstallScripts(context.sdkHome, resources, type)
                     List<String> args = [context.jpackage.absolutePath, '--type', type, '--name', 'Jasper',
                         '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
-                        '--about-url', 'https://github.com/an0nn30/moray',
+                        '--about-url', 'https://github.com/an0nn30/Jasper',
                         '--icon', nativeIcon.get().absolutePath,
                         '--app-image', image.absolutePath, '--resource-dir', resources.absolutePath,
                         '--dest', output.absolutePath, '--temp', new File(temporary, 'jpackage').absolutePath,

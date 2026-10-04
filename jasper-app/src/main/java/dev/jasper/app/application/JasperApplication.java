@@ -398,7 +398,7 @@ public final class JasperApplication {
                     }
                 }
             });
-            windows.add(window); window.show();
+            windows.add(window); window.restoreLayout(uiState); window.show();
         } catch (RuntimeException | Error failure) {
             // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
             try {
@@ -414,13 +414,14 @@ public final class JasperApplication {
     }
 
     /**
-     * Closes a window whose composition failed. If closing it fails too, the window is still forgotten (by the window
-     * list and the notification cards, which would otherwise keep routing to it) and its frame disposed, and each
-     * further failure is added to {@code failure} as suppressed. EDT.
+     * Closes a window whose composition failed, without saving its bounds or dock layout: it must not become the last
+     * window closed, whose layout the next window restores. If closing it fails too, the window is still forgotten (by
+     * the window list and the notification cards, which would otherwise keep routing to it) and its frame disposed, and
+     * each further failure is added to {@code failure} as suppressed. EDT.
      */
     private void discard(TerminalWindow window, Throwable failure) {
         try {
-            window.close();
+            window.discard();
         } catch (RuntimeException | Error closing) {
             failure.addSuppressed(closing);
             windows.remove(window);
@@ -672,7 +673,8 @@ public final class JasperApplication {
             new CommandHistory());
         // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
         Rehearsal.silence(window.content());
-        Runnable close = () -> Rehearsal.closeAndDispose(window::close, window.nativeWindow()::dispose);
+        // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
+        Runnable close = () -> Rehearsal.closeAndDispose(window::discard, window.nativeWindow()::dispose);
         try {
             window.content().connectContributions(contributions, UiState.inMemory(), false);
         } catch (RuntimeException | Error failure) {

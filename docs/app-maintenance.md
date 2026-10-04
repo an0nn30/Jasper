@@ -428,7 +428,9 @@ never shown. It must stay invisible to everything else: it opens no `WindowTrace
 passed to `warmUp` marks whether the rehearsal succeeded, failed or threw; it is not registered with the terminal registry and is not a
 content host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it;
 and its error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as
-incidents (`Rehearsal.silence`). A process that has warmed up labels its first plain window
+incidents (`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved window layout and is
+discarded rather than closed (`TerminalWindow.discard`, also used for a window that failed to compose), so its default
+size and layout never become the last window closed, which the next window restores. A process that has warmed up labels its first plain window
 `menu` rather than `cold`. Once `done` has run, on every path (a played rehearsal, a failed one, an `Error`, and the
 headless early return), `warmUp` starts one `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's
 garbage does not stay in the resident heap (user decision 2026-10-03); `JasperApplication.collector` is the test seam.
@@ -479,7 +481,10 @@ while the stripes are visible, matching rounded corners for the terminal/tab col
 the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
-tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
+on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
+partner held a window (a stand-in in the copy of the state), even where the dropped window will really fill the side or
+the bottom area because its partner is empty. The first slots keep the true landing.
 What a drop over the workspace targets is `DockDropResolver`'s job: the nearest of the left, right and
 bottom edges (each distance a share of the workspace's own width or height, so the zones keep their shape
 at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height

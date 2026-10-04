@@ -7,6 +7,11 @@ Replaces: the single left rail (`WindowRail`), the three-region nested-split doc
 "one panel per region" rule from the [plugin SDK design](2026-09-21-jasper-plugin-sdk-design.md) ("Rail and
 panels") and plan 3a's decision that regions have no header or close button.
 
+> User correction, 2026-10-03: the last window **closed** wins. Save that window's complete tool-panel layout
+> (placement/order, visibility, sizes, split ratios and rail visibility) and native size/position on close,
+> then restore them on relaunch. This supersedes the last-change-wins policy below and the earlier phase-1
+> exclusion of window-size persistence. Normal bounds and maximized axes are remembered; minimized state is not.
+
 ## Purpose
 
 `Anchor` lets a plugin dock a panel LEFT, RIGHT or BOTTOM, and the rail's "Move to …" menu lets the user move it,
@@ -179,10 +184,14 @@ group bounds, button bounds and workspace bounds:
 
 `DockDropOverlay`, a transparent component on the layered pane's `DRAG_LAYER`, paints:
 
-1. **Area highlight:** a translucent filled rectangle with a 1px border, exactly where the window would land,
+1. **Area highlight:** a translucent filled rectangle with a 1px border where the window would land (with the
+   second-slot exception below),
    computed by `DockGeometry.compute` on a "what if" copy of the state (the dragged window active in the target
    slot). The real layout does not reflow during the drag. A stripe drop of a hidden window shows no area highlight,
-   because the window stays hidden and no frame would appear; the placeholder and the ghost still show.
+   because the window stays hidden and no frame would appear; the placeholder and the ghost still show. Amended
+   2026-10-03 at the user's request: for Left Bottom, Right Bottom and Bottom Right, the area highlight always shows
+   that half, as if its partner held a window, so the guide shows the slot's place even when the window will fill the
+   side or the bottom area because its partner is empty.
 2. **Stripe placeholder:** the target group's buttons part to open a gap at the insertion index, holding a
    highlighted rounded square. The source button is lifted out of its old place.
 3. **Ghost:** the dragged window's icon follows the cursor.
