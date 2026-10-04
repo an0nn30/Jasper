@@ -51,7 +51,7 @@ rest; 8,067 before those fixes), 0 failures, 0 errors, 6 skips; the native harne
 image built at `0f3138b1` (Task 9): warm reopen first paint 252 ms median from the click (target 150, missed; window
 shown 209 ms, output painted 1,246 ms); idle resident RSS 455.3 MiB (A, 2 s after settle) and 188.3 MiB (B, 60 s after a
 heavy session); one collection after the warm-up (user decision 2026-10-03), because A included the rehearsal's
-garbage; A after that collection: re-measurement pending (user-run) (see the
+garbage; A after that collection re-measured at `27ab995a` (trained image, warm benchmark, 10 runs, all ok): 305.2 MiB median (302.3–308.4) 2 s after settle, down from 455.3 MiB; the warm reopen in the same run: first paint 231 ms, output painted 1,150 ms (see the
 [Plan 4 benchmark record](../../benchmarks/2026-10-02-startup-plan4.md)). The task text below is unchanged; the result
 differs from it in these ways:
 
@@ -100,7 +100,7 @@ Deviations:
      decided on 2026-10-03 on its own spec amendment and plan after this one, ahead of Plans 3A and 3B;
    - G1 periodic collection was not added. The first reading, "not needed", misread the data: A (455.3 MiB, 2 s after
      settle) included the rehearsal's garbage, so the user decided on 2026-10-03 on one collection after the warm-up
-     instead (see deviation 11); A after that collection: re-measurement pending (user-run).
+     instead (see deviation 11); A after that collection re-measured at `27ab995a` (trained image, warm benchmark, 10 runs, all ok): 305.2 MiB median (302.3–308.4) 2 s after settle, down from 455.3 MiB; the warm reopen in the same run: first paint 231 ms, output painted 1,150 ms.
 9. GUI steps: the controller ran Task 3's `verifyPackage`, Task 9's training, the warm benchmark and the idle-memory
    reading after the user approved each one. The user ran the spike and the heavy session.
 10. Known and deferred (the final review triages these):

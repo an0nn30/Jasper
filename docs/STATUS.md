@@ -20,7 +20,7 @@
   150, **missed**; window shown 209 ms, output painted 1,246 ms), see the
   [Plan 4 benchmark record](benchmarks/2026-10-02-startup-plan4.md); idle RSS 455.3 MiB (2 s after settle), 188.3 MiB
   60 s after a heavy session; one collection after the warm-up (user decision 2026-10-03), because A included the
-  rehearsal's garbage; A after that collection: re-measurement pending (user-run). Full check: 8,073/0/0/6
+  rehearsal's garbage; A after that collection re-measured at `27ab995a` (trained image, warm benchmark, 10 runs, all ok): 305.2 MiB median (302.3–308.4) 2 s after settle, down from 455.3 MiB; the warm reopen in the same run: first paint 231 ms, output painted 1,150 ms. Full check: 8,073/0/0/6
   (Plan 2's 7,991 plus the plan's new tests; the plan counted 35, and the rulings, the fix rounds and the final-review
   fixes added the rest).
   The other Plan 1 leftover, "a resident's first plain window is labelled `cold`", is fixed here: a warmed-up process

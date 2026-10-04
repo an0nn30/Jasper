@@ -34,8 +34,8 @@ Decisions:
   `jasper-app/build.gradle.kts` is unchanged. The first reading of that number ("not needed") misread the data: A was
   taken two seconds after the settle and included the rehearsal's garbage, which is why it sits above B (sixty seconds
   after a heavy session the resident is down to about 190 MiB). So `JasperApplication.warmUp` now ends with one
-  `System.gc()` on a daemon thread, after the warm-up's `done` has run, on every path. A after that collection:
-  re-measurement pending (user-run).
+  `System.gc()` on a daemon thread, after the warm-up's `done` has run, on every path. A after that collection,
+  re-measured at `27ab995a` (trained image, warm benchmark, 10 runs, all ok): 305.2 MiB median (302.3–308.4) 2 s after settle, down from 455.3 MiB; the warm reopen in the same run: first paint 231 ms, output painted 1,150 ms.
 - **Spike answers (Task 1, user-run 2026-10-03).** Q1 (a): the Dock tile, Spotlight and `open -a` each delivered a
   reopen event to the one running process (no second process), also after a launchd-style `--background` exec and
   after `open -a … --args --background`. Q2: variant A (the menu bar, Cmd+Tab and typing were right after each
