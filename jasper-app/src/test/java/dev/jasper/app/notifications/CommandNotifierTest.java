@@ -355,4 +355,18 @@ class CommandNotifierTest {
             notifier.close(); notifier.close();
         }
     }
+
+    /** A repeat belongs to the pane it last came from, so only that pane closing ends it. */
+    @Test void aRepeatFromAnotherPaneIsEndedOnlyByThePaneItLastCameFrom() {
+        CommandNotifier notifier = notifier(10);
+        var focused = new ArrayList<String>();
+        notifier.finished("a", "make", OptionalInt.of(0), Duration.ofSeconds(30), HIDDEN_TAB, window, () -> focused.add("a"));
+        notifier.finished("b", "make", OptionalInt.of(0), Duration.ofSeconds(30), HIDDEN_TAB, window, () -> focused.add("b"));
+        notifier.closed("a");
+        assertThat(notifications()).containsExactly("jasper.commands|INFO|make|Finished in 30s|" + window + "|live");
+        center.activate(center.history().getFirst().id());
+        assertThat(focused).containsExactly("b");
+        notifier.closed("b");
+        assertThat(notifications()).containsExactly("jasper.commands|INFO|make|Finished in 30s|" + window + "|expired");
+    }
 }

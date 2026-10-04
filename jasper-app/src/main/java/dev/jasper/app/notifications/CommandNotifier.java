@@ -162,7 +162,11 @@ public final class CommandNotifier implements AutoCloseable {
         var request = NotificationRequest.of(GROUP.id(), succeeded ? Severity.INFO : Severity.WARNING, title)
             .withContent(detail).withActivate(Objects.requireNonNull(activate, "activate"));
         if (window != null) request = request.withTarget(window);
-        center.post(request).ifPresent(id -> outcomes.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(id));
+        center.post(request).ifPresent(id -> {
+            // A repeat moves the entry to this pane, so only the pane it last came from may expire it.
+            outcomes.values().forEach(ids -> ids.remove(id));
+            outcomes.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(id);
+        });
         if (center.presence() != Delivery.Presence.FOCUSED) operatingSystem.accept(title, detail);
     }
 
