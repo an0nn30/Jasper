@@ -736,9 +736,7 @@ public final class PluginRuntime {
         switch (event.state()) {
             case STARTED -> notifier.started(event.sourcePluginId(), event.id(), event.title(), detail, action);
             case PROGRESS -> notifier.progress(event.sourcePluginId(), event.id(), detail);
-            case SUCCEEDED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), true, event.detail(), action);
-            case FAILED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), false, event.detail(), action);
-            case CANCELLED -> notifier.cancelled(event.sourcePluginId(), event.id());
+            case SUCCEEDED, FAILED, CANCELLED -> notifier.ended(event.sourcePluginId(), event.id());
         }
     }
 

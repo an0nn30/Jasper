@@ -1511,7 +1511,7 @@ with
 
 ```java
             case SUCCEEDED, FAILED, CANCELLED -> notifier.ended(event.sourcePluginId(), event.id());
-```.
+```
 
 - [ ] **Step 4: Run the tests to see them pass**
 
