@@ -5,50 +5,59 @@ import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelEntry;
-import dev.jasper.app.contributions.PanelRegion;
 import dev.jasper.app.contributions.PanelSite;
-import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.dock.DockDropResolver;
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Side;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.palette.PaletteScope;
+import dev.jasper.app.persistence.UiState;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-import dev.jasper.app.palette.PaletteScope;
 
 /**
  * This window's Swing side of the application-wide contributions model: one {@link Action} per
  * contributed action, registered as a palette command and bound to its shortcut, kept in step with the
- * model. Chrome and status rendering hang off the same change notifications. EDT only.
+ * model. Chrome and status rendering hang off the same change notifications. Panels dock in the window's
+ * {@link DockState}; the one listener on it builds what starts showing, lays the area out, renders the
+ * stripes, tells the panels and saves. EDT only.
  */
 final class WindowContributions implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(WindowContributions.class.getName());
     private final WindowContent owner;
     private final Contributions model;
     private final Map<String, Action> actions = new LinkedHashMap<>();
     private final Map<String, Subscription> commands = new LinkedHashMap<>();
+    private final Map<PaletteScope, Subscription> scopes = new LinkedHashMap<>();
     private Subscription listening;
-        private static final System.Logger LOG = System.getLogger(WindowContributions.class.getName());
-        private final Map<PaletteScope, Subscription> scopes = new LinkedHashMap<>();
-        private Subscription paletteRequests;
+    private Subscription paletteRequests;
 
+    /** One panel's instance in this window, built the first time it shows; where it docks lives in the dock state. */
     private static final class PanelInstance {
         final PanelEntry entry;
-        PanelRegion region;
-        boolean visible;
-        int size;
         PanelSite site;
         JComponent component;
+        /** What the panel last heard: a nested change can overtake a notification, which then must not be sent. */
+        boolean notified;
         PanelInstance(PanelEntry entry) { this.entry = entry; }
     }
 
     private final UiState state;
+    private final DockState dock;
+    private final Consumer<DockState.Change> docked = this::docked;
     private final Map<String, PanelInstance> panels = new LinkedHashMap<>();
     private Subscription panelRequests;
 
@@ -56,16 +65,26 @@ final class WindowContributions implements AutoCloseable {
         this.owner = owner;
         this.model = model;
         this.state = state;
+        this.dock = owner.dock();
         syncActions();
         owner.chrome().connect(this);
         renderStatus();
-        owner.rail().onToggle = this::togglePanel;
-        owner.rail().onMove = this::movePanel;
+        restoreSizes();
+        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
+            stripe.onToggle = this::togglePanel;
+            stripe.onMove = this::movePanel;
+            stripe.onHide = this::hidePanel;
+        }
+        owner.area().onMove = this::movePanel;
+        owner.area().onHide = this::hidePanel;
+        owner.dockDrag().onDrop = this::dropped;
+        owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
+        dock.addListener(docked);
         panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
         syncScopes();
         syncPanels();
-        renderRail();
+        renderStripes();
         listening = model.onChanged(this::changed);
     }
 
@@ -105,24 +124,24 @@ final class WindowContributions implements AutoCloseable {
 
     private void renderStatus() { owner.status().setContributed(model.status(), this::action); }
 
-        private void requestedPalette(Contributions.PaletteRequest request) {
-            if (!request.windowId().equals(owner.id()) || owner.commandPalette() == null) return;
-            owner.commandPalette().open(request.scopeId(), request.query().orElse(null), request.rowId().orElse(null));
-        }
+    private void requestedPalette(Contributions.PaletteRequest request) {
+        if (!request.windowId().equals(owner.id()) || owner.commandPalette() == null) return;
+        owner.commandPalette().open(request.scopeId(), request.query().orElse(null), request.rowId().orElse(null));
+    }
 
-        /** Registers contributed scopes this window does not have yet and drops the ones that left the model. */
-        private void syncScopes() {
-            List<PaletteScope> current = model.scopes();
-            for (PaletteScope scope : List.copyOf(scopes.keySet()))
-                if (!current.contains(scope)) scopes.remove(scope).close();
-            for (PaletteScope scope : current) {
-                if (scopes.containsKey(scope)) continue;
-                try { scopes.put(scope, owner.scopes().register(scope)); }
-                catch (IllegalArgumentException clash) {
-                    LOG.log(System.Logger.Level.WARNING, "A contributed scope is not shown in this window: " + clash.getMessage());
-                }
+    /** Registers contributed scopes this window does not have yet and drops the ones that left the model. */
+    private void syncScopes() {
+        List<PaletteScope> current = model.scopes();
+        for (PaletteScope scope : List.copyOf(scopes.keySet()))
+            if (!current.contains(scope)) scopes.remove(scope).close();
+        for (PaletteScope scope : current) {
+            if (scopes.containsKey(scope)) continue;
+            try { scopes.put(scope, owner.scopes().register(scope)); }
+            catch (IllegalArgumentException clash) {
+                LOG.log(System.Logger.Level.WARNING, "A contributed scope is not shown in this window: " + clash.getMessage());
             }
         }
+    }
 
     private void requested(Contributions.PanelRequest request) {
         if (!request.windowId().equals(owner.id())) return;
@@ -133,116 +152,198 @@ final class WindowContributions implements AutoCloseable {
         }
     }
 
-    private void togglePanel(String id) {
-        PanelInstance panel = panels.get(id);
-        if (panel == null) return;
-        if (panel.visible) hidePanel(id); else showPanel(id);
+    private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
+
+    private void showPanel(String id) { if (panels.containsKey(id)) dock.show(id); }
+
+    private void hidePanel(String id) { if (panels.containsKey(id)) dock.hide(id); }
+
+    /**
+     * A drop from the dock drag. Over a stripe the window moves and keeps its visibility; over the workspace it moves
+     * and shows, and the slot's previously showing window hides but stays on its stripe. A workspace drop on the
+     * window's own slot keeps its place in the group.
+     */
+    private void dropped(String id, DockDropResolver.Target target) {
+        if (!panels.containsKey(id)) return;
+        Slot slot = target.slot();
+        if (target.onStripe()) {
+            dock.move(id, slot, target.index().getAsInt());
+            return;
+        }
+        List<String> ids = dock.ids(slot);
+        dock.moveAndShow(id, slot, ids.contains(id) ? ids.indexOf(id) : ids.size());
     }
 
-    /** Adds instances for new panels, restoring their saved place, and discards instances of removed panels. */
+    /** From a Move to menu: the end of the target slot's group, keeping visibility. */
+    private void movePanel(String id, Slot slot) {
+        if (!panels.containsKey(id) || dock.slot(id).filter(slot::equals).isPresent()) return;
+        dock.move(id, slot, dock.ids(slot).size());
+    }
+
+    /** The window opens at the saved sizes and ratios; nothing listens yet, so this saves nothing. */
+    private void restoreSizes() {
+        UiState.Dock saved = state.dock();
+        dock.resize(Side.LEFT, saved.leftWidth());
+        dock.resize(Side.RIGHT, saved.rightWidth());
+        dock.resize(Side.BOTTOM, saved.bottomHeight());
+        dock.setRatio(Side.LEFT, saved.leftRatio());
+        dock.setRatio(Side.RIGHT, saved.rightRatio());
+        dock.setRatio(Side.BOTTOM, saved.bottomRatio());
+    }
+
+    /**
+     * Docks new panels where they were saved (a saved slot wins over the default) or at the end of their default
+     * slot's group, showing those that showed; undocks the panels that left the model and discards their instances.
+     */
     private void syncPanels() {
         Map<String, PanelEntry> current = new LinkedHashMap<>();
         for (PanelEntry entry : model.panels()) current.put(entry.id(), entry);
         for (String id : List.copyOf(panels.keySet())) {
             if (current.containsKey(id)) continue;
             PanelInstance gone = panels.remove(id);
-            if (gone.visible) owner.regions().hide(gone.region);
+            dock.remove(id);
+            owner.area().removeContent(id);
             if (gone.site != null) gone.site.notifyClosed();
         }
         for (PanelEntry entry : current.values()) {
             if (panels.containsKey(entry.id())) continue;
-            var panel = new PanelInstance(entry);
-            var saved = state.panel(entry.id());
-            panel.region = saved.map(value -> PanelRegion.valueOf(value.region())).orElse(entry.defaultRegion());
-            panel.size = saved.map(UiState.Panel::size).orElse(owner.regions().size(panel.region));
-            panels.put(entry.id(), panel);
-            if (saved.map(UiState.Panel::visible).orElse(false)) showPanel(entry.id());
+            panels.put(entry.id(), new PanelInstance(entry));
+            Optional<UiState.Panel> saved = state.panel(entry.id());
+            Slot slot = saved.map(UiState.Panel::slot).orElse(entry.defaultSlot());
+            dock.add(entry.id(), slot, insertionIndex(slot, saved.map(UiState.Panel::order).orElse(UiState.Panel.LAST)));
+            if (saved.map(UiState.Panel::visible).orElse(false)) dock.show(entry.id());
         }
     }
 
-    void showPanel(String id) {
+    /** Where a panel goes back into its slot: before the panels saved after it. One never placed goes last. */
+    private int insertionIndex(Slot slot, int order) {
+        List<String> ids = dock.ids(slot);
+        if (order >= UiState.Panel.LAST) return ids.size();
+        int index = 0;
+        for (String other : ids)
+            if (state.panel(other).map(UiState.Panel::order).orElse(UiState.Panel.LAST) < order) index++;
+        return index;
+    }
+
+    /**
+     * The one place a dock change takes effect: build what now shows, lay out, render the stripes, tell the hidden
+     * panels, return focus to the terminal if something hid, tell the shown panels, save. Focus returns before the
+     * shown panels hear it, so a window that takes focus when it shows keeps it when it replaces another.
+     */
+    private void docked(DockState.Change change) {
+        // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
+        owner.dockDrag().cancel();
+        for (String id : change.shown()) build(id);
+        if (change.layout()) owner.area().sync();
+        if (change.stripes()) renderStripes();
+        for (String id : change.hidden()) notifyVisibility(id, false);
+        // Hiding a window by any route returns focus to the terminal.
+        if (!change.hidden().isEmpty()) owner.focusSelected();
+        for (String id : change.shown()) notifyVisibility(id, true);
+        persist();
+    }
+
+    /** Builds the panel's instance the first time it shows in this window; a failing factory yields a placeholder. */
+    private void build(String id) {
         PanelInstance panel = panels.get(id);
-        if (panel == null || panel.visible) return;
-        for (PanelInstance other : panels.values())
-            if (other != panel && other.visible && other.region == panel.region) hidePanel(other.entry.id());
-        if (panel.component == null) {
-            panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> panel.visible);
-            JComponent built = null;
-            try { built = panel.entry.factory().apply(panel.site); }
-            catch (RuntimeException failure) { /* The contributor's adapter has logged it; the window only needs a placeholder. */ }
-            panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
+        if (panel == null || panel.component != null) return;
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id));
+        JComponent built = null;
+        try { built = panel.entry.factory().apply(panel.site); }
+        catch (RuntimeException failure) {
+            // A plugin's adapter turns its own failures into null, so an exception reaching here came from no adapter.
+            LOG.log(System.Logger.Level.WARNING, "The panel " + id + " could not be built; showing a placeholder.", failure);
         }
-        owner.regions().show(panel.region, panel.component, panel.size);
-        panel.visible = true;
-        persist(panel);
-        renderRail();
-        panel.site.notifyVisibility(true);
+        panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
+        owner.area().setContent(id, panel.entry.title(), panel.component);
     }
 
-    void hidePanel(String id) {
+    /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
+    private void notifyVisibility(String id, boolean visible) {
         PanelInstance panel = panels.get(id);
-        if (panel == null || !panel.visible) return;
-        panel.size = owner.regions().size(panel.region);
-        owner.regions().hide(panel.region);
-        panel.visible = false;
-        persist(panel);
-        renderRail();
-        panel.site.notifyVisibility(false);
-        owner.focusSelected();
+        if (panel == null || panel.site == null || dock.visible(id) != visible || panel.notified == visible) return;
+        panel.notified = visible;
+        panel.site.notifyVisibility(visible);
     }
 
-    void movePanel(String id, PanelRegion region) {
-        PanelInstance panel = panels.get(id);
-        if (panel == null || panel.region == region) return;
-        if (panel.visible) {
-            // A move is not a change of visibility, so the instance hears nothing; only the region changes.
-            for (PanelInstance other : panels.values())
-                if (other != panel && other.visible && other.region == region) hidePanel(other.entry.id());
-            owner.regions().hide(panel.region);
-            panel.region = region;
-            panel.size = owner.regions().size(region);
-            owner.regions().show(region, panel.component, panel.size);
-        } else {
-            panel.region = region;
-            panel.size = owner.regions().size(region);
+    /**
+     * Saves every panel's place and the dock's sizes. A slot's saved order also keeps a place for its panels that are
+     * not in this window right now (a plugin still loading, or turned off), so each goes back where it was; a panel
+     * that never had a place keeps none.
+     */
+    private void persist() {
+        for (Slot slot : Slot.values()) {
+            List<String> merged = new ArrayList<>();
+            for (String id : dock.ids(slot)) if (panels.containsKey(id)) merged.add(id);
+            state.panels().entrySet().stream()
+                .filter(entry -> entry.getValue().slot() == slot && entry.getValue().order() < UiState.Panel.LAST)
+                .filter(entry -> !panels.containsKey(entry.getKey()))
+                .sorted(Comparator.comparingInt(entry -> entry.getValue().order()))
+                .forEach(entry -> merged.add(Math.min(entry.getValue().order(), merged.size()), entry.getKey()));
+            for (int i = 0; i < merged.size(); i++) {
+                String id = merged.get(i);
+                boolean visible = panels.containsKey(id) ? dock.visible(id) : state.panel(id).map(UiState.Panel::visible).orElse(false);
+                state.putPanel(id, new UiState.Panel(slot, Math.min(i, UiState.Panel.LAST), visible));
+            }
         }
-        persist(panel);
-        renderRail();
-    }
-
-    private void persist(PanelInstance panel) {
-        state.putPanel(panel.entry.id(), new UiState.Panel(panel.region.name(), panel.visible, Math.clamp(panel.size, 80, 4000)));
+        state.setDock(new UiState.Dock(dock.size(Side.LEFT), dock.size(Side.RIGHT), dock.size(Side.BOTTOM),
+            dock.ratio(Side.LEFT), dock.ratio(Side.RIGHT), dock.ratio(Side.BOTTOM)));
         state.save();
     }
 
-    private void renderRail() {
-        List<WindowRail.PanelButton> buttons = new ArrayList<>();
-        for (PanelInstance panel : panels.values())
-            buttons.add(new WindowRail.PanelButton(panel.entry.id(), panel.entry.title(), panel.entry.icon(), panel.region, panel.visible));
+    private void renderStripes() {
+        owner.dockDrag().cancel();
+        List<ToolStripe.Button> left = new ArrayList<>(), right = new ArrayList<>();
+        for (Slot slot : Slot.values())
+            for (String id : dock.ids(slot)) {
+                PanelInstance panel = panels.get(id);
+                if (panel == null) continue;
+                var button = new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
+                    panel.entry.badge());
+                (slot.stripe() == Side.LEFT ? left : right).add(button);
+            }
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
-        owner.rail().render(buttons, railActions);
+        owner.leftStripe().render(left, railActions);
+        owner.rightStripe().render(right, List.of());
         owner.syncRailVisibility();
+    }
+
+    /**
+     * Gives each panel's stripe button its panel's current badge, without a render: a render rebuilds every button,
+     * which would end a drag, and a badge changes neither the layout nor which windows there are. The stripe that does
+     * not show a panel ignores it.
+     */
+    private void updateBadges() {
+        for (PanelInstance panel : panels.values()) {
+            owner.leftStripe().updateBadge(panel.entry.id(), panel.entry.badge());
+            owner.rightStripe().updateBadge(panel.entry.id(), panel.entry.badge());
+        }
     }
 
     /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
     void refreshTheme() {
         for (PanelInstance panel : panels.values())
-            if (panel.component != null && !panel.visible) SwingUtilities.updateComponentTreeUI(panel.component);
+            if (panel.component != null && !dock.visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
     }
 
     private void changed(Contributions.Kind kind) {
         switch (kind) {
             case ACTIONS -> {
-                if (syncActions()) owner.rebind();
+                boolean structural = syncActions();
+                if (structural) owner.rebind();
                 // Titles label toolbar buttons, and a vanished or disabled action changes every placement of it.
                 owner.chrome().renderContributedToolbar();
                 owner.chrome().renderContributedMenus();
                 renderStatus();
-                renderRail();
+                // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
+                // enabled change renames and repaints the buttons it has, so that it does not end a drag.
+                if (structural) renderStripes();
+                else for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) stripe.refreshActions();
             }
-            case PANELS -> { syncPanels(); renderRail(); }
-            case RAIL -> renderRail();
+            case PANELS -> { syncPanels(); renderStripes(); }
+            case RAIL -> renderStripes();
+            case BADGES -> updateBadges();
             case SCOPES -> syncScopes();
             case TOOLBAR -> owner.chrome().renderContributedToolbar();
             case MENUS -> owner.chrome().renderContributedMenus();
@@ -290,6 +391,11 @@ final class WindowContributions implements AutoCloseable {
         if (listening == null) return;
         listening.close();
         listening = null;
+        // Closing the window is not hiding its panels, and every change was saved as it happened: just let go of the dock.
+        owner.dockDrag().cancel();
+        owner.dockDrag().onDrop = (id, target) -> { };
+        owner.dockDrag().icons = id -> null;
+        dock.removeListener(docked);
         commands.values().forEach(Subscription::close);
         commands.clear();
         scopes.values().forEach(Subscription::close);
@@ -297,15 +403,16 @@ final class WindowContributions implements AutoCloseable {
         if (paletteRequests != null) { paletteRequests.close(); paletteRequests = null; }
         actions.values().forEach(action -> action.setEnabled(false));
         if (panelRequests != null) { panelRequests.close(); panelRequests = null; }
-        for (PanelInstance panel : panels.values()) {
-            if (panel.visible) { panel.size = owner.regions().size(panel.region); state.putPanel(panel.entry.id(),
-                new UiState.Panel(panel.region.name(), true, Math.clamp(panel.size, 80, 4000))); }
-            if (panel.site != null) panel.site.notifyClosed();
-        }
-        state.save();
+        for (PanelInstance panel : panels.values()) if (panel.site != null) panel.site.notifyClosed();
         panels.clear();
-        owner.rail().onToggle = id -> { }; owner.rail().onMove = (id, region) -> { };
-        owner.rail().render(List.of(), List.of());
+        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
+            stripe.onToggle = id -> { };
+            stripe.onMove = (id, slot) -> { };
+            stripe.onHide = id -> { };
+            stripe.render(List.of(), List.of());
+        }
+        owner.area().onMove = (id, slot) -> { };
+        owner.area().onHide = id -> { };
         owner.syncRailVisibility();
         actions.clear();
         owner.chrome().connect(null);

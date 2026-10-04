@@ -63,8 +63,19 @@ class WindowChromeTest {
             try(var owner=content(launcher(new ArrayDeque<>()))) {
                 var names=new java.util.ArrayList<String>();
                 for(var component:owner.menuBar().getMenu(2).getMenuComponents())if(component instanceof JMenuItem item)names.add(item.getText());
-                assertThat(names).contains("UI Theme","Workspace Theme","Themes…").doesNotContain("Terminal Colors");
+                assertThat(names).contains("UI Theme","Workspace Scheme","Themes…").doesNotContain("Terminal Colors");
                 assertThat(owner.commands().entries().stream().map(entry->entry.command().id())).contains("view.themes").noneMatch(id->id.startsWith("view.appearance."));
+            }
+        });
+    }
+
+    @Test void viewThemesOpensSettingsAtAppearance() throws Exception {
+        edt(() -> {
+            try(var owner=content(launcher(new ArrayDeque<>()))) {
+                var opened=new java.util.ArrayList<String>();
+                owner.connectSettings(edit->java.util.concurrent.CompletableFuture.completedFuture(null), opened::add);
+                owner.windowCommands().view("view.themes").actionPerformed(null);
+                assertThat(opened).containsExactly("appearance");
             }
         });
     }

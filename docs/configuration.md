@@ -28,7 +28,8 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 ## Settings dialog
 
 **Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
-The tree on the left groups them as Appearance & Behavior (Appearance, Themes, Window, Notifications, Command Palette,
+It blocks only the window it was opened from, and stays in front of every Jasper window while Jasper is the active
+application; other windows remain usable. The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
 Desk Buddy, System Settings), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins;
 the search field filters the tree and highlights matching settings on the page.
 Terminal › Shell's Profile lists the shells Jasper detected, including each WSL distribution
@@ -44,8 +45,9 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
-Appearance and Terminal › Font & Colors link to Settings › Themes, which holds both staged pickers and the local preview. The old stores are retired; see
-[Themes](themes.md) for the offline collection and automatic legacy upgrade.
+Appearance holds the Theme and Workspace scheme dropdowns, and the theme gear's Import theme…; Terminal › Font &
+Colors links there. The old stores are retired; see [Themes](themes.md) for the offline collection and automatic
+legacy upgrade.
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
@@ -126,7 +128,7 @@ workspace = "match"
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
-| `window.rail_width` | `28` | Integer 28–64 logical pixels; the panel rail's buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
+| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
 | `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
 | `window.status_bar` | `true` | Boolean | Live |
@@ -284,8 +286,8 @@ from a local shell can also supply remote context; Jasper does not infer SSH hos
 parsing command text.
 
 Tabs sit directly beneath the header. The selected tab has an inset rounded fill and
-thin outline from the active workspace theme, with a muted blue selection in Jasper Dark.
-An independent workspace theme also changes tab text and icon artwork. Narrow
+thin outline from the active workspace scheme, with a muted blue selection in Jasper Dark.
+An independent workspace scheme also changes tab text and icon artwork. Narrow
 windows scroll overflowing tabs, and keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
 pixels by default, 20–72).
 
@@ -387,7 +389,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices save: Toolbar, Status Bar, UI Theme and Workspace Theme write `window.toolbar`, `window.status_bar`, `ui.theme.name` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
+View menu choices save: Toolbar, Status Bar, UI Theme and Workspace Scheme write `window.toolbar`, `window.status_bar`, `ui.theme.name` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -541,8 +543,8 @@ settings file and data there too; their jars are in the application image). A zi
 `plugins/` is unpacked at the next launch and then waits for your review in Manage Plugins; an
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
-launch. `ui-state.toml` beside `config.toml` remembers panel placement, rail visibility and plugin
-window bounds; it is written by Jasper and is not meant to be edited.
+launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
+dock's sizes, stripe visibility and plugin window bounds; it is written by Jasper and is not meant to be edited.
 
 ## Shortcuts
 
@@ -670,8 +672,8 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 - `"IntelliJ Light"` or `"Darcula"` (IntelliJ's classic themes, converted);
 - or a native Jasper TOML theme in the `themes` folder beside this file.
 
-The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers installing
-local import, duplication, removal and how a theme colours the workspace. An unknown name is a warning that lists
+The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers writing and importing
+themes and how a theme colours the workspace. An unknown name is a warning that lists
 the available themes: at start-up Jasper uses Jasper Dark; on reload it uses the safe built-in
 for the last successfully applied chrome darkness. The requested name stays in the file for a later retry.
 A non-string value rejects the configuration.
@@ -686,10 +688,10 @@ The former `[colors]` table (`appearance`, `theme`) and custom palette files are
 supported: a `[colors]` table is reported as an unknown setting and ignored. See the
 [dark](design/mock-ui-dark.png) and [light](design/mock-ui-light.png) renders.
 
-## Workspace theme
+## Workspace scheme
 
-`ui.theme.workspace` chooses the theme for the terminal workspace independently of `ui.theme.name`.
-`"match"` follows the interface theme. A separate choice names a native theme, including converted Alacritty palettes;
+`ui.theme.workspace` chooses the workspace scheme: the theme that colours the terminal workspace, independently of
+`ui.theme.name`. `"match"` follows the UI theme. A separate choice names a native theme, including converted Alacritty palettes;
 `"Jasper Light"` and `"Jasper Dark"` name the bundled themes. A native theme named `"Light"` is
 selected literally. The older `terminal.colors` and `ui.theme.terminal` keys still load; their
 `light` and `dark` values become `Jasper Light` and `Jasper Dark` when migrated. A canonical
@@ -700,21 +702,21 @@ background is `#191c20`.
 
 The workspace setting changes terminal panes, tabs, find controls, dividers, zone-aware icons
 and Editor syntax in all windows without restarting Editor or discarding edits. Even two themes
-with the same light/dark variant produce a workspace update. A missing workspace theme warns and
+with the same light/dark variant produce a workspace update. A missing workspace scheme warns and
 temporarily matches the chrome; its requested name stays saved for repair and reload.
-General hosted plugin pane controls also follow the workspace theme.
+General hosted plugin pane controls also follow the workspace scheme.
 
-Settings › Themes has a pinned **Same as UI theme** entry, searchable lists and a local preview. Apply/OK saves
-choices; Cancel discards them. Confirmed Import, Duplicate and Remove file actions happen immediately and survive
-Cancel. View › UI Theme and Workspace Theme save immediately; View › Themes… opens the staged workflow.
+Settings › Appearance's **Workspace scheme** dropdown starts with **Same as UI theme**. Apply/OK saves choices;
+Cancel discards them. A confirmed Import theme… writes immediately and survives Cancel. View › UI Theme and Workspace
+Scheme save immediately; View › Themes… opens Settings at Appearance.
 Native file edits, deletions and repairs reload automatically on the existing one-second poll, including inherited
 parent changes. Filesystem work runs off the EDT. A blank workspace value warns and uses `"match"`; a non-string
-value rejects the configuration. [Themes](themes.md#settings-and-file-actions) details safe removal and fallback.
+value rejects the configuration. [Themes](themes.md#settings-and-importing) details importing and fallback.
 
 ### Alacritty themes
 
 Alacritty palettes are converted into native themes. Existing `terminal-themes/` files migrate once at startup;
-the old store is removed. Select converted palettes in Settings › Themes. See
+the old store is removed. Select converted palettes as the workspace scheme in Settings › Appearance. See
 [Themes](themes.md#converted-terminal-palettes). `themes.marketplace.enabled` is ignored for compatibility.
 
 ### Interface typography

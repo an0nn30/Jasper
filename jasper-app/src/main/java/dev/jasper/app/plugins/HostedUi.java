@@ -8,7 +8,7 @@ import dev.jasper.sdk.files.FileLocation;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuTarget;
-import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.contributions.StatusEntry;
 import dev.jasper.app.contributions.ToolbarEntry;
@@ -361,7 +361,9 @@ final class HostedUi {
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
             spec.toggleActionId().ifPresent(HostedUi.this::requireOwn);
-            var entry = model.addPanel(spec.id(), spec.title(), spec.icon(), PanelRegion.valueOf(spec.defaultAnchor().name()),
+            // Anchor plus split is IntelliJ's anchor plus split: one of the six slots. The SDK's own Side is imported here.
+            var entry = model.addPanel(spec.id(), spec.title(), spec.icon(),
+                Slot.of(dev.jasper.app.dock.Side.valueOf(spec.defaultAnchor().name()), spec.split()),
                 spec.toggleActionId(), site -> {
                 JComponent[] built = {null};
                 containment.run(pluginId, "panel " + spec.id(), () -> built[0] = factory.create(host(site)));

@@ -21,6 +21,9 @@ public interface ValueEditor<T> {
     /** Whether choosing the default value means "remove the key" rather than "save the default". */
     default boolean removesAtDefault() { return false; }
 
+    /** Reads again whatever the control offers, such as its list of choices; its page calls this on each refresh. */
+    default void refresh() { }
+
     /** Releases whatever the control listens to; its page calls this when it is disposed. */
     default void dispose() { }
 }

@@ -7,6 +7,8 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.WorkspaceBlur;
 import dev.jasper.app.config.WorkspaceThemeChoice;
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Color;
 import java.awt.Component;
@@ -42,21 +44,27 @@ class WorkspaceGlassTest {
         edt(() -> {
             var deck = new JPanel();
             deck.setOpaque(false);
-            var regions = new WorkspaceRegions(deck);
-            regions.setRailVisible(true);
-            regions.setTerminalBackground(new Color(0x212734));
-            regions.setSize(1000, 600);
-            LayoutTestSupport.layoutTree(regions);
-            LayoutTestSupport.layoutTree(regions);
-            assertThat(alpha(render(regions), regions, deck, 300, 200)).isEqualTo(255);
+            var area = new ToolWindowArea(deck, new DockState());
+            area.setStripesVisible(true);
+            area.setTerminalBackground(new Color(0x212734));
+            var side = new JPanel();
+            DockTestSupport.show(area, Slot.LEFT_TOP, side, 200);
+            area.setSize(1000, 600);
+            LayoutTestSupport.layoutTree(area);
+            LayoutTestSupport.layoutTree(area);
+            var host = (JComponent) deck.getParent();
+            var insets = host.getInsets();
+            assertThat(alpha(render(area), area, deck, 300, 200)).isEqualTo(255);
 
-            regions.setGlass(0.5f);
-            var glass = render(regions);
-            assertThat(alpha(glass, regions, deck, 300, 200)).as("inside the rounded surface").isEqualTo(128);
-            assertThat(alpha(glass, regions, regions, 997, 300)).as("the right gutter is chrome").isEqualTo(255);
+            area.setGlass(0.5f);
+            var glass = render(area);
+            assertThat(alpha(glass, area, deck, 300, 200)).as("inside the rounded surface").isEqualTo(128);
+            assertThat(alpha(glass, area, host, host.getWidth() / 2, insets.top / 2)).as("the top gutter is chrome").isEqualTo(255);
+            assertThat(alpha(glass, area, host, insets.left, insets.top)).as("the rounded corner is chrome").isEqualTo(255);
+            assertThat(alpha(glass, area, side, side.getWidth() / 2, side.getHeight() / 2)).as("a tool window stays solid").isEqualTo(255);
 
-            regions.setGlass(1f);
-            assertThat(alpha(render(regions), regions, deck, 300, 200)).isEqualTo(255);
+            area.setGlass(1f);
+            assertThat(alpha(render(area), area, deck, 300, 200)).isEqualTo(255);
         });
     }
 
@@ -77,30 +85,30 @@ class WorkspaceGlassTest {
         return deck;
     }
 
-    @Test void everySurfacePixelIsGlassWithTheRailVisible() throws Exception {
+    @Test void everySurfacePixelIsGlassWithTheStripesVisible() throws Exception {
         edt(() -> {
             var background = new Color(0x212734);
             var deck = translucentDeck(background, 0.5f);
-            var regions = new WorkspaceRegions(deck);
-            regions.setRailVisible(true);
-            regions.setTerminalBackground(background);
-            regions.setSize(1000, 600);
-            LayoutTestSupport.layoutTree(regions);
-            LayoutTestSupport.layoutTree(regions);
+            var area = new ToolWindowArea(deck, new DockState());
+            area.setStripesVisible(true);
+            area.setTerminalBackground(background);
+            area.setSize(1000, 600);
+            LayoutTestSupport.layoutTree(area);
+            LayoutTestSupport.layoutTree(area);
             var host = (JComponent) deck.getParent();
             var insets = host.getInsets();
             int arc = com.formdev.flatlaf.util.UIScale.scale(16);
             var surface = new java.awt.geom.RoundRectangle2D.Double(insets.left, insets.top,
                 host.getWidth() - insets.left - insets.right, host.getHeight() - insets.top - insets.bottom, arc, arc);
 
-            regions.setGlass(0.5f);
-            var image = render(regions);
+            area.setGlass(0.5f);
+            var image = render(area);
             int inside = 0;
             var wrongSurface = new ArrayList<String>();
             var wrongGutter = new ArrayList<String>();
             var wrongEdge = new ArrayList<String>();
             for (int y = 0; y < host.getHeight(); y++) for (int x = 0; x < host.getWidth(); x++) {
-                int alpha = alpha(image, regions, host, x, y);
+                int alpha = alpha(image, area, host, x, y);
                 String pixel = "(" + x + ", " + y + ") = " + alpha;
                 if (surface.contains(x, y, 1, 1)) {
                     inside++;
@@ -227,7 +235,7 @@ class WorkspaceGlassTest {
             var side = new JPanel();
             var sideChild = new JPanel();
             side.add(sideChild);
-            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, side, 200);
+            DockTestSupport.show(owner, Slot.LEFT_TOP, side, 200);
             assertThat(owner.workspaceOpacity(inside)).as("opaque window").isEqualTo(1.0);
             var terminalTab = owner.tabStrip().getComponentAt(0);
 

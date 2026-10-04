@@ -74,7 +74,7 @@ class RemotePluginTest {
             assertThat(icons).anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.NETWORK);
             assertThat(icons).as("session tab icon").anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.SERVER);
             assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
-            assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT|dev.jasper.remote.sftp.toggle",
+            assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT+split|dev.jasper.remote.sftp.toggle",
                 "dev.jasper.remote.tunnels.panel|Tunnels|LEFT|dev.jasper.remote.tunnels",
                 "dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
         }
@@ -265,7 +265,7 @@ class RemotePluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).contains("dev.jasper.remote.connect|Connect to SSH Host...|true", "dev.jasper.remote.hosts|Toggle SSH hosts|true", "dev.jasper.remote.sftp.toggle|Toggle SFTP|true",
                 "dev.jasper.remote.split|Split with Same Host|false", "dev.jasper.remote.import|Import from ~/.ssh/config...|true");
-            assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT|dev.jasper.remote.sftp.toggle",
+            assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT+split|dev.jasper.remote.sftp.toggle",
                 "dev.jasper.remote.tunnels.panel|Tunnels|LEFT|dev.jasper.remote.tunnels",
                 "dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
             assertThat(host.scopes()).containsExactly("dev.jasper.remote.tunnels.scope|Tunnels|toggle,browse,edit",

@@ -84,7 +84,7 @@ SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it ac
 programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
-guards too. Plugins declare `sdk = ">=0.12.0, <0.13"`.
+guards too. Plugins declare `sdk = ">=0.13.0, <0.14"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -120,7 +120,16 @@ zone on every call. `current()` reads workspace defaults. Unmarked components an
 Custom hosts implementing the older `Appearance` methods remain source compatible: new methods have defaults,
 using ordinary Swing colors when no host semantic defaults exist and plain-text syntax with italic comments.
 
-## Workspace opacity (SDK 0.12.1)
+## Tool windows (SDK 0.13.0)
+
+A panel docks in one of six slots: the upper or lower half of the left or right side, or the left or right half of the
+full-width bottom area. `Anchor` names the side; `PanelSpec.withSplit()` starts the panel in the second half (the
+lower half of a side, the right half of the bottom area). `withToggleActionId` keeps the flag, and the four- and
+five-argument constructors remain, so plugins written for 0.12 compile unchanged; they need only the new `sdk` range.
+Jasper gives every tool window a header with its title, so a panel should not show its own title. The user's placement
+wins over the default. The testkit lists a split panel as `id|title|LEFT+split`.
+
+## Workspace opacity (SDK 0.13.1)
 
 `Appearance.workspaceOpacity(Component)` returns how opaque the workspace is behind a component: 1.0 unless the
 component is in the workspace area (terminals and hosted content tabs) of a translucent ("glass") window, where it is
@@ -135,4 +144,4 @@ unantialiased rectangles (antialiased translucent fills fall back to software re
 lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
 carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
 announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
-outside a translucent window. Plugins that use it declare `sdk = ">=0.12.1, <0.13"`.
+outside a translucent window. Plugins that use it declare `sdk = ">=0.13.1, <0.14"`.

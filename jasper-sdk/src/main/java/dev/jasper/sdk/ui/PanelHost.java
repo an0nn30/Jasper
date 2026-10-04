@@ -13,7 +13,7 @@ public interface PanelHost {
      */
     WindowHandle window();
 
-    /** Shows the panel in this window, hiding whatever else occupied its region. */
+    /** Shows the panel in this window, hiding whatever else occupied its slot. */
     void show();
 
     /** Hides the panel in this window. */

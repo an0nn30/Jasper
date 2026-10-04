@@ -634,6 +634,19 @@ public abstract class PluginContractTest {
             .containsExactly("test.alpha.hosts|Hosts|LEFT|test.alpha.show", "test.alpha.files|Files|RIGHT");
     }
 
+    @Test void aSplitPanelKeepsItsSplitBesideItsToggleAndStartsInTheSecondaryHalf() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.show", "Toggle Files"), invoked -> { });
+            context.panels().register(new PanelSpec("test.alpha.files", "Files", new ImageIcon(), Anchor.LEFT).withSplit()
+                .withToggleActionId("test.alpha.show"), host -> new JLabel());
+            context.panels().register(new PanelSpec("test.alpha.log", "Log", new ImageIcon(), Anchor.BOTTOM).withSplit(),
+                host -> new JLabel());
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.RIGHT), host -> new JLabel());
+        });
+        assertThat(h.panels()).containsExactly("test.alpha.files|Files|LEFT+split|test.alpha.show",
+            "test.alpha.log|Log|BOTTOM+split", "test.alpha.hosts|Hosts|RIGHT");
+    }
+
     @Test void panelsAreNamespacedLazyPerWindowAndContained() {
         List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
         var registration = new AtomicReference<Subscription>();

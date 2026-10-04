@@ -29,6 +29,8 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     Runnable onChanged = () -> {};
     Runnable onEmpty = () -> {};
     Consumer<String> onError = message -> {};
+    /** Whether this tab is the only one its window holds; set by the window. */
+    java.util.function.BooleanSupplier lastInWindow = () -> false;
     Consumer<TerminalPane> onPaneCreated = pane -> {};
     Consumer<TerminalPane> configure = pane -> {};
 
@@ -60,7 +62,8 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
         pane.onClose = () -> closePane(pane);
         pane.onFailure = message -> {
             onError.accept(message);
-            closePane(pane);
+            // The window's only pane stays, showing why it failed: closing it would close the window before anyone read the error.
+            if (panes.size() > 1 || !lastInWindow.getAsBoolean()) closePane(pane);
         };
         pane.onReady = view -> configure.accept(pane);
         onPaneCreated.accept(pane);
@@ -249,5 +252,6 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
         closed = true; ++renderGeneration;
         panes.values().forEach(TerminalPane::close); panes.clear(); splits.clear(); removeAll();
         onChanged = () -> {}; onEmpty = () -> {}; configure = pane -> {}; onPaneCreated = pane -> {}; onError = message -> {};
+        lastInWindow = () -> false;
     }
 }

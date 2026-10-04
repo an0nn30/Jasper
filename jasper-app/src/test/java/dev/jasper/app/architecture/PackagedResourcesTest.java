@@ -63,13 +63,12 @@ class PackagedResourcesTest {
                 "dev/jasper/app/themeimport/intellij/LICENSE.txt",
                 "dev/jasper/app/themes/intellij-light.toml",
                 "dev/jasper/app/themes/darcula.toml",
-                "dev/jasper/app/themes/jasper-dark.toml"
+                "dev/jasper/app/themes/jasper-dark.toml",
+                "dev/jasper/app/themes/THIRD-PARTY-THEMES.md"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")
-                || n.contains("TestSupport") || (n.contains("Preview.class") && !n.equals("dev/jasper/app/themesui/ThemePreview.class"))
-                || n.contains("ControlledSessionChild"));
-            assertThat(jar.getJarEntry("dev/jasper/app/themesui/ThemePreview.class")).isNotNull();
+                || n.contains("TestSupport") || n.contains("Preview.class") || n.contains("ControlledSessionChild"));
             assertThat(jar.getJarEntry("dev/jasper/app/themes/FlatLaf.properties")).isNull();
             String border = dev.jasper.app.appearance.ThemeManager.APP_DEFAULTS.get("SplitPaneDivider.border");
             assertThat(jar.getJarEntry(border.replace('.', '/') + ".class")).isNotNull();

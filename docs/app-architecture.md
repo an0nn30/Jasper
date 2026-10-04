@@ -135,7 +135,8 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT argument/handoff flow and EDT composition. StartupResources owns rollback until explicit transfer. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows, tabs, splits, panes, panel regions and the rail, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
+| `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
@@ -147,7 +148,8 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane, and the app-native session request and attempt state machine. Application owns the TerminalRegistry; each window closes its own registration. |
 | `windows` | Application-built auxiliary windows and dialogs: a headless surface core and the only other native frame boundary besides TerminalWindow. Application owns AuxiliaryWindows and closes it at shutdown. |
 | `files` | Jasper's file chooser: the headless `ChooserModel` over `Location`s, `Browser`s and `ChooserSource`s (the local disk is `LocalSource`/`LocalBrowser`; plugin sources are adapted in `plugins`) and the Swing `FileChooserPanel`. NativeShells shows it in a dialog and owns that dialog's worker; the model applies worker results on the EDT, drops stale ones and closes the browsers it opened. |
-| `notifications` | EDT terminal and activity notice production, active producer identities, attention and visibility policy. Application closes notifiers before companion. |
+| `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, plus terminal and activity notice production for Buddy. Application owns the center and closes notifiers before companion. |
+| `notificationui` | EDT Swing views of the center: each window's CardLayer, the history panel and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window. |
 | `residency` | Bounded interprocess protocol and endpoint workers. Bootstrap transfers endpoint close to application shutdown and process-hook backup. |
 | `platform` | OS adapters, icons, fonts, title-bar paint and logging. Callers own registrations and native handles; Swing operations run on EDT and logging has its own worker. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
@@ -155,7 +157,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
 | `themeimport` | Offline bounded conversion, deterministic vendoring, frozen import plans and locked file operations. Startup owns resumable legacy migration; no config/application dependency. |
-| `themesui` | Canned terminal preview for the forthcoming Themes page; EDT owner closes its fake transport and view. |
+| `themesui` | The Appearance page's Import theme…: a serial import worker and its dialogs over Settings. The Appearance page owns each ThemeImport and closes it when disposed. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
@@ -218,7 +220,7 @@ colours are required), the 48 tokens and the syntax roles are derived with contr
 keys install through the IntelliJ path above. The four classic singleton built-ins are `Theme.DARK` (`themes/jasper-dark.toml`),
 `Theme.JASPER_LIGHT` (`themes/jasper-light.toml`), and `Theme.INTELLIJ_LIGHT` and `Theme.DARCULA`, converted from the
 vendored IntelliJ files by `IntellijConversion` as `ui_complete` documents (their own keys install unchanged).
-Side panels paint `ToolWindow.background` through `ToolWindowSurface`; the rail stays chrome.
+Tool windows paint `ToolWindow.background` through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
 Native themes come from `ThemeCatalog`: user TOML files beside the actual config, then the indexed offline
 collection. `Theme.Source` permits only `Bundled` and `UserFile`. The index loads lazily and reuses the four classic
@@ -239,8 +241,7 @@ successful config handling. Recoverable source failures remain diagnostics after
 
 The configuration worker rescans the native catalog and refreshes migration diagnostics without conversion.
 `ConfigurationController` retains those separately from transient warnings; chrome and workspace both resolve in
-the same native catalog. Settings keeps Appearance and Font & Colors, with `match`, until the Plan 5 Themes page.
-`themesui.SampleTerminal` is the reusable canned preview and never launches a shell.
+the same native catalog. Settings › Appearance offers both as dropdowns, with `match` as Same as UI theme.
 
 ## Hosted workspace styling
 

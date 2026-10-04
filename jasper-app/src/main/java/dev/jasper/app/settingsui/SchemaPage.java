@@ -161,9 +161,24 @@ public final class SchemaPage implements SettingsPage {
                 terms.add(row.setting().description());
                 terms.add(String.join(" ", row.setting().keywords()));
                 terms.addAll(row.editor().terms());
-            } else if (item instanceof SectionItem section) terms.add(section.title());
+            } else if (item instanceof SectionItem section && sectionShown(section)) terms.add(section.title());
         }
         return List.copyOf(terms);
+    }
+
+    /**
+     * Whether a section's header shows: not when it heads rows that are all hidden (for example rows for a setting
+     * only another platform uses), so no empty header is left behind.
+     */
+    private boolean sectionShown(SectionItem section) {
+        boolean after = false, anyRow = false;
+        for (Item item : spec.items) {
+            if (!after) { after = item == section; continue; }
+            if (item instanceof SectionItem) break;
+            if (item instanceof ActionItem) return true;
+            if (item instanceof RowItem row) { if (row.shown()) return true; anyRow = true; }
+        }
+        return !anyRow;
     }
 
     List<Row<?>> rows() { return rows; }
@@ -179,6 +194,7 @@ public final class SchemaPage implements SettingsPage {
         for (Item item : spec.items) {
             switch (item) {
                 case SectionItem section -> {
+                    if (!sectionShown(section)) continue;
                     var c = constraints(0, y++, 3);
                     c.fill = GridBagConstraints.HORIZONTAL;
                     c.insets = new Insets(first ? 0 : 14, 0, 6, 0);
@@ -394,6 +410,7 @@ public final class SchemaPage implements SettingsPage {
 
     @Override public void refresh() {
         actionRefreshers.forEach(Runnable::run);
+        for (Row<?> row : rows) row.editor.refresh();
         if (panel != null) showValues();
     }
 

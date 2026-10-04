@@ -137,6 +137,27 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*CommandNotifierTest" --tests "*WorkspaceActivityTest" :jasper-buddy:test --tests "*BuddyDeckTest" --tests "*BuddyCompanionTest"
 ```
 
+## Posting a notification
+
+Application code never opens a message dialog to tell the user something; it posts a notification
+([guide](notifications.md), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+
+- Window code calls `WindowContent.onError` / `onInfo` with a fixed title and the details; the application posts them
+  to `jasper.general`. Never put user data in the title: it is what a window logs when nothing receives the message.
+- Application code calls `NotificationsFeature.error` / `info`, or posts a `NotificationRequest` for another group,
+  actions or a default action. `NotificationCenter.submit` is the any-thread entry point (at once on the EDT,
+  otherwise through the UI executor); `NotificationCenter.post` is EDT-only and throws elsewhere. Declare a group with
+  `NotificationCenter.register` before posting to it; posts to an undeclared group are dropped and logged.
+- Text is plain and bounded: titles are one line (cut at 200 characters), details at most 4,000. Pass exception
+  messages as details, never as titles.
+- Contextual feedback (a Settings field error, a palette error row, a plugin's inline row) stays where it is, and
+  confirmation or input prompts stay dialogs: notifications are for things that happen elsewhere or later.
+- Cards, the panel and the badge read `Jasper.notification.*` and `Jasper.railBadge*` colours derived in `ChromeKeys`;
+  a theme's own `Notification.*` keys win. The badge is a `PanelEntry.setBadge` on the panel: each window's
+  `ToolStripe` shows it as a `BadgedIcon` on that panel's stripe button, with the count in the tooltip and
+  accessible description. Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner
+  of the `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
+
 ## Platform integration
 
 Place OS behavior in [MacTitleBar](../jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java)-style adapters or the existing platform package. Supply narrow JDK callbacks and values rather than WindowContent/JasperApplication back-references. Register cleanup immediately using [StartupResources](../jasper-app/src/main/java/dev/jasper/app/bootstrap/StartupResources.java) during startup, then transfer it to the long-lived owner only after wiring succeeds. Keep handoff before AWT; distinguish unsupported capability from failed startup. Tests inject boundary callbacks and do not open a real desktop window.
@@ -190,12 +211,12 @@ failure leaves an opaque window.
   lives and dies with the view, and removing the view stops it. There is no private CoreGraphics call; the corner
   radius comes from AppKit's private `_cornerRadius` when present, else 10 pt. `./gradlew :jasper-app:run` passes
   `-Djasper.glassLibrary`; a packaged app loads it from `Contents/app/`.
-- **Painting**: the window peer is the only non-opaque ancestor. `WorkspaceRegions`' center host fills its rounded
+- **Painting**: the window peer is the only non-opaque ancestor. `ToolWindowArea`'s center host fills its rounded
   surface with the terminal background at the opacity in effect (`Src`), so a strip no pane covers is glass too;
   `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
   `TerminalView` fill the default background with alpha using the `Src` composite, replacing the host's fill. Anything
   new inside the terminal surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
-- **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.12.1). The answer comes from
+- **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.13.1). The answer comes from
   `dev.jasper.app.plugins.GlassSource`, which `JasperApplication` builds from its windows: `owns(component)` finds the
   window and `content().backgroundOpacity()` is the value in effect (1.0 for a component outside a translucent window).
   `WindowContent.setGlassListener` notifies it on a real opacity change and when hosted content mounts or unmounts while
@@ -254,7 +275,7 @@ Converters/security fixtures live in `themeimport`; native catalog/installation 
 file or deleting an equal-byte foreign backup. Keep original data and report the conflict. Config migration must
 stay ahead of ConfigService construction and use its actual override directory.
 
-Plan 5 consumes `ThemeFiles`, `ThemeImporter`, `ThemeTomlWriter` and the canned `themesui.SampleTerminal`.
+Import theme… (`themesui.ThemeImport`) consumes `ThemeImporter`, which writes through `ThemeFiles` and `ThemeTomlWriter`.
 Run `./gradlew check` and all architecture guards; hand native visual acceptance to the user ([themes](themes.md)).
 
 ## Maintaining SDK icons
@@ -343,39 +364,61 @@ padding. Keep compact palette rows tall enough for these insets. Plugin forms in
 these defaults; upstream theme assets should not be edited to duplicate them.
 
 
-Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and,
-while the rail is visible, matching rounded corners for the terminal/tab column. With
-the rail hidden or empty, the terminal/tab column has square corners, no exterior
+Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
+while the stripes are visible, matching rounded corners for the terminal/tab column. With
+the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
-Keep the layout-only terminal
+Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
+components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
+headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
+button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
+to the pressed component keep arriving. Any dock change or stripe render, View › Rail and the window
+being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher
+claims only an Esc from its own window. A panel badge change is not a render: it fires
+`Contributions.Kind.BADGES`, and `WindowContributions` applies it to the existing stripe buttons with
+`ToolStripe.updateBadge` (the icon's size is the base icon's, so nothing is laid out), so a notification
+arriving mid-drag leaves the drag alone. An action's enable or title change is not a render either:
+`WindowContributions` calls `ToolStripe.refreshActions`, which renames the existing rail action buttons
+(a button follows the action's enabled state itself) and repaints them. Only adding or removing an
+action or a rail placement, or a dock or panel change, renders the stripes again. Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
-left/center/bottom surface has no additional leading gutter. Hiding or emptying the
-rail restores that gutter on plugin panel hosts without reparenting their content.
+beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. Hiding or emptying the
+stripes restores that gutter on tool window frames without reparenting their content.
 The following gutter and lower-inset rules apply to the terminal column only while
-the rail is visible. A visible status bar
+the stripes are visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header
 also replaces the exterior top gutter, keeping its controls centered between the window
 top and workspace surfaces. Hiding toolbar actions retains this spacing on macOS because
-the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent hosts omit
-their facing gutters so the plain 6px draggable splitter supplies the gap.
-Region widths/heights and persisted splitter sizes include exterior gutters. The center
+the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent frames omit
+their facing gutters so the area's plain 6px divider supplies the gap.
+Slot sizes and the saved dock sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px
 minimum. The center reserves an 8px lower inset (the corner radius) below the terminal
 grid, so terminal cells stay rectangular and unclipped. The inset uses the resolved
 terminal palette, including independent terminal-color changes. Its height contributes
-to the workspace minimum and scales with the UI. Keep clipping and hit testing in the
+to the workspace minimum and scales with the UI. The area's minimum height is the larger of the
+terminal column's minimum and `DockGeometry.splitMinimum` (two tool window minimums and a divider
+when the left or the right side shows both halves, else 0), plus the bottom row; only a split side
+raises it, so the scaled 120px terminal floor never raises an unsplit layout's minimum (the terminal
+column's own minimum, the gap and the bottom floor still scale with the UI). `DockGeometry.compute`
+keeps `upperMinimum` (that, or the terminal's own 120px floor, whichever is larger) above the bottom
+row. `ToolWindowArea.sync` and `WindowContent.syncRailVisibility` tell the window
+(`onMinimumSizeChanged`) so the frame's minimum follows a split, or the stripes, appearing or going
+away. Keep clipping and hit testing in the
 host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
 `ToolWindow.background` supplies the inner surface. `UiTemplate` maps it to the `sidebar` token and list/tree/table backgrounds to `surface_sunken`; edit the
 `[tokens]` in `jasper-dark.toml` or `jasper-light.toml` to tune the contrast.
-Rail selection uses the theme's toolbar-button background and the original theme-aware icon;
+Stripe selection uses the theme's toolbar-button background and the original theme-aware icon;
 do not substitute the tab accent or a different selected icon variant.
 
 
@@ -390,8 +433,8 @@ The palette uses the same geometry for selections, hover and scope highlights.
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
 workspace title bar, tab strip and status bar have no edge strokes. The selected tab
-uses an inset rounded selection instead of an underline. Workspace-region splitters remove their border/grip after every UI
-update; terminal-internal splits keep their existing visible indicators. The standalone
+uses an inset rounded selection instead of an underline. Dock dividers paint nothing, so no UI
+update can give them a border or grip; terminal-internal splits keep their existing visible indicators. The standalone
 dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 
@@ -450,23 +493,35 @@ and icons use the active theme and bundled catalog. `shortcutHelpPreview` render
 expanded and editing states in both themes and larger UI type without opening a window.
 
 
-### Maintaining the Themes page
+### Maintaining the theme dropdowns and Import theme…
 
-`themesui.ThemesPage` owns the two draft-bound pickers, local `ThemePreview` and page-scoped `ThemeActions` worker.
-`settingsui.CorePages` receives its factory from application wiring, so it has no dependency on themesui. The two
-canonical theme settings are deliberately absent from schema rows; the setting-coverage test counts their explicit
-page ownership. Preview generation runs on EDT against private effective defaults; it never installs a LAF.
+The Appearance page's Theme and Workspace scheme rows are ordinary schema rows (`Editors.theme` and
+`Editors.workspaceScheme`, one `Editors.ThemePick` each). `settingsui.ThemeChoices` carries the catalog's names and a
+per-page import factory from application wiring, so settingsui has no dependency on themesui. A pick re-reads the
+names on each page refresh (`ValueEditor.refresh`); a saved name the catalog lacks stays listed as "(not found)" and
+keeps its spelling. Only the Theme row has the gear; its page disposes the row, which closes the import.
 
-All file/conversion/hash/desktop work runs on the serial action worker. Dialogs and reload requests run on EDT;
-completion waits for catalog refresh before updating a live page. A closed page suppresses UI callbacks while a
-running confirmed write still refreshes application state. Removal eligibility is checked off EDT and the eventual
-operation captures/rechecks its own frozen intent. Never replace a failed trash operation with silent deletion.
+Both picks use `settingsui.SearchCombo`, a `JComboBox` whose look-and-feel UI (a `FlatComboBoxUI` subclass, or Basic
+without FlatLaf) creates its own `ComboPopup`: a non-focusable `JPopupMenu` with a search bar over a filtered list.
+Focus stays on the combo; the popup's key listener, which the UI installs on the combo, routes typed characters into
+the search and handles Up/Down (keypad too), Page Up/Down, Home/End, Enter, Escape and Backspace while the list is
+open or a search runs; every key the combo's own bindings would answer with a pick behind the list must stay handled
+there. `selectWithKeyChar` always returns false, because each look and feel installs a fresh key selection manager.
+The popup's size is fixed when it opens; only the bar's first appearance repacks. Its rows have their own renderer,
+padded as FlatLaf pads its own combo popup (`ComboBox.padding` plus the combo's focus width at each side, read at paint
+time), with the combo's `selectionInsets`/`selectionArc` and `popupInsets`; `SearchComboTest` compares the padding
+with a stock FlatLaf combo.
+FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
+
+`themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;
+completion waits for the catalog refresh before reporting. A closed import suppresses UI callbacks while a running
+confirmed write still refreshes application state. Copying, editing and removing themes are file edits in the
+`themes` folder; there is no UI for them.
 
 The configuration worker's companion scan hashes native content every second and publishes catalog-only changes.
 `WindowContent` receives the latest snapshot supplier from `ConfigurationController`; menu models rebuild on opening
 only when names or requested choices change. Menu listeners and catalogs are released with the window. Keep the three
 legacy terminal-color command IDs mapped to explicit Jasper names; canonical Light/Dark user names are literal.
 
-Headless checks: ThemesPageTest, ThemePreviewTest, ThemeActionsTest, ThemesWorkflowTest, WindowThemeMenuTest and
-JasperApplicationThemesTest. The user-run native checklist is in the Plan 5 implementation plan; do not launch the GUI
-or native Trash from an unattended agent.
+Headless checks: AppearancePageTest, ThemeImportTest, ThemeImportViewTest, WindowThemeMenuTest and
+JasperApplicationThemesTest. Do not launch the GUI from an unattended agent.

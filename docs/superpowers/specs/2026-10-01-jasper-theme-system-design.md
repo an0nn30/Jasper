@@ -372,6 +372,13 @@ Theme and Trash Panda (no licence or no source).
 
 ## 7. Settings › Themes
 
+> **Superseded 2026-10-02 (user request in chat, branch `claude/settings-appearance`).** The Themes page, its pickers,
+> preview, Duplicate, Remove, Open themes folder and About were removed. Settings › Appearance now has, as in IntelliJ,
+> a **Theme** dropdown of every installed name with a gear whose menu offers **Import theme…** (the import flow below,
+> unchanged), and a **Workspace scheme** dropdown (the user's name for the workspace theme) starting with "Same as UI
+> theme" (`match`). Both are staged until Apply or OK and re-read the catalog on each refresh. Font & Colors links to
+> Appearance; View › Themes… opens it. Live file reload stays. The text below records the original design.
+
 One page replaces the Themes group's IntelliJ Themes and Alacritty Themes pages.
 
 - **UI theme** and **Workspace theme** pickers. The workspace picker's first entry is "Same as UI theme" (`match`).

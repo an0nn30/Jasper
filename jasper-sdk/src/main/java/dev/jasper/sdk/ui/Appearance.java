@@ -48,7 +48,7 @@ public interface Appearance {
      * {@link #onWorkspaceChanged}. UI thread only.
      * @param component a component of this plugin's, shown or not
      * @return the opacity in effect, from 0.1 to 1
-     * @since 0.12.1
+     * @since 0.13.1
      */
     default double workspaceOpacity(java.awt.Component component) {
         java.util.Objects.requireNonNull(component, "component");

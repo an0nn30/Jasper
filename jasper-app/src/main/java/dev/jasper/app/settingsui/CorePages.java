@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 public final class CorePages {
     /** The page shown when Settings opens for the first time. */
     public static final String DEFAULT_PAGE = "appearance";
+
     private CorePages() { }
 
     /**
@@ -37,40 +38,41 @@ public final class CorePages {
      *
      * @param keymap the Keymap page
      * @param plugins the Plugins page
-     * @param themes the Themes page
      * @param tools pages under Tools, such as plugins' settings pages
      */
-    public record Pages(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins, Function<PageContext, SettingsPage> themes,
+    public record Pages(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins,
                         Function<PageContext, List<SettingsPage>> tools) {
         /** Keymap and Plugins only. */
-        public static Pages of(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins, Function<PageContext, SettingsPage> themes) {
-            return new Pages(keymap, plugins, themes, context -> List.of());
+        public static Pages of(Function<PageContext, SettingsPage> keymap, Function<PageContext, SettingsPage> plugins) {
+            return new Pages(keymap, plugins, context -> List.of());
         }
     }
 
     /** Every schema page's spec, in tree order, with no detected shells. */
-    public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system) {
-        return specs(themeNames, system, ShellChoices.NONE);
+    public static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system) {
+        return specs(themes, system, ShellChoices.NONE);
     }
 
     /** Every schema page's spec, in tree order. */
-    public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells) {
-        return specs(themeNames, system, shells, id -> {});
+    public static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells) {
+        return specs(themes, system, shells, id -> {});
     }
-    /** Schema pages with links into the supplied Themes page. */
-    public static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate) {
-        return specs(themeNames, system, shells, navigate, com.formdev.flatlaf.util.SystemInfo.isMacOS);
+    /** Schema pages whose links select other pages with {@code navigate}. */
+    public static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate) {
+        return specs(themes, system, shells, navigate, com.formdev.flatlaf.util.SystemInfo.isMacOS);
     }
 
-    /** Schema pages; {@code glass} is whether workspace glass exists here (macOS only), which decides its Settings rows. */
-    static List<SchemaPage.Spec> specs(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
+    /**
+     * Schema pages; {@code glass} is whether workspace glass exists here (macOS only), which decides whether its
+     * Settings rows (and their Workspace section) are built.
+     */
+    static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
-                .action(() -> "Choose and preview application colors.", new SchemaPage.Button("Choose UI theme…", () -> navigate.accept("themes#ui"), () -> true))
+                .row(UI_THEME_NAME, Editors.theme(themes))
+                .row(UI_THEME_WORKSPACE, Editors.workspaceScheme(themes))
                 .section("Workspace")
-                .action(() -> glass ? "Translucent terminal and editor backgrounds; a workspace theme may set its own." : "Colours for the terminal and editor.",
-                    new SchemaPage.Button("Choose workspace theme…", () -> navigate.accept("themes#workspace"), () -> true))
                 .row(UI_WORKSPACE_OPACITY, Editors.optionalNumber("Use theme's value", 1, "%")).shownWhen(glass)
                 .row(UI_WORKSPACE_BLUR, Editors.choice(Map.of("theme", "Use theme's value"))).shownWhen(glass)
                 .section("Interface font")
@@ -122,7 +124,8 @@ public final class CorePages {
                 .row(TERMINAL_FONT_LIGATURES)
                 .row(TERMINAL_FONT_LINE_HEIGHT, Editors.number(0.05, "×"))
                 .section("Colors")
-                .action(() -> "Choose terminal and workspace colors.", new SchemaPage.Button("Choose workspace theme…", () -> navigate.accept("themes#workspace"), () -> true)),
+                .action(() -> "Terminal colors come from the workspace scheme in Appearance.",
+                    new SchemaPage.Button("Choose workspace scheme…", () -> navigate.accept("appearance"), () -> true)),
             SchemaPage.page("terminal.cursor", "Cursor").parent("terminal")
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),
@@ -141,49 +144,49 @@ public final class CorePages {
     }
 
     /** The whole tree with no detected shells. */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system,
+    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system,
                                                                    Function<PageContext, SettingsPage> keymap,
-                                                                   Function<PageContext, SettingsPage> plugins, Function<PageContext, SettingsPage> themes) {
-        return pages(themeNames, system, ShellChoices.NONE, keymap, plugins, themes);
+                                                                   Function<PageContext, SettingsPage> plugins) {
+        return pages(themes, system, ShellChoices.NONE, keymap, plugins);
     }
 
     /**
      * The whole tree for one dialog, in display order: group and schema pages, with the Keymap and Plugins pages the
      * application supplies.
      */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
+    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system, ShellChoices shells,
                                                                    Function<PageContext, SettingsPage> keymap,
-                                                                   Function<PageContext, SettingsPage> plugins, Function<PageContext, SettingsPage> themes) {
-        return pages(themeNames, system, shells, keymap, plugins, themes, context -> List.of());
+                                                                   Function<PageContext, SettingsPage> plugins) {
+        return pages(themes, system, shells, keymap, plugins, context -> List.of());
     }
 
     /** The whole tree with no detected shells, followed by {@code tools}. */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system,
+    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system,
                                                                    Function<PageContext, SettingsPage> keymap,
-                                                                   Function<PageContext, SettingsPage> plugins, Function<PageContext, SettingsPage> themes,
+                                                                   Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools) {
-        return pages(themeNames, system, ShellChoices.NONE, keymap, plugins, themes, tools);
+        return pages(themes, system, ShellChoices.NONE, keymap, plugins, tools);
     }
 
     /** As above with {@code shells}, followed by {@code tools}: pages under Tools, such as plugins' settings pages. */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
+    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system, ShellChoices shells,
                                                                    Function<PageContext, SettingsPage> keymap,
-                                                                   Function<PageContext, SettingsPage> plugins, Function<PageContext, SettingsPage> themes,
+                                                                   Function<PageContext, SettingsPage> plugins,
                                                                    Function<PageContext, List<SettingsPage>> tools) {
-        return pages(themeNames, system, shells, new Pages(keymap, plugins, themes, tools));
+        return pages(themes, system, shells, new Pages(keymap, plugins, tools));
     }
 
     /** The whole tree for one dialog, in display order, with the pages the application supplies. */
-    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames,
+    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes,
                                                                    SystemActions system, ShellChoices shells, Pages supplied) {
         return context -> {
-            var specs = specs(themeNames, system, shells, context.navigate());
+            var specs = specs(themes, system, shells, context.navigate());
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();
             all.add(new GroupPage("appearance-behavior", "Appearance & Behavior", Optional.empty(), false,
                 childrenOf.apply("appearance-behavior"), context));
-            for (var spec : specs.subList(0, 6)) { all.add(spec.build(context)); if (spec.id().equals("appearance")) all.add(supplied.themes().apply(context)); }
+            for (var spec : specs.subList(0, 6)) all.add(spec.build(context));
             all.add(supplied.keymap().apply(context));
             for (var spec : specs.subList(6, specs.size())) all.add(spec.build(context));
             all.add(supplied.plugins().apply(context));

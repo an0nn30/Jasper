@@ -45,6 +45,7 @@ final class ConfigurationController implements AutoCloseable {
     private final java.util.function.Supplier<List<ThemeCatalog.Problem>> migrationSource;
     private Predicate<String> pluginSettingsExist = id -> false;
     private final List<Consumer<ConfigService.State>> stateListeners = new java.util.ArrayList<>();
+    private Consumer<ConfigService.State> problemListener = state -> {};
     private java.util.function.BiConsumer<WindowContent, String> settingsOpener;
     private final java.util.Map<Path, java.util.LinkedHashSet<ConfigDiagnostic>> pluginReports = new java.util.LinkedHashMap<>();
 
@@ -67,14 +68,14 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         if (closed) return;
         pluginReports.computeIfAbsent(diagnostic.file(), file -> new java.util.LinkedHashSet<>()).add(diagnostic);
-        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+        publish();
     }
 
     /** Forgets every plugin problem in {@code file}. */
     void clearReports(Path file) {
         requireEdt();
         if (closed || pluginReports.remove(file) == null) return;
-        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+        publish();
     }
 
     /** An application problem with a key of config.toml; shown once with the file's diagnostics until the next reload. */
@@ -84,7 +85,7 @@ final class ConfigurationController implements AutoCloseable {
         var diagnostic = new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, key, message);
         if (reported.contains(diagnostic)) return;
         reported.add(diagnostic);
-        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+        publish();
     }
 
     ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog) {
@@ -104,7 +105,7 @@ final class ConfigurationController implements AutoCloseable {
         catch (ThemeController.InstallationFailure ignored) {
             // Already recorded as a theme problem below; a theme that cannot be installed never stops start-up.
         }
-        settingsOpener = (owner, page) -> reportFailure(owner, service.openSettings(editor));
+        settingsOpener = (owner, page) -> reportFailure(owner, "Could not open Settings", service.openSettings(editor));
         service.start(this::accept);
     }
 
@@ -123,21 +124,35 @@ final class ConfigurationController implements AutoCloseable {
         if (!closed) listener.accept(state.snapshot());
     }
 
+    /** One application-level observer of the problems windows show: the current state at once, then after every change. */
+    void onProblems(Consumer<ConfigService.State> listener) {
+        requireEdt();
+        problemListener = java.util.Objects.requireNonNull(listener, "listener");
+        if (!closed) listener.accept(shown());
+    }
+
+    /** Shows the merged problems in every window and tells the application. */
+    private void publish() {
+        ConfigService.State shown = shown();
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown);
+        problemListener.accept(shown);
+    }
+
     void register(WindowContent owner) {
         requireEdt();
         if (closed || !owners.add(owner)) return;
         owner.connectConfiguration(() -> settingsOpener.accept(owner, null),
-            () -> reportFailure(owner, service.reload()), () -> migrateFor(owner), () -> unregister(owner));
+            () -> reportFailure(owner, "Could not reload the configuration", service.reload()), () -> migrateFor(owner), () -> unregister(owner));
         owner.connectThemeCatalog(catalog::latest);
         owner.connectSettings(this::save, page -> settingsOpener.accept(owner, page));
         owner.applyConfiguration(state.snapshot(), service.macOs());
         owner.setConfigurationState(shown());
     }
 
-    private void reportFailure(WindowContent owner, CompletableFuture<?> result) {
+    private void reportFailure(WindowContent owner, String title, CompletableFuture<?> result) {
         result.whenComplete((ignored, failure) -> {
             if (failure != null) SwingUtilities.invokeLater(() -> {
-                if (!closed && owners.contains(owner)) owner.onError.accept(failure.getMessage());
+                if (!closed && owners.contains(owner)) owner.onError.accept(title, failure.getMessage());
             });
         });
     }
@@ -152,7 +167,7 @@ final class ConfigurationController implements AutoCloseable {
     void pluginSettingsExist(Predicate<String> test) {
         requireEdt();
         pluginSettingsExist = Objects.requireNonNull(test, "test");
-        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+        publish();
     }
 
     /** Whether Migrate Config has anything to do for the file as last loaded. */
@@ -173,8 +188,8 @@ final class ConfigurationController implements AutoCloseable {
     private void migrateFor(WindowContent owner) {
         migrate().whenComplete((message, failure) -> SwingUtilities.invokeLater(() -> {
             if (closed || !owners.contains(owner)) return;
-            if (failure == null) owner.onInfo.accept(message);
-            else owner.onError.accept((failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
+            if (failure == null) owner.onInfo.accept("Migrate Config", message);
+            else owner.onError.accept("Migrate Config failed", (failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
         }));
     }
 
@@ -228,7 +243,7 @@ final class ConfigurationController implements AutoCloseable {
         if (closed) return;
         try { configureThemes(next); }
         catch (ThemeController.InstallationFailure failure) {
-            for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
+            owners.stream().findFirst().ifPresent(owner -> owner.onError.accept("Could not apply the theme", failure.getMessage()));
         }
         state = next;
         reported.clear();
@@ -239,6 +254,7 @@ final class ConfigurationController implements AutoCloseable {
         }
         var visible = shown();
         for (Consumer<ConfigService.State> listener : List.copyOf(stateListeners)) listener.accept(visible);
+        problemListener.accept(visible);
     }
 
     /**
@@ -264,7 +280,7 @@ final class ConfigurationController implements AutoCloseable {
         if (!choice.matchesChrome()) workspace = available.find(choice.name()).orElse(null);
         if (!choice.matchesChrome() && workspace == null)
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.workspace",
-                "Unknown workspace theme \"" + choice.name() + "\"; matching the chrome theme."));
+                "Unknown workspace scheme \"" + choice.name() + "\"; matching the chrome theme."));
         var retained = new java.util.ArrayList<>(available.themes());
         retained.addAll(themes.activeThemes());
         retained.add(theme);
@@ -290,6 +306,7 @@ final class ConfigurationController implements AutoCloseable {
         appearance.close();
         applicationListener = snapshot -> {};
         stateListeners.clear();
+        problemListener = state -> {};
         for (WindowContent owner : List.copyOf(owners)) unregister(owner);
         service.close();
     }

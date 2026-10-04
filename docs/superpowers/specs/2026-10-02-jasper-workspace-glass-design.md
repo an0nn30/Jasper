@@ -254,3 +254,8 @@ Plan 2 shipped `Appearance.workspaceOpacity(java.awt.Component)` (SDK 0.12.1), n
 the SDK section: opacity is per window and content moves between windows, so the answer depends on the component. The
 default is still 1.0, a component outside a translucent window reports 1.0, and `onWorkspaceChanged` reports changes
 (including a component entering or leaving a translucent window).
+
+Merging main (2026-10-03, SDK 0.13.0, dock layout and theme rows in Appearance): the method is `@since 0.13.1` and the
+Editor needs `>=0.13.1, <0.14`; the Workspace section follows Appearance's Theme section with only the Opacity and Blur
+rows (no "Choose workspace theme…" button, since the theme pickers are rows) and shows no header off macOS; the glass
+fill moved from the deleted `WorkspaceRegions.Host` to `ToolWindowArea`'s centre host.

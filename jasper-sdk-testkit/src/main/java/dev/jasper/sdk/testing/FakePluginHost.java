@@ -132,7 +132,7 @@ public final class FakePluginHost implements AutoCloseable {
      * workspace change on the next {@link #flush()} (no announcement when unchanged). Like the other workspace values,
      * components report the last flushed opacity until then.
      * @param opacity from 0.1 to 1
-     * @since 0.12.1
+     * @since 0.13.1
      */
     public void setWorkspaceOpacity(double opacity) {
         requireAppearanceThread();
@@ -726,14 +726,15 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Registered panels, registration order.
      *
-     * @return lines of the form {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor), followed by
-     *         {@code |actionId} when the panel names its own toggle action
+     * @return lines of the form {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor, with {@code +split} when the
+     *         panel starts in its side's secondary half), followed by {@code |actionId} when the panel names its own
+     *         toggle action
      */
     public List<String> panels() {
         List<String> lines = new ArrayList<>();
         for (FakePluginContext context : contexts.values())
             for (FakeUi.Panel panel : context.ui.panels) lines.add(panel.spec.id() + "|" + panel.spec.title() + "|" + panel.spec.defaultAnchor()
-                + panel.spec.toggleActionId().map(toggle -> "|" + toggle).orElse(""));
+                + (panel.spec.split() ? "+split" : "") + panel.spec.toggleActionId().map(toggle -> "|" + toggle).orElse(""));
         return lines;
     }
 

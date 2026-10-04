@@ -56,8 +56,9 @@ public interface ContractHarness extends AutoCloseable {
     List<String> status();
 
     /**
-     * Registered panels as {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor), followed by
-     * {@code |actionId} when the panel names its own toggle action; registration order.
+     * Registered panels as {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor, with {@code +split} when the panel
+     * starts in its side's secondary half), followed by {@code |actionId} when the panel names its own toggle action;
+     * registration order.
      */
     List<String> panels();
 

@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.12.0, <0.13"
+sdk = ">=0.13.0, <0.14"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -157,19 +157,29 @@ outside automatic branding. No additional SDK factory or dependency is required.
 
 ## Panels, the rail and windows
 
-A panel is a Swing component in the left, right or bottom region of every terminal window.
-Register it once; Jasper asks your factory for one instance per window, the first time the
-panel is shown there, and gives the panel a rail icon, a `<panel id>.toggle` action and a
-View → Tools entry, so don't add a View menu item of your own that toggles it. If you already have
+A panel is a Swing component docked as a tool window in every terminal window, as in IntelliJ:
+stripes of icons on the window's left and right edges, and six slots. The left and right sides each
+have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
+and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
+SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for one
+instance per window, the first time the panel is shown there, and gives the panel a stripe icon, a
+header (its title, an options menu and a hide button), a `<panel id>.toggle` action and a
+View → Tools entry, so don't add a View menu item of your own that toggles it, and don't repeat the
+panel's title inside it. If you already have
 an action that toggles the panel, for example to give it a shortcut, register it first and name it
 with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tools and the palette then list your action,
-with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per region; the user can move a panel to another region
-from its rail icon, and Jasper remembers where it was and how big.
+with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per slot; the user
+can drag a panel by its stripe icon or its header to another slot or another place on a stripe, or
+use the Move to menu on either, and Jasper remembers its slot, its place on the stripe and the side's
+size. A drop on a stripe keeps the panel shown or hidden as it was; a drop on the workspace shows it.
+Your `PanelHost.onVisibility` hears a drop only when it shows your hidden panel, or when it hides
+your panel to make room in the target slot; a drop that leaves your panel shown or hidden as it was
+tells it nothing.
 
-A rail button runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS
-title bar, menu bar, theme tracking and remembered bounds are its job; the content is yours.
-Dialogs belong to a terminal window or to one of your windows, so they are parented correctly
-without your plugin ever seeing a frame.
+A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
+is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
+its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
+they are parented correctly without your plugin ever seeing a frame.
 
 <!-- example:pluginpanels -->
 ```java
@@ -181,7 +191,7 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
         run.addActionListener(event -> context.background().execute(() -> demo(context, stepMillis)));
         var panel = new JPanel(new BorderLayout(0, 8));
         panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        panel.add(new JLabel("Sample panel"), BorderLayout.NORTH);
+        panel.add(new JLabel("Runs a short demo activity in the background."), BorderLayout.NORTH);
         panel.add(run, BorderLayout.SOUTH);
         return panel;
     });
@@ -530,8 +540,8 @@ try (var host = new FakePluginHost()) {
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
 `host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
-`<panel id>.toggle` action or View → Tools menu; `host.panels()` appends `|<action id>` for a panel
-that names its own toggle.
+`<panel id>.toggle` action or View → Tools menu; `host.panels()` lists `id|title|ANCHOR`, with
+`+split` after the anchor for a split panel and `|<action id>` for a panel that names its own toggle.
 `host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
 `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
@@ -706,7 +716,7 @@ The no-argument `current()` reads the published workspace palette. A popup or to
 opened from a workspace pane. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
 workspace event; an event can change colors while `workspaceVariant()` remains `DARK` or `LIGHT`. Keep the document
 and undo model when changing only its styles.
-Since SDK 0.12.1, a surface that should follow a translucent window reads `Appearance.workspaceOpacity(component)` on
+Since SDK 0.13.1, a surface that should follow a translucent window reads `Appearance.workspaceOpacity(component)` on
 the UI thread (it is 1 unless the component is in the workspace area of a translucent window, so tool and side panels
 stay opaque), fills its own background once with that alpha (`AlphaComposite.Src`, unantialiased rectangles) and keeps
 the components above it non-opaque; `onWorkspaceChanged` also fires when the opacity changes or the component moves to

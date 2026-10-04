@@ -1,6 +1,7 @@
 package dev.jasper.app.contributions;
 
 import dev.jasper.app.commands.KeyContext;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.lifecycle.Subscription;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,7 +21,8 @@ import dev.jasper.app.files.ChooserSource;
 
 /**
  * What extensions have contributed, in registration order. Windows subscribe and re-render the part
- * that changed. Everything here is EDT-only; callbacks into contributors are their concern to contain.
+ * that changed. A {@code BADGES} change updates the existing stripe buttons in place instead. Everything here is
+ * EDT-only; callbacks into contributors are their concern to contain.
  */
 public final class Contributions {
     private final ContentRegistry content = new ContentRegistry();
@@ -28,8 +30,11 @@ public final class Contributions {
     private final QuitGuards quitGuards = new QuitGuards();
     public QuitGuards quitGuards() { return quitGuards; }
 
-    /** Which part changed. */
-    public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, SCOPES }
+    /**
+     * Which part changed. {@code RAIL} is the rail actions' placement and {@code BADGES} a panel's unread mark, which a
+     * window applies to its existing stripe buttons without a render.
+     */
+    public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, BADGES, SCOPES }
 
     /** Where an action was invoked: the window, and the pane it concerns if the window has one. */
     public record Invocation(UUID windowId, Optional<UUID> paneId) {
@@ -131,19 +136,19 @@ public final class Contributions {
         return new Subscription(() -> listeners.remove(listener));
     }
 
-    public PanelEntry addPanel(String id, String title, Icon icon, PanelRegion defaultRegion,
+    public PanelEntry addPanel(String id, String title, Icon icon, Slot defaultSlot,
                                Function<PanelSite, JComponent> factory) {
-        return addPanel(id, title, icon, defaultRegion, Optional.empty(), factory);
+        return addPanel(id, title, icon, defaultSlot, Optional.empty(), factory);
     }
 
     /** A panel toggled by {@code toggleActionId} when present; otherwise the model registers {@code <id>.toggle}. */
-    public PanelEntry addPanel(String id, String title, Icon icon, PanelRegion defaultRegion, Optional<String> toggleActionId,
+    public PanelEntry addPanel(String id, String title, Icon icon, Slot defaultSlot, Optional<String> toggleActionId,
                                Function<PanelSite, JComponent> factory) {
         requireEdt();
         Objects.requireNonNull(factory, "factory");
         if (panels.containsKey(id)) throw new IllegalArgumentException("Panel already registered: " + id);
         String toggle = toggleActionId.orElse(id + ".toggle");
-        var entry = new PanelEntry(this, id, title, icon, Objects.requireNonNull(defaultRegion, "defaultRegion"),
+        var entry = new PanelEntry(this, id, title, icon, Objects.requireNonNull(defaultSlot, "defaultSlot"),
             toggle, toggleActionId.isPresent(), factory);
         panels.put(id, entry);
         if (toggleActionId.isEmpty())

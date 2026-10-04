@@ -87,11 +87,10 @@ public final class TunnelsPanel extends JPanel {
         this.actions = actions;
         this.icons = icons;
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        var title = new JLabel("Tunnels");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
+        // The tool window header carries the title.
         var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        header.add(title); header.add(Box.createHorizontalGlue()); header.add(add);
+        header.add(Box.createHorizontalGlue()); header.add(add);
         add.setToolTipText("New Tunnel…");
         filter.putClientProperty("JTextField.placeholderText", "Filter tunnels…");
         var north = new JPanel(new BorderLayout(0, 6));

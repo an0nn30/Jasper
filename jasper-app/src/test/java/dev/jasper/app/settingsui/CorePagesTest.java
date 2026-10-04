@@ -16,25 +16,24 @@ class CorePagesTest {
     private final List<String> calls = new ArrayList<>();
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("/home/me/.config/jasper/config.toml"),
         () -> calls.add("open"), () -> calls.add("reveal"), () -> calls.add("reload"), () -> calls.add("migrate"), () -> true);
+    private static final ThemeChoices JASPER_DARK = ThemeChoices.of(() -> List.of("Jasper Dark"));
     private final PageContext context = new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
         id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
 
     @Test void everyCoreSettingIsOnExactlyOnePage() {
         var shown = new ArrayList<Setting<?>>();
-        for (var spec : CorePages.specs(() -> List.of("Jasper Dark"), system)) shown.addAll(spec.settings());
-        assertThat(shown).doesNotContain(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE);
-        shown.addAll(List.of(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE));
+        for (var spec : CorePages.specs(JASPER_DARK, system)) shown.addAll(spec.settings());
         assertThat(shown).doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(CoreSettings.SCHEMA.settings());
     }
 
     @Test void appearanceHasAWorkspaceSectionForOpacityAndBlur() {
-        var appearance = CorePages.specs(() -> List.of("Jasper Dark"), system).getFirst();
+        var appearance = CorePages.specs(JASPER_DARK, system).getFirst();
         assertThat(appearance.id()).isEqualTo("appearance");
         assertThat(appearance.settings()).containsSubsequence(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
     }
 
     private static SchemaPage.Spec appearance(boolean glass) {
-        return CorePages.specs(() -> List.of("Jasper Dark"), system(), ShellChoices.NONE, id -> { }, glass).getFirst();
+        return CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, glass).getFirst();
     }
 
     private static CorePages.SystemActions system() {
@@ -53,7 +52,8 @@ class CorePagesTest {
         assertThat(builtSettings(page)).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR)
             .contains(CoreSettings.UI_FONT_FAMILY, CoreSettings.UI_FONT_SIZE);
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
-        assertThat(page.actionButtons()).extracting(javax.swing.JButton::getText).containsExactly("Choose UI theme…", "Choose workspace theme…");
+        assertThat(page.searchTerms()).doesNotContain("Workspace");
+        assertThat(SchemaPageTest.sectionTitles(page.component())).containsExactly("Theme", "Interface font");
         page.dispose();
     }
 
@@ -69,23 +69,19 @@ class CorePagesTest {
         page.dispose();
     }
 
-    @Test void theWorkspaceSectionTextFollowsThePlatform() {
-        assertThat(actionText(appearance(true))).contains("Translucent terminal and editor backgrounds; a workspace theme may set its own.");
-        assertThat(actionText(appearance(false))).contains("Colours for the terminal and editor.").doesNotContain("Translucent");
+    @Test void theWorkspaceSectionFollowsTheThemeSectionOnlyOnMacOs() {
+        assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface font");
+        assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface font");
+        assertThat(appearance(true).settings()).containsSubsequence(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE,
+            CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR, CoreSettings.UI_FONT_FAMILY);
     }
 
-    private static List<String> actionText(SchemaPage.Spec spec) {
+    private static List<String> sectionTitles(SchemaPage.Spec spec) {
         var page = spec.build(new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
             id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
-        var texts = new ArrayList<String>();
-        collectLabels(page.component(), texts);
+        var titles = SchemaPageTest.sectionTitles(page.component());
         page.dispose();
-        return texts;
-    }
-
-    private static void collectLabels(java.awt.Component component, List<String> out) {
-        if (component instanceof javax.swing.JLabel label && label.getText() != null) out.add(label.getText());
-        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) collectLabels(child, out);
+        return titles;
     }
 
     @Test void theBlurRowNamesTheThemeChoiceLikeOpacity() {
@@ -101,11 +97,11 @@ class CorePagesTest {
     }
 
     @Test void theTreeIsTheApprovedOne() {
-        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins, CorePagesTest::themes).apply(context);
-        assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "themes", "window", "notifications",
+        var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
+        assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "window", "notifications",
             "command-palette", "desk-buddy", "system", "keymap", "terminal", "terminal.font",
             "terminal.cursor", "terminal.shell", "plugins", "tools");
-        assertThat(pages).extracting(page -> page.parent().orElse("")).containsExactly("", "appearance-behavior", "appearance-behavior", "appearance-behavior",
+        assertThat(pages).extracting(page -> page.parent().orElse("")).containsExactly("", "appearance-behavior", "appearance-behavior",
             "appearance-behavior", "appearance-behavior", "appearance-behavior", "appearance-behavior", "", "", "terminal",
             "terminal", "terminal", "", "");
         assertThat(pages).extracting(SettingsPage::title).contains("Appearance & Behavior", "System Settings", "Font & Colors", "Tools");
@@ -116,14 +112,14 @@ class CorePagesTest {
 
     @Test void toolsPagesComeLastUnderTools() {
         var extra = new GroupPage("plugin.dev.example", "Example", Optional.of("tools"), false, List::of, context);
-        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins, CorePagesTest::themes,
+        var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins,
             page -> List.of(extra)).apply(context);
         assertThat(pages.getLast()).isSameAs(extra);
         assertThat(pages.get(pages.size() - 2).id()).isEqualTo("tools");
     }
 
     @Test void systemSettingsOffersTheConfigurationFileActions() {
-        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins, CorePagesTest::themes).apply(context);
+        var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();
         systemPage.component();
         assertThat(systemPage.actionButtons()).extracting(javax.swing.JButton::getText)
@@ -132,17 +128,12 @@ class CorePagesTest {
         assertThat(calls).containsExactly("open", "reveal", "reload", "migrate");
     }
 
-    static SettingsPage themes(PageContext context) {
-        return new GroupPage("themes", "Themes", Optional.of("appearance-behavior"), false, List::of, context);
-    }
-    @Test void themeLinksNavigateToTheCorrectPicker() {
+    @Test void fontAndColorsLinksToTheWorkspaceSchemeInAppearance() {
         var navigation = new ArrayList<String>();
-        for (var spec : CorePages.specs(List::of, system, ShellChoices.NONE, navigation::add)) {
-            if (!List.of("appearance", "terminal.font").contains(spec.id())) continue;
-            var page=spec.build(context);page.component();page.actionButtons().forEach(javax.swing.JButton::doClick);page.dispose();
+        for (var spec : CorePages.specs(ThemeChoices.of(List::of), system, ShellChoices.NONE, navigation::add)) {
+            var page = spec.build(context); page.component(); page.actionButtons().forEach(javax.swing.JButton::doClick); page.dispose();
         }
-        // Appearance links to both pickers (UI theme, then the Workspace section's button); Terminal > Font links to the workspace one.
-        assertThat(navigation).containsExactly("themes#ui", "themes#workspace", "themes#workspace");
+        assertThat(navigation).containsExactly("appearance");
     }
     private static SettingsPage keymap(PageContext context) {
         return new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, context);
@@ -155,7 +146,7 @@ class CorePagesTest {
     @Test void theShellPageOffersProfilesAndEnablesProgramAndArgsOnlyForCustom() {
         var shells = new ShellChoices(() -> List.of(new ShellChoices.Choice("powershell", "PowerShell"), new ShellChoices.Choice("custom", "Custom")),
             () -> { }, listener -> new Subscription(() -> { }));
-        var spec = CorePages.specs(() -> List.of("Jasper Dark"), system, shells).stream()
+        var spec = CorePages.specs(JASPER_DARK, system, shells).stream()
             .filter(candidate -> candidate.id().equals("terminal.shell")).findFirst().orElseThrow();
         assertThat(spec.settings()).startsWith(CoreSettings.TERMINAL_SHELL_PROFILE, CoreSettings.TERMINAL_SHELL_PROGRAM, CoreSettings.TERMINAL_SHELL_ARGS);
         var page = spec.build(context);

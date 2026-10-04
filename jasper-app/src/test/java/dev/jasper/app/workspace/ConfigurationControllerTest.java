@@ -217,10 +217,10 @@ class ConfigurationControllerTest {
             themes = new ThemeController();
             controller = new ConfigurationTestSupport(themes, service, path -> { throw new IllegalStateException("Editor unavailable"); });
             var owner = owner();
-            owner.onError = message -> { assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); errors.add(message); };
+            owner.onError = (title, message) -> { assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); errors.add(title + ": " + message); };
             owner.invoke(ActionId.OPEN_SETTINGS);
         });
-        assertThat(errors.poll(5, java.util.concurrent.TimeUnit.SECONDS)).contains("Editor unavailable");
+        assertThat(errors.poll(5, java.util.concurrent.TimeUnit.SECONDS)).startsWith("Could not open Settings: ").contains("Editor unavailable");
         assertThat(Files.exists(directory.resolve("config.toml"))).isTrue();
         until(() -> owners.getFirst().status().getText().contains("Config loaded"));
     }
@@ -231,7 +231,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             themes = new ThemeController(theme -> theme != Theme.INTELLIJ_LIGHT && ThemeTestSupport.install(theme));
             controller = new ConfigurationTestSupport(themes, service);
-            owner().onError = errors::add;
+            owner().onError = (title, message) -> errors.add(message);
             var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), Theme.INTELLIJ_LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
@@ -513,7 +513,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             themes = new ThemeController(theme -> { attempts.add(theme); return !broken.get() && ThemeTestSupport.install(theme); });
             controller = new ConfigurationTestSupport(themes, service);
-            owner().onError = errors::add;
+            owner().onError = (title, message) -> errors.add(message);
             assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
             assertThat(attempts).containsExactly(Theme.DARK);
             broken.set(true);
@@ -643,7 +643,7 @@ class ConfigurationControllerTest {
         var infos = new java.util.concurrent.CopyOnWriteArrayList<String>();
         edt(() -> {
             owner.showConfigDiagnostics = shown::add;
-            owner.onInfo = infos::add;
+            owner.onInfo = (title, message) -> infos.add(title + ": " + message);
             assertThat(controller.migrationAvailable()).isTrue();
             owner.status().configButton().doClick();
         });
@@ -651,7 +651,7 @@ class ConfigurationControllerTest {
         var button = find(shown.getFirst(), "configuration.migrate");
         edt(button::doClick);
         until(() -> !infos.isEmpty());
-        assertThat(infos).containsExactly("Migrated 1 old setting to the new layout. Backup: config.toml.v1.bak.");
+        assertThat(infos).containsExactly("Migrate Config: Migrated 1 old setting to the new layout. Backup: config.toml.v1.bak.");
         assertThat(Files.readString(directory.resolve("config.toml"))).isEqualTo("version = 2\n[terminal.font]\nsize = 19\n");
         edt(() -> {});
         edt(() -> assertThat(controller.migrationAvailable()).isFalse());
@@ -679,6 +679,25 @@ class ConfigurationControllerTest {
         edt(() -> assertThat(controller.shown().diagnostics()).extracting(d -> d.file()).containsExactly(a, b));
         edt(() -> controller.clearReports(a));
         edt(() -> assertThat(controller.shown().diagnostics()).extracting(d -> d.file()).containsExactly(b));
+    }
+
+    @Test void problemsReachTheApplicationWheneverTheyChange() throws Exception {
+        start("[terminal.font]\nsize = 19\n");
+        var states = new ArrayList<ConfigService.State>();
+        var plugin = directory.resolve("plugins/dev.example/dev.example.toml");
+        edt(() -> {
+            controller.onProblems(states::add);
+            assertThat(states).hasSize(1);
+            controller.report("terminal.shell.profile", "No such shell profile");
+            assertThat(states.getLast().diagnostics()).extracting(dev.jasper.app.config.ConfigDiagnostic::message).contains("No such shell profile");
+            controller.report(new dev.jasper.app.config.ConfigDiagnostic(dev.jasper.app.config.ConfigDiagnostic.Severity.ERROR, plugin, 2, 1, "x", "Bad value"));
+            assertThat(states.getLast().diagnostics()).extracting(dev.jasper.app.config.ConfigDiagnostic::message).contains("Bad value");
+            controller.clearReports(plugin);
+            assertThat(states.getLast().diagnostics()).extracting(dev.jasper.app.config.ConfigDiagnostic::message).doesNotContain("Bad value");
+        });
+        reload("[terminal.font]\nsize = 20\n");
+        edt(() -> assertThat(states.getLast().diagnostics()).extracting(dev.jasper.app.config.ConfigDiagnostic::message)
+            .doesNotContain("No such shell profile"));
     }
 
     @Test void settingsOpenerServesCmdCommaAndWindowSettings() throws Exception {
@@ -723,12 +742,12 @@ class ConfigurationControllerTest {
         var owner = owners.getFirst();
         var errors = new ArrayList<String>();
         edt(() -> {
-            owner.onError = errors::add;
+            owner.onError = (title, message) -> errors.add(title + ": " + message);
             owner.setActive(true);
             var status = owner.windowCommands().view("view.status_bar");
             status.putValue(javax.swing.Action.SELECTED_KEY, false); // what a clicked check box does before the action runs
             status.actionPerformed(new java.awt.event.ActionEvent(owner, 0, "menu"));
-            assertThat(errors).containsExactly("config.toml has errors, so changes can't be saved until they're fixed.");
+            assertThat(errors).containsExactly("Settings not saved: config.toml has errors, so changes can't be saved until they're fixed.");
             assertThat(owner.status().isVisible()).isTrue();
             assertThat(status.getValue(javax.swing.Action.SELECTED_KEY)).isEqualTo(true);
         });

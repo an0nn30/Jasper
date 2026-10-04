@@ -21,11 +21,11 @@ class NativeThemeNavigationTest {
         var system = new CorePages.SystemActions(() -> Path.of("config.toml"), () -> {}, () -> {}, () -> {}, () -> {}, () -> false);
         var context = new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", false).values()), id -> {}, Runnable::run, (title, initial) -> Optional.empty(), () -> {});
         var names = ThemeManager.builtIns().stream().map(t -> t.name()).toList();
-        var pages = CorePages.pages(() -> names, system,
+        var pages = CorePages.pages(ThemeChoices.of(() -> names), system,
             ctx -> new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, ctx),
-            ctx -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, ctx), CorePagesTest::themes).apply(context);
+            ctx -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, ctx)).apply(context);
         var ids = pages.stream().map(SettingsPage::id).toList();
-        assertThat(ids).doesNotContain("themes.intellij", "themes.alacritty").containsOnlyOnce("themes").contains("appearance", "terminal.font");
+        assertThat(ids).doesNotContain("themes", "themes.intellij", "themes.alacritty").contains("appearance", "terminal.font");
         for (var page : pages) page.parent().ifPresent(parent -> assertThat(ids).contains(parent));
         assertThat(names).contains("Studio Dark", "Catppuccin Mocha");
     }
