@@ -27,6 +27,28 @@
   a window already alone in a lower half shows the lower-half guide as soon as its drag starts, while the window itself
   still fills the side.
 
+- **Notifications plan 4: long commands and Buddy, merged to local `main` 2026-10-03 (not pushed); awaiting the user's
+  GUI checks and their call on a background finish's route to its pane** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
+  [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
+  did not finish in the pane you were typing in is posted in "Long-running commands" (`jasper.commands`, CARD), in the
+  pane's window, with a click that focuses the pane; a closed pane expires its notifications. Buddy keeps live work
+  only: `BuddyNotice` lost `DONE` and `FAILED`, its activation is required, and `acknowledge` and both `orphan`
+  overloads are gone; `CommandNotifier` and `ActivityNotifier` dismiss a card when its work ends. A coalesced repeat
+  now carries the newest post's actions, default action and target, and its card moves to that window; an expiring
+  action expires its entry before it runs. The macOS banner for long commands stays, background only, until plan 5.
+  Spec interpretations: see the plan's list (1 to 12). Final review (Opus): three important findings fixed —
+  closing the older of two panes whose identical outcomes coalesced expired the newer pane's entry (`b35fc8db`); an
+  expired entry kept its poster's callbacks, and with them a closed pane, its buffers and its window (`28810afb`;
+  expiry now keeps text, labels and target only, which also releases a stopped plugin); clicking a running capsule hid
+  the whole column until the deck next changed (`be5a344d`). A fourth is a decision for the user: a command that
+  finishes while Jasper is in the background has no click route to its pane until plan 5 (a history row has no click
+  of its own; options: a "Show pane" action, a clickable history row, or wait for plan 5's clickable OS notification).
+  Seven minor findings are deferred in the plan's status banner. `./gradlew check --continue`: **8,435 tests, 0
+  failures, 0 errors, 6 skipped** (merged with main `be3b593d`; 8,339 on the branch before). No GUI launched. GUI checks for the
+  user: a long command finishing in another tab shows a card in its window and a click focuses the pane; with Buddy
+  on, the capsule shows while it runs and goes when it ends, and clicking it focuses the pane and keeps the column; the
+  drawer lists only running work; in the packaged app with Jasper in the background, the macOS banner still arrives
+  and the notification waits unread.
 - **Dock drop zones: six edge zones replace the 3 × 2 grid; pushed to `main`, awaiting the user's GUI check**
   (2026-10-03; spec §3 "Targets" and "Guides" amended
   at the user's request). The user could not drop a tool window on the lower half of the left or right side and named
@@ -55,8 +77,8 @@
   the left and right halves of the bottom) and see the highlight. The split sits exactly at half of the side panels'
   visible height (the terminal column's height), pinned one pixel either side by `DockDragTest`.
 
-- **Notifications plan 3: SDK notifications, reviewed on branch `claude/notifications-3`; awaiting the user's GUI
-  checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
+- **Notifications plan 3: SDK notifications, merged to `main` (`3c64ea5c`) and pushed; awaiting the user's GUI
+  checks** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
   [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
   (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
   removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15` (Editor `>=0.14.1` since the workspace-glass merge). `plugins.HostedNotifications` posts into the

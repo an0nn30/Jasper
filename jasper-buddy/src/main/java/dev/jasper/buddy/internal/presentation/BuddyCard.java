@@ -65,7 +65,7 @@ final class BuddyCard {
     }
 
     static boolean shimmers(BuddyNotice notice) {
-        return notice.state() == BuddyNotice.State.RUNNING && !notice.orphaned();
+        return notice.state() == BuddyNotice.State.RUNNING;
     }
 
     static void paint(BuddyOptions options, Graphics2D g2, JComponent owner, BuddyNotice notice, Rectangle bounds,
@@ -100,7 +100,7 @@ final class BuddyCard {
                 right -= GLYPH_SIZE + GLYPH_GAP;
             }
             // Reserve the affordance's space only while it is visible. Text never changes position.
-            if (hover > 0 && !notice.orphaned()) {
+            if (hover > 0) {
                 paintAction(c, right - 32, (bounds.height - 32) / 2, dark, hover, false);
                 right -= Math.round(38 * hover);
             }
@@ -108,7 +108,7 @@ final class BuddyCard {
             try {
                 text.clipRect(PAD_X, 0, Math.max(0, right - PAD_X), bounds.height);
                 text.setFont(titleFont(options));
-                text.setColor(notice.orphaned() ? detailColor(options) : dark ? Color.WHITE : new Color(30, 30, 30));
+                text.setColor(dark ? Color.WHITE : new Color(30, 30, 30));
                 paintText(text, notice.title(), right, 25, hover);
                 text.setFont(detailFont(options));
                 text.setColor(detailColor(options));
@@ -202,19 +202,15 @@ final class BuddyCard {
         } finally { c.dispose(); }
     }
 
+    /** A cross for a connection that is down; a dot for a task waiting on you or a connection in trouble. */
     private static void paintGlyph(BuddyOptions options, Graphics2D g2, BuddyNotice.State state, int x, int y) {
-        boolean good = state == BuddyNotice.State.DONE;
-        boolean bad = state == BuddyNotice.State.FAILED || state == BuddyNotice.State.DOWN;
-        Color configured = UIManager.getColor(good ? "Jasper.configSuccessForeground" : "Jasper.configErrorForeground");
+        boolean down = state == BuddyNotice.State.DOWN;
+        Color configured = UIManager.getColor("Jasper.configErrorForeground");
         Graphics2D c = (Graphics2D) g2.create();
         try {
-            c.setColor(good || bad ? (configured != null ? configured
-                : good ? new Color(0x5AB07A) : new Color(0xC45A53)) : detailColor(options));
+            c.setColor(down ? (configured != null ? configured : new Color(0xC45A53)) : detailColor(options));
             c.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            if (good) {
-                c.drawLine(x + 2, y + 6, x + 5, y + 9);
-                c.drawLine(x + 5, y + 9, x + 10, y + 3);
-            } else if (bad) {
+            if (down) {
                 c.drawLine(x + 3, y + 3, x + 9, y + 9);
                 c.drawLine(x + 9, y + 3, x + 3, y + 9);
             } else c.fillOval(x + 3, y + 3, GLYPH_SIZE - 6, GLYPH_SIZE - 6);

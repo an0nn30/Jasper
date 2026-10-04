@@ -51,16 +51,17 @@ Every outcome is a `PluginStatus` line in the log.
 - **Events.** `EventBus.publish` always enqueues through `SwingUtilities.invokeLater`: one
   global order, never re-entrant. `jasper.*` topics belong to the application.
 - **Activities.** `ActivityHub` stamps the source, coalesces progress and ends each activity
-  once. `PluginRuntime` forwards them to `notifications.ActivityNotifier`, which posts Buddy
-  cards keyed by `BuddyNoticeId(pluginId, activityId)`.
+  once. `PluginRuntime` forwards them to `notifications.ActivityNotifier`, which shows a running
+  activity as a Buddy card keyed by `BuddyNoticeId(pluginId, activityId)` and dismisses it when
+  the activity ends; `PluginHost` posts the outcome as a notification.
 - **Connections** (SDK 0.10.2). `ConnectionHub` stamps the source, delivers every state change in
   order, joins a detail-only report to the delivery still queued for that state and publishes one
   `CLOSED`. `PluginRuntime` forwards `Activities.CONNECTIONS` to `ActivityNotifier.connection`, which
-  posts a `Kind.CONNECTION` card on each new state (new news, even after it was acknowledged),
+  posts a `Kind.CONNECTION` card on each new state (new news),
   updates only the detail otherwise, and dismisses it on `CLOSED`.
 - **Card activation.** Every activity and connection card raises the application when clicked.
   When its `activateActionId` names an action the source plugin registered (`PluginHost.ownsAction`),
-  the click then invokes it in the last active window and acknowledges the card.
+  the click then invokes it in the last active window.
 - **Services.** Staged during `start`, committed on success. Per-consumer factories run on
   the EDT just before each consumer starts; lookups are cache reads.
 - **State.** `PluginStateStore` changes `plugins.toml` only inside a `FileLock` transaction

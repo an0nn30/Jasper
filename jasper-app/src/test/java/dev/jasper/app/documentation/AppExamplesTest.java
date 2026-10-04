@@ -79,9 +79,8 @@ class AppExamplesTest {
                 var id = new BuddyNoticeId("example.transfer", UUID.randomUUID());
                 buddy.post(new BuddyNotice(id, BuddyNotice.Kind.TASK, "Copy logs", BuddyNotice.State.RUNNING,
                     () -> "3 files remaining", () -> {}));
-                // At producer close: cancel queued work first, then freeze and disconnect the notice.
-                buddy.orphan(id, "Stopped after 3 files");
-                buddy.acknowledge(id);
+                // When the work ends or the producer closes: cancel queued work first, then remove the card.
+                buddy.dismiss(id);
             }
             // example:producer:end
         });

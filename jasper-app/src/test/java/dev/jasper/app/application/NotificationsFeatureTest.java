@@ -95,6 +95,20 @@ class NotificationsFeatureTest {
         assertThat(feature.layer(second.id()).showing()).isEmpty();
     }
 
+    @Test void aRepeatFromAnotherWindowMovesItsCardThere() {
+        var feature = new NotificationsFeature(center, contributions);
+        var first = window();
+        var second = window();
+        feature.attach(first);
+        feature.attach(second);
+        feature.error("Could not save", "same details", first.id());
+        assertThat(feature.layer(first.id()).showing()).hasSize(1);
+        feature.error("Could not save", "same details", second.id());
+        assertThat(center.history()).hasSize(1);
+        assertThat(feature.layer(second.id()).showing()).hasSize(1);
+        assertThat(feature.layer(first.id()).showing()).as("one card, in the window it last happened in").isEmpty();
+    }
+
     @Test void aClosedWindowsCardsGoAndLaterOnesFindAnotherWindow() {
         var feature = new NotificationsFeature(center, contributions);
         var first = window();

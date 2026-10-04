@@ -21,7 +21,7 @@ class BuddyShimmerTest {
         return image;
     }
 
-    @Test void highlightTravelsAcrossDetailOnlyAndStopsWhenTheCommandFinishes() throws Exception {
+    @Test void highlightTravelsAcrossDetailOnlyAndStopsWhileTheTaskWaitsForInput() throws Exception {
         BuddyTestAppearance.edt(() -> {
             for (boolean dark : new boolean[]{false, true}) {
                 var options = BuddyTestAppearance.options(dark);
@@ -30,8 +30,8 @@ class BuddyShimmerTest {
                 BufferedImage late = paint(options, BuddyNotice.State.RUNNING, 1_100_000_000L);
                 double firstX = differences(rest, early), lastX = differences(rest, late);
                 assertThat(lastX).isGreaterThan(firstX + 40);
-                assertThat(differences(paint(options, BuddyNotice.State.DONE, 400_000_000L),
-                    paint(options, BuddyNotice.State.DONE, 1_100_000_000L))).isEqualTo(-1);
+                assertThat(differences(paint(options, BuddyNotice.State.NEEDS_INPUT, 400_000_000L),
+                    paint(options, BuddyNotice.State.NEEDS_INPUT, 1_100_000_000L))).isEqualTo(-1);
                 assertThat(differences(rest, paint(options, BuddyNotice.State.RUNNING, 4_500_000_000L))).isEqualTo(-1);
             }
         });
@@ -55,7 +55,8 @@ class BuddyShimmerTest {
         var task = new BuddyNotice(new BuddyNoticeId("test", "one"), BuddyNotice.Kind.TASK, "title", BuddyNotice.State.RUNNING, () -> "Thinking", () -> {});
         deck.post(task); panel.refresh(); panel.setClock(() -> 1_000_000_000L);
         assertThat(panel.needsAnimationFrames()).isTrue();
-        deck.orphan(new BuddyNoticeId("test", "one")); panel.refresh();
+        deck.post(new BuddyNotice(new BuddyNoticeId("test", "one"), BuddyNotice.Kind.TASK, "title", BuddyNotice.State.NEEDS_INPUT,
+            () -> "Waiting", () -> {})); panel.refresh();
         assertThat(panel.needsAnimationFrames()).isFalse();
         assertThat(BuddyCard.shimmers(new BuddyNotice(new BuddyNoticeId("test", "two"), BuddyNotice.Kind.TASK, "title", BuddyNotice.State.NEEDS_INPUT, () -> "Waiting", () -> {}))).isFalse();
     }

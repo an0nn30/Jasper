@@ -3,8 +3,9 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.notifications.CommandNotice;
 import dev.jasper.app.notifications.CommandNotifier;
+import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.buddy.view.BuddyTestSupport;
-import dev.jasper.buddy.notice.BuddyNotice;
 
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.SessionLaunchOptions;
@@ -12,6 +13,7 @@ import dev.jasper.terminal.session.SessionLaunchOptions;
 import dev.jasper.terminal.session.TerminalSession;
 import dev.jasper.terminal.session.TerminalSessionListener;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -39,7 +41,7 @@ class TerminalTitleIntegrationTest {
     }
 
     private record Fixture(WindowContent content, BuddyTestSupport deck, List<String> nativeTitles,
-                           List<String> notificationTitles) { }
+                           List<String> notificationTitles, NotificationCenter center) { }
 
     private Fixture open(String script) throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(
@@ -59,7 +61,9 @@ class TerminalTitleIntegrationTest {
             WindowContent window = content(launcher);
             BuddyTestSupport deck = new BuddyTestSupport();
             List<String> notificationTitles = new ArrayList<>();
-            CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck.companion(),
+            // In the background, so the interim OS sink hears the outcome as well as the center.
+            var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> Delivery.Presence.BACKGROUND);
+            CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck.companion(), center,
                 (title, detail) -> notificationTitles.add(title), working -> {}, (delay, run) -> () -> {});
             window.activity(event -> {
             switch (event) {
@@ -67,13 +71,13 @@ class TerminalTitleIntegrationTest {
                     value.elapsedNanos(), value.activate(), false);
                 case WorkspaceActivity.Finished value -> notifier.finished(value.id(), value.command(),
                     value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
-                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), value.activate());
+                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), null, value.activate());
                 case WorkspaceActivity.TitleChanged value -> notifier.titleChanged(value.id(), value.title());
                 case WorkspaceActivity.PaneState value -> {
                     switch (value.state()) {
                         case OPENED -> notifier.opened(value.id());
                         case CLOSED -> notifier.closed(value.id());
-                        case FOCUSED -> notifier.looked(value.id());
+                        case FOCUSED -> { }
                         case BLURRED -> notifier.hidden(value.id());
                     }
                 }
@@ -81,7 +85,7 @@ class TerminalTitleIntegrationTest {
             });
             List<String> titles = new ArrayList<>();
             window.onTitle = titles::add;
-            fixture[0] = new Fixture(window, deck, titles, notificationTitles);
+            fixture[0] = new Fixture(window, deck, titles, notificationTitles, center);
         });
         pending.remove().run();
         until(() -> fixture[0].content.currentPane().view() != null);
@@ -171,9 +175,10 @@ class TerminalTitleIntegrationTest {
         });
         until(() -> f.content.tabStrip().getTitleAt(0).equals("Prompt directory"));
         edt(() -> {
-            assertThat(f.deck.notices().getFirst().title()).isEqualTo("sleep 12");
+            assertThat(f.center.history()).singleElement()
+                .satisfies(entry -> assertThat(entry.request().title()).isEqualTo("sleep 12"));
             assertThat(f.notificationTitles).containsExactly("sleep 12");
-            assertThat(f.deck.notices().getFirst().state()).isEqualTo(BuddyNotice.State.DONE);
+            assertThat(f.deck.notices()).as("Buddy keeps live work only").isEmpty();
             assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory");
         });
     }
