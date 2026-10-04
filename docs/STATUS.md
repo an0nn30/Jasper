@@ -17,6 +17,11 @@
   **602 workspace tests** and a separate 2× scale check passed. Final `./gradlew check --continue`: **8,445 tests,
   0 failures, 0 errors, 6 skipped**; architecture gates and doclint passed. Changed-Java source hygiene and
   `git diff --check` passed. Independent review found no actionable findings. No GUI, benchmark, merge or push.
+  Native screenshot refinement (2026-10-04): removed the 3-pixel top inset and matched the upper corners to the
+  frame’s shared 8-pixel radius. Tabs and controls now fill the rail height; broad bottom shoulders remain. The
+  rendered-pixel regression failed on the old gap and passes at normal and 2× scale across configured heights;
+  dark/light render previews are refreshed. Independent follow-up review found no actionable findings. The full
+  check passed again: **8,445 tests, 0 failures/errors, 6 skipped**; source hygiene and whitespace checks passed.
   User-run visual acceptance: first/middle selected tabs, dark/light and independent workspace themes, glass,
   overflow/long titles, plugin tabs, new-tab plus and native pointer/trackpad behavior. Headless renders do not
   establish native Metal/compositor performance.

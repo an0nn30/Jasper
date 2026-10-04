@@ -26,6 +26,14 @@ class FolderTabScaleTest {
                 var g = image.createGraphics();
                 try { strip.paint(g); } finally { g.dispose(); }
                 var entry = WindowTabsTest.named(strip, "select:second").getParent();
+                Color surface = owner.theme().palette().background();
+                assertThat(new Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 0)))
+                    .as("folder reaches the top of the rail without a dark gap").isEqualTo(surface);
+                for (int cornerX : new int[]{entry.getX() + UIScale.scale(5),
+                        entry.getX() + entry.getWidth() - UIScale.scale(5) - 1}) {
+                    assertThat(new Color(image.getRGB(cornerX, UIScale.scale(1))))
+                        .as("upper corner follows the rail's eight-pixel radius at height %s", height).isEqualTo(surface);
+                }
                 int x = entry.getX() - UIScale.scale(4), y = strip.getHeight() - 1;
                 assertThat(new Color(image.getRGB(x, y))).as("scaled shoulder joins the terminal at height %s", height)
                     .isEqualTo(owner.theme().palette().background());

@@ -98,7 +98,7 @@ class WindowTabsTest {
                 assertThat(pixel(strip, right + 4, 29)).as("right shoulder spreads outward at the bottom").isEqualTo(surface);
                 assertThat(pixel(strip, x - 5, 20)).as("left shoulder is concave above the bottom").isEqualTo(recessed);
                 assertThat(pixel(strip, right + 4, 20)).as("right shoulder is concave above the bottom").isEqualTo(recessed);
-                assertThat(pixel(strip, x + 1, 3)).as("soft top corner exposes the recess").isEqualTo(recessed);
+                assertThat(pixel(strip, x, 0)).as("soft top corner exposes the recess").isEqualTo(recessed);
                 owner.setActive(false);
                 assertThat(pixel(strip, middle, 5)).as("window activation adds no outline").isEqualTo(surface);
                 owner.setActive(true);

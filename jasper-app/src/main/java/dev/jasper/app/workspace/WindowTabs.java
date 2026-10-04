@@ -178,23 +178,23 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
     /** Soft top corners with quarter-circle cutouts forming broad outward bottom shoulders. */
     private java.awt.Shape folder(Entry entry) {
-        double x = entry.getX(), w = entry.getWidth(), h = getHeight(), top = topInset();
-        double r = Math.min(UIScale.scale(10f), Math.max(0, (h - top) / 2));
+        double x = entry.getX(), w = entry.getWidth(), h = getHeight();
+        double r = Math.min(UIScale.scale(10f), Math.max(0, h / 2));
+        double upper = Math.min(UIScale.scale(ToolWindowArea.SURFACE_ARC) / 2.0, Math.max(0, h / 2));
         double k = r * .5522847498;
+        double upperK = upper * .5522847498;
         var shape = new java.awt.geom.Path2D.Double();
         shape.moveTo(x - r, h);
         shape.curveTo(x - r + k, h, x, h - r + k, x, h - r);
-        shape.lineTo(x, top + r);
-        shape.curveTo(x, top + r - k, x + r - k, top, x + r, top);
-        shape.lineTo(x + w - r, top);
-        shape.curveTo(x + w - r + k, top, x + w, top + r - k, x + w, top + r);
+        shape.lineTo(x, upper);
+        shape.curveTo(x, upper - upperK, x + upper - upperK, 0, x + upper, 0);
+        shape.lineTo(x + w - upper, 0);
+        shape.curveTo(x + w - upper + upperK, 0, x + w, upper - upperK, x + w, upper);
         shape.lineTo(x + w, h - r);
         shape.curveTo(x + w, h - r + k, x + w + r - k, h, x + w + r, h);
         shape.closePath();
         return shape;
     }
-
-    private int topInset() { return Math.min(UIScale.scale(3), Math.max(0, getHeight() - UIScale.scale(16))); }
 
     /** Fade clipped tabs into the recessed strip; the tab-list button stays outside the viewport. */
     private void paintOverflow(Graphics2D graphics) {
@@ -340,12 +340,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         @Override public void doLayout() {
             int edge = UIScale.scale(EDGE), closeWidth = Math.min(UIScale.scale(16), getWidth());
             int closeX = Math.max(0, getWidth() - edge - closeWidth);
-            int top = topInset(), height = Math.max(0, getHeight() - top);
-            close.setBounds(closeX, top, closeWidth, height);
+            close.setBounds(closeX, 0, closeWidth, getHeight());
             // Reserve the icon's space even on plain inactive labels, so selecting never changes the tab width.
             int leading = edge + (tab == selected ? 0 : UIScale.scale(16 + GAP));
-            select.setBounds(Math.min(leading, getWidth()), top,
-                Math.max(0, closeX - UIScale.scale(GAP) - leading), height);
+            select.setBounds(Math.min(leading, getWidth()), 0,
+                Math.max(0, closeX - UIScale.scale(GAP) - leading), getHeight());
         }
     }
 }
