@@ -54,7 +54,7 @@ class WindowTabsTest {
             Container one = first.getParent(), two = second.getParent();
             assertThat(one.getX()).isZero();
             assertThat(two.getX()).isEqualTo(one.getWidth());
-            assertThat(one.getWidth()).isBetween(80, 240);
+            assertThat(one.getWidth()).isBetween(160, 480);
             assertThat(one.getWidth() + two.getWidth()).isLessThan(800 - 24);
             var close = named(strip, "close:second");
             assertThat(close.isVisible()).as("the selected tab always offers close").isTrue();
@@ -318,7 +318,7 @@ class WindowTabsTest {
             owner.invoke(ActionId.SELECT_TAB_1); layout(tabs, 330, 38);
             JComponent selected = named(tabs, "select:" + owner.currentTab().title());
             assertThat(selected.getParent().isVisible()).isTrue();
-            wheel(tabs, 6); layout(tabs, 330, 38);
+            wheel(tabs, 12); layout(tabs, 330, 38);
             assertThat(selected.getParent().isVisible()).isFalse();
             owner.invoke(ActionId.NEXT_TAB); layout(tabs, 330, 38);
             assertThat(named(tabs, "select:" + owner.currentTab().title()).getParent().isVisible()).isTrue();
@@ -376,9 +376,9 @@ class WindowTabsTest {
             assertThat(SwingUtilities.getDeepestComponentAt(strip, 394, 19)).isSameAs(named(strip, "tabList"));
             ((JMenuItem) strip.tabList().getComponent(0)).doClick(); layout(strip, 430, 38);
             assertThat(entry.getX()).as("choosing the already-selected tab reveals it again").isZero();
-            layout(strip, 2200, 38);
+            layout(strip, 4400, 38);
             assertThat(entry.getX()).isZero();
-            wheel(first, 1000); layout(strip, 2200, 38);
+            wheel(first, 1000); layout(strip, 4400, 38);
             assertThat(entry.getX()).as("no movement when all tabs fit").isZero();
         });
     }
@@ -424,7 +424,7 @@ class WindowTabsTest {
                 if (i > 0) owner.newTab(HOME);
                 owner.currentTab().rename("tab-" + i);
             }
-            var strip = owner.windowTabs(); layout(strip, 330, 38);
+            var strip = owner.windowTabs(); layout(strip, 612, 38);
             var selected = owner.currentTab();
             var source = named(strip, "select:tab-5");
             var target = named(strip, "select:tab-4");
@@ -432,16 +432,16 @@ class WindowTabsTest {
             mouse(source, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
             mouse(source, MouseEvent.MOUSE_RELEASED, end.x, end.y, MouseEvent.BUTTON1);
             assertThat(owner.tabStrip().getComponentAt(4)).isSameAs(selected);
-            layout(strip, 330, 38);
+            layout(strip, 612, 38);
             var bounds = SwingUtilities.convertRectangle(source.getParent(), source.getBounds(), source.getParent().getParent());
             assertThat(bounds.x).isGreaterThanOrEqualTo(0);
-            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(282);
-            ((AbstractButton) named(strip, "close:tab-5")).doClick(); layout(strip, 330, 38);
+            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(564);
+            ((AbstractButton) named(strip, "close:tab-5")).doClick(); layout(strip, 612, 38);
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(5);
             var remaining = named(strip, "select:" + owner.currentTab().title()).getParent();
             assertThat(remaining.isVisible()).isTrue();
             assertThat(remaining.getX()).isGreaterThanOrEqualTo(0);
-            assertThat(remaining.getX() + remaining.getWidth()).isLessThanOrEqualTo(282);
+            assertThat(remaining.getX() + remaining.getWidth()).isLessThanOrEqualTo(564);
         });
     }
 

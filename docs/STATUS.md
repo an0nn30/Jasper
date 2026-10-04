@@ -2,6 +2,12 @@
 
 ## Current state — 2026-10-04
 
+- **Wider folder tabs** (2026-10-04; user follow-up): doubled each tab's calculated width, including its
+  bounds (now 160–480 logical pixels). Fonts, control sizes, tab height and motion timings are unchanged.
+  The next user follow-up also doubles the active accent pill to 64 × 2 logical pixels.
+  Updated the existing motion/overflow/drag fixtures for the wider geometry. All **645 workspace tests**
+  passed; headless Swing previews refreshed and inspected. No native GUI launched.
+
 - **Folder tabs adversarial review and main integration** (2026-10-04; `codex/folder-tabs`): integrated
   `main` at `e11961c8`, preserving saved view modes, workspace glass, current theme fixtures, startup/resident
   behavior, and the Appearance View mode section alongside Animations. An independent adversarial review found

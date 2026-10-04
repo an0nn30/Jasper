@@ -30,10 +30,10 @@ class WindowTabMotionTest {
             assertThat(fixture.owner.currentTab().title()).isEqualTo("second");
             assertThat(second.getWidth()).isZero();
             fixture.advance(75);
-            assertThat(second.getWidth()).isBetween(35, 120);
+            assertThat(second.getWidth()).isBetween(70, 240);
             assertThat(maximumAlpha(second)).as("the entering title fades at midpoint").isBetween(1, 200);
             fixture.advance(75);
-            assertThat(second.getWidth()).isBetween(80, 240);
+            assertThat(second.getWidth()).isBetween(160, 480);
             assertThat(maximumAlpha(second)).isEqualTo(255);
             assertThat(fixture.strip.motionRunning()).isFalse();
         });
@@ -113,7 +113,7 @@ class WindowTabMotionTest {
             assertThat(fixture.strip.folderBounds()).isEqualTo(before);
             fixture.advance(65);
             assertThat(fixture.strip.folderBounds().getX()).isZero();
-            assertThat(fixture.strip.folderBounds().getWidth()).isEqualTo(240);
+            assertThat(fixture.strip.folderBounds().getWidth()).isEqualTo(480);
             assertThat(fixture.strip.motionRunning()).isFalse();
         });
     }
@@ -144,9 +144,9 @@ class WindowTabMotionTest {
             int width = named(fixture.strip, "select:second").getParent().getWidth();
             fixture.owner.closeTab(fixture.owner.currentTab()); fixture.strip.refresh();
             fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("third"); fixture.strip.refresh();
-            assertThat(named(fixture.strip, "select:third").getParent().getX()).isGreaterThanOrEqualTo(80 + width - 1);
+            assertThat(named(fixture.strip, "select:third").getParent().getX()).isGreaterThanOrEqualTo(160 + width - 1);
             fixture.strip.setAnimations(new AnimationSettings(false, 150, 120, 130));
-            assertThat(named(fixture.strip, "select:third").getParent().getWidth()).isBetween(80, 240);
+            assertThat(named(fixture.strip, "select:third").getParent().getWidth()).isBetween(160, 480);
             assertThat(fixture.strip.motionRunning()).isFalse();
         });
     }
@@ -178,7 +178,7 @@ class WindowTabMotionTest {
             var g = image.createGraphics(); fixture.strip.paint(g); int before = image.getRGB(100, 29);
             g.setClip(90, 20, 30, 10);
             fixture.strip.paint(g); assertThat(image.getRGB(100, 29)).isEqualTo(before); g.dispose();
-            assertThat(fixture.strip.folderBounds().getWidth()).isBetween(0.0, 240.0);
+            assertThat(fixture.strip.folderBounds().getWidth()).isBetween(0.0, 480.0);
         });
     }
 
@@ -190,7 +190,7 @@ class WindowTabMotionTest {
             assertThat(fixture.strip.folderBounds().getX()).isEqualTo(initial);
             fixture.advance(500);
             double middle = fixture.strip.folderBounds().getX();
-            assertThat(middle).isBetween(1.0, 79.0);
+            assertThat(middle).isBetween(1.0, 159.0);
             fixture.advance(500);
             double beforeClose = fixture.strip.folderBounds().getX();
             fixture.owner.closeTab(fixture.owner.currentTab()); fixture.strip.refresh();
@@ -210,7 +210,7 @@ class WindowTabMotionTest {
             fixture.owner.currentTab().rename("a shell title with enough characters to use the maximum tab width"); fixture.strip.refresh();
             assertThat(fixture.strip.folderBounds()).isEqualTo(before);
             fixture.advance(500);
-            assertThat(fixture.strip.folderBounds().getWidth()).isEqualTo(240);
+            assertThat(fixture.strip.folderBounds().getWidth()).isEqualTo(480);
             assertThat(fixture.strip.motionRunning()).isFalse();
         });
     }
@@ -231,7 +231,7 @@ class WindowTabMotionTest {
                 assertThat(owner.windowTabs().motionRunning()).isFalse();
                 owner.newTab(HOME);
                 assertThat(owner.windowTabs().motionRunning()).isFalse();
-                assertThat(named(owner.windowTabs(), "select:" + owner.currentTab().title()).getParent().getWidth()).isBetween(80, 240);
+                assertThat(named(owner.windowTabs(), "select:" + owner.currentTab().title()).getParent().getWidth()).isBetween(160, 480);
             }
         });
     }
