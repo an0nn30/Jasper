@@ -12,6 +12,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class WindowsTrayTest {
     private final List<String> events = new ArrayList<>();
+    /** Whether each icon call in {@code events} ran on the EDT, in the same order. */
+    private final List<Boolean> onEdt = new ArrayList<>();
     private final List<Runnable> actions = new ArrayList<>();
     private final List<String> clicks = new ArrayList<>();
     private int opened;
@@ -22,13 +24,18 @@ class WindowsTrayTest {
             if (refuse) return null;
             int number = actions.size() + 1;
             actions.add(action);
-            events.add("add " + number + (menu.isPresent() ? " with Open and Quit" : ""));
-            return new WindowsTray.Icon(tip -> events.add("tooltip " + number + " " + tip),
-                message -> events.add("balloon " + number + " " + message.level() + " " + message.title()),
-                () -> events.add("remove " + number));
+            record("add " + number + (menu.isPresent() ? " with Open and Quit" : ""));
+            return new WindowsTray.Icon(tip -> record("tooltip " + number + " " + tip),
+                message -> record("balloon " + number + " " + message.level() + " " + message.title()),
+                () -> record("remove " + number));
         });
         tray.onClick(clicks::add);
         return tray;
+    }
+
+    private void record(String event) {
+        events.add(event);
+        onEdt.add(SwingUtilities.isEventDispatchThread());
     }
 
     private static SystemNotifier.Message message(String id) {
@@ -144,6 +151,7 @@ class WindowsTrayTest {
     }
 
     @Test void theBackendHopsToTheEdtAndRoutesClicks() throws Exception {
+        assertThat(SwingUtilities.isEventDispatchThread()).as("the test calls the backend from off the EDT").isFalse();
         var tray = tray();
         var backend = WindowsTray.backend(tray, clicks::add);
         backend.show().accept(message("a"));
@@ -152,6 +160,8 @@ class WindowsTrayTest {
         backend.focused().run();
         SwingUtilities.invokeAndWait(() -> { });
         assertThat(clicks).containsExactly("a");
-        assertThat(events).endsWith("remove 1");
+        assertThat(events).containsExactly("add 1", "tooltip 1 Jasper", "balloon 1 WARNING title a", "remove 1");
+        assertThat(onEdt).as("every tray call made through the backend ran on the EDT").hasSameSizeAs(events)
+            .containsOnly(true);
     }
 }
