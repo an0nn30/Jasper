@@ -25,6 +25,7 @@ final class ViewReconciler implements AutoCloseable {
         } catch (Throwable failure) { created.forEach(ControlRegistry.Control::close); throw failure; }
         inherit(spec.root(), next, true);
         for (var node : nodes.values()) next.get(node.id()).update(node);
+        detachMoves(spec.root(), nodes, next);
         for (var node : nodes.values()) if (node instanceof Nodes.Stack stack) {
             ((Stacks.StackControl)next.get(node.id())).children(stack.children().stream().map(child -> next.get(child.id()).component).toList());
         }
@@ -32,6 +33,20 @@ final class ViewReconciler implements AutoCloseable {
         if (root.getParent() != view) { view.removeAll(); view.add(root, java.awt.BorderLayout.CENTER); }
         for (var old : mounted.values()) if (next.get(old.node.id()) != old) old.close();
         mounted = next; view.revalidate(); view.repaint();
+    }
+    private void detachMoves(Nodes.Node root, Map<String, Nodes.Node> nodes, Map<String, ControlRegistry.Control> next) {
+        var parents = new LinkedHashMap<JComponent, java.awt.Container>();
+        parents.put(next.get(root.id()).component, view);
+        for (var node : nodes.values()) if (node instanceof Nodes.Stack stack) {
+            var parent = next.get(stack.id()).component;
+            for (var child : stack.children()) parents.put(next.get(child.id()).component, parent);
+        }
+        // Detach every move before attaching any new edge: a valid new tree may invert old ancestry.
+        // Children staying under the same parent are untouched, preserving unaffected sibling component identity.
+        for (var entry : parents.entrySet()) {
+            var component = entry.getKey(); var parent = component.getParent();
+            if (parent != null && parent != entry.getValue()) parent.remove(component);
+        }
     }
     private void inherit(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean enabled) {
         next.get(node.id()).parentEnabled = enabled;

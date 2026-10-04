@@ -75,6 +75,11 @@
   scrolling and multiline placeholder padding. Headless focused tests: **23 at default and 2x scale**;
   module check/architecture: **152 tests, 0 failures/errors/skips**. Headless focus evidence proves stable
   component identity without reparenting; actual native focus acceptance remains user-run. No GUI/AOT.
+  Task 6 independent review fix round restores synchronous Edited feedback: equal live values skip
+  document writes; callback normalization defers writes past notification with latest-value/close guards.
+  Hierarchy moves now detach changed parents before attaching new edges, allowing valid ancestor inversion
+  while retaining input documents and unaffected sibling parent identity. All **28 affected focused tests
+  pass**, zero failures/errors/skips, following reproduced edit/normalization/hierarchy regressions.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

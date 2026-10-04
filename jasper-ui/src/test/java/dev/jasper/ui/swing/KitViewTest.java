@@ -54,6 +54,25 @@ class KitViewTest {
             } finally { release(context); }
         });
     }
+    @Test void ancestorInversionRetainsControlsDocumentsAndUnmovedSiblingParent() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var inputNode = field("a", FieldKind.TEXT, "initial"); var siblingNode = field("sibling", FieldKind.TEXT, "sibling");
+            var nested = new Stack("nested", ControlState.READY, LayoutRole.VERTICAL, List.of(inputNode));
+            var before = new ViewSpec(new Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(nested, siblingNode)));
+            try (var view = new KitView(context, before, e -> {})) {
+                var input = editor(view, "a"); var document = input.getDocument(); input.setText("edited"); input.select(1, 4);
+                var sibling = editor(view, "sibling"); var parent = find(view, "sibling", JComponent.class).getParent();
+                var root = new Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(inputNode, siblingNode));
+                view.update(new ViewSpec(new Stack("nested", ControlState.READY, LayoutRole.VERTICAL, List.of(root))));
+                assertThat(editor(view, "a")).isSameAs(input); assertThat(input.getDocument()).isSameAs(document);
+                assertThat(input.getText()).isEqualTo("edited"); assertThat(input.getSelectionStart()).isEqualTo(1); assertThat(input.getSelectionEnd()).isEqualTo(4);
+                assertThat(editor(view, "sibling")).isSameAs(sibling); assertThat(find(view, "sibling", JComponent.class).getParent()).isSameAs(parent);
+                assertThat(find(view, "root", JComponent.class).getParent()).isSameAs(find(view, "nested", JComponent.class));
+                view.update(before); assertThat(editor(view, "a")).isSameAs(input); assertThat(input.getDocument()).isSameAs(document);
+            } finally { release(context); }
+        });
+    }
     @Test void changedFieldKindReplacesOnlyThatControlAndRemovedListenersCannotDispatch() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

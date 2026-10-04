@@ -22,6 +22,8 @@ final class TextFields {
         final JScrollPane scroll;
         final DocumentListener listener;
         boolean applying;
+        boolean notifying;
+        long valueRevision;
         FieldControl(KitView view, Nodes.Field node) {
             super(view, node, new JPanel(new BorderLayout())); container = (JPanel)component;
             input = node.kind() == Nodes.FieldKind.TEXTAREA ? new JTextArea(3, 16) : new JTextField(node.kind() == Nodes.FieldKind.PORT ? 6 : 16);
@@ -46,10 +48,15 @@ final class TextFields {
                 @Override public void insertUpdate(DocumentEvent e) { changed(); }
                 @Override public void removeUpdate(DocumentEvent e) { changed(); }
                 @Override public void changedUpdate(DocumentEvent e) { changed(); }
-                private void changed() { if (!applying) emit(new UiEvent.Edited(FieldControl.this.node.id(), input.getText())); }
+                private void changed() {
+                    if (applying) return;
+                    notifying = true;
+                    try { emit(new UiEvent.Edited(FieldControl.this.node.id(), input.getText())); }
+                    finally { notifying = false; }
+                }
             };
             input.getDocument().addDocumentListener(listener); own(() -> input.getDocument().removeDocumentListener(listener));
-            applying = true; try { input.setText(node.value()); } finally { applying = false; }
+            setValue(node.value());
             refresh();
         }
         private Nodes.Button browseNode(Nodes.Field field) {
@@ -58,10 +65,24 @@ final class TextFields {
         }
         @Override void update(Nodes.Node next) {
             var previous = (Nodes.Field)node; var field = (Nodes.Field)next;
-            if (!previous.value().equals(field.value())) {
-                applying = true; try { input.setText(field.value()); } finally { applying = false; }
+            if (!previous.value().equals(field.value()) || notifying && !input.getText().equals(field.value())) {
+                long revision = ++valueRevision;
+                if (!input.getText().equals(field.value())) {
+                    if (notifying) {
+                        // A synchronous host may normalize Edited text. Swing forbids document writes
+                        // during notification; publish the descriptor now and apply the latest value later.
+                        EventQueue.invokeLater(() -> {
+                            if (!closed && valueRevision == revision) setValue(field.value());
+                        });
+                    } else setValue(field.value());
+                }
             }
             super.update(next);
+        }
+        private void setValue(String value) {
+            if (input.getText().equals(value)) return;
+            applying = true;
+            try { input.setText(value); } finally { applying = false; }
         }
         @Override JComponent focusTarget() { return input; }
         @Override void refresh() {

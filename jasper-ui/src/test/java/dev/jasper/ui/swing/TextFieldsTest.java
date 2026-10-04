@@ -12,6 +12,77 @@ import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.ui.swing.KitViewTest.*;
 
 class TextFieldsTest {
+    @Test void synchronousEditEchoUpdatesDescriptorWithoutMutatingInNotification() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var failures = new ArrayList<Throwable>(); var events = new ArrayList<UiEvent>();
+            Thread thread = Thread.currentThread(); var old = thread.getUncaughtExceptionHandler();
+            thread.setUncaughtExceptionHandler((t, failure) -> failures.add(failure)); KitView[] mounted = new KitView[1];
+            try {
+                mounted[0] = new KitView(context, stack(field("a", FieldKind.TEXT, "")), event -> {
+                    events.add(event);
+                    if (event instanceof UiEvent.Edited edit) mounted[0].update(stack(field("a", FieldKind.TEXT, edit.text())));
+                });
+                var input = editor(mounted[0], "a"); var document = input.getDocument(); input.replaceSelection("a");
+                assertThat(failures).isEmpty();
+                assertThat(((Field)((Stack)mounted[0].spec().root()).children().getFirst()).value()).isEqualTo("a");
+                assertThat(input.getText()).isEqualTo("a"); assertThat(input.getDocument()).isSameAs(document);
+                assertThat(events).containsExactly(new UiEvent.Edited("a", "a"));
+            } finally { if (mounted[0] != null) mounted[0].close(); thread.setUncaughtExceptionHandler(old); release(context); }
+        });
+    }
+    @Test void synchronousNormalizationDefersWritesAndLatestEditWinsWithoutDuplicateEvents() {
+        var failures = new ArrayList<Throwable>(); var events = new ArrayList<UiEvent>();
+        KitView[] mounted = new KitView[1]; KitContext[] contexts = new KitContext[1];
+        Thread.UncaughtExceptionHandler[] handlers = new Thread.UncaughtExceptionHandler[1];
+        Edt.run(() -> {
+            contexts[0] = KitFixtures.context(); handlers[0] = Thread.currentThread().getUncaughtExceptionHandler();
+            Thread.currentThread().setUncaughtExceptionHandler((t, failure) -> failures.add(failure));
+            mounted[0] = new KitView(contexts[0], stack(field("a", FieldKind.TEXT, "")), event -> {
+                events.add(event);
+                if (event instanceof UiEvent.Edited edit) mounted[0].update(stack(field("a", FieldKind.TEXT, edit.text().toUpperCase(java.util.Locale.ROOT))));
+            });
+            var input = editor(mounted[0], "a"); input.replaceSelection("a"); input.replaceSelection("b");
+        });
+        Edt.run(() -> {
+            try {
+                assertThat(failures).isEmpty(); assertThat(editor(mounted[0], "a").getText()).isEqualTo("AB");
+                assertThat(((Field)((Stack)mounted[0].spec().root()).children().getFirst()).value()).isEqualTo("AB");
+                assertThat(events).containsExactly(new UiEvent.Edited("a", "a"), new UiEvent.Edited("a", "ab"));
+            } finally { mounted[0].close(); Thread.currentThread().setUncaughtExceptionHandler(handlers[0]); release(contexts[0]); }
+        });
+    }
+    @Test void callbackNormalizationCanRestoreAnUnchangedDescriptorValue() {
+        KitView[] mounted = new KitView[1]; KitContext[] contexts = new KitContext[1]; var events = new ArrayList<UiEvent>();
+        Edt.run(() -> {
+            contexts[0] = KitFixtures.context(); mounted[0] = new KitView(contexts[0], stack(field("a", FieldKind.TEXT, "A")), event -> {
+                events.add(event);
+                if (event instanceof UiEvent.Edited edit) mounted[0].update(stack(field("a", FieldKind.TEXT, edit.text().strip())));
+            });
+            var input = editor(mounted[0], "a"); input.setCaretPosition(1); input.replaceSelection(" ");
+        });
+        Edt.run(() -> {
+            try {
+                assertThat(editor(mounted[0], "a").getText()).isEqualTo("A");
+                assertThat(events).containsExactly(new UiEvent.Edited("a", "A "));
+            } finally { mounted[0].close(); release(contexts[0]); }
+        });
+    }
+    @Test void closingFieldCancelsPendingNormalizationWrite() {
+        KitView[] mounted = new KitView[1]; KitContext[] contexts = new KitContext[1]; JTextComponent[] inputs = new JTextComponent[1];
+        var failures = new ArrayList<Throwable>(); Thread.UncaughtExceptionHandler[] handlers = new Thread.UncaughtExceptionHandler[1];
+        Edt.run(() -> {
+            contexts[0] = KitFixtures.context(); handlers[0] = Thread.currentThread().getUncaughtExceptionHandler();
+            Thread.currentThread().setUncaughtExceptionHandler((t, failure) -> failures.add(failure));
+            mounted[0] = new KitView(contexts[0], stack(field("a", FieldKind.TEXT, "")), event -> {
+                if (event instanceof UiEvent.Edited edit) mounted[0].update(stack(field("a", FieldKind.TEXT, edit.text().toUpperCase(java.util.Locale.ROOT))));
+            });
+            inputs[0] = editor(mounted[0], "a"); inputs[0].replaceSelection("a"); mounted[0].close();
+        });
+        Edt.run(() -> {
+            try { assertThat(failures).isEmpty(); assertThat(inputs[0].getText()).isEqualTo("a"); }
+            finally { Thread.currentThread().setUncaughtExceptionHandler(handlers[0]); release(contexts[0]); }
+        });
+    }
     @Test void allFieldKindsHaveAssociatedLabelsHintAndEditableInput() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
