@@ -2,6 +2,22 @@
 
 ## Current state — 2026-10-03
 
+- **File chooser visual continuity** (2026-10-04), on `codex/file-dialog-corners` in
+  `/Users/dustin/.codex/worktrees/file-dialog-corners/moray`, based on fetched `origin/main` at `a6d15621`.
+  Places and the file-list background use the workspace's scaled 16px corner arc, including opaque-child
+  repaints and the listing beside Preview. Places is a title-case column header aligned with the file headings;
+  the resize gutter follows the rail panels' plain chrome styling while retaining Swing dragging and keyboard
+  resizing. The file list uses a transient overlay scroll thumb: no column reflow, no idle track, and a one-second
+  idle timeout that stays suspended during a held drag. Hiding/removing/closing the chooser stops the timer.
+  This user-directed bounded cleanup used inline implementation and independent final review; no architecture
+  changes or historical-plan rewrites. Initial corner, heading and scrollbar regressions reproduced the old
+  behavior; focused rendering and scrolling/lifecycle tests pass. Independent review's listing/Preview corner
+  finding was corrected, and follow-up review approved with no remaining findings. The theme-refresh spacing regression also reproduced the original replacement and now passes.
+  Final `./gradlew check` passed all 88 tasks: **8,488 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. Dark/light headless previews were
+  inspected with Preview open and closed; see `jasper-app/build/file-dialog-preview/` in the worktree.
+  No GUI or benchmark launched; native scrolling/drag acceptance remains user-run. No merge or push authorized.
+
 - **View menu cleanup** (2026-10-04; `codex/refine-bundled-themes`, updated from local main `79232532`):
   removed the user-selected Show/Hide Jasper, UI Theme, Workspace Scheme, Themes… and Window Settings… entries
   from View, including the now-empty Appearance submenu. Settings and command-palette access remain; Zen,
