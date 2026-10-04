@@ -285,7 +285,6 @@
 "ToolWindow.HeaderTab.selectedInactiveBackground" = "#343638"
 "Tree.background" = "#3C3F41"
 "Tree.foreground" = "#bbbbbb"
-"Tree.forceFocusedSelectionForeground" = "true"
 "ValidationTooltip.errorBackground" = "#593D41"
 "ValidationTooltip.errorBorderColor" = "#73454B"
 "ValidationTooltip.warningBackground" = "#594E32"

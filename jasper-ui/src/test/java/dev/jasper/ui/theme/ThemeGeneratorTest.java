@@ -305,4 +305,24 @@ class ThemeGeneratorTest {
             .doesNotContainKeys("@unsafeBorderReference", "@unsafeWildcardBorder", "@malformedOptional", "Button.border");
     }
 
+    @Test void generatedUiRejectsBooleanColorsButKeepsColorIdentifiersAndBooleanConditions() {
+        var theme = generate(SEEDS + """
+            [ui]
+            "Tree.forceFocusedSelectionForeground" = "true"
+            "Probe.foreground" = "false"
+            "Probe.background" = { "os.mac" = "true", "os.default" = "#123456" }
+            "Probe.borderColor" = "mix(false, #fff, 25%)"
+            "Probe.caretColor" = "if(true, true, #123456)"
+            "Label.foreground" = "Gray2"
+            "Button.background" = "if(true, #123456, #abcdef)"
+            "Button.foreground" = "if(false, Gray2, #abcdef)"
+            """
+        );
+        assertThat(theme.uiKeys()).doesNotContainKeys("Tree.forceFocusedSelectionForeground", "Probe.foreground",
+            "Probe.background", "Probe.borderColor", "Probe.caretColor")
+            .containsEntry("Label.foreground", "Gray2")
+            .containsEntry("Button.background", "if(true, #123456, #abcdef)")
+            .containsEntry("Button.foreground", "if(false, Gray2, #abcdef)");
+    }
+
 }

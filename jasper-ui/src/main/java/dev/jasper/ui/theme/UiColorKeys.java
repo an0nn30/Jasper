@@ -46,7 +46,8 @@ public final class UiColorKeys {
 
     /** Validates the color grammar only; rendering and reference resolution remain caller-owned. */
     private static boolean expression(String text, int depth) {
-        if (depth > 32 || text.isEmpty()) return false;
+        // FlatLaf parses these as booleans before inferring color type. They are valid only as conditions.
+        if (depth > 32 || text.isEmpty() || text.equals("true") || text.equals("false")) return false;
         if (HEX.matcher(text).matches() || text.equals("null")) return true;
         if (text.startsWith("@")) return NAME.matcher(text.substring(1)).matches();
         if (text.startsWith("$")) return property(text.substring(1));

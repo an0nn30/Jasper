@@ -48,6 +48,10 @@
   plus static golden color parity, source hygiene, byte-identical resource checks and authored-source whitespace checks.
   Byte-preserved upstream IntelliJ assets retain five pre-existing trailing-whitespace lines;
   exact-file attributes exempt only their upstream end-of-line spaces, keeping the full diff check clean.
+  Task 3 review fixed a boolean literal escaping the color-only suffix policy: exact `true`/`false`
+  values are discarded in scalar/platform/nested color positions, while boolean conditions and
+  resolved named-color references survive. Static color golden corrected; **79 focused import/generator
+  tests, 0 failures/errors/skips**, and architecture passed after observed regression failures.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`
