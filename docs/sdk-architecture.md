@@ -426,7 +426,7 @@ reports its changes. The method takes a component because opacity is per window 
 design's no-argument form was changed for that reason). `dev.jasper.app.plugins.GlassSource` is the per-component lookup
 plus change subscription; `JasperApplication` builds it from its `TerminalWindow`s (`owns(component)`, then the window
 content's `workspaceOpacity(component)`: the window's opacity inside the centre deck that holds terminal and hosted
-content tabs, 1.0 for chrome, the rail and side or bottom panels), `PluginRuntime.glass(GlassSource)` hands it to `PluginHost.Environment` and `HostedUi`,
+content tabs, 1.0 for chrome, the stripes and the tool windows), `PluginRuntime.glass(GlassSource)` hands it to `PluginHost.Environment` and `HostedUi`,
 and `WindowContent.setGlassListener(Runnable)` fires on a real opacity change and when hosted content mounts or unmounts
 while the window is translucent. A component outside a translucent window reports 1.0. `FakePluginHost.setWorkspaceOpacity`
 announces on `flush()` and reports one value for every component; the contract case

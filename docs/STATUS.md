@@ -6,7 +6,7 @@
   checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
   [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
   (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
-  removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15`. `plugins.HostedNotifications` posts into the
+  removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15` (Editor `>=0.14.1` since the workspace-glass merge). `plugins.HostedNotifications` posts into the
   center with the plugin id as source and contained links; a cause becomes the plugin's incident with Show more…
   (`IncidentNotices.pluginNotice`); a plugin's notifications expire when it stops. `PluginHost` posts succeeded and
   failed activities in `<plugin-id>.activities`. After launch, `PluginProblemNotices` posts each load failure, skipped
@@ -212,7 +212,7 @@
   with alpha inside a cleared surface, and any failure keeps the window opaque; the whole path is macOS-only (rows hidden in Settings, no `WindowGlass`, no launcher flags, `GlassSource.NONE` elsewhere; the keys are silently ignored). Deviations from the spec: ancestors stay
   opaque and the workspace host clears a hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no
   `TerminalOptions` field), and it takes a `float`; `WindowGlass` follows the root pane. Rulings made during execution:
-  `ClearThemesTest` runs under `EdtTestExtension`; the Workspace section keeps its own "Choose workspace theme…" button
+  `ClearThemesTest` runs under `EdtTestExtension`; the Workspace section kept its own "Choose workspace theme…" button (superseded by the 2026-10-03 merge: no button; the theme rows now sit in Appearance)
   (Terminal › Font & Colors has one too). The final review's fix wave makes a window translucent again after a UI-theme
   switch's deferred opaque frame background (restoring the newer background later), fills the whole terminal surface
   with one glass fill instead of clearing it (the lower-arc strip was a hole), and finds the blurred `NSWindow` through
@@ -247,9 +247,9 @@
   so check a long file looks acceptable; Vim `:set nonumber` then `:set number` in a glass window (digits do not smear);
   a plugin tool panel (e.g. a side panel) in a glass window stays opaque. Plan 1 GUI checks: Clear Dark beside Terminal.app's, the Clear Dark
   (`hudWindow`) versus Clear Light (light `underWindowBackground`) material, rounded corners without slivers and square
-  full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, hidden-rail mode,
+  full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, stripes hidden,
   native fullscreen, switching back to an opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a
-  packaged build loading `Contents/app/libjasper-glass.dylib`, and Settings rows disabled off macOS.
+  packaged build loading `Contents/app/libjasper-glass.dylib`, and Settings rows hidden (no Workspace header) off macOS.
   Merged `origin/main` (`ffce7483`: dock layout, notifications, theme rows in Appearance, SDK 0.13.0) on 2026-10-03:
   SDK 0.13.1 (Editor needs `>=0.13.1, <0.14`), the glass fill ported from the deleted `WorkspaceRegions.Host` to
   `ToolWindowArea`'s centre host (`setGlass`), and Opacity/Blur in an Appearance › Workspace section after main's theme
