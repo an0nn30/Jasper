@@ -8,7 +8,7 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.AppLog;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.LoginItem;
-import dev.jasper.app.platform.ResidentTray;
+import dev.jasper.app.platform.WindowsTray;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.bootstrap.StartupResources;
@@ -135,7 +135,8 @@ public final class ApplicationBootstrap {
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
                 replacementHandsOff(options), standaloneNotice(options));
             // Shown only once startup settles residency, and only on Windows.
-            application.residentIndicator(ResidentTray::install);
+            WindowsTray tray = WindowsTray.forThisDesktop();
+            application.residentIndicator(tray::resident);
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
             acquired.transfer();
             return application;
