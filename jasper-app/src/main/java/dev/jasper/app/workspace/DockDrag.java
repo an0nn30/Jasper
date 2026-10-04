@@ -219,8 +219,8 @@ final class DockDrag {
      */
     private int sideSplit(Rectangle workspace) {
         DockGeometry.Layout layout = DockGeometry.compute(new Rectangle(0, 0, area.getWidth(), area.getHeight()), state, ToolWindowArea.metrics());
-        int visibleHeight = layout.slot(Slot.BOTTOM_LEFT).or(() -> layout.slot(Slot.BOTTOM_RIGHT))
-            .map(bottomArea -> bottomArea.y).orElse(area.getHeight());
+        // The side panels are as tall as the terminal column: the area above the bottom area, or all of it.
+        int visibleHeight = layout.terminal().height;
         return workspace.y + (visibleHeight + 1) / 2;
     }
 

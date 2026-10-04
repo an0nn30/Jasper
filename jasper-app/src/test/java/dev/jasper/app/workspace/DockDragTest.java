@@ -387,7 +387,14 @@ class DockDragTest {
         int visibleHalf = (bottom.y - workspace.y) / 2, workspaceHalf = workspace.height / 2;
         assertThat(visibleHalf).as("the side panels end above the bottom area: their half is higher").isLessThan(workspaceHalf - 20);
         Point lowerHalfOfTheSidePanel = new Point(workspace.x + 130, workspace.y + (visibleHalf + workspaceHalf) / 2);
-        var source = w.dragTo(w.button(w.left, "b"), lowerHalfOfTheSidePanel);
+        // The split is exactly half of the left panel's frame as it shows, in the same coordinates as the cursor.
+        Rectangle leftPanel = SwingUtilities.convertRectangle(w.area, w.area.content(Slot.LEFT_TOP).getParent().getBounds(), w.content);
+        int split = leftPanel.y + (leftPanel.height + 1) / 2;
+        var source = w.dragTo(w.button(w.left, "b"), new Point(workspace.x + 130, split - 1));
+        assertThat(w.drag.target()).as("one pixel above the side panel's half").hasValue(DockDropResolver.Target.workspace(Slot.LEFT_TOP));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(workspace.x + 130, split));
+        assertThat(w.drag.target()).as("on the side panel's half").hasValue(DockDropResolver.Target.workspace(Slot.LEFT_BOTTOM));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, lowerHalfOfTheSidePanel);
         assertThat(w.drag.target()).as("below the side panel's half, above the workspace's")
             .hasValue(DockDropResolver.Target.workspace(Slot.LEFT_BOTTOM));
         w.mouse(source, MouseEvent.MOUSE_RELEASED, lowerHalfOfTheSidePanel);

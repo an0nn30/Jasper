@@ -84,26 +84,26 @@ plugin default.
 ## Panels, the rail and plugin windows
 
 Panels and rail actions are part of the `Contributions` model; each panel carries its default
-`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0). Each
-window's `WindowContributions` keeps one lazily built instance per panel and docks the panels in the
-window's `DockState` (per slot an ordered list with at most one active window; per-side sizes and
-ratios). One listener on that state builds what starts showing, lays out `ToolWindowArea` (the terminal
-column, the tab strip over the deck, and a rounded frame with a `ToolWindowHeader` for each showing
-slot, placed by the pure `DockGeometry`: the bottom area spans the full width, the sides and the
-terminal column run from the toolbar to it), renders the two `ToolStripe`s, tells the panels and
-saves. `DockDrag` drags a window from its stripe button or its header with plain mouse events:
-`DockDropResolver` finds the target under the cursor (a stripe group and a position, or one of the
-workspace's six edge zones: the nearest of its left, right and bottom edges, a side split at half
-the side panels' visible height and the bottom at half its width), the stripes open a gap, and `DockDropOverlay` on the
-layered pane's `DRAG_LAYER` previews the landing with `DockGeometry.landing`, the same function as
-the layout. A stripe drop moves the window and keeps its visibility, so a hidden window's stripe
-drop previews no frame; a workspace drop moves and shows it. A window
-with nothing contributed has no stripes and its old layout. Requests to show, hide or toggle a panel
-travel through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
-window. Every panel gets a View → Tools entry for its toggle action: the application-registered
-`<panel id>.toggle`, or, since SDK 0.8.1, the plugin's own action named by
-`PanelSpec.toggleActionId` (which must already be registered by that plugin), so a plugin action
-that toggles a panel appears once in the menu and the palette.
+`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0).
+Each window's `WindowContributions` keeps one lazily built instance per panel and docks the panels
+in the window's `DockState` (per slot an ordered list with at most one active window; per-side
+sizes and ratios). One listener on that state builds what starts showing, lays out
+`ToolWindowArea` (the terminal column, the tab strip over the deck, and a rounded frame with a
+`ToolWindowHeader` for each showing slot, placed by the pure `DockGeometry`: the bottom area spans
+the full width, the sides and the terminal column run from the toolbar to it), renders the two
+`ToolStripe`s, tells the panels and saves. `DockDrag` drags a window from its stripe button or its
+header with plain mouse events: `DockDropResolver` finds the target under the cursor (a stripe
+group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
+bottom edges, a side split at half the side panels' visible height and the bottom at half its
+width), the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews
+the landing with `DockGeometry.landing`, the same function as the layout. A stripe drop moves the
+window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
+drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
+Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
+action or a `PanelHost` reaches exactly one window. Every panel gets a View → Tools entry for its
+toggle action: the application-registered `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's
+own action named by `PanelSpec.toggleActionId` (which must already be registered by that plugin),
+so a plugin action that toggles a panel appears once in the menu and the palette.
 
 Plugin windows follow the `TerminalWindow`/`WindowContent` split: `AuxiliarySurface` holds the
 content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`
