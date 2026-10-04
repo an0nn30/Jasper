@@ -107,6 +107,11 @@ card radius 9, window radius 12, segment track/item radius 7/5, focus ring 3, pa
 panel footer 34, switch 32×18 with 14 knob and compact 28×16 with 12 knob.
 Typography role sizes: hero 15, detail 16, window/panel/body/bodyStrong 13, label/description 12.5,
 caption/monoSmall 11.5, section/count 11, chip 9.5, mono 12. Resolve actual platform family centrally.
+Task 7 source-derived named metrics: segment inner padding 2, chip height/padding/radius 16/5/4,
+status dot 6, strength height/gap/radius 3/3/2, from preserved source §§8.5/8.8/8.9/8.17.
+Progress reuses the source's 3px meter thickness; meter widths fit content and available layout.
+Switch confirmation motion is 135ms (within the source's 120–150ms range). Focus margins are
+outside the exact 32×18 or 28×16 track; they do not enlarge that painted track.
 Standard title/section weights are 600, bodyStrong and selected labels 500, other text 400.
 Resolve ranges this way once; mock-calibration corrections are reviewed changes to named metrics.
 
@@ -210,6 +215,13 @@ Widths/gaps come from these semantic roles; plugins cannot pass dimensions or UI
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,
 `Toggled(String id,boolean checked)`, `Expanded(String id,boolean expanded)`,
 `Reordered(String id,String itemId,int destination)`, `SecretChanged(String id)`.
+Event identifier mapping (approved Task 7 ruling): `Action.id` is the configured action key
+(Button/MenuButton/menu item, Browse, or Choice PICKER opening). Every payload-bearing event
+(`Edited`, `Selected`, `Toggled`, `Expanded`, `Reordered`, `SecretChanged`) identifies its owning
+node. For Choice DROPDOWN/SEGMENTED, `Selected.id` is the Choice node id and `ids` contains its
+local option id; for Toggle, `Toggled.id` is the Toggle node id. Hosts/plugins resolve the node's
+configured `action` from the current spec when routing selection/toggle intent. These operations
+emit no additional generic Action, preserving the payload and node context for inline rows.
 Secret content never appears in an event, immutable descriptor or `toString()`.
 
 `KitView` in `UI/swing/KitView.java` is a final `JPanel implements AutoCloseable`:

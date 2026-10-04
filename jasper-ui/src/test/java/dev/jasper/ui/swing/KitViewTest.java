@@ -134,7 +134,7 @@ class KitViewTest {
             var context = KitFixtures.context();
             try (var view = new KitView(context, stack(field("a", FieldKind.TEXT, "value")), e -> {})) {
                 var a = editor(view, "a"); var spec = view.spec();
-                assertThatThrownBy(() -> view.update(new ViewSpec(new Secret("secret", ControlState.READY, "", "Password", ""))))
+                assertThatThrownBy(() -> view.update(new ViewSpec(new Custom("custom", ControlState.READY, "content", CustomKind.EDITOR, "Editor"))))
                     .isInstanceOf(UnsupportedOperationException.class);
                 assertThat(view.spec()).isSameAs(spec); assertThat(editor(view, "a")).isSameAs(a);
             } finally { release(context); }

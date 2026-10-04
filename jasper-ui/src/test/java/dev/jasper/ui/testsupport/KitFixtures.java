@@ -25,6 +25,15 @@ public final class KitFixtures {
             white = "#c7ced7"
             """, "fixture.toml")));
     }
+    /** Minimal real unlock composition; Task 8 adds full form anatomy. */
+    public static dev.jasper.ui.model.ViewSpec form(String name) {
+        if (!"unlock".equals(name)) throw new IllegalArgumentException("Unknown form fixture: " + name);
+        return new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Stack("unlock", dev.jasper.ui.model.ControlState.READY,
+            dev.jasper.ui.model.Nodes.LayoutRole.VERTICAL, java.util.List.of(
+                new dev.jasper.ui.model.Nodes.Secret("password", dev.jasper.ui.model.ControlState.READY, "Password", "Password", ""),
+                new dev.jasper.ui.model.Nodes.Button("unlock-action", dev.jasper.ui.model.ControlState.READY, "Unlock", "",
+                    dev.jasper.ui.model.Nodes.ButtonKind.PRIMARY, "unlock", ""))));
+    }
     /** Caller owns and closes the binding and icon registry; creation requires EDT. */
     public static KitContext context() {
         return new KitContext(new ThemeBinding(new ThemePair(dark(), dark()), failure -> { throw new AssertionError(failure); }),

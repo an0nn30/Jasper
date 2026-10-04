@@ -159,7 +159,7 @@ final class TextFields {
         }
         @Override protected void paintChildren(Graphics graphics) {
             super.paintChildren(graphics);
-            if (input.getText().isEmpty() && !hint.isEmpty()) {
+            if (input.getDocument().getLength() == 0 && !hint.isEmpty()) {
                 var g = (Graphics2D)graphics.create();
                 try {
                     Point origin = SwingUtilities.convertPoint(input, 0, 0, this);

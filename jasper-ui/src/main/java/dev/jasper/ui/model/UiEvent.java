@@ -3,7 +3,11 @@ package dev.jasper.ui.model;
 import java.util.Objects;
 import java.util.Set;
 
-/** Typed user intent. Secret edits carry only the control id. */
+/**
+ * Typed user intent. Action ids are configured action keys. All payload-bearing events identify
+ * the owning node; consumers resolve its configured action through the current ViewSpec.
+ * Choice option/item ids are local to that node. Secret edits carry only the secret node id.
+ */
 public sealed interface UiEvent {
     String id();
     record Action(String id) implements UiEvent { public Action { ModelChecks.id(id); } }

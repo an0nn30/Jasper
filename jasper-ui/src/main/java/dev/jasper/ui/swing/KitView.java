@@ -46,10 +46,23 @@ public final class KitView extends JPanel implements AutoCloseable {
     public void update(ViewSpec spec) { requireOpen(); Objects.requireNonNull(spec); reconciler.update(spec); this.spec = spec; }
     /** Current immutable descriptor; it never contains mutable input or secret content. */
     public ViewSpec spec() { requireOpen(); return spec; }
-    /** Temporary, finally-erased secret copies are supplied by the secret-control task. */
-    public void withSecret(String fieldId, Consumer<char[]> use) { requireOpen(); throw new UnsupportedOperationException("Secret controls are not implemented yet"); }
-    /** Erase the live secret document, once secret controls are installed. */
-    public void clearSecret(String fieldId) { requireOpen(); throw new UnsupportedOperationException("Secret controls are not implemented yet"); }
+    /**
+     * Use a temporary secret copy, erased in finally even if the consumer fails. An async owner
+     * must explicitly clone/transfer what it needs and erase that independently owned copy.
+     */
+    public void withSecret(String fieldId, Consumer<char[]> use) {
+        requireOpen(); Objects.requireNonNull(use);
+        char[] copy = secret(fieldId).buffer.snapshot();
+        try { use.accept(copy); } finally { java.util.Arrays.fill(copy, (char)0); }
+    }
+    /** Erase live mutable storage; callbacks may request erasure while an edit is being delivered. */
+    public void clearSecret(String fieldId) { requireOpen(); secret(fieldId).buffer.clear(); }
+    private SecretFields.SecretControl secret(String id) {
+        var control = reconciler.control(Objects.requireNonNull(id));
+        if (control instanceof SecretFields.SecretControl secret) return secret;
+        throw new IllegalArgumentException("Node is not a secret field: " + id);
+    }
+    void revealSecrets(SecretFields.SecretControl source, boolean revealed) { reconciler.revealSecrets(source, revealed); }
     /** Focus an existing control without replacing its component or document. */
     public void focus(String id) { requireOpen(); reconciler.control(Objects.requireNonNull(id)).focusTarget().requestFocusInWindow(); }
     /** Register only explicit Custom content; ordinary Swing trees cannot enter through this method. */

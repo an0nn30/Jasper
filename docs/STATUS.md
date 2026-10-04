@@ -80,6 +80,18 @@
   Hierarchy moves now detach changed parents before attaching new edges, allowing valid ancestor inversion
   while retaining input documents and unaffected sibling parent identity. All **28 affected focused tests
   pass**, zero failures/errors/skips, following reproduced edit/normalization/hierarchy regressions.
+  Task 7 implementation/self-review complete (independent review pending): real secure fields, dropdowns,
+  domain pickers, keyboard segments, confirmed-state switches and semantic chip/status/progress/strength
+  owners. Secret documents wipe replaced/removed storage and close safely from SecretChanged callbacks;
+  copies are erased even on consumer failure. Shared reveal groups include added fields and survive removal.
+  Shared contracts/JavaDoc now distinguish action keys from payload-bearing node ids for SDK translation.
+  Source-derived chip/status/strength metrics live in the catalog. The required unlock fixture uses real
+  Stack/Secret/Button nodes now; Task 8 adds full Form anatomy. Self-review reproduced/fixed undo event
+  retention, new-field reveal synchronization, authored switch alpha, empty-picker chrome and disabled
+  segment-track opacity. Final headless focused default/2x: **17 tests**; module check/architecture:
+  **174 tests, 0 failures/errors/skips**. Approved cross-task handoff: Task 9 verifies actual first/last
+  ordered-action 30% painting through the shared button painter once the real ordered owner exists;
+  no unused alpha setter was added. Source hygiene/diff checks clean; no GUI/AOT.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

@@ -11,6 +11,8 @@ final class ControlRegistry {
     static void validate(Nodes.Node node) {
         switch (node) {
             case Nodes.Text ignored -> {} case Nodes.Icon ignored -> {} case Nodes.Button ignored -> {} case Nodes.Field ignored -> {}
+            case Nodes.Secret ignored -> {} case Nodes.Choice ignored -> {} case Nodes.Toggle ignored -> {}
+            case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
             case Nodes.Stack stack -> stack.children().forEach(ControlRegistry::validate);
             default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         }
@@ -21,6 +23,13 @@ final class ControlRegistry {
             case Nodes.Icon icon -> new Labels.IconControl(view, icon);
             case Nodes.Button button -> new Buttons.ButtonControl(view, button);
             case Nodes.Field field -> new TextFields.FieldControl(view, field);
+            case Nodes.Secret secret -> new SecretFields.SecretControl(view, secret);
+            case Nodes.Choice choice -> new Choices.ChoiceControl(view, choice);
+            case Nodes.Toggle toggle -> new Switches.ToggleControl(view, toggle);
+            case Nodes.Chip chip -> new Indicators.ChipControl(view, chip);
+            case Nodes.StatusDot dot -> new Indicators.DotControl(view, dot);
+            case Nodes.Progress progress -> new Indicators.ProgressControl(view, progress);
+            case Nodes.Strength strength -> new Indicators.StrengthControl(view, strength);
             case Nodes.Stack stack -> new Stacks.StackControl(view, stack);
             default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         };
@@ -29,6 +38,7 @@ final class ControlRegistry {
         return switch (node) {
             case Nodes.Field field -> field.kind();
             case Nodes.Button button -> button.kind();
+            case Nodes.Choice choice -> choice.kind();
             default -> node.getClass();
         };
     }

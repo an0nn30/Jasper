@@ -23,8 +23,17 @@ final class ViewReconciler implements AutoCloseable {
                 else { var control = ControlRegistry.create(view, node); created.add(control); next.put(node.id(), control); }
             }
         } catch (Throwable failure) { created.forEach(ControlRegistry.Control::close); throw failure; }
+        var revealGroups = new LinkedHashMap<String, Boolean>();
+        for (var control : mounted.values()) if (control instanceof SecretFields.SecretControl secret) {
+            String group = ((Nodes.Secret)secret.node).revealGroup();
+            if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
+        }
         inherit(spec.root(), next, true);
         for (var node : nodes.values()) next.get(node.id()).update(node);
+        for (var control : next.values()) if (control instanceof SecretFields.SecretControl secret) {
+            String group = ((Nodes.Secret)secret.node).revealGroup();
+            if (!group.isEmpty()) secret.reveal(revealGroups.getOrDefault(group, false));
+        }
         detachMoves(spec.root(), nodes, next);
         for (var node : nodes.values()) if (node instanceof Nodes.Stack stack) {
             ((Stacks.StackControl)next.get(node.id())).children(stack.children().stream().map(child -> next.get(child.id()).component).toList());
@@ -60,6 +69,11 @@ final class ViewReconciler implements AutoCloseable {
     }
     ControlRegistry.Control control(String id) {
         var control = mounted.get(id); if (control == null) throw new IllegalArgumentException("Unknown node: " + id); return control;
+    }
+    void revealSecrets(SecretFields.SecretControl source, boolean revealed) {
+        String group = ((Nodes.Secret)source.node).revealGroup();
+        for (var control : mounted.values()) if (control instanceof SecretFields.SecretControl secret
+                && (secret == source || !group.isEmpty() && group.equals(((Nodes.Secret)secret.node).revealGroup()))) secret.reveal(revealed);
     }
     void refresh() { mounted.values().forEach(ControlRegistry.Control::refresh); view.revalidate(); view.repaint(); }
     @Override public void close() { mounted.values().forEach(ControlRegistry.Control::close); mounted.clear(); view.removeAll(); }

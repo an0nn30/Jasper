@@ -42,7 +42,7 @@ final class Buttons {
             button.revalidate(); button.repaint();
         }
     }
-    static final class KitButton extends JButton {
+    static class KitButton extends JButton {
         private final KitContext context;
         Nodes.ButtonKind kind;
         ThemePainting.Focus focus;
