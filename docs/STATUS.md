@@ -2,6 +2,25 @@
 
 ## Current state — 2026-10-04
 
+- **File chooser visual continuity** (2026-10-04), on `codex/file-dialog-corners` in
+  `/Users/dustin/.codex/worktrees/file-dialog-corners/moray`, based on fetched `origin/main` at `a6d15621`.
+  Places and the file-list background use the workspace's scaled 16px corner arc, including opaque-child
+  repaints and the listing beside Preview. Places is a title-case column header aligned with the file headings;
+  the resize gutter follows the rail panels' plain chrome styling while retaining Swing dragging and keyboard
+  resizing. The file list uses a transient overlay scroll thumb: no column reflow, no idle track, and a one-second
+  idle timeout that stays suspended during a held drag. Hiding/removing/closing the chooser stops the timer.
+  This user-directed bounded cleanup used inline implementation and independent final review; no architecture
+  changes or historical-plan rewrites. Initial corner, heading and scrollbar regressions reproduced the old
+  behavior; focused rendering and scrolling/lifecycle tests pass. Independent review's listing/Preview corner
+  finding was corrected, and follow-up review approved with no remaining findings. The theme-refresh spacing regression also reproduced the original replacement and now passes.
+  Final `./gradlew check` passed all 88 tasks: **8,488 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. Dark/light headless previews were
+  inspected with Preview open and closed; see `jasper-app/build/file-dialog-preview/` in the worktree.
+  No GUI or benchmark launched; native scrolling/drag acceptance remains user-run. User approved merge to main and push.
+  Integrated current main `b51fb3b9` without conflicts; final combined `./gradlew check` passed all 91 tasks:
+  **8,680 tests, 0 failures, 0 errors, 6 skipped**. The reviewed chooser code is unchanged.
+  Headless previews are preserved in the main checkout at `jasper-app/build/file-dialog-preview/`.
+
 - **Folder tabs adversarial review and main integration** (2026-10-04; `codex/folder-tabs`): integrated
   `main` at `e11961c8`, preserving saved view modes, workspace glass, current theme fixtures, startup/resident
   behavior, and the Appearance View mode section alongside Animations. An independent adversarial review found
@@ -314,22 +333,6 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
   source hygiene and diff checks passed.
   User-run acceptance: drag each outer and shared divider slowly through its default size or equal split from both
   directions, feel the brief hold, continue past it, then release inside the zone and confirm the default sticks.
-
-- **File chooser visual continuity** (2026-10-04), on `codex/file-dialog-corners` in
-  `/Users/dustin/.codex/worktrees/file-dialog-corners/moray`, based on fetched `origin/main` at `a6d15621`.
-  Places and the file-list background use the workspace's scaled 16px corner arc, including opaque-child
-  repaints and the listing beside Preview. Places is a title-case column header aligned with the file headings;
-  the resize gutter follows the rail panels' plain chrome styling while retaining Swing dragging and keyboard
-  resizing. The file list uses a transient overlay scroll thumb: no column reflow, no idle track, and a one-second
-  idle timeout that stays suspended during a held drag. Hiding/removing/closing the chooser stops the timer.
-  This user-directed bounded cleanup used inline implementation and independent final review; no architecture
-  changes or historical-plan rewrites. Initial corner, heading and scrollbar regressions reproduced the old
-  behavior; focused rendering and scrolling/lifecycle tests pass. Independent review's listing/Preview corner
-  finding was corrected, and follow-up review approved with no remaining findings. The theme-refresh spacing regression also reproduced the original replacement and now passes.
-  Final `./gradlew check` passed all 88 tasks: **8,488 tests, 0 failures, 0 errors, 6 skipped**;
-  architecture/doc checks, changed-source hygiene and diff checks passed. Dark/light headless previews were
-  inspected with Preview open and closed; see `jasper-app/build/file-dialog-preview/` in the worktree.
-  No GUI or benchmark launched; native scrolling/drag acceptance remains user-run. No merge or push authorized.
 
 - **View menu cleanup** (2026-10-04; `codex/refine-bundled-themes`, updated from local main `79232532`):
   removed the user-selected Show/Hide Jasper, UI Theme, Workspace Scheme, Themes… and Window Settings… entries
