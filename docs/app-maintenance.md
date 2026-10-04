@@ -409,6 +409,13 @@ the stripes hidden or empty, the terminal/tab column has square corners, no exte
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
 tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+What a drop over the workspace targets is `DockDropResolver`'s job: the nearest of the left, right and
+bottom edges (each distance a share of the workspace's own width or height, so the zones keep their shape
+at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height
+(`DockDrag.sideSplit`: above the bottom area while it shows, else the workspace's half) and the bottom at half
+its width; a side wins a tie. `DockDrag` previews no area for a stripe drop of a hidden window, which stays
+hidden. Change the zones in the resolver and its tests first; the window tests aim with
+`DockTestSupport.zone(workspace, slot)`.
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
 components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
 headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
