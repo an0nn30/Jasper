@@ -41,7 +41,11 @@
   with a window open, before shipping); **opting out still interrupts a log-out once** (this predates Plan 4; a cheap
   follow-up is to prepare the bridge whenever a presence exists); **before the pre-built window plan,** add trace phases
   around `windowOpening()` and `residencySettled` (the 116 ms "reopen to shown" includes the synchronous Dock policy
-  switch). A plugin window's File › Quit is a real quit (`NativeShells` calls `quit()`), unlike a terminal window's.
+  switch). Parked for the Cmd+Q plan: the File Server setting's description (`FileServerSettings.java:18`,
+  `settings.toml:2`, "Quitting or restarting Jasper stops every file server") is untrue for Cmd+Q on a resident Mac
+  until that plan lands; the SDK-facing `Windows.onQuitting` Javadoc and `sdk-architecture.md` omit that Cmd+Q is a
+  real quit until the bridge is prepared; `app-architecture.md`'s `quit()` caller list should say a plugin window's
+  File › Quit exists only outside macOS, and that `quit()` asks the windows' closing guards before the quit guards.
 
 - **Start-up Part 2: JVM and packaging** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
   plan `docs/superpowers/plans/2026-10-02-startup-2-jvm-packaging.md`): packaged Jasper ships a trimmed runtime (41
