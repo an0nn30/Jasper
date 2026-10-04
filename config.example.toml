@@ -39,11 +39,12 @@ enabled = false
 long_command_seconds = 10
 
 [system]
-# Restart required for residency; the login item updates on reload. Keep Jasper running with no
-# windows after the last one closes so the next launch can reuse the warm process, and start it in the background
-# at login. Quit (Cmd+Q) still exits completely. Autostart requires an installed Jasper: a
+# Keep Jasper running with no windows so a new window opens instantly, and start it in the background at login.
+# On by default on macOS and Windows and off on Linux, so it is commented out here: uncomment it to choose.
+# On macOS, Quit (Cmd+Q) closes every window and keeps Jasper in the menu bar; its Quit Jasper Completely ends it.
+# Restart required for residency; the login item updates on reload. Autostart requires an installed Jasper: a
 # ./gradlew run development session stays resident but never registers a login item.
-run_in_background = false
+# run_in_background = true
 
 [palette]
 # Live. Result rows the palette list shows before it scrolls. Range: 1-20.
@@ -129,6 +130,10 @@ workspace = "match"
 # opacity = 95
 # Blur behind a translucent workspace: "theme", "on" or "off".
 blur = "theme"
+
+[ui.animations]
+# Live app-wide switch. Turning off finishes active transitions immediately.
+enabled = true
 
 [keybindings]
 # Zen mode is unassigned by default. Assign it here or in Settings > Keymap.

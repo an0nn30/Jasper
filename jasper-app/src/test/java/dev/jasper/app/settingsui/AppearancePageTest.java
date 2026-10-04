@@ -105,6 +105,17 @@ class AppearancePageTest {
         assertThat(page.modified()).isTrue();
     }
 
+    @Test void animationSectionOnlyStagesTheSharedPolicyAndHasNoDurationEditors() {
+        page.component();
+        var animationRows = page.rows().stream().filter(row -> row.setting().table().equals(List.of("ui", "animations"))).toList();
+        assertThat(animationRows).extracting(row -> row.setting().name()).containsExactly("ui.animations.enabled");
+        var toggle = animationRows.getFirst();
+        ((javax.swing.JCheckBox) toggle.editor().component()).doClick();
+        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_ENABLED)).isFalse();
+        assertThat(page.modified()).isTrue();
+        assertThat(page.searchTerms()).doesNotContain("Open tab duration", "Close tab duration", "Switch tab duration");
+    }
+
     @Test void bothDropdownsSearchAndEnterStagesTheMatch() {
         var theme = editor(0);
         var keys = ((SearchCombo) theme.box).searchPopup().getKeyListener();

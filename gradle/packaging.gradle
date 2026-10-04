@@ -10,6 +10,8 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 
 apply from: rootProject.file('gradle/mac-launcher-identity.gradle')
 apply from: rootProject.file('gradle/mac-launcher-identity-test.gradle')
+apply from: rootProject.file('gradle/packaging-support.gradle')
+apply from: rootProject.file('gradle/packaging-support-test.gradle')
 
 def app = extensions.getByType(JavaApplication)
 def toolchains = extensions.getByType(JavaToolchainService)
@@ -22,6 +24,8 @@ def inputDirectory = packagingRoot.map { it.dir('input') }
 def imageDirectory = packagingRoot.map { it.dir('image') }
 def distributionDirectory = packagingRoot.map { it.dir('dist') }
 def markerFile = packagingRoot.map { it.file('image.complete') }
+// -Pjasper.aot=true makes packageApp (and verifyPackage) train the AOT cache; packageDist on macOS always does.
+def aotRequested = providers.gradleProperty('jasper.aot').map { it == 'true' }.getOrElse(false)
 // Shown by macOS's Local Network privacy prompt. Without the grant, connections to LAN addresses
 // fail with EHOSTUNREACH ("No route to host"), which is how Remote's SSH connections to them fail.
 def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
@@ -171,6 +175,45 @@ def resignImage = { File image ->
         image.absolutePath], 'codesign after bundle edits')
 }
 
+// The bytes of one bundled native library (gradle/packaging-support.gradle), read from its jar in the image's app directory.
+def bundledNativeBytes = { File appDir, Map nativeFile ->
+    List<File> jars = (appDir.listFiles() ?: [] as File[]).findAll { it.name ==~ nativeFile.jar }
+    if (jars.size() != 1) throw new GradleException("Expected one jar matching ${nativeFile.jar} in ${appDir}, found ${jars*.name}")
+    new ZipFile(jars[0]).withCloseable { zip ->
+        def entry = zip.getEntry(nativeFile.entry)
+        if (entry == null) throw new GradleException("${jars[0].name} has no ${nativeFile.entry}; update bundledNatives in gradle/packaging-support.gradle")
+        zip.getInputStream(entry).withCloseable { it.readAllBytes() }
+    }
+}
+
+// Copies the host's bundled native libraries into the image's app directory, byte for byte.
+def installBundledNatives = { File appDir, Map host ->
+    bundledNatives(host.os, host.architecture).each { Map nativeFile ->
+        File target = new File(appDir, nativeFile.path)
+        target.parentFile.mkdirs()
+        target.bytes = bundledNativeBytes(appDir, nativeFile)
+        if (nativeFile.executable) target.setExecutable(true, false)
+    }
+}
+
+// The image's own java with the launcher's JVM options and class path and -XX:AOTMode=on, which exits with an error
+// instead of running without a stale or broken cache. Returns false when Jasper.cfg names no AOT cache.
+def verifyAotCache = { File runtimeHome, File appDir ->
+    String config = new File(appDir, 'Jasper.cfg').getText('UTF-8')
+    if (!config.readLines().contains('java-options=' + aotCacheOption)) return false
+    File cache = new File(appDir, 'jasper.aot')
+    if (!cache.isFile() || cache.length() == 0) {
+        throw new GradleException("Package verification failed: Jasper.cfg names an AOT cache, but ${cache} is missing or empty")
+    }
+    def result = executeNative(aotCheckCommand(new File(runtimeHome, 'bin/java'), config, appDir),
+        'AOT cache check (java -XX:AOTMode=on): the JVM refuses the cache; train it again with trainAotCache')
+    String output = result.stdout + result.stderr
+    if (!output.contains('sharing')) {
+        throw new GradleException("Package verification failed: java ran without class data sharing although it accepted the AOT cache\n${output}")
+    }
+    true
+}
+
 def stage = tasks.register('stagePackage', Sync) {
     group = 'distribution'
     description = 'Stages the application JAR, runtime dependencies, configuration example and package guide.'
@@ -184,7 +227,7 @@ def stage = tasks.register('stagePackage', Sync) {
     duplicatesStrategy = DuplicatesStrategy.FAIL
 }
 
-apply from: rootProject.file('gradle/mac-notifications.gradle')
+apply from: rootProject.file('gradle/mac-native.gradle')
 apply from: rootProject.file('gradle/mac-glass.gradle')
 
 def packageApp = tasks.register('packageApp') {
@@ -201,6 +244,10 @@ def packageApp = tasks.register('packageApp') {
     }
     inputs.property('mainClass', app.mainClass)
     inputs.property('jvmArgs', providers.provider { app.applicationDefaultJvmArgs.collect { it.toString() } })
+    inputs.property('runtimeRootModules', providers.provider { runtimeRootModules(normalizedHost().os) })
+    inputs.property('jlinkOptions', jlinkOptions)
+    inputs.property('bundledNatives', providers.provider { bundledNatives(normalizedHost().os, normalizedHost().architecture).collect { it.toString() } })
+    inputs.property('bundledNativeOptions', providers.provider { bundledNativeJvmOptions(normalizedHost().os) })
     inputs.property('localNetworkUsage', localNetworkUsage)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
@@ -222,8 +269,10 @@ def packageApp = tasks.register('packageApp') {
             '--main-jar', jarTask.get().archiveFile.get().asFile.name,
             '--main-class', app.mainClass.get(),
             '--icon', nativeIcon.get().absolutePath,
-            '--jlink-options', '--strip-debug --no-man-pages --no-header-files --bind-services']
+            '--add-modules', runtimeRootModules(context.host.os).join(','),
+            '--jlink-options', jlinkOptions]
         app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
+        bundledNativeJvmOptions(context.host.os).each { args.addAll(['--java-options', it]) }
         if (context.host.os == 'macos') {
             args.addAll(['--mac-package-identifier', 'dev.jasper.app', '--mac-package-name', 'Jasper'])
         }
@@ -232,6 +281,8 @@ def packageApp = tasks.register('packageApp') {
             if (context.host.os == 'macos') {
                 File image = new File(imageDir, 'Jasper.app')
                 removePluginClasspath(new File(image, 'Contents/app/Jasper.cfg'))
+                // After jpackage, which re-signs native inputs: these keep their vendor signatures, sealed by resignImage below.
+                installBundledNatives(new File(image, 'Contents/app'), context.host)
                 Files.copy(macIconCatalog.toPath(), new File(image, 'Contents/Resources/Assets.car').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 executeNative(['/usr/bin/plutil', '-replace', 'CFBundleIconName', '-string', macIconName,
@@ -244,8 +295,8 @@ def packageApp = tasks.register('packageApp') {
                     'dev.jasper.app', macLauncherTemplate(context.sdkHome)))
                 // jpackage re-signs native inputs. Restore our already-signed bridge so the
                 // same staged payload is verified byte-for-byte, then sign the outer bundle.
-                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-notifications.dylib').toPath(),
-                    new File(image, 'Contents/app/libjasper-notifications.dylib').toPath(),
+                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-macos.dylib').toPath(),
+                    new File(image, 'Contents/app/libjasper-macos.dylib').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 Files.copy(new File(inputDirectory.get().asFile, 'libjasper-glass.dylib').toPath(),
                     new File(image, 'Contents/app/libjasper-glass.dylib').toPath(),
@@ -255,6 +306,7 @@ def packageApp = tasks.register('packageApp') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
+                installBundledNatives(new File(imageDir, 'Jasper/app'), context.host)
             }
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
@@ -268,6 +320,8 @@ def verifyPackage = tasks.register('verifyPackage') {
     group = 'verification'
     description = 'Verifies the generated native image and bundled runtime without launching Jasper.'
     dependsOn(packageApp)
+    // BundledNativesProbe lives in the test sources: verification tooling, never in the application jar.
+    if (normalizedHost().os in ['macos', 'windows']) dependsOn(tasks.named('testClasses'))
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.upToDateWhen { false }
@@ -310,6 +364,16 @@ def verifyPackage = tasks.register('verifyPackage') {
         boolean anyGlassOption = cfg.contains('--add-opens=java.desktop/java.awt=ALL-UNNAMED') || cfg.contains('--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED')
         if (context.host.os == 'macos' && !glassOptions) throw new GradleException('Package verification failed: the workspace glass JVM options are missing from Jasper.cfg')
         if (context.host.os != 'macos' && anyGlassOption) throw new GradleException('Package verification failed: Jasper.cfg opens JDK internals for workspace glass, which exists only on macOS')
+        // Part 2 adds no JVM tuning flags: only the application's own options (on macOS these include the workspace
+        // glass options above), the bundled-native options and jpackage's app version may appear (trainAotCache adds
+        // -XX:AOTCache on macOS).
+        List<String> cfgOptions = cfg.readLines().findAll { it.startsWith('java-options=') }.collect { it.substring('java-options='.length()) }
+        List<String> requiredOptions = app.applicationDefaultJvmArgs.collect { it.toString() } + bundledNativeJvmOptions(context.host.os)
+        List<String> permittedOptions = requiredOptions + ["-Djpackage.app-version=${context.version}".toString()] +
+            (context.host.os == 'macos' ? [aotCacheOption] : [])
+        if (cfgOptions != cfgOptions.toUnique() || !cfgOptions.containsAll(requiredOptions) || !(cfgOptions - permittedOptions).isEmpty()) {
+            throw new GradleException("Package verification failed: Jasper.cfg's JVM options are ${cfgOptions}; expected ${requiredOptions} and jpackage's app version")
+        }
         String normalizedCfg = cfg.replace('\\', '/')
         configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
             if (!normalizedCfg.contains("\$APPDIR/${dependency.name}")) throw new GradleException("Package verification failed: classpath omits ${dependency.name}")
@@ -328,6 +392,37 @@ def verifyPackage = tasks.register('verifyPackage') {
         String normalizedReleaseArchitecture = releaseArchitecture in ['aarch64', 'arm64'] ? 'aarch64' :
                 (releaseArchitecture in ['amd64', 'x86_64', 'x64'] ? 'x64' : releaseArchitecture)
         if (releaseArchitecture && normalizedReleaseArchitecture != context.host.architecture) throw new GradleException("Package verification failed: runtime architecture is ${releaseArchitecture}")
+        // The trimmed runtime: exactly the documented modules, with a default CDS archive.
+        def modulesMatcher = releaseText =~ /(?m)^MODULES="([^"]*)"/
+        List<String> packagedModules = modulesMatcher.find() ? modulesMatcher.group(1).tokenize(' ').toSorted() : []
+        List<String> expectedModules = runtimeModules(context.host.os)
+        if (packagedModules != expectedModules) {
+            throw new GradleException("Package verification failed: the runtime's modules differ from runtimeModules in gradle/packaging-support.gradle\n" +
+                "missing: ${expectedModules - packagedModules}\nunexpected: ${packagedModules - expectedModules}")
+        }
+        File cdsArchive = new File(runtimeHome, context.host.os == 'windows' ? 'bin/server/classes.jsa' : 'lib/server/classes.jsa')
+        if (!cdsArchive.isFile() || cdsArchive.length() == 0) {
+            throw new GradleException("Package verification failed: the runtime has no default CDS archive at ${cdsArchive}")
+        }
+        // jdeps sees each jar's static module needs. Without this, a bundled plugin needing a module the runtime lacks
+        // would fail with NoClassDefFoundError only in the packaged app.
+        File jdeps = new File(context.sdkHome, "bin/jdeps${context.host.os == 'windows' ? '.exe' : ''}")
+        List<File> applicationJars = appDir.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
+        def requireModules = { List<File> jars, List<File> classPath, String what ->
+            String output = executeNative([jdeps.absolutePath, '--multi-release', '25', '--ignore-missing-deps', '--print-module-deps',
+                '--class-path', classPath*.absolutePath.join(File.pathSeparator)] + jars*.absolutePath, "jdeps for ${what}").stdout
+            List<String> needed = output.readLines().findAll { it.trim() }.last().tokenize(',')*.trim()
+            List<String> missing = needed - expectedModules
+            if (missing) {
+                throw new GradleException("Package verification failed: ${what} needs ${missing}, which the runtime lacks; " +
+                    'add them to runtimeRootModules (gradle/packaging-support.gradle) and docs/plugin-authoring.md')
+            }
+        }
+        requireModules(applicationJars, applicationJars, 'the application class path')
+        new File(appDir, 'plugins').eachDir { plugin ->
+            List<File> pluginJars = plugin.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
+            requireModules(pluginJars, pluginJars + applicationJars, "bundled plugin ${plugin.name}")
+        }
         File ptyJar = appDir.listFiles().find { it.name.startsWith('pty4j-') && it.name.endsWith('.jar') }
         File jnaJar = appDir.listFiles().find { it.name.startsWith('jna-') && !it.name.startsWith('jna-platform') && it.name.endsWith('.jar') }
         if (ptyJar == null || jnaJar == null) throw new GradleException('Package verification failed: pty4j or JNA dependency is missing')
@@ -345,15 +440,39 @@ def verifyPackage = tasks.register('verifyPackage') {
                 if (!hasPayload) throw new GradleException("Package verification failed: ${nativeJar.name} lacks a host native payload")
             } finally { zip.close() }
         }
+        // Bundled native libraries: present, byte-identical to their jar entries (so their vendor signatures hold),
+        // executable where needed and, on macOS, validly signed.
+        List<Map> natives = bundledNatives(context.host.os, context.host.architecture)
+        natives.each { Map nativeFile ->
+            File packaged = new File(appDir, nativeFile.path)
+            if (!packaged.isFile() || !Arrays.equals(bundledNativeBytes(appDir, nativeFile), Files.readAllBytes(packaged.toPath()))) {
+                throw new GradleException("Package verification failed: ${nativeFile.path} is missing or differs from ${nativeFile.entry}")
+            }
+            if (nativeFile.executable && !packaged.canExecute()) throw new GradleException("Package verification failed: ${nativeFile.path} is not executable")
+            if (context.host.os == 'macos') {
+                executeNative(['/usr/bin/codesign', '--verify', '--strict', packaged.absolutePath], "signature of ${nativeFile.path}")
+            }
+        }
         if (context.host.os == 'macos') {
+            // Jasper's own signed bridges, staged and restored byte for byte by packageApp: the macOS bridge
+            // (notifications and the Dock presence) and the workspace glass blur.
             String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
-            ['notification': 'libjasper-notifications.dylib', 'glass': 'libjasper-glass.dylib'].each { label, name ->
-                File bridge = new File(appDir, name)
-                if (!bridge.isFile()) throw new GradleException("Package verification failed: ${label} bridge missing")
-                String bridgeArchitecture = executeNative(['/usr/bin/lipo', '-archs', bridge.absolutePath],
-                    "${label} bridge architecture").stdout.trim()
-                if (bridgeArchitecture != expectedBridgeArchitecture) throw new GradleException("Package verification failed: ${label} bridge architecture mismatch")
-                executeNative(['/usr/bin/codesign', '--verify', '--strict', bridge.absolutePath], "${label} bridge signature")
+            [
+                [label: 'native', name: 'libjasper-macos.dylib', symbols: ['Java_dev_jasper_app_platform_MacNotifications_post',
+                    'Java_dev_jasper_app_platform_MacDock_setRegular', 'Java_dev_jasper_app_platform_MacDock_watchPowerOff',
+                    'Java_dev_jasper_app_platform_MacDock_poweringOffNow']],
+                [label: 'glass', name: 'libjasper-glass.dylib', symbols: ['Java_dev_jasper_app_platform_MacGlass_setEffect']],
+            ].each { Map bridge ->
+                File library = new File(appDir, bridge.name as String)
+                if (!library.isFile()) throw new GradleException("Package verification failed: ${bridge.label} bridge missing")
+                String bridgeArchitecture = executeNative(['/usr/bin/lipo', '-archs', library.absolutePath],
+                    "${bridge.label} bridge architecture".toString()).stdout.trim()
+                if (bridgeArchitecture != expectedBridgeArchitecture) throw new GradleException("Package verification failed: ${bridge.label} bridge architecture mismatch")
+                executeNative(['/usr/bin/codesign', '--verify', '--strict', library.absolutePath], "${bridge.label} bridge signature".toString())
+                String bridgeSymbols = executeNative(['/usr/bin/nm', '-gU', library.absolutePath], "${bridge.label} bridge symbols".toString()).stdout
+                bridge.symbols.each { String symbol ->
+                    if (!bridgeSymbols.contains('_' + symbol)) throw new GradleException("Package verification failed: ${bridge.label} bridge lacks ${symbol}")
+                }
             }
             File plist = new File(image, 'Contents/Info.plist')
             if (!plist.isFile()) throw new GradleException("Package verification failed: missing ${plist}")
@@ -382,6 +501,11 @@ def verifyPackage = tasks.register('verifyPackage') {
                 throw new GradleException('Package verification failed: launcher lacks its app-specific Mach-O UUID; macOS may apply another app\'s Local Network permission')
             }
             executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', image.absolutePath], 'codesign verification')
+            if (verifyAotCache(runtimeHome, appDir)) {
+                logger.lifecycle("AOT cache accepted (-XX:AOTMode=on): ${new File(appDir, 'jasper.aot').length().intdiv(1024 * 1024)} MB")
+            } else {
+                logger.lifecycle('No AOT cache in this image: packageDist and -Pjasper.aot=true train one')
+            }
             String sdk = installedMacSdkVersion()
             if (sdk == null) {
                 logger.lifecycle('Launcher SDK check skipped: Xcode command line tools not found')
@@ -441,11 +565,54 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (runtimeArchitecture != context.host.architecture) {
             throw new GradleException("Package verification failed: bundled Java architecture is ${runtimeArchitecture ?: 'unknown'}")
         }
+        def sharing = executeNative([bundledJava.absolutePath, '-Xshare:on', '-version'], 'bundled java with its default CDS archive (-Xshare:on)')
+        if (!(sharing.stdout + sharing.stderr).contains('sharing')) {
+            throw new GradleException("Package verification failed: the bundled java reports no class data sharing\n${sharing.stderr}")
+        }
+        long runtimeBytes = 0
+        runtimeHome.eachFileRecurse(groovy.io.FileType.FILES) { runtimeBytes += it.length() }
+        logger.lifecycle("Runtime: ${packagedModules.size()} modules, ${runtimeBytes.intdiv(1024 * 1024)} MB, " +
+            "default CDS archive ${cdsArchive.length().intdiv(1024 * 1024)} MB")
+        if (natives) {
+            // Headless: the image's java, launcher options and class path load every bundled library and start one
+            // process through pty4j. -Xlog:library shows where the JVM loaded each library from, the probe prints the
+            // files pty4j resolved, and the scratch home and temporary folders must stay empty (nothing extracted).
+            File scratch = new File(temporaryDir, 'natives-probe')
+            delete(scratch)
+            ['home', 'tmp'].each { new File(scratch, it).mkdirs() }
+            List<String> probe = ([bundledJava.absolutePath] +
+                launcherJavaOptions(cfg, appDir).findAll { !it.startsWith('-XX:AOTCache=') } +
+                ['-Djava.awt.headless=true', "-Duser.home=${new File(scratch, 'home')}", "-Djava.io.tmpdir=${new File(scratch, 'tmp')}",
+                 "-Djna.tmpdir=${new File(scratch, 'jna')}", "-Dpty4j.tmpdir=${new File(scratch, 'pty4j')}", '-Xlog:library=info:stdout',
+                 '-cp', (launcherClasspath(cfg, appDir) + sourceSets.test.output.classesDirs.files*.absolutePath).join(File.pathSeparator),
+                 'dev.jasper.app.architecture.BundledNativesProbe'])*.toString()
+            String output = executeNative(probe, 'bundled natives probe (headless)').stdout
+            if (!output.contains('bundled natives probe passed')) throw new GradleException("Package verification failed: the natives probe did not finish\n${output}")
+            Set<File> loaded = loadedLibraries(output).collect { new File(it).canonicalFile } as Set
+            natives.findAll { it.loaded }.each { Map nativeFile ->
+                if (!loaded.contains(new File(appDir, nativeFile.path).canonicalFile)) {
+                    throw new GradleException("Package verification failed: the JVM did not load ${nativeFile.path} from the image; it loaded\n${loaded.join('\n')}")
+                }
+            }
+            File nativeRoot = new File(appDir, 'native').canonicalFile
+            def resolved = (output =~ /(?m)^pty4j (\S+) (.+)$/).collect { [name: it[1], file: new File(it[2].trim()).canonicalFile] }
+            if (!resolved) throw new GradleException("Package verification failed: the natives probe reported no pty4j files\n${output}")
+            resolved.each { pty ->
+                if (!pty.file.isFile() || !pty.file.path.startsWith(nativeRoot.path + File.separator)) {
+                    throw new GradleException("Package verification failed: pty4j resolved ${pty.name} to ${pty.file}, not a file under ${nativeRoot}")
+                }
+            }
+            List<File> extracted = []
+            scratch.eachFileRecurse(groovy.io.FileType.FILES) { extracted << it }
+            if (extracted) throw new GradleException("Package verification failed: loading the natives extracted ${extracted}")
+            logger.lifecycle("Bundled natives load from ${nativeRoot}")
+        }
         logger.lifecycle("Verified Jasper ${context.version} ${context.host.os}-${context.host.architecture} image at ${image}")
     }
 }
 
 if (normalizedHost().os == 'windows') {
+    if (aotRequested) throw new GradleException('-Pjasper.aot=true: AOT training runs on macOS only')
     // Stable across releases: changing this would install a second product instead of upgrading.
     def upgradeUuid = 'c035e743-82bf-4ca6-aacf-5512d9831a09'
     def installerVerifier = rootProject.file('packaging/windows/Verify-Installer.ps1')
@@ -509,6 +676,7 @@ if (normalizedHost().os == 'windows') {
         doFirst { nativeContext() }
     }
 } else if (normalizedHost().os == 'linux') {
+    if (aotRequested) throw new GradleException('-Pjasper.aot=true: AOT training runs on macOS only')
     // jpackage builds only for the host, so each architecture needs its own Linux build machine.
     // Each package format names the architecture its own way.
     def linuxArchitecture = [
@@ -681,37 +849,118 @@ if (normalizedHost().os == 'windows') {
         dependsOn(packageDeb, packageRpm)
     }
 } else {
+    def aotTrainingDirectory = packagingRoot.map { it.dir('aot-training') }
+    // Launches the image once: a Jasper window for a few seconds, without a Dock icon. Agents ask the user first.
+    // Training changes packageApp's output, so the next packageApp rebuilds the image from scratch, untrained.
+    def trainAotCache = tasks.register('trainAotCache') {
+        group = 'distribution'
+        description = 'Launches the packaged app once (a window for a few seconds, no Dock icon) to record its AOT cache.'
+        dependsOn(packageApp)
+        doLast {
+            File image = new File(imageDirectory.get().asFile, 'Jasper.app')
+            File appDir = new File(image, 'Contents/app')
+            File config = new File(appDir, 'Jasper.cfg')
+            if (config.readLines('UTF-8').contains('java-options=' + aotCacheOption)) {
+                throw new GradleException("${image} already has an AOT cache; packageApp rebuilds the image before training")
+            }
+            File cache = runAotTraining(new File(image, 'Contents/MacOS/Jasper'), aotTrainingDirectory.get().asFile, 90, 300)
+            Files.copy(cache.toPath(), new File(appDir, 'jasper.aot').toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            config.setText(withJavaOption(config.getText('UTF-8'), aotCacheOption), 'UTF-8')
+            resignImage(image)
+            if (!verifyAotCache(new File(image, 'Contents/runtime/Contents/Home'), appDir)) {
+                throw new GradleException('AOT training left Jasper.cfg without the cache option')
+            }
+            logger.lifecycle("Trained the AOT cache: ${new File(appDir, 'jasper.aot').length().intdiv(1024 * 1024)} MB in ${appDir}")
+        }
+    }
+    verifyPackage.configure { mustRunAfter(trainAotCache) }
+    if (aotRequested) {
+        packageApp.configure { finalizedBy(trainAotCache) }
+        verifyPackage.configure { dependsOn(trainAotCache) }
+    }
     tasks.register('packageDist') {
         group = 'distribution'
-        description = 'Creates the macOS distribution after verifying its image.'
-        dependsOn(verifyPackage)
+        description = 'Trains the AOT cache, verifies the image and creates the macOS DMG (launches Jasper once: ask first).'
+        dependsOn(trainAotCache, verifyPackage)
         inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property('version', version)
         outputs.files(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-macos-${normalizedHost().architecture}.dmg") })
         doLast {
-        def context = nativeContext()
-        File distDir = distributionDirectory.get().asFile
-        distDir.mkdirs()
-        File artifact = new File(distDir, "Jasper-${context.version}-macos-${context.host.architecture}.dmg")
-        delete(artifact)
-        File temporary = new File(packagingRoot.get().asFile, 'dist-dmg-work')
-        delete(temporary)
-        temporary.mkdirs()
-        try {
-            executeNative([context.jpackage.absolutePath, '--type', 'dmg', '--name', 'Jasper',
-                '--app-image', new File(imageDirectory.get().asFile, 'Jasper.app').absolutePath,
-                '--dest', temporary.absolutePath], 'jpackage dmg')
-            File generated = temporary.listFiles().find { it.name.endsWith('.dmg') }
-            if (generated == null) throw new GradleException('jpackage dmg completed without producing a DMG')
-            Files.move(generated.toPath(), artifact.toPath())
-            executeNative(['/usr/bin/hdiutil', 'verify', artifact.absolutePath], 'hdiutil verify')
-        } catch (Exception failure) {
+            def context = nativeContext()
+            File image = new File(imageDirectory.get().asFile, 'Jasper.app')
+            File distDir = distributionDirectory.get().asFile
+            distDir.mkdirs()
+            File artifact = new File(distDir, "Jasper-${context.version}-macos-${context.host.architecture}.dmg")
+            File temporary = new File(packagingRoot.get().asFile, 'dist-dmg-work')
+            File volume = new File(temporary, 'volume')
+            File mount = new File(temporary, 'mount')
+            def detach = { File target ->
+                detachMount(target) { List<String> command ->
+                    try {
+                        executeNative(command, 'hdiutil detach')
+                        return 0
+                    } catch (GradleException refused) {
+                        logger.warn(refused.message)
+                        return 1
+                    }
+                }
+            }
+            String recovery = "hdiutil detach -force ${mount}".toString()
+            // A killed or failed earlier run can leave its DMG mounted read-only, which delete(temporary) cannot remove.
+            if (new File(mount, 'Jasper.app').exists() && !detach(mount)) {
+                throw new GradleException("An earlier packageDist left ${mount} mounted and it will not detach; run ${recovery}, then try again")
+            }
             delete(artifact)
-            throw failure
-        } finally {
             delete(temporary)
-        }
-        logger.lifecycle("Created ${artifact}")
+            volume.mkdirs()
+            mount.mkdirs()
+            String stillMounted = null
+            try {
+                // jpackage --type dmg copies the image without modification times (Files.copy without COPY_ATTRIBUTES),
+                // and the JVM then refuses the AOT cache and the CDS archive. ditto and hdiutil keep the times.
+                executeNative(['/usr/bin/ditto', image.absolutePath, new File(volume, 'Jasper.app').absolutePath], 'ditto Jasper.app into the DMG folder')
+                Files.createSymbolicLink(new File(volume, 'Applications').toPath(), new File('/Applications').toPath())
+                int attempt = 0
+                while (true) {
+                    attempt++
+                    try {
+                        executeNative(['/usr/bin/hdiutil', 'create', '-volname', 'Jasper', '-srcfolder', volume.absolutePath,
+                            '-fs', 'HFS+', '-format', 'UDZO', '-ov', artifact.absolutePath], 'hdiutil create')
+                        break
+                    } catch (GradleException busy) {
+                        // hdiutil sometimes reports a busy resource; jpackage retries for the same reason.
+                        if (attempt == 3) throw busy
+                        Thread.sleep(2000)
+                    }
+                }
+                executeNative(['/usr/bin/hdiutil', 'verify', artifact.absolutePath], 'hdiutil verify')
+                // Check what a user installs: mounted read-only and hidden from Finder, no window opens.
+                executeNative(['/usr/bin/hdiutil', 'attach', artifact.absolutePath, '-readonly', '-nobrowse', '-noautoopen',
+                    '-mountpoint', mount.absolutePath], 'hdiutil attach')
+                try {
+                    File installed = new File(mount, 'Jasper.app')
+                    List<String> changed = modificationTimeMismatches(new File(image, 'Contents/app'), new File(installed, 'Contents/app'))
+                    if (changed) throw new GradleException("DMG verification failed: modification times differ for ${changed.take(10)}; the JVM would refuse the AOT cache")
+                    executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', installed.absolutePath], 'codesign verification of the DMG copy')
+                    if (!verifyAotCache(new File(installed, 'Contents/runtime/Contents/Home'), new File(installed, 'Contents/app'))) {
+                        throw new GradleException('DMG verification failed: the app in the DMG has no AOT cache')
+                    }
+                } finally {
+                    if (!detach(mount)) {
+                        stillMounted = "Could not detach ${mount}, a hidden read-only mount that makes the next packageDist and clean fail; run ${recovery}".toString()
+                    }
+                }
+            } catch (Exception failure) {
+                // The check failure propagates; a detach failure on top of it is reported here rather than masking it.
+                if (stillMounted != null) logger.error(stillMounted)
+                delete(artifact)
+                throw failure
+            } finally {
+                if (!new File(mount, 'Jasper.app').exists()) delete(temporary)
+            }
+            // The checks passed and the DMG was written; only the mount is left to clean up by hand.
+            if (stillMounted != null) throw new GradleException("${stillMounted}. The DMG itself was written to ${artifact}.")
+            logger.lifecycle("Created ${artifact}")
         }
     }
 }

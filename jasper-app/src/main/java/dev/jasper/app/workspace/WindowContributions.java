@@ -399,9 +399,15 @@ final class WindowContributions implements AutoCloseable {
         return structural;
     }
 
-    @Override public void close() {
+    @Override public void close() { close(true); }
+
+    /**
+     * As {@link #close()}. With {@code remember} false the window's layout is not saved first: the window is discarded
+     * (it failed to compose, or it is the warm-up rehearsal's), so it must not become the last window closed.
+     */
+    void close(boolean remember) {
         if (listening == null) return;
-        persist();
+        if (remember) persist();
         listening.close();
         listening = null;
         // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.

@@ -1,0 +1,64 @@
+package dev.jasper.app.workspace;
+
+import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+
+import static dev.jasper.app.workspace.DesktopTestSupport.edt;
+import static dev.jasper.app.workspace.DesktopTestSupport.until;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DisabledOnOs(OS.WINDOWS)
+class WindowContentFirstTerminalTest {
+    @AfterEach void close() throws Exception { DesktopTestSupport.closeOwners(); }
+
+    @Test void reportsOnlyTheWindowsFirstConfiguredTerminal() throws Exception {
+        var pending = new ArrayDeque<Runnable>();
+        List<TerminalPane> seen = new ArrayList<>();
+        WindowContent[] content = new WindowContent[1];
+        edt(() -> {
+            content[0] = DesktopTestSupport.content(DesktopTestSupport.launcher(pending));
+            content[0].onFirstTerminal(seen::add);
+        });
+        pending.poll().run();
+        until(() -> seen.size() == 1);
+        TerminalPane first = seen.getFirst();
+        assertThat(first.view()).isNotNull();
+        TerminalTab[] second = new TerminalTab[1];
+        edt(() -> second[0] = content[0].openTab(DesktopTestSupport.HOME, null));
+        pending.poll().run();
+        until(() -> second[0].panes().getFirst().view() != null);
+        edt(() -> { });
+        assertThat(seen).containsExactly(first);
+    }
+
+    @Test void aThrowingObserverDoesNotEscapeIntoThePanesAdoption() throws Exception {
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        List<Throwable> recorded = new ArrayList<>();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> recorded.add(e));
+        try {
+            var pending = new ArrayDeque<Runnable>();
+            List<TerminalPane> observed = new ArrayList<>();
+            WindowContent[] content = new WindowContent[1];
+            edt(() -> {
+                content[0] = DesktopTestSupport.content(DesktopTestSupport.launcher(pending));
+                content[0].onFirstTerminal(pane -> {
+                    observed.add(pane);
+                    throw new IllegalStateException("observer");
+                });
+            });
+            pending.poll().run();
+            until(() -> !observed.isEmpty());
+            until(() -> observed.getFirst().view() != null);
+            edt(() -> { });
+            assertThat(recorded).isEmpty();
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previous);
+            DesktopTestSupport.closeOwners();
+        }
+    }
+}

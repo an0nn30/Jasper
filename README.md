@@ -54,7 +54,7 @@ Run this **on macOS**, with a JBR SDK matching the build architecture: Apple Sil
 ./gradlew check :jasper-app:packageDist
 ```
 
-This compiles Jasper, runs the headless tests, creates `Jasper.app` with its own JBR runtime, verifies the application image, and builds and verifies the DMG. It does not launch Jasper.
+This compiles Jasper, runs the headless tests, creates `Jasper.app` with its own trimmed JBR runtime, launches it once for a few seconds (no Dock icon) to train its start-up cache, verifies the application image, and builds and verifies the DMG. See [start-up performance](docs/packaging.md#start-up-performance).
 
 With the default package version `1.0.0`, the outputs are:
 

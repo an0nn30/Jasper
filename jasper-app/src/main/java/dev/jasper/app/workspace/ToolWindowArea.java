@@ -46,7 +46,9 @@ import javax.swing.UIManager;
  * calls {@link #sync} afterwards. EDT only.
  */
 final class ToolWindowArea extends JPanel {
-    private static final int GUTTER = 6, ARC = 16;
+    private static final int GUTTER = 6;
+    /** Shared with the folder tabs so their upper corners meet the workspace frame exactly. */
+    static final int SURFACE_ARC = 16;
 
     /** A shared frame around plugin-owned content; gutters belong to the workspace chrome. */
     private static final class Host extends JPanel {
@@ -72,7 +74,7 @@ final class ToolWindowArea extends JPanel {
         private java.awt.Shape surface() {
             var insets = getInsets();
             int width = Math.max(0, getWidth() - insets.left - insets.right);
-            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = rounded ? UIScale.scale(ARC) : 0;
+            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = rounded ? UIScale.scale(SURFACE_ARC) : 0;
             return new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
         }
 
@@ -201,7 +203,7 @@ final class ToolWindowArea extends JPanel {
     private boolean toolsSuppressed;
     private final Host center = new Host(false);
     private final JPanel lowerInset = new JPanel() {
-        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(ARC / 2)); }
+        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(SURFACE_ARC / 2)); }
         @Override public Dimension getMinimumSize() { return getPreferredSize(); }
     };
     private final EnumMap<Slot, Host> hosts = new EnumMap<>(Slot.class);

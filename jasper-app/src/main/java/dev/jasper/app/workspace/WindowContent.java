@@ -93,6 +93,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final DockDrag dockDrag;
     private UiState uiState = UiState.inMemory();
     private boolean railVisible = true;
+    /** False once {@link #forgetLayout} ran: closing then saves nothing. */
+    private boolean rememberLayout = true;
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
     private final ThemeController themes;
@@ -131,6 +133,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private ConfigService.State configurationState;
     static final String REJECTED_CHOICE = "config.toml has errors, so changes can't be saved until they're fixed.";
     private Runnable unregisterConfiguration = () -> {};
+    private java.util.function.Consumer<TerminalPane> firstTerminal = pane -> { };
+    private boolean firstTerminalSeen;
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
     Consumer<String> onTitle = title -> {};
@@ -162,6 +166,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                     listener.accept(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
         } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
         return new Subscription(() -> activityListeners.remove(listener));
+    }
+
+    /**
+     * Called once, on the EDT, when this window's first terminal is configured: start-up timing. Register it before the
+     * window's first terminal is configured; a later registration never fires.
+     */
+    public void onFirstTerminal(java.util.function.Consumer<TerminalPane> action) {
+        firstTerminal = java.util.Objects.requireNonNull(action, "action");
     }
 
     private void emit(WorkspaceActivity.Event event) {
@@ -730,16 +742,32 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Connects this window to the application-wide contributions model, once, remembering panel
      * placement and rail visibility in {@code state}.
      */
-    public void connectContributions(Contributions model, UiState state) {
+    public void connectContributions(Contributions model, UiState state) { connectContributions(model, state, true); }
+
+    /**
+     * Closing this window will not save its dock layout or stripe visibility: it is being discarded (it failed to
+     * compose, or it is the warm-up rehearsal's), not closed by the user, so it never becomes the last window closed,
+     * whose layout the next window restores. EDT.
+     */
+    public void forgetLayout() { rememberLayout = false; }
+
+    /**
+     * As {@link #connectContributions(Contributions, UiState)}. A window that does not {@code hostsContent} is wired to
+     * the model but never registered as a place where plugin content opens, so the content registry cannot choose it as
+     * the main window: the warm-up rehearsal is such a window, and content opened in it would vanish when it closes.
+     */
+    public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
         // Restore before contributions can build or show saved panels.
         setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
-        contentRegistry = model.content();
-        contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
-            this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
+        if (hostsContent) {
+            contentRegistry = model.content();
+            contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
+                this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
+        }
         rebind();
     }
 
@@ -939,6 +967,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             JPopupMenu popup = chrome.contextMenu();
             popup.show(pane.view(), event.getX(), event.getY());
         });
+        if (!firstTerminalSeen) {
+            firstTerminalSeen = true;
+            try {
+                firstTerminal.accept(pane);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
+            }
+        }
     }
 
     void selectTab(Component tab) {
@@ -1217,8 +1253,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * The opacity actually in effect for this window, 1 being opaque. The terminal surface and each pane paint the
-     * terminal background at that opacity, each replacing what lies beneath; chrome, tab strips and dividers stay
-     * solid.
+     * terminal background at that opacity, each replacing what lies beneath. The selected folder follows it; chrome,
+     * the recessed strip and dividers stay solid.
      */
     void applyBackgroundOpacity(double opacity) {
         if (closed || opacity == backgroundOpacity) return;
@@ -1234,8 +1270,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The tab
-     * strip shares it (whatever the theme's tab bar colour), so terminals, tabs and hosted content read as one space.
+     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The selected
+     * folder shares it, so the active tab, terminals and hosted content read as one space.
      */
     java.awt.Color workspaceSurface() {
         java.awt.Color background = themes.current().palette().background();
@@ -1306,6 +1342,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onMinimumSizeChanged.run();
     }
 
+    void setAnimations(dev.jasper.app.config.AnimationSettings settings) {
+        if (!closed && windowTabs != null) windowTabs.setAnimations(settings);
+    }
+
     void setTabHeight(int height) {
         requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;
@@ -1343,7 +1383,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         dockDrag.cancel();
         paletteKeys.close();
-        if (contributed != null) { contributed.close(); contributed = null; }
+        if (contributed != null) { contributed.close(rememberLayout); contributed = null; }
         commandPalette.close(); windowCommands.close(); commands.close();
         scopes.close();
         closed = true;

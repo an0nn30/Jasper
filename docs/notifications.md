@@ -22,7 +22,11 @@ configuration problems, stay until you close them. When three sticky cards are s
 **+N more** link that opens the panel.
 
 When Jasper is in the background, notifications collect in the panel; sticky ones show their card when you come
-back. Notifications that arrive before the first window opens show when it does.
+back. A resident Jasper with no window open (after Quit on macOS, once the last window closed on Windows, or after a
+login launch) works the same way, however long it stays so: what arrives goes to the panel as unread, and only sticky
+notifications show their card when the next window opens. A notification that arrives while a window is opening,
+before the first window of a normal start, or while a login launch is still starting up, waits and shows its card when
+that window is focused.
 
 ## The Notifications panel
 
@@ -95,7 +99,8 @@ trace.
 - **Clear** empties the list. Notifications of cleared incidents stay in the Notifications panel with their links
   disabled.
 
-Incidents are kept in memory only, at most the latest 100, and are gone when Jasper quits. Incidents add nothing to the
+Incidents are kept in memory only, at most the latest 100, and are gone when Jasper quits completely (a resident macOS
+Jasper that Cmd+Q only sent to the background keeps them, like the panel's history). Incidents add nothing to the
 log: an incident's message and stack trace are never written to it, and the log keeps the same short, scrubbed records
 as before.
 

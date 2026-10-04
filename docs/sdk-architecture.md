@@ -389,7 +389,10 @@ records no relaunch. Start-up rollback, a `--background` launch that cannot stay
 benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
 launch goes through `quit()` and does. Since SDK 0.11.0 the same check then asks `Windows.onQuitting` guards, kept in
 `Contributions.quitGuards()` (`QuitGuards`), one at a time, pumping UI events while a decision is pending; a refusal
-cancels, and a guard that throws or fails allows the quit.
+cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper's Cmd+Q does not go through `quit()`:
+`quitRequested()` calls `toBackground()`, which asks only `windowsMayClose()` (content tabs and plugin windows), so
+`Windows.onQuitting` guards are not asked and plugin background work keeps running until `quit()` (Quit Jasper
+Completely, a log-out or a retire request).
 
 `Windows.chooseSaveFile` is the save-target twin of `chooseFiles`: `PathChoice.Mode.SAVE` makes
 `NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and

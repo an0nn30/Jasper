@@ -78,7 +78,9 @@ certificate makes clients that trusted the old one warn again; running servers k
 ## Quitting
 
 Servers run inside Jasper and stop when it quits. While any runs, quitting or restarting asks first; turn that off
-with *Ask before quitting while servers run* in File Server's settings.
+with *Ask before quitting while servers run* in File Server's settings. On a Mac where Jasper stays resident, Cmd+Q
+only closes the windows and keeps Jasper in the background: servers keep running and nothing is asked until you choose
+**Quit Jasper Completely** in the menu bar item (or log out).
 
 ## Files
 

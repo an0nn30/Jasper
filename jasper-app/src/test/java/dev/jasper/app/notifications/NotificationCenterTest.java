@@ -82,6 +82,29 @@ class NotificationCenterTest {
         assertThat(kinds()).containsExactly("Upserted", "CardRequested");
     }
 
+    @Test void cardsPostedWhileIdleOnlyEnterHistoryAndNeverShowLater() {
+        var center = center();
+        presence = Delivery.Presence.IDLE;
+        UUID id = center.post(request(CARDS, "while nobody was looking")).orElseThrow();
+        assertThat(kinds()).containsExactly("Upserted");
+        presence = Delivery.Presence.FOCUSED;
+        center.focusReturned();
+        assertThat(kinds()).as("history only: no card when a window next has focus").containsExactly("Upserted");
+        assertThat(center.history()).extracting(Notification::id).containsExactly(id);
+        assertThat(center.unread()).isEqualTo(1);
+    }
+
+    @Test void stickyCardsPostedWhileIdleWaitForTheNextFocus() {
+        var center = center();
+        presence = Delivery.Presence.IDLE;
+        center.post(request(STICKY, "needs you"));
+        assertThat(kinds()).containsExactly("Upserted");
+        presence = Delivery.Presence.FOCUSED;
+        center.focusReturned();
+        center.focusReturned();
+        assertThat(kinds()).containsExactly("Upserted", "CardRequested");
+    }
+
     @Test void aRepeatThatShowsItsCardNoLongerWaitsForFocus() {
         var center = center();
         presence = Delivery.Presence.BACKGROUND;

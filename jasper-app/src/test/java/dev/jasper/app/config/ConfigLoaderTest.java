@@ -384,17 +384,19 @@ class ConfigLoaderTest {
         assertDiagnostic(unknown, "buddy.visible", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
-    @Test void backgroundEnabledDefaultsToOffAndRejectsNonBooleans() {
+    @Test void backgroundEnabledFollowsThePlatformDefaultAndRejectsNonBooleans() {
+        boolean platform = CoreSettings.SYSTEM_RUN_IN_BACKGROUND.defaultValue();
         var on = parse("[system]\nrun_in_background = true\n");
         assertThat(on.rejected()).isFalse();
         assertThat(on.diagnostics()).isEmpty();
         assertThat(on.snapshot().backgroundEnabled()).isTrue();
-        // Residency is opt-in: an absent table and an empty file both mean off.
-        assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isFalse();
-        assertThat(parse("# empty").snapshot().backgroundEnabled()).isFalse();
+        assertThat(parse("[system]\nrun_in_background = false\n").snapshot().backgroundEnabled()).isFalse();
+        // On by default on macOS and Windows, off on Linux: an absent table and an empty file both mean that default.
+        assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isEqualTo(platform);
+        assertThat(parse("# empty").snapshot().backgroundEnabled()).isEqualTo(platform);
         var bad = parse("[system]\nrun_in_background = 1\n");
         assertThat(bad.rejected()).isTrue();
-        assertThat(bad.snapshot().backgroundEnabled()).isFalse();
+        assertThat(bad.snapshot().backgroundEnabled()).isEqualTo(platform);
         assertDiagnostic(bad, "system.run_in_background", 2, 1, ConfigDiagnostic.Severity.ERROR);
         var unknown = parse("[system]\nstart_at_login = true\n");
         assertDiagnostic(unknown, "system.start_at_login", 2, 1, ConfigDiagnostic.Severity.WARNING);

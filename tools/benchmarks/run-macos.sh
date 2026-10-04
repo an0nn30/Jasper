@@ -2,7 +2,7 @@
 # Explicit native invocation. Caller first checks the no-game/no-VM prerequisite.
 set -eu
 if [ "$#" -lt 4 ]; then
-    echo "Usage: $0 /absolute/Jasper.app throughput|memory REVISION /absolute/result.json [benchmark options...]" >&2
+    echo "Usage: $0 /absolute/Jasper.app throughput|memory|startup REVISION /absolute/result.json [benchmark options...]" >&2
     exit 2
 fi
 image=$1
@@ -12,12 +12,14 @@ output=$4
 shift 4
 case "$image" in /*) ;; *) echo 'Use an absolute package path' >&2; exit 2;; esac
 case "$output" in /*) ;; *) echo 'Use an absolute output path' >&2; exit 2;; esac
-case "$mode" in throughput) entry=Bench;; memory) entry=MemoryBench;; *) echo 'Expected throughput or memory' >&2; exit 2;; esac
+case "$mode" in throughput) entry=Bench;; memory) entry=MemoryBench;; startup) entry=StartupBench;; *) echo 'Expected throughput, memory or startup' >&2; exit 2;; esac
 # Preserved baseline images retain the flat launcher; new images use the benchmark package.
 entry_package=dev.jasper.app
 if unzip -Z1 "$image/Contents/app/jasper-app.jar" | grep -Fxq "dev/jasper/app/benchmark/$entry.class"; then
     entry_package=dev.jasper.app.benchmark
 fi
+# The start-up benchmark launches the image itself through LaunchServices.
+if [ "$mode" = startup ]; then set -- --app "$image" "$@"; fi
 exec "$image/Contents/runtime/Contents/Home/bin/java" --enable-native-access=ALL-UNNAMED \
     -Dapple.awt.application.name='Jasper benchmark' -cp "$image/Contents/app/*" \
     "$entry_package.$entry" --revision "$revision" --output "$output" "$@"

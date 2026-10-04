@@ -1,6 +1,319 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-03
+## Current state — 2026-10-04
+
+- **Folder tabs adversarial review and main integration** (2026-10-04; `codex/folder-tabs`): integrated
+  `main` at `e11961c8`, preserving saved view modes, workspace glass, current theme fixtures, startup/resident
+  behavior, and the Appearance View mode section alongside Animations. An independent adversarial review found
+  one reproducible bug: a shell/plugin title update during selection snapped the moving folder because only
+  slot-width motion contributed remaining time. Metadata retargeting now retains the folder position/width/alpha
+  transition deadline too. A deterministic regression failed before the fix; both unrelated-title and changing-width
+  cases pass after it. The repeated independent review approved the combined tree with no remaining actionable
+  findings. Final integrated `./gradlew check --continue`: **8,677 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doclint, headless native checks and a separate 2× tab-geometry check passed. Changed-Java hygiene
+  and whitespace checks passed.
+  No native GUI, benchmark or AOT training launched; native animation feel remains covered by user testing.
+
+- **Tab timings finalized and active indicator added** (2026-10-04; `codex/folder-tabs`): user native testing
+  selected **80 ms open, 100 ms close, 130 ms switch**. Temporary timing controls/schema keys are removed; exactly
+  their three old saved keys are silently ignored so old values cannot override the permanent motion. Unknown
+  siblings still warn, and existing config bytes remain untouched. Appearance → Animations retains the live global
+  toggle. A centered **32 × 2 logical-pixel pill** in the resolved workspace accent now marks the active folder,
+  follows its motion/opacity, and clips to the scrolling viewport. [Design and current previews](design/folder-tabs.md).
+  Config retirement and indicator regressions passed; dark/light Swing renders inspected, plus normal/2× geometry
+  and glass repaint checks. Final `./gradlew check --continue`: **8,465 tests, 0 failures, 0 errors,
+  6 skipped**; architecture/doclint, changed-Java hygiene and whitespace checks passed. Independent follow-up
+  review found no actionable findings. No GUI, benchmark, merge or push. Native indicator appearance remains user-run.
+
+- **Folder-tab motion and shared animation policy implemented** (2026-10-04; `codex/folder-tabs`; config
+  `9a2a43ca`, motion `6fdb0ddd`; [design and tuning](design/folder-tabs.md#tab-motion-and-shared-animation-setting)):
+  opening expands/fades, closing fades while its gap contracts, and selection glides the folder highlight.
+  Content/focus and close teardown remain immediate. Rapid actions retarget the current presentation; timers run
+  only during motion and stop on settlement/disposal. Exit visuals retain pixels rather than content, use native
+  device resolution, and clip text at natural size. The full-height folder geometry and glass alpha are preserved.
+  **Settings → Appearance → Animations → Enable animations** is a saved app-wide policy, on by default; Apply
+  disables running and future motion in every window. Future consumers check `ConfigSnapshot.animations().enabled()`.
+  At the user's request, temporary live **Open/Close/Switch tab duration** fields allow tuning without a rebuild:
+  **150/120/130 ms**, range 0–2000, with 0 instant. Apply/OK saves; Cancel preserves existing values. Keep these fields
+  until native testing establishes permanent timings. Unrelated animations were not scanned or modified.
+  This bounded approved extension used a workspace implementer, root configuration integration, and independent
+  final review, rather than re-executing historical motion plans. Regression fixes cover mixed durations, shell
+  title arrival mid-open, and rapid actual mouse clicks (the latter found by review); all were observed failing
+  before correction. Final `./gradlew check --continue`: **8,460 tests, 0 failures, 0 errors, 6 skipped**; architecture
+  gates/doclint, changed-Java hygiene and whitespace checks passed. Final review approved with no remaining findings.
+  Actual Swing dark/light/glass frames were inspected. No native GUI, benchmark, merge or push. User acceptance:
+  tune the three speeds with Apply; try rapid open/close/switch, mouse and shortcuts, overflow, glass and Retina
+  displays, then disable animations during motion. Native smoothness/compositor performance remain user-run checks.
+
+- **Folder tabs implemented** (2026-10-04; `codex/folder-tabs`, based on `main` at `5979c030`; source `2ab63b13`):
+  the selected workspace tab now rises from the terminal surface with rounded top corners and concave bottom
+  shoulders, matching the [approved reference and actual Swing renders](design/folder-tabs.md). Inactive tabs are
+  plain muted labels; the active tab retains its session/plugin icon and close control, and inactive close appears
+  on hover. A fixed new-tab plus sits at the far right beside the existing tab list. Selection, shortcuts, overflow,
+  wheel scrolling, drag reorder, middle-close, context menus and plugin-tab ownership remain on existing paths.
+  The selected folder uses the actual workspace background and glass alpha; the recessed strip stays solid and
+  derives from the workspace palette. Rectangular replacement painting and an opaque antialiased recess preserve
+  partial-repaint stability. Height and geometry scale with the existing configuration and UIScale.
+  This is a bounded approved visual follow-up using an implementer and independent final review, not re-execution
+  of historical tab-motion plans; no animation subsystem or setting was added. The initially attached clean worktree
+  was advanced from the old Moray revision to current Jasper before implementation. RED captured before the change;
+  **602 workspace tests** and a separate 2× scale check passed. Final `./gradlew check --continue`: **8,445 tests,
+  0 failures, 0 errors, 6 skipped**; architecture gates and doclint passed. Changed-Java source hygiene and
+  `git diff --check` passed. Independent review found no actionable findings. No GUI, benchmark, merge or push.
+  Native screenshot refinement (2026-10-04): removed the 3-pixel top inset and matched the upper corners to the
+  frame’s shared 8-pixel radius. Tabs and controls now fill the rail height; broad bottom shoulders remain. The
+  rendered-pixel regression failed on the old gap and passes at normal and 2× scale across configured heights;
+  dark/light render previews are refreshed. Independent follow-up review found no actionable findings. The full
+  check passed again: **8,445 tests, 0 failures/errors, 6 skipped**; source hygiene and whitespace checks passed.
+  User-run visual acceptance: first/middle selected tabs, dark/light and independent workspace themes, glass,
+  overflow/long titles, plugin tabs, new-tab plus and native pointer/trackpad behavior. Headless renders do not
+  establish native Metal/compositor performance.
+- **Merged `origin/main` (`a6d15621`) into `claude/startup-speed`** (2026-10-04; 21 commits past `857f3020`): view
+  modes (Normal and Compact in `window.view_mode`, restart-only; Zen in `ui-state.toml`), the bundled theme shortlist
+  (Jasper, Nord and Clear), the rounded connection overlay with its animated dots, and the View menu cleanup.
+  Conflicts: `JasperApplication.openWindow` keeps Plan 4's guarded composition (now `composeWindow`, with the
+  `openingWindows` count) and composes from main's `windowConfiguration()` (live settings with the start-up view
+  mode); `WindowContent.close()` keeps the discard-aware `contributed.close(rememberLayout)` without main's removed
+  theme menus. Semantics checked against the start-up plans: every window path (first window, reopen from the
+  background, the menu bar item's New Window, a handoff) goes through `composeWindow`, so it gets the start-up view
+  mode, its Zen state from `connectContributions` and its bounds from `restoreLayout`. The `--background` warm-up now
+  rehearses with `windowConfiguration()` and copies Zen mode into its own in-memory state, so it warms the chrome the
+  next window shows; it still saves nothing. The connection dots' timer runs only while working and showing, and
+  stops on `removeNotify`, so nothing animates in a resident process with no window or in the never-shown rehearsal.
+  No packaging, AOT training or benchmark code names a removed theme (training uses the default Jasper Dark). The menu
+  bar item's New Window and Settings… are `ResidentTray` actions, untouched by the View menu cleanup. `config.example.toml`
+  has both `view_mode = "normal"` and the commented per-platform `run_in_background`. `./gradlew check --continue`:
+  **8,617 tests, 0 failures, 0 errors, 6 skipped**; `:jasper-app:verifyPackage` passes; source hygiene clean. No GUI
+  launched, no AOT training. GUI checks for the user: with `view_mode = "compact"` or Zen on, a resident Mac's Cmd+Q and
+  Dock click bring the window back in that mode, and a login launch's first window shows it without a visible delay.
+
+- **A resident Jasper with no window sends cards to history** (user's decision of 2026-10-04; branch
+  `claude/startup-speed`). Resident by default makes "no window open" last for hours, and the delivery rule held every
+  CARD and STICKY notification posted then until a window was focused, so they would have piled up. Built:
+  `Delivery.Presence` has a fourth value, `IDLE`: a resident Jasper whose start-up has settled, with no window open and
+  none being opened. `Delivery.route` sends `CARD` + `IDLE` to history (as `BACKGROUND` does, with no card later) and
+  `STICKY` + `IDLE` to pending (the card waits for the next focus); `OFF` and `HISTORY` are unchanged.
+  `JasperApplication.presence(...)` gains a `residentIdle` input that wins; the instance method computes it as all of:
+  `resident`; `startupSettled` (the existing EDT flag `residencySettled` sets: the first output painted, a finished
+  `--background` warm-up, or 2 s after the first paint); no Jasper window of any kind open (`windowsOpen()`: terminal
+  and plugin windows); and no terminal window being opened (`openingWindows`, an EDT-confined count raised by
+  `openWindow` and lowered in its `finally`, so it lasts until `composeWindow` returns or fails). The settled gate
+  matters because incidents (`IncidentNotices`: `pluginFailure`, `jasperFailure`, `launchFailure`, `pluginNotice`) and
+  the plugin start failures and problems with a cause are recorded through `invokeLater`; in a `--background` launch
+  `compose` has made the process resident before they run, so without the gate they would have been `IDLE` and gone to
+  history, while problems posted directly (no cause, configuration) wait for the first window. Everything queued while
+  the application is built runs before the warm-up finishes, so it is `NO_WINDOW` and waits. The opening count is a
+  second guard and covers only what is posted directly on the EDT while a window composes (a plugin's panel factory
+  posting inside `connectContributions`, say); incidents never land inside it, being always queued. Start-up is
+  otherwise unchanged: `NO_WINDOW` still covers a normal start before its first window, a window being composed
+  (including a resident one) and a window attached but not yet activated, so a failure raised while the first window
+  opens still shows its card when the window activates; a resident Jasper with only a plugin window open stays
+  `NO_WINDOW`, as before. Consequences: a `--background` login launch is `NO_WINDOW` until its warm-up finishes and
+  `IDLE` after, so only what arrives later (a plugin's background outcome, an incident) goes to the panel as unread.
+  `CommandNotifier` sends an operating-system notification whenever Jasper is not `FOCUSED`, so it does for `IDLE` too.
+  Also: the `discard()` fallback of a window whose composition failed and whose own close failed now forgets it through
+  the same private helper as `windowClosed` (window list, cards, Buddy, `lastActive`, `activatedSinceOpen`); before it
+  skipped Buddy and `lastActive`. `TerminalWindow` cannot be built headless, so that fallback is covered by reading.
+  Docs: notifications spec section 7 (dated amendment, original sentence kept and struck through),
+  `docs/notifications.md`. Tests: `DeliveryTest` (the four `IDLE` rows), `JasperApplicationPresenceTest` (idle wins;
+  every earlier assertion kept), `NotificationCenterTest` (a CARD posted while idle is history only and never requested
+  on focus; a STICKY waits and shows on the next focus), `NotificationsFeatureTest` (history only, and the sticky
+  config problem alone shows when the next window activates) and `JasperApplicationBackgroundTest` (resident and idle
+  is `IDLE`; the Dock switch inside `openWindow` sees `NO_WINDOW`; a failed open ends the opening; a process that is not
+  resident is `NO_WINDOW`, never `IDLE`; an incident queued before start-up settles waits for a window, and one after
+  settling goes to history, checked to fail without the gate). A resident Jasper with only a plugin window open cannot
+  be built headless, so it is covered by reading. `./gradlew check`: **8,580 tests, 0 failures, 0 errors, 6 skipped**
+  (the previous merge's 8,569 and these 11), all architecture gates and doclint included; `AppDocumentationTest` and
+  the source hygiene check pass. No GUI launched, no AOT training. GUI checks for the user: Cmd+Q on a resident Mac,
+  then something that posts an ordinary notification (a plugin's background outcome): no card and an unread dot in the
+  next window's Notifications button; a sticky notification still shows its card; a normal start with a broken plugin
+  still shows its card; a login (`--background`) launch with a broken plugin shows its card when the first window
+  opens.
+
+- **Merged `main` into `claude/startup-speed` again** (2026-10-04; `main` at `857f3020`, 11 commits past the first
+  merge's `a23d0f15`): the dock guide halves, the window layout restoration (`ad1eb65a`: `[main_window]` bounds, the
+  last window closed wins) and the repository rename to `an0nn30/Jasper`. Conflicts: `AGENTS.md` keeps the AOT
+  training rule with the new URL; `JasperApplication.openWindow` calls `restoreLayout(uiState)` before `show()` inside
+  Plan 4's guarded composition. Semantics checked against Plan 4: Quit to the background closes every window through
+  `TerminalWindow.close()` in the order they opened, exactly as a real Quit does, so each saves its bounds and dock
+  layout and the newest window's win in both; a reopen, the menu bar item's New Window or a handoff then restores
+  them from the same in-memory `UiState`. Fixed: a window that failed to compose, or the `--background` warm-up's
+  rehearsal (never shown, at the default size), would have counted as the last window closed. Both are now discarded
+  (`TerminalWindow.discard()`: no placement save, and `WindowContent.forgetLayout()` makes `WindowContributions` skip
+  its closing snapshot); the rehearsal also keeps its own in-memory `UiState` and never restores the saved layout.
+  New tests in `WindowPanelsTest`: a discarded window saves nothing, so the last window closed still wins (checked to
+  fail without `forgetLayout`), and a window opened after every window closed in the same process gets the last layout
+  without reloading. `TerminalWindow` itself cannot be built headless, so its `discard()` and the order of saves in
+  `close()` are covered by reading. `./gradlew check --continue`: **8,569 tests, 0 failures, 0 errors, 6 skipped** (the
+first merge's 8,554, main's 13 new and these 2); `:jasper-app:verifyPackage` passes; source hygiene clean. No GUI
+launched, no AOT training. GUI checks for the user: move and resize a window, Cmd+Q on a resident Mac, click
+  the Dock icon, and the window comes back where it was with its tool windows; a `--background` (login) launch's first
+  window opens at the saved place, not the default size.
+
+- **Merged `main` into `claude/startup-speed`** (2026-10-04; `main` at `a23d0f15`, merge base `91400d29`, 176
+  commits): start-up Plans 1, 2 and 4 now sit on notifications plans 1–4, the six-slot dock and its edge zones,
+  workspace glass and the chooser fix. The 13 conflict hunks kept both sides (this file keeps every entry, start-up's
+  first; the `application` and `plugins` package-info files list the union of allowed dependencies). Semantic fixes:
+  `JasperApplication` had two `presence()` methods, main's notification presence (the `NotificationCenter`'s supplier)
+  and Plan 4's Dock switch, which is now `updateDock()`; `openWindow` keeps Plan 4's guarded composition
+  (`windowOpening`, `discard`, `quitRequested`) with main's per-window wiring (titled `onError`/`onInfo`,
+  `onLaunchFailure`, the card layer, the glass listener) inside it, and `discard`'s fallback also detaches the card
+  layer; the Errors window is an auxiliary window, so the Dock follows it. `Rehearsal.silence` takes main's titled
+  callbacks and silences `onLaunchFailure` too, so a failed canned launch is never an incident or a notification.
+  `MacGlass.library` found the glass library beside `MacNotifications.libraryPath`, which Plan 4 moved to
+  `MacNative`. Packaging applies `mac-native.gradle` and `mac-glass.gradle`; Plan 2's JVM-option allow-list accepts
+  the glass `--add-opens`/`--add-exports` because they are part of `applicationDefaultJvmArgs` on macOS, and main's
+  glass check stays; `verifyPackage` checks both bridges in one list (presence, architecture, signature and `nm`, new
+  for `MacGlass_setEffect`). A headless JBR 25.0.4 probe showed that an AOT cache trained with those two options keeps
+  the full module graph and AOT-linked classes when run with them; training and `aotCheckCommand` both read
+  `Jasper.cfg`. Docs: app maintenance has main's glass section, then the packaging section with "a new JVM option"
+  and "Jasper's own macOS bridges"; the notifications guide says cards wait while a resident Jasper has no window and
+  that incidents and history survive a background Quit. `./gradlew check --continue`: **8,554 tests, 0 failures, 0
+  errors, 6 skipped** (main's 8,435 plus the start-up plans' 119), all architecture gates, doclint, `testMacGlass`,
+  `testMacDock`, `testMacNotifications` and `verifyPackagingSupport` included; `:jasper-app:verifyPackage` (untrained
+  image) passes with both bridges and the glass options; source hygiene clean. No GUI launched, no AOT training.
+  **Resolved by the user's decision of 2026-10-04 (see the first entry above):** with residency on by default, "no
+  window open" is a long-lived state, and the delivery rule (notifications spec section 7) kept every CARD and STICKY
+  notification posted then (a plugin's background activity outcome after Cmd+Q, an incident) pending until the next
+  window. Now a resident Jasper with no window sends ordinary CARD notifications to history and only STICKY ones wait.
+  GUI checks: in the packaged resident app, a Clear theme stays translucent after Cmd+Q and a Dock click; a sticky
+  notification posted while no window is open shows when the next window opens, and an ordinary one is waiting unread
+  in the Notifications panel.
+
+- **Start-up speed Plan 4 (Resident by default)** (branch `claude/startup-speed`, worktree
+  `.claude/worktrees/startup-speed`, [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) Part 4,
+  [plan](superpowers/plans/2026-10-02-startup-4-resident-default.md); executed 2026-10-03):
+  `system.run_in_background` is on by default on macOS and Windows, off on Linux. On macOS a resident Jasper has a menu
+  bar item (New Window, Settings…, Quit Jasper Completely); Quit closes every window and keeps the process, hidden from
+  the Dock and Cmd+Tab until the next window (`DockPresence`, `platform.MacDock`; the bridge is now
+  `libjasper-macos.dylib`); a log-out or shutdown still quits; a login launch starts hidden; a Dock click after an
+  update relaunches the new build; the `--background` warm-up rehearses one unseen window (`application.Rehearsal`).
+  The indicator (the menu bar item, and the Windows tray icon) and the bridge arrive once start-up has settled: the
+  first output painted, a finished warm-up, or 2 s after the first paint. Until the bridge is prepared, and whenever its
+  preparation failed, a quit is a real quit that never goes to the background (`quitIsSystemQuit()`;
+  `MacDock.prepare()` returns whether the power-off observer is installed); only the Shortcuts recorder holding Cmd+Q
+  or a refusing guard (content tab, plugin window or plugin quit guard) can cancel it. Spike (user-run
+  2026-10-03): Q1 (a), the Dock tile, Spotlight and `open -a` each reopen the one running process, also after a
+  launchd-style `--background` exec; Q2 variant A; Q3 yes. Warm reopen: first paint 252 ms median from the click (target
+  150, **missed**; window shown 209 ms, output painted 1,246 ms), see the
+  [Plan 4 benchmark record](benchmarks/2026-10-02-startup-plan4.md); idle RSS 455.3 MiB (2 s after settle), 188.3 MiB
+  60 s after a heavy session; one collection after the warm-up (user decision 2026-10-03), because A included the
+  rehearsal's garbage; A after that collection re-measured at `27ab995a` (trained image, warm benchmark, 10 runs, all ok): 305.2 MiB median (302.3–308.4) 2 s after settle, down from 455.3 MiB; the warm reopen in the same run: first paint 231 ms, output painted 1,150 ms. Full check: 8,073/0/0/6
+  (Plan 2's 7,991 plus the plan's new tests; the plan counted 35, and the rulings, the fix rounds and the final-review
+  fixes added the rest).
+  The other Plan 1 leftover, "a resident's first plain window is labelled `cold`", is fixed here: a warmed-up process
+  labels it `menu`. Cold numbers from here on include residency, so they are not strictly comparable with the Plan 1
+  and Plan 2 baselines. **Cmd+Q and plugin work, as built:** on a resident macOS Jasper, Cmd+Q, Jasper › Quit, the Dock's
+  Quit and a terminal window's File › Quit close the windows through their closing guards and do not ask
+  `Windows.onQuitting` guards, so plugin background work (for example File Server shares) keeps running until Quit Jasper
+  Completely, a log-out or a retire request. The user decided on 2026-10-03 that Cmd+Q must close every window and stop
+  all plugin background work, with one global confirmation when work is running and a Settings switch to turn it off,
+  keeping the JVM warm; that needs an SDK change, so it is its own spec amendment and plan. Next: a spec amendment and
+  plan for Cmd+Q stopping all work (user decision 2026-10-03), then the pre-built hidden window, then Plans 3A and 3B.
+  The final whole-branch review is done and its fixes are in. Not done: the macOS and Windows checklist items in
+  `docs/packaging.md` (user-run), the A re-measurement above (user-run), push. Known and deferred: some failure paths
+  are covered by reading only, because a headless JVM cannot build a `TerminalWindow`; a hidden start whose bridge fails
+  to prepare shows no Dock icon (the menu bar item, the reopen and the handoff still reach it) and logs nothing loud
+  yet; a nested reopen during a slow plugin quit guard can close the window it opened. Follow-ups from the final review:
+  **log-out ordering is unverified on hardware** (run the `docs/packaging.md` log-out/restart checklist item, hidden and
+  with a window open, before shipping); **opting out still interrupts a log-out once** (this predates Plan 4; a cheap
+  follow-up is to prepare the bridge whenever a presence exists); **before the pre-built window plan,** add trace phases
+  around `windowOpening()` and `residencySettled` (the 116 ms "reopen to shown" includes the synchronous Dock policy
+  switch). Parked for the Cmd+Q plan: the File Server setting's description (`FileServerSettings.java:18`,
+  `settings.toml:2`, "Quitting or restarting Jasper stops every file server") is untrue for Cmd+Q on a resident Mac
+  until that plan lands; the SDK-facing `Windows.onQuitting` Javadoc and `sdk-architecture.md` omit that Cmd+Q is a
+  real quit until the bridge is prepared; `app-architecture.md`'s `quit()` caller list should say a plugin window's
+  File › Quit exists only outside macOS, and that `quit()` asks the windows' closing guards before the quit guards.
+
+- **Start-up Part 2: JVM and packaging** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
+  plan `docs/superpowers/plans/2026-10-02-startup-2-jvm-packaging.md`): packaged Jasper ships a trimmed runtime (41
+  modules, 42 on Windows; `runtimeRootModules` in `gradle/packaging-support.gradle`, documented in plugin-authoring
+  "The Java runtime"; 189 MB, was 192 MB: `lib/modules` fell from 146 to 96 MB, but jlink's two default CDS archives
+  add 63 MB and other removals outside `lib/modules` offset only part of that, so there is little disk-size win) with
+  jlink's default CDS archive; loads FlatLaf's, JNA's and pty4j's native libraries from `Contents/app/native` on macOS
+  and Windows (Linux keeps extraction: FlatLaf's Linux library links GTK 3); and on macOS carries a JDK 25 AOT cache (about 60 MB) from `trainAotCache` (`packageDist` always trains,
+  `packageApp` with `-Pjasper.aot=true`; AGENTS.md: ask first, it opens a window). `packageDist` builds the DMG
+  (155.7 MB) with `ditto` and `hdiutil` because jpackage's DMG copy resets modification times, which invalidates the
+  cache, and checks the mounted copy. `verifyPackage` checks modules, CDS, natives (bytes, signatures, a headless load
+  probe), JVM options and the cache (`-XX:AOTMode=on`). The JVM prints AOT cache errors on stdout, not stderr. The final
+  whole-branch review is done and its fixes are in: `packageDist`'s DMG detach retries once, then forces, fails the
+  build with the recovery command (`hdiutil detach -force <mount>`) if the mount stays and clears a stale mount before
+  its next run (`detachMount`, pinned in `verifyPackagingSupport`); the probe test's wait is bounded; documentation
+  corrections. Final full check: **7,991/0/0/6** (tests/failures/errors/skipped).
+  Measured (`startupBench`, medians of 10 cold launches, Plan 1 image `34f51a8b` against the trained image
+  `d22ea939`): window on screen 1908 → 1184 ms (WINDOW_SHOWN), shell output painted 2727 → 2057 ms (OUTPUT_PAINTED);
+  AOT cache used and CDS on in all 10 after runs, no new extraction folder in `$TMPDIR` (the probe in `verifyPackage`
+  covers the rest); see
+  [Part 2 in the baseline](benchmarks/2026-10-02-startup-baseline.md#part-2--jvm-and-packaging). About 1 s (984 ms
+  median) still separates SHELL_SPAWNED from SHELL_OUTPUT, as before Part 2 (941 ms), so the JVM work did not move it;
+  most likely it is the shell's own start-up before its first prompt (not measured; the benchmark runs the default
+  shell in an empty, isolated home), which Parts 3A and 4 target. The cold target (≤ 600 ms) is not met by Part 2
+  alone. Not done: the Windows packaging run (not verifiable on the Mac); CI on Linux and Windows and
+  `.github/workflows/linux-packages.yml` (needs a push, so the user decides); the GUI checklist items in
+  `docs/packaging.md`; the deferred `-Pjasper.aot=true` item (it throws at configuration time on Windows and Linux, even
+  for unrelated tasks; an explicit opt-in that fails loudly); three parked review minors in `packageDist`'s detach path
+  in `gradle/packaging.gradle`: the recovery command does not shell-quote the mount path; the detach-failure message
+  says the next `packageDist` fails, but it now clears a stale mount and only `clean` fails; an `hdiutil` that cannot
+  start at all would throw from the inner `finally` and mask a check failure. Next: Plan 4 (resident by default), which
+  starts with a user-run spike.
+
+- **Start-up speed: designed, measured and planned; Plan 1 executed** (branch `claude/startup-speed`, worktree
+  `.claude/worktrees/startup-speed`, from local `main@91400d29`; user request in chat 2026-10-02).
+  [Spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) approved section by section. Measured Dock click
+  to window on screen: ~3.5 s for the installed pre-`c4211cf1` build, 2.3 s at HEAD, 1.7 s with a JDK 25 AOT cache and
+  no code change; plugins cost ~0.5 s, and FlatLaf/JNA/pty4j/SQLite natives are re-extracted every launch. Targets:
+  resident Dock click ≤ 150 ms, cold ≤ 600 ms. Five plans, executed in this order:
+  [1 Measure](superpowers/plans/2026-10-02-startup-1-measure.md) →
+  [2 JVM and packaging](superpowers/plans/2026-10-02-startup-2-jvm-packaging.md) →
+  [4 Resident by default](superpowers/plans/2026-10-02-startup-4-resident-default.md) →
+  [3A Start-up sequence](superpowers/plans/2026-10-02-startup-3a-sequence.md) →
+  [3B Contribution replay](superpowers/plans/2026-10-02-startup-3b-contribution-replay.md). Plan 1's trace, file,
+  benchmark and session-output tests were compiled and run against the plan's own code; the others were cross-checked
+  against each other's written code. Baseline `./gradlew check`: 7,954/0/0/6. GUI measurement runs need the user's
+  approval per batch. Not done: Plans 4, 3A and 3B.
+
+- **Start-up speed Plan 1 (Measure)** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
+  [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md),
+  [plan](superpowers/plans/2026-10-02-startup-1-measure.md)): every launch logs one start-up line (milestones from the
+  OS process start, phases, AOT/CDS use) and each window logs its own timing; `-Djasper.startupTrace` writes JSON;
+  `TerminalView.afterNextPaint` is the new supported view hook; `tools/benchmarks/run-macos.sh … startup` measures cold
+  and warm launches of a packaged image. [Baseline](benchmarks/2026-10-02-startup-baseline.md): window on screen 2.3 s
+  at HEAD, 1.7 s with an AOT cache. Executed with per-task review; the review rounds changed the plan's code (failure
+  isolation in the trace and session output, a once-only trace-file error, `trackOutput` instead of a weak map, strict
+  "incomplete" runs and guaranteed Jasper cleanup in the benchmark), listed in the plan's status banner.
+  `./gradlew check`: 7,990/0/0/6. Next: Plan 2 (JVM and packaging). Not done: a recorded `startupBench` run (user-run).
+  Carried forward from the final review: the first `StartupTrace.current()` in `main` costs ~4–5 ms net
+  (`ProcessHandle.info`, a virtual-thread cap timer; move them off `main` in Plan 2 or 3A); a window's request time is
+  taken on the EDT rather than at reopen/handoff receipt (re-routed to Plan 3A: Plan 4 left it, because `startupBench`
+  reads absolute paint times; the other leftover, a resident's first plain window labelled `cold`, was fixed in Plan 4);
+  per-plugin phases may push the start-up line past `AppLog`'s 512-character record cap
+  (Plan 3B); no test drives `watchOutput`→`timeFirstTerminal` end to end; the diagnostics example's phase numbers
+  contradict "phases overlap" and the benchmark doc's cleanup sentence is loose (docs pass).
+
+- **Panel default-size snapping** (2026-10-04; `codex/panel-default-snap`, based on local `main` at `ccd4868f`):
+  dragging the left/right width or bottom height snaps within 8 logical pixels of the existing defaults
+  (260 / 260 / 200). Moving beyond the zone releases the snap in either direction. Both the preview and release
+  use the same scaled geometry rule, and an unreachable default does not override the divider's legal range.
+  The user's extension adds the same snap zone at 50/50 for Left Top/Bottom, Right Top/Bottom and Bottom
+  Left/Right; it stores an exact 0.5 ratio even when the available pixel count is odd. Saved sizes and
+  programmatic resizing are unchanged. First-install symmetry was also verified through a missing UI-state file
+  and real contribution/layout startup: both icon rails are 28px, both side panels 260px, paired tools divide
+  equally and left/right rows align when there is room for the defaults. Different tool content preferences
+  do not override these shared defaults; odd spans permit one-pixel rounding. No production default changes
+  were needed. This bounded follow-up used the approved
+  in-chat design, inline TDD and independent review; no implementation plan was needed. The dock design records
+  the approved amendment. Baseline full check passed; the new snap cases demonstrated RED/GREEN, and all
+  106 focused geometry/mouse/rail/panel tests passed, including the snap extension's RED/GREEN checks and the
+  first-install integration check. Independent review approved the changes and symmetry coverage without findings.
+  Final `./gradlew check --continue` passed:
+  **8,515 tests, 0 failures, 0 errors, 6 skipped**; architecture/native
+  headless checks, changed-source hygiene and diff checks passed. No GUI launched. The user authorized merging
+  to `main` and pushing. Integration with current `main` at `a6d15621` preserves its theme, View menu and overlay
+  work; the only conflict was this handoff, resolved by retaining both histories. Independent integration review
+  approved. Full combined `./gradlew check --continue` passed: **8,519 tests, 0 failures/errors, 6 skipped**;
+  source hygiene and diff checks passed.
+  User-run acceptance: drag each outer and shared divider slowly through its default size or equal split from both
+  directions, feel the brief hold, continue past it, then release inside the zone and confirm the default sticks.
 
 - **File chooser visual continuity** (2026-10-04), on `codex/file-dialog-corners` in
   `/Users/dustin/.codex/worktrees/file-dialog-corners/moray`, based on fetched `origin/main` at `a6d15621`.

@@ -4,6 +4,7 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.settingsui.PageContext;
 import dev.jasper.app.settingsui.SettingsPage;
+import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.Delivery;
@@ -536,6 +537,8 @@ public final class PluginRuntime {
         problems.forEach(problem -> LOG.log(System.Logger.Level.WARNING, "Plugin discovery: " + problem));
         statusLines().forEach(line -> LOG.log(System.Logger.Level.INFO, "Plugin " + line));
         LOG.log(System.Logger.Level.INFO, "Plugins started in " + (System.nanoTime() - began) / 1_000_000 + " ms");
+        StartupTrace.current().phase("plugins", began);
+        StartupTrace.current().mark(StartupTrace.Milestone.PLUGINS_BOUND);
     }
 
     /**

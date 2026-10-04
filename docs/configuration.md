@@ -85,7 +85,7 @@ enabled = false
 long_command_seconds = 10
 
 [system]
-run_in_background = false
+run_in_background = true  # false on Linux
 
 [palette]
 visible_rows = 5
@@ -146,7 +146,7 @@ workspace = "match"
 | `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
-| `system.run_in_background` | `false` | Boolean | Next start (residency); live (login item) |
+| `system.run_in_background` | `true` on macOS and Windows, `false` on Linux | Boolean | Next start (residency); live (login item) |
 | `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
 | `ui.font.size` | Platform default (omit key) | Finite number 8–32 points | Live, app and plugins |
@@ -168,6 +168,7 @@ workspace = "match"
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
+| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
@@ -188,43 +189,61 @@ saved change to `buddy.enabled` resets that session choice.
 
 ```toml
 [system]
-run_in_background = false
+run_in_background = true  # the default on macOS and Windows; false on Linux
 ```
 
-With `enabled = true`, closing the last window no longer ends Jasper. The process stays with no
-windows, holding the initialized toolkit, fonts and theme, so the next launch reveals a window
-without a cold start. **Quit (Cmd+Q, the palette's Quit, or Quit from the Dock) still exits
-completely** — closing a window and quitting are different things, and quitting is the off switch.
+Jasper stays running when its last window closes, holding the initialized toolkit, fonts, theme and started plugins,
+so the next window opens without a cold start. It is on by default on macOS and Windows and off on Linux, which has no
+tray to reach a windowless process from. A resident process keeps no shell, PTY or child process: closing panes ends
+their shells as always (process cleanup is asynchronous, so a child can briefly be finishing after the last window
+disappears).
 
-On Windows, the resident process shows a Jasper icon in the notification area (it may sit in the
-taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens
-a window or raises the open one; **Quit Jasper** exits completely, the same as Quit from a window.
-Launching Jasper again also reveals a window. macOS keeps using the Dock icon and has no tray icon.
+**macOS.** While residency is on, Jasper has a menu bar item, a terminal glyph that follows the light or dark menu bar,
+with **New Window**, **Settings…** and **Quit Jasper Completely**. The item appears once start-up has settled (the first
+output painted, a finished `--background` warm-up, or 2 s after the first paint), never on the start-up path.
 
-Residency keeps no pane session alive intentionally: once pane cleanup completes, it holds no shell, PTY or child process.
-Closing panes requests shell termination; process cleanup is asynchronous, so a child can briefly be finishing cleanup after the last window disappears.
+| | A window is open | No window is open |
+|---|---|---|
+| Dock icon and Cmd+Tab | shown | hidden |
+| Menu bar item | shown | shown |
+| Plugins and the configuration watcher | running | running; no shells |
 
-Enabling it also registers Jasper to start in the background at login:
+**Quit (Cmd+Q, Jasper › Quit, File › Quit, the palette's Quit or the Dock's Quit) closes every window and keeps Jasper
+running in the background.** Content tabs and plugin windows are asked first, exactly as when you close them, and a
+refusal leaves everything open. Plugins keep running, so a plugin's background work (a File Server share, for example)
+carries on after Cmd+Q, and a plugin's quit confirmation is not asked. Only **Quit Jasper Completely** ends the process
+and stops that work. Until start-up has settled, Quit
+still exits completely, as it does when residency is off. Logging out, restarting or shutting down quits Jasper by
+itself. Clicking the Dock icon, Spotlight or `open -a Jasper` opens a window in the running process; no new process
+starts. At login Jasper starts with no window and no Dock icon. A development run (`./gradlew run`) stays resident but
+never hides from the Dock, and Quit there still exits.
 
-- **macOS** writes `~/Library/LaunchAgents/dev.jasper.background.plist`. It takes effect at your
-  next login.
-- **Windows** adds a `Jasper` value under
-  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+**Windows.** Once start-up has settled, the resident process shows a Jasper icon in the notification area (it may sit
+in the taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens a window
+or raises the open one; **Quit Jasper** exits completely, the same as Quit from a window. Launching Jasper again also
+reveals a window.
 
-Both are removed as soon as you set `enabled = false` and save. Autostart needs an installed
-Jasper: a `./gradlew run` development session stays resident but never registers a login item.
+Residency also registers Jasper to start in the background at login:
 
-The two halves of the key have different timing. The login item is reconciled every time the
-configuration is read, so turning it on or off applies at once. **Residency itself applies from
-the next start** — whether a given process owns the handoff endpoint is settled when it starts,
-not renegotiated while it runs.
+- **macOS** writes `~/Library/LaunchAgents/dev.jasper.background.plist`. It takes effect at your next login.
+- **Windows** adds a `Jasper` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 
-Jasper keeps a socket, a token and a lock in a `daemon` directory beside `config.toml`,
-owner-only. A second launch hands its request to the resident process over that socket and
-exits; on macOS a Dock click never creates a process at all. After you upgrade, the first launch
-of the new build retires the old resident process — which exits if it has no windows open, or
-otherwise keeps running, no longer resident, until those windows are closed or it is quit —
-rather than being served a window built from the old code.
+Both are removed as soon as you set `run_in_background = false` and save. Autostart needs an installed Jasper: a
+`./gradlew run` development session stays resident but never registers a login item.
+
+The two halves of the key have different timing. The login item is reconciled every time the configuration is read,
+so turning it on or off applies at once. **Residency itself applies from the next start**: whether a process owns the
+handoff endpoint, shows the menu bar item and quits into the background is settled when it starts. With the key off
+Jasper behaves as before: no login item, no menu bar item, Quit exits, and closing the last window ends the process.
+
+Jasper keeps a socket, a token and a lock in a `daemon` directory beside `config.toml`, owner-only. A second launch
+hands its request to the resident process over that socket and exits; on macOS a Dock click never creates a process.
+
+**Updates.** Finder will not replace a running app, so choose **Quit Jasper Completely** before installing a new
+version from the disk image. If the app is replaced some other way while Jasper runs, the next Dock click with no
+window open relaunches Jasper as the new build; with windows open it raises them, and the relaunch waits until they are
+closed. A plain launch of the new build likewise retires the old resident process, which exits if it has no windows
+open or otherwise keeps running, no longer resident, until those windows are closed.
 
 **A launch with `--config` is fully standalone.** It never hands off to a resident process, never
 binds the shared endpoint itself, is never itself resident, and never touches the login item. Any
@@ -553,7 +572,9 @@ pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whol
 launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
 dock's sizes and split ratios, which panels are open, stripe visibility, main-window size/position and maximized
 state, and plugin window bounds. The last main window closed supplies the layout for the next launch, including
-the terminal area left between its panels. Normal bounds are retained while maximized or minimized; relaunch
+the terminal area left between its panels; a resident Jasper (see [Background residency](#background-residency))
+uses it for its next window too, also after Quit sent it to the background, which closes every window as a real
+Quit does. Normal bounds are retained while maximized or minimized; relaunch
 never starts minimized. If a saved window no longer fits an available display, its bounds are fitted to a usable
 display. This file is written by Jasper and is not meant to be edited. Terminal sessions and editor documents
 are not recreated by this layout state.
@@ -782,3 +803,15 @@ platform size; do not set it to zero. Remove both keys to restore the defaults.
 Changes update open and hidden panels,
 menus, tabs, dialogs and subsequent windows without restarting sessions. Headings and secondary
 labels retain their relative emphasis. Native OS dialogs and system menu rendering remain OS-owned.
+
+### Animations
+
+Settings → Appearance → Animations controls motion throughout the app. **Enable animations** is on by default;
+turning it off and clicking Apply finishes running transitions immediately in open windows. Future app animations
+use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
+
+Tab motion uses fixed timings: opening takes 80 ms, closing 100 ms, and selection 130 ms.
+The temporary **Open tab duration**, **Close tab duration**, and **Switch tab duration** tuning fields have been removed.
+Existing `ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms` values are
+ignored silently and left in the configuration file; they no longer affect motion. Other unknown animation keys
+still produce the usual diagnostics.

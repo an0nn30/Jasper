@@ -4,6 +4,12 @@
 
 **Builds on:** the [packaging design](2026-09-12-jasper-plan-4d-packaging-design.md) (the jpackage image whose launcher the login item points at) and the [config design](2026-09-11-jasper-plan-4a-config-design.md) (`ConfigSnapshot`, `ConfigLoader` and live reload).
 
+**Amended 2026-10-02 (resident by default):** Part 4 of the [start-up speed design](2026-10-02-jasper-startup-speed-design.md)
+supersedes "Quit exits for good" on macOS (a resident Jasper's Quit closes every window and keeps the process, hidden
+from the Dock; Quit Jasper Completely in its new menu bar item ends it), "No new UI" and the out-of-scope menu-bar icon
+(macOS gains that menu bar item; the Windows tray icon of the 2026-09-27 amendment stays) and the opt-in default (`system.run_in_background` is on by
+default on macOS and Windows, off on Linux). Residency is still decided at start-up.
+
 ## Purpose
 
 Jasper exits when its last window closes, so every launch pays a full cold start: JVM, AWT toolkit, FlatLaf, font resolution and metrics, theme, shell-integration extraction, shell-history discovery. The user wants Jasper resident in the background — started at login — so that opening a terminal is instant rather than a wait.

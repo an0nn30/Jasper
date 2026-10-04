@@ -25,6 +25,9 @@ Start with the [authoring guide](../docs/plugin-authoring.md); the
 [architecture](../docs/sdk-architecture.md) explains loading, threading and lifetimes.
 Unit-test a plugin with `dev.jasper.sdk.testing.FakePluginHost` from `jasper-sdk-testkit`.
 
+Packaged Jasper ships a trimmed Java runtime: [The Java runtime](../docs/plugin-authoring.md#the-java-runtime) lists
+the JDK modules a plugin may rely on.
+
 ## Icons (SDK 0.8)
 
 ```java
@@ -84,8 +87,9 @@ browser in the background; `FakePluginHost.browsed()` records the requests.
 SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it accepts connections from other
 programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
-a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
-guards too. Plugins declare `sdk = ">=0.14.0, <0.15"`.
+a `false` decision cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper that only goes to
+the background on Cmd+Q does not ask them. `FakePluginHost.requestQuit` asks these guards too. Plugins declare
+`sdk = ">=0.14.0, <0.15"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
