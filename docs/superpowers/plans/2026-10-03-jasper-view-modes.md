@@ -1,0 +1,73 @@
+# Normal and Compact View Modes Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox syntax for tracking.
+
+**Goal:** Add the saved Appearance view mode, preserving Normal and giving Compact a native title and floating existing palette.
+
+**Architecture:** Extend the schema and immutable snapshot with ViewMode. Capture it once for the application lifetime; workspace owners use it to suppress the header and choose native decoration installation. Reuse palette floating positioning.
+
+**Tech Stack:** JBR 25, Java Swing, FlatLaf, Gradle wrapper, JUnit/AssertJ.
+
+**Spec:** `docs/superpowers/specs/2026-10-03-jasper-view-modes-design.md`
+
+**Status:** Ready for requested SDD. Design assumption: restart-required mode, pending optional user preference. Plan deviation: existing-method edits are specified by exact behavioral contracts and test assertions rather than duplicating entire large classes; new value type is given in full. The user's explicit build request authorizes reversible implementation; no merge/push/GUI is authorized.
+
+## Global Constraints
+
+- Normal is the current window without visual or behavioral changes.
+- Compact removes the entire workspace header, including plugin toolbar contributions and overflow.
+- Preserve the activated palette design; only placement changes.
+- The saved key is `window.view_mode = "normal" | "compact"`, default `normal`.
+- Switching mode takes effect after application restart. All windows created before the next restart retain the startup mode.
+- No terminal, SDK, plugin API or theme format changes. Java 25 on JBR; wrapper only; headless tests; no GUI or benchmark.
+- Work only in `/Users/dustin/.codex/worktrees/appearance-view-modes/moray`, branch `codex/appearance-view-modes`. No merge or push. End commits with `Co-Authored-By: Codex <noreply@openai.com>`.
+
+## Review Focus
+
+1. Saving a new mode then creating a window must keep the process's startup mode (Task 2 application test).
+2. Toolbar reload, View menu overrides and newly contributed toolbar buttons must never reveal Compact controls (Task 2 workspace tests).
+3. Compact must leave native title rendering enabled and add no Swing substitute or blank header row (Task 2 root/layout tests).
+4. Normal must retain anchored palette placement and existing platform decoration choices (Task 2 regression tests).
+5. Invalid config and builder copies must retain schema diagnostics and unrelated settings (Task 1 tests).
+
+### Task 1: Saved view mode and Appearance editor
+
+**Files:**
+- Create `jasper-app/src/main/java/dev/jasper/app/config/ViewMode.java`.
+- Modify `config/CoreSettings.java`, `config/ConfigSnapshot.java`, `settingsui/CorePages.java` under `jasper-app/src/main/java/dev/jasper/app/`.
+- Test `config/ViewModeTest.java`, `config/CoreSettingsTest.java`, `settingsui/AppearancePageTest.java` under app test sources; amend related template/schema assertions if they enumerate all keys.
+- Update `config.example.toml` and `docs/configuration.md`.
+
+**Interfaces:** Produces public `ViewMode.NORMAL`, `ViewMode.COMPACT`; `CoreSettings.WINDOW_VIEW_MODE`; `ConfigSnapshot.viewMode()` and `ConfigSnapshot.Builder.viewMode(ViewMode)`.
+
+- [ ] Write failing config tests using real `ConfigLoader.parse(Path.of("config.toml"), text, true)`: absent value is NORMAL; each accepted token maps to enum; invalid token diagnoses `window.view_mode` and falls back NORMAL; wrong type uses existing parser policy. A Compact snapshot copied with `.toBuilder().toolbarHeight(40).build()` remains Compact. Prior canonical and convenience constructors default NORMAL.
+- [ ] Write Appearance test that finds setting by key instead of fragile row offsets: View mode displays Normal and Compact, defaults Normal, stages Compact for Apply and resets correctly; setting applicability is RESTART and page search contains Compact. Preserve existing theme/font tests.
+- [ ] Run focused tests and record expected failures before implementation.
+- [ ] Create the entire value type:
+
+```java
+package dev.jasper.app.config;
+/** Saved workspace title and command-palette presentation. */
+public enum ViewMode { NORMAL, COMPACT }
+```
+
+Add schema setting with tokens normal/compact, label View mode, keywords title bar/compact/normal/command palette, `Applies.RESTART`, description explaining native title, hidden toolbar and floating palette. Add to CoreSettings list. Append the field to ConfigSnapshot canonical record, null-check, add prior-canonical compatibility constructor, populate `from`, copy/build and setter. Preserve all older overloads. Append a View mode section/row on Appearance after existing rows to preserve their order. Use existing choice editor (prettifies tokens).
+- [ ] Document key/default/restart effect and toolbar preference retention; update copyable example. The generated template already consumes the schema: amend expectations only where necessary.
+- [ ] Run `./gradlew :jasper-app:test --tests '*ViewModeTest' --tests '*CoreSettingsTest' --tests '*AppearancePageTest' --tests '*ConfigTemplateTest' --tests '*ConfigSnapshotBuilderTest'`; adapt only nonexistent test selectors, record actual commands and counts. Self-review, commit task with coauthor trailer, write report with RED/GREEN evidence.
+
+### Task 2: Startup mode, native chrome and floating palette
+
+**Files:**
+- Modify `bootstrap/ApplicationBootstrap.java`, `platform/TitleBarStyle.java`, `application/JasperApplication.java`, `workspace/TerminalWindow.java`, `workspace/WindowContent.java`, `workspace/WindowChrome.java`, `workspace/WorkspaceConfiguration.java` under app main sources.
+- Modify `workspace/WindowCommandPalette.java` only if existing fallback needs adjustment; keep rendering/controller untouched.
+- Tests: `platform/TitleBarStyleTest.java`, `workspace/ViewModeChromeTest.java`, `workspace/WindowCommandPaletteTest.java`, `workspace/WindowChromeContributionsTest.java`, appropriate `application` startup test, existing `workspace/MacTitleBarTest.java` and `workspace/CustomTitleBarTest.java`.
+- Update spec/plan status, `docs/STATUS.md`, and create `docs/superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md`.
+
+**Interfaces:** Consumes Task 1 `ViewMode`, snapshot getter/builder. Add overloaded `TitleBarStyle.choose(boolean macOs, boolean nativeDecorations, boolean compact)`; preserve existing two-argument normal behavior. Add `WindowContent.viewMode()` package-private getter and initialize startup mode on first configuration application; later configuration applications must not change it. Expose a package-private `JasperApplication.windowConfiguration()` snapshot helper whose mode is replaced with final captured startup mode; use in actual window construction and prove with headless test.
+
+- [ ] Write failing tests and run them. Exact assertions: `choose(true, false, true)` and `choose(false, false, true)` equal NATIVE; passing false equals existing two-argument result for every platform/native combination. Compact root installation returns no MacTitleBar, root content is owner, fullWindowContent/transparentTitleBar are not true, windowTitleVisible is not false. No header is attached, toolbar invisible, palette anchor null, title metadata still updated. Reloaded toolbar settings and View toolbar actions do not reveal controls; a new plugin toolbar contribution remains suppressed. Normal retains current title/header and anchor tests.
+- [ ] Write startup-lifetime tests: application starts Compact, saved snapshot becomes Normal, `windowConfiguration().viewMode()` stays COMPACT while another live setting reflects latest config; inverse direction too. A WindowContent first configured with Compact stays Compact through later Normal reload and vice versa; unrelated settings apply.
+- [ ] Implement TitleBarStyle overload: `return compact ? NATIVE : choose(macOs, nativeDecorations);`. Bootstrap uses startup view mode to configure decorations. Capture startup view mode in final application field and use windowConfiguration() in the production new-window path. Preserve service-null defaults. Capture workspace mode only at first configuration apply, before setting toolbar mode.
+- [ ] Make workspace header visibility and toolbar effective visibility follow captured mode, keeping saved toolbar preference independent. Compact's `paletteAnchor(Component)` returns null. `installTitleBar` skips MacTitleBar install in Compact, keeps native title metadata callback, and applies native macOS appearance without custom geometry. Keep normal path byte-for-byte where possible. `installCustomTitleBar` returns immediately in Compact without installing a deferred decoration listener. Native menu stays on frame, palette root bindings stay installed. No GUI peer recreation or session restart. Keep macOS dialog appearance unchanged; Windows/Linux use the existing native decoration defaults.
+- [ ] Write/run real palette tests for Compact: invoke normal palette action, assert existing component uses `positioned` full workspace bounds, fixed top for varying results where space allows, stays inside narrow/short windows, remains centered with side dock panels. Escape/outside click dismiss and existing target/focus lifecycle tests still pass. No duplicate palette implementation. If tests expose absent layout refresh, fix at existing owner boundary.
+- [ ] Run focused tests `./gradlew :jasper-app:test --tests '*ViewMode*' --tests '*TitleBar*Test' --tests '*WindowCommandPaletteTest' --tests '*WindowChrome*Test' --tests '*ConfigurationControllerTest'`. Use known existing test selectors and record commands/results. Update user-run native checklist and status with actual evidence and deviations. Self-review and commit with coauthor trailer, report RED/GREEN evidence. Controller runs final full check and whole-branch review after task review.
