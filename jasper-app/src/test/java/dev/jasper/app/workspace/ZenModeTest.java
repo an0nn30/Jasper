@@ -5,6 +5,7 @@ import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.config.ToolbarMode;
+import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.dock.Side;
@@ -235,6 +236,31 @@ class ZenModeTest {
             assertThat(owner.toolbar().isVisible()).isFalse();
             toggle(owner);
             assertThat(owner.toolbar().isVisible()).as("Zen never overrides the chosen toolbar style").isFalse();
+        });
+    }
+
+    @Test void savedZenAndTogglesPreserveTheStartupChromeMode() throws Exception {
+        edt(() -> {
+            for (ViewMode mode : ViewMode.values()) {
+                var state = UiState.inMemory(); state.setZenMode(true);
+                var owner = window();
+                owner.applyConfiguration(ConfigSnapshot.defaults().toBuilder().viewMode(mode).build(), true);
+                owner.connectContributions(new Contributions(), state);
+                assertThat(owner.zenMode()).isTrue();
+                assertThat(owner.viewMode()).isEqualTo(mode);
+                assertThat(owner.toolbar().isVisible()).isEqualTo(mode == ViewMode.NORMAL);
+                assertThat(owner.status().isVisible()).isFalse();
+                toggle(owner);
+                assertThat(owner.viewMode()).isEqualTo(mode);
+                assertThat(owner.toolbar().isVisible()).isEqualTo(mode == ViewMode.NORMAL);
+                assertThat(owner.status().isVisible()).isTrue();
+                toggle(owner);
+                owner.applyConfiguration(ConfigSnapshot.defaults().toBuilder().viewMode(mode).build(), true);
+                assertThat(owner.zenMode()).isTrue();
+                assertThat(owner.viewMode()).isEqualTo(mode);
+                assertThat(owner.toolbar().isVisible()).isEqualTo(mode == ViewMode.NORMAL);
+                assertThat(owner.status().isVisible()).isFalse();
+            }
         });
     }
 

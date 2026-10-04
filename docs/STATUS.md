@@ -2,6 +2,12 @@
 
 ## Current state — 2026-10-03
 
+- **Zen integration with current main** (2026-10-04): merged `origin/main` at `4c3c6bb0`, preserving its
+  Normal/Compact startup setting independently of the saved Zen toggle. A regression covers restoring and
+  toggling Zen in both modes and reloading configuration. Independent merge review approved with no findings.
+  `./gradlew --no-daemon build --continue` passed: **8,481 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. No GUI launched.
+
 - **Zen view mode and View menu organization** (2026-10-04; `codex/jasper-zen-mode`, based on freshly fetched
   `origin/main` at `5979c030`): View now groups View Modes, Show/Hide, Font Size and Appearance; the contributed Tools
   submenu remains. Zen hides the current window's status bar, tool windows and rails while
@@ -22,6 +28,37 @@
   Zen a shortcut in Settings › Keymap and invoke it from a terminal, tool window and editor tab; remove it while
   in Zen and exit through the menu; change saved visibility in another window, and close/reopen while in Zen.
   See [View modes](configuration.md#view-modes). Worktree: `/Users/dustin/.codex/worktrees/jasper-zen-mode/moray`.
+
+- **View modes: adversarial review complete, integration authorized** (2026-10-04). Updated `codex/appearance-view-modes` through origin/main `857f3020`. First adversarial review found one P2: Compact widened the activated palette from 560 to 680 logical pixels. Fixed in `c92cdf3e`: Compact retains scaled 560 width with existing floating geometry and clamps; Normal's fallback stays unchanged. Paired roomy/narrow regressions demonstrated RED then GREEN (29 focused tests). A second independent adversarial review approved spec compliance and code quality with no remaining findings. Full `./gradlew check` on the fix: **8,471 tests, 0 failures/errors, 6 skipped**, 88 tasks (10 executed, 78 up-to-date); changed-source hygiene and diff checks passed. The original position-only requirement takes precedence over the derived fallback-only plan. Native tabs were explicitly abandoned; built-in tabs remain. User authorized merge to main and push after review/fixes; final merged verification and publication follow this record. No GUI or benchmark launched; [native acceptance](superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md) remains user-run.
+
+- **View-modes branch updated from local main `ad1eb65a`** at the user's request. The merge retains workspace glass, window-layout restoration and picker fixes alongside Normal/Compact modes. Configuration snapshots preserve both view mode and glass through loading, builder copies and both prior constructor signatures; schema count is 38. Full merged `./gradlew check` passed: **8,460 tests, 0 failures/errors, 6 skipped**, all 88 tasks successful (33 executed, 55 up-to-date). Updated main's Appearance section-list expectations to include View mode; independent merge review and scoped test review approved. Source hygiene checked 1,767 Java files; diff checks passed. No GUI launched or push performed.
+
+- **Appearance view modes: SDD complete, native acceptance remains user-run** on `codex/appearance-view-modes`, based on `43894416`, in `/Users/dustin/.codex/worktrees/appearance-view-modes/moray`. User requested Normal (unchanged) and Compact (native macOS title, no toolbar, existing palette floating). [Design](superpowers/specs/2026-10-03-jasper-view-modes-design.md), [SDD plan](superpowers/plans/2026-10-03-jasper-view-modes.md). Restart-required is the announced implementation default; the optional preference question is unanswered. Plan text specifies existing-method changes by exact contracts/tests rather than copying large classes. Tasks 1 and 2 are implemented and independently approved; whole-branch code review approved with no critical or important findings. Its one minor docs finding, a stale reference to a nonexistent Task 3 in the manual checklist, is corrected. Compact captures startup mode, uses native workspace chrome, suppresses the complete header through reloads/menu actions/plugin contributions, and uses the existing floating palette fallback. Focused Task 2 tests: **97 tests, 0 failures, 0 errors, 0 skipped**; existing compiler warnings only. Final controller `./gradlew check` on `713b53b5`: **8,373 tests, 0 failures, 0 errors, 6 skipped**, 85 tasks (9 executed, 76 up-to-date), architecture/doc checks included. Source hygiene covered 1,747 Java files; diff checks passed. The controller inspected dark/default-font and light/18pt headless Appearance renders: the row and restart notice fit. `settingsPreview` was intentionally stopped after those renders with SIGTERM (exit 143) because it enumerates all bundled themes; full preview-matrix completion is not claimed. [Native manual checks](superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md) remain user-run. Task 2 deviations: `TerminalWindow` needed no edits because its existing menu/root ownership satisfies the contract. Initial Task 2 left `WindowCommandPalette` unchanged; adversarial review later found its fallback enlarged Compact from 560 to 680 logical pixels. The position-only user requirement takes precedence over the derived fallback-reuse instruction: Compact now supplies scaled 560 width to the existing floating positioning/clamps, preserving Normal's fallback. Paired literal-width/narrow-clamp regressions cover the correction; the controller owns final full verification and publication status. Without a config service, the existing null initial window config and sizing are preserved (controller clarification). User explicitly authorized implementation with SDD and subsequently authorized merge and push; the controller owns integration/publication. Native GUI acceptance remains user-run; no GUI or benchmark was launched.
+
+- **Dock guides: a second slot's guide always shows its half; pushed to `main`, awaiting the user's GUI check**
+  (2026-10-03; spec §3 "Guides" amended at the user's request). The user: the guides should show the bottom
+  half left or right when a tool panel moves there, "regardless if doing so would make the tool full screen or not",
+  because the guide only showed a bottom half while a tool already held the top half. Rule: `DockGeometry.landing`, for
+  a pair's second slot (Left Bottom, Right Bottom, Bottom Right; extended to Bottom Right by the same principle, since
+  its home is the right half of the bottom area), puts a stand-in window into the partner slot of its what-if copy
+  whenever the partner would show nothing, so the guide is the lower half of the side or the right half of the bottom
+  area. This covers a hidden partner window and the dragged window being the partner's only one (Sessions alone in Left
+  Top, dragged to Left Bottom). The stand-in id has spaces, so no panel id can equal it, and it exists only in the copy:
+  the real state and layout do not change, and a dropped lone window still fills its side or the bottom area (spec §1,
+  as in IntelliJ), so the guide and the first frame differ on purpose until a window shows in the partner. The first
+  slots (Left Top, Right Top, Bottom Left) keep the true landing. `DockDropModelTest` 5 → 10 (the three second slots
+  against a real split and the explicit rectangles, a hidden partner, the partner's only window moving over, the first
+  slots unchanged, the state passed in untouched; the one existing assertion that expected the full-width bottom preview
+  now expects the right half) and `WindowDragTest` 15 → 17 (Sessions alone on the left dragged toward Left Bottom: the
+  guide is the lower half and equals the lower frame once Files splits the side, while the real layout stays full height
+  before and after the drop; a hidden Files dragged toward Bottom Right likewise). Tests: **+7**. `./gradlew check
+  --continue`: **8,456 tests, 0 failures, 0 errors, 6 skipped**, all architecture gates and doclint included. No GUI
+  launched. GUI check for the user: with only one tool window showing on the left (or right) side, drag it, or a hidden
+  one, toward that side's lower half and see the highlight cover the lower half, not the whole side; the same toward the
+  right half of the bottom with no bottom window showing. After the drop the window fills the whole side or bottom area,
+  as before. A drag toward an upper half or Bottom Left still previews the whole side or bottom area. Also expect this:
+  a window already alone in a lower half shows the lower-half guide as soon as its drag starts, while the window itself
+  still fills the side.
 
 - **Window layout restoration fix** (2026-10-03; `codex/restore-window-layout`, based on `main` at `f450112b`):
   main terminal frames previously never saved or restored their bounds; dock persistence intentionally used the
@@ -83,7 +120,8 @@
   of a hidden window previewing a frame that never appears, because the stripe drop keeps it hidden: `DockDrag` now
   shows no area highlight for it (the placeholder and the ghost stay). Unchanged: a window alone in a side's bottom
   slot still fills that side (spec §1, as in IntelliJ), so its preview looks like the top zone until the top slot
-  shows a window. Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
+  shows a window (superseded the same day by the entry above: the guide now shows the lower half).
+  Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
   diagonal, the half splits, ties, a wide and a tall workspace and the split line; `DockDragTest` 21 → 24 and
   `WindowDragTest` 12 → 15, including a lower-left drop beside a showing Sessions, the same under a showing bottom
   area and the hidden-window preview); the drag tests aim with `DockTestSupport.zone(workspace, slot)` instead of a
@@ -217,7 +255,8 @@
   stripe, and a `ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3,
   4, 6 and 9 none; final review: `WindowContributions.close()` no longer saves, because every dock change is saved as
   it happens and saving again on close overwrote other windows' later changes (new test
-  `closingAWindowKeepsTheChangesAnotherWindowSaved`); `DockGeometry` reserves above the bottom area the larger of the
+  `closingAWindowKeepsTheChangesAnotherWindowSaved`; superseded on 2026-10-03 by the user's correction that the last
+  window closed wins, so `close()` saves again: see the window layout restoration entry); `DockGeometry` reserves above the bottom area the larger of the
   terminal's minimum height and two tool window minimums plus a divider when the left or the right side shows both
   halves, in the squeeze and in the bottom divider's range (new tests
   `theBottomAreaGrowsOnlyUntilASplitSidesHalvesReachTheirMinimum`,

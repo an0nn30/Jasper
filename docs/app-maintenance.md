@@ -407,7 +407,10 @@ while the stripes are visible, matching rounded corners for the terminal/tab col
 the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
 Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
-tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree, with one exception
+on purpose: the guide for a second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, as if its
+partner held a window (a stand-in in the copy of the state), even where the dropped window will really fill the side or
+the bottom area because its partner is empty. The first slots keep the true landing.
 What a drop over the workspace targets is `DockDropResolver`'s job: the nearest of the left, right and
 bottom edges (each distance a share of the workspace's own width or height, so the zones keep their shape
 at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height

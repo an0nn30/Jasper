@@ -23,6 +23,10 @@ lines = 35
 # Restart required. Windows and Linux only: true uses the operating system's title bar, with the menus and
 # the toolbar in rows of their own, instead of Jasper's title bar. macOS ignores it.
 native_decorations = false
+# Restart required. "normal" keeps the current workspace; "compact" uses the native title bar,
+# hides the title search field and all toolbar buttons, and floats the existing command palette.
+# Compact retains the saved toolbar preference for a return to Normal.
+view_mode = "normal"
 
 [buddy]
 # Live. Show the pixel-art Jasper floating above your windows while a terminal is open.

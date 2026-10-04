@@ -10,11 +10,16 @@ public enum TitleBarStyle {
     MAC_UNIFIED,
     /** Windows and Linux: FlatLaf's title pane holding the app icon, menus, header and window buttons. */
     CUSTOM,
-    /** Windows and Linux with {@code window.native_decorations}: the system title bar, then the menu and header rows. */
+    /** The system title bar; Normal keeps menu/header rows, Compact keeps only platform menus. */
     NATIVE;
 
     public static TitleBarStyle choose(boolean macOs, boolean nativeDecorations) {
         return macOs ? MAC_UNIFIED : nativeDecorations ? NATIVE : CUSTOM;
+    }
+
+    /** Compact keeps the operating system title bar on every platform. */
+    public static TitleBarStyle choose(boolean macOs, boolean nativeDecorations, boolean compact) {
+        return compact ? NATIVE : choose(macOs, nativeDecorations);
     }
 
     /** Sets the look-and-feel decoration defaults; FlatLaf decorates Windows frames unless told not to. */

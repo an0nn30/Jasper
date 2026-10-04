@@ -45,14 +45,20 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
-Appearance holds the Theme and Workspace scheme dropdowns, and the theme gear's Import theme…; Terminal › Font &
-Colors links there. The old stores are retired; see [Themes](themes.md) for the offline collection and automatic
+Appearance holds View mode (Normal or Compact, applied after restart), the Theme and Workspace scheme dropdowns,
+and the theme gear's Import theme…; Terminal › Font & Colors links there. The old stores are retired; see [Themes](themes.md) for the offline collection and automatic
 legacy upgrade.
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
 needs review, failed to start, was skipped, for example because a plugin it requires is missing, or safe mode is on)
 shows why, with Open in Editor for its file.
+
+Appearance > View mode defaults to **Normal**, preserving the current window. **Compact** uses the native title
+bar, hides the title search field and all toolbar buttons (including plugin buttons and overflow), and opens the
+existing command palette as a floating card over the workspace. Menus and palette shortcuts stay available.
+The saved `window.toolbar` preference is retained; returning to Normal restores it after restart. A saved mode
+change takes effect only after restarting Jasper, including for windows opened before that restart.
 
 ## Supported settings
 
@@ -70,6 +76,7 @@ status_bar = true
 status_bar_height = 24
 columns = 100
 lines = 35
+view_mode = "normal"
 
 [buddy]
 enabled = false
@@ -135,6 +142,7 @@ workspace = "match"
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
+| `window.view_mode` | `"normal"` | `"normal"` or `"compact"`; Compact uses the native title bar, hides the workspace header and floats the command palette | After restart |
 | `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
@@ -555,6 +563,8 @@ are not recreated by this layout state.
 View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the status bar,
 tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
 controls remain available; the toolbar keeps its selected style. Toggle Zen again to restore your layout; pane zoom works independently.
+Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
+and floating command palette when Zen is toggled.
 
 Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
 New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last

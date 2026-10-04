@@ -28,6 +28,7 @@ import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
+import dev.jasper.app.config.ViewMode;
 
 
 import java.awt.*;
@@ -75,8 +76,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final java.util.Set<Integer> traversalHeld = new java.util.HashSet<>();
     private boolean traversalTyped;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
-    enum ViewMode { NORMAL, ZEN }
     private ViewMode viewMode = ViewMode.NORMAL;
+    private boolean zenMode;
     private boolean statusVisible = true;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
@@ -259,7 +260,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
                                       Consumer<String> nativeTitle) {
-        var bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
+        MacTitleBar bar;
+        if (content.viewMode == ViewMode.COMPACT) {
+            root.setContentPane(content);
+            bar = null;
+        } else {
+            bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
+        }
         if (bar != null) {
             content.remove(content.chrome.header());
             bar.setHeader(content.chrome.header(), java.util.List.of(content.chrome.header(), content.toolbar()));
@@ -278,6 +285,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
             bar.setLight(!content.theme().chrome().dark());
         }
+        if (content.viewMode == ViewMode.COMPACT && content.macOs) {
+            content.onThemeChanged = theme -> root.putClientProperty("apple.awt.windowAppearance",
+                theme.chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+            content.onThemeChanged.accept(content.theme());
+        }
         content.update();
         return bar;
     }
@@ -290,6 +302,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * is created (on {@code pack} or first show), so a new frame's root pane still reads {@code NONE} here.
      */
     static boolean installCustomTitleBar(JRootPane root, WindowContent content) {
+        if (content.viewMode == ViewMode.COMPACT) return false;
         if (root.getWindowDecorationStyle() != JRootPane.NONE) {
             decorateTitleBar(root, content);
             return true;
@@ -651,6 +664,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowCommandPalette commandPalette() { return commandPalette; }
     /** The title field's bounds in {@code target}'s coordinates while the palette can drop from it; null otherwise. */
     java.awt.Rectangle paletteAnchor(Component target) {
+        if (viewMode == ViewMode.COMPACT) return null;
         TitleSearchField field = chrome.search();
         if (!field.isVisible() || field.collapsed() || field.getWidth() <= 0 || field.getParent() == null) return null;
         if (SwingUtilities.getRootPane(field) != SwingUtilities.getRootPane(target)) return null;
@@ -660,26 +674,38 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
     boolean statusVisible() { return statusVisible; }
-    boolean zenMode() { return viewMode == ViewMode.ZEN; }
+    boolean zenMode() { return zenMode; }
 
     /** Saves this window's mode without changing its normal visibility or dock layout. */
     void toggleZenMode() {
         if (closed) return;
-        setViewMode(zenMode() ? ViewMode.NORMAL : ViewMode.ZEN);
+        setZenMode(!zenMode());
         uiState.setZenMode(zenMode());
         uiState.save();
     }
 
-    private void setViewMode(ViewMode mode) {
-        if (closed || viewMode == mode) return;
+    private void setZenMode(boolean enabled) {
+        if (closed || zenMode == enabled) return;
         dockDrag.cancel();
-        viewMode = mode;
+        zenMode = enabled;
         refreshChromeVisibility();
         area.setToolsSuppressed(zenMode());
         syncRailVisibility();
         if (zenMode()) focusSelected();
         if (contributed != null) contributed.viewModeChanged();
         updateActions();
+    }
+    ViewMode viewMode() { return viewMode; }
+
+    /** Called only for the first configuration application, before any native chrome is installed. */
+    void initializeViewMode(ViewMode mode) {
+        viewMode = mode;
+        if (mode == ViewMode.COMPACT) {
+            remove(chrome.header());
+            area.setHeaderVisible(false);
+        }
+        chrome.setToolbarMode(toolbarMode);
+
     }
     public boolean isActiveAndOpen() { return active && !closed; }
 
@@ -711,7 +737,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
         // Restore before contributions can build or show saved panels.
-        setViewMode(state.zenMode() ? ViewMode.ZEN : ViewMode.NORMAL);
+        setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         contentRegistry = model.content();
         contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,

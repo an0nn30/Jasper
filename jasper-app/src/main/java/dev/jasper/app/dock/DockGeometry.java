@@ -158,14 +158,28 @@ public final class DockGeometry {
     }
 
     /**
-     * Where a window would land if it moved to the target slot and showed there: the drop preview. It lays out a copy
-     * of the state, so the real layout does not change, and it uses {@link #compute}, so preview and layout agree. A
-     * window already in the target slot keeps its place there. Empty when the window is not docked.
+     * The stand-in window that fills a pair's first slot in {@link #landing}'s copy of the state. It is no real
+     * window's id: panel ids are lowercase dotted names, and this one has spaces.
+     */
+    private static final String GUIDE_PARTNER = "dock guide partner";
+
+    /**
+     * Where a window would land if it moved to the target slot and showed there: the drop preview, the guide. It lays
+     * out a copy of the state, so the real layout does not change, and it uses {@link #compute}, so preview and layout
+     * agree, with one exception on purpose: the guide for a pair's second slot (Left Bottom, Right Bottom, Bottom
+     * Right) is always that slot's half, as if its partner held a window. A window dropped there while the partner
+     * shows nothing really fills the whole side or bottom area, but the guide shows the slot's place. The first slots
+     * keep the true landing. A window already in the target slot keeps its place there. Empty when the window is not
+     * docked.
      */
     public static Optional<Rectangle> landing(Rectangle bounds, DockState state, String id, Slot target, Metrics metrics) {
         DockState whatIf = state.copy();
         if (whatIf.slot(id).isEmpty()) return Optional.empty();
         whatIf.moveAndShow(id, target, whatIf.dropIndex(id, target));
+        if (target.split() && whatIf.active(target.partner()).isEmpty()) {
+            whatIf.add(GUIDE_PARTNER, target.partner());
+            whatIf.show(GUIDE_PARTNER);
+        }
         return compute(bounds, whatIf, metrics).slot(target);
     }
 
