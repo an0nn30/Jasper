@@ -224,6 +224,31 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
   (Plan 3B); no test drives `watchOutput`→`timeFirstTerminal` end to end; the diagnostics example's phase numbers
   contradict "phases overlap" and the benchmark doc's cleanup sentence is loose (docs pass).
 
+- **Panel default-size snapping** (2026-10-04; `codex/panel-default-snap`, based on local `main` at `ccd4868f`):
+  dragging the left/right width or bottom height snaps within 8 logical pixels of the existing defaults
+  (260 / 260 / 200). Moving beyond the zone releases the snap in either direction. Both the preview and release
+  use the same scaled geometry rule, and an unreachable default does not override the divider's legal range.
+  The user's extension adds the same snap zone at 50/50 for Left Top/Bottom, Right Top/Bottom and Bottom
+  Left/Right; it stores an exact 0.5 ratio even when the available pixel count is odd. Saved sizes and
+  programmatic resizing are unchanged. First-install symmetry was also verified through a missing UI-state file
+  and real contribution/layout startup: both icon rails are 28px, both side panels 260px, paired tools divide
+  equally and left/right rows align when there is room for the defaults. Different tool content preferences
+  do not override these shared defaults; odd spans permit one-pixel rounding. No production default changes
+  were needed. This bounded follow-up used the approved
+  in-chat design, inline TDD and independent review; no implementation plan was needed. The dock design records
+  the approved amendment. Baseline full check passed; the new snap cases demonstrated RED/GREEN, and all
+  106 focused geometry/mouse/rail/panel tests passed, including the snap extension's RED/GREEN checks and the
+  first-install integration check. Independent review approved the changes and symmetry coverage without findings.
+  Final `./gradlew check --continue` passed:
+  **8,515 tests, 0 failures, 0 errors, 6 skipped**; architecture/native
+  headless checks, changed-source hygiene and diff checks passed. No GUI launched. The user authorized merging
+  to `main` and pushing. Integration with current `main` at `a6d15621` preserves its theme, View menu and overlay
+  work; the only conflict was this handoff, resolved by retaining both histories. Independent integration review
+  approved. Full combined `./gradlew check --continue` passed: **8,519 tests, 0 failures/errors, 6 skipped**;
+  source hygiene and diff checks passed.
+  User-run acceptance: drag each outer and shared divider slowly through its default size or equal split from both
+  directions, feel the brief hold, continue past it, then release inside the zone and confirm the default sticks.
+
 - **View menu cleanup** (2026-10-04; `codex/refine-bundled-themes`, updated from local main `79232532`):
   removed the user-selected Show/Hide Jasper, UI Theme, Workspace Scheme, Themes… and Window Settings… entries
   from View, including the now-empty Appearance submenu. Settings and command-palette access remain; Zen,

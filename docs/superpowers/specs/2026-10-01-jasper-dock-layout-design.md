@@ -68,6 +68,12 @@ Each slot has a side (`LEFT`, `RIGHT`, `BOTTOM`) and a split flag.
 - **sizes per side**: left width, right width, bottom height (pixels, unscaled, defaults 260 / 260 / 200);
 - **ratios**: left, right and bottom split ratios (0.1–0.9, default 0.5).
 
+First-install symmetry (confirmed by the user, 2026-10-04): both icon stripes use the same configured width
+(28px by default), both side panels start at the shared 260px width, and paired tools start at equal shares.
+The snap targets use these same dock defaults. With space for the default layout, left/right paired rows align;
+an odd number of available pixels may leave one half one pixel larger. Tool content's preferred size does not
+override these defaults. Existing saved user layouts still restore their chosen sizes and ratios.
+
 Operations: `add(id, slot)` (appends), `remove(id)`, `show(id)`, `hide(id)`, `toggle(id)`,
 `move(id, slot, index)`, `resize(side, px)`, `setRatio(side, ratio)`. Showing a window hides the slot's other
 active window. `move` keeps visibility (plan 2 adds a "move and show" for workspace drops). Every mutation that
@@ -87,6 +93,15 @@ each visible slot, the terminal column, and each divider (with what it resizes: 
   column 200 × 120 px, scaled). When the window is too small, panels shrink toward their minimums in the order
   bottom, then right, then left, before the terminal column goes under its minimum. Sizes saved in the state are
   not changed by this squeeze; enlarging the window restores them.
+- **Approved follow-up, 2026-10-04:** while dragging a side-width or bottom-height divider, snap to its default
+  size (260px left/right, 200px bottom) when the requested edge is within 8 logical pixels of that position,
+  inclusive. Scale the target and tolerance with the UI. Moving farther releases the snap in either direction.
+  Preview and release use the same rule; the real state still changes only on release. Skip snapping when the
+  default is outside the divider's legal range, preserving panel and terminal minimums. The user's extension
+  applies the same snap zone to the dividers between Left Top/Bottom and Right Top/Bottom (equal heights), and
+  Bottom Left/Right (equal widths). Their target is the midpoint of the space excluding the divider, rounded
+  to the nearest pixel; snapping stores the exact default 0.5 ratio so resizing the window keeps equal shares.
+  Saved sizes and programmatic resizing retain their existing behavior.
 - Gutters and rounded frames keep today's rules from `WorkspaceRegions.refreshGutters`: tool windows in their
   rounded `Host` frames, the center frame rounded only while the stripes are visible, and the terminal filling
   its area edge to edge when the stripes are hidden.

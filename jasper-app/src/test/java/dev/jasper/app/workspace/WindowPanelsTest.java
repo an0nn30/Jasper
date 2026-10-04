@@ -451,6 +451,57 @@ class WindowPanelsTest {
         });
     }
 
+    @Test void aFirstInstallOpensSymmetricRailsPanelsAndPairedTools() throws Exception {
+        Path file = dir.resolve("first-install-ui-state.toml");
+        assertThat(file).doesNotExist();
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults(), true);
+            owner.connectContributions(model, UiState.load(file));
+            for (Slot slot : Slot.values()) {
+                String id = "dev.x." + slot.name().toLowerCase(java.util.Locale.ROOT);
+                model.addPanel(id, slot.name(), new ImageIcon(), slot, site -> {
+                    var content = new JPanel();
+                    // Tool-specific preferred sizes must not override the shared dock defaults.
+                    content.setPreferredSize(new java.awt.Dimension(350 + slot.ordinal() * 50, 400));
+                    return content;
+                });
+                toggle(model, owner, id);
+            }
+            for (int width : new int[]{1200, 1401}) {
+                owner.setSize(width, 800);
+                LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
+                Rectangle leftRail = in(owner, owner.leftStripe()), rightRail = in(owner, owner.rightStripe());
+                assertThat(leftRail.width).isEqualTo(UIScale.scale(28));
+                assertThat(rightRail.width).isEqualTo(leftRail.width);
+                assertThat(rightRail.y).isEqualTo(leftRail.y);
+                assertThat(rightRail.height).isEqualTo(leftRail.height);
+                Rectangle leftTop = in(owner, owner.area().content(Slot.LEFT_TOP).getParent());
+                Rectangle leftBottom = in(owner, owner.area().content(Slot.LEFT_BOTTOM).getParent());
+                Rectangle rightTop = in(owner, owner.area().content(Slot.RIGHT_TOP).getParent());
+                Rectangle rightBottom = in(owner, owner.area().content(Slot.RIGHT_BOTTOM).getParent());
+                for (Rectangle panel : List.of(leftTop, leftBottom, rightTop, rightBottom))
+                    assertThat(panel.width).isEqualTo(UIScale.scale(260));
+                assertThat(rightTop.y).isEqualTo(leftTop.y);
+                assertThat(rightTop.height).isEqualTo(leftTop.height);
+                assertThat(rightBottom.y).isEqualTo(leftBottom.y);
+                assertThat(rightBottom.height).isEqualTo(leftBottom.height);
+                assertThat(Math.abs(leftTop.height - leftBottom.height)).as("equal heights, allowing pixel rounding").isLessThanOrEqualTo(1);
+                assertThat(leftTop.x - leftRail.x - leftRail.width).as("matching spacing against the rails")
+                    .isEqualTo(rightRail.x - rightTop.x - rightTop.width);
+                Rectangle bottomLeft = in(owner, owner.area().content(Slot.BOTTOM_LEFT).getParent());
+                Rectangle bottomRight = in(owner, owner.area().content(Slot.BOTTOM_RIGHT).getParent());
+                assertThat(bottomLeft.height).isEqualTo(UIScale.scale(200));
+                assertThat(bottomRight.height).isEqualTo(bottomLeft.height);
+                assertThat(bottomRight.y).isEqualTo(bottomLeft.y);
+                assertThat(Math.abs(bottomLeft.width - bottomRight.width)).as("equal widths, allowing pixel rounding").isLessThanOrEqualTo(1);
+                assertThat(bottomLeft.x).isEqualTo(leftTop.x);
+                assertThat(bottomRight.x + bottomRight.width).isEqualTo(rightTop.x + rightTop.width);
+            }
+        });
+    }
+
     @Test void draggingADividerSavesTheNewSideSize() throws Exception {
         Path file = dir.resolve("ui-state.toml");
         edt(() -> {
