@@ -373,4 +373,22 @@ class NotificationCenterTest {
         presence = Delivery.Presence.BACKGROUND;
         assertThat(center.presence()).isEqualTo(Delivery.Presence.BACKGROUND);
     }
+
+    /**
+     * History keeps an expired entry's text and action labels, never its poster's callbacks: those capture the poster
+     * (a closed pane and its window, a stopped plugin), which must not stay reachable for as long as the entry does.
+     */
+    @Test void anExpiredEntryKeepsItsLabelsButLetsGoOfItsPostersCallbacks() {
+        var center = center();
+        var ran = new ArrayList<String>();
+        UUID id = center.post(request(CARDS, "built").withActivate(() -> ran.add("activate"))
+            .withAction(NotificationAction.of("Open", () -> ran.add("open")))).orElseThrow();
+        center.expire(id);
+        NotificationRequest kept = center.find(id).orElseThrow().request();
+        assertThat(kept.title()).isEqualTo("built");
+        assertThat(kept.actions()).extracting(NotificationAction::label).containsExactly("Open");
+        assertThat(kept.activate()).isEmpty();
+        kept.actions().getFirst().run().run();
+        assertThat(ran).isEmpty();
+    }
 }
