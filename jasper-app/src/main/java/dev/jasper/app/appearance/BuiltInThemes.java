@@ -1,6 +1,6 @@
 package dev.jasper.app.appearance;
 
-/** The themes Jasper ships: Jasper's own theme files and IntelliJ's classic themes, converted. */
+/** The themes Jasper ships: Jasper Light/Dark, Nord and Clear Dark/Light. */
 final class BuiltInThemes {
     private BuiltInThemes() {}
 
@@ -34,8 +34,7 @@ final class BuiltInThemes {
         private static java.util.List<Theme> load() {
             String index = ThemeManager.read("index.txt");
             if (index == null) throw new IllegalStateException("Missing bundled theme index");
-            var classics = java.util.Map.of("jasper-light", Theme.JASPER_LIGHT, "jasper-dark", Theme.DARK,
-                "intellij-light", Theme.INTELLIJ_LIGHT, "darcula", Theme.DARCULA);
+            var classics = java.util.Map.of("jasper-light", Theme.JASPER_LIGHT, "jasper-dark", Theme.DARK);
             var themes = new java.util.ArrayList<Theme>(); var ids = new java.util.HashSet<String>();
             for (String file : index.lines().toList()) {
                 if (!file.matches("[a-z0-9][a-z0-9-]*\\.toml") || !ids.add(file)) throw new IllegalStateException("Invalid theme index entry: " + file);

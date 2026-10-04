@@ -34,8 +34,8 @@ class ConfigLoaderTest {
     @Test void themeNameDefaultsToJasperDarkAndAcceptsBuiltInNames() {
         var path = Path.of("config.toml");
         assertThat(ConfigLoader.parse(path, "", true).snapshot().theme()).isEqualTo("Jasper Dark");
-        assertThat(ConfigLoader.parse(path, "[ui.theme]\nname = 'IntelliJ Light'\n", true).snapshot().theme())
-            .isEqualTo("IntelliJ Light");
+        assertThat(ConfigLoader.parse(path, "[ui.theme]\nname = 'Jasper Light'\n", true).snapshot().theme())
+            .isEqualTo("Jasper Light");
         assertThat(ConfigLoader.parse(path, "ui.theme.name = 'Jasper Dark'\n", true).snapshot().theme())
             .isEqualTo("Jasper Dark");
     }
@@ -127,7 +127,7 @@ class ConfigLoaderTest {
             [terminal.font]
             size = 18
             [ui.theme]
-            name = "IntelliJ Light"
+            name = "Jasper Light"
             [keybindings]
             "copy" = "cmd+v"
             paste = "cmd+c"
@@ -142,7 +142,7 @@ class ConfigLoaderTest {
         assertThat(state.toolbar()).isEqualTo(ToolbarMode.ICONS);
         assertThat(state.statusBar()).isFalse();
         assertThat(state.fontSize()).isEqualTo(18f);
-        assertThat(state.theme()).isEqualTo("IntelliJ Light");
+        assertThat(state.theme()).isEqualTo("Jasper Light");
         assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.META_DOWN_MASK)))
             .contains(ActionId.COPY);
         assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
@@ -336,7 +336,7 @@ class ConfigLoaderTest {
     @Test void snapshotAndResultDefensivelyCopyCollections() {
         var bindings = new HashMap<String,String>();
         bindings.put("copy", "none");
-        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.INTELLIJ_LIGHT.name(), bindings, 150, 45, TerminalConfig.defaults());
+        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.JASPER_LIGHT.name(), bindings, 150, 45, TerminalConfig.defaults());
         bindings.put("copy", "cmd+c");
         assertThat(snapshot.bindings(true).strokeFor(ActionId.COPY)).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> snapshot.keybindings().put("paste", "none"));
@@ -478,17 +478,17 @@ class ConfigLoaderTest {
         for (var choice : TerminalColors.builtIns())
             assertThat(parse("[terminal]\ncolors = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
                 .snapshot().terminalColors()).isEqualTo(choice);
-        var mixed = parse("terminal.colors = 'dark'\nui.theme.name = 'IntelliJ Light'\n").snapshot();
-        assertThat(mixed.theme()).isEqualTo("IntelliJ Light");
+        var mixed = parse("terminal.colors = 'dark'\nui.theme.name = 'Jasper Light'\n").snapshot();
+        assertThat(mixed.theme()).isEqualTo("Jasper Light");
         assertThat(mixed.terminalColors()).isEqualTo(TerminalColors.DARK);
     }
 
     @Test void invalidTerminalColorsUseTheExistingPerFieldDiagnosticPolicy() {
         for (String value : java.util.List.of("'   '", "7", "true")) {
-            var result = parse("[terminal]\ncolors=" + value + "\n[ui.theme]\nname='IntelliJ Light'\n");
+            var result = parse("[terminal]\ncolors=" + value + "\n[ui.theme]\nname='Jasper Light'\n");
             assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
             assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
-            assertThat(result.snapshot().theme()).isEqualTo("IntelliJ Light");
+            assertThat(result.snapshot().theme()).isEqualTo("Jasper Light");
             assertThat(result.diagnostics()).filteredOn(problem -> problem.severity() == ConfigDiagnostic.Severity.ERROR)
                 .singleElement().satisfies(problem -> {
                 assertThat(problem.key()).isEqualTo("terminal.colors");
@@ -499,9 +499,9 @@ class ConfigLoaderTest {
     }
 
     @Test void aLeftoverStyleLineIsAnOrdinaryUnknownSettingAndChangesNothing() {
-        var result = parse("[ui.theme]\nstyle = 'retro'\nname = 'IntelliJ Light'\n");
+        var result = parse("[ui.theme]\nstyle = 'retro'\nname = 'Jasper Light'\n");
         assertThat(result.rejected()).isFalse();
-        assertThat(result.snapshot().theme()).isEqualTo("IntelliJ Light");
+        assertThat(result.snapshot().theme()).isEqualTo("Jasper Light");
         assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
             assertThat(problem.key()).isEqualTo("ui.theme.style");
             assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);

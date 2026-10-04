@@ -30,7 +30,7 @@ view_mode = "normal"
 
 [buddy]
 # Live. Show the pixel-art Jasper floating above your windows while a terminal is open.
-# View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
+# Show/Hide Jasper in the command palette and right-click > Hide Jasper toggle him for the session.
 enabled = false
 
 [notifications]
@@ -118,7 +118,7 @@ family = "system"
 # size = 14.0
 
 [ui.theme]
-# Live across open windows: "Jasper Dark", "Jasper Light", "IntelliJ Light", "Darcula", or a theme in the themes folder.
+# Live across open windows: "Jasper Dark", "Jasper Light", "Nord", "Clear Dark", "Clear Light", or a theme in the themes folder.
 name = "Jasper Dark"
 # Workspace scheme, live: "match" follows the UI theme; or name a native theme.
 workspace = "match"

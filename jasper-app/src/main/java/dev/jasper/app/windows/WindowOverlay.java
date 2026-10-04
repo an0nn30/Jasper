@@ -1,9 +1,11 @@
 package dev.jasper.app.windows;
 
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.WindowInput;
 import java.awt.*;
 import java.awt.event.*;
 import java.beans.PropertyChangeListener;
+import java.awt.geom.RoundRectangle2D;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
 
@@ -29,10 +31,8 @@ final class WindowOverlay implements AutoCloseable {
     WindowOverlay(JRootPane root, JComponent content, KeyboardFocusManager focusManager) {
         this.root = root; this.content = content; this.focusManager = focusManager;
         // A progress overlay is a single fitted surface, never a scrolling viewport.
-        card = new JPanel(new BorderLayout());
+        card = new RoundedCard();
         card.add(content, BorderLayout.CENTER);
-        card.setBorder(BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor") == null
-            ? Color.GRAY : UIManager.getColor("Component.borderColor")));
         card.setFocusCycleRoot(true);
         card.setFocusTraversalPolicy(new ContainerOrderFocusTraversalPolicy() {
             @Override protected boolean accept(Component component) {
@@ -126,6 +126,44 @@ final class WindowOverlay implements AutoCloseable {
             if (!WindowInput.blocked(root) && previous.isShowing() && SwingUtilities.getRootPane(previous) == root
                     && (current == null || current == closingFocus)) previous.requestFocusInWindow();
         });
+    }
+
+    /** Clips plugin-owned opaque children too, including repaints initiated by those children. */
+    private static final class RoundedCard extends JPanel {
+        RoundedCard() {
+            super(new BorderLayout());
+            setOpaque(false);
+            setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 1));
+        }
+
+        private Shape surface(double inset) {
+            double arc = Math.max(0, UIScale.scale(16) - 2 * inset);
+            return new RoundRectangle2D.Double(inset, inset, Math.max(0, getWidth() - 2 * inset),
+                Math.max(0, getHeight() - 2 * inset), arc, arc);
+        }
+
+        @Override protected boolean isPaintingOrigin() { return true; }
+
+        @Override protected void paintChildren(Graphics graphics) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                // Swing may skip paintComponent when an opaque child covers the dirty rectangle.
+                // Fill here: rounding that child exposes the card underneath even in that case.
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(getBackground());
+                g.fill(surface(0));
+                g.clip(surface(1));
+                super.paintChildren(g);
+            } finally { g.dispose(); }
+            // Paint last so child backgrounds cannot cover the antialiased border.
+            g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color border = UIManager.getColor("Component.borderColor");
+                g.setColor(border == null ? Color.GRAY : border);
+                g.draw(surface(.5));
+            } finally { g.dispose(); }
+        }
     }
 
     private final class Backdrop extends JComponent {

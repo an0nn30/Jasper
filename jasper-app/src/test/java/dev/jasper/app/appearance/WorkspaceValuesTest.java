@@ -15,7 +15,7 @@ class WorkspaceValuesTest {
         var chromeLaf = UIManager.getLookAndFeel();
         var chromeBackground = UIManager.getColor("Panel.background");
         var before = colors();
-        var base = Theme.DARCULA.source().document();
+        var base = dev.jasper.app.appearance.ThemeFixtures.DARCULA.source().document();
         var seeds = new java.util.HashMap<>(base.seeds());
         seeds.put(Seed.BACKGROUND, new Color(0x010203));
         var ui = new java.util.LinkedHashMap<>(base.ui());
@@ -64,7 +64,7 @@ class WorkspaceValuesTest {
     }
 
     @Test void explicitAlphaTokensAndSyntaxSurviveEffectiveDefaults() {
-        var base = Theme.DARCULA.source().document();
+        var base = dev.jasper.app.appearance.ThemeFixtures.DARCULA.source().document();
         var explicit = new Color(1, 2, 3, 100);
         var style = new SyntaxStyle(new Color(0x987654), true, false);
         var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
@@ -90,8 +90,8 @@ class WorkspaceValuesTest {
         try {
             var nativeValues = ThemeManager.generated(Theme.DARK);
             assertThat(ThemeManager.generated(Theme.DARK)).isSameAs(nativeValues);
-            var values = ThemeManager.generated(Theme.DARCULA);
-            assertThat(ThemeManager.install(Theme.DARCULA)).isTrue();
+            var values = ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA);
+            assertThat(ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.DARCULA)).isTrue();
             var mismatches = new java.util.ArrayList<String>();
             WorkspaceTokenKeys.KEYS.forEach((token, key) -> {
                 var color = UIManager.getLookAndFeelDefaults().getColor(key);

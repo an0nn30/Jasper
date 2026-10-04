@@ -260,7 +260,7 @@ class CommandPaletteTest {
         SwingUtilities.invokeAndWait(() -> {
             var original = UIManager.getLookAndFeel();
             try {
-                for (Theme theme : List.of(Theme.INTELLIJ_LIGHT, Theme.DARK)) {
+                for (Theme theme : List.of(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, Theme.DARK)) {
                     ThemeTestSupport.install(theme);
                     var palette = palette(new ArrayList<>());
                     var historyRow = new PaletteRow("c", "Row c", "a detail", null, null, true, null);
@@ -320,7 +320,7 @@ class CommandPaletteTest {
         SwingUtilities.invokeAndWait(() -> {
             var original = UIManager.getLookAndFeel();
             try {
-                ThemeTestSupport.install(Theme.INTELLIJ_LIGHT);
+                ThemeTestSupport.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 var palette = palette(new ArrayList<>());
                 palette.setEntries(List.of(item(COMMANDS, "a"), item(COMMANDS, "b")), null, null);
                 palette.setSize(palette.getPreferredSize());
@@ -447,7 +447,7 @@ class CommandPaletteTest {
 
     @Test void aStepReplacesTheListAndHidesTheHintBar() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            new ThemeController(Theme.INTELLIJ_LIGHT);
+            new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             try {
                 var palette = palette(new ArrayList<>());
                 palette.setEntries(List.of(item(HISTORY, "a"), item(HISTORY, "b")), null, null);
@@ -512,7 +512,7 @@ class CommandPaletteTest {
                 palette.queryField().setText("fir");
                 palette.selectRow("b");
                 assertThat(PaletteTestSupport.describe(palette.selectedEntry())).isEqualTo("jasper.commands/b");
-                for (Theme theme : List.of(Theme.INTELLIJ_LIGHT, Theme.DARK)) {
+                for (Theme theme : List.of(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, Theme.DARK)) {
                     ThemeTestSupport.install(theme);
                     palette.refreshTheme();
                     assertThat(palette.queryField().getText()).as(theme.name()).isEqualTo("fir");
@@ -527,7 +527,7 @@ class CommandPaletteTest {
     @Test void renderPaletteResultsAndFormsAtBothScales() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try {
-                for (var choice : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                for (var choice : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     new ThemeController(choice);
                     var card = palette(new ArrayList<>());
                     card.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "new_tab"), item(COMMANDS, "settings")), null, null);

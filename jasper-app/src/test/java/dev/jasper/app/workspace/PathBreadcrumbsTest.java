@@ -46,7 +46,7 @@ class PathBreadcrumbsTest {
                 pane(Optional.of(HOME.resolve("projects/moray/plugins/remote/src")), Optional.empty(), false),
                 pane(Optional.empty(), Optional.of(new RemoteLocation("ssh.example", "/srv/moray/src")), true),
                 pane(Optional.empty(), Optional.empty(), true));
-            for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 ThemeTestSupport.install(theme); SwingUtilities.updateComponentTreeUI(status); status.refreshTheme();
                 var preview = new BufferedImage(1000, 144, BufferedImage.TYPE_INT_ARGB);
                 var graphics = preview.createGraphics();
@@ -78,7 +78,7 @@ class PathBreadcrumbsTest {
             var breadcrumbs = new PathBreadcrumbs();
             var location = PathBreadcrumbs.Location.local(HOME.resolve("projects/a-very-long-workspace/plugins/remote/src"), HOME);
             breadcrumbs.setLocation(location);
-            for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 ThemeTestSupport.install(theme); SwingUtilities.updateComponentTreeUI(breadcrumbs); breadcrumbs.refreshTheme();
                 breadcrumbs.setSize(240, 28); breadcrumbs.doLayout();
                 var visible = java.util.Arrays.stream(breadcrumbs.getComponents()).filter(Component::isVisible)

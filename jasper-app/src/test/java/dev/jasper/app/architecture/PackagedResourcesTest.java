@@ -61,8 +61,10 @@ class PackagedResourcesTest {
                 "dev/jasper/app/themeimport/intellij/islands/ManyIslandsDark.theme.json",
                 "dev/jasper/app/themeimport/intellij/islands/IslandSchemeDark.xml",
                 "dev/jasper/app/themeimport/intellij/LICENSE.txt",
-                "dev/jasper/app/themes/intellij-light.toml",
-                "dev/jasper/app/themes/darcula.toml",
+                "dev/jasper/app/themes/jasper-light.toml",
+                "dev/jasper/app/themes/nord-nord.toml",
+                "dev/jasper/app/themes/clear-dark.toml",
+                "dev/jasper/app/themes/clear-light.toml",
                 "dev/jasper/app/themes/jasper-dark.toml",
                 "dev/jasper/app/themes/THIRD-PARTY-THEMES.md"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();

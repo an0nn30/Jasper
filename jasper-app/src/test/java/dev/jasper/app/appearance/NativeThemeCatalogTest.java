@@ -26,22 +26,26 @@ class NativeThemeCatalogTest {
         Files.writeString(file, "name='Child'\nextends='Missing'\n");
         var catalog = ThemeCatalog.beside(home.resolve("config.toml"));
         assertThat(catalog.scan().problems()).anyMatch(problem -> problem.line() == 2);
-        Files.writeString(file, "name='Child'\nextends='Darcula'\n");
+        Files.writeString(file, "name='Child'\nextends='Nord'\n");
         assertThat(catalog.scan().find("Child")).isPresent(); assertThat(catalog.latest().problems()).isEmpty();
         Files.delete(file); Files.delete(file.getParent());
         assertThat(catalog.scan().find("Child")).isEmpty(); assertThat(file.getParent()).isDirectory();
-        Files.writeString(file, "name='Child'\nextends='Darcula'\n");
+        Files.writeString(file, "name='Child'\nextends='Nord'\n");
         assertThat(catalog.scan().find("Child")).isPresent();
     }
 
     @Test void indexedCollectionIsNativeAndReusesClassicSingletons() throws Exception {
         var snapshot = ThemeCatalog.builtIn().scan();
-        assertThat(snapshot.themes()).hasSize(286).allMatch(theme -> theme.source() instanceof Theme.Bundled);
-        assertThat(snapshot.find("Studio Dark")).isPresent(); assertThat(snapshot.find("Catppuccin Mocha")).isPresent();
+        assertThat(snapshot.themes()).hasSize(5).allMatch(theme -> theme.source() instanceof Theme.Bundled);
+        assertThat(snapshot.names()).containsExactly("Clear Dark", "Clear Light", "Jasper Dark", "Jasper Light", "Nord");
         assertThat(snapshot.find("Jasper Dark")).containsSame(Theme.DARK);
-        assertThat(snapshot.find("Darcula")).containsSame(Theme.DARCULA);
+        assertThat(snapshot.find("Jasper Light")).containsSame(Theme.JASPER_LIGHT);
         try (var jar = new java.util.jar.JarFile(System.getProperty("jasper.appJar"))) {
             String root = "dev/jasper/app/themes/";
+            assertThat(jar.stream().map(java.util.jar.JarEntry::getName)
+                .filter(name -> name.startsWith(root) && name.endsWith(".toml")).toList())
+                .containsExactlyInAnyOrder(root + "jasper-light.toml", root + "jasper-dark.toml",
+                    root + "nord-nord.toml", root + "clear-dark.toml", root + "clear-light.toml");
             String index = new String(jar.getInputStream(jar.getJarEntry(root + "index.txt")).readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             for (String file : index.lines().toList()) {
                 var entry = jar.getJarEntry(root + file); assertThat(entry).isNotNull();

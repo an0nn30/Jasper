@@ -44,6 +44,8 @@ public final class ConvertThemes {
             }
         }
         for (var source : manifest.sources()) {
+            // The source lock also retains import/conversion fixtures; only Nord is shipped.
+            if (!source.id().equals("nord")) continue;
             Path root = ThemeSources.safe(sources, source.id());
             Map<String, ConversionResult> converted = convert(source, root);
             notice.append("## ").append(source.id()).append("\n\n")

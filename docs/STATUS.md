@@ -20,9 +20,57 @@
   Final `./gradlew check --continue` passed:
   **8,515 tests, 0 failures, 0 errors, 6 skipped**; architecture/native
   headless checks, changed-source hygiene and diff checks passed. No GUI launched. The user authorized merging
-  to `main` and pushing; integration verification and publication are in progress.
+  to `main` and pushing. Integration with current `main` at `a6d15621` preserves its theme, View menu and overlay
+  work; the only conflict was this handoff, resolved by retaining both histories. Independent integration review
+  approved. Full combined `./gradlew check --continue` passed: **8,519 tests, 0 failures/errors, 6 skipped**;
+  source hygiene and diff checks passed.
   User-run acceptance: drag each outer and shared divider slowly through its default size or equal split from both
   directions, feel the brief hold, continue past it, then release inside the zone and confirm the default sticks.
+
+- **View menu cleanup** (2026-10-04; `codex/refine-bundled-themes`, updated from local main `79232532`):
+  removed the user-selected Show/Hide Jasper, UI Theme, Workspace Scheme, Themes… and Window Settings… entries
+  from View, including the now-empty Appearance submenu. Settings and command-palette access remain; Zen,
+  toolbar/status/rail visibility, font controls and contributed Tools remain. Removed obsolete theme-menu
+  listeners/caches and lifecycle hooks, updated existing tests and current help/docs. Bounded inline cleanup;
+  no architecture or historical-plan changes. The recursive absence regression failed before the removal and
+  passed afterward in both Buddy visibility states. Focused checks and independent review passed; all review
+  documentation findings corrected. Full `./gradlew check`: **8,485 tests, 0 failures/errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. No GUI launched. Merged into `main` after user approval, preserving the newer overlay handoff.
+  Fresh merged `./gradlew check` reproduced **8,485 tests, 0 failures/errors, 6 skipped**; publication is authorized.
+
+- **Bundled theme shortlist** (2026-10-04; `codex/refine-bundled-themes`, based on local main `ccd4868f`):
+  Jasper now ships only **Jasper Light, Jasper Dark, Nord, Clear Dark and Clear Light**. Their existing palettes
+  are unchanged, ready for individual refinement. The catalog, packaged TOMLs and offline generator agree on
+  those five; obsolete bundled palettes/licenses are removed. Import/conversion sources remain available for
+  custom themes, with two former palettes retained only as test fixtures. Saved removed-theme names retain
+  the existing warning/fallback and repair behavior. Settings help, configuration example and current theme
+  documentation reflect the shortlist. This bounded cleanup used inline implementation and independent review;
+  no architecture change or historical-plan rewrite. Independent review approved with no blocking findings; all documentation findings corrected.
+  `./gradlew check` passed: **8,481 tests, 0 failures/errors, 6 skipped**; architecture/doc checks included.
+  Regeneration parity, exact five-theme JAR inventory, changed-source hygiene and diff checks passed. No GUI launched.
+  Worktree: `/Users/dustin/.codex/worktrees/3941/moray`. Keep the branch here for the next refinement pass.
+
+- **Connection overlay polish** (2026-10-04), on `codex/connection-overlay` in
+  `/Users/dustin/.codex/worktrees/connection-overlay/moray`, based on fetched `origin/main` at `4c3c6bb0`.
+  Window overlays now use the workspace's scaled 16px corner arc, clip opaque plugin content and repaint their
+  border with the current theme. Remote connection progress replaces the loading bar with an accent-colored
+  dot that stretches into three bouncing dots and rejoins over a 1.6-second loop (sped up at the user’s request). The timer runs only while
+  working and showing; ancestor hiding, removal, failure and completion stop it, and retry restarts it.
+  This is a bounded follow-up implemented inline with independent final review; no historical plan changed.
+  Both original visual regressions were observed failing before the fixes. Focused rendering/lifecycle tests
+  pass, and independent review found no actionable issues. Initial full `./gradlew check` passed all 88 tasks:
+  **8,476 tests, 0 failures/errors, 6 skipped**. Changed-source hygiene and diff checks passed. Actual-component dark/light
+  headless renders were inspected; the local animation preview is `build/connection-preview/connection-overlay-faster.gif`. The speed-only follow-up passed all four focused connection tests.
+  Adversarial round 1 found one P2: opaque-child partial repaints skipped the rounded card's background,
+  damaging its corners. The fill now runs before clipped children in `paintChildren`; a regression failed before
+  the fix and passes at 1×/2×. A fresh second adversarial review approved the entire change with no findings,
+  including 75 exact-pixel repaint probes at 1×/1.25×/1.5×/2×/3× under Metal, FlatLight and FlatDark.
+  Full post-fix `./gradlew check` passed: **8,487 tests, 0 failures/errors, 6 skipped**, all 88 tasks successful.
+  Integrated into `main` at `79232532`, preserving Zen and the five-theme catalog update. Fresh merged
+  `./gradlew check` passed all 88 tasks: **8,487 tests, 0 failures/errors, 6 skipped**. Merged diff and source
+  hygiene checks passed. Publication is user-authorized. Native motion acceptance remains user-run;
+  no GUI or benchmark launched. The local preview is also preserved in the main checkout's
+  `build/connection-preview/connection-overlay-faster.gif`.
 
 - **Zen integration with current main** (2026-10-04): merged `origin/main` at `4c3c6bb0`, preserving its
   Normal/Compact startup setting independently of the saved Zen toggle. A regression covers restoring and

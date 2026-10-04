@@ -40,7 +40,7 @@ public final class HostedContentPreview {
                         new ContentStatus("UTF-8", "Encoding", null), new ContentStatus("LF", "Line ending", null), new ContentStatus("Spaces: 4", "Indentation", null)));
                     selected = entry;
                 }
-                for (Theme theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                for (Theme theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     owner.selectTheme(theme);
                     for (var entry : model.content().entries()) {
                         var scroll = (JScrollPane)entry.component();

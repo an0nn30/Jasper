@@ -25,7 +25,7 @@ class BundledThemeConversionTest {
         assertThat(Files.readAllBytes(notices)).isEqualTo(Files.readAllBytes(ROOT.resolve("THIRD-PARTY-THEMES.md")));
     }
 
-    @Test void catalogCoversTheApprovedFamiliesWithUniqueNativeValuesAndProvenance() throws Exception {
+    @Test void catalogShipsOnlyNordFromTheLockedThirdPartySources() throws Exception {
         var manifest = ThemeSources.read(ROOT.resolve("tools/themes/sources.json"));
         ThemeSources.verify(manifest, ROOT.resolve("third_party/themes"));
         var counts = new java.util.TreeMap<String, Long>();
@@ -33,6 +33,7 @@ class BundledThemeConversionTest {
         var ids = new java.util.HashSet<String>();
         Path bundled = ROOT.resolve("jasper-app/src/main/resources/dev/jasper/app/themes");
         for (var source : manifest.sources()) {
+            if (!source.id().equals("nord")) continue;
             counts.put(source.id(), source.variants().stream().filter(ThemeSources.Variant::included).count());
             for (var variant : source.variants()) if (variant.included()) {
                 assertThat(names.add(variant.name().strip().toLowerCase(java.util.Locale.ROOT))).isTrue();
@@ -46,11 +47,7 @@ class BundledThemeConversionTest {
                 dev.jasper.app.appearance.ThemeResolver.resolve(document);
             }
         }
-        assertThat(counts).containsExactlyInAnyOrderEntriesOf(java.util.Map.ofEntries(
-            java.util.Map.entry("intellij", 2L), java.util.Map.entry("alacritty", 168L),
-            java.util.Map.entry("one-dark", 2L), java.util.Map.entry("dracula", 3L), java.util.Map.entry("solarized", 2L),
-            java.util.Map.entry("catppuccin", 4L), java.util.Map.entry("material-lite", 88L), java.util.Map.entry("vscode", 3L),
-            java.util.Map.entry("nord", 1L), java.util.Map.entry("gruvbox", 6L), java.util.Map.entry("one-dark-modern", 1L), java.util.Map.entry("xcode", 2L)));
+        assertThat(counts).containsExactlyInAnyOrderEntriesOf(java.util.Map.of("nord", 1L));
         try (var files = Files.list(bundled)) {
             assertThat(files.filter(path -> path.toString().endsWith(".toml")).map(path -> path.getFileName().toString()).toList())
                 .containsExactlyInAnyOrderElementsOf(Files.readAllLines(bundled.resolve("index.txt")));
@@ -86,7 +83,7 @@ class BundledThemeConversionTest {
 
     @Test void classicDarculaKeepsItsBundledConsoleScheme() throws Exception {
         var document = dev.jasper.app.appearance.ThemeToml.parse(Files.readString(ROOT.resolve(
-            "jasper-app/src/main/resources/dev/jasper/app/themes/darcula.toml")), "darcula");
+            "jasper-app/src/test/resources/dev/jasper/app/themes/darcula.toml")), "darcula");
         var scheme = EditorScheme.named("Darcula", "Darcula", true);
         assertThat(document.seeds().get(dev.jasper.app.appearance.Seed.BACKGROUND)).isEqualTo(scheme.palette().background());
         for (int i = 0; i < 16; i++) assertThat(document.ansi().get(i)).isEqualTo(scheme.palette().ansi().get(i));

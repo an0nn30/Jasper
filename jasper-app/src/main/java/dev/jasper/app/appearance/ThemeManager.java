@@ -32,7 +32,7 @@ public final class ThemeManager {
 
     private ThemeManager() {}
 
-    /** The bundled themes: Jasper's own, then IntelliJ's. */
+    /** The five bundled themes: Jasper Light/Dark, Nord and Clear Dark/Light. */
     public static List<Theme> builtIns() { return BuiltInThemes.all(); }
 
     /** {@code theme}'s generated values; EDT only (the cache is unsynchronized). */

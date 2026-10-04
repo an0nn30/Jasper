@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -31,42 +30,32 @@ class WindowChromeTest {
 
     @org.junit.jupiter.api.AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void openingSiblingTerminalColorsMenuReflectsTheCurrentGlobalChoice() throws Exception {
+    @Test void viewOmitsAppearanceAndBuddyEntriesWhileCommandsRemainAvailable() throws Exception {
         edt(() -> {
-            WindowContent first = null;
-            WindowContent second = null;
-            try {
-                var themes = new ThemeController();
-                first = content(launcher(new ArrayDeque<>()), themes);
-                second = content(launcher(new ArrayDeque<>()), themes);
-                first.setActive(true);
-                JMenu firstColors = WindowThemeMenuTest.workspace(first);
-                JMenu secondColors = WindowThemeMenuTest.workspace(second);
-                WindowThemeMenuTest.item(firstColors,"Jasper Light").doClick();
-                secondColors.setSelected(true);
-                assertThat(WindowThemeMenuTest.item(secondColors,"Jasper Light").isSelected()).isTrue();
-                assertThat(WindowThemeMenuTest.item(secondColors,"Same as UI theme").isSelected()).isFalse();
-                secondColors.setSelected(false);
-                WindowThemeMenuTest.item(firstColors,"Jasper Dark").doClick();
-                secondColors.setSelected(true);
-                assertThat(WindowThemeMenuTest.item(secondColors,"Jasper Dark").isSelected()).isTrue();
-                assertThat(WindowThemeMenuTest.item(secondColors,"Jasper Light").isSelected()).isFalse();
-            } finally {
-                if (first != null) first.close();
-                if (second != null) second.close();
+            try (var owner = content(launcher(new ArrayDeque<>()))) {
+                for (boolean buddyShown : List.of(false, true)) {
+                    owner.buddyEnabled = () -> buddyShown;
+                    owner.updateActions();
+                    assertThat(menuLabels(owner.menuBar().getMenu(2)))
+                        .doesNotContain("Show Jasper", "Hide Jasper", "UI Theme", "Workspace Scheme",
+                            "Themes\u2026", "Window Settings\u2026", "Appearance")
+                        .contains("View Modes", "Show/Hide", "Font Size", "Toolbar", "Status Bar", "Rail");
+                }
+                assertThat(owner.commands().entries().stream().map(entry -> entry.command().id()))
+                    .contains("view.buddy", "view.themes", "view.window_settings")
+                    .noneMatch(id -> id.startsWith("view.appearance."));
+                assertThat(owner.action(ActionId.OPEN_SETTINGS)).isNotNull();
             }
         });
     }
 
-    @Test void viewOffersBothCatalogsAndThemesWithoutRegisteringEachThemeAsACommand() throws Exception {
-        edt(() -> {
-            try(var owner=content(launcher(new ArrayDeque<>()))) {
-                var names=new java.util.ArrayList<String>();
-                for(var component:ZenModeTest.child(owner.menuBar().getMenu(2), "Appearance").getMenuComponents())if(component instanceof JMenuItem item)names.add(item.getText());
-                assertThat(names).contains("UI Theme","Workspace Scheme","Themes…").doesNotContain("Terminal Colors");
-                assertThat(owner.commands().entries().stream().map(entry->entry.command().id())).contains("view.themes").noneMatch(id->id.startsWith("view.appearance."));
-            }
-        });
+    static List<String> menuLabels(JMenu menu) {
+        var labels = new java.util.ArrayList<String>();
+        for (var component : menu.getMenuComponents()) {
+            if (component instanceof JMenuItem item) labels.add(item.getText());
+            if (component instanceof JMenu child) labels.addAll(menuLabels(child));
+        }
+        return labels;
     }
 
     @Test void viewThemesOpensSettingsAtAppearance() throws Exception {

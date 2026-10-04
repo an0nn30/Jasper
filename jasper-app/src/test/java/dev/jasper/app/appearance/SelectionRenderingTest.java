@@ -36,7 +36,7 @@ class SelectionRenderingTest {
             table.setRowHeight(28); table.setRowSelectionInterval(0, 0); table.setShowGrid(false);
             var menu = new JMenuItem("Menu choice"); menu.setArmed(true);
             var all = List.of(standard, composite, tree, table, menu);
-            for (Theme theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARK)) {
+            for (Theme theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, Theme.DARK)) {
                 ThemeTestSupport.install(theme);
                 var preview = new BufferedImage(600, 400, BufferedImage.TYPE_INT_ARGB);
                 var g = preview.createGraphics();

@@ -194,7 +194,7 @@ final class ConfigurationController implements AutoCloseable {
     }
 
     /**
-     * What Cmd+, each window's Settings command and View \u203a Window Settings\u2026 open, with the page to show (null for the
+     * What Cmd+, each window's Settings command and the Window Settings\u2026 command open, with the page to show (null for the
      * last one visited); by default config.toml in an editor.
      */
     void settingsOpener(java.util.function.BiConsumer<WindowContent, String> opener) {
