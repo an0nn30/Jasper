@@ -27,6 +27,10 @@ class FolderTabScaleTest {
                 try { strip.paint(g); } finally { g.dispose(); }
                 var entry = WindowTabsTest.named(strip, "select:second").getParent();
                 Color surface = owner.theme().palette().background();
+                assertThat(new Color(image.getRGB(entry.getX() + entry.getWidth() / 2,
+                    strip.getHeight() - UIScale.scale(2))))
+                    .as("the thin accent indicator follows UI scale and configured height")
+                    .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.ACCENT));
                 assertThat(new Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 0)))
                     .as("folder reaches the top of the rail without a dark gap").isEqualTo(surface);
                 for (int cornerX : new int[]{entry.getX() + UIScale.scale(5),

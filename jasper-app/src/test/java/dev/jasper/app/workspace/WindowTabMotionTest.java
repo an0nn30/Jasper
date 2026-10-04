@@ -202,6 +202,8 @@ class WindowTabMotionTest {
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTab().rename("first"); owner.update();
         var clock = new AtomicLong(); var strip = new WindowTabs(owner, clock::get);
+        // Exercise explicit durations independently of the permanent product defaults.
+        strip.setAnimations(new AnimationSettings(true, 150, 120, 130));
         strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
         return new Fixture(owner, strip, clock);
     }

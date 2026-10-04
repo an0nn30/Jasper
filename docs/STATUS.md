@@ -2,6 +2,17 @@
 
 ## Current state — 2026-10-04
 
+- **Tab timings finalized and active indicator added** (2026-10-04; `codex/folder-tabs`): user native testing
+  selected **80 ms open, 100 ms close, 130 ms switch**. Temporary timing controls/schema keys are removed; exactly
+  their three old saved keys are silently ignored so old values cannot override the permanent motion. Unknown
+  siblings still warn, and existing config bytes remain untouched. Appearance → Animations retains the live global
+  toggle. A centered **32 × 2 logical-pixel pill** in the resolved workspace accent now marks the active folder,
+  follows its motion/opacity, and clips to the scrolling viewport. [Design and current previews](design/folder-tabs.md).
+  Config retirement and indicator regressions passed; dark/light Swing renders inspected, plus normal/2× geometry
+  and glass repaint checks. Final `./gradlew check --continue`: **8,465 tests, 0 failures, 0 errors,
+  6 skipped**; architecture/doclint, changed-Java hygiene and whitespace checks passed. Independent follow-up
+  review found no actionable findings. No GUI, benchmark, merge or push. Native indicator appearance remains user-run.
+
 - **Folder-tab motion and shared animation policy implemented** (2026-10-04; `codex/folder-tabs`; config
   `9a2a43ca`, motion `6fdb0ddd`; [design and tuning](design/folder-tabs.md#tab-motion-and-shared-animation-setting)):
   opening expands/fades, closing fades while its gap contracts, and selection glides the folder highlight.

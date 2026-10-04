@@ -245,6 +245,17 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                 fading.intersect(new java.awt.geom.Area(viewport.getBounds()));
                 g.fill(fading);
             }
+            // A slim accent pill travels with the folder, staying inside the scrolling tab viewport.
+            double indicatorWidth = Math.min(UIScale.scale(32), Math.max(0, folderWidth.current - UIScale.scale(16)));
+            if (indicatorWidth > 0 && folderAlpha.current > 0) {
+                g.clip(viewport.getBounds());
+                g.setComposite(AlphaComposite.SrcOver.derive((float) folderAlpha.current));
+                g.setColor(owner.theme().workspace().tokens().get(Token.ACCENT));
+                double thickness = UIScale.scale(2f);
+                g.fill(new java.awt.geom.RoundRectangle2D.Double(
+                    folderX.current - scrollOffset + (folderWidth.current - indicatorWidth) / 2,
+                    getHeight() - UIScale.scale(3), indicatorWidth, thickness, thickness, thickness));
+            }
         } finally { g.dispose(); }
     }
 

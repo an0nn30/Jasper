@@ -199,7 +199,8 @@ class WorkspaceGlassTest {
             assertThat(strip.getHeight()).as("the tab strip is laid out").isPositive();
             Color workspace = owner.currentPane().getBackground();
             var entry = WindowTabsTest.named(strip, "select:" + owner.currentTab().title()).getParent();
-            int x = entry.getX() + entry.getWidth() / 2, y = strip.getHeight() - 2;
+            // Sample below the accent pill: the joined folder surface keeps its glass alpha.
+            int x = entry.getX() + entry.getWidth() / 2, y = strip.getHeight() - 1;
             Point at = SwingUtilities.convertPoint(strip, x, y, owner);
 
             Color opaque = new Color(render(owner).getRGB(at.x, at.y), true);
@@ -225,7 +226,8 @@ class WorkspaceGlassTest {
             var strip = owner.windowTabs(); WindowTabsTest.layout(strip, 400, 30);
             var entry = WindowTabsTest.named(strip, "select:wide folder tab 7").getParent();
             var image = render(strip);
-            int x = entry.getX() + entry.getWidth() / 2, y = strip.getHeight() - 2;
+            // Sample below the accent pill: the joined folder surface keeps its glass alpha.
+            int x = entry.getX() + entry.getWidth() / 2, y = strip.getHeight() - 1;
             assertThat(new Color(image.getRGB(x, y), true).getAlpha()).as("folder retains one workspace fill").isEqualTo(128);
             assertThat(new Color(image.getRGB(390, y), true).getAlpha()).as("fixed controls sit on a solid recess").isEqualTo(255);
             // Repaint the dirty region a close-button hover produces, through its strip painting origin.

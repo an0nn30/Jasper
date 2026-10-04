@@ -110,6 +110,24 @@ class WindowTabsTest {
         });
     }
 
+    @Test void activeFolderHasAThinPillInTheWorkspaceAccent() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            for (var theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                owner.selectTheme(theme);
+                var strip = owner.windowTabs(); layout(strip, 800, 30);
+                var selected = named(strip, "select:second").getParent();
+                int middle = selected.getX() + selected.getWidth() / 2;
+                Color accent = owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.ACCENT);
+                assertThat(pixel(strip, middle, 28)).as("active indicator uses the current workspace accent").isEqualTo(accent);
+                assertThat(pixel(strip, middle, 26)).as("indicator remains only two pixels tall").isEqualTo(owner.workspaceSurface());
+                assertThat(pixel(strip, middle, 29)).as("the folder still joins the terminal below the indicator").isEqualTo(owner.workspaceSurface());
+                assertThat(pixel(strip, 40, 28)).as("inactive tabs have no accent indicator").isEqualTo(strip.getBackground());
+            }
+        });
+    }
+
     @Test void newTabAtTheFarRightOpensAndSelectsATabAndStopsAfterClosure() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

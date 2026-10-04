@@ -38,9 +38,9 @@ public final class WindowTabMotionPreview {
                     owner.installRootBindings(root);
                     strip.refresh(); root.setSize(800, 420); LayoutTestSupport.layoutTree(root);
                     var third = model.content().open("preview", "third", "pve-root", owner.id(), terminalText());
-                    strip.refresh(); frames(root, strip, clock, output, appearance + "-open", 150);
-                    third.requestClose(); strip.refresh(); frames(root, strip, clock, output, appearance + "-close", 120);
-                    first.select(); strip.refresh(); frames(root, strip, clock, output, appearance + "-switch", 130);
+                    strip.refresh(); frames(root, strip, clock, output, appearance + "-open", dev.jasper.app.config.AnimationSettings.defaults().tabOpenMillis());
+                    third.requestClose(); strip.refresh(); frames(root, strip, clock, output, appearance + "-close", dev.jasper.app.config.AnimationSettings.defaults().tabCloseMillis());
+                    first.select(); strip.refresh(); frames(root, strip, clock, output, appearance + "-switch", dev.jasper.app.config.AnimationSettings.defaults().tabSwitchMillis());
                     strip.close();
                 }
             });
