@@ -2,6 +2,27 @@
 
 ## Current state — 2026-10-03
 
+- **Dock drop zones: six edge zones replace the 3 × 2 grid, on branch `claude/dock-bottom-halves` (from `main` at
+  `43894416`); awaiting the user's GUI check and merge decision** (2026-10-03; spec §3 "Targets" and "Guides" amended
+  at the user's request). The user could not drop a tool window on the lower half of the left or right side and named
+  six zones: left up, left down, bottom left, bottom right, right up, right down. Root cause: the workspace target was
+  a grid of thirds (rows) and halves (columns), which gave Left Bottom and Right Bottom only the middle third of each
+  half; most of the lower left and right fell in the full-width bottom row (a headless probe of a 1144 × 746
+  workspace: 130 px in and 560 px down resolved to Bottom Left). Fix: `DockDropResolver` takes the nearest of the left,
+  right and bottom edges, each distance a share of the workspace's own width (sides) or height (bottom); a side splits
+  at half the height into its top and bottom slot, the bottom at half the width; a side wins a tie with the bottom and
+  left wins over right; exact `long` cross-multiplication. The probe also showed a stripe drop of a hidden window
+  previewing a frame that never appears, because the stripe drop keeps it hidden: `DockDrag` now shows no area
+  highlight for it (the placeholder and the ghost stay). Unchanged: a window alone in a side's bottom slot still fills
+  that side (spec §1, as in IntelliJ), so its preview looks like the top zone until the top slot shows a window.
+  Tests: **+11** (`DockDropResolverTest` 5 → 12, rewritten for the new rule with the probe's case, the diagonal, the
+  half splits, ties, a wide and a tall workspace; `DockDragTest` 21 → 23 and `WindowDragTest` 12 → 14, including a
+  lower-left drop beside a showing Sessions and the hidden-window preview); the drag tests aim with
+  `DockTestSupport.zone(workspace, slot)` instead of a grid cell, and `WindowCornerLayerTest` aims lower in the cards.
+  `./gradlew check --continue`: **8,364 tests, 0 failures, 0 errors, 6 skipped**, all architecture gates and doclint
+  included. No GUI launched. GUI check for the user: drag a tool window toward each of the six edges (the upper and
+  lower halves of the left and right sides, and the left and right halves of the bottom) and see the highlight.
+
 - **Notifications plan 3: SDK notifications, reviewed on branch `claude/notifications-3`; awaiting the user's GUI
   checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
   [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
@@ -51,9 +72,9 @@
 
 - **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe
-  buttons and headers. `DockDropResolver` (pure) resolves a stripe group and position or a cell of the workspace's 3 × 2
-  grid; `DockGeometry.landing` previews the landing on a copy of the state; during a drag both stripes show all three
-  groups, lift the dragged button and open a gap; `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the
+  buttons and headers. `DockDropResolver` (pure) resolves a stripe group and position or one of the workspace's six edge
+  zones (a 3 × 2 grid until 2026-10-03; see the first entry); `DockGeometry.landing` previews the landing on a copy of
+  the state; during a drag both stripes show all three groups, lift the dragged button and open a gap; `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the
   placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
   drop moves and keeps visibility; a workspace drop moves and shows (`DockState.moveAndShow`). Any dock change, View ›
   Rail, or the window closing or being deactivated cancels a drag. Deviations from the plan text: before execution

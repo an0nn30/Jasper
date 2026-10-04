@@ -145,20 +145,32 @@ group bounds, button bounds and workspace bounds:
 - **Over a stripe:** the group under the cursor (top, second, foot) and the insertion index from button midpoints.
   During a drag both stripes show all three groups with their separators; an empty group gets one button's height
   of drop space.
-- **Over the workspace** (between the stripes, from below the header to above the status bar): a 3 × 2 grid that
-  mirrors the stripes. Rows are thirds of the height, columns halves of the width:
+- **Over the workspace** (between the stripes, from below the header to above the status bar): six edge zones, one
+  for each slot. The target is the nearest of the workspace's left, right and bottom edges, each distance taken as a
+  share of the workspace's own width (left, right) or height (bottom), so a wide or a tall workspace splits like any
+  other. There is no top edge, because there are no top slots. The left and right edges split at half the height:
+  the upper half is the side's top slot, the lower half its bottom slot. The bottom edge splits at half the width,
+  into Bottom Left and Bottom Right. The three edges meet at the middle: a diagonal runs from each lower corner to
+  it, and the half-height lines run across to it. A tie goes to a side over the bottom, and to the left over the
+  right.
 
   ```
-  ┌──────────────┬──────────────┐
-  │  LEFT_TOP    │  RIGHT_TOP   │
-  ├──────────────┼──────────────┤
-  │  LEFT_BOTTOM │  RIGHT_BOTTOM│
-  ├──────────────┼──────────────┤
-  │  BOTTOM_LEFT │  BOTTOM_RIGHT│
-  └──────────────┴──────────────┘
+  ┌─────────────────────┬─────────────────────┐
+  │                     │                     │
+  │      LEFT_TOP       │     RIGHT_TOP       │
+  │                     │                     │
+  ├─────────────────────┼─────────────────────┤
+  │ LEFT_BOTTOM      ╲     ╱     RIGHT_BOTTOM │
+  │              ╲      │      ╱              │
+  │          ╲          │          ╱          │
+  │       ╲             │             ╱       │
+  │    ╲    BOTTOM_LEFT │   BOTTOM_RIGHT ╱    │
+  │                     │                     │
+  └─────────────────────┴─────────────────────┘
   ```
 
-  A workspace drop appends the window to that slot's group.
+  A workspace drop appends the window to that slot's group. Amended 2026-10-03 at the user's request: six edge zones
+  replace the 3 × 2 grid, whose middle-third bottom halves were hard to hit.
 - **Anywhere else** (title bar, status bar, outside the window): no target, no highlight; release cancels.
 
 ### Guides
@@ -167,7 +179,8 @@ group bounds, button bounds and workspace bounds:
 
 1. **Area highlight:** a translucent filled rectangle with a 1px border, exactly where the window would land,
    computed by `DockGeometry.compute` on a "what if" copy of the state (the dragged window active in the target
-   slot). The real layout does not reflow during the drag.
+   slot). The real layout does not reflow during the drag. A stripe drop of a hidden window shows no area highlight,
+   because the window stays hidden and no frame would appear; the placeholder and the ghost still show.
 2. **Stripe placeholder:** the target group's buttons part to open a gap at the insertion index, holding a
    highlighted rounded square. The source button is lifted out of its old place.
 3. **Ghost:** the dragged window's icon follows the cursor.
