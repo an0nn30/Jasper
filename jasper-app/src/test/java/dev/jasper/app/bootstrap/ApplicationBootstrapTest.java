@@ -8,12 +8,29 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class ApplicationBootstrapTest {
+    /** What {@code configureDesktopProperties} sets in this JVM: restored after every test, so nothing leaks into other suites. */
+    private static final java.util.List<String> DESKTOP_PROPERTIES = java.util.List.of(
+        "apple.laf.useScreenMenuBar", "apple.awt.application.appearance", "apple.awt.enableTemplateImages");
+    private final java.util.Map<String, String> savedDesktopProperties = new java.util.HashMap<>();
     @TempDir Path directory;
+
+    @BeforeEach void rememberDesktopProperties() {
+        for (String key : DESKTOP_PROPERTIES) savedDesktopProperties.put(key, System.getProperty(key));
+    }
+
+    @AfterEach void restoreDesktopProperties() {
+        savedDesktopProperties.forEach((key, value) -> {
+            if (value == null) System.clearProperty(key); else System.setProperty(key, value);
+        });
+    }
+
     @Test void upgradesSelectionsBeforeInitialServiceStateAndCarriesProblems() throws Exception {
         Path config = directory.resolve("config.toml");
         Files.writeString(config, "ui.theme.variant='light'\n");
@@ -43,17 +60,11 @@ class ApplicationBootstrapTest {
     }
     @Test void desktopPropertiesOverrideAnInheritedMenuBarSetting() {
         String menuKey = "apple.laf.useScreenMenuBar", appearanceKey = "apple.awt.application.appearance";
-        String previousMenu = System.getProperty(menuKey), previousAppearance = System.getProperty(appearanceKey);
-        try {
-            // Override an inherited JVM setting before desktop startup.
-            System.setProperty(menuKey, "false");
-            ApplicationBootstrap.configureDesktopProperties();
-            assertThat(System.getProperty(menuKey)).isEqualTo("true");
-            assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
-        } finally {
-            if (previousMenu == null) System.clearProperty(menuKey); else System.setProperty(menuKey, previousMenu);
-            if (previousAppearance == null) System.clearProperty(appearanceKey); else System.setProperty(appearanceKey, previousAppearance);
-        }
+        // Override an inherited JVM setting before desktop startup.
+        System.setProperty(menuKey, "false");
+        ApplicationBootstrap.configureDesktopProperties();
+        assertThat(System.getProperty(menuKey)).isEqualTo("true");
+        assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
     }
 
     @Test void helpAndErrorsExitBeforeConfigurationOrDesktopStartup() {
@@ -216,26 +227,16 @@ class ApplicationBootstrapTest {
     }
 
     @Test void desktopPropertiesAlwaysUseTheMacScreenMenuBar() {
-        String previous = System.getProperty("apple.laf.useScreenMenuBar");
-        try {
-            System.clearProperty("apple.laf.useScreenMenuBar");
-            ApplicationBootstrap.configureDesktopProperties();
-            assertThat(System.getProperty("apple.laf.useScreenMenuBar")).isEqualTo("true");
-            assertThat(System.getProperty("apple.awt.application.appearance")).isEqualTo("system");
-        } finally {
-            if (previous == null) System.clearProperty("apple.laf.useScreenMenuBar");
-            else System.setProperty("apple.laf.useScreenMenuBar", previous);
-        }
+        System.clearProperty("apple.laf.useScreenMenuBar");
+        ApplicationBootstrap.configureDesktopProperties();
+        assertThat(System.getProperty("apple.laf.useScreenMenuBar")).isEqualTo("true");
+        assertThat(System.getProperty("apple.awt.application.appearance")).isEqualTo("system");
     }
 
     @Test void desktopPropertiesMakeTheMenuBarGlyphATemplateImage() {
-        String key = "apple.awt.enableTemplateImages", previous = System.getProperty(key);
-        try {
-            System.clearProperty(key);
-            ApplicationBootstrap.configureDesktopProperties();
-            assertThat(System.getProperty(key)).isEqualTo("true");
-        } finally {
-            if (previous == null) System.clearProperty(key); else System.setProperty(key, previous);
-        }
+        String key = "apple.awt.enableTemplateImages";
+        System.clearProperty(key);
+        ApplicationBootstrap.configureDesktopProperties();
+        assertThat(System.getProperty(key)).isEqualTo("true");
     }
 }

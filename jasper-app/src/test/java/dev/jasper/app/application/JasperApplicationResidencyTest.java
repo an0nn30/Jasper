@@ -96,6 +96,31 @@ class JasperApplicationResidencyTest {
         }
     }
 
+    @Test void warmingUpStartsOneCollectionAfterDoneOffTheEdt() throws Exception {
+        JasperApplication[] held = new JasperApplication[1];
+        var events = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var collected = new CountDownLatch(1);
+        var onEdt = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try {
+            edt(() -> {
+                held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { });
+                held[0].trace(StartupTrace.detached());
+                held[0].collector = () -> {
+                    onEdt.set(javax.swing.SwingUtilities.isEventDispatchThread());
+                    events.add("collect");
+                    collected.countDown();
+                };
+            });
+            edt(() -> held[0].warmUp(() -> events.add("done")));
+            assertThat(collected.await(5, TimeUnit.SECONDS)).as("the collection follows the warm-up").isTrue();
+            edt(() -> { });
+            assertThat(events).as("after done, once").containsExactly("done", "collect");
+            assertThat(onEdt).as("never on the EDT").isFalse();
+        } finally {
+            edt(() -> { if (held[0] != null) held[0].quit(); });
+        }
+    }
+
     @Test void theLoginItemFollowsTheSettingWhileResidencyDoesNot(@org.junit.jupiter.api.io.TempDir
                                                                  java.nio.file.Path dir) throws Exception {
         java.nio.file.Path file = dir.resolve("config.toml");

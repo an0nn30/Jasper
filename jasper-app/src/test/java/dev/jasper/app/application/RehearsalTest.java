@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.testsupport.IdleTerminalSession;
 import dev.jasper.app.workspace.DesktopTestSupport;
@@ -7,6 +8,7 @@ import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.terminal.session.TerminalSession;
 import dev.jasper.terminal.session.TerminalSessionListener;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
+import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -313,6 +316,153 @@ class RehearsalTest {
             .hasRootCauseInstanceOf(Boom.class);
         assertThat(composeDone).as("done ran before the Error left").hasValue(1);
         DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
+    }
+
+    /**
+     * An application whose collection after a warm-up only records, into the same event list as the rehearsal's stage and
+     * done, and on which thread it ran. The warm-up's one collection must come after done and nowhere else.
+     */
+    private static final class Collecting implements AutoCloseable {
+        final JasperApplication application;
+        final Recording recording;
+        final CountDownLatch collected = new CountDownLatch(1);
+        final AtomicInteger collections = new AtomicInteger();
+        final AtomicReference<Thread> thread = new AtomicReference<>();
+        final AtomicReference<Boolean> onEdt = new AtomicReference<>();
+
+        Collecting(Recording recording) throws Exception {
+            this.recording = recording;
+            JasperApplication[] held = new JasperApplication[1];
+            edt(() -> {
+                held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { });
+                held[0].collector = () -> {
+                    thread.set(Thread.currentThread());
+                    onEdt.set(SwingUtilities.isEventDispatchThread());
+                    recording.events.add("collect");
+                    collections.incrementAndGet();
+                    collected.countDown();
+                };
+            });
+            application = held[0];
+        }
+
+        /** The recording's done, held up a moment: a collection started before done would show ahead of it. */
+        Runnable slowDone() {
+            return application.collectingAfter(() -> {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                recording.done().run();
+            });
+        }
+
+        /** Waits for the collection, then for any second one that a bug would have queued behind it. */
+        void awaitOneCollection() throws Exception {
+            assertThat(collected.await(5, TimeUnit.SECONDS)).as("the collection ran").isTrue();
+            edt(() -> { });
+            Thread.sleep(200);
+            assertThat(collections).as("exactly one collection").hasValue(1);
+            assertThat(onEdt.get()).as("off the EDT").isFalse();
+            assertThat(thread.get().isDaemon()).as("on a daemon thread").isTrue();
+        }
+
+        @Override public void close() {
+            try {
+                edt(application::quitNow);
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            }
+        }
+    }
+
+    @Test void oneCollectionFollowsAPlayedRehearsalAfterDone() throws Exception {
+        var recording = new Recording();
+        var feeds = new AtomicReference<Rehearsal.Feed>();
+        try (var collecting = new Collecting(recording)) {
+            edt(() -> Rehearsal.run(() -> {
+                feeds.set(Rehearsal.feed(80, 24));
+                return feeds.get();
+            }, feed -> recording.stage(), collecting.slowDone(), Duration.ofSeconds(30)));
+            collecting.awaitOneCollection();
+            assertThat(recording.events).as("never ahead of done").containsExactly("paint", "close", "done", "collect");
+            assertThat(recording.dones).hasValue(1);
+        }
+        DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
+    }
+
+    @Test void oneCollectionAlsoFollowsARehearsalThatCouldNotBeBuiltOrComposed() throws Exception {
+        var recording = new Recording();
+        try (var quiet = new Quiet(); var collecting = new Collecting(recording)) {
+            edt(() -> Rehearsal.run(() -> { throw new IllegalStateException("no canned session"); },
+                feed -> recording.stage(), collecting.slowDone(), Duration.ofSeconds(30)));
+            collecting.awaitOneCollection();
+            assertThat(recording.events).containsExactly("done", "collect");
+            assertThat(quiet.warnings()).singleElement().asString().contains("could not be built");
+        }
+
+        var composed = new Recording();
+        var feeds = new AtomicReference<Rehearsal.Feed>();
+        try (var quiet = new Quiet(); var collecting = new Collecting(composed)) {
+            edt(() -> Rehearsal.run(() -> {
+                feeds.set(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
+                return feeds.get();
+            }, feed -> { throw new IllegalStateException("cannot compose"); }, collecting.slowDone(), Duration.ofSeconds(30)));
+            collecting.awaitOneCollection();
+            assertThat(composed.events).containsExactly("done", "collect");
+            assertThat(quiet.warnings()).singleElement().asString().contains("could not be built");
+        }
+        DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
+    }
+
+    @Test void oneCollectionAlsoFollowsARehearsalThatFailedWhilePaintingEvenWithAnError() throws Exception {
+        var plain = new Recording();
+        var feeds = new CopyOnWriteArrayList<Rehearsal.Feed>();
+        try (var quiet = new Quiet(); var collecting = new Collecting(plain)) {
+            edt(() -> Rehearsal.run(() -> {
+                feeds.add(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
+                return feeds.get(0);
+            }, feed -> plain.stage(() -> { throw new IllegalStateException("no screen"); }, () -> { }),
+                collecting.slowDone(), Duration.ofMillis(50)));
+            collecting.awaitOneCollection();
+            assertThat(plain.events).containsExactly("paint", "close", "done", "collect");
+            assertThat(quiet.uncaught()).isEmpty();
+        }
+
+        var failing = new Recording();
+        try (var quiet = new Quiet(); var collecting = new Collecting(failing)) {
+            edt(() -> Rehearsal.run(() -> {
+                feeds.add(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
+                return feeds.get(1);
+            }, feed -> failing.stage(() -> { throw new Boom("no toolkit"); }, () -> { }),
+                collecting.slowDone(), Duration.ofMillis(50)));
+            collecting.awaitOneCollection();
+            DesktopTestSupport.until(() -> !quiet.uncaught().isEmpty());
+            assertThat(failing.events).as("the collection started although an Error was leaving")
+                .containsExactly("paint", "close", "done", "collect");
+            assertThat(quiet.uncaught()).singleElement().isInstanceOf(Boom.class);
+        }
+        for (var feed : feeds) DesktopTestSupport.until(() -> feed.session().exitFuture().isDone());
+    }
+
+    @Test void oneCollectionFollowsAnErrorWhileBuildingAndADoneThatThrows() throws Exception {
+        var building = new Recording();
+        try (var collecting = new Collecting(building)) {
+            assertThatThrownBy(() -> edt(() -> Rehearsal.run(() -> { throw new Boom("build"); },
+                feed -> { throw new AssertionError("never composed"); }, collecting.slowDone(), Duration.ofSeconds(30))))
+                .hasRootCauseInstanceOf(Boom.class);
+            collecting.awaitOneCollection();
+            assertThat(building.events).containsExactly("done", "collect");
+        }
+
+        var throwing = new Recording();
+        try (var collecting = new Collecting(throwing)) {
+            Runnable done = collecting.application.collectingAfter(() -> { throw new IllegalStateException("done failed"); });
+            assertThatThrownBy(() -> edt(done::run)).hasRootCauseInstanceOf(IllegalStateException.class);
+            collecting.awaitOneCollection();
+            assertThat(throwing.events).as("done's own failure still propagated").containsExactly("collect");
+        }
     }
 
     @Test void aFailedCannedLaunchIsLoggedAndNeverOpensADialog() throws Exception {

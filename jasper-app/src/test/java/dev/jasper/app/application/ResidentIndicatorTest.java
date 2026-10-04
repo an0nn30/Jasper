@@ -152,6 +152,35 @@ class ResidentIndicatorTest {
         }
     }
 
+    @Test void aBridgeThatThrowsWhilePreparingStillGetsTheIndicator() throws Exception {
+        var indicator = new Indicator();
+        var prepares = new AtomicInteger();
+        var uncaught = new java.util.concurrent.CopyOnWriteArrayList<Throwable>();
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        // Settling does its work once and nothing retries it, so the indicator must not depend on the bridge having loaded.
+        Thread.setDefaultUncaughtExceptionHandler((thread, failure) -> uncaught.add(failure));
+        JasperApplication application = application(() -> { }, indicator, settled());
+        try {
+            edt(() -> application.backgroundOnQuit(new DockControl(visible -> { }, () -> {
+                prepares.incrementAndGet();
+                throw new IllegalStateException("the bridge could not be loaded");
+            }, () -> false), true));
+            resident(application);
+            DesktopTestSupport.until(() -> indicator.shown().get() == 1 && !uncaught.isEmpty());
+            assertThat(prepares).as("start-up tried to prepare it").hasValue(1);
+            assertThat(indicator.removed()).hasValue(0);
+            assertThat(application.quitIsSystemQuit()).as("a bridge that never prepared: quits stay real").isTrue();
+            assertThat(uncaught).as("the failure propagated as before").singleElement()
+                .isInstanceOf(IllegalStateException.class);
+            resident(application);
+            assertThat(prepares).as("settling does not run again").hasValue(1);
+            assertThat(indicator.shown()).hasValue(1);
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previous);
+            edt(application::quitNow);
+        }
+    }
+
     @Test void aProcessThatIsNotResidentShowsNothing() throws Exception {
         var indicator = new Indicator();
         JasperApplication application = application(() -> { }, indicator, settled());

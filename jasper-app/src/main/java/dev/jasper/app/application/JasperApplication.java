@@ -127,6 +127,11 @@ public final class JasperApplication {
     private ResidentControl residentControl = ResidentControl.NONE;
     private boolean replacementHandsOff;
     private boolean standaloneNotice;
+    /**
+     * Test seam: the one collection that follows a {@link #warmUp}, started on its own daemon thread. Production is
+     * {@code System.gc()}: the rehearsal's garbage would otherwise stay in the resident process's heap.
+     */
+    Runnable collector = System::gc;
     /** Test seams. Production plans from this process's own command line and starts a real process. */
     Function<RestartMode, Optional<List<String>>> restartPlanner = RestartCommand::current;
     Consumer<List<String>> spawner = command -> {
@@ -482,8 +487,12 @@ public final class JasperApplication {
         if (startupSettled || !resident || quitting || stopped) return;
         startupSettled = true;
         stopSettleFallback();
-        if (dock != null) dock.prepare();
-        showIndicator(true);
+        try {
+            if (dock != null) dock.prepare();
+        } finally {
+            // Settling happens once and nothing retries it: a bridge that throws must not leave a resident process unseen.
+            showIndicator(true);
+        }
     }
 
     /** The menu bar item's New Window: always a new window, in front of other applications. EDT. */
@@ -558,10 +567,12 @@ public final class JasperApplication {
      * through the window's own graphics pipeline, and disposed without ever being shown. Plugins never see its pane:
      * it is not registered with the terminal registry, and it is not a place where plugin content opens. It opens no
      * window timing and marks no first paint, so only {@code done} tells the trace the warm-up finished. Headless there
-     * is nothing to rehearse with. EDT.
+     * is nothing to rehearse with. Once {@code done} has run, whatever the outcome, one explicit collection starts off the
+     * EDT, so the heap the rehearsal grew returns to the operating system. EDT.
      */
     public void warmUp(Runnable done) {
         Objects.requireNonNull(done, "done");
+        Runnable finished = collectingAfter(done);
         ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
         boolean rehearsing = false;
         try {
@@ -575,14 +586,30 @@ public final class JasperApplication {
             rehearsing = !GraphicsEnvironment.isHeadless() && !quitting && !stopped;
         } finally {
             // Nothing to rehearse, or the font set threw an Error: finished now. Otherwise the rehearsal reports it.
-            if (!rehearsing) done.run();
+            if (!rehearsing) finished.run();
         }
         if (rehearsing) {
             // This bypasses openWindow: no window timing and no FIRST_PAINT or OUTPUT_PAINTED, which would settle
             // residency for a window nobody sees. Only done marks WARMED_UP.
             Rehearsal.run(() -> Rehearsal.feed(snapshot.columns(), snapshot.lines()), feed -> rehearsalWindow(feed, snapshot),
-                done, Rehearsal.FALLBACK);
+                finished, Rehearsal.FALLBACK);
         }
+    }
+
+    /**
+     * {@code done} followed, whether it returned or threw, by one {@link #collector} run on a new daemon thread. The thread
+     * starts from a later EDT event, not from the one that finished the rehearsal: that event's frames still hold the
+     * closed window, which the collection could not free. An {@link Error} from {@code done} still propagates; the
+     * returned task runs on the EDT, like {@link #warmUp}.
+     */
+    Runnable collectingAfter(Runnable done) {
+        return () -> {
+            try {
+                done.run();
+            } finally {
+                SwingUtilities.invokeLater(() -> Thread.ofPlatform().daemon().name("jasper-warm-up-collection").start(collector));
+            }
+        };
     }
 
     /**
