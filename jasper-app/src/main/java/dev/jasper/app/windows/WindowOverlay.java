@@ -144,18 +144,14 @@ final class WindowOverlay implements AutoCloseable {
 
         @Override protected boolean isPaintingOrigin() { return true; }
 
-        @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(getBackground());
-                g.fill(surface(0));
-            } finally { g.dispose(); }
-        }
-
         @Override protected void paintChildren(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
+                // Swing may skip paintComponent when an opaque child covers the dirty rectangle.
+                // Fill here: rounding that child exposes the card underneath even in that case.
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(getBackground());
+                g.fill(surface(0));
                 g.clip(surface(1));
                 super.paintChildren(g);
             } finally { g.dispose(); }

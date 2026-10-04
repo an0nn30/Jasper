@@ -13,7 +13,14 @@
   pass, and independent review found no actionable issues. Initial full `./gradlew check` passed all 88 tasks:
   **8,476 tests, 0 failures/errors, 6 skipped**. Changed-source hygiene and diff checks passed. Actual-component dark/light
   headless renders were inspected; the local animation preview is `build/connection-preview/connection-overlay-faster.gif`. The speed-only follow-up passed all four focused connection tests.
-  Native motion acceptance remains user-run. No GUI or benchmark launched, and no merge or push performed.
+  Adversarial round 1 found one P2: opaque-child partial repaints skipped the rounded card's background,
+  damaging its corners. The fill now runs before clipped children in `paintChildren`; a regression failed before
+  the fix and passes at 1×/2×. A fresh second adversarial review approved the entire change with no findings,
+  including 75 exact-pixel repaint probes at 1×/1.25×/1.5×/2×/3× under Metal, FlatLight and FlatDark.
+  Full post-fix `./gradlew check` passed: **8,487 tests, 0 failures/errors, 6 skipped**, all 88 tasks successful.
+  The branch includes Zen integration through `ccd4868f`; the user's authorized merge will also preserve newer
+  main changes. Native motion acceptance remains user-run. No GUI or benchmark launched. Merge and push are
+  explicitly authorized; final merged verification and publication follow this record.
 
 - **Zen integration with current main** (2026-10-04): merged `origin/main` at `4c3c6bb0`, preserving its
   Normal/Compact startup setting independently of the saved Zen toggle. A regression covers restoring and
