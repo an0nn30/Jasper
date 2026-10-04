@@ -64,6 +64,17 @@
   in the shared contracts; form/panel/render test fixtures arrive with the real renderer tasks.
   Headless focused tests: **22 at default and 2x scale**, zero failures/errors/skips; module check and
   architecture: **129 tests, 0 failures/errors/skips**. Source hygiene and diff checks are clean.
+  Task 6 renderer implementation and self-review complete (independent review pending): stable id/kind
+  reconciliation, five basic button and field kinds, literal labels/tooltips, inline validation/adornments,
+  callback containment and owned listener teardown. Descriptor value comparison preserves pending edits;
+  textarea documents/viewports and sibling components survive unrelated updates. Approved sequencing
+  pulls basic real Stacks forward from Task 8 for sibling identity and Task 7 paired controls; Task 8
+  completes full composition. KitView owns a defaultFont-only UIDefaults subscription now, independently
+  of equal ThemePair suppression: font growth fits larger controls while retaining document/caret/selection.
+  Self-review regressions fixed descendant/Browse availability, tooltip HTML interpretation, textarea
+  scrolling and multiline placeholder padding. Headless focused tests: **23 at default and 2x scale**;
+  module check/architecture: **152 tests, 0 failures/errors/skips**. Headless focus evidence proves stable
+  component identity without reparenting; actual native focus acceptance remains user-run. No GUI/AOT.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`
