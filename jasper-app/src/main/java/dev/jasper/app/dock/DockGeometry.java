@@ -165,8 +165,7 @@ public final class DockGeometry {
     public static Optional<Rectangle> landing(Rectangle bounds, DockState state, String id, Slot target, Metrics metrics) {
         DockState whatIf = state.copy();
         if (whatIf.slot(id).isEmpty()) return Optional.empty();
-        List<String> ids = whatIf.ids(target);
-        whatIf.moveAndShow(id, target, ids.contains(id) ? ids.indexOf(id) : ids.size());
+        whatIf.moveAndShow(id, target, whatIf.dropIndex(id, target));
         return compute(bounds, whatIf, metrics).slot(target);
     }
 

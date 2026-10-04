@@ -170,8 +170,7 @@ final class WindowContributions implements AutoCloseable {
             dock.move(id, slot, target.index().getAsInt());
             return;
         }
-        List<String> ids = dock.ids(slot);
-        dock.moveAndShow(id, slot, ids.contains(id) ? ids.indexOf(id) : ids.size());
+        dock.moveAndShow(id, slot, dock.dropIndex(id, slot));
     }
 
     /** From a Move to menu: the end of the target slot's group, keeping visibility. */

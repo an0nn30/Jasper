@@ -5,11 +5,14 @@ import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.ToolbarEntry;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.Anchor;
+import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.ShortcutContext;
@@ -361,6 +364,26 @@ class HostedUiTest {
         ui.closeAll();
         assertThat(model.panels()).isEmpty();
         assertThat(model.railActions()).isEmpty();
+    }
+
+    @Test void everyAnchorAndSplitCombinationMapsToItsOwnSlot() {
+        record Case(String id, Anchor anchor, boolean split, Slot slot) { }
+        var cases = List.of(
+            new Case("dev.x.tool.left", Anchor.LEFT, false, Slot.LEFT_TOP),
+            new Case("dev.x.tool.leftsplit", Anchor.LEFT, true, Slot.LEFT_BOTTOM),
+            new Case("dev.x.tool.right", Anchor.RIGHT, false, Slot.RIGHT_TOP),
+            new Case("dev.x.tool.rightsplit", Anchor.RIGHT, true, Slot.RIGHT_BOTTOM),
+            new Case("dev.x.tool.bottom", Anchor.BOTTOM, false, Slot.BOTTOM_LEFT),
+            new Case("dev.x.tool.bottomsplit", Anchor.BOTTOM, true, Slot.BOTTOM_RIGHT));
+        for (Case each : cases) {
+            var spec = new PanelSpec(each.id(), "Panel", new javax.swing.ImageIcon(), each.anchor());
+            ui.panels().register(each.split() ? spec.withSplit() : spec, host -> new javax.swing.JLabel());
+        }
+        assertThat(model.panels()).hasSize(6);
+        for (Case each : cases)
+            assertThat(model.panels()).filteredOn(panel -> panel.id().equals(each.id())).singleElement()
+                .satisfies(panel -> assertThat(panel.defaultSlot()).as("%s anchor, split %s", each.anchor(), each.split())
+                    .isEqualTo(each.slot()));
     }
 
     @Test void windowsAndDialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {

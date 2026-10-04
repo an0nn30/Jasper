@@ -19,7 +19,8 @@
   all four architecture gates and doclint included; the source hygiene check and `git diff --check c02673cd` are
   clean. Final review: one important finding fixed (a plugin whose manifest `name` showed nothing stopped Jasper from
   launching; `DescriptorParser` now rejects such a name, making it an unreadable-plugin problem); seven minor findings
-  are deferred in the plan's status banner. No GUI launched. GUI checks for the user: a plugin error card with Show
+  are deferred in the plan's status banner. No GUI launched. Pushed to `origin` on 2026-10-03 with the dock polish
+  round, at the user's choice. GUI checks for the user: a plugin error card with Show
   more… opening the Errors window; a long File Server transfer (one that runs past the activity threshold), whose
   outcome is posted in "File Server activities" as "Sending <file>" or "Receiving <file>" (an interrupted one as an
   error); a plugin directory without `plugin.toml` in the user plugins folder, reported at launch with Open Plugins.
@@ -88,9 +89,22 @@
   (an action's enable or title change now refreshes the stripe in place, so only adding or removing an action or a
   rail placement, or a dock or panel change, re-renders it; follow-up pushed to main on 2026-10-03; GUI check: lock the
   vault, or otherwise change an action, while dragging a tool window, and the drag carries on); on stripes shorter than about 200px the
-  foot can clip by one step during a drag; and the overlay repaints the whole window on each drag event, which may
-  lag on large HiDPI windows (the GUI checks will tell). No GUI launched; GUI checks for the user are the plan's last
-  section.
+  foot can clip by one step during a drag; and the overlay now repaints only what changed on each drag event (each
+  changed guide's old and new bounds, nothing when none changed, no longer the whole window and every terminal under
+  it), and the placeholder's fill sits inside its border like the highlight's, so the two no longer stack; GUI check:
+  the ghost should not lag while dragging on a large HiDPI window; if the ghost still lags over a terminal, the next
+  lever is in `jasper-terminal`: `TerminalView.paintComponent` takes a full snapshot and paints every row whatever its
+  clip, so a terminal under a small dirty rectangle still pays the whole snapshot. No GUI launched; GUI checks for the
+  user are the plan's last section.
+  Polish round (2026-10-03, pushed to `main` with notifications plans 2 and 3 at the user's choice): the overlay repaints only what changed, the placeholder's
+  border no longer stacks over its fill, and the placeholder's fill is concentric with its border (its corner
+  diameter is `arc - 1`, where the border's inner edge lies); `DockState.dropIndex` is the one drop-index rule shared
+  by the preview and the drop. 8 new tests pin behaviour that was already there: `HostedUiTest` maps all six anchor and
+  split combinations to their slots (`everyAnchorAndSplitCombinationMapsToItsOwnSlot`); `UiStateTest` gains 7 cases: a
+  version 1 side takes its size from the visible panel, else from the first panel (2), the dock's sizes and ratios
+  exactly at their limits are accepted and one step outside each falls back alone (2), and a scalar where the `dock`
+  or `panels` table belongs, or where a panel entry does, loses only that part (3). `./gradlew check --continue`:
+  **8,314 tests, 0 failures, 0 errors, 6 skipped** (8,306 before).
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.
@@ -263,8 +277,8 @@
   whole-branch review's findings were fixed (`5aa67e75`, `ac407bbb`). Findings deferred to plans 3, 4 and 5, and the
   smaller ones left open, are listed under "Deferred findings" in the plan's status banner. `./gradlew check`:
   **8,161 tests, 0 failures, 0 errors, 6 skips** (all four architecture gates, doclint and compiled examples
-  included; source hygiene over the 34 changed Java files and `git diff --check` clean). No GUI was launched and
-  nothing was pushed. GUI checks for the user:
+  included; source hygiene over the 34 changed Java files and `git diff --check` clean). No GUI was launched. Pushed
+  to `origin` on 2026-10-03 with the dock polish round, at the user's choice. GUI checks for the user:
   - an uncaught exception (for example from a plugin under development) shows an "Unexpected error in Jasper" or
     plugin card; Show more… opens the Errors window at it, in light and dark themes;
   - the Errors window: list selection with the mouse and the arrow keys, the monospaced trace scrolls, Copy pastes a

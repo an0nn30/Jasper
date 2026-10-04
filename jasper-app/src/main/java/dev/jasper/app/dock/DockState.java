@@ -73,6 +73,15 @@ public final class DockState {
     /** The slot's windows in stripe order. */
     public List<String> ids(Slot slot) { return List.copyOf(order.get(slot)); }
 
+    /**
+     * Where a workspace drop puts the window in the target slot's group: its own place if it is already there, else
+     * the end.
+     */
+    public int dropIndex(String id, Slot target) {
+        List<String> ids = ids(target);
+        return ids.contains(id) ? ids.indexOf(id) : ids.size();
+    }
+
     /** The window the slot shows, if any. */
     public Optional<String> active(Slot slot) { return Optional.ofNullable(active.get(slot)); }
 
