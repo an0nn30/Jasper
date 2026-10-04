@@ -80,6 +80,8 @@ public final class JasperApplication {
     private volatile boolean resident;
     /** A packaged macOS Jasper's Dock presence while resident; null where Quit really quits (Windows, Linux, development runs). */
     private volatile DockPresence dock;
+    /** Whether the application jar changed on disk since start-up: an update was installed under this process. */
+    private BooleanSupplier staleBuild = () -> false;
     private volatile StartupTrace trace = StartupTrace.current();
     private int windowsOpened;
     /**
@@ -230,7 +232,7 @@ public final class JasperApplication {
         // Registered whether or not residency is on, because a window that is merely minimized
         // should come back the same way.
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
-            reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise("reopen"));
+            reopenListener = event -> SwingUtilities.invokeLater(this::reopened);
             Desktop.getDesktop().addAppEventListener(reopenListener);
         }
         if (supports(Desktop.Action.APP_PREFERENCES)) {
@@ -414,6 +416,32 @@ public final class JasperApplication {
      */
     public void backgroundOnQuit(DockControl control, boolean visibleAtLaunch) {
         dock = new DockPresence(control, visibleAtLaunch);
+    }
+
+    /**
+     * Tells this process how to notice that it was updated on disk. Install before the first reopen.
+     *
+     * @param stale true once the application jar this process runs from has changed or gone
+     */
+    public void staleBuild(BooleanSupplier stale) {
+        staleBuild = Objects.requireNonNull(stale, "stale");
+    }
+
+    /**
+     * The macOS reopen event: a Dock click, Spotlight or {@code open -a} reaching the running Jasper. With no window open
+     * and the application replaced on disk since start-up, it relaunches as the new build through the restart path and
+     * exits; if that cannot happen (the command line is unknown, or a plugin refuses), the running build opens the
+     * window. With windows open it raises them: an update never takes a running terminal down. EDT.
+     */
+    void reopened() {
+        if (quitting || stopped) return;
+        if (resident && !windowsOpen() && staleBuild.getAsBoolean()) {
+            restart(RestartMode.SAME);
+            if (quitting || stopped) return;
+            LOG.log(System.Logger.Level.WARNING,
+                "Jasper was updated on disk but could not relaunch as the new build; this window comes from the running build");
+        }
+        openOrRaise("reopen");
     }
 
     private void showIndicator(boolean show) {

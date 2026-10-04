@@ -29,6 +29,18 @@ class ApplicationBootstrapTest {
         });
         assertThat(result).isZero();
     }
+    @Test void anUpdateIsTheJarChangingOrVanishingOnDisk() throws Exception {
+        Path jar = Files.writeString(directory.resolve("jasper-app.jar"), "build 1");
+        long started = HandoffSocket.lastModified(jar);
+        var replaced = ApplicationBootstrap.replacedOnDisk(jar, started);
+        assertThat(replaced.getAsBoolean()).isFalse();
+        Files.setLastModifiedTime(jar, java.nio.file.attribute.FileTime.fromMillis(started + 60_000));
+        assertThat(replaced.getAsBoolean()).as("a new build in place").isTrue();
+        Files.delete(jar);
+        assertThat(replaced.getAsBoolean()).as("the old build's jar is gone").isTrue();
+        assertThat(ApplicationBootstrap.replacedOnDisk(null, 0).getAsBoolean())
+            .as("an unknown code source never counts as updated").isFalse();
+    }
     @Test void desktopPropertiesOverrideAnInheritedMenuBarSetting() {
         String menuKey = "apple.laf.useScreenMenuBar", appearanceKey = "apple.awt.application.appearance";
         String previousMenu = System.getProperty(menuKey), previousAppearance = System.getProperty(appearanceKey);

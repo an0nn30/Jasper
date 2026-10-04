@@ -155,6 +155,7 @@ public final class ApplicationBootstrap {
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
                 replacementHandsOff(options), standaloneNotice(options));
+            application.staleBuild(replacedOnDisk(source, HandoffSocket.lastModified(source)));
             // The macOS menu bar item and the Windows notification-area icon, once start-up has settled.
             application.residentIndicator(ResidentTray::install);
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
@@ -310,6 +311,14 @@ public final class ApplicationBootstrap {
     static boolean stale(LaunchRequest request, Path source, long modified) {
         return !request.codeSource().equals(source == null ? Path.of("") : source)
             || request.codeSourceModified() != modified;
+    }
+
+    /**
+     * True once the application jar this process was loaded from has changed on disk (a new build was installed under
+     * it) or gone. An unknown code source never counts. Any thread; one file stat per call.
+     */
+    static java.util.function.BooleanSupplier replacedOnDisk(Path source, long modified) {
+        return () -> source != null && HandoffSocket.lastModified(source) != modified;
     }
 
     /**

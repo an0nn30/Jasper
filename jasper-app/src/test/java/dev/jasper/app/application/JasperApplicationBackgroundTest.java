@@ -3,6 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.contributions.ContentHost;
 import dev.jasper.app.platform.AppDirs;
+import dev.jasper.app.restart.RestartMode;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.testsupport.PluginJars;
 import java.awt.HeadlessException;
@@ -12,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -512,6 +514,133 @@ class JasperApplicationBackgroundTest {
             edt(application::quitRequested);
             assertThat(dock).as("it was still open, and closes once the plugin agrees").containsExactly(false);
             assertThat(terminated.getCount()).as("and the process stays").isEqualTo(1);
+        } finally {
+            edt(application::quitNow);
+            // The shutdown writes the plugin's and the window state under the temporary directory.
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test void aReopenAfterAnUpdateRelaunchesTheNewBuildFromTheBackground() throws Exception {
+        var terminated = new CountDownLatch(1);
+        var spawned = new CopyOnWriteArrayList<List<String>>();
+        var modes = new CopyOnWriteArrayList<RestartMode>();
+        JasperApplication application = application(terminated::countDown, false);
+        edt(() -> {
+            application.residency(true);
+            application.restartPlanner = mode -> {
+                modes.add(mode);
+                return Optional.of(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+            };
+            application.spawner = spawned::add;
+            application.staleBuild(() -> true);
+        });
+        edt(application::reopened);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).as("the old build exits").isTrue();
+        assertThat(modes).containsExactly(RestartMode.SAME);
+        assertThat(spawned).as("and starts the new one").containsExactly(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+        assertThat(dock).as("no window of the old build was shown").isEmpty();
+    }
+
+    @Test void aReopenOfTheRunningBuildOpensAWindowAndRelaunchesNothing() throws Exception {
+        var spawned = new CopyOnWriteArrayList<List<String>>();
+        JasperApplication application = application(() -> { }, false);
+        try {
+            edt(() -> {
+                application.residency(true);
+                application.spawner = spawned::add;
+                application.staleBuild(() -> false);
+            });
+            assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(dock).as("it went for a window").containsExactly(true, false);
+            assertThat(spawned).isEmpty();
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void anUpdateThatCannotRelaunchStillOpensAWindowFromTheRunningBuild() throws Exception {
+        var spawned = new CopyOnWriteArrayList<List<String>>();
+        JasperApplication application = application(() -> { }, false);
+        try {
+            edt(() -> {
+                application.residency(true);
+                application.restartPlanner = mode -> Optional.empty();
+                application.spawner = spawned::add;
+                application.staleBuild(() -> true);
+            });
+            assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(dock).as("it went for a window").containsExactly(true, false);
+            assertThat(spawned).isEmpty();
+            assertThat(application.resident()).isTrue();
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aPluginThatRefusesTheRelaunchStillGetsAWindowFromTheRunningBuild() throws Exception {
+        // restart() returns true with nothing changed when a plugin's quit guard refuses. That is not a failure to plan a
+        // relaunch, so the reopen has to notice that the process is still running and open the window itself.
+        var spawned = new CopyOnWriteArrayList<List<String>>();
+        var planned = new AtomicInteger();
+        var asked = new AtomicInteger();
+        var terminations = new AtomicInteger();
+        JasperApplication application = application(terminations::incrementAndGet, false);
+        try {
+            edt(() -> {
+                application.residency(true);
+                application.contributions().quitGuards().add(() -> {
+                    asked.incrementAndGet();
+                    return CompletableFuture.completedFuture(false);
+                });
+                application.restartPlanner = mode -> {
+                    planned.incrementAndGet();
+                    return Optional.of(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+                };
+                application.spawner = spawned::add;
+                application.staleBuild(() -> true);
+            });
+            // Composing the window is where a headless JVM fails. Reaching it proves the process was neither quitting nor
+            // stopped, because openOrRaise returns first thing in either state.
+            assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(planned).as("a relaunch was planned").hasValue(1);
+            assertThat(asked).as("and the plugin refused it").hasValue(1);
+            assertThat(spawned).as("so nothing was started").isEmpty();
+            assertThat(dock).as("the window was attempted from the running build").containsExactly(true, false);
+            edt(() -> { });
+            assertThat(terminations).as("and the process did not exit").hasValue(0);
+            assertThat(application.resident()).isTrue();
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS) void aReopenWithAWindowOpenNeverRelaunchesTheBuild() throws Exception {
+        // "An upgrade must never take a running terminal down": any open window, a plugin's included, keeps the running
+        // build, and the reopen goes on as an ordinary one.
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
+            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
+        var spawned = new CopyOnWriteArrayList<List<String>>();
+        var planned = new AtomicInteger();
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = settled(terminated::countDown, true);
+        try {
+            edt(() -> {
+                application.startPlugins(null, dev, false, dirs);
+                application.restartPlanner = mode -> {
+                    planned.incrementAndGet();
+                    return Optional.of(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+                };
+                application.spawner = spawned::add;
+                application.staleBuild(() -> true);
+            });
+            // The plugin's window is open; no terminal window can be composed headlessly, so the reopen ends there.
+            assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(planned).as("the update was not acted on while a window is open").hasValue(0);
+            assertThat(spawned).isEmpty();
+            assertThat(terminated.getCount()).as("and the process runs on").isEqualTo(1);
         } finally {
             edt(application::quitNow);
             // The shutdown writes the plugin's and the window state under the temporary directory.
