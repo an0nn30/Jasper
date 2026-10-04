@@ -367,13 +367,6 @@ class NotificationCenterTest {
         });
     }
 
-    @Test void presenceIsWhatDeliverySees() {
-        var center = center();
-        assertThat(center.presence()).isEqualTo(Delivery.Presence.FOCUSED);
-        presence = Delivery.Presence.BACKGROUND;
-        assertThat(center.presence()).isEqualTo(Delivery.Presence.BACKGROUND);
-    }
-
     /**
      * History keeps an expired entry's text and action labels, never its poster's callbacks: those capture the poster
      * (a closed pane and its window, a stopped plugin), which must not stay reachable for as long as the entry does.

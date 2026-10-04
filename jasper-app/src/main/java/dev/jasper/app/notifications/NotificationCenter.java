@@ -42,7 +42,7 @@ public final class NotificationCenter {
         record CardRequested(Notification notification) implements Change {}
         /**
          * The operating system should show this entry now, Jasper not being focused; for an entry it already shows, the
-         * newer post replaces it.
+         * newer post replaces it where the platform can.
          */
         record SystemRequested(Notification notification) implements Change {}
         record Removed(UUID id) implements Change {}
@@ -64,7 +64,8 @@ public final class NotificationCenter {
     /**
      * @param ui runs {@link #submit}ted posts on the EDT ({@code SwingUtilities::invokeLater} in the application)
      * @param clock stamps posts and decides coalescing; its zone is the one times are shown in
-     * @param presence whether Jasper is focused, in the background, or has no window open
+     * @param presence where Jasper stands as delivery sees it now: {@code FOCUSED}, {@code BACKGROUND}, {@code NO_WINDOW}
+     *     (a resident Jasper with every window closed) or {@code OPENING} (starting, or a window not yet activated)
      */
     public NotificationCenter(Executor ui, Clock clock, Supplier<Delivery.Presence> presence) {
         this.ui = Objects.requireNonNull(ui, "ui");
@@ -73,12 +74,6 @@ public final class NotificationCenter {
     }
 
     public Clock clock() { return clock; }
-
-    /** Whether Jasper is focused, in the background, or has no window open, as delivery sees it now. */
-    public Delivery.Presence presence() {
-        requireEdt();
-        return presence.get();
-    }
 
     /** Declares a group, or returns the one already declared under its id. */
     public NotificationGroup register(NotificationGroup group) {

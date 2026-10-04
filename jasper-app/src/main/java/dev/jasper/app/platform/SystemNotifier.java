@@ -49,7 +49,7 @@ public final class SystemNotifier implements AutoCloseable {
     /**
      * What a platform does, as functions the worker runs.
      *
-     * @param show shows a notification, replacing the one already shown for its id
+     * @param show shows a notification, replacing the one already shown for its id where the platform can (macOS does)
      * @param withdraw removes one by id, where the platform can
      * @param withdrawAll removes every one Jasper showed, where the platform can
      * @param focused hears that Jasper is focused again
@@ -147,7 +147,7 @@ public final class SystemNotifier implements AutoCloseable {
         clicks = Objects.requireNonNull(handler, "handler");
     }
 
-    /** Shows a notification, or replaces the one already shown for {@code id}. */
+    /** Shows a notification, replacing the one already shown for {@code id} where the platform can (macOS does). */
     public void send(UUID id, Level level, String title, String body) {
         var message = new Message(Objects.requireNonNull(id, "id").toString(), level, title(title), body(body));
         run(() -> backend.show().accept(message));

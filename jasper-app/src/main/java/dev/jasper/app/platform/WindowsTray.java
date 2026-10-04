@@ -19,8 +19,9 @@ import javax.swing.SwingUtilities;
  * Jasper's one Windows notification-area icon (spec section 9). A resident Jasper with no window shows it with Open and
  * Quit, since a windowless process is otherwise invisible and has nothing to quit from. A notification sent while Jasper
  * is in the background shows its balloon from that icon, or from one added for the purpose and removed when Jasper is
- * focused again. A click on a balloon or on the icon activates the most recent notification still unread, since
- * {@code TrayIcon} cannot tell balloons apart; with none, a click on the resident icon is Open. macOS keeps its Dock
+ * focused again. A click on a balloon or on the icon activates the most recent notification, if it is still unread,
+ * since {@code TrayIcon} cannot tell balloons apart; once that one is read, a click on the resident icon is Open and a
+ * click on the icon added for balloons does nothing, even if an older notification is unread. macOS keeps its Dock
  * icon and gets no tray icon; neither does Linux. EDT only.
  */
 public final class WindowsTray {
@@ -45,7 +46,7 @@ public final class WindowsTray {
     private Icon icon;
     private boolean resident;
     private Runnable open = () -> { };
-    /** The most recent notification still unread, which a click on a balloon or on the icon activates. */
+    /** The most recent notification's id while it is still unread, which a click on a balloon or on the icon activates. */
     private String latest;
     private Consumer<String> clicked = id -> { };
 

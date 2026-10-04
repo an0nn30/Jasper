@@ -80,7 +80,10 @@ public final class JasperApplication {
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
-    /** Whether start-up has settled: a terminal window was activated, or a resident Jasper warmed up with none. */
+    /**
+     * Whether start-up has settled: a terminal window was activated, or a resident Jasper warmed up with none and the
+     * records start-up queued have run.
+     */
     private boolean settled;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
@@ -460,8 +463,10 @@ public final class JasperApplication {
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
         }
-        // A resident Jasper with no window has finished starting: its notifications reach the operating system now.
-        settled = true;
+        // A resident Jasper with no window has finished starting once the records start-up queued have run: a plugin
+        // that failed to start is recorded through invokeLater, after this task, and nobody is away from Jasper yet.
+        // Settling through the same queue puts it behind them, so a login start sends no banner for them.
+        SwingUtilities.invokeLater(() -> settled = true);
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
@@ -861,9 +866,23 @@ public final class JasperApplication {
         return Optional.empty();
     }
 
-    /** {@code notifications.system}, live: whether the operating system shows notifications while Jasper is away. */
+    /**
+     * {@code notifications.system}, live: whether the operating system shows notifications while Jasper is away; never
+     * once Jasper quits.
+     */
     private boolean systemNotificationsEnabled() {
-        return configuration == null || configuration.state().values().get(dev.jasper.app.config.CoreSettings.NOTIFICATIONS_SYSTEM);
+        return systemNotificationsEnabled(
+            configuration == null || configuration.state().values().get(dev.jasper.app.config.CoreSettings.NOTIFICATIONS_SYSTEM),
+            quitting, stopped);
+    }
+
+    /**
+     * The rule behind {@link #systemNotificationsEnabled()}. Quitting closes every window, so Jasper then looks away,
+     * but a banner raised while windows close or a plugin stops would outlive the process, and on macOS a click on it
+     * would relaunch Jasper with nothing to route to.
+     */
+    static boolean systemNotificationsEnabled(boolean configured, boolean quitting, boolean stopped) {
+        return configured && !quitting && !stopped;
     }
 
     private void updateBuddyActions() {
