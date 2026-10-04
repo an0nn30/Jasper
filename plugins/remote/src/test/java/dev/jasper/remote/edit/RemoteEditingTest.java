@@ -8,6 +8,7 @@ import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.remote.sftp.LocalEndpoint;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.testing.FakeNotifications;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ class RemoteEditingTest {
     }, identity -> connected, background, ui);
     final List<dev.jasper.sdk.WindowOwner> editorOwners = new ArrayList<>();
     final List<EditorDocument> documents = new ArrayList<>();
-    final List<String> notices = new ArrayList<>();
+    final FakeNotifications notifications = new FakeNotifications();
     volatile RuntimeException editorFailure;
     final Map<String, Function<String, Optional<Function<dev.jasper.sdk.WindowOwner, EditorDocument>>>> reopeners = new ConcurrentHashMap<>();
     final Map<UUID, RemoteHost> saved = new ConcurrentHashMap<>();
@@ -58,8 +59,8 @@ class RemoteEditingTest {
         }
     };
     volatile Optional<WindowHandle> active = Optional.empty();
-    final RemoteEditing editing = new RemoteEditing(editor, channels, () -> active, notices::add);
-    final RemoteEditing reopening = new RemoteEditing(editor, channels, () -> active, notices::add, id -> Optional.ofNullable(saved.get(id)));
+    final RemoteEditing editing = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"));
+    final RemoteEditing reopening = new RemoteEditing(editor, channels, () -> active, notifications.group("dev.jasper.remote"), id -> Optional.ofNullable(saved.get(id)));
     final ConnectionIdentity prod = EditChannelsTest.identity("prod");
     final TestWindow origin = new TestWindow(UUID.randomUUID(), new AtomicBoolean(true));
 
@@ -118,7 +119,8 @@ class RemoteEditingTest {
     @Test void anEditorFailureBecomesANotice() throws Exception {
         editorFailure = new IllegalStateException("the Editor window is closing");
         onUi(() -> { editing.open(prod, "/etc/hosts", origin); return null; });
-        assertThat(notices).containsExactly("Could not open /etc/hosts in the Editor: the Editor window is closing");
+        assertThat(notifications.lines()).containsExactly(
+            "dev.jasper.remote|ERROR|Could not open a file in the Editor|/etc/hosts: the Editor window is closing|IllegalStateException");
         assertThat(documents).isEmpty();
     }
 

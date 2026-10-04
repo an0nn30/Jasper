@@ -208,13 +208,24 @@ public final class CoreSettings {
         .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
         .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"IntelliJ Light\",\n"
             + "\"Darcula\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
+    public static final Setting<Float> UI_WORKSPACE_OPACITY = Setting.of("ui.workspace.opacity", SettingKind.number(10, 100),
+            GlassSettings.UNSET_OPACITY)
+        .example(95f).label("Opacity").keywords("opacity", "transparency", "translucent", "glass", "workspace", "background")
+        .description("macOS only (ignored on other platforms), live: the terminal and editor background opacity, 10-100 percent.\n"
+            + "Omit to use the workspace theme's value (opaque unless the theme sets one).").build();
+    public static final Setting<WorkspaceBlur> UI_WORKSPACE_BLUR = Setting.of("ui.workspace.blur", SettingKind.choice(List.of(
+            Map.entry("theme", WorkspaceBlur.THEME), Map.entry("on", WorkspaceBlur.ON), Map.entry("off", WorkspaceBlur.OFF))),
+            WorkspaceBlur.THEME)
+        .label("Blur").keywords("blur", "frosted", "glass", "workspace", "background")
+        .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows the workspace theme.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
             WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
-            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_WORKSPACE),
+            TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_WORKSPACE,
+            UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
             Map.entry(List.of("window"), "Workspace chrome. Heights and widths are logical pixels."),
@@ -227,5 +238,6 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "shell"), "The shell new panes start."),
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
-            Map.entry(List.of("ui", "theme"), "The UI theme and workspace scheme.")));
+            Map.entry(List.of("ui", "theme"), "The UI theme and workspace scheme."),
+            Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values follow the workspace theme.")));
 }

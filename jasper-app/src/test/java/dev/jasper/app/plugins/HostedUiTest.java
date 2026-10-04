@@ -5,11 +5,14 @@ import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.ToolbarEntry;
+import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.Anchor;
+import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.ShortcutContext;
@@ -73,6 +76,43 @@ class HostedUiTest {
         themes.configure(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.config.WorkspaceThemeChoice.MATCH, null,
             dev.jasper.app.config.UiFontConfig.defaults());
         assertThat(seen).hasSize(1);
+    }
+
+    @Test void workspaceOpacityFollowsTheGlassSourceAndItsChangesAreWorkspaceChanges() {
+        var themes = new dev.jasper.app.appearance.ThemeController();
+        double[] value = {0.6};
+        var listeners = new ArrayList<Runnable>();
+        var glass = new GlassSource(component -> value[0], listener -> {
+            listeners.add(listener);
+            return new dev.jasper.app.lifecycle.Subscription(() -> listeners.remove(listener));
+        });
+        var hosted = new HostedUi("dev.x.tool", model, containment, Runnable::run,
+            javax.swing.SwingUtilities::isEventDispatchThread, open::get, getClass().getClassLoader(), () -> Variant.DARK,
+            handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals,
+            themes::current, handler -> themes.subscribe((next, changed) -> handler.accept(next)), glass);
+        var appearance = hosted.appearance();
+        var component = new javax.swing.JPanel();
+        assertThat(listeners).hasSize(1);
+        assertThat(appearance.workspaceOpacity(component)).isEqualTo(0.6);
+        assertThatNullPointerException().isThrownBy(() -> appearance.workspaceOpacity(null));
+        var chrome = new java.util.concurrent.atomic.AtomicInteger();
+        var seen = new ArrayList<Double>();
+        appearance.onChanged(variant -> chrome.incrementAndGet());
+        var subscription = appearance.onWorkspaceChanged(variant -> seen.add(appearance.workspaceOpacity(component)));
+        value[0] = 0.4;
+        List.copyOf(listeners).forEach(Runnable::run);
+        assertThat(seen).containsExactly(0.4);
+        assertThat(chrome).hasValue(0);
+        subscription.close();
+        List.copyOf(listeners).forEach(Runnable::run);
+        assertThat(seen).containsExactly(0.4);
+        var late = new java.util.concurrent.atomic.AtomicInteger();
+        appearance.onWorkspaceChanged(variant -> late.incrementAndGet());
+        open.set(false);
+        List.copyOf(listeners).forEach(Runnable::run);
+        assertThat(late).hasValue(0);
+        hosted.closeAll();
+        assertThat(listeners).isEmpty();
     }
 
     @Test void bothVariantsReadThePublishedNativeSnapshotInsideWorkspaceCallbacks() {
@@ -329,8 +369,14 @@ class HostedUiTest {
         assertThatIllegalArgumentException().isThrownBy(() -> ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.other.panel", "Foreign",
             new javax.swing.ImageIcon(), dev.jasper.sdk.ui.Anchor.LEFT), host -> new javax.swing.JLabel()));
 
+        ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.files", "Files", new javax.swing.ImageIcon(),
+            dev.jasper.sdk.ui.Anchor.BOTTOM).withSplit(), host -> new javax.swing.JLabel("files"));
+
         var entry = model.panels().get(0);
-        assertThat(entry.defaultRegion()).isEqualTo(dev.jasper.app.contributions.PanelRegion.RIGHT);
+        assertThat(entry.defaultSlot()).isEqualTo(dev.jasper.app.dock.Slot.RIGHT_TOP);
+        assertThat(model.panels().get(1).defaultSlot()).isEqualTo(dev.jasper.app.dock.Slot.LEFT_TOP);
+        assertThat(model.panels().get(2).defaultSlot()).as("a split panel starts in its side's secondary half")
+            .isEqualTo(dev.jasper.app.dock.Slot.BOTTOM_RIGHT);
         UUID window = UUID.randomUUID();
         boolean[] visible = {true};
         var site = new dev.jasper.app.contributions.PanelSite(window, () -> visible[0] = true, () -> visible[0] = false, () -> visible[0]);
@@ -351,10 +397,30 @@ class HostedUiTest {
         ui.panels().toggle("dev.x.tool.hosts", hosts.getFirst().window());
         assertThat(requests).containsExactly(new dev.jasper.app.contributions.Contributions.PanelRequest(window, "dev.x.tool.hosts", dev.jasper.app.contributions.Contributions.PanelRequest.Op.TOGGLE));
         panel.close();
-        assertThat(model.panels()).hasSize(1);
+        assertThat(model.panels()).hasSize(2);
         ui.closeAll();
         assertThat(model.panels()).isEmpty();
         assertThat(model.railActions()).isEmpty();
+    }
+
+    @Test void everyAnchorAndSplitCombinationMapsToItsOwnSlot() {
+        record Case(String id, Anchor anchor, boolean split, Slot slot) { }
+        var cases = List.of(
+            new Case("dev.x.tool.left", Anchor.LEFT, false, Slot.LEFT_TOP),
+            new Case("dev.x.tool.leftsplit", Anchor.LEFT, true, Slot.LEFT_BOTTOM),
+            new Case("dev.x.tool.right", Anchor.RIGHT, false, Slot.RIGHT_TOP),
+            new Case("dev.x.tool.rightsplit", Anchor.RIGHT, true, Slot.RIGHT_BOTTOM),
+            new Case("dev.x.tool.bottom", Anchor.BOTTOM, false, Slot.BOTTOM_LEFT),
+            new Case("dev.x.tool.bottomsplit", Anchor.BOTTOM, true, Slot.BOTTOM_RIGHT));
+        for (Case each : cases) {
+            var spec = new PanelSpec(each.id(), "Panel", new javax.swing.ImageIcon(), each.anchor());
+            ui.panels().register(each.split() ? spec.withSplit() : spec, host -> new javax.swing.JLabel());
+        }
+        assertThat(model.panels()).hasSize(6);
+        for (Case each : cases)
+            assertThat(model.panels()).filteredOn(panel -> panel.id().equals(each.id())).singleElement()
+                .satisfies(panel -> assertThat(panel.defaultSlot()).as("%s anchor, split %s", each.anchor(), each.split())
+                    .isEqualTo(each.slot()));
     }
 
     @Test void windowsAndDialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {

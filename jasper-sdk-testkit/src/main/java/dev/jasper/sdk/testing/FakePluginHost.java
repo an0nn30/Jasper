@@ -77,9 +77,9 @@ public final class FakePluginHost implements AutoCloseable {
     private final java.util.ArrayDeque<List<dev.jasper.sdk.files.FileLocation>> fileChoiceQueue = new java.util.ArrayDeque<>();
     private final List<dev.jasper.sdk.files.FileChoice> fileChoices = new ArrayList<>();
         final List<String> paletteOpens = new ArrayList<>();
-        final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
     final List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
+    final FakeNotifications notifications = new FakeNotifications(this);
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
@@ -94,12 +94,15 @@ public final class FakePluginHost implements AutoCloseable {
         dev.jasper.sdk.ui.EditorPalette.current(), dev.jasper.sdk.ui.SyntaxPalette.current());
     private Workspace requestedAppearance = appearance;
     private boolean workspaceMatches = true;
+    private volatile double workspaceOpacity = 1.0;
+    private double requestedOpacity = 1.0;
     private final List<Entry> workspaceHandlers = new CopyOnWriteArrayList<>();
 
     void requireAppearanceThread() {
         if (Thread.currentThread() != appearanceThread && !javax.swing.SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Appearance requires the UI thread");
     }
     Workspace workspaceAppearance() { return appearance; }
+    double workspaceOpacity() { return workspaceOpacity; }
     Subscription subscribeWorkspace(String pluginId, Consumer<Variant> handler) {
         requireAppearanceThread(); Objects.requireNonNull(handler, "handler");
         var entry = new Entry(pluginId, value -> handler.accept((Variant) value), new AtomicBoolean());
@@ -122,13 +125,28 @@ public final class FakePluginHost implements AutoCloseable {
         var next = new Workspace(Objects.requireNonNull(variant), Objects.requireNonNull(palette),
             Objects.requireNonNull(editor), Objects.requireNonNull(syntax));
         workspaceMatches = false;
-        publishWorkspace(next);
+        publishWorkspace(next, requestedOpacity);
     }
-    private void publishWorkspace(Workspace next) {
-        if (requestedAppearance.equals(next)) return;
+
+    /** Sets the opacity every component reports through {@code Appearance.workspaceOpacity} and announces it as a
+     * workspace change on the next {@link #flush()} (no announcement when unchanged). Like the other workspace values,
+     * components report the last flushed opacity until then.
+     * @param opacity from 0.1 to 1
+     * @since 0.14.1
+     */
+    public void setWorkspaceOpacity(double opacity) {
+        requireAppearanceThread();
+        if (!(opacity >= 0.1 && opacity <= 1)) throw new IllegalArgumentException("opacity must be from 0.1 to 1");
+        publishWorkspace(requestedAppearance, opacity);
+    }
+
+    private void publishWorkspace(Workspace next, double opacity) {
+        if (requestedAppearance.equals(next) && requestedOpacity == opacity) return;
         requestedAppearance = next;
+        requestedOpacity = opacity;
         events.add(() -> {
             appearance = next;
+            workspaceOpacity = opacity;
             // Subscription lifetime is judged when the state is published, including plugins started since enqueue.
             for (var entry : workspaceHandlers) {
                 if (!entry.closed().get()) {
@@ -175,6 +193,7 @@ public final class FakePluginHost implements AutoCloseable {
                 return context;
             }
         }
+        notifications.declareDefaults(info.id(), info.name());
         for (var provider : committed.entrySet()) {
             if (!context.requires.contains(provider.getValue().pluginId())) continue;
             try { context.services.put(provider.getKey(), provider.getValue().factory().apply(info)); }
@@ -334,6 +353,14 @@ public final class FakePluginHost implements AutoCloseable {
     public List<ConnectionEvent> connectionLog() { return List.copyOf(connectionLog); }
 
     /**
+     * What plugins posted and the groups declared for them.
+     *
+     * @return the host's notifications
+     * @since 0.14.0
+     */
+    public FakeNotifications notifications() { return notifications; }
+
+    /**
      * Contained failures: throwing starts, stops, handlers, factories and background tasks.
      *
      * @return one line per failure
@@ -381,7 +408,7 @@ public final class FakePluginHost implements AutoCloseable {
     public void setVariant(Variant next) {
         Objects.requireNonNull(next, "next");
         variant = next;
-        if (workspaceMatches) publishWorkspace(new Workspace(next, appearance.palette(), appearance.editor(), appearance.syntax()));
+        if (workspaceMatches) publishWorkspace(new Workspace(next, appearance.palette(), appearance.editor(), appearance.syntax()), requestedOpacity);
         publishApp(AppEvents.THEME_CHANGED, new AppEvents.ThemeChanged(next));
     }
 
@@ -511,6 +538,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.ui.closeAll();
         context.palette.closeAll();
         context.fileSources.closeAll();
+        notifications.stopped(context.plugin().id());
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
         for (ActivityEvent open : List.copyOf(running.values())) {
@@ -560,13 +588,33 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     private void deliver(String topicId, Object payload) {
-        if (payload instanceof ActivityEvent event && topicId.equals(Activities.TOPIC.id())) activityLog.add(event);
+        if (payload instanceof ActivityEvent event && topicId.equals(Activities.TOPIC.id())) {
+            activityLog.add(event);
+            outcome(event);
+        }
         if (payload instanceof ConnectionEvent event && topicId.equals(Activities.CONNECTIONS.id())) connectionLog.add(event);
         for (Entry entry : subscribers.getOrDefault(topicId, new CopyOnWriteArrayList<>())) {
             if (entry.closed().get()) continue;
             try { entry.handler().accept(payload); }
             catch (RuntimeException | LinkageError failure) { failures.add(entry.pluginId() + " handler: " + failure); }
         }
+    }
+
+    /**
+     * As the host does: an activity that succeeded or failed is posted in its plugin's activities group, unless the
+     * plugin is no longer running.
+     */
+    private void outcome(ActivityEvent event) {
+        FakePluginContext owner = contexts.get(event.sourcePluginId());
+        if (owner == null || !active(event.sourcePluginId())) return;
+        // Like the host: only the source plugin's own action, run in the window used last.
+        Optional<Runnable> activate = event.activateActionId().filter(owner.ui.actions::containsKey)
+            .<Runnable>map(id -> () -> {
+                var window = workspace.lastActive;
+                if (window != null) invoke(id, window.id, workspace.activePane().map(pane -> pane.id).orElse(null));
+            });
+        try { notifications.outcome(event, activate); }
+        catch (IllegalArgumentException unshowable) { failures.add(event.sourcePluginId() + " activity outcome: " + unshowable); }
     }
 
     void stage(String pluginId, Class<?> api, Function<PluginInfo, ?> factory) {
@@ -708,14 +756,15 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Registered panels, registration order.
      *
-     * @return lines of the form {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor), followed by
-     *         {@code |actionId} when the panel names its own toggle action
+     * @return lines of the form {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor, with {@code +split} when the
+     *         panel starts in its side's secondary half), followed by {@code |actionId} when the panel names its own
+     *         toggle action
      */
     public List<String> panels() {
         List<String> lines = new ArrayList<>();
         for (FakePluginContext context : contexts.values())
             for (FakeUi.Panel panel : context.ui.panels) lines.add(panel.spec.id() + "|" + panel.spec.title() + "|" + panel.spec.defaultAnchor()
-                + panel.spec.toggleActionId().map(toggle -> "|" + toggle).orElse(""));
+                + (panel.spec.split() ? "+split" : "") + panel.spec.toggleActionId().map(toggle -> "|" + toggle).orElse(""));
         return lines;
     }
 
@@ -1275,9 +1324,6 @@ public final class FakePluginHost implements AutoCloseable {
 
         /** Every {@code Palette.open} call as {@code windowId scopeId query rowId}, with {@code -} for an absent value. */
         public List<String> paletteOpens() { return List.copyOf(paletteOpens); }
-
-        /** Every error notice as {@code pluginId: message}. */
-        public List<String> notices() { return List.copyOf(notices); }
 
         /** Every file a plugin asked to open in the editor. */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }

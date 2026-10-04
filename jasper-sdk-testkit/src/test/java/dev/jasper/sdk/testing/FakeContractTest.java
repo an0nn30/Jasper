@@ -27,6 +27,7 @@ class FakeContractTest extends PluginContractTest {
                     dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {
                 host.setWorkspace(variant, palette, editor, syntax);
             }
+            @Override public void setWorkspaceOpacity(double opacity) { host.setWorkspaceOpacity(opacity); }
             @Override public void ui(Runnable action) { action.run(); }
             @Override public void flush() { host.flush(); }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.publishApp(topic, payload); }
@@ -54,7 +55,10 @@ class FakeContractTest extends PluginContractTest {
             @Override public String completeStep(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull, java.util.Map<String, String> values) { return host.completeStep(scopeId, rowId, verbId, windowId, paneIdOrNull, values); }
             @Override public void executeInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { host.executeInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }
             @Override public List<String> paletteOpens() { return host.paletteOpens(); }
-            @Override public List<String> notices() { return host.notices(); }
+            @Override public List<String> notifications() { return host.notifications().posts().stream().map(FakeContractTest::contractLine).toList(); }
+            @Override public List<String> notificationGroups() { return host.notifications().groups(); }
+            @Override public boolean runNotificationAction(String title, String label) { return host.notifications().runAction(title, label); }
+            @Override public boolean clickNotification(String title) { return host.notifications().click(title); }
             @Override public List<java.nio.file.Path> openedInEditor() { return host.openedInEditor(); }
             @Override public List<java.net.URI> browsed() { return host.browsed(); }
             @Override public java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory) {
@@ -83,5 +87,14 @@ class FakeContractTest extends PluginContractTest {
             @Override public void stopAll() { host.stopAll(); }
             @Override public void close() { host.close(); }
         };
+    }
+
+    /** The contract's line for a fake post. */
+    static String contractLine(FakeNotifications.Post post) {
+        var spec = post.spec();
+        List<String> labels = spec.actions().stream().map(dev.jasper.sdk.notifications.NotificationAction::label).toList();
+        return String.join("|", post.group(), spec.severity().name(), spec.title(), spec.content(),
+            labels.isEmpty() ? "-" : String.join(";", labels), spec.cause().isPresent() ? "cause" : "-",
+            spec.window().map(window -> window.id().toString()).orElse("-"), post.expired() ? "expired" : "live");
     }
 }

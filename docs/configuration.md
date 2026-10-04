@@ -128,7 +128,7 @@ workspace = "match"
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
-| `window.rail_width` | `28` | Integer 28–64 logical pixels; the panel rail's buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
+| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
 | `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
 | `window.status_bar` | `true` | Boolean | Live |
@@ -162,6 +162,8 @@ workspace = "match"
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
+| `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
+| `ui.workspace.blur` | `"theme"` | `"theme"` (the workspace theme's value), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -253,7 +255,7 @@ an open palette.
 
 ### Finished-command notifications
 
-`notifications.long_command_seconds` sets how long a command must run before it is worth remembering.
+`notifications.long_command_seconds` sets how long a command must run before it is worth telling you about.
 The default is 10 seconds; `0` turns the feature off entirely.
 
 **This needs [shell integration](#shell-integration).** The duration is measured between the
@@ -261,35 +263,34 @@ command-start and command-end marks the integration scripts emit, so a shell tha
 produces no notifications and no cards at all — Jasper cannot know how long anything took. There is
 no fallback guess.
 
-A running command shows a **capsule above the buddy's head**, and he sits down and types while it runs. The bubble appears **the moment you look away** —
-switching tab, switching window, or sending Jasper to the background — because out of sight is the
-whole reason it exists. If you stay in the pane and watch, it appears once the command passes
-`long_command_seconds` instead. It shows the app-supplied terminal title (or the command when no title is supplied),
-how long it has been running, and when the command ends a check or a cross with the final time.
+When a command that ran at least `long_command_seconds` finishes anywhere except the pane you were
+typing in (a visible but unfocused split pane included), Jasper posts a notification in **Long-running
+commands**: the command as its title, and "Finished in 2m 03s" or "Exited 1 · 2m 03s" below it. While
+Jasper is focused it shows as a card in the pane's window; otherwise it waits, unread, in the
+Notifications panel. Clicking the card focuses the pane (a row in the panel has no click of its own),
+and closing the pane expires the notification. See [Notifications](notifications.md#long-running-commands).
 
-**Looking at it clears it.** Focusing the pane a bubble came from takes it out of the column, so the
-column empties as you work rather than needing to be tidied. A command that finishes in the pane you
-were already typing in never produces a bubble at all — you watched it happen. When nothing is
-running and nothing is unseen there is nothing above his head, which is the resting state.
+While a command runs, a **capsule above the buddy's head** shows it, and he sits down and types. The
+capsule appears **the moment you look away** — switching tab, switching window, or sending Jasper to
+the background — because out of sight is the whole reason it exists. If you stay in the pane and
+watch, it appears once the command passes `long_command_seconds` instead. It shows the app-supplied
+terminal title (or the command when no title is supplied) and how long it has been running, and it
+goes when the command ends.
 
-At most three bubbles are shown, newest nearest his head, with a count on the newest when there are
+At most three capsules are shown, newest nearest his head, with a count on the newest when there are
 more. A new capsule slides down into place with a small spring settle; existing capsules move
 smoothly to make room. Its size stays fixed, and status changes update the text in place. The
-translucent material and text follow the light or dark app theme. The column flips below him when he is too near the top of the screen, and the order inverts so
-the newest is still the one closest to him.
+translucent material and text follow the light or dark app theme. The column flips below him when he
+is too near the top of the screen, and the order inverts so the newest is still the one closest to him.
 
-**Single-clicking him opens the drawer**: everything from this run, newest first, whether or not you
-have seen it, with the × on a card to dismiss one and **Clear all** to empty it. At most 50 are kept,
-the oldest falling off, and the drawer starts empty each time Jasper starts. A card whose pane you
-have closed stays readable but dims and no longer responds — there is nowhere left for it to take
-you. Double-clicking him still raises the terminal and right-clicking still opens his menu.
+**Single-clicking him opens the drawer**: everything still going, newest first, with the × on a card
+to dismiss one and **Clear all** to empty it. Double-clicking him still raises the terminal and
+right-clicking still opens his menu.
 
-A **system notification** is sent as well, unless the command finished in the pane you were actually
-typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to
-miss. System notifications require the packaged macOS `Jasper.app`; elsewhere (including Gradle/IDE
-launches) the drawer is the only channel. macOS uses Jasper's app icon and notification settings.
-The first eligible notice asks for permission; allow Jasper in System Settings → Notifications.
-Denied permission leaves the drawer available.
+In the packaged macOS `Jasper.app`, a command that finishes while Jasper is in the background also
+sends a **system notification**, with Jasper's app icon and notification settings. The first eligible
+notice asks for permission; allow Jasper in System Settings → Notifications. Other launches (Gradle
+and IDE runs included) send none.
 
 ### Automatic tab and notification titles
 
@@ -331,10 +332,10 @@ Buddy bubbles use the program-supplied title without the tab's job suffix; shell
 integration provides the current command as their fallback. Running subtext shimmers from left to right. Dragging the buddy smoothly moves
 the bubbles between above/below positions while keeping them on screen. Live title changes
 update a bubble in place, without moving it to the front or replaying its arrival.
-Once the command finishes, its bubble and native notification show the completed
-command, including its arguments (for example, `sleep 12`), instead of the live terminal
-title. Later prompt titles do not rewrite the result. Title reception works without shell
-integration, but buddy notifications still need command-start/end marks.
+Once the command finishes, its notification shows the completed command, including its
+arguments (for example, `sleep 12`), instead of the live terminal title. Later prompt titles
+do not rewrite it. Title reception works without shell integration, but long-command
+notifications still need command-start/end marks.
 
 Inside tmux, the multiplexer must forward titles to its outer terminal. If tmux's
 `set-titles` option is off, Jasper cannot see titles applications set inside its
@@ -559,8 +560,8 @@ settings file and data there too; their jars are in the application image). A zi
 `plugins/` is unpacked at the next launch and then waits for your review in Manage Plugins; an
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
-launch. `ui-state.toml` beside `config.toml` remembers panel placement, rail visibility and plugin
-window bounds; it is written by Jasper and is not meant to be edited.
+launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
+dock's sizes, stripe visibility and plugin window bounds; it is written by Jasper and is not meant to be edited.
 
 ## Shortcuts
 

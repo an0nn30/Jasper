@@ -44,6 +44,7 @@ public final class EditorTab extends JPanel {
     private final VimTextArea area = new VimTextArea();
     private final VimBar vimBar = new VimBar();
     private final RTextScrollPane scroll;
+    private final GlassSurface text;
     private final CardLayout cards = new CardLayout();
     private final JPanel body = new JPanel(cards);
     private final JLabel stateText = new JLabel();
@@ -104,7 +105,7 @@ public final class EditorTab extends JPanel {
         stack.add(buttons);
         var state = new JPanel(new GridBagLayout());
         state.add(stack);
-        var text = new JPanel(new BorderLayout());
+        text = new GlassSurface(scroll);
         text.add(scroll, BorderLayout.CENTER);
         text.add(vimBar, BorderLayout.SOUTH);
         vimBar.setVisible(false);
@@ -172,9 +173,22 @@ public final class EditorTab extends JPanel {
      * @param syntax workspace token styles
      */
     public void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax) {
+        apply(settings, theme, editor, syntax, 1.0);
+    }
+
+    GlassSurface surface() { return text; }
+
+    /**
+     * @param settings font and tab size
+     * @param theme the colours
+     * @param editor workspace editor surfaces
+     * @param syntax workspace token styles
+     * @param opacity the workspace opacity behind this tab; below 1 its text and gutter backgrounds are translucent
+     */
+    public void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax, double opacity) {
         Font font = settings.font();
         area.setFont(font);
-        theme.apply(area, scroll, editor, syntax);
+        theme.apply(area, scroll, editor, syntax, opacity);
         scroll.getGutter().setLineNumberFont(font);
         area.setTabSize(settings.tabSize());
         tabSize = settings.tabSize();
@@ -189,6 +203,7 @@ public final class EditorTab extends JPanel {
                 graphics.fillRect(x, y + height - 1, width, 1);
             }
         });
+        text.glass(opacity, editor.background(), editor.gutter());
     }
 
     /** @param commands bound in the text area's own map, which overrides RSyntaxTextArea's defaults for the same strokes */

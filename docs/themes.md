@@ -1,7 +1,7 @@
 # Themes
 
 Jasper's themes are Jasper theme files: TOML that colours the app, workspace, terminal palette and editor syntax.
-Jasper ships **284 native themes**, including Jasper Light/Dark, IntelliJ Light/Darcula, Dracula,
+Jasper ships **286 native themes**, including Jasper Light/Dark, Clear Dark/Light (ported from Terminal.app), IntelliJ Light/Darcula, Dracula,
 Catppuccin, Solarized, Nord, Gruvbox, One Dark, Material Lite, Code, Studio and converted Alacritty palettes.
 The complete offline collection, pinned sources, licenses, exclusions and explicit renames are in
 [third-party theme notices](../THIRD-PARTY-THEMES.md). No Marketplace network client remains.
@@ -42,6 +42,9 @@ test results.
 ## Settings and importing
 
 Both dropdowns list every installed theme by name and update when theme files are added, imported, edited or removed.
+Start typing in an open (or focused) dropdown to search: a search bar appears at the top and the list keeps the names
+holding every typed word, ignoring case, so `cat mocha` finds Catppuccin Mocha. **Same as UI theme** stays at the top.
+Up, Down, Home and End move, Enter picks, Backspace edits the search, × clears it and Escape closes the list.
 Running windows change only on **Apply** or **OK**; Cancel discards the choices. A saved name that no installed theme
 has shows as "(not found)" and stays saved for repair; Jasper uses the fallback described in
 [configuration](configuration.md#theme) meanwhile.
@@ -109,6 +112,12 @@ Everything else is derived. A theme can also set:
   `annotation`, `operator`, `punctuation`, `tag`, `attribute`, `regex`, `error`, each a colour or
   `{ color = "#…", bold = true, italic = true }`;
 - `[icons]`: bounded IntelliJ icon color-palette data retained by conversion; no plugin code or external artwork is loaded;
+- `[workspace]`: `opacity` (0.1–1) and `blur = true/false`. When this theme is the workspace theme on macOS, the
+  terminal and editor default background becomes translucent and, with `blur = true`, the desktop behind it is
+  blurred (a fixed-strength macOS material: `hudWindow` for a dark theme, a light `underWindowBackground` for a light
+  one). Clear Dark sets `opacity = 0.95`, Clear Light `opacity = 0.93`, both `blur = true`. Settings › Appearance ›
+  Workspace can override both. Absent values are inherited through `extends`, then mean opaque and unblurred. Only
+  the workspace theme's table is used;
 - `[ui]`: raw FlatLaf or IntelliJ keys (`"Button.arc" = 6`), laid over everything else. `[ui]` values that look like a
   Java class name (for example `com.example.Border`) are refused, except FlatLaf's own `com.formdev.flatlaf.` classes,
   and keys ending in `UI` cannot be set.
@@ -161,6 +170,10 @@ supplies the terminal's console background, text, cursor, selection and 16 ANSI 
   background is `#191c20`.
 
 Scheme colours are used exactly as the theme author chose them.
+
+The terminal tab strip is part of the workspace surface: it always shows the terminal background, whatever the
+theme's `tab_bar` token says, so terminals, their tabs and hosted content read as one space (and, in a translucent
+window, as one sheet of glass). `tab_bar` still colours tabbed panes inside plugin panes.
 
 ## Converted terminal palettes
 

@@ -58,12 +58,13 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private boolean closed;
     private boolean active;
     private float configuredDim = .3f;
+    private float backgroundOpacity = 1f;
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
     java.util.function.BooleanSupplier allowLaunchFocus = () -> true;
     Runnable onChanged = () -> {};
     Runnable onFocused = () -> {};
     Runnable onClose = () -> {};
-    Consumer<String> onFailure = message -> {};
+    BiConsumer<String, Throwable> onFailure = (message, cause) -> {};
     Consumer<TerminalView> onReady = terminal -> {};
 
     /** A command finished: its text, exit status, how long it ran and where, locally or remotely. Delivered on the EDT. */
@@ -234,7 +235,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 var message = new JLabel("Could not start terminal: " + cause.getMessage());
                 message.setForeground(getForeground()); add(message);
                 revalidate(); repaint();
-                onFailure.accept("Could not start terminal in " + launchDirectory + ":\n" + cause.getMessage());
+                onFailure.accept("Could not start terminal in " + launchDirectory + ":\n" + cause.getMessage(), failure);
                 return;
             }
             adopt(created);
@@ -249,6 +250,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (session != null) session.removeListener(listener);
         session = created;
         view = new TerminalView(session, applicationOptions());
+        view.setBackgroundOpacity(backgroundOpacity);
         setFocusable(false);
         findBar = new FindBar(view);
         view.setOnCloseRequest(() -> onClose.run());
@@ -501,6 +503,28 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         setActive(active);
     }
 
+    /** Below 1 this pane is not opaque and fills its padding with the terminal background at that opacity. */
+    void setBackgroundOpacity(float opacity) {
+        backgroundOpacity = opacity;
+        setOpaque(opacity >= 1f);
+        if (view != null) view.setBackgroundOpacity(opacity);
+        repaint();
+    }
+
+    @Override protected void paintComponent(java.awt.Graphics graphics) {
+        if (backgroundOpacity >= 1f) { super.paintComponent(graphics); return; }
+        var g = (java.awt.Graphics2D) graphics.create();
+        try {
+            java.awt.Color background = getBackground();
+            // Antialiasing would send this translucent Src fill down Java2D's slow software path (see ToolWindowArea).
+            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_OFF);
+            g.setComposite(java.awt.AlphaComposite.Src);
+            g.setColor(new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
+                Math.round(255 * backgroundOpacity)));
+            g.fillRect(0, 0, getWidth(), getHeight());
+        } finally { g.dispose(); }
+    }
+
     void applyTheme(dev.jasper.app.appearance.ResolvedTheme theme) {
         WorkspaceTheme.apply(this, theme);
         var palette = theme.palette();
@@ -533,7 +557,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         onDirectoryChanged = (directory, remote) -> {}; onBell = () -> {}; onStarted = () -> {}; onExited = status -> {};
         onConnecting = () -> {};
         allowLaunchFocus = () -> false;
-        onReady = terminal -> {}; onFailure = message -> {};
+        onReady = terminal -> {}; onFailure = (message, cause) -> {};
         removeAll();
     }
 }

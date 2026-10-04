@@ -48,7 +48,6 @@ public final class HostsPanel extends JPanel {
     final JTextField search = new JTextField();
     final JList<HostRows.Row> list;
     final JPanel card = new JPanel();
-    final JLabel title = heading("Sessions");
     final JLabel cardName = heading(""), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel(), cardInfo = new JLabel();
     final JButton connect = new JButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
     final JLabel empty = new JLabel("No hosts yet \u2014 Add or Import from ~/.ssh/config");
@@ -94,7 +93,8 @@ public final class HostsPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        header.add(title); header.add(Box.createHorizontalGlue()); header.add(importButton); header.add(Box.createHorizontalStrut(4)); header.add(add);
+        // The tool window header carries the title.
+        header.add(Box.createHorizontalGlue()); header.add(importButton); header.add(Box.createHorizontalStrut(4)); header.add(add);
         var north = new JPanel(new BorderLayout(0, 6));
         north.add(header, BorderLayout.NORTH);
         search.putClientProperty("JTextField.placeholderText", "Search sessions\u2026");

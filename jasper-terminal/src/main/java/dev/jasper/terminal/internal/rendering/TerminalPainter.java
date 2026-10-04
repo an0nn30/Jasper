@@ -6,7 +6,9 @@ import dev.jasper.terminal.internal.text.CellAttributes;
 import dev.jasper.terminal.internal.text.TerminalRow;
 import dev.jasper.terminal.rendering.FontSet;
 
+import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Composite;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -49,10 +51,33 @@ public final class TerminalPainter {
     }
 
     public void paint(Graphics2D g, ScreenSnapshot snapshot, CursorLook cursor, List<Highlight> highlights, int widthPx, int heightPx) {
+        paint(g, snapshot, cursor, highlights, widthPx, heightPx, 1f);
+    }
+
+    /**
+     * Paints the snapshot. Below 1, {@code backgroundOpacity} fills the default background translucent, replacing
+     * whatever is underneath; explicit cell backgrounds, highlights, glyphs and the cursor stay solid.
+     */
+    public void paint(Graphics2D g, ScreenSnapshot snapshot, CursorLook cursor, List<Highlight> highlights, int widthPx, int heightPx,
+                      float backgroundOpacity) {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-        g.setColor(palette.background());
-        g.fillRect(0, 0, widthPx, heightPx);
+        if (backgroundOpacity < 1f) {
+            Color background = palette.background();
+            Composite previous = g.getComposite();
+            Object antialiasing = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+            // An antialiased translucent Src fill takes Java2D's software path, reading the GPU surface back.
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+            g.setComposite(AlphaComposite.Src);
+            g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(),
+                Math.round(255 * Math.max(0f, backgroundOpacity))));
+            g.fillRect(0, 0, widthPx, heightPx);
+            g.setComposite(previous);
+            if (antialiasing != null) g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, antialiasing);
+        } else {
+            g.setColor(palette.background());
+            g.fillRect(0, 0, widthPx, heightPx);
+        }
 
         int cellWidth = fonts.cellWidth();
         int cellHeight = fonts.cellHeight();

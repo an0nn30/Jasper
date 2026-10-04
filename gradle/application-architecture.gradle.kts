@@ -23,6 +23,8 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
         }
         val supported = setOf("view.BuddyCompanion", "notice.BuddyNotice", "notice.BuddyNoticeId",
             "config.BuddyOptions", "config.BuddyPosition").map { "dev.jasper.buddy.$it" }.toSet()
+        // The dock model is pure: JDK types only, and from java.awt only two value classes.
+        val dockAwt = setOf("java.awt.Rectangle", "java.awt.Point")
         fun topLevel(name: String) = name.substringBefore('$')
         fun packageOf(name: String) = name.substringBeforeLast('.')
         fun jdk(name: String) = name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.")
@@ -57,6 +59,10 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                 if (module == app && to.startsWith("dev.jasper.sdk."))
                     check(packageOf(from) == "dev.jasper.app.plugins" || packageOf(from).startsWith("dev.jasper.app.plugins.")) {
                         "SDK types are confined to dev.jasper.app.plugins: $line"
+                    }
+                if (module == app && packageOf(from) == "dev.jasper.app.dock")
+                    check(to.startsWith("dev.jasper.app.dock.") || (to.startsWith("java.") && !to.startsWith("java.awt.")) || to in dockAwt) {
+                        "dev.jasper.app.dock is JDK-only and holds no Swing or AWT components: $line"
                     }
                 if (to.startsWith(prefix) && packageOf(from) != packageOf(to))
                     graph.getOrPut(packageOf(from)) { linkedSetOf() }.add(packageOf(to))

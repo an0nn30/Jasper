@@ -82,7 +82,7 @@ final class BuddyDeckPanel extends JComponent {
 
     boolean needsAnimationFrames() { return animating() || deck.notices().stream().anyMatch(BuddyCard::shimmers); }
 
-    boolean needsDetailUpdates() { return deck.notices().stream().anyMatch(BuddyNotice::live); }
+    boolean needsDetailUpdates() { return !deck.isEmpty(); }
 
     int cardHeight() { return BuddyCard.height(this); }
 
@@ -173,8 +173,6 @@ final class BuddyDeckPanel extends JComponent {
             changed();
             return true;
         }
-        // An orphan has nowhere to go, so a click on it is not a miss - it is simply nothing.
-        if (notice.orphaned()) return true;
         notice.activate().run();
         return false;
     }

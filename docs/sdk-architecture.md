@@ -9,9 +9,10 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `contributions`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `contributions`, `dock`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
 | `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
-| `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
+| `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `dock`, `lifecycle` |
+| `dev.jasper.app.dock` | The tool window dock model: the six slots, each window's `DockState` and the pure `DockGeometry`; JDK-only | none |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
 | `dev.jasper.app.pluginmanager` | The Settings dialog's Plugins page: passive Swing view, consent view and controller over app-native rows | `plugins`, `restart`, `settingsui`, `windows` |
 | `dev.jasper.app.restart` | Restart planning from the process's own command line, `ResidentControl`, and the Restart normally conversation | none |
@@ -50,16 +51,17 @@ Every outcome is a `PluginStatus` line in the log.
 - **Events.** `EventBus.publish` always enqueues through `SwingUtilities.invokeLater`: one
   global order, never re-entrant. `jasper.*` topics belong to the application.
 - **Activities.** `ActivityHub` stamps the source, coalesces progress and ends each activity
-  once. `PluginRuntime` forwards them to `notifications.ActivityNotifier`, which posts Buddy
-  cards keyed by `BuddyNoticeId(pluginId, activityId)`.
+  once. `PluginRuntime` forwards them to `notifications.ActivityNotifier`, which shows a running
+  activity as a Buddy card keyed by `BuddyNoticeId(pluginId, activityId)` and dismisses it when
+  the activity ends; `PluginHost` posts the outcome as a notification.
 - **Connections** (SDK 0.10.2). `ConnectionHub` stamps the source, delivers every state change in
   order, joins a detail-only report to the delivery still queued for that state and publishes one
   `CLOSED`. `PluginRuntime` forwards `Activities.CONNECTIONS` to `ActivityNotifier.connection`, which
-  posts a `Kind.CONNECTION` card on each new state (new news, even after it was acknowledged),
+  posts a `Kind.CONNECTION` card on each new state (new news),
   updates only the detail otherwise, and dismisses it on `CLOSED`.
 - **Card activation.** Every activity and connection card raises the application when clicked.
   When its `activateActionId` names an action the source plugin registered (`PluginHost.ownsAction`),
-  the click then invokes it in the last active window and acknowledges the card.
+  the click then invokes it in the last active window.
 - **Services.** Staged during `start`, committed on success. Per-consumer factories run on
   the EDT just before each consumer starts; lookups are cache reads.
 - **State.** `PluginStateStore` changes `plugins.toml` only inside a `FileLock` transaction
@@ -82,17 +84,27 @@ plugin default.
 
 ## Panels, the rail and plugin windows
 
-Panels and rail actions are part of the `Contributions` model. Each window's
-`WindowContributions` keeps one lazily built instance per panel, shows at most one per region
-through `WorkspaceRegions` (nested split panes rebuilt around the terminal column, the tab
-strip over the deck: bottom wraps the column, right wraps that, left wraps that, so the rail and
-the side panels run from the toolbar to the status bar), and renders `WindowRail`. A window with nothing
-contributed has no rail and its old layout. Requests to show, hide or toggle a panel travel
-through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
-window. Every panel gets a View → Tools entry for its toggle action: the application-registered
-`<panel id>.toggle`, or, since SDK 0.8.1, the plugin's own action named by
-`PanelSpec.toggleActionId` (which must already be registered by that plugin), so a plugin action
-that toggles a panel appears once in the menu and the palette.
+Panels and rail actions are part of the `Contributions` model; each panel carries its default
+`dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0).
+Each window's `WindowContributions` keeps one lazily built instance per panel and docks the panels
+in the window's `DockState` (per slot an ordered list with at most one active window; per-side
+sizes and ratios). One listener on that state builds what starts showing, lays out
+`ToolWindowArea` (the terminal column, the tab strip over the deck, and a rounded frame with a
+`ToolWindowHeader` for each showing slot, placed by the pure `DockGeometry`: the bottom area spans
+the full width, the sides and the terminal column run from the toolbar to it), renders the two
+`ToolStripe`s, tells the panels and saves. `DockDrag` drags a window from its stripe button or its
+header with plain mouse events: `DockDropResolver` finds the target under the cursor (a stripe
+group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
+bottom edges, a side split at half the side panels' visible height and the bottom at half its
+width), the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews
+the landing with `DockGeometry.landing`, the same function as the layout. A stripe drop moves the
+window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
+drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
+Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
+action or a `PanelHost` reaches exactly one window. Every panel gets a View → Tools entry for its
+toggle action: the application-registered `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's
+own action named by `PanelSpec.toggleActionId` (which must already be registered by that plugin),
+so a plugin action that toggles a panel appears once in the menu and the palette.
 
 Plugin windows follow the `TerminalWindow`/`WindowContent` split: `AuxiliarySurface` holds the
 content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`
@@ -117,10 +129,11 @@ chooser over the shown window or dialog. `HostedUi` checks the plugin lifetime a
 parents `FileDialog` to the actual frame or dialog and always disposes it. The testkit queues
 selections through `FakePluginHost.queueFileSelection`; an empty queue models cancellation.
 
-`persistence.UiState` (`ui-state.toml`) holds panel region, visibility and size, rail
-visibility and auxiliary window bounds. It is application state, not configuration: strict
-read, atomic write, defaults when unreadable. The process stays alive while a plugin window
-is open.
+`persistence.UiState` (`ui-state.toml`, version 2) holds each panel's slot, order and visibility,
+the dock's per-side sizes and ratios, stripe visibility and auxiliary window bounds. It is
+application state, not configuration: a bad panel or window entry or dock key falls back alone,
+an unreadable file falls back to defaults, writes are atomic, and a version 1 file migrates on read.
+The process stays alive while a plugin window is open.
 
 ## Terminal API
 
@@ -173,10 +186,9 @@ and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained
 `PaletteQuery` built from the target's window and pane ids through the plugin's own handles, and
 the plugin's row kept as the app row's token so it comes back unchanged. Every scope gets a tab;
 `ScopeSpec.inAll` (SDK 0.8.0, `withInAll(false)` to opt out) decides whether the All tab searches it
-too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `HostedContext.notices()`
-reaches the last active window's error handler; `platform().openInEditor` runs the application's
-`ConfigEditor` on the plugin's executor and reports failure as a notice, and `platform().browse`
-does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
+too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `platform().openInEditor` runs the application's
+`ConfigEditor` on the plugin's executor and posts a failure in the plugin's notification group, and
+`platform().browse` does the same with `platform.Browser` after refusing anything but an http or https address. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
 contributors; `stagePlugins` copies each plugin's jar and runtime classpath into `lib/plugins/<id>/`.
 
@@ -199,6 +211,21 @@ stroke when their contexts don't conflict (a conflict is the same context, or Gl
 a terminal pane). `WindowContent.dispatchShortcut` resolves the stroke against the focus owner: an enabled action in
 the most specific containing context runs; a disabled one takes the key without running in a terminal pane (plan K1
 Deviation 9: X11 would send it to the shell as a control character); otherwise the key is not consumed. Window contexts apply once plugin windows get the Keymap (plan K4).
+
+## Notifications (SDK 0.14.0)
+
+`PluginContext.notifications()` is `plugins.HostedNotifications`, one per context. When the context is made it
+registers the plugin's default group (`<plugin-id>`, CARD) and `<plugin-id>.activities` in the application's
+`NotificationCenter`; `group(GroupSpec)` registers more inside the plugin's namespace. `post` requires an open context,
+turns the SDK spec into a `NotificationRequest` with the plugin id as its source, wraps every action and the body in
+`Containment.run`, and posts from any thread. A spec with a cause goes to `PluginRuntime.NotificationHost.caused`,
+which the application wires to `IncidentNotices.pluginNotice`: the trace is captured on the posting thread and
+recorded as the plugin's incident, named after the title, and the notification gains Show more…. A handle learns its
+entry's id on the EDT and expires with it; teardown expires everything the plugin posted. `PluginHost` hears
+`Activities.TOPIC` and posts a running plugin's succeeded or failed activity in its activities group.
+`PluginRuntime.problems()` lists what kept plugins from running at launch, and `application.PluginProblemNotices`
+posts each in Plugin problems with Open Plugins. The testkit's `FakeNotifications` records the same posts, and
+`PluginContractTest` holds both hosts to one contract.
 
 ## Plugins manager, install and restart
 
@@ -390,7 +417,7 @@ Closed handles cannot reattach or take focus.
 
 The application translates SDK values to `contributions.ContentRegistry`/`ContentEntry`.
 `WindowContent` hosts both terminal and plugin components; `WindowTabs` and
-`WorkspaceRegions` remain the single renderer. Separate document windows reuse those same
+`ToolWindowArea` remain the single renderer. Separate document windows reuse those same
 owners without starting a shell. Terminal enumeration and active-pane APIs continue to
 report terminal content only. Plugins must tolerate an empty active pane while editing.
 
@@ -399,6 +426,17 @@ and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `Synta
 `SyntaxStyle`. `Appearance.workspaceVariant` is a safe immutable snapshot; palette getters require the UI thread.
 `onWorkspaceChanged` compares the complete workspace generated value, skips initial replay, contains handler failures,
 and removes registrations on disposal or stop. Chrome `variant` and `onChanged` retain their existing meaning.
+
+SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0, UI thread, null rejected); `onWorkspaceChanged` also
+reports its changes. The method takes a component because opacity is per window and content moves between windows (the
+design's no-argument form was changed for that reason). `dev.jasper.app.plugins.GlassSource` is the per-component lookup
+plus change subscription; `JasperApplication` builds it from its `TerminalWindow`s (`owns(component)`, then the window
+content's `workspaceOpacity(component)`: the window's opacity inside the centre deck that holds terminal and hosted
+content tabs, 1.0 for chrome, the stripes and the tool windows), `PluginRuntime.glass(GlassSource)` hands it to `PluginHost.Environment` and `HostedUi`,
+and `WindowContent.setGlassListener(Runnable)` fires on a real opacity change and when hosted content mounts or unmounts
+while the window is translucent. A component outside a translucent window reports 1.0. `FakePluginHost.setWorkspaceOpacity`
+announces on `flush()` and reports one value for every component; the contract case
+`workspaceOpacityStartsOpaqueAndChangesAreWorkspaceChanges` runs on the fake and on the app.
 
 `PluginRuntime.appearance` accepts app-native `ResolvedTheme` suppliers and subscriptions. The `plugins` package
 alone adapts native tokens and syntax to SDK values (its allowed dependencies include `appearance`). The appearance

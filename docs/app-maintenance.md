@@ -116,7 +116,7 @@ touches the real keychain under a throwaway item.
 
 ## New Buddy notice producer
 
-Follow [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java) and the app translation of [WorkspaceActivity](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActivity.java). Allocate a source-qualified stable opaque ID. Pair opened and closed registration; remove the active identity before cancelling delayed work. Every delayed callback and event checks the current producer lifetime. Suppliers and activation callbacks run on EDT and must not block. At producer close, orphan and freeze only unfinished details; preserve completed outcomes. At app shutdown cancel producer work before closing the companion. Workspace reports events and never imports notice policy.
+Follow [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java) and the app translation of [WorkspaceActivity](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActivity.java). Allocate a source-qualified stable opaque ID. Pair opened and closed registration; remove the active identity before cancelling delayed work. Every delayed callback and event checks the current producer lifetime. Suppliers and activation callbacks run on EDT and must not block. When the work ends, and at producer close, dismiss the card; report how the work ended as a notification (see Posting a notification below), never through Buddy. At app shutdown cancel producer work before closing the companion. Workspace reports events and never imports notice policy.
 
 <!-- example:producer -->
 ```java
@@ -125,9 +125,8 @@ try (var buddy = new BuddyCompanion(options)) {
     var id = new BuddyNoticeId("example.transfer", UUID.randomUUID());
     buddy.post(new BuddyNotice(id, BuddyNotice.Kind.TASK, "Copy logs", BuddyNotice.State.RUNNING,
         () -> "3 files remaining", () -> {}));
-    // At producer close: cancel queued work first, then freeze and disconnect the notice.
-    buddy.orphan(id, "Stopped after 3 files");
-    buddy.acknowledge(id);
+    // When the work ends or the producer closes: cancel queued work first, then remove the card.
+    buddy.dismiss(id);
 }
 ```
 
@@ -136,6 +135,66 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ```sh
 ./gradlew :jasper-app:test --tests "*CommandNotifierTest" --tests "*WorkspaceActivityTest" :jasper-buddy:test --tests "*BuddyDeckTest" --tests "*BuddyCompanionTest"
 ```
+
+## Posting a notification
+
+Application code never opens a message dialog to tell the user something; it posts a notification
+([guide](notifications.md), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+
+- Window code calls `WindowContent.onError` / `onInfo` with a fixed title and the details; the application posts them
+  to `jasper.general`. Never put user data in the title: it is what a window logs when nothing receives the message.
+- Application code calls `NotificationsFeature.error` / `info`, or posts a `NotificationRequest` for another group,
+  actions or a default action. `NotificationCenter.submit` is the any-thread entry point (at once on the EDT,
+  otherwise through the UI executor); `NotificationCenter.post` is EDT-only and throws elsewhere. Declare a group with
+  `NotificationCenter.register` before posting to it; posts to an undeclared group are dropped and logged.
+- Text is plain and bounded: titles are one line (cut at 200 characters), details at most 4,000. Pass exception
+  messages as details, never as titles.
+- Contextual feedback (a Settings field error, a palette error row, a plugin's inline row) stays where it is, and
+  confirmation or input prompts stay dialogs: notifications are for things that happen elsewhere or later.
+- Cards, the panel and the badge read `Jasper.notification.*` and `Jasper.railBadge*` colours derived in `ChromeKeys`;
+  a theme's own `Notification.*` keys win. The badge is a `PanelEntry.setBadge` on the panel: each window's
+  `ToolStripe` shows it as a `BadgedIcon` on that panel's stripe button, with the count in the tooltip and
+  accessible description. Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner
+  of the `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
+
+## Recording an incident
+
+An unexpected failure is an incident: it is kept for the Errors window, and a Jasper or plugin incident is announced by
+one error notification
+([guide](notifications.md#the-errors-window), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+`application.IncidentNotices` is the only producer, and its entry points are safe from any thread:
+
+- `jasperFailure(operation, failure)` is for Jasper's own failures. The default uncaught-exception handler (every
+  thread, the EDT included) forwards through `JasperApplication.unexpected`, and a notification action that throws
+  arrives through `NotificationCenter.reportActionFailuresTo`.
+- `pluginFailure(pluginId, operation, failure)` receives every failure `plugins.Containment` catches, through
+  `PluginRuntime.reportFailuresTo`. Give each contained call a short operation ("panel <id>", "action <id>"): it is
+  the incident's header and the notification's title.
+- `launchFailure(window, details, failure)` is for a shell that could not start, from `WindowContent.onLaunchFailure`.
+  Every occurrence is announced in its own window with its details and Show more…, while the incident itself still
+  counts up.
+
+Expected failures the user can act on, such as a file that cannot be read or a host that cannot be reached, are not
+incidents: post a notification with the details instead.
+
+A `Capture` takes the trace once, on the thread that caught the failure (trace at most 256 KiB, message at most
+16 KiB), so later changes to the throwable never reach the incident. Incidents coalesce by source, exception class
+and the root cause's top five frames; at most 100 are kept, and a repeating incident's notification is updated at
+most once a second (its count catches up). Capture never throws and does not re-enter on the same thread. A failure
+whose first Jasper frame lies in `dev.jasper.app.notifications`, `dev.jasper.app.notificationui`,
+`IncidentNotices`, `NotificationsFeature`, `ErrorsWindow` or `ConfigProblemNotices` is left to the log, so the
+notification system can never report its own failures in a loop; a launch failure rejected that way still gets its
+plain "Could not start the terminal" notification. The log is unchanged: incidents add no messages or traces to it.
+
+## A plugin's notifications
+
+Plugins post through `PluginContext.notifications()`, which `plugins.HostedNotifications` implements over the
+application's `NotificationCenter` ([design](superpowers/specs/2026-10-02-jasper-notifications-design.md)). The
+runtime gets a `PluginRuntime.NotificationHost`: the center; `caused`, for a plugin's notification with a cause, which
+`JasperApplication` hands to `IncidentNotices.pluginNotice`; and `problem`, for a plugin problem of the runtime's own,
+such as a settings file that cannot be opened. `PluginHost` posts activity outcomes, and
+`application.PluginProblemNotices` posts `PluginRuntime.problems()` after `PluginRuntime.start`. Change the SDK side
+in `PluginContractTest` first, so the testkit's `FakeNotifications` and the application keep one contract.
 
 ## Platform integration
 
@@ -159,6 +218,54 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*StartupResourcesTest" --tests "*ApplicationBootstrapRollbackTest" --tests "*MacTitleBarTest"
 ```
 
+### Workspace glass
+
+A translucent, blurred terminal workspace on macOS. The workspace theme's `[workspace]` table and
+`ui.workspace.opacity`/`ui.workspace.blur` combine in `GlassLevels.resolve`; `WindowContent.requestGlass` sends the
+result to the window's `WindowGlass` after every theme or configuration change. `WindowGlass` decides, and reports the
+opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting never reads the raw settings, so any
+failure leaves an opaque window.
+
+- **macOS only.** Elsewhere the Opacity and Blur rows are hidden in Settings (`CorePages`, `shownWhen`), the keys stay
+  valid and are silently ignored, `TerminalWindow` constructs no `WindowGlass` (so neither it nor `MacGlass` is ever
+  loaded), `JasperApplication` gives plugins `GlassSource.NONE` and installs no glass listener, and the launcher
+  (`applicationDefaultJvmArgs`, `Jasper.cfg`) carries no `--add-opens`/`--add-exports`; `packaging.gradle` requires
+  them on a macOS host and requires them absent on others.
+- **Translucency** needs two JDK internals (AWT refuses alpha on a decorated frame): `MacGlass` sets
+  `Component.background` and calls `WindowPeer.setOpaque(false)`. The launcher passes
+  `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED`;
+  `packaging.gradle` refuses a `Jasper.cfg` without them. After a JBR upgrade, check that a Clear theme is still
+  translucent; if the internals changed, `WindowGlass` logs one warning and windows stay opaque. A notified opaque
+  window background (FlatLaf sets the frame's a turn after a UI-theme switch, and AWT then makes the peer opaque) is
+  watched through `WindowGlass.Platform.watch`: `WindowGlass` reports opaque at once and re-applies on the next turn,
+  and `MacGlass` restores that newer background later.
+- **Blur** is on or off (`WindowGlass.Blur`: `NONE`, `DARK` or `LIGHT`, from the request's blur and whether the
+  workspace theme is dark) and lives in `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by
+  `gradle/mac-glass.gradle`). It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it
+  and, on the main thread without waiting, places a public `NSVisualEffectView` behind the content view: material
+  `hudWindow` (13) in the dark appearance, or `underWindowBackground` (21) in the light one (`MacGlass.DARK_MATERIAL`
+  and `LIGHT_MATERIAL`). The view is masked to the window's rounded corners and a `JasperCornerObserver`, kept alive by
+  the view as an associated object, refreshes the mask on full-screen and screen changes (none in full screen); it
+  lives and dies with the view, and removing the view stops it. There is no private CoreGraphics call; the corner
+  radius comes from AppKit's private `_cornerRadius` when present, else 10 pt. `./gradlew :jasper-app:run` passes
+  `-Djasper.glassLibrary`; a packaged app loads it from `Contents/app/`.
+- **Painting**: the window peer is the only non-opaque ancestor. `ToolWindowArea`'s center host fills its rounded
+  surface with the terminal background at the opacity in effect (`Src`), so a strip no pane covers is glass too;
+  `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
+  `TerminalView` fill the default background with alpha using the `Src` composite, replacing the host's fill. Anything
+  new inside the terminal surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
+- **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.14.1). The answer comes from
+  `dev.jasper.app.plugins.GlassSource`, which `JasperApplication` builds from its windows: `owns(component)` finds the
+  window and `content().backgroundOpacity()` is the value in effect (1.0 for a component outside a translucent window).
+  `WindowContent.setGlassListener` notifies it on a real opacity change and when hosted content mounts or unmounts while
+  the window is translucent, and `HostedUi` turns that into an `onWorkspaceChanged` event. The Editor plugin paints
+  its text and gutter backgrounds once each from this value; see the SDK README for the painting rule.
+
+```sh
+./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest" --tests "*ClearThemesTest"
+./gradlew :jasper-app:testMacGlass :jasper-terminal:test --tests "*TerminalPainterTest"
+```
+
 ## Packaged runtime, bundled natives and the AOT cache
 
 `gradle/packaging-support.gradle` holds what packaging decides: the runtime's modules, the native libraries copied into
@@ -173,6 +280,14 @@ checks a built image ([start-up performance](packaging.md#start-up-performance))
   and that the properties in `bundledNativeJvmOptions` still apply. `BundledNativesProbeTest` (macOS, in `check`)
   loads them from a folder laid out like the image; `verifyPackage` fails when a jar lacks an entry or the image loads
   a library from elsewhere.
+- **A new JVM option.** `verifyPackage` accepts only the application's own options (`applicationDefaultJvmArgs`, which
+  on macOS include the workspace glass `--add-opens`/`--add-exports`), `bundledNativeJvmOptions`, jpackage's app
+  version and, once trained, `-XX:AOTCache`. Add an option to one of those lists, never to `Jasper.cfg` alone; the AOT
+  training launch and `aotCheckCommand` read the same `Jasper.cfg`, so a trained cache always matches its options.
+- **Jasper's own macOS bridges** (`libjasper-macos.dylib` from `gradle/mac-native.gradle`, `libjasper-glass.dylib`
+  from `gradle/mac-glass.gradle`) are not bundled natives: each is staged by `stagePackage`, copied back after jpackage
+  re-signs it in `packageApp` (so the staged bytes and their ad-hoc signature survive), and listed in `verifyPackage`'s
+  bridge check with the JNI symbols it must export. A new bridge needs all three.
 - **The AOT cache.** It is trained per build, so it follows class-path changes automatically; never edit a jar inside a
   trained image, rebuild it. Training opens a window: agents ask the user before `packageDist`, `trainAotCache` or
   `-Pjasper.aot=true`.
@@ -207,12 +322,13 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Edit Jasper Light/Dark seed and token TOMLs under `jasper-app/src/main/resources/dev/jasper/app/themes/`;
+Edit the hand-written Jasper Light/Dark and Clear Dark/Light TOMLs under
+`jasper-app/src/main/resources/dev/jasper/app/themes/` (`ConvertThemes` copies these four unchanged);
 change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 256 KiB native cap remains.
 
 `tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
 refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
-assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 284 native files, index, legacy
+assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 286 native files, index, legacy
 aliases and third-party notices entirely offline. Normal build/test never fetches. Do not normalize upstream bytes.
 Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
 colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
@@ -311,7 +427,8 @@ never shown. It must stay invisible to everything else: it opens no `WindowTrace
 `OUTPUT_PAINTED` (those would settle residency for a window nobody sees), only `WARMED_UP`, which the `done` callback
 passed to `warmUp` marks whether the rehearsal succeeded, failed or threw; it is not registered with the terminal registry and is not a
 content host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it;
-and its error and info callbacks are logged, never shown. A process that has warmed up labels its first plain window
+and its error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as
+incidents (`Rehearsal.silence`). A process that has warmed up labels its first plain window
 `menu` rather than `cold`. Once `done` has run, on every path (a played rehearsal, a failed one, an `Error`, and the
 headless early return), `warmUp` starts one `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's
 garbage does not stay in the resident heap (user decision 2026-10-03); `JasperApplication.collector` is the test seam.
@@ -357,39 +474,68 @@ padding. Keep compact palette rows tall enough for these insets. Plugin forms in
 these defaults; upstream theme assets should not be edited to duplicate them.
 
 
-Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and,
-while the rail is visible, matching rounded corners for the terminal/tab column. With
-the rail hidden or empty, the terminal/tab column has square corners, no exterior
+Workspace rounding belongs to `ToolWindowArea.Host`: 8px-radius tool window frames and,
+while the stripes are visible, matching rounded corners for the terminal/tab column. With
+the stripes hidden or empty, the terminal/tab column has square corners, no exterior
 gutters and no lower corner spacer: it fills the available workspace edge to edge.
-Keep the layout-only terminal
+Where frames go is `DockGeometry`'s job, never the area's: change the geometry and its
+tests first; the drop preview (`DockGeometry.landing`) uses the same function, so the two agree.
+What a drop over the workspace targets is `DockDropResolver`'s job: the nearest of the left, right and
+bottom edges (each distance a share of the workspace's own width or height, so the zones keep their shape
+at any aspect ratio), a side split into its top and bottom slot at half of the side panels' visible height
+(`DockDrag.sideSplit`: above the bottom area while it shows, else the workspace's half) and the bottom at half
+its width; a side wins a tie. `DockDrag` previews no area for a stripe drop of a hidden window, which stays
+hidden. Change the zones in the resolver and its tests first; the window tests aim with
+`DockTestSupport.zone(workspace, slot)`.
+Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
+components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
+headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
+button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
+to the pressed component keep arriving. Any dock change or stripe render, View › Rail and the window
+being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher
+claims only an Esc from its own window. A panel badge change is not a render: it fires
+`Contributions.Kind.BADGES`, and `WindowContributions` applies it to the existing stripe buttons with
+`ToolStripe.updateBadge` (the icon's size is the base icon's, so nothing is laid out), so a notification
+arriving mid-drag leaves the drag alone. An action's enable or title change is not a render either:
+`WindowContributions` calls `ToolStripe.refreshActions`, which renames the existing rail action buttons
+(a button follows the action's enabled state itself) and repaints them. Only adding or removing an
+action or a rail placement, or a dock or panel change, renders the stripes again. Keep the layout-only terminal
 column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
 skips the host background, leaving square corner pixels behind the clipped children.
 Corner regressions must exercise clipped `paint` calls as well as full-window previews.
 Exterior gutters are 6px, except
-beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
-left/center/bottom surface has no additional leading gutter. Hiding or emptying the
-rail restores that gutter on plugin panel hosts without reparenting their content.
+beside the visible stripes: each stripe supplies its own balanced spacing, so the adjacent
+frames and the terminal column have no additional side gutter. Hiding or emptying the
+stripes restores that gutter on tool window frames without reparenting their content.
 The following gutter and lower-inset rules apply to the terminal column only while
-the rail is visible. A visible status bar
+the stripes are visible. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
 status bar restores the 6px bottom gutter. A visible toolbar or unified native header
 also replaces the exterior top gutter, keeping its controls centered between the window
 top and workspace surfaces. Hiding toolbar actions retains this spacing on macOS because
-the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent hosts omit
-their facing gutters so the plain 6px draggable splitter supplies the gap.
-Region widths/heights and persisted splitter sizes include exterior gutters. The center
+the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent frames omit
+their facing gutters so the area's plain 6px divider supplies the gap.
+Slot sizes and the saved dock sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px
 minimum. The center reserves an 8px lower inset (the corner radius) below the terminal
 grid, so terminal cells stay rectangular and unclipped. The inset uses the resolved
 terminal palette, including independent terminal-color changes. Its height contributes
-to the workspace minimum and scales with the UI. Keep clipping and hit testing in the
+to the workspace minimum and scales with the UI. The area's minimum height is the larger of the
+terminal column's minimum and `DockGeometry.splitMinimum` (two tool window minimums and a divider
+when the left or the right side shows both halves, else 0), plus the bottom row; only a split side
+raises it, so the scaled 120px terminal floor never raises an unsplit layout's minimum (the terminal
+column's own minimum, the gap and the bottom floor still scale with the UI). `DockGeometry.compute`
+keeps `upperMinimum` (that, or the terminal's own 120px floor, whichever is larger) above the bottom
+row. `ToolWindowArea.sync` and `WindowContent.syncRailVisibility` tell the window
+(`onMinimumSizeChanged`) so the frame's minimum follows a split, or the stripes, appearing or going
+away. Keep clipping and hit testing in the
 host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
 `ToolWindow.background` supplies the inner surface. `UiTemplate` maps it to the `sidebar` token and list/tree/table backgrounds to `surface_sunken`; edit the
 `[tokens]` in `jasper-dark.toml` or `jasper-light.toml` to tune the contrast.
-Rail selection uses the theme's toolbar-button background and the original theme-aware icon;
+Stripe selection uses the theme's toolbar-button background and the original theme-aware icon;
 do not substitute the tab accent or a different selected icon variant.
 
 
@@ -404,8 +550,8 @@ The palette uses the same geometry for selections, hover and scope highlights.
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
 workspace title bar, tab strip and status bar have no edge strokes. The selected tab
-uses an inset rounded selection instead of an underline. Workspace-region splitters remove their border/grip after every UI
-update; terminal-internal splits keep their existing visible indicators. The standalone
+uses an inset rounded selection instead of an underline. Dock dividers paint nothing, so no UI
+update can give them a border or grip; terminal-internal splits keep their existing visible indicators. The standalone
 dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 
@@ -471,6 +617,18 @@ The Appearance page's Theme and Workspace scheme rows are ordinary schema rows (
 per-page import factory from application wiring, so settingsui has no dependency on themesui. A pick re-reads the
 names on each page refresh (`ValueEditor.refresh`); a saved name the catalog lacks stays listed as "(not found)" and
 keeps its spelling. Only the Theme row has the gear; its page disposes the row, which closes the import.
+
+Both picks use `settingsui.SearchCombo`, a `JComboBox` whose look-and-feel UI (a `FlatComboBoxUI` subclass, or Basic
+without FlatLaf) creates its own `ComboPopup`: a non-focusable `JPopupMenu` with a search bar over a filtered list.
+Focus stays on the combo; the popup's key listener, which the UI installs on the combo, routes typed characters into
+the search and handles Up/Down (keypad too), Page Up/Down, Home/End, Enter, Escape and Backspace while the list is
+open or a search runs; every key the combo's own bindings would answer with a pick behind the list must stay handled
+there. `selectWithKeyChar` always returns false, because each look and feel installs a fresh key selection manager.
+The popup's size is fixed when it opens; only the bar's first appearance repacks. Its rows have their own renderer,
+padded as FlatLaf pads its own combo popup (`ComboBox.padding` plus the combo's focus width at each side, read at paint
+time), with the combo's `selectionInsets`/`selectionArc` and `popupInsets`; `SearchComboTest` compares the padding
+with a stock FlatLaf combo.
+FlatLaf touches its own popup type only behind an `instanceof` check; recheck that when upgrading FlatLaf.
 
 `themesui.ThemeImport` runs every conversion and write on its serial worker. Dialogs and reload requests run on EDT;
 completion waits for the catalog refresh before reporting. A closed import suppresses UI callbacks while a running

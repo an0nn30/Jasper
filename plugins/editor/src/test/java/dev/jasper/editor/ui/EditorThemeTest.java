@@ -117,6 +117,60 @@ class EditorThemeTest {
         assertThat(area.getSelectionColor()).isEqualTo(EDITOR.selection());
     }
 
+    @Test void translucentOpacityClearsEverySurfaceSoOnlyTheGlassSurfacePaints() {
+        var area = new RSyntaxTextArea();
+        var scroll = new RTextScrollPane(area);
+        scroll.setLineNumbersEnabled(true);
+        scroll.setFoldIndicatorEnabled(true);
+        var theme = new EditorTheme();
+        theme.apply(area, scroll, EDITOR, syntax(0x223300), 0.5);
+        var gutter = scroll.getGutter();
+        assertThat(area.isOpaque()).isFalse();
+        assertThat(scroll.isOpaque()).isFalse();
+        assertThat(scroll.getViewport().isOpaque()).isFalse();
+        assertThat(scroll.getRowHeader().isOpaque()).isFalse();
+        assertThat(gutter.isOpaque()).isFalse();
+        assertThat(gutter.getComponents()).isNotEmpty();
+        for (var child : gutter.getComponents()) if (child instanceof javax.swing.JComponent component) assertThat(component.isOpaque()).isFalse();
+        assertThat(area.getBackground().getAlpha()).isZero();
+        assertThat(gutter.getBackground().getAlpha()).isZero();
+        assertThat(area.getCurrentLineHighlightColor().getAlpha()).isEqualTo(128);
+        assertThat(area.getCurrentLineHighlightColor().getRGB() & 0xFFFFFF).isEqualTo(EDITOR.currentLine().getRGB() & 0xFFFFFF);
+
+        theme.apply(area, scroll, EDITOR, syntax(0x223300), 1.0);
+        assertThat(area.isOpaque()).isTrue();
+        assertThat(scroll.isOpaque()).isTrue();
+        assertThat(scroll.getViewport().isOpaque()).isTrue();
+        assertThat(scroll.getRowHeader().isOpaque()).isTrue();
+        assertThat(gutter.isOpaque()).isTrue();
+        for (var child : gutter.getComponents()) if (child instanceof javax.swing.JComponent component) assertThat(component.isOpaque()).isTrue();
+        assertThat(area.getBackground()).isEqualTo(EDITOR.background());
+        assertThat(gutter.getBackground()).isEqualTo(EDITOR.gutter());
+        assertThat(area.getCurrentLineHighlightColor()).isEqualTo(EDITOR.currentLine());
+    }
+
+    @Test void lineNumbersReattachedAfterAnOpacityChangeFollowTheGutter() {
+        var area = new RSyntaxTextArea();
+        var scroll = new RTextScrollPane(area);
+        scroll.setLineNumbersEnabled(true);
+        var theme = new EditorTheme();
+        var gutter = scroll.getGutter();
+
+        theme.apply(area, scroll, EDITOR, syntax(0x223300), 1.0);
+        gutter.setLineNumbersEnabled(false);
+        theme.apply(area, scroll, EDITOR, syntax(0x223300), 0.5);
+        gutter.setLineNumbersEnabled(true);
+        assertThat(gutter.getComponents()).isNotEmpty();
+        for (var child : gutter.getComponents()) if (child instanceof javax.swing.JComponent component)
+            assertThat(component.isOpaque()).as("%s back in a glass gutter", component.getClass().getSimpleName()).isFalse();
+
+        gutter.setLineNumbersEnabled(false);
+        theme.apply(area, scroll, EDITOR, syntax(0x223300), 1.0);
+        gutter.setLineNumbersEnabled(true);
+        for (var child : gutter.getComponents()) if (child instanceof javax.swing.JComponent component)
+            assertThat(component.isOpaque()).as("%s back in an opaque gutter", component.getClass().getSimpleName()).isTrue();
+    }
+
     @Test void blendMovesPartWayTowardTheSecondColour() {
         assertThat(EditorTheme.blend(Color.BLACK, Color.WHITE, 0.5)).isEqualTo(new Color(128, 128, 128));
     }

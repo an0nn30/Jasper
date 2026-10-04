@@ -20,6 +20,13 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.CommandNotice;
 import dev.jasper.app.notifications.CommandNotifier;
+import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.IncidentReport;
+import dev.jasper.app.notifications.Incidents;
+import dev.jasper.app.notifications.NotificationCenter;
+import dev.jasper.app.notifications.NotificationRequest;
+import dev.jasper.app.notifications.Severity;
+import dev.jasper.app.notificationui.ErrorsView;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
@@ -72,6 +79,11 @@ public final class JasperApplication {
     private final ThemeController themes;
     private final ThemeCatalog themeCatalog;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
+    /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
+    private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+    private final List<Runnable> glassListeners = new ArrayList<>();
+    /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
+    private boolean activatedSinceOpen;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -143,6 +155,14 @@ public final class JasperApplication {
     private volatile List<CompletableFuture<?>> processCleanups;
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     private ActivityNotifier activityNotifier;
+    private final NotificationCenter notificationCenter;
+    private final NotificationsFeature notificationViews;
+    private final Incidents incidents;
+    private final IncidentNotices incidentNotices;
+    /** Built once plugins start, with the auxiliary windows it opens in. */
+    private ErrorsWindow errorsWindow;
+    /** Where Open Log Folder points, known once plugins start. */
+    private Path logFolder;
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
@@ -204,6 +224,12 @@ public final class JasperApplication {
             created = new ThemeController(Theme.DARK);
         }
         themes = created;
+        notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
+        notificationViews = new NotificationsFeature(notificationCenter, contributions);
+        incidents = new Incidents(notificationCenter.clock());
+        incidentNotices = new IncidentNotices(notificationCenter, incidents, SwingUtilities::invokeLater,
+            JasperApplication::afterDelay, this::pluginName, this::disablePlugin, this::showErrors);
+        notificationCenter.reportActionFailuresTo(failure -> incidentNotices.jasperFailure("a notification action", failure));
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
@@ -213,7 +239,7 @@ public final class JasperApplication {
             themes.current().chrome().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
-            buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
+            buddy.companion(), notificationCenter, nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog, new dev.jasper.app.platform.ConfigEditor()::open, () -> migrationProblems);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
@@ -229,6 +255,10 @@ public final class JasperApplication {
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
             updateMigrateAction();
         });
+        if (configuration != null) {
+            var problems = new ConfigProblemNotices(notificationCenter, this::showConfigurationProblems, this::openConfigFile);
+            configuration.onProblems(problems::accept);
+        }
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler((event, response) -> nativeQuitRequested(response));
             quitHandlerInstalled = true;
@@ -296,6 +326,14 @@ public final class JasperApplication {
      */
     static String windowTrigger(int windowsOpened, boolean warmedUp) { return windowsOpened == 0 && !warmedUp ? "cold" : "menu"; }
 
+    /** The opacity in effect behind {@code component}: its terminal window's within that window's workspace area, else 1. */
+    private double glassOpacity(Component component) {
+        for (TerminalWindow window : windows) if (window.owns(component)) return window.content().workspaceOpacity(component);
+        return 1.0;
+    }
+
+    private void glassChanged() { for (Runnable listener : List.copyOf(glassListeners)) listener.run(); }
+
     /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
     public TerminalWindow newWindow() {
         return openWindow(null, false,
@@ -331,7 +369,13 @@ public final class JasperApplication {
                 launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
             if (configuration != null) configuration.register(window.content());
             window.content().connectContributions(contributions, uiState);
+            UUID windowId = window.content().id();
+            window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
+            window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
+            window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
+            notificationViews.attach(window.content());
             window.content().connectTerminals(terminals, window::toFront);
+            if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
             window.content().onToggleBuddy = this::toggleBuddy;
             window.content().onFirstTerminal(pane -> timeFirstTerminal(pane, windowTrace));
             window.content().buddyEnabled = this::buddyEnabled;
@@ -342,13 +386,13 @@ public final class JasperApplication {
                         value.elapsedNanos(), value.activate(), value.watched());
                     case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
                         value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
-                            value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), value.activate());
+                            value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), windowId, value.activate());
                     case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
                     case WorkspaceActivity.PaneState value -> {
                         switch (value.state()) {
                             case OPENED -> notifications.opened(value.id());
                             case CLOSED -> notifications.closed(value.id());
-                            case FOCUSED -> notifications.looked(value.id());
+                            case FOCUSED -> { }
                             case BLURRED -> notifications.hidden(value.id());
                         }
                     }
@@ -360,7 +404,7 @@ public final class JasperApplication {
             try {
                 if (window != null) discard(window, failure);
             } finally {
-                presence();
+                updateDock();
             }
             throw failure;
         }
@@ -370,8 +414,9 @@ public final class JasperApplication {
     }
 
     /**
-     * Closes a window whose composition failed. If closing it fails too, the window is still forgotten and its frame
-     * disposed, and that second failure is added to {@code failure} as suppressed. EDT.
+     * Closes a window whose composition failed. If closing it fails too, the window is still forgotten (by the window
+     * list and the notification cards, which would otherwise keep routing to it) and its frame disposed, and each
+     * further failure is added to {@code failure} as suppressed. EDT.
      */
     private void discard(TerminalWindow window, Throwable failure) {
         try {
@@ -379,6 +424,11 @@ public final class JasperApplication {
         } catch (RuntimeException | Error closing) {
             failure.addSuppressed(closing);
             windows.remove(window);
+            try {
+                notificationViews.detach(window.content());
+            } catch (RuntimeException | Error detaching) {
+                failure.addSuppressed(detaching);
+            }
             try {
                 window.nativeWindow().dispose();
             } catch (RuntimeException | Error disposing) {
@@ -656,16 +706,29 @@ public final class JasperApplication {
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
         auxiliary.onAllClosed = () -> {
             if (windows.isEmpty() && !resident && !quitting) requestShutdown();
-            else presence();
+            else updateDock();
         };
         auxiliary.onFirstOpened = this::windowOpening;
+        logFolder = dirs.logs();
+        errorsWindow = new ErrorsWindow(contributions, auxiliary, incidents, new ErrorsView.Hooks(this::pluginName,
+            id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),
+            this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone());
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
             new PluginRuntime.SettingsReports(
                 diagnostic -> { if (configuration != null) configuration.report(diagnostic); },
                 file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
-            this::notice, new dev.jasper.app.platform.ConfigEditor()::open,
+            new PluginRuntime.NotificationHost(notificationCenter,
+                caused -> incidentNotices.pluginNotice(caused.pluginId(), caused.request(), caused.cause(), caused.posted()),
+                (title, details) -> notificationCenter.submit(NotificationRequest.of(IncidentNotices.PLUGINS.id(), Severity.ERROR, title)
+                    .withContent(details))),
+            new dev.jasper.app.platform.ConfigEditor()::open,
             new PluginRuntime.ShellProfiles(shellProfiles::current, shellProfiles::onChanged));
+        plugins.glass(WORKSPACE_GLASS ? new dev.jasper.app.plugins.GlassSource(this::glassOpacity, listener -> {
+            glassListeners.add(listener);
+            return new Subscription(() -> glassListeners.remove(listener));
+        }) : dev.jasper.app.plugins.GlassSource.NONE);
+        plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
@@ -681,6 +744,8 @@ public final class JasperApplication {
             return created.content().id();
         });
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
+        new PluginProblemNotices(notificationCenter, incidentNotices,
+            () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         var keymap = new dev.jasper.app.shortcuthelp.KeymapPage.Hooks(contributions,
             () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).keybindings(),
@@ -731,8 +796,9 @@ public final class JasperApplication {
         private void migrateConfiguration() {
             if (configuration == null || quitting || stopped) return;
             configuration.migrate().whenComplete((message, failure) -> javax.swing.SwingUtilities.invokeLater(() -> {
-                if (failure == null) info(message);
-                else notice((failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
+                if (failure == null) notificationViews.info("Migrate Config", message);
+                else notificationViews.error("Migrate Config failed",
+                    (failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
             }));
         }
 
@@ -747,7 +813,7 @@ public final class JasperApplication {
         private void openConfigFile() {
             if (configuration == null) return;
             configuration.openConfigFile().whenComplete((file, failure) -> {
-                if (failure != null) SwingUtilities.invokeLater(() -> notice(failure.getMessage()));
+                if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not open config.toml", failure.getMessage()));
             });
         }
 
@@ -756,7 +822,7 @@ public final class JasperApplication {
             Path folder = configuration.state().file().toAbsolutePath().getParent();
             CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().reveal(folder))
                 .whenComplete((ignored, failure) -> {
-                    if (failure != null) SwingUtilities.invokeLater(() -> notice("Could not reveal " + folder));
+                    if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not reveal the folder", folder.toString()));
                 });
         }
 
@@ -768,19 +834,72 @@ public final class JasperApplication {
             });
         }
 
-        /** A plain informational message: the window the user used last, or the log when there is none. */
-        void info(String message) {
-            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
-            if (target == null) LOG.log(System.Logger.Level.INFO, message);
-            else target.content().onInfo.accept(message);
-        }
+    /** Where Jasper stands for notifications: focused, in the background, or with no window open. */
+    private Delivery.Presence presence() {
+        return presence(!windows.isEmpty(), activatedSinceOpen,
+            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null);
+    }
 
-        /** A plugin's error notice: the window the user used last, or the log when there is none. */
-        void notice(String message) {
-            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
-            if (target == null) LOG.log(System.Logger.Level.WARNING, "Plugin notice with no window: " + message);
-            else target.content().onError.accept(message);
+    /**
+     * The rule behind {@link #presence()}. A window counts only once it has been activated: a failure raised while the
+     * first window opens is queued ahead of the native activation event, and judging it "background" would keep its
+     * card out of sight for good. Until then the card waits, as it does with no window at all, and shows on activation.
+     */
+    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive) {
+        if (!windowsOpen || !activatedSinceOpen) return Delivery.Presence.NO_WINDOW;
+        return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
+    }
+
+    /** An uncaught failure, after the default handler logged it: an incident (spec section 7, producer 6). Any thread. */
+    public void unexpected(Thread thread, Throwable failure) {
+        incidentNotices.jasperFailure(thread == null ? "an unknown thread" : "thread " + thread.getName(), failure);
+    }
+
+    private String pluginName(String id) {
+        PluginRuntime running = plugins;
+        return running == null ? id : running.pluginNames().getOrDefault(id, id);
+    }
+
+    /** Disable Plugin on an incident: the Plugins page's operation, effective from the next launch. */
+    private void disablePlugin(String id, Consumer<Optional<String>> done) {
+        if (plugins == null || stopped) {
+            done.accept(Optional.of("Plugins are not running."));
+            return;
         }
+        plugins.setEnabled(id, false, outcome -> done.accept(outcome.ok() ? Optional.empty()
+            : Optional.of(outcome.message() == null ? "" : outcome.message())));
+    }
+
+    /** Show more… on an incident's notification: the Errors window, with that incident selected. */
+    private void showErrors(UUID incident) {
+        if (errorsWindow != null && !quitting && !stopped) errorsWindow.show(Optional.of(incident));
+    }
+
+    private void copyReport(String text) {
+        try {
+            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
+                .setContents(new java.awt.datatransfer.StringSelection(text), null);
+        } catch (RuntimeException failure) {
+            notificationViews.error("Could not copy the report", failure.getMessage());
+        }
+    }
+
+    private void openLogFolder() {
+        Path folder = logFolder;
+        if (folder == null) return;
+        CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().openFolder(folder))
+            .whenComplete((ignored, failure) -> {
+                if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not open the log folder", folder.toString()));
+            });
+    }
+
+    /** Show Problems on the configuration notification: the details over the window used last. */
+    private void showConfigurationProblems() {
+        TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
+        if (target == null) return;
+        target.toFront();
+        target.content().showConfigurationDetails();
+    }
 
     /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
     List<KeyBindings.Problem> bindingProblems() {
@@ -935,8 +1054,10 @@ public final class JasperApplication {
 
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
+        if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
+        if (windows.isEmpty()) activatedSinceOpen = false;
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.
@@ -944,7 +1065,7 @@ public final class JasperApplication {
         if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
         else {
             updateBuddyActions();
-            presence();
+            updateDock();
         }
     }
 
@@ -958,6 +1079,8 @@ public final class JasperApplication {
     void windowActivated(TerminalWindow window) {
         if (!windows.contains(window)) return;
         lastActive = window;
+        activatedSinceOpen = true;
+        notificationViews.activated(window.content());
         terminals.windowActivated(window.content().id());
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
@@ -1038,6 +1161,10 @@ public final class JasperApplication {
     }
 
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
+
+    NotificationCenter notificationCenter() { return notificationCenter; }
+
+    Incidents incidents() { return incidents; }
 
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
@@ -1150,7 +1277,7 @@ public final class JasperApplication {
         if (!windowsMayClose()) return;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
         if (auxiliary != null) auxiliary.close();
-        presence();
+        updateDock();
     }
 
     /** Whether any Jasper window, terminal or plugin, is open. EDT. */
@@ -1166,8 +1293,11 @@ public final class JasperApplication {
         return dock != null && resident && !quitting && !stopped;
     }
 
-    /** Foreground with a window open, Background with none; only a resident process with Dock presence switches. EDT. */
-    private void presence() {
+    /**
+     * Foreground with a window open, Background with none; only a resident process with Dock presence switches. Not to
+     * be confused with {@link #presence()}, which is where Jasper stands for notifications. EDT.
+     */
+    private void updateDock() {
         if (dockFollowsWindows()) dock.windows(windowsOpen());
     }
 
@@ -1213,6 +1343,8 @@ public final class JasperApplication {
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();
         buddy.close();
+        incidentNotices.close();
+        notificationViews.close();
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }

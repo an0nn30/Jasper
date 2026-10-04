@@ -129,8 +129,9 @@ final class Rehearsal {
     }
 
     /**
-     * A rehearsal window shows nothing, ever: what would open a dialog (a launch that failed, a rejected choice) is only
-     * logged. Without this a failed canned launch would reach {@code WindowContent}'s modal message dialog. EDT.
+     * A rehearsal window shows nothing, ever: what it would tell the user (a launch that failed, a rejected choice) is
+     * only logged. The application never connects this window's receivers, so without this a failed canned launch would
+     * depend on {@code WindowContent}'s defaults; it must never become a notification or an incident. EDT.
      */
     static void silence(WindowContent content) {
         silence(content, message -> LOG.log(System.Logger.Level.WARNING,
@@ -138,8 +139,9 @@ final class Rehearsal {
     }
 
     static void silence(WindowContent content, Consumer<String> report) {
-        content.onError = report;
-        content.onInfo = report;
+        content.onError = (title, details) -> report.accept(title + ": " + details);
+        content.onInfo = (title, details) -> report.accept(title + ": " + details);
+        content.onLaunchFailure = (details, cause) -> report.accept("Could not start the terminal: " + details);
     }
 
     /**

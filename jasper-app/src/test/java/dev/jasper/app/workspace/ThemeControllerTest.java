@@ -282,7 +282,7 @@ class ThemeControllerTest {
         edt(() -> {
             var themes = new ThemeController(theme -> theme != Theme.INTELLIJ_LIGHT && ThemeTestSupport.install(theme));
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            var errors = new ArrayList<String>(); owner.onError = errors::add;
+            var errors = new ArrayList<String>(); owner.onError = (title, message) -> errors.add(message);
             var before = UIManager.getLookAndFeel();
             owner.selectTheme(Theme.INTELLIJ_LIGHT);
             assertThat(themes.current().chrome()).isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
@@ -300,7 +300,8 @@ class ThemeControllerTest {
                 themes.configure(theme);
                 assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
                 assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
-                assertThat(owner.rail().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(owner.leftStripe().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(owner.rightStripe().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 assertThat(UIManager.getColor("ToolBar.background")).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 for (String prefix : new String[]{"Panel", "TextField", "MenuItem", "PopupMenu", "Button"}) {
                     assertThat(contrast(UIManager.getColor(prefix + ".foreground"), UIManager.getColor(prefix + ".background")))

@@ -1,6 +1,35 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-03
+## Current state — 2026-10-04
+
+- **Merged `main` into `claude/startup-speed`** (2026-10-04; `main` at `a23d0f15`, merge base `91400d29`, 176
+  commits): start-up Plans 1, 2 and 4 now sit on notifications plans 1–4, the six-slot dock and its edge zones,
+  workspace glass and the chooser fix. The 13 conflict hunks kept both sides (this file keeps every entry, start-up's
+  first; the `application` and `plugins` package-info files list the union of allowed dependencies). Semantic fixes:
+  `JasperApplication` had two `presence()` methods, main's notification presence (the `NotificationCenter`'s supplier)
+  and Plan 4's Dock switch, which is now `updateDock()`; `openWindow` keeps Plan 4's guarded composition
+  (`windowOpening`, `discard`, `quitRequested`) with main's per-window wiring (titled `onError`/`onInfo`,
+  `onLaunchFailure`, the card layer, the glass listener) inside it, and `discard`'s fallback also detaches the card
+  layer; the Errors window is an auxiliary window, so the Dock follows it. `Rehearsal.silence` takes main's titled
+  callbacks and silences `onLaunchFailure` too, so a failed canned launch is never an incident or a notification.
+  `MacGlass.library` found the glass library beside `MacNotifications.libraryPath`, which Plan 4 moved to
+  `MacNative`. Packaging applies `mac-native.gradle` and `mac-glass.gradle`; Plan 2's JVM-option allow-list accepts
+  the glass `--add-opens`/`--add-exports` because they are part of `applicationDefaultJvmArgs` on macOS, and main's
+  glass check stays; `verifyPackage` checks both bridges in one list (presence, architecture, signature and `nm`, new
+  for `MacGlass_setEffect`). A headless JBR 25.0.4 probe showed that an AOT cache trained with those two options keeps
+  the full module graph and AOT-linked classes when run with them; training and `aotCheckCommand` both read
+  `Jasper.cfg`. Docs: app maintenance has main's glass section, then the packaging section with "a new JVM option"
+  and "Jasper's own macOS bridges"; the notifications guide says cards wait while a resident Jasper has no window and
+  that incidents and history survive a background Quit. `./gradlew check --continue`: **8,554 tests, 0 failures, 0
+  errors, 6 skipped** (main's 8,435 plus the start-up plans' 119), all architecture gates, doclint, `testMacGlass`,
+  `testMacDock`, `testMacNotifications` and `verifyPackagingSupport` included; `:jasper-app:verifyPackage` (untrained
+  image) passes with both bridges and the glass options; source hygiene clean. No GUI launched, no AOT training.
+  **Open, for the user:** with residency on by default, "no window open" is now a long-lived state, and the delivery
+  rule (notifications spec section 7) keeps every CARD and STICKY notification posted then (a plugin's background
+  activity outcome after Cmd+Q, an incident) pending until the next window, which then shows them at once; whether a
+  CARD should go to history only in that state is a product decision. GUI checks: in the packaged resident app, a
+  Clear theme stays translucent after Cmd+Q and a Dock click; a plugin notification posted while no window is open
+  shows when the next window opens.
 
 - **Start-up speed Plan 4 (Resident by default)** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) Part 4,
@@ -112,6 +141,219 @@
   (Plan 3B); no test drives `watchOutput`→`timeFirstTerminal` end to end; the diagnostics example's phase numbers
   contradict "phases overlap" and the benchmark doc's cleanup sentence is loose (docs pass).
 
+- **Notifications plan 4: long commands and Buddy, merged to local `main` 2026-10-03 (not pushed); awaiting the user's
+  GUI checks and their call on a background finish's route to its pane** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
+  [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
+  did not finish in the pane you were typing in is posted in "Long-running commands" (`jasper.commands`, CARD), in the
+  pane's window, with a click that focuses the pane; a closed pane expires its notifications. Buddy keeps live work
+  only: `BuddyNotice` lost `DONE` and `FAILED`, its activation is required, and `acknowledge` and both `orphan`
+  overloads are gone; `CommandNotifier` and `ActivityNotifier` dismiss a card when its work ends. A coalesced repeat
+  now carries the newest post's actions, default action and target, and its card moves to that window; an expiring
+  action expires its entry before it runs. The macOS banner for long commands stays, background only, until plan 5.
+  Spec interpretations: see the plan's list (1 to 12). Final review (Opus): three important findings fixed —
+  closing the older of two panes whose identical outcomes coalesced expired the newer pane's entry (`b35fc8db`); an
+  expired entry kept its poster's callbacks, and with them a closed pane, its buffers and its window (`28810afb`;
+  expiry now keeps text, labels and target only, which also releases a stopped plugin); clicking a running capsule hid
+  the whole column until the deck next changed (`be5a344d`). A fourth is a decision for the user: a command that
+  finishes while Jasper is in the background has no click route to its pane until plan 5 (a history row has no click
+  of its own; options: a "Show pane" action, a clickable history row, or wait for plan 5's clickable OS notification).
+  Seven minor findings are deferred in the plan's status banner. `./gradlew check --continue`: **8,435 tests, 0
+  failures, 0 errors, 6 skipped** (merged with main `be3b593d`; 8,339 on the branch before). No GUI launched. GUI checks for the
+  user: a long command finishing in another tab shows a card in its window and a click focuses the pane; with Buddy
+  on, the capsule shows while it runs and goes when it ends, and clicking it focuses the pane and keeps the column; the
+  drawer lists only running work; in the packaged app with Jasper in the background, the macOS banner still arrives
+  and the notification waits unread.
+- **Dock drop zones: six edge zones replace the 3 × 2 grid; pushed to `main`, awaiting the user's GUI check**
+  (2026-10-03; spec §3 "Targets" and "Guides" amended
+  at the user's request). The user could not drop a tool window on the lower half of the left or right side and named
+  six zones: left up, left down, bottom left, bottom right, right up, right down. Root cause: the workspace target was
+  a grid of thirds (rows) and halves (columns), which gave Left Bottom and Right Bottom only the middle third of each
+  half; most of the lower left and right fell in the full-width bottom row (a headless probe of a 1144 × 746
+  workspace: 130 px in and 560 px down resolved to Bottom Left). Fix: `DockDropResolver` takes the nearest of the
+  left, right and bottom edges, each distance a share of the workspace's own width (sides) or height (bottom); a side
+  splits into its top and bottom slot at half of the side panels' visible height, the bottom at half the width; a side
+  wins a tie with the bottom and left wins over right; exact `long` cross-multiplication. The user's refinement before
+  pushing: with a bottom area showing the side panels end above it, so the review found about 38% of a side panel's
+  lower half still resolving to the top slot at the workspace's half; `DockDrag.sideSplit` now gives
+  `DockDropResolver.resolve` a `splitY` at half of the visible height in the real layout (above the bottom area while
+  it shows, else the workspace's half, which the three-argument `resolve` keeps). The probe also showed a stripe drop
+  of a hidden window previewing a frame that never appears, because the stripe drop keeps it hidden: `DockDrag` now
+  shows no area highlight for it (the placeholder and the ghost stay). Unchanged: a window alone in a side's bottom
+  slot still fills that side (spec §1, as in IntelliJ), so its preview looks like the top zone until the top slot
+  shows a window. Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
+  diagonal, the half splits, ties, a wide and a tall workspace and the split line; `DockDragTest` 21 → 24 and
+  `WindowDragTest` 12 → 15, including a lower-left drop beside a showing Sessions, the same under a showing bottom
+  area and the hidden-window preview); the drag tests aim with `DockTestSupport.zone(workspace, slot)` instead of a
+  grid cell, and `WindowCornerLayerTest` aims lower in the cards. `./gradlew check --continue`: **8,369 tests, 0
+  failures, 0 errors, 6 skipped**, all architecture gates and doclint included. No GUI launched. GUI check for the
+  user: drag a tool window toward each of the six edges (the upper and lower halves of the left and right sides, and
+  the left and right halves of the bottom) and see the highlight. The split sits exactly at half of the side panels'
+  visible height (the terminal column's height), pinned one pixel either side by `DockDragTest`.
+
+- **Notifications plan 3: SDK notifications, merged to `main` (`3c64ea5c`) and pushed; awaiting the user's GUI
+  checks** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
+  [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
+  (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
+  removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15` (Editor `>=0.14.1` since the workspace-glass merge). `plugins.HostedNotifications` posts into the
+  center with the plugin id as source and contained links; a cause becomes the plugin's incident with Show more…
+  (`IncidentNotices.pluginNotice`); a plugin's notifications expire when it stops. `PluginHost` posts succeeded and
+  failed activities in `<plugin-id>.activities`. After launch, `PluginProblemNotices` posts each load failure, skipped
+  plugin and unreadable plugin directory in Plugin problems with Open Plugins. The model now strips bidi controls,
+  treats invisible-only text as blank, fits poster icons to 16 px and bounds group names. Snippets, Editor, File
+  Server, Vault and Remote post titled notifications with their causes; Remote declares `dev.jasper.remote.tunnels`.
+  Spec interpretations: see the plan's list (1 to 17). `./gradlew check --continue`: **8,333 tests, 0 failures, 0
+  errors, 6 skipped** (39 new, after the final-review fix; one run in between failed only the known
+  `TerminalAppIntegrationTest` "reflow" row-reset flake, which passed in three isolated reruns and in the full rerun),
+  all four architecture gates and doclint included; the source hygiene check and `git diff --check c02673cd` are
+  clean. Final review: one important finding fixed (a plugin whose manifest `name` showed nothing stopped Jasper from
+  launching; `DescriptorParser` now rejects such a name, making it an unreadable-plugin problem); seven minor findings
+  are deferred in the plan's status banner. No GUI launched. Pushed to `origin` on 2026-10-03 with the dock polish
+  round, at the user's choice. GUI checks for the user: a plugin error card with Show
+  more… opening the Errors window; a long File Server transfer (one that runs past the activity threshold), whose
+  outcome is posted in "File Server activities" as "Sending <file>" or "Receiving <file>" (an interrupted one as an
+  error); a plugin directory without `plugin.toml` in the user plugins folder, reported at launch with Open Plugins.
+
+- **Merged `main` into `claude/dock-layout`** (2026-10-03; `main` at `63e3b95c`, merge base `cc0429f5`): main's
+  features that touch the dock now use it. Unread badges are on the stripes: `ToolStripe.Button` carries the
+  `PanelBadge`, a badged button shows a `BadgedIcon` and names the badge in its tooltip and accessible description, and
+  a badge change updates its button in place (`Contributions.Kind.BADGES`, `ToolStripe.updateBadge`) and so never
+  cancels a drag; the drag ghost keeps the plain icon. The
+  Notifications panel docks in Right Top (`Slot.RIGHT_TOP`, where `PanelRegion.RIGHT` was), and its in-content
+  "Notifications" heading is gone because the tool window header carries the title (Clear All stays). The notification
+  card layer sits in the bottom-right corner of `ToolWindowArea` (between the stripes, above the status bar, over any
+  docked tool window), on `PALETTE_LAYER` under the dock drag's `DRAG_LAYER` guides. `NotificationsFeature`'s
+  `dev.jasper.app.dock` import is listed in the `application` package-info. Docs: this file keeps both sides' entries;
+  the notifications guide and app maintenance describe the stripe button, its badge and the area corner. New tests:
+  `WindowPanelsTest.aBadgedPanelShowsADotAndDescribesItsCount` (on the right stripe),
+  `WindowDragTest.aBadgedButtonStillDragsAndLiftsOutAndItsGhostIsThePlainIcon`,
+  `WindowCornerLayerTest.theLayerStaysBetweenTheStripesOverDockedWindowsAndUnderADockDrag` (its two older cases now
+  follow the area) and `HistoryPanelTest.theToolWindowHeaderCarriesTheTitle`; for the in-place badge update,
+  `ToolStripeTest`, two `WindowDragTest` cases (a badge set mid-drag, in this window and in another) and
+  `BadgedIconTest.theSizeEqualsTheBaseIconsSize` (a `BadgedIcon` is its base icon's size, so a badge change needs no
+  relayout). `./gradlew check --continue`: **8,200 tests, 0 failures, 0 errors, 6 skipped**, all four architecture
+  gates and doclint included; main's `ExFilesTest` fix (`185a5f8e`) makes it pass on this Mac, and the Remote
+  `ListenerTest` flake did not fail. Open: the notifications GUI checks now look at the Notifications button on the
+  right stripe; one more GUI check: start a tool window drag, then trigger a notification (for example a config
+  error), and the stripe button gains its dot while the drag continues. No GUI launched. Fast-forwarded to `main` and
+  pushed to `origin` on 2026-10-03 at the user's choice, together with the notifications plan 1 merge below.
+
+- **Dock layout plan 2: drag and drop** (branch `claude/dock-layout`,
+  [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe
+  buttons and headers. `DockDropResolver` (pure) resolves a stripe group and position or one of the workspace's six edge
+  zones (a 3 × 2 grid until 2026-10-03; see the first entry); `DockGeometry.landing` previews the landing on a copy of
+  the state; during a drag both stripes show all three groups, lift the dragged button and open a gap;
+  `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
+  drop moves and keeps visibility; a workspace drop moves and shows (`DockState.moveAndShow`). Any dock change, View ›
+  Rail, or the window closing or being deactivated cancels a drag. Deviations from the plan text: before execution
+  (`728167c4`) the expected test counts and Task 6's `close()` anchor were aligned with plan 1 as executed; Task 4,
+  `DockDropOverlayTest` is isolated from the installed theme (it saves and restores the look-and-feel-level colours,
+  clears `DragAndDrop.areaBackground`, `DragAndDrop.borderColor` and `Component.accentColor` at both the developer and
+  look-and-feel level, and installs `Theme.DARK` first in `theThemesOwnDragColoursWin`); Task 5, `DockDrag` button rules
+  (a non-left press during a drag cancels it, only a left release drops, popup-trigger presses are ignored, and a left
+  press during a drag means the release was lost, so the drag is cancelled and the new press starts over; `DockDragTest`
+  grew by 4 cases, and a lint fix was made); Task 6, the drag returns home and the source group keeps its step
+  (`DockDrag` targets the lifted stripe button's home, its old square, slot and index, until the cursor first leaves
+  that square grown by the drag threshold and one more pixel on every side, and a resize forgets it; during a drag the
+  lifted button's group keeps its step at the group's end and the gap takes it when the target is in that group, so
+  later groups do not slide up; three `ToolStripeDragTest` values moved one step; final counts `DockDragTest` 17 cases,
+  `ToolStripeDragTest` 8); Tasks 1, 2 and 3 none in code; final review: a press near a stripe button's edge that moves
+  just past the drag threshold and back stays home (`DockDrag` leaves home only past the square grown by the threshold
+  and one more pixel on every side; new tests `aWobbleOutOfTheLastRowAndBackStaysHome`,
+  `aWobbleOutOfTheLastColumnAndBackStaysHome` and `oneMorePixelOutLeavesHomeAndComingBackIsResolvedFromTheStripe`); a
+  drag ends when its window is deactivated (a modal dialog opening, another application taking focus), through
+  `WindowContent.setActive(false)`, which `TerminalWindow`'s `windowDeactivated` already calls, rather than through a
+  window listener `DockDrag` adds and removes, since a headless test cannot build a `Window`; for the same reason its
+  Esc dispatcher claims only key events from its own window as told by the root pane, not by
+  `SwingUtilities.getWindowAncestor` (new tests `theWindowDeactivatingMidDragCancelsItAndNothingDrops` and
+  `anEscInAnotherWindowIsLeftToItAndTheDragGoesOn`); View › Rail cancels a running drag (new test
+  `turningTheRailOnOrOffMidDragCancelsIt`); and test cleanup (`DockDragTest` records the Esc dispatchers with its own
+  focus manager, cancels every fixture's drag after each test and checks none is left; `DockDropOverlayTest` saves and
+  restores on the EDT, the look and feel first, and fails when it cannot reinstall it); final counts `DockDragTest` 21
+  cases, `WindowDragTest` 8. Planning decisions are listed in the plan. `./gradlew check --continue`: 8,044 tests, 1
+  failure, 0 errors, 6 skipped; the one failure is `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails
+  on this Mac only (its `java.io.tmpdir` contains "zz") and predates the branch, and
+  `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite load (it did not fail in this run and
+  passes when run alone). Open: the GUI checks are pending; any dock change or stripe render cancels a running drag
+  (an action's enable or title change now refreshes the stripe in place, so only adding or removing an action or a
+  rail placement, or a dock or panel change, re-renders it; follow-up pushed to main on 2026-10-03; GUI check: lock the
+  vault, or otherwise change an action, while dragging a tool window, and the drag carries on); on stripes shorter than about 200px the
+  foot can clip by one step during a drag; and the overlay now repaints only what changed on each drag event (each
+  changed guide's old and new bounds, nothing when none changed, no longer the whole window and every terminal under
+  it), and the placeholder's fill sits inside its border like the highlight's, so the two no longer stack; GUI check:
+  the ghost should not lag while dragging on a large HiDPI window; if the ghost still lags over a terminal, the next
+  lever is in `jasper-terminal`: `TerminalView.paintComponent` takes a full snapshot and paints every row whatever its
+  clip, so a terminal under a small dirty rectangle still pays the whole snapshot. No GUI launched; GUI checks for the
+  user are the plan's last section.
+  Polish round (2026-10-03, pushed to `main` with notifications plans 2 and 3 at the user's choice): the overlay repaints only what changed, the placeholder's
+  border no longer stacks over its fill, and the placeholder's fill is concentric with its border (its corner
+  diameter is `arc - 1`, where the border's inner edge lies); `DockState.dropIndex` is the one drop-index rule shared
+  by the preview and the drop. 8 new tests pin behaviour that was already there: `HostedUiTest` maps all six anchor and
+  split combinations to their slots (`everyAnchorAndSplitCombinationMapsToItsOwnSlot`); `UiStateTest` gains 7 cases: a
+  version 1 side takes its size from the visible panel, else from the first panel (2), the dock's sizes and ratios
+  exactly at their limits are accepted and one step outside each falls back alone (2), and a scalar where the `dock`
+  or `panels` table belongs, or where a panel entry does, loses only that part (3). `./gradlew check --continue`:
+  **8,314 tests, 0 failures, 0 errors, 6 skipped** (8,306 before).
+- **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
+  [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
+  [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.
+  New JDK-only package `dev.jasper.app.dock` (`Slot`, `Side`, `DockState`, pure `DockGeometry`), enforced by
+  `verifyApplicationArchitecture`. `ToolWindowArea` replaces `WorkspaceRegions` (one rounded frame with a
+  `ToolWindowHeader` per showing slot, a full-width bottom area, its own 6px dividers that preview a drag and save on
+  release); two `ToolStripe`s replace `WindowRail`; six-slot Move to menus on stripe buttons and headers.
+  `ui-state.toml` version 2 (`[dock]` sizes and ratios, per-panel slot, order and visibility; per-entry fallback;
+  version 1 migrates on read). SDK 0.13.0 adds `PanelSpec.withSplit()`; all seven manifests require `>=0.13.0, <0.14`;
+  Remote 0.11.0 opens SFTP under Sessions on a fresh state or after Move to › Left Bottom once (an upgraded state that
+  already places SFTP keeps it in Left Top, since a saved place wins). Sessions, Tunnels and File Servers no longer
+  repeat their title. Deviations from the plan text: Task 2, `DockGeometry` keeps each ratio divider's drag range
+  inside `DockState`'s 0.1–0.9 ratio limits (new test `aWideSplitsDividerRangeStaysWithinTheRatioLimits`); Task 5,
+  `ToolWindowHeader`'s padding is a compound border around `FlatEmptyBorder` so it survives theme switches, and
+  `ToolWindowMenu`'s six Move to items share a `ButtonGroup`; Task 7, a divider press and release without a drag
+  between them leaves the state alone (new test `aClickOnASqueezedDividerChangesNothing`); Task 8, `docked()` returns
+  focus to the terminal between the hidden and the shown notifications as `hidePanel` did before, a throwing panel
+  factory is logged at WARNING, `WindowPanelsTest` has 18 cases rather than 16, the close test checks the right
+  stripe, and a `ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3,
+  4, 6 and 9 none; final review: `WindowContributions.close()` no longer saves, because every dock change is saved as
+  it happens and saving again on close overwrote other windows' later changes (new test
+  `closingAWindowKeepsTheChangesAnotherWindowSaved`); `DockGeometry` reserves above the bottom area the larger of the
+  terminal's minimum height and two tool window minimums plus a divider when the left or the right side shows both
+  halves, in the squeeze and in the bottom divider's range (new tests
+  `theBottomAreaGrowsOnlyUntilASplitSidesHalvesReachTheirMinimum`,
+  `aShortWindowSqueezesTheBottomAreaBeforeASplitSidesHalves` and `theSplitSidesMinimumScalesWithTheUi`); each panel
+  instance keeps a `notified` flag and hears a visibility only while it is still true and not yet told (new tests
+  `aFactoryThatHidesItsOwnWindowHearsNothing` and `aWindowThatShowsItselfAgainWhenReplacedHearsOnlyWhatIsTrue`, so
+  `WindowPanelsTest` now has 21 cases); a bad `[windows]` entry is skipped alone instead of resetting the whole file
+  (new test `aBadWindowEntryFallsBackAlone`; the bad-window case of
+  `invalidValuesAreRejectedAndInvalidFilesFallBackToDefaults` now checks that the rest of the file survives); and the
+  SFTP wording above and in the plan's GUI checks. Planning decisions are listed in the plan.
+  `./gradlew check --continue`: 7,994 tests, 1 failure, 0 errors, 6 skipped; the one failure is
+  `ExFilesTest.bufferSelectsATabByNumberOrName` (Editor), which fails on this Mac only (its `java.io.tmpdir` contains
+  "zz") and predates the branch, and `ListenerTest.acceptsOnLocalhostUntilClosed` (Remote) is flaky under full-suite
+  load (it did not fail in this run and passes alone). The window's minimum height now counts a split side's two
+  halves (one shared rule, `DockGeometry.splitMinimum`; follow-up pushed to main on 2026-10-03). No GUI launched. GUI
+  checks for the user: the plan's section
+  "GUI checks for the user". Plan 2 (drag and drop) was executed on top of it; see the entry above.
+
+- **No FlatLaf SEVERE at start-up with Nord** (branch `fix/theme-lazy-border`, user report 2026-10-02): Nord sets
+  `TableHeader.cellBorder` to a colour. Resolving workspace values asked the private, never-installed FlatLaf defaults
+  `get(key) == null` for every explicit colour key, which built FlatLaf's lazy `FlatTableHeaderBorder`; its constructor
+  reads `TableHeader.cellMargins` from the installed look, missing before any theme is installed, and FlatLaf logged
+  the NPE. `FlatLafThemeData.defines` checks the table without building values (then `get` for keys FlatLaf serves
+  elsewhere); WorkspaceValues and ThemeManager.install use it. Full check **7,967/0/0/6**; merged into local main
+  2026-10-02 (fast-forward), not pushed. Separate, not fixed here:
+  Darcula and four other converted themes keep IntelliJ named-colour values such as `"panel"`, which FlatLaf logs as
+  "Failed to parse" (`TitlePane.background`, `NewUiOnboarding.Dialog.background`).
+
+- **Theme dropdowns search as you type** (branch `claude/theme-search`, worktree `.claude/worktrees/settings-appearance`,
+  design approved in chat 2026-10-02): both Appearance dropdowns (`Editors.ThemePick`) are a `settingsui.SearchCombo`.
+  Typing in the open or focused dropdown shows an IntelliJ-style search bar at the top of the list and keeps the
+  names holding every word; Same as UI theme stays pinned; "No matching themes" is an unpickable row. Up/Down/Enter/
+  Escape/Backspace/Home/End work while searching, Enter picks without reaching OK (and picks nothing when nothing
+  matched), Space opens the list, and the combo never picks by first letter, even after a theme change rebuilds its
+  look and feel (an independent review found that and the Home/End leak; both fixed with tests). Rows are padded as
+  FlatLaf pads its own combo popup (the user saw text outside the highlight; fixed in `a1d3022f`). Full check
+  **7,966/0/0/6**; merged into local main 2026-10-02 (fast-forward), not pushed. Not done: grouped sections (not
+  requested), GUI check (hover/click, the × button, typing on a closed dropdown), push.
+
 - **Settings stays in front; Appearance gets IntelliJ-style theme dropdowns** (branch `claude/settings-appearance`,
   worktree `.claude/worktrees/settings-appearance`, design approved in chat 2026-10-02):
   - **On top:** macOS raised the window Settings blocks in front of it. Every modal dialog now floats above Jasper's
@@ -147,6 +389,67 @@
   match; Vim tries contains, starts-with, ends-with, exact and stops at the first with exactly one. With buffers `xab`
   and `abab`, Vim's `:b ab` selects `abab` where Jasper reports E93.
 
+- **Workspace glass, plans 1 (foundation) and 2 (editor)** (branch `claude/workspace-glass`, user request 2026-10-02):
+  2026-10-03 (user request): the terminal tab strip now always shows the workspace background instead of the theme's
+  `tab_bar` colour (called a bug by the user) and, being non-opaque over the centre host, is the same glass as the
+  terminal in a translucent window; pills, hover, close buttons and the list button stay solid. GUI check: the strip
+  reads as one surface with the terminal, opaque and glass, in Clear Dark and a theme with a distinct tab bar.
+  [spec](superpowers/specs/2026-10-02-jasper-workspace-glass-design.md),
+  [plan 1](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md),
+  [plan 2](superpowers/plans/2026-10-02-workspace-glass-2-editor.md). Themes gain `[workspace] opacity/blur`; Settings
+  › Appearance › Workspace overrides them (`ui.workspace.opacity` in percent, `ui.workspace.blur`
+  `"theme"`/`"on"`/`"off"`); bundled Clear Dark (0.95, blur on) and Clear Light (0.93, blur on) are ported from
+  Terminal.app (catalog 286). On macOS, `WindowGlass` makes the window translucent through two JDK internals (new
+  launcher flags) and blurs behind it through `libjasper-glass.dylib`; terminal panes paint their default background
+  with alpha inside a cleared surface, and any failure keeps the window opaque; the whole path is macOS-only (rows hidden in Settings, no `WindowGlass`, no launcher flags, `GlassSource.NONE` elsewhere; the keys are silently ignored). Deviations from the spec: ancestors stay
+  opaque and the workspace host clears a hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no
+  `TerminalOptions` field), and it takes a `float`; `WindowGlass` follows the root pane. Rulings made during execution:
+  `ClearThemesTest` runs under `EdtTestExtension`; the Workspace section kept its own "Choose workspace theme…" button (superseded by the 2026-10-03 merge: no button; the theme rows now sit in Appearance)
+  (Terminal › Font & Colors has one too). The final review's fix wave makes a window translucent again after a UI-theme
+  switch's deferred opaque frame background (restoring the newer background later), fills the whole terminal surface
+  with one glass fill instead of clearing it (the lower-arc strip was a hole), and finds the blurred `NSWindow` through
+  any layer ancestor. Typing lag and blank live resizes with glass on came from Java2D's Metal pipeline rendering
+  antialiased translucent `Src` fills in software (`fc127ca9`: plain rectangular fills, opaque chrome corners). Blur
+  then moved from the private CoreGraphics radius, which blurred the square corners outside the rounded window, to a
+  public `NSVisualEffectView` masked to the window's corners: on/off, `hudWindow` for dark workspace themes and a light
+  `underWindowBackground` for light ones; theme `blur` is a boolean and the CoreGraphics path is gone (spec amendment
+  2026-10-02). `GlassSettings`' blur component is `blurChoice` (a `WorkspaceBlur`), so `blur()` can stay the
+  `Optional<Boolean>` that `GlassLevels.resolve` reads. Review follow-ups: the corner-mask observer is a
+  `JasperCornerObserver` the effect view keeps alive, so its lifetime follows the view (and the window); the Blur row
+  shows "Use theme's value" for `"theme"`.
+  Plan 2 (editor glass) is done: SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0; `onWorkspaceChanged`
+  also reports it, including a component entering or leaving a translucent window), answered by the app's `GlassSource`
+  and `WindowContent.setGlassListener`; Editor 0.7.0 paints its text and gutter backgrounds once each in a `GlassSurface`
+  and makes the area, viewports and gutter non-opaque (the current-line band takes the opacity's alpha; selection, caret,
+  find/Vim bars, banner and loading state stay solid). Deviation: the spec's no-argument `workspaceOpacity()` became
+  `workspaceOpacity(Component)` because opacity is per window and content moves between windows. Rulings: the gutter
+  border is cleared in glass mode (it was an opaque stripe); `EditorTabTest` primes RSyntaxTextArea 3.6.0 font metrics by
+  reflection (headless, no peer). Final-review fix wave: `workspaceOpacity` answers the window's opacity only inside the
+  workspace centre (`WindowContent.workspaceOpacity`: the deck holding terminal and hosted content tabs) and 1.0 for
+  chrome, the rail and side/bottom panels; the applied opacity is kept as the double it arrived as (0.8 reads back as
+  0.8); the glass listener runs after `mountContent`'s try; gutter children reattached by RSyntaxTextArea (Vim
+  `:set nonumber`/`number`) take the gutter's opacity through a once-per-gutter container listener.
+  `./gradlew check --continue`: 8,043 tests, 0 errors, 6 skipped across all modules (jasper-app 1,815, jasper-terminal
+  394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 85, plugins 5,542); its one failure was the known flake
+  `TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation` `[3 reflow]`
+  (jasper-terminal is untouched by plan 2), which passed an isolated rerun and the rerun of the check (BUILD
+  SUCCESSFUL): a timing flake under load, not investigated further. GUI checks (user-run) for plan 2: an editor tab
+  in Clear Dark and Clear Light, a split of terminal and editor tabs, moving an editor tab to a separate window and back,
+  opacity changes live, and the current-line and selection look; scroll bars stay solid in a glass editor (by design),
+  so check a long file looks acceptable; Vim `:set nonumber` then `:set number` in a glass window (digits do not smear);
+  a plugin tool panel (e.g. a side panel) in a glass window stays opaque. Plan 1 GUI checks: Clear Dark beside Terminal.app's, the Clear Dark
+  (`hudWindow`) versus Clear Light (light `underWindowBackground`) material, rounded corners without slivers and square
+  full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, stripes hidden,
+  native fullscreen, switching back to an opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a
+  packaged build loading `Contents/app/libjasper-glass.dylib`, and Settings rows hidden (no Workspace header) off macOS.
+  Merged `origin/main` (`ffce7483`: dock layout, notifications, theme rows in Appearance, SDK 0.13.0) on 2026-10-03:
+  SDK 0.13.1 (Editor needs `>=0.13.1, <0.14`), the glass fill ported from the deleted `WorkspaceRegions.Host` to
+  `ToolWindowArea`'s centre host (`setGlass`), and Opacity/Blur in an Appearance › Workspace section after main's theme
+  rows, with no header off macOS (`SchemaPage` now hides a section whose rows are all hidden). `./gradlew check
+  --continue`: 8,288 tests, 0 failures, 0 errors, 6 skipped.
+  A second merge of `origin/main` (`43894416`: SDK 0.14.0, Notices replaced by notifications, dock polish) moved
+  `workspaceOpacity` to SDK 0.14.1 (Editor 0.7.0 needs `>=0.14.1, <0.15`); `PluginHost.Environment` carries both
+  main's failure sink and the `GlassSource`. `./gradlew check --continue`: 8,429 tests, 0 failures, 0 errors, 6 skipped.
 - **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
   user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
   failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
@@ -167,6 +470,74 @@
   scope shortcuts and the query-field chip are unchanged. `WindowContent.scopeShortcut` became `paletteShortcut`,
   because the title search field is its only remaining caller. Merged into main 2026-10-02 and pushed with `5729a684`.
   Not done: GUI check.
+
+- **Notifications plan 1: core, reviewed and merged to local `main`; awaiting the user's GUI checks** (2026-10-02; branch `claude/notifications`, spec
+  `docs/superpowers/specs/2026-10-02-jasper-notifications-design.md`, plan
+  `docs/superpowers/plans/2026-10-02-notifications-1-core.md`, [guide](notifications.md)): an EDT `NotificationCenter` (in-memory history of 500,
+  60 s coalescing, read/expired state, waiting cards), per-window card stacks in the content corner, the built-in
+  Notifications rail panel with an unread badge, and the `jasper.general` / `jasper.config` producers. Window errors
+  and info, plugin `Notices` and configuration problems no longer open dialogs. Recorded interpretations are in the
+  plan's "Spec interpretations" section; the six deviations made during execution are in its status banner. `./gradlew check`: **8,076 tests, 0 failures, 0 errors, 6 skips**
+  (all four architecture gates, doclint and compiled examples included; source hygiene over the 58 changed Java files
+  and `git diff --check` clean). On this Mac `plugins/editor`'s `ExFilesTest.bufferSelectsATabByNumberOrName` fails when
+  the temp folder's path contains `zz` (as `$TMPDIR` does here); main already fixes it (`185a5f8e`), the branch base does
+  not, so the check was run with `java.io.tmpdir` pointed at a short path without `zz` (some tests also depend on the temp path's length and text); merging main removes the need. No GUI was launched
+  and nothing was pushed. GUI checks for the user:
+  - cards in light and dark themes, their shadow, and the badge dot on a normal and a selected/hovered rail button;
+  - several windows: a card appears in the window that raised it; clicks beside a card reach the terminal; Dismiss Cards;
+  - the Notifications panel: New/Earlier, Clear All, row ✕, theme switch while open;
+  - auto-hide pausing while the window is in the background and while hovering a card (including while its More menu is open);
+  - a broken `config.toml` at startup shows a sticky Configuration card with Show Problems / Open config.toml;
+  - a broken shell profile at startup leaves the window open with the failure in the pane and an error card; at cold
+    start this also checks the final-review fix for a card raised before the first window's activation (the card must
+    show once the window is active, not only sit in history);
+  - busy terminal output (for example `yes` or a large `cat`) scrolling under a sticky card stays smooth, and the
+    card's shadow looks as before on a Retina display.
+
+  Final whole-branch review fixes, all applied on the branch (`d2bd488f`, `08a2c9ff`, `498e4d61`): a card raised
+  before a new window's first activation waits instead of landing in history only; a coalesced repeat that shows its
+  card no longer stays waiting for focus; each card's shadow is rendered once and cached instead of twelve rings on
+  every repaint. `./gradlew check` after the fixes (same short temp path): **8,084 tests, 0 failures, 0 errors, 6
+  skips** (8 new tests; the 8,076 above is the count before them).
+
+  Merged to local `main` on 2026-10-02 with the user's agreement: `main` (`8a428f0b`) was merged into the branch first
+  (`438f6a99`; one trivial conflict in `WindowCommandPalette`, keeping main's argument list without `scopeShortcut` and
+  this branch's titled "Command failed" error), then `main` was fast-forwarded. `./gradlew cleanTest check --continue`
+  on the merged tree, with no temp-path workaround: **8,079 tests, 0 failures, 0 errors, 6 skips**. One earlier run of
+  it failed `FtpEngineTest.tlsWithoutRequireAllowsBoth` with "425 Can't open passive connection"; the File Server
+  suite then passed three isolated re-runs (160/160) and the next full run, so it is a load-dependent passive-port
+  flake, not a regression (the branch does not touch File Server). Pushed to `origin` on 2026-10-03 with the dock
+  layout, at the user's choice; the GUI checks are still the user's.
+
+- **Notifications plan 2: incidents and the Errors window, merged to local `main` (`c02673cd`); awaiting the user's
+  GUI checks** (2026-10-02 to 2026-10-03; plan
+  `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-window)):
+  uncaught exceptions on any thread, contained plugin failures, failed shell launches and failing notification
+  actions are in-memory incidents (at most 100, coalesced by source, class and root-cause frames, traces taken on the
+  catching thread and capped at 256 KiB). Each is announced by one ERROR notification in `jasper.errors`,
+  `jasper.plugins` or, for a shell, `jasper.general`, with Disable Plugin for plugins and Show more… last; a repeat
+  updates it at most once a second (failures waiting for the EDT are merged first, and the count catches up), with a
+  card at most once a minute. The Errors window lists them with Copy, Disable Plugin, Open Log Folder and Clear. The
+  log is unchanged. Recorded interpretations are in the plan's "Spec interpretations" section; the execution
+  deviations are in its status banner: each shell launch failure is announced in its own window (the repeat rules
+  cover Jasper and plugin incidents only), the center's 60 s coalescing still ignores the target, no package-info
+  files changed beyond `notifications` and `notificationui`, and the final review's fixes (the once-a-second update
+  with the merge, Show more… last, Open Log Folder opening the folder). Every task passed its review, and the final
+  whole-branch review's findings were fixed (`5aa67e75`, `ac407bbb`). Findings deferred to plans 3, 4 and 5, and the
+  smaller ones left open, are listed under "Deferred findings" in the plan's status banner. `./gradlew check`:
+  **8,161 tests, 0 failures, 0 errors, 6 skips** (all four architecture gates, doclint and compiled examples
+  included; source hygiene over the 34 changed Java files and `git diff --check` clean). No GUI was launched. Pushed
+  to `origin` on 2026-10-03 with the dock polish round, at the user's choice. GUI checks for the user:
+  - an uncaught exception (for example from a plugin under development) shows an "Unexpected error in Jasper" or
+    plugin card; Show more… opens the Errors window at it, in light and dark themes;
+  - the Errors window: list selection with the mouse and the arrow keys, the monospaced trace scrolls, Copy pastes a
+    report, Open Log Folder opens the folder, Clear empties the list and disables the cleared notifications' links;
+  - a plugin that keeps failing shows one card, counts up `×N`, and shows its card again no sooner than a minute later;
+  - with the Notifications panel open, a plugin failing in a tight loop keeps Jasper responsive and its card counts up;
+  - Disable Plugin posts "… will be disabled when Jasper restarts", and the Plugins page agrees after a restart;
+  - a broken shell profile shows "Could not start the terminal" with Show more…, and the window's only pane stays
+    open showing the failure;
+  - Notifications: Show Errors from the palette; the window remembers its size and position.
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed

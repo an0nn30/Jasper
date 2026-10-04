@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.GlassLevels;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
@@ -10,8 +11,11 @@ import dev.jasper.app.commands.KeyContext;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Side;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
@@ -30,6 +34,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
@@ -76,14 +81,25 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     // One root binding per stroke; dispatch picks the action for where focus is.
     private final java.util.Map<KeyStroke, String> rootKeys = new java.util.HashMap<>();
     private WindowContributions contributed;
-    private final WorkspaceRegions regions;
-    private final WindowRail rail;
+    /** Where this window's tool windows dock: its contributions change it, its area lays it out. */
+    private final DockState dock = new DockState();
+    private final ToolWindowArea area;
+    private final ToolStripe leftStripe = new ToolStripe(Side.LEFT), rightStripe = new ToolStripe(Side.RIGHT);
+    /** Drags a tool window from its stripe button or its header to another slot. */
+    private final DockDrag dockDrag;
     private UiState uiState = UiState.inMemory();
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
     private final ThemeController themes;
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
+    private JComponent cornerLayer;
+    private JRootPane cornerRoot;
+    private final ComponentAdapter cornerRelayout = new ComponentAdapter() {
+        @Override public void componentResized(ComponentEvent event) { layoutCornerLayer(); }
+        @Override public void componentMoved(ComponentEvent event) { layoutCornerLayer(); }
+    };
+    private final java.beans.PropertyChangeListener cornerResized = event -> layoutCornerLayer();
     private final Map<KeyStroke, String> contentBindings = new HashMap<>();
     private final Map<Component, dev.jasper.app.lifecycle.Subscription> contentListeners = new IdentityHashMap<>();
     Runnable onMinimumSizeChanged = () -> {};
@@ -96,6 +112,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private boolean closed;
+    // Kept as given, so callers read back exactly what was applied; terminal components take it as a float.
+    private double backgroundOpacity = 1;
+    private Runnable glassListener = () -> {};
+    private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
     private boolean rearranging;
     private WindowTerminals terminals;
     private boolean active = true;
@@ -111,9 +131,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
     Consumer<String> onTitle = title -> {};
-    public Consumer<String> onError = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.ERROR_MESSAGE);
-    /** Shows a plain informational message, such as the result of Migrate Config. */
-    public Consumer<String> onInfo = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.INFORMATION_MESSAGE);
+    /** An error to tell the user about, as a title and details; the application posts it as a notification. */
+    public java.util.function.BiConsumer<String, String> onError = WindowContent::unheard;
+    /** Information to tell the user, such as the result of Migrate Config; the application posts it as a notification. */
+    public java.util.function.BiConsumer<String, String> onInfo = WindowContent::unheard;
+    /**
+     * A shell could not start in this window: the directory and cause to show, and what was thrown. By default an
+     * error with a fixed title; the application records an incident instead.
+     */
+    public java.util.function.BiConsumer<String, Throwable> onLaunchFailure =
+        (details, cause) -> onError.accept("Could not start the terminal", details);
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     public Runnable onToggleBuddy = () -> {};
     public java.util.function.BooleanSupplier buddyEnabled = () -> false;
@@ -203,18 +230,24 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
         windowTabs = new WindowTabs(this);
-        // The tabs belong to the terminal column, so the rail and the side panels reach the toolbar.
+        // The tabs belong to the terminal column, so the stripes and the side panels reach the toolbar.
         var terminalColumn = new JPanel(new BorderLayout());
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
-        regions = new WorkspaceRegions(terminalColumn);
-        regions.setStatusVisible(chrome.status().isVisible());
-        regions.setHeaderVisible(true);
-        rail = new WindowRail();
-        rail.setVisible(false);
+        area = new ToolWindowArea(terminalColumn, dock);
+        area.setStatusVisible(chrome.status().isVisible());
+        area.setHeaderVisible(true);
+        leftStripe.setVisible(false);
+        rightStripe.setVisible(false);
         var body = new JPanel(new BorderLayout());
-        body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
+        body.add(leftStripe, BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(rightStripe, BorderLayout.EAST);
+        dockDrag = new DockDrag(this, dock, area, leftStripe, rightStripe);
+        leftStripe.dragSource = dockDrag::install;
+        rightStripe.dragSource = dockDrag::install;
+        area.dragSource = dockDrag::install;
+        // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
+        area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
@@ -304,6 +337,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         });
         syncContentBindings();
         commandPalette.install(root);
+        installCornerLayer(root);
         syncPaletteDispatcher();
     }
 
@@ -440,6 +474,49 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         bindingRoot = null;
     }
 
+    /**
+     * The application's notification card layer: kept flush with the bottom-right corner of the tool window area
+     * (between the stripes, above the status bar, over any docked tool window) on the root's palette layer, at its
+     * preferred size, under a dock drag's guides. Once per window; removed at close.
+     */
+    public void mountCornerLayer(JComponent layer) {
+        if (closed || cornerLayer != null) return;
+        cornerLayer = Objects.requireNonNull(layer, "layer");
+        layer.addPropertyChangeListener("preferredSize", cornerResized);
+        if (bindingRoot != null) installCornerLayer(bindingRoot);
+    }
+
+    private void installCornerLayer(JRootPane root) {
+        if (cornerLayer == null || cornerRoot == root) return;
+        uninstallCornerLayer();
+        cornerRoot = root;
+        root.getLayeredPane().add(cornerLayer, JLayeredPane.PALETTE_LAYER);
+        root.getLayeredPane().addComponentListener(cornerRelayout);
+        area.addComponentListener(cornerRelayout);
+        layoutCornerLayer();
+    }
+
+    private void uninstallCornerLayer() {
+        if (cornerRoot == null) return;
+        cornerRoot.getLayeredPane().removeComponentListener(cornerRelayout);
+        area.removeComponentListener(cornerRelayout);
+        cornerRoot.getLayeredPane().remove(cornerLayer);
+        cornerRoot.repaint();
+        cornerRoot = null;
+    }
+
+    void layoutCornerLayer() {
+        if (cornerRoot == null || cornerLayer == null) return;
+        JLayeredPane pane = cornerRoot.getLayeredPane();
+        if (!SwingUtilities.isDescendingFrom(area, pane)) { cornerLayer.setBounds(0, 0, 0, 0); return; }
+        Rectangle bounds = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), pane);
+        Dimension size = cornerLayer.getPreferredSize();
+        int width = Math.min(size.width, bounds.width), height = Math.min(size.height, bounds.height);
+        cornerLayer.setBounds(bounds.x + bounds.width - width, bounds.y + bounds.height - height, width, height);
+        cornerLayer.revalidate();
+        cornerLayer.repaint();
+    }
+
     void setBindings(KeyBindings replacement) {
         baseBindings = Objects.requireNonNull(replacement);
         rebind();
@@ -539,6 +616,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             panel.add(actions, BorderLayout.SOUTH);
             showConfigDiagnostics.accept(panel);
         };
+    }
+
+    /** Opens the status bar's configuration details, as clicking its configuration button does. */
+    public void showConfigurationDetails() {
+        if (!closed) status().onConfigurationDetails.run();
+    }
+
+    /** A message before the application connected a receiver: logged by its fixed title, never shown in a dialog. */
+    private static void unheard(String title, String details) {
+        LOG.log(System.Logger.Level.WARNING, "A window message had no receiver: " + title);
     }
 
     public void applyConfiguration(ConfigSnapshot next, boolean macOs) { workspaceConfiguration.apply(next, macOs); }
@@ -644,6 +731,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             WorkspaceTheme.clear(component);
             throw failure;
         }
+        // After the mount stands: a failing glass handler must not roll it back.
+        if (backgroundOpacity < 1) glassListener.run();
     }
     private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
         if (!hosted.containsKey(entry.component()) && !hostedStylers.containsKey(entry.component())) return;
@@ -653,6 +742,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (styler != null) styler.close();
         hosted.remove(entry.component()); tabs.remove(entry.component());
         WorkspaceTheme.clear(entry.component()); update();
+        if (backgroundOpacity < 1) glassListener.run();
         if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
     }
     public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
@@ -676,22 +766,36 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
     public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
 
-    WorkspaceRegions regions() { return regions; }
-    WindowRail rail() { return rail; }
+    ToolWindowArea area() { return area; }
+    DockState dock() { return dock; }
+    ToolStripe leftStripe() { return leftStripe; }
+    ToolStripe rightStripe() { return rightStripe; }
+    DockDrag dockDrag() { return dockDrag; }
     boolean railVisible() { return uiState.railVisible(); }
 
     void setRailVisible(boolean value) {
+        // A drag shows its view on the stripes that showed when it began; showing or hiding them ends it.
+        dockDrag.cancel();
         uiState.setRailVisible(value);
         uiState.save();
         syncRailVisibility();
         updateActions();
     }
 
-    /** The rail shows only when it has contributed items and the user has not hidden it. */
+    /**
+     * Both stripes show together while either has a tool window or an action (an empty right stripe included: it is a
+     * place to move windows to), unless the user hid them with View > Rail.
+     */
     void syncRailVisibility() {
-        boolean wanted = !rail.empty() && uiState.railVisible();
-        regions.setRailVisible(wanted);
-        if (rail.isVisible() != wanted) { rail.setVisible(wanted); revalidate(); repaint(); }
+        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && uiState.railVisible();
+        area.setStripesVisible(wanted);
+        if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
+            leftStripe.setVisible(wanted);
+            rightStripe.setVisible(wanted);
+            revalidate(); repaint();
+            // The stripes' own width, and the area's lower inset, are part of the window's minimum size.
+            onMinimumSizeChanged.run();
+        }
     }
     boolean updatingActions() { return workspaceActions.updating(); }
     Action action(ActionId id) { return workspaceActions.action(id); }
@@ -729,12 +833,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             update();
         };
         tab.onEmpty = () -> closeTab(tab);
-        tab.onError = message -> onError.accept(message);
+        tab.onError = (message, cause) -> onLaunchFailure.accept(message, cause);
+        tab.lastInWindow = () -> tabs.getTabCount() == 1;
         tab.configure = pane -> configurePane(tab, pane);
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
         for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
         WorkspaceTheme.apply(tab, themes.current());
         tab.setBackground(themes.current().palette().background());
+        tab.setBackgroundOpacity((float) backgroundOpacity);
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
@@ -948,7 +1054,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void selectTheme(Theme theme) {
         if (closed) return;
         try { themes.configure(theme); }
-        catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
+        catch (ThemeController.InstallationFailure failure) { onError.accept("Could not apply the theme", failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
@@ -993,7 +1099,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var save = saveSettings;
         var state = configurationState;
         if (save == null || state == null) { locally.run(); return; }
-        if (state.rejected()) { revertChoices(); onError.accept(REJECTED_CHOICE); return; }
+        if (state.rejected()) { revertChoices(); onError.accept("Settings not saved", REJECTED_CHOICE); return; }
         java.util.concurrent.CompletableFuture<?> result;
         try { result = save.apply(dev.jasper.app.config.SettingsEdit.of(setting, value, state.values())); }
         catch (RuntimeException failure) { result = java.util.concurrent.CompletableFuture.failedFuture(failure); }
@@ -1004,7 +1110,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 revertChoices();
                 Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
                     ? failure.getCause() : failure;
-                onError.accept(cause.getMessage());
+                onError.accept("Settings not saved", cause.getMessage());
             });
         });
     }
@@ -1028,9 +1134,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             }
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
-            rail.refreshTheme();
-            regions.refreshTheme();
-            regions.setTerminalBackground(theme.palette().background());
+            leftStripe.refreshTheme();
+            rightStripe.refreshTheme();
+            area.refreshTheme();
+            area.setTerminalBackground(theme.palette().background());
             WorkspaceTheme.apply(windowTabs, theme);
             windowTabs.refresh();
             for (var component : new ArrayList<>(hostedStylers.keySet())) {
@@ -1055,12 +1162,80 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
             onThemeChanged.accept(theme); update();
+            requestGlass();
             revalidate(); repaint();
         } finally {
             for (var styler : suspended) styler.afterUiUpdate();
             retained.forEach(TerminalTab::endThemeUpdate);
         }
     }
+
+    /**
+     * Where this window's requested workspace glass goes, with whether the workspace theme is dark (it picks the blur
+     * material); the native window boundary installs it.
+     */
+    void setGlassRequests(BiConsumer<GlassLevels, Boolean> requests) {
+        glassRequests = Objects.requireNonNull(requests);
+        requestGlass();
+    }
+
+    /** Asks for the saved glass over the workspace theme's; called after every theme or configuration change. */
+    void requestGlass() {
+        if (closed) return;
+        ConfigSnapshot configured = workspaceConfiguration.snapshot();
+        var workspace = themes.current().workspace();
+        glassRequests.accept(GlassLevels.resolve(configured == null ? GlassSettings.UNSET : configured.glass(), workspace.glass()),
+            workspace.dark());
+    }
+
+    /**
+     * The opacity actually in effect for this window, 1 being opaque. The terminal surface and each pane paint the
+     * terminal background at that opacity, each replacing what lies beneath; chrome, tab strips and dividers stay
+     * solid.
+     */
+    void applyBackgroundOpacity(double opacity) {
+        if (closed || opacity == backgroundOpacity) return;
+        backgroundOpacity = opacity;
+        float value = (float) opacity;
+        boolean glass = value < 1f;
+        area.setGlass(value);
+        tabs.setOpaque(!glass);
+        for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
+        windowTabs.refresh();
+        repaint();
+        glassListener.run();
+    }
+
+    /**
+     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The tab
+     * strip shares it (whatever the theme's tab bar colour), so terminals, tabs and hosted content read as one space.
+     */
+    java.awt.Color workspaceSurface() {
+        java.awt.Color background = themes.current().palette().background();
+        if (backgroundOpacity >= 1) return background;
+        return new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue(),
+            (int) Math.round(255 * backgroundOpacity));
+    }
+
+    /** The opacity in effect for this window, as last applied; 1 is opaque. EDT only.
+     * @return from 0.1 to 1
+     */
+    public double backgroundOpacity() { return backgroundOpacity; }
+
+    /** The opacity behind {@code component}: this window's opacity when it sits in the workspace centre, where the
+     * terminal tabs and hosted content live, and 1 anywhere else (chrome, the stripes and the tool windows). EDT only.
+     * @param component a component that may be in this window
+     * @return from 0.1 to 1
+     */
+    public double workspaceOpacity(Component component) {
+        return component != null && SwingUtilities.isDescendingFrom(component, tabs) ? backgroundOpacity : 1;
+    }
+
+    /** Runs when this window's background opacity changes, or hosted content enters or leaves it while translucent.
+     * EDT only; replaces any earlier listener.
+     * @param listener the callback
+     */
+    public void setGlassListener(Runnable listener) { glassListener = Objects.requireNonNull(listener); }
 
     int tabHeight() { return tabHeight; }
 
@@ -1098,7 +1273,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         requireSize("Rail width", width, ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH);
         if (closed || railWidth == width) return;
         railWidth = width;
-        rail.setRailWidth(width);
+        leftStripe.setRailWidth(width);
+        rightStripe.setRailWidth(width);
         revalidate(); repaint();
         onMinimumSizeChanged.run();
     }
@@ -1117,6 +1293,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     void setActive(boolean value) {
         if (!value && commandPalette != null) commandPalette.dismiss();
+        // A modal dialog opening takes the drag's release, and so does another application taking focus.
+        if (!value) dockDrag.cancel();
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
@@ -1124,12 +1302,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
     void setStatusVisible(boolean visible) {
-        chrome.setStatusVisible(visible); regions.setStatusVisible(visible);
+        chrome.setStatusVisible(visible); area.setStatusVisible(visible);
         updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
 
     @Override public void close() {
         if (closed) return;
+        dockDrag.cancel();
         paletteKeys.close();
         if (contributed != null) { contributed.close(); contributed = null; }
         commandPalette.close(); windowCommands.close(); chrome.closeThemeMenus(); commands.close();
@@ -1144,6 +1323,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
         if (windowTabs != null) windowTabs.close();
+        uninstallCornerLayer();
+        if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
         Runnable closeTabs = () -> {
             for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }
@@ -1155,7 +1336,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         refreshTabs();
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
-        onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
+        onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();
         anyWindowActive = () -> false;

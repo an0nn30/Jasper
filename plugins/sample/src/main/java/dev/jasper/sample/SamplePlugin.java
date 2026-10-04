@@ -112,7 +112,7 @@ public final class SamplePlugin implements Plugin {
             run.addActionListener(event -> context.background().execute(() -> demo(context, stepMillis)));
             var panel = new JPanel(new BorderLayout(0, 8));
             panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-            panel.add(new JLabel("Sample panel"), BorderLayout.NORTH);
+            panel.add(new JLabel("Runs a short demo activity in the background."), BorderLayout.NORTH);
             panel.add(run, BorderLayout.SOUTH);
             return panel;
         });

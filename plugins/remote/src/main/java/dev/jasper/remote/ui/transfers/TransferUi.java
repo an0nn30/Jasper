@@ -117,17 +117,17 @@ public final class TransferUi implements AutoCloseable {
 
     private void act(WindowHandle window, UUID id, TransferRows.Action action) {
         switch (action) {
-            case RESUME -> report(coordinator.resume(id, window));
-            case RETRY_FAILED -> report(coordinator.retryFailed(id, window));
-            case RETRY_CLEANUP -> report(coordinator.cleanup(id, window));
+            case RESUME -> report("Could not resume the transfer", coordinator.resume(id, window));
+            case RETRY_FAILED -> report("Could not retry the failed items", coordinator.retryFailed(id, window));
+            case RETRY_CLEANUP -> report("Could not clean up the transfer", coordinator.cleanup(id, window));
             case RESOLVE -> resolve(window, id);
         }
     }
 
-    private void report(CompletableFuture<?> operation) {
+    private void report(String title, CompletableFuture<?> operation) {
         operation.whenComplete((ignored, error) -> ui.execute(() -> {
             if (closed) return;
-            if (error != null) context.notices().error(message(error));
+            if (error != null) context.notifications().group().error(title, message(error), error);
             refresh();
         }));
     }
@@ -138,7 +138,8 @@ public final class TransferUi implements AutoCloseable {
         coordinator.clear(id, acknowledgeCleanup).whenComplete((ignored, error) -> ui.execute(() -> {
             clearing.remove(id);
             if (closed) return;
-            if (error != null && !GONE.equals(message(error))) context.notices().error(message(error));
+            if (error != null && !GONE.equals(message(error)))
+                context.notifications().group().error("Could not clear the transfer", message(error), error);
             refresh();
         }));
     }
@@ -156,15 +157,15 @@ public final class TransferUi implements AutoCloseable {
     private void resolve(WindowHandle window, UUID id) {
         coordinator.firstAttention(id).whenComplete((entry, error) -> ui.execute(() -> {
             if (closed) return;
-            if (error != null) { context.notices().error(message(error)); return; }
-            if (entry.isEmpty()) { report(coordinator.resume(id, window)); return; }
+            if (error != null) { context.notifications().group().error("Could not resolve the transfer", message(error), error); return; }
+            if (entry.isEmpty()) { report("Could not resume the transfer", coordinator.resume(id, window)); return; }
             var target = entry.get();
             var dialog = context.windows().dialog(new DialogSpec("Resolve transfer", window, false));
             dialog.setContent(new ResolvePanel(target, choice -> {
                 dialog.close();
                 if (choice.decision() == ConflictDecision.RENAME) rename(window, target);
                 else resolved(window, target, choice.decision(), null, choice.remaining());
-            }, () -> { dialog.close(); report(coordinator.restart(target.id(), window)); }, dialog::close));
+            }, () -> { dialog.close(); report("Could not restart the transfer", coordinator.restart(target.id(), window)); }, dialog::close));
             dialog.show();
         }));
     }
@@ -185,8 +186,8 @@ public final class TransferUi implements AutoCloseable {
     private void resolved(WindowHandle window, TransferEntry entry, ConflictDecision decision, String name, boolean remaining) {
         coordinator.resolve(entry.id(), decision, name, remaining).whenComplete((ignored, error) -> ui.execute(() -> {
             if (closed) return;
-            if (error != null) { context.notices().error(message(error)); return; }
-            report(coordinator.resume(entry.jobId(), window));
+            if (error != null) { context.notifications().group().error("Could not resolve the conflict", message(error), error); return; }
+            report("Could not resume the transfer", coordinator.resume(entry.jobId(), window));
         }));
     }
 

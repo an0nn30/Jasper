@@ -18,7 +18,7 @@ import org.tomlj.TomlTable;
 /** Reads a Jasper theme file. Every problem is a {@link ThemeFileException} naming the file and line. */
 public final class ThemeToml {
     private static final Set<String> TOP = Set.of("name", "dark", "extends", "author", "license", "source", "commit",
-        "ui_complete", "colors", "tokens", "syntax", "ui", "icons");
+        "ui_complete", "colors", "tokens", "syntax", "ui", "icons", "workspace");
     private static final List<String> METADATA = List.of("author", "license", "source", "commit");
     private static final Set<String> STYLE_FIELDS = Set.of("color", "bold", "italic");
     private static final Pattern COLOR = Pattern.compile("#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?");
@@ -86,7 +86,7 @@ public final class ThemeToml {
         if (uiTable != null) file.flatten(List.of("ui"), "", uiTable, ui);
         return new ThemeDocument(origin, name.strip(), file.bool(List.of("dark")), parent.map(String::strip),
             parent.isPresent() ? file.line(List.of("extends")) : 0, file.bool(List.of("ui_complete")), metadata, seeds,
-            ansi, tokens, syntax, ui, file.icons());
+            ansi, tokens, syntax, ui, file.icons(), file.workspace());
     }
 
     /** Typed reads from one parsed file, each failure naming the key's line. */
@@ -119,6 +119,30 @@ public final class ThemeToml {
             if (value == null) return Optional.empty();
             if (!(value instanceof Boolean flag)) throw error(path, "\"" + label(path) + "\" must be true or false");
             return Optional.of(flag);
+        }
+
+        Optional<Double> number(List<String> path, double min, double max) {
+            Object value = toml.get(path);
+            if (value == null) return Optional.empty();
+            double number;
+            if (value instanceof Double fraction) number = fraction;
+            else if (value instanceof Long whole) number = whole;
+            else throw error(path, "\"" + label(path) + "\" must be a number");
+            if (!(number >= min && number <= max))
+                throw error(path, "\"" + label(path) + "\" must be from " + plain(min) + " to " + plain(max));
+            return Optional.of(number);
+        }
+
+        private static String plain(double value) { return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString(); }
+
+        WorkspaceGlass workspace() {
+            TomlTable table = table(List.of("workspace"));
+            if (table == null) return WorkspaceGlass.NONE;
+            for (String key : table.keySet())
+                if (!key.equals("opacity") && !key.equals("blur"))
+                    throw error(List.of("workspace", key), "unknown key \"" + key + "\" in [workspace]");
+            return new WorkspaceGlass(number(List.of("workspace", "opacity"), GlassLevels.MIN_OPACITY, 1),
+                bool(List.of("workspace", "blur")));
         }
 
         Color color(List<String> path) {

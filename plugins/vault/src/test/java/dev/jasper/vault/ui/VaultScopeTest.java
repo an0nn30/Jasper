@@ -4,6 +4,7 @@ import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteRow;
 import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.vault.lock.LockManager;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
@@ -45,15 +46,21 @@ class VaultScopeTest {
     String clipboard = "";
     final List<Runnable> armed = new ArrayList<>();
     final List<String> opened = new ArrayList<>();
+    final FakeNotifications notifications = new FakeNotifications();
+    boolean clipboardBroken;
     LockManager lock;
     VaultScope scope;
 
     VaultScope scope(Path dir) {
         var keychain = new KeychainStore("Linux", command -> { throw new UncheckedIOException(new IOException("none")); }, dir.resolve("x"));
         lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret"))), Runnable::run, Runnable::run, state -> { });
-        var service = new VaultService(lock, () -> Optional.of(window), prompt -> { }, prompt -> { }, prompt -> { }, notice -> { });
-        scope = new VaultScope(lock, service, new SecretClipboard(text -> clipboard = text, () -> Optional.of(clipboard), armed::add),
-            (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")));
+        var service = new VaultService(lock, () -> Optional.of(window), prompt -> { }, prompt -> { }, prompt -> { },
+            notifications.group("dev.jasper.vault"));
+        scope = new VaultScope(lock, service, new SecretClipboard(text -> {
+                if (clipboardBroken) throw new IllegalStateException("clipboard busy");
+                clipboard = text;
+            }, () -> Optional.of(clipboard), armed::add),
+            (owner, id) -> opened.add(id.map(UUID::toString).orElse("-")), notifications.group("dev.jasper.vault"));
         return scope;
     }
 
@@ -139,5 +146,15 @@ class VaultScopeTest {
         scope.onChanged(() -> changes[0]++);
         scope.changed();
         assertThat(changes[0]).isEqualTo(1);
+    }
+
+    @Test void aCopyThatFailsIsPostedWithItsCause(@TempDir Path dir) {
+        scope(dir);
+        populate();
+        clipboardBroken = true;
+        scope.execute(row(scope.search("", query).rows(), "cred." + PROD), VaultScope.COPY_USERNAME, query);
+        assertThat(notifications.lines()).containsExactly(
+            "dev.jasper.vault|ERROR|Could not copy from the vault|IllegalStateException: clipboard busy|IllegalStateException");
+        assertThat(clipboard).isEmpty();
     }
 }

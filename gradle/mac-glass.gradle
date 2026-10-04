@@ -1,0 +1,67 @@
+// The blur behind a translucent window is a public NSVisualEffectView behind the content view, masked to the window's
+// rounded corners; this small bridge finds the window through JAWT and adds it (no private CoreGraphics call). Only
+// macOS builds compile it; elsewhere windows stay opaque and Settings disables the rows.
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.jvm.toolchain.JavaToolchainService
+
+if (!System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('mac')) return
+
+def toolchains = extensions.getByType(JavaToolchainService)
+def javaExtension = extensions.getByType(JavaPluginExtension)
+def sdkHome = toolchains.launcherFor(javaExtension.toolchain).map { it.metadata.installationPath }
+def source = file('src/main/native/MacGlass.m')
+def nativeDirectory = layout.buildDirectory.dir('native')
+def library = nativeDirectory.map { it.file('libjasper-glass.dylib') }
+def testSource = file('src/test/native/MacGlassTest.m')
+def testExecutable = nativeDirectory.map { it.file('glass-tests') }
+def compilerArguments = {
+    ['-fobjc-arc', '-fblocks', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
+        '-mmacosx-version-min=11.0', '-framework', 'AppKit', '-framework', 'QuartzCore',
+        '-I' + sdkHome.get().dir('include').asFile.absolutePath,
+        '-I' + sdkHome.get().dir('include/darwin').asFile.absolutePath]
+}
+
+def compileBridge = tasks.register('compileMacGlass', Exec) {
+    inputs.file(source)
+    inputs.property('sdkHome', sdkHome.map { it.asFile.absolutePath })
+    inputs.property('architecture', System.getProperty('os.arch'))
+    outputs.file(library)
+    doFirst {
+        nativeDirectory.get().asFile.mkdirs()
+        commandLine(['/usr/bin/xcrun', 'clang'] + compilerArguments() +
+            ['-dynamiclib', '-install_name', '@rpath/libjasper-glass.dylib',
+             source.absolutePath, '-o', library.get().asFile.absolutePath])
+    }
+    doLast {
+        providers.exec {
+            commandLine('/usr/bin/codesign', '--force', '--sign', '-', library.get().asFile.absolutePath)
+        }.result.get()
+    }
+}
+
+// `./gradlew :jasper-app:run` is unpackaged, so it names the freshly built bridge explicitly.
+tasks.named('run', JavaExec) {
+    dependsOn(compileBridge)
+    systemProperty('jasper.glassLibrary', library.get().asFile.absolutePath)
+}
+
+def compileTests = tasks.register('compileMacGlassTests', Exec) {
+    inputs.files(source, testSource)
+    inputs.property('sdkHome', sdkHome.map { it.asFile.absolutePath })
+    inputs.property('architecture', System.getProperty('os.arch'))
+    outputs.file(testExecutable)
+    doFirst {
+        nativeDirectory.get().asFile.mkdirs()
+        commandLine(['/usr/bin/xcrun', 'clang'] + compilerArguments() +
+            [testSource.absolutePath, '-o', testExecutable.get().asFile.absolutePath])
+    }
+}
+
+def nativeTests = tasks.register('testMacGlass', Exec) {
+    group = 'verification'
+    description = 'Checks the macOS glass bridge headlessly: finding a window by its layer, the corner mask and appearance.'
+    dependsOn(compileTests, compileBridge)
+    commandLine(testExecutable.get().asFile.absolutePath)
+}
+tasks.named('check') { dependsOn(nativeTests) }
+tasks.named('stagePackage', Sync) { from(compileBridge) }

@@ -89,9 +89,9 @@ class HostsPanelTest {
         return panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(index), index, false, false);
     }
 
-    @Test void theHeadingReadsSessionsAndThereIsNoWslGroupWithoutDistributions() {
+    @Test void theToolWindowHeaderCarriesTheTitleAndThereIsNoWslGroupWithoutDistributions() {
         var panel = new HostsPanel(actions);
-        assertThat(panel.title.getText()).isEqualTo("Sessions");
+        assertThat(texts(panel)).as("Jasper's header shows Sessions").doesNotContain("Sessions");
         panel.setDistros(List.of(pwsh), profile -> 0);
         assertThat(rows(panel)).isEmpty();
         assertThat(panel.empty.isVisible()).isTrue();
@@ -379,4 +379,12 @@ class HostsPanelTest {
         assertThat(renderer.getBackground()).isEqualTo(panel.list.getSelectionBackground());
     }
 
+    private static List<String> texts(java.awt.Container root) {
+        List<String> found = new ArrayList<>();
+        for (java.awt.Component child : root.getComponents()) {
+            if (child instanceof javax.swing.JLabel label) found.add(label.getText());
+            if (child instanceof java.awt.Container nested) found.addAll(texts(nested));
+        }
+        return found;
+    }
 }

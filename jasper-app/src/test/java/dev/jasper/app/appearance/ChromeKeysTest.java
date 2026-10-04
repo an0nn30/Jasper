@@ -124,4 +124,29 @@ class ChromeKeysTest {
         assertThat(themed.getColor("Jasper.titleSearch.border")).isEqualTo(new Color(0x202020));
         assertThat(themed.getColor("Jasper.titleSearch.hoverBackground")).isEqualTo(new Color(0x303030));
     }
+
+    @Test void railBadgesReadAgainstTheRail() {
+        var defaults = flatLafOnly();
+        ChromeKeys.derive(defaults, TERMINAL);
+        Color rail = defaults.getColor("Jasper.titleBackground");
+        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.railBadgeError"), rail)).isGreaterThanOrEqualTo(3);
+        assertThat(ChromeKeys.contrast(defaults.getColor("Jasper.railBadgeAccent"), rail)).isGreaterThanOrEqualTo(3);
+    }
+
+    @Test void notificationCardsFollowIntellijNotificationKeysOrDeriveThem() {
+        var derived = flatLafOnly();
+        ChromeKeys.derive(derived, TERMINAL);
+        assertThat(derived.getColor("Jasper.notification.background")).isEqualTo(new Color(0xf2f2f2));
+        assertThat(derived.getColor("Jasper.notification.borderColor")).isEqualTo(new Color(0xc4c4c4));
+        assertThat(derived.getColor("Jasper.notification.foreground")).isEqualTo(new Color(0x000000));
+        assertThat(ChromeKeys.contrast(derived.getColor("Jasper.notification.linkForeground"), new Color(0xf2f2f2))).isGreaterThanOrEqualTo(4.5);
+        assertThat(ChromeKeys.contrast(derived.getColor("Jasper.notification.mutedForeground"), new Color(0xf2f2f2))).isGreaterThanOrEqualTo(4.5);
+        var authored = flatLafOnly();
+        put(authored, "Notification.background", 0xfff8e0); put(authored, "Notification.borderColor", 0xd0b060);
+        put(authored, "Notification.foreground", 0x222222); put(authored, "PopupMenu.background", 0xffffff);
+        ChromeKeys.derive(authored, TERMINAL);
+        assertThat(authored.getColor("Jasper.notification.background")).isEqualTo(new Color(0xfff8e0));
+        assertThat(authored.getColor("Jasper.notification.borderColor")).isEqualTo(new Color(0xd0b060));
+        assertThat(authored.getColor("Jasper.notification.foreground")).isEqualTo(new Color(0x222222));
+    }
 }

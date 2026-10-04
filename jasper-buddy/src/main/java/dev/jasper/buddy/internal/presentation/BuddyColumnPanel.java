@@ -74,7 +74,7 @@ final class BuddyColumnPanel extends JComponent {
     /** Sample interrupted motion before retargeting, keeping existing capsules continuous. */
     void refresh() {
         long now = clock.getAsLong();
-        List<BuddyNotice> column = deck.column();
+        List<BuddyNotice> column = deck.notices();
         List<Motion> next = new ArrayList<>();
         for (int i = 0; i < BuddyDeckLayout.visibleInColumn(column.size()); i++) {
             BuddyNotice notice = column.get(i);
@@ -110,18 +110,17 @@ final class BuddyColumnPanel extends JComponent {
             || (hovered >= 0 || leaving >= 0) && now - hoverChangedAt < BubbleMotion.HOVER_NANOS;
     }
 
-    boolean needsAnimationFrames() { return animating() || deck.column().stream().anyMatch(BuddyCard::shimmers); }
+    boolean needsAnimationFrames() { return animating() || deck.notices().stream().anyMatch(BuddyCard::shimmers); }
 
-    boolean needsDetailUpdates() { return deck.column().stream().anyMatch(BuddyNotice::live); }
+    boolean needsDetailUpdates() { return !deck.isEmpty(); }
 
     /** Settled shimmer changes only the subtext, not the full translucent shadow surface. */
     void repaintFrame() {
         boolean moving = animating();
         if (moving || lastFrameMoving) repaint();
         else {
-            List<BuddyNotice> column = deck.column();
+            List<BuddyNotice> column = deck.notices();
             for (int i = 0; i < BuddyDeckLayout.visibleInColumn(column.size()); i++) {
-                if (!column.get(i).live()) continue;
                 Rectangle bounds = cardBounds(i);
                 repaint(bounds.x + BuddyCard.PAD_X, bounds.y + 28,
                     bounds.width - 2 * BuddyCard.PAD_X, 18);
@@ -133,7 +132,7 @@ final class BuddyColumnPanel extends JComponent {
     int hovered() { return hovered; }
 
     @Override public Dimension getPreferredSize() {
-        int count = deck.column().size();
+        int count = deck.notices().size();
         if (count == 0) return new Dimension(0, 0);
         return new Dimension(BuddyCard.WIDTH + 2 * MARGIN,
             BuddyDeckLayout.columnHeight(count, BuddyCard.HEIGHT) + 2 * MARGIN + ARRIVAL_ROOM);
@@ -141,7 +140,7 @@ final class BuddyColumnPanel extends JComponent {
 
     /** Actual painted rectangle, used for input too while a capsule is moving. */
     Rectangle cardBounds(int index) {
-        List<BuddyNotice> column = deck.column();
+        List<BuddyNotice> column = deck.notices();
         Rectangle card = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT, false);
         Motion motion = motionFor(column.get(index));
         float target = index * (BuddyCard.HEIGHT + BuddyDeckLayout.COLUMN_GAP);
@@ -172,8 +171,12 @@ final class BuddyColumnPanel extends JComponent {
         onLayoutChanged.run();
     }
 
+    /**
+     * A click on a capsule runs its activation; a click beside them opens the drawer. Returns whether the column stays,
+     * and it always does now: every capsule is work still going, the clicked one included.
+     */
     boolean handleClick(Point point) {
-        List<BuddyNotice> column = deck.column();
+        List<BuddyNotice> column = deck.notices();
         if (column.isEmpty()) return true;
         int index = indexAt(point);
         if (index < 0) {
@@ -181,13 +184,12 @@ final class BuddyColumnPanel extends JComponent {
             return true;
         }
         BuddyNotice notice = column.get(index);
-        if (notice.orphaned()) return true;
         notice.activate().run();
-        return false;
+        return true;
     }
 
     private int indexAt(Point point) {
-        for (int i = 0; i < BuddyDeckLayout.visibleInColumn(deck.column().size()); i++) {
+        for (int i = 0; i < BuddyDeckLayout.visibleInColumn(deck.notices().size()); i++) {
             Rectangle card = cardBounds(i);
             if (new java.awt.geom.RoundRectangle2D.Float(card.x, card.y, card.width, card.height,
                 card.height, card.height).contains(point)) return i;
@@ -196,7 +198,7 @@ final class BuddyColumnPanel extends JComponent {
     }
 
     @Override protected void paintComponent(Graphics g) {
-        List<BuddyNotice> column = deck.column();
+        List<BuddyNotice> column = deck.notices();
         if (column.isEmpty()) return;
         Graphics2D g2 = (Graphics2D) g.create();
         try {

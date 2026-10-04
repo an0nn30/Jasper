@@ -21,7 +21,7 @@ final class WorkspaceValues {
             laf.setExtraDefaults(ThemeManager.APP_DEFAULTS);
             var defaults = laf.getDefaults();
             FlatLafThemeData.explicitColors(generated.uiKeys()).forEach((key, color) -> {
-                if (defaults.get(key) == null) defaults.put(key, new ColorUIResource(color));
+                if (!FlatLafThemeData.defines(defaults, key)) defaults.put(key, new ColorUIResource(color));
             });
             ChromeKeys.derive(defaults, generated.terminal().background());
             return ThemeGenerator.withWorkspaceTokens(document,

@@ -237,4 +237,10 @@ class FileServersPanelTest {
             if (child instanceof java.awt.Container c) layoutAll(c);
         }
     }
+
+    @Test void theToolWindowHeaderCarriesTheTitle() {
+        List<javax.swing.JLabel> found = new ArrayList<>();
+        labels(panel(), found);
+        assertThat(found).extracting(javax.swing.JLabel::getText).as("Jasper's header shows File Servers").doesNotContain("File Servers");
+    }
 }

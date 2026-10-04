@@ -1,6 +1,7 @@
 package dev.jasper.snippets;
 
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.palette.PaletteQuery;
 import dev.jasper.sdk.palette.PaletteResults;
 import dev.jasper.sdk.palette.PaletteRow;
@@ -17,7 +18,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 /** The Snippets scope: Enter pastes, Cmd/Ctrl+Enter pastes and runs, Shift+Enter edits the file. */
 final class SnippetsScope implements PaletteScope {
@@ -27,11 +27,11 @@ final class SnippetsScope implements PaletteScope {
     static final String ERROR_ROW = "snippets.file-error";
 
     private final SnippetStore store;
-    private final Consumer<String> onError;
+    private final NotificationGroup notifications;
     private final String openActionId;
 
-    SnippetsScope(SnippetStore store, Consumer<String> onError, String openActionId) {
-        this.store = store; this.onError = onError; this.openActionId = openActionId;
+    SnippetsScope(SnippetStore store, NotificationGroup notifications, String openActionId) {
+        this.store = store; this.notifications = notifications; this.openActionId = openActionId;
     }
 
     @Override public ScopeSpec spec() {
@@ -110,7 +110,7 @@ final class SnippetsScope implements PaletteScope {
     }
 
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) {
-        if (verb.equals(EDIT)) { store.openInEditor(onError); return; }
+        if (verb.equals(EDIT)) { store.openInEditor(notifications); return; }
         if (row.token() instanceof Snippet snippet) paste(snippet.fill(Map.of()), verb, context);
     }
 

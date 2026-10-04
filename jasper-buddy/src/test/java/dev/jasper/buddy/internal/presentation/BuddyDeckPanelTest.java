@@ -30,7 +30,7 @@ class BuddyDeckPanelTest {
     }
 
     private void post(String key, String title) {
-        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", key), BuddyNotice.Kind.TASK, title, BuddyNotice.State.DONE, () -> "Finished in 1m 12s", () -> activated.add(title)));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", key), BuddyNotice.Kind.TASK, title, BuddyNotice.State.RUNNING, () -> "Running · 1m 12s", () -> activated.add(title)));
         panel.refresh();
     }
 
@@ -70,17 +70,6 @@ class BuddyDeckPanelTest {
         assertThat(panel.handleClick(inCard(1))).isFalse();
 
         assertThat(activated).containsExactly("one");
-    }
-
-    @Test void anOrphanedCardReadsButDoesNotClick() {
-        post("a", "one");
-        deck.orphan(new BuddyNoticeId("terminal", "a"));
-        layout();
-
-        assertThat(panel.handleClick(inCard(0))).isTrue();
-
-        assertThat(activated).isEmpty();
-        assertThat(deck.size()).as("it stays in the drawer").isEqualTo(1);
     }
 
     @Test void theDismissTargetRemovesItsOwnCardAndNotTheOneBehindIt() {
@@ -206,7 +195,7 @@ class BuddyDeckPanelTest {
         connected.setSize(connected.getPreferredSize());
         connected.handleClick(dismissOf(0));
         assertThat(notified[0]).isEqualTo(1);
-        assertThat(deck.column()).isEmpty();
+        assertThat(deck.notices()).isEmpty();
     }
 
     @Test void transparentMarginsAndRoundedCornersDoNotActivateACard() {

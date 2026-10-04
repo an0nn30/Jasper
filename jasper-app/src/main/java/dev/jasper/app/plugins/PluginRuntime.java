@@ -7,6 +7,9 @@ import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.notifications.ActivityNotifier;
+import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.NotificationCenter;
+import dev.jasper.app.notifications.NotificationRequest;
 import dev.jasper.sdk.JasperSdk;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
@@ -17,6 +20,7 @@ import dev.jasper.sdk.events.AppEvents;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -26,16 +30,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.SwingUtilities;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import dev.jasper.app.terminals.TerminalRegistry;
-import dev.jasper.app.terminals.PaneEntry;
 
 /**
  * The application's single entry to plugins: discover, resolve, load and start them once at launch,
@@ -183,6 +188,97 @@ public final class PluginRuntime {
     public record Outcome(boolean ok, String message, Snapshot snapshot) { }
 
     /**
+     * A plugin callback that failed and was contained.
+     *
+     * @param pluginId the plugin
+     * @param operation what the host asked it to do, such as {@code start} or {@code panel <id>}
+     * @param cause what it threw
+     */
+    public record Failure(String pluginId, String operation, Throwable cause) {
+        public Failure {
+            Objects.requireNonNull(pluginId, "pluginId");
+            Objects.requireNonNull(operation, "operation");
+            Objects.requireNonNull(cause, "cause");
+        }
+    }
+
+    /**
+     * A plugin's notification that carries a cause, for the application to record the cause as the plugin's incident.
+     *
+     * @param pluginId the plugin
+     * @param request the notification as the plugin asked for it
+     * @param cause the failure behind it
+     * @param posted hears the posted notification's id on the UI thread, or empty when its group dropped it
+     */
+    public record CausedNotice(String pluginId, NotificationRequest request, Throwable cause, Consumer<Optional<UUID>> posted) {
+        public CausedNotice {
+            Objects.requireNonNull(pluginId, "pluginId");
+            Objects.requireNonNull(request, "request");
+            Objects.requireNonNull(cause, "cause");
+            Objects.requireNonNull(posted, "posted");
+        }
+    }
+
+    /**
+     * Where plugins' notifications go (spec section 6).
+     *
+     * @param center the application's notification center; the host reaches it on the UI thread
+     * @param caused records a post's cause as the plugin's incident and posts it with Show more…; any thread
+     * @param problem posts a problem with plugins, as a title and details, among the application's plugin problems;
+     *     any thread
+     */
+    public record NotificationHost(NotificationCenter center, Consumer<CausedNotice> caused, BiConsumer<String, String> problem) {
+        public NotificationHost {
+            Objects.requireNonNull(center, "center");
+            Objects.requireNonNull(caused, "caused");
+            Objects.requireNonNull(problem, "problem");
+        }
+
+        /**
+         * A host whose notifications nobody looks at, for a runtime without the application (previews and tests): a
+         * cause is not recorded, and a problem is only logged.
+         *
+         * @return the host
+         */
+        public static NotificationHost detached() {
+            var center = new NotificationCenter(SwingUtilities::invokeLater, Clock.systemDefaultZone(), () -> Delivery.Presence.NO_WINDOW);
+            return new NotificationHost(center,
+                caused -> SwingUtilities.invokeLater(() -> caused.posted().accept(center.post(caused.request()))),
+                (title, details) -> LOG.log(System.Logger.Level.WARNING, "A plugin problem: " + title));
+        }
+    }
+
+    /**
+     * Something that kept a plugin from running at this launch, for the application to announce (spec section 7,
+     * producer 5). A plugin that failed while starting is not one: its incident already says so.
+     *
+     * @param kind what went wrong
+     * @param pluginId the plugin's id; empty for a directory that holds no readable plugin
+     * @param name the plugin's name; empty with the id
+     * @param detail why, in the user's terms
+     * @param cause the exception behind it, when there is one
+     */
+    public record Problem(Kind kind, Optional<String> pluginId, Optional<String> name, String detail, Optional<Throwable> cause) {
+        /** What went wrong. */
+        public enum Kind {
+            /** The plugin's jars could not be loaded. */
+            NOT_LOADED,
+            /** The plugin was skipped: it needs another SDK, or a dependency is missing, failed or forms a cycle. */
+            NOT_STARTED,
+            /** A directory in a plugins folder holds no plugin Jasper can read. */
+            UNREADABLE
+        }
+
+        public Problem {
+            Objects.requireNonNull(kind, "kind");
+            Objects.requireNonNull(pluginId, "pluginId");
+            Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(detail, "detail");
+            Objects.requireNonNull(cause, "cause");
+        }
+    }
+
+    /**
      * Where plugin settings problems go, on the UI thread.
      *
      * @param report adds one problem, attributed to the plugin's own settings file
@@ -221,7 +317,7 @@ public final class PluginRuntime {
     private final Contributions contributions;
     private final AuxiliaryWindows windows;
     private final TerminalRegistry terminals;
-    private final Consumer<String> notice;
+    private final NotificationHost notifications;
     private final Consumer<Path> editor;
     private final ShellProfiles profiles;
     private java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance;
@@ -238,12 +334,24 @@ public final class PluginRuntime {
         appearanceSubscriber = Objects.requireNonNull(subscribe);
     }
 
+    private GlassSource glass = GlassSource.NONE;
+
+    /** Supplies window opacity for plugins before they start. UI thread.
+     * @param source the app's per-window lookup
+     */
+    public void glass(GlassSource source) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        glass = Objects.requireNonNull(source);
+    }
+
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
+    private final List<Problem> startupProblems = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
     private final PluginSettingsFiles settingsFiles;
     private java.util.concurrent.ScheduledExecutorService settingsPoller;
     private volatile Map<String, PluginCandidate> launched = Map.of();
+    private volatile Consumer<Failure> failureSink = failure -> { };
     private volatile PluginHost host;
     private Subscription bridge, connectionBridge;
     private volatile PluginCatalog.Launch launch;
@@ -262,12 +370,12 @@ public final class PluginRuntime {
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals) {
-        this(options, notifier, reports, contributions, windows, terminals,
-            message -> LOG.log(System.Logger.Level.WARNING, "Plugin notice: " + message), new dev.jasper.app.platform.ConfigEditor()::open);
+        this(options, notifier, reports, contributions, windows, terminals, NotificationHost.detached(),
+            new dev.jasper.app.platform.ConfigEditor()::open);
     }
 
     /**
-     * As the six-argument constructor, plus where plugin notices and editor requests go.
+     * As the six-argument constructor, plus where plugin notifications and editor requests go.
      *
      * @param options locations and mode
      * @param notifier receives plugin activities for Buddy
@@ -275,13 +383,13 @@ public final class PluginRuntime {
      * @param contributions the application-wide model that plugin chrome contributions are written to
      * @param windows builds plugin windows and dialogs
      * @param terminals the application-wide directory of terminal windows, tabs and panes
-     * @param notice shows a plugin's error notice to the user, on the UI thread
+     * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals,
-                         Consumer<String> notice, Consumer<Path> editor) {
-        this(options, notifier, reports, contributions, windows, terminals, notice, editor, ShellProfiles.NONE);
+                         NotificationHost notifications, Consumer<Path> editor) {
+        this(options, notifier, reports, contributions, windows, terminals, notifications, editor, ShellProfiles.NONE);
     }
 
     /**
@@ -293,14 +401,14 @@ public final class PluginRuntime {
      * @param contributions the application-wide model that plugin chrome contributions are written to
      * @param windows builds plugin windows and dialogs
      * @param terminals the application-wide directory of terminal windows, tabs and panes
-     * @param notice shows a plugin's error notice to the user, on the UI thread
+     * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw
      * @param profiles the detected shell profiles
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals,
-                         Consumer<String> notice, Consumer<Path> editor, ShellProfiles profiles) {
-        this.notice = Objects.requireNonNull(notice);
+                         NotificationHost notifications, Consumer<Path> editor, ShellProfiles profiles) {
+        this.notifications = Objects.requireNonNull(notifications);
         this.editor = Objects.requireNonNull(editor);
         this.profiles = Objects.requireNonNull(profiles);
         this.options = Objects.requireNonNull(options);
@@ -380,12 +488,18 @@ public final class PluginRuntime {
             LOG.log(System.Logger.Level.WARNING, "Plugin state is unreadable; user plugins will need consent", unreadable);
             state = Map.of();
         }
+        for (String problem : problems)
+            startupProblems.add(new Problem(Problem.Kind.UNREADABLE, Optional.empty(), Optional.empty(), problem, Optional.empty()));
         var resolution = PluginResolver.resolve(candidates, state, Version.parse(JasperSdk.VERSION), options.safeMode());
         statuses.addAll(resolution.rejected());
+        for (PluginStatus rejected : resolution.rejected())
+            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.superseded())
+                startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(rejected.id()), Optional.of(rejected.name()),
+                    rejected.reason(), Optional.empty()));
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
-            reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor, settingsFiles, reports.clear(), profiles,
-            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber));
+            reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
+            dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);
@@ -401,6 +515,8 @@ public final class PluginRuntime {
             try { unit = PluginLoader.load(candidate, loaded, PluginRuntime.class.getClassLoader()); }
             catch (PluginLoader.LoadFailure failure) {
                 statuses.add(PluginStatus.of(candidate, PluginStatus.State.FAILED, failure.getMessage()));
+                startupProblems.add(new Problem(Problem.Kind.NOT_LOADED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
+                    failure.getMessage(), failure.getCause() == null ? Optional.empty() : Optional.of(failure)));
                 continue;
             }
             loaded.put(candidate.id(), unit);
@@ -411,6 +527,9 @@ public final class PluginRuntime {
             PluginHost.Outcome outcome = created.start(new HostedPlugin(candidate.descriptor().info(), hard, optional,
                 candidate.descriptor().exports(), unit.loader(), unit::instantiate));
             statuses.add(PluginStatus.of(candidate, outcome.state(), outcome.reason()));
+            if (outcome.state() == PluginStatus.State.SKIPPED)
+                startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
+                    outcome.reason(), Optional.empty()));
         }
         launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode());
         admin = new PluginAdmin(options, Version.parse(JasperSdk.VERSION), () -> launch, created.containment::failures, LOCK_WAIT);
@@ -451,6 +570,31 @@ public final class PluginRuntime {
         var names = new java.util.LinkedHashMap<String, String>();
         launched.forEach((id, candidate) -> names.put(id, candidate.descriptor().name()));
         return Map.copyOf(names);
+    }
+
+    /**
+     * What kept plugins from running at this launch, in the order it was found; empty before {@link #start}. UI thread.
+     *
+     * @return the problems
+     */
+    public List<Problem> problems() { return List.copyOf(startupProblems); }
+
+    /**
+     * Where contained plugin failures go after they are logged; the application records each as an incident.
+     *
+     * @param sink hears each failure on the thread it happened on
+     */
+    public void reportFailuresTo(Consumer<Failure> sink) { failureSink = Objects.requireNonNull(sink, "sink"); }
+
+    /**
+     * Discovered plugin versions, without performing file I/O.
+     *
+     * @return each plugin's version by id
+     */
+    public Map<String, String> pluginVersions() {
+        var versions = new java.util.LinkedHashMap<String, String>();
+        launched.forEach((id, candidate) -> versions.put(id, candidate.descriptor().version().toString()));
+        return Map.copyOf(versions);
     }
 
     /**
@@ -605,9 +749,7 @@ public final class PluginRuntime {
         switch (event.state()) {
             case STARTED -> notifier.started(event.sourcePluginId(), event.id(), event.title(), detail, action);
             case PROGRESS -> notifier.progress(event.sourcePluginId(), event.id(), detail);
-            case SUCCEEDED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), true, event.detail(), action);
-            case FAILED -> notifier.finished(event.sourcePluginId(), event.id(), event.title(), false, event.detail(), action);
-            case CANCELLED -> notifier.cancelled(event.sourcePluginId(), event.id());
+            case SUCCEEDED, FAILED, CANCELLED -> notifier.ended(event.sourcePluginId(), event.id());
         }
     }
 
@@ -631,12 +773,7 @@ public final class PluginRuntime {
      */
     private Optional<Runnable> activation(String source, Optional<String> actionId) {
         PluginHost current = host;
-        if (current == null) return Optional.empty();
-        return actionId.filter(id -> current.ownsAction(source, id)).<Runnable>map(id -> () -> {
-            if (!current.ownsAction(source, id)) return;
-            terminals.activeWindow().ifPresent(window -> contributions.action(id).ifPresent(entry ->
-                entry.invoke(new Contributions.Invocation(window.id(), terminals.activePane().map(PaneEntry::id)))));
-        });
+        return current == null ? Optional.empty() : current.activation(source, actionId);
     }
 
     /**
@@ -735,14 +872,16 @@ public final class PluginRuntime {
         };
     }
 
-    /** Seeds and opens a plugin's settings file off the UI thread; a failure becomes a notice. */
+    /** Seeds and opens a plugin's settings file off the UI thread; a failure is a plugin problem. */
     private void openSettingsFile(String id) {
         Thread.ofVirtual().name("jasper-plugin-settings-open").start(() -> {
             try {
                 prepareSettings(id);
                 editor.accept(PluginSettingsFiles.file(options.userDirectory(), id));
             } catch (IOException | RuntimeException failure) {
-                SwingUtilities.invokeLater(() -> notice.accept(failure.getMessage() == null ? failure.toString() : failure.getMessage()));
+                String name = Optional.ofNullable(launched.get(id)).map(candidate -> candidate.descriptor().name()).orElse(id);
+                String reason = failure.getMessage() == null ? failure.toString() : failure.getMessage();
+                notifications.problem().accept("Could not open a plugin's settings file", name + ": " + reason);
             }
         });
     }

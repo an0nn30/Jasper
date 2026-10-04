@@ -59,11 +59,22 @@ public final class CorePages {
     }
     /** Schema pages whose links select other pages with {@code navigate}. */
     public static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate) {
+        return specs(themes, system, shells, navigate, com.formdev.flatlaf.util.SystemInfo.isMacOS);
+    }
+
+    /**
+     * Schema pages; {@code glass} is whether workspace glass exists here (macOS only), which decides whether its
+     * Settings rows (and their Workspace section) are built.
+     */
+    static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
                 .row(UI_THEME_NAME, Editors.theme(themes))
                 .row(UI_THEME_WORKSPACE, Editors.workspaceScheme(themes))
+                .section("Workspace")
+                .row(UI_WORKSPACE_OPACITY, Editors.optionalNumber("Use theme's value", 1, "%")).shownWhen(glass)
+                .row(UI_WORKSPACE_BLUR, Editors.choice(Map.of("theme", "Use theme's value"))).shownWhen(glass)
                 .section("Interface font")
                 .row(UI_FONT_FAMILY, Editors.font(false))
                 .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt")),

@@ -41,6 +41,11 @@ public final class ThemeTomlWriter {
                     .append(", bold = ").append(style.bold()).append(", italic = ").append(style.italic()).append(" }\n");
             }
         }
+        if (!document.workspace().isEmpty()) {
+            out.append("\n[workspace]\n");
+            document.workspace().opacity().ifPresent(value -> entry(out, "opacity", value));
+            document.workspace().blur().ifPresent(value -> entry(out, "blur", value));
+        }
         section(out, "ui", document.ui());
         section(out, "icons", document.icons());
         String result = out.toString();

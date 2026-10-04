@@ -48,7 +48,7 @@ public final class SftpUi implements AutoCloseable {
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
         this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
-        context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT).withToggleActionId(TOGGLE),this::create);
+        context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
     }
     private JComponent create(PanelHost host) {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();
@@ -119,16 +119,16 @@ public final class SftpUi implements AutoCloseable {
     private record Queued(TransferRequest request,List<String> names) {}
     private void background(Callable<Queued> prepare,WindowHandle owner) {
         background.execute(()-> { try { var queued=prepare.call();var identity=queued.request().destination().identity();ui.execute(()->check(queued,identity,owner)); }
-            catch(Exception failure) { ui.execute(()-> { if(!closed) context.notices().error(message(failure)); }); } });
+            catch(Exception failure) { ui.execute(()-> { if(!closed) context.notifications().group().error("Could not prepare the transfer",message(failure),failure); }); } });
     }
     /** Asks once before copying onto items that already exist; one stat per selected item, off the UI thread. */
     private void check(Queued queued,Optional<ConnectionIdentity> identity,WindowHandle owner) {
         if(closed || !owner.isOpen()) return;
         endpoints.open(identity,owner,status->{}).whenComplete((endpoint,error)-> {
-            if(error!=null) { ui.execute(()-> { if(!closed) context.notices().error(message(error)); });return; }
+            if(error!=null) { ui.execute(()-> { if(!closed) context.notifications().group().error("Could not connect for the transfer",message(error),error); });return; }
             background.execute(()-> { List<String> existing;
                 try { existing=ExistingItems.existing(endpoint,queued.request().directory(),queued.names()); }
-                catch(Exception failure) { ui.execute(()-> { if(!closed) context.notices().error(message(failure)); });return; }
+                catch(Exception failure) { ui.execute(()-> { if(!closed) context.notifications().group().error("Could not check for existing items",message(failure),failure); });return; }
                 finally { endpoint.abort(); }
                 ui.execute(()->decide(queued,identity,existing,owner)); });
         });
@@ -142,7 +142,7 @@ public final class SftpUi implements AutoCloseable {
             choice-> { dialog.close();if(!closed && owner.isOpen()) enqueue(queued.request().withExisting(choice),owner); },dialog::close));dialog.show();
     }
     private void enqueue(TransferRequest request,WindowHandle owner) {
-        transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(!closed && error!=null) context.notices().error(message(error)); }));
+        transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(!closed && error!=null) context.notifications().group().error("Could not queue the transfer",message(error),error); }));
     }
     private void copyPaths(View view) {
         view.controller().capture().ifPresent(captured->{try { if(!captured.selection().isEmpty()) clipboard.accept(String.join("\n",paths(captured))); }

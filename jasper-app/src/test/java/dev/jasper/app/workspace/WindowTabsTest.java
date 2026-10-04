@@ -124,7 +124,7 @@ class WindowTabsTest {
         });
     }
 
-    @Test void stripUsesWorkspaceTabSurfaceWithReadableTitlesWhateverTheUiTheme() throws Exception {
+    @Test void stripUsesTheWorkspaceSurfaceWithReadableTitlesWhateverTheUiTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("other"); owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
@@ -133,7 +133,7 @@ class WindowTabsTest {
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo((owner.theme().matching() ? UIManager.getColor("ToolWindow.background") : owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_BAR)));
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo(owner.theme().palette().background());
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();

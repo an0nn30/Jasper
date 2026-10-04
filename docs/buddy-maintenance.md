@@ -13,11 +13,11 @@ covers translating a terminal/workspace event into a notice.
    [BuddyCompanion](../jasper-buddy/src/main/java/dev/jasper/buddy/view/BuddyCompanion.java).
    Choose a distinct source and stable opaque key, and a state compatible with the kind.
 2. Keep the producer outside the library. Post on EDT; detail suppliers read a cheap
-   snapshot and activation requests return quickly. Repost an ID for a new outcome;
-   use `updateTitle` for wording that must not create new attention.
-3. On producer close, invalidate identity before cancelling delayed callbacks. Freeze
-   unfinished detail with `orphan(id, text)`; use `orphan(id)` for a completed outcome
-   whose existing detail should remain. Acknowledge separately if it should leave the column.
+   snapshot and activation requests return quickly. Repost an ID for a new state; use
+   `updateTitle` for wording that must not count as a new post.
+3. When the work ends, and on producer close, invalidate identity before cancelling delayed
+   callbacks, then `dismiss` the notice. Report how the work ended through the host's
+   notifications, never through Buddy.
 4. On host shutdown, close producers before the companion. Verify a callback saved
    before closure cannot post afterward. Hiding the companion must retain notices.
 
@@ -52,15 +52,14 @@ class Java-public does not make it supported.
 ./gradlew :jasper-app:test --tests '*AppDocumentationTest' :jasper-buddy:javadoc verifyApplicationArchitecture
 ```
 
-## Change notice ordering, capacity or acknowledgement
+## Change notice ordering or capacity
 
 Edit [BuddyDeck](../jasper-buddy/src/main/java/dev/jasper/buddy/internal/model/BuddyDeck.java),
-then its model tests. Preserve source-plus-key identity, newest-first replacement,
-acknowledgement reset only on post, the 50-notice bound, immutable snapshots and
-unconditional detail replacement by the final-detail orphan overload. Column eligibility
-is live-or-unseen; orphaning preserves state and removes liveness. Layout's three-card
-column limit is separate from retained model capacity. Exercise the panels too when a
-model change affects what is displayed.
+then its model tests. Preserve source-plus-key identity, newest-first replacement, the
+50-notice bound and immutable snapshots. Every retained notice is live work; the column
+and the drawer read the same snapshot. Layout's three-card column limit is separate from
+retained model capacity. Exercise the panels too when a model change affects what is
+displayed.
 
 ```sh
 ./gradlew :jasper-buddy:test --tests '*BuddyDeckTest' --tests '*BuddyColumnPanelTest' --tests '*BuddyDeckPanelTest'

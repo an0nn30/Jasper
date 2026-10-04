@@ -466,8 +466,8 @@ class RehearsalTest {
     }
 
     @Test void aFailedCannedLaunchIsLoggedAndNeverOpensADialog() throws Exception {
-        // The pane reports a failed launch through its window's onError, which by default is a modal message dialog
-        // (headless, that throws a HeadlessException on the EDT). A silenced window reports to the log instead.
+        // The pane reports a failed launch through its window's onLaunchFailure, which in a real window becomes an
+        // incident and a notification. A silenced window reports to the log instead, and never attempts a dialog.
         var reported = new CopyOnWriteArrayList<String>();
         try (var quiet = new Quiet()) {
             edt(() -> {

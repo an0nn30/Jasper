@@ -56,8 +56,9 @@ public interface ContractHarness extends AutoCloseable {
     List<String> status();
 
     /**
-     * Registered panels as {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor), followed by
-     * {@code |actionId} when the panel names its own toggle action; registration order.
+     * Registered panels as {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor, with {@code +split} when the panel
+     * starts in its side's secondary half), followed by {@code |actionId} when the panel names its own toggle action;
+     * registration order.
      */
     List<String> panels();
 
@@ -148,6 +149,11 @@ public interface ContractHarness extends AutoCloseable {
     void setWorkspace(Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
         dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax);
 
+    /** Sets the opacity every plugin component reports and announces it as a workspace change.
+     * @param opacity from 0.1 to 1
+     */
+    void setWorkspaceOpacity(double opacity);
+
     /** Stops every active plugin in reverse start order. */
     void stopAll();
 
@@ -179,8 +185,18 @@ public interface ContractHarness extends AutoCloseable {
         void executeInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull);
         /** Every palette open request as {@code windowId scopeId query rowId}, {@code -} for an absent value. */
         List<String> paletteOpens();
-        /** Every error notice as {@code <plugin name>: <message>}. */
-        List<String> notices();
+        /**
+         * Every notification plugins posted, oldest first, as {@code group|SEVERITY|title|content|labels|cause|window|state}:
+         * the plugin's action labels joined with {@code ;}, or {@code -}; {@code cause} when it carried one (the application
+         * then offers Show more…), or {@code -}; the target window's id, or {@code -}; and {@code live} or {@code expired}.
+         */
+        List<String> notifications();
+        /** Every notification group declared for plugins, in declaration order, as {@code id|name|MODE}. */
+        List<String> notificationGroups();
+        /** UI thread: clicks the labelled link of the newest notification with this title; false when there is none or it expired. */
+        boolean runNotificationAction(String title, String label);
+        /** UI thread: clicks the body of the newest notification with this title; false when there is none or it expired. */
+        boolean clickNotification(String title);
         List<java.nio.file.Path> openedInEditor();
         /** Every web address a plugin asked to open in the browser, in request order. */
         List<java.net.URI> browsed();

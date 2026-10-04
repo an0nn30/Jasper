@@ -120,6 +120,13 @@ name = "Jasper Dark"
 # Workspace scheme, live: "match" follows the UI theme; or name a native theme.
 workspace = "match"
 
+[ui.workspace]
+# macOS only (ignored on other platforms), live: translucent terminal and editor backgrounds. Omit opacity to use the workspace theme's value.
+# Opacity: 10-100 percent.
+# opacity = 95
+# Blur behind a translucent workspace: "theme", "on" or "off".
+blur = "theme"
+
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
 # On macOS, cmd is Command and alt/option is Option. Example:

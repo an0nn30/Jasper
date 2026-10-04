@@ -17,6 +17,8 @@ import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.bootstrap.StartupResources;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -103,7 +105,11 @@ public final class ApplicationBootstrap {
                 service.close(); System.exit(0); return;
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
-                history -> createApplication(service, history, dirs, options, startup.themeProblems()), application -> {
+                history -> {
+                    JasperApplication application = createApplication(service, history, dirs, options, startup.themeProblems());
+                    exceptions.forwardTo(application::unexpected);
+                    return application;
+                }, application -> {
                     if (!standalone)
                         application.loginItems(loginItemReconciler(enabled -> reconcileLoginItem(enabled, appPath, home)));
                     if (!residentRole(options, resident)) return null;
@@ -195,11 +201,9 @@ public final class ApplicationBootstrap {
 
     static UnexpectedExceptions installUnexpectedExceptionHandler() {
         synchronized (ApplicationBootstrap.class) {
-            Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
-            Thread.UncaughtExceptionHandler installed = (thread, failure) ->
-                LOG.log(System.Logger.Level.ERROR, "Unexpected application failure", failure);
-            Thread.setDefaultUncaughtExceptionHandler(installed);
-            return new UnexpectedExceptions(previous, installed);
+            var exceptions = new UnexpectedExceptions(Thread.getDefaultUncaughtExceptionHandler());
+            Thread.setDefaultUncaughtExceptionHandler(exceptions.installed);
+            return exceptions;
         }
     }
 
@@ -217,19 +221,30 @@ public final class ApplicationBootstrap {
 
     static final class UnexpectedExceptions implements AutoCloseable {
         private final Thread.UncaughtExceptionHandler previous;
-        private final Thread.UncaughtExceptionHandler installed;
+        /** The handler this installed; it logs each failure, then forwards it. */
+        final Thread.UncaughtExceptionHandler installed = this::uncaught;
+        private volatile BiConsumer<Thread, Throwable> forward = (thread, failure) -> { };
         private boolean closed;
 
-        private UnexpectedExceptions(Thread.UncaughtExceptionHandler previous,
-                                     Thread.UncaughtExceptionHandler installed) {
-            this.previous = previous;
-            this.installed = installed;
+        private UnexpectedExceptions(Thread.UncaughtExceptionHandler previous) { this.previous = previous; }
+
+        /** Where each failure goes after it is logged: the application records it as an incident. Any thread. */
+        void forwardTo(BiConsumer<Thread, Throwable> sink) { forward = Objects.requireNonNull(sink, "sink"); }
+
+        private void uncaught(Thread thread, Throwable failure) {
+            LOG.log(System.Logger.Level.ERROR, "Unexpected application failure", failure);
+            try { forward.accept(thread, failure); }
+            catch (RuntimeException | Error unrecorded) {
+                // Never back into this handler: a failure while recording is only logged.
+                LOG.log(System.Logger.Level.ERROR, "An unexpected failure could not be recorded", unrecorded);
+            }
         }
 
         @Override public void close() {
             synchronized (ApplicationBootstrap.class) {
                 if (closed) return;
                 closed = true;
+                forward = (thread, failure) -> { };
                 if (Thread.getDefaultUncaughtExceptionHandler() == installed) {
                     Thread.setDefaultUncaughtExceptionHandler(previous);
                 }

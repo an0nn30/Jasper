@@ -59,45 +59,47 @@ class AppContractTest extends PluginContractTest {
 
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, new CopyOnWriteArrayList<>());
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited) {
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, problems, edited, new CopyOnWriteArrayList<>());
     }
 
     /** As above; configuration problems land in {@code diagnostics}, and a file's reload or save clears that file's. */
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, PluginRuntime.ShellProfiles.NONE);
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, problems, edited, diagnostics, PluginRuntime.ShellProfiles.NONE);
     }
 
     /** As above, with the shell profiles plugins list and open. */
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, new CopyOnWriteArrayList<>());
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, problems, edited, diagnostics, profiles, new CopyOnWriteArrayList<>());
     }
 
     /** As above; the web addresses plugins ask to open land in {@code browsed}. */
     static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, List<String> problems, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
                            List<java.net.URI> browsed) {
-        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, profiles, browsed, null);
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, new NotificationsFixture(problems), edited, diagnostics, profiles, browsed, null,
+            GlassSource.NONE);
     }
 
     private static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           TerminalRegistry terminals, NotificationsFixture notifications, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles,
-                           List<java.net.URI> browsed, WorkspaceAppearanceFixture appearance) {
+                           List<java.net.URI> browsed, WorkspaceAppearanceFixture appearance, GlassSource glass) {
         var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
-            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles,
-            browsed::add, appearance == null ? null : appearance::current, appearance == null ? null : appearance::subscribe)));
+            notifications.host, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles,
+            browsed::add, appearance == null ? null : appearance::current, appearance == null ? null : appearance::subscribe,
+            glass)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -136,14 +138,20 @@ class AppContractTest extends PluginContractTest {
                 }, () -> {}));
             return id;
         }));
-        List<String> notices = new CopyOnWriteArrayList<>();
+        var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
         List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
         List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
         var appearance = onEdtValue(WorkspaceAppearanceFixture::new);
-        PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
-            diagnostics, shells.source(), browsed, appearance);
+        double[] opacity = {1.0};
+        List<Runnable> glassListeners = new java.util.ArrayList<>();
+        var glass = new GlassSource(component -> opacity[0], listener -> {
+            glassListeners.add(listener);
+            return new dev.jasper.app.lifecycle.Subscription(() -> glassListeners.remove(listener));
+        });
+        PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notifications, edited,
+            diagnostics, shells.source(), browsed, appearance, glass);
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
@@ -246,7 +254,8 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public List<String> panels() {
                 return onEdtValue(() -> contributions.panels().stream()
-                    .map(panel -> panel.id() + "|" + panel.title() + "|" + panel.defaultRegion()
+                    .map(panel -> panel.id() + "|" + panel.title() + "|" + panel.defaultSlot().side()
+                        + (panel.defaultSlot().split() ? "+split" : "")
                         + (panel.namedToggle() ? "|" + panel.toggleActionId() : "")).toList());
             }
             @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) {
@@ -297,6 +306,14 @@ class AppContractTest extends PluginContractTest {
             @Override public void setWorkspace(dev.jasper.sdk.Variant variant, dev.jasper.sdk.ui.WorkspacePalette palette,
                     dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {
                 onEdt(() -> appearance.set(variant, palette, editor, syntax));
+            }
+            @Override public void setWorkspaceOpacity(double next) {
+                // Like a window's glass: listeners hear only real changes, on the UI thread.
+                onEdt(() -> {
+                    if (opacity[0] == next) return;
+                    opacity[0] = next;
+                    for (Runnable listener : List.copyOf(glassListeners)) listener.run();
+                });
             }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) {
                 onEdt(() -> appearance.setVariant(variant));
@@ -367,7 +384,10 @@ class AppContractTest extends PluginContractTest {
                             onEdt(() -> { var scope = scope(scopeId); scope.execute(row(scopeId, rowId), verb(scope, verbId), context(windowId, paneIdOrNull)); });
                         }
                         @Override public List<String> paletteOpens() { return List.copyOf(opens); }
-                        @Override public List<String> notices() { return List.copyOf(notices); }
+                        @Override public List<String> notifications() { return notifications.lines(); }
+                        @Override public List<String> notificationGroups() { return notifications.groups(); }
+                        @Override public boolean runNotificationAction(String title, String label) { return notifications.runAction(title, label); }
+                        @Override public boolean clickNotification(String title) { return notifications.click(title); }
                         @Override public List<Path> openedInEditor() { return List.copyOf(edited); }
                         @Override public List<java.net.URI> browsed() { return List.copyOf(browsed); }
             @Override public void close() { stopAll(); flush(); }
