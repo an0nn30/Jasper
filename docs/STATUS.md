@@ -2,9 +2,9 @@
 
 ## Current state — 2026-10-04
 
-- **Theme engine/UI kit overhaul: draft spec awaiting user review** (2026-10-04), on
+- **Theme engine/UI kit overhaul: spec approved; three plans awaiting review** (2026-10-04), on
   `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.
-  [Draft specification](superpowers/specs/2026-10-04-jasper-theme-engine-design.md);
+  [Approved specification](superpowers/specs/2026-10-04-jasper-theme-engine-design.md);
   [preserved source and nine visual references](design/theme-engine/reference/README.md).
   Brainstorming decisions: standalone engine/kit module; evolve the existing engine; fixed design
   geometry with theme colors and retained user font/scaling settings; mocks prevail for depicted
@@ -14,9 +14,17 @@
   updated with the user's additional panel reference: inline title/counts, mixed-content rows with
   protocol chips and interactive switches, persistent detail/settings footers, and full-body empty
   states with centered button/dropdown actions are required kit and SDK capabilities. Plan 1 must prove
-  all four panel compositions in its gallery; Plan 3 matches the depicted panel areas. The spec is
-  not yet approved; plans and implementation have not started. Next: user reviews the written spec,
-  then write three detailed plans. No workflow deviation. Fresh headless baseline `./gradlew check`
+  all four panel compositions in its gallery; Plan 3 matches the depicted panel areas. The user approved
+  the written spec with “alrighty, lets get started”. Three plans are now written for review:
+  [1: engine and kit](superpowers/plans/2026-10-04-theme-engine-1-engine-and-kit.md),
+  [2: consumer/SDK migration](superpowers/plans/2026-10-04-theme-engine-2-consumer-migration.md),
+  [3: surface composition](superpowers/plans/2026-10-04-theme-engine-3-surface-refactor.md), with
+  [shared API contracts](superpowers/plans/2026-10-04-theme-engine-contracts.md). The plans cover 14/12/11
+  task groups, preserve the per-task implementer/reviewer workflow, and propose the coordinated SDK
+  0.15.0 boundary. Planning self-review checked source paths, cross-plan signatures, spec coverage,
+  and panel capability gaps (including status dots and menu buttons). Product implementation has not
+  started. Next: user reviews the plans, then execute Plan 1 in this worktree. No workflow deviation.
+  The prior fresh headless baseline `./gradlew check`
   passed all 91 tasks: **8,743 tests, 0 failures, 0 errors, 6 skipped**. Documentation link and
   placeholder checks passed; source attachments are preserved unchanged. No GUI or AOT training.
 

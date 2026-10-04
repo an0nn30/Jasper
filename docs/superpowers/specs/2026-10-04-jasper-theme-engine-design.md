@@ -1,7 +1,8 @@
 # Jasper theme engine and UI kit overhaul
 
-Status: **Draft for user review.** Architecture and delivery boundaries agreed in brainstorming on
-2026-10-04; this written specification has not yet been approved. Implementation has not started.
+Status: **Approved for implementation planning on 2026-10-04.** The user approved the written
+specification, including the additional plugin-panel reference, with “alrighty, lets get started”.
+The three implementation plans are written and awaiting review; product implementation has not started.
 
 Branch: `codex/theme-engine`, based on `192443b3`.
 
@@ -406,7 +407,12 @@ and screen-reader interaction are recorded as user-run acceptance, distinct from
 
 ## 11. Review and next step
 
-This document is the review artifact. No implementation plans or product changes have been made yet.
-After the user approves this written specification, write three separate detailed plans with complete
+This specification is approved. Write three separate detailed plans with complete
 steps, meaningful tests, commit boundaries, review tasks and runnable exit criteria. Plan deviations
 must be recorded in each plan's status banner and `docs/STATUS.md`.
+
+Written plans: [engine and kit](../plans/2026-10-04-theme-engine-1-engine-and-kit.md),
+[consumer migration](../plans/2026-10-04-theme-engine-2-consumer-migration.md), and
+[surface refactoring](../plans/2026-10-04-theme-engine-3-surface-refactor.md).
+Their [shared contract appendix](../plans/2026-10-04-theme-engine-contracts.md) records exact
+cross-task APIs, defaults and compatibility decisions. Plan review precedes product implementation.
