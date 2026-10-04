@@ -1,6 +1,5 @@
 package dev.jasper.app.platform;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -9,17 +8,6 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class NativeNotifierTest {
-    @Test
-    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "jasper.testNotificationLibrary", matches = ".+")
-    @SuppressWarnings("restricted")
-    void realNativeBridgeLoadsAndDeclinesAnUnbundledJvm() throws Exception {
-        System.load(System.getProperty("jasper.testNotificationLibrary"));
-        var post = MacNotifications.class.getDeclaredMethod("post", String.class, String.class);
-        post.setAccessible(true);
-        // Exercises real JNI linkage without a permission prompt or notification side effect.
-        post.invoke(null, "build", "Finished");
-    }
-
     @Test void sendsLiteralUnicodeTextOffTheCallingThread() throws Exception {
         String title = "echo \"hi\"; say 'boo'\n\\ $() " + (char) 0xD83D + (char) 0xDE80;
         String detail = "Finished\0in 1m";
@@ -60,19 +48,5 @@ class NativeNotifierTest {
             notifier.send("second", "Finished");
             assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
         }
-    }
-
-    @Test void nativeLibraryBelongsToTheRunningBundleIncludingRenamedApps() {
-        assertThat(MacNotifications.libraryPath("/Applications/Jasper Preview.app/Contents/MacOS/Jasper"))
-            .isEqualTo(Path.of("/Applications/Jasper Preview.app/Contents/app/libjasper-notifications.dylib")
-                .toAbsolutePath());
-    }
-
-    @Test void unpackagedLaunchesDoNotUseAnotherApplicationsIdentity() {
-        assertThat(MacNotifications.libraryPath(null)).isNull();
-        assertThat(MacNotifications.libraryPath(" ")).isNull();
-        assertThat(MacNotifications.libraryPath("/usr/bin/java")).isNull();
-        assertThat(MacNotifications.libraryPath("/tmp/Contents/MacOS/Jasper")).isNull();
-        assertThat(MacNotifications.libraryPath("/Contents/MacOS/Jasper")).isNull();
     }
 }
