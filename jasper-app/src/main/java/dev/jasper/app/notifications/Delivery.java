@@ -1,20 +1,34 @@
 package dev.jasper.app.notifications;
 
 /**
- * Where a posted notification goes (spec section 7). Pure, so the rule is testable without a window. While Jasper is
- * in the background an auto-hiding card would be stale on return, so it only enters history; a sticky one waits; and
- * the operating system shows either, which is how a person away from Jasper hears of it. With no window open the card
- * waits for the next one and the operating system shows it meanwhile. While Jasper starts or a window opens the card
- * waits for that window and the operating system is left alone, since the card is about to show.
+ * Where a posted notification goes (spec section 7). Pure, so the rule is testable without a window. By presence:
+ * <ul>
+ *   <li>focused: a card shows now;
+ *   <li>in the background: an auto-hiding card would be stale on return, so it only enters history; a sticky one waits
+ *       for Jasper to be focused; and the operating system shows either, which is how a person away from Jasper hears
+ *       of it;
+ *   <li>no window yet (before the first window of a start, while one opens, or until it is activated): both wait for
+ *       the window to be focused, so a failure raised while it opens shows its card, and the operating system is left
+ *       alone, since the card is about to show;
+ *   <li>idle (a resident Jasper with no window open and none being opened, which can last for hours): an auto-hiding
+ *       card goes to history, as in the background; only a sticky one waits for the next window; and the operating
+ *       system shows either, as in the background.
+ * </ul>
  */
 public final class Delivery {
     private Delivery() {}
 
-    /**
-     * Whether a Jasper window is focused; Jasper is behind another application; Jasper runs with every window closed
-     * (a resident Jasper); or Jasper is starting, or opening a window that has not been activated yet.
-     */
-    public enum Presence { FOCUSED, BACKGROUND, NO_WINDOW, OPENING }
+    /** Where Jasper stands for notifications. */
+    public enum Presence {
+        /** A Jasper window is focused. */
+        FOCUSED,
+        /** Jasper is behind another application. */
+        BACKGROUND,
+        /** No window has been focused yet: before the first window of a start, while one opens, or until it is activated. */
+        NO_WINDOW,
+        /** A resident Jasper with no window open and none being opened; it may stay that way for hours. */
+        IDLE
+    }
 
     /**
      * @param record whether it enters the history
@@ -37,14 +51,13 @@ public final class Delivery {
             case HISTORY -> Outcome.HISTORY;
             case CARD -> switch (presence) {
                 case FOCUSED -> Outcome.CARD;
-                case BACKGROUND -> Outcome.HISTORY_AND_SYSTEM;
-                case NO_WINDOW -> Outcome.PENDING_AND_SYSTEM;
-                case OPENING -> Outcome.PENDING;
+                case BACKGROUND, IDLE -> Outcome.HISTORY_AND_SYSTEM;
+                case NO_WINDOW -> Outcome.PENDING;
             };
             case STICKY -> switch (presence) {
                 case FOCUSED -> Outcome.CARD;
-                case BACKGROUND, NO_WINDOW -> Outcome.PENDING_AND_SYSTEM;
-                case OPENING -> Outcome.PENDING;
+                case BACKGROUND, IDLE -> Outcome.PENDING_AND_SYSTEM;
+                case NO_WINDOW -> Outcome.PENDING;
             };
         };
     }

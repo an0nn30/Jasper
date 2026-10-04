@@ -12,7 +12,7 @@ Build with JBR SDK 25 and the wrapper; these commands do not launch the GUI:
 ./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage
 ```
 
-Copy the entire verified image outside `jasper-app/build/packaging` before changing terminal source. Keep a revision label, command arguments and SHA-256 of the all Jasper JARs present in that image (app, terminal, and Buddy in current builds) alongside the results. Never label a dirty working tree as an exact commit. A later package build replaces its build outputs.
+Copy the entire verified image outside `jasper-app/build/packaging` before changing terminal source. Keep a revision label, command arguments and SHA-256 of the all Jasper JARs present in that image (app, terminal, and Buddy in current builds) alongside the results. Never label a dirty working tree as an exact commit. A later package build replaces its build outputs. Copy with `ditto`, as below: it keeps modification times, so a trained AOT cache stays valid; `cp -R` does not.
 
 macOS example (replace paths and revision with the actual preserved baseline):
 
@@ -115,3 +115,29 @@ No profiler dependency, GC calls, logging installation or heap-size override is 
 Use the same preserved image runtime architecture, exact options, seed/bytes, window/display/scaling, fonts, scrollback, pane visibility, power state and quiet-machine conditions. Run at least three independent JVM invocations per baseline and final image for cold-start comparisons, keeping each JSON and companion. `--repeat 3` supplies within-JVM repetitions, useful for warm/retention trends, but cannot make later repetitions cold. The first run's cold scope is explicitly "first application window in this JVM; payload prepared by exited child"; later runs are new windows in a warm JVM. Compare matched configurations and phase samples, summarize medians/ranges, and retain failed runs rather than silently dropping them.
 
 Native baseline execution belongs to the controller after tooling review. Preserve its package before terminal hardening; then rebuild/verify the final package and repeat equivalent commands. Investigate material regressions in stream throughput, EDT delay, painting, memory peak/settle or session cleanup. The 35/45 MB/s floor/target applies to the full one-pane throughput workload, not summed multi-pane memory throughput. Memory wins require comparable measured results and acceptable responsiveness/rendering; headless allocation reasoning alone is not a savings claim. Windows native acceptance, physical rendering, and the daily-use gate remain separate human checks.
+
+## Start-up benchmark
+
+`tools/benchmarks/run-macos.sh /absolute/Jasper.app startup REVISION /absolute/result.json [--mode cold|warm] [--runs N]
+[--prime N] [--real-home] [--timeout-seconds N]` launches a packaged image through LaunchServices, like a Dock click,
+reads each launch's start-up trace and quits it. Cold mode measures fresh launches; warm mode starts a resident Jasper
+with `--background`, records its idle memory (`ps` RSS, two seconds after it settles), then measures the window a
+reopen (`open -a`) produces. By default every run of one invocation shares one isolated home
+under `/tmp` (`-Duser.home`), so the user's configuration, logs and login items are untouched; one priming launch is
+discarded. `--real-home` measures the user's own setup and warns when the terminal program is tmux or screen, whose
+servers keep a session per launch. The benchmark refuses to start while any Jasper is running, and while it runs it stops every Jasper process it finds
+when a run ends, so do not use Jasper during a run. It opens windows: ask
+the user before each run. The 2026-10-02 baseline is [recorded here](benchmarks/2026-10-02-startup-baseline.md).
+
+A run counts as `ok` only when its trace has `OUTPUT_PAINTED` (cold) or the reopen window's `OUTPUT_PAINTED` (warm);
+a run that settled without it is `incomplete`, one that never produced a trace is `timeout` and one whose Jasper would
+not exit is `did-not-exit`. Only `ok` runs feed the medians; any other outcome makes the whole report `incomplete` and
+the exit status 1. Every Jasper the benchmark started is stopped when it finishes, on an error and on Ctrl-C. The JSON
+at the output path holds each run's outcome, JVM status, phases and milliseconds from the click, plus a summary of
+count, median, minimum and maximum per milestone; a `.json.md` companion lists the same summary as a table.
+
+Jasper is resident by default on macOS and Windows since start-up Plan 4, so a Jasper usually runs: on macOS choose
+Quit Jasper Completely in its menu bar item before the benchmark. Plan 4's warm-path results are [recorded here](benchmarks/2026-10-02-startup-plan4.md).
+Cold numbers measured from Plan 4 on include residency (for example the handoff endpoint is bound before the first
+window), so they are not strictly comparable with the Plan 1 and Plan 2 baselines; the AOT training launch stays
+non-resident.

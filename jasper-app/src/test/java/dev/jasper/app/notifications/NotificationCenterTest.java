@@ -74,12 +74,36 @@ class NotificationCenterTest {
         assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "CardRequested");
     }
 
-    @Test void cardsPostedWhileJasperOpensWaitForTheFirstFocus() {
+    @Test void cardsPostedWithNoWindowWaitForTheFirstFocus() {
         var center = center();
-        presence = Delivery.Presence.OPENING;
+        presence = Delivery.Presence.NO_WINDOW;
         center.post(request(CARDS, "early"));
         center.focusReturned();
         assertThat(kinds()).containsExactly("Upserted", "CardRequested");
+    }
+
+    @Test void cardsPostedWhileIdleOnlyEnterHistoryAndNeverShowLater() {
+        var center = center();
+        presence = Delivery.Presence.IDLE;
+        UUID id = center.post(request(CARDS, "while nobody was looking")).orElseThrow();
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested");
+        presence = Delivery.Presence.FOCUSED;
+        center.focusReturned();
+        assertThat(kinds()).as("history only: no card when a window next has focus")
+            .containsExactly("Upserted", "SystemRequested");
+        assertThat(center.history()).extracting(Notification::id).containsExactly(id);
+        assertThat(center.unread()).isEqualTo(1);
+    }
+
+    @Test void stickyCardsPostedWhileIdleWaitForTheNextFocus() {
+        var center = center();
+        presence = Delivery.Presence.IDLE;
+        center.post(request(STICKY, "needs you"));
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested");
+        presence = Delivery.Presence.FOCUSED;
+        center.focusReturned();
+        center.focusReturned();
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "CardRequested");
     }
 
     @Test void aRepeatThatShowsItsCardNoLongerWaitsForFocus() {
@@ -367,6 +391,13 @@ class NotificationCenterTest {
         });
     }
 
+    @Test void presenceIsWhatDeliverySees() {
+        var center = center();
+        assertThat(center.presence()).isEqualTo(Delivery.Presence.FOCUSED);
+        presence = Delivery.Presence.BACKGROUND;
+        assertThat(center.presence()).isEqualTo(Delivery.Presence.BACKGROUND);
+    }
+
     /**
      * History keeps an expired entry's text and action labels, never its poster's callbacks: those capture the poster
      * (a closed pane and its window, a stopped plugin), which must not stay reachable for as long as the entry does.
@@ -394,21 +425,30 @@ class NotificationCenterTest {
         assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "Upserted", "SystemRequested", "Upserted");
     }
 
-    @Test void withNoWindowOpenTheOperatingSystemHearsAndTheCardStillWaits() {
+    /** A resident Jasper with every window closed: the card goes to history, the sticky one waits, and both are shown. */
+    @Test void whileIdleCardAndStickyGroupsAskTheOperatingSystem() {
+        var center = center();
+        presence = Delivery.Presence.IDLE;
+        center.post(request(CARDS, "c"));
+        center.post(request(STICKY, "s"));
+        center.post(request(QUIET, "q"));
+        assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "Upserted", "SystemRequested", "Upserted");
+        presence = Delivery.Presence.FOCUSED;
+        center.focusReturned();
+        assertThat(kinds()).as("only the sticky card waited for the next window").containsExactly("Upserted",
+            "SystemRequested", "Upserted", "SystemRequested", "Upserted", "CardRequested");
+    }
+
+    /** Before the first window is focused, or while one opens, the card is about to show: the system is left alone. */
+    @Test void withNoWindowYetNothingGoesToTheOperatingSystem() {
         var center = center();
         presence = Delivery.Presence.NO_WINDOW;
         center.post(request(CARDS, "c"));
-        assertThat(kinds()).containsExactly("Upserted", "SystemRequested");
-        center.focusReturned();
-        assertThat(kinds()).containsExactly("Upserted", "SystemRequested", "CardRequested");
-    }
-
-    @Test void whileJasperOpensNothingGoesToTheOperatingSystem() {
-        var center = center();
-        presence = Delivery.Presence.OPENING;
-        center.post(request(CARDS, "c"));
         center.post(request(STICKY, "s"));
         assertThat(kinds()).containsExactly("Upserted", "Upserted");
+        presence = Delivery.Presence.FOCUSED;
+        center.focusReturned();
+        assertThat(kinds()).containsExactly("Upserted", "Upserted", "CardRequested", "CardRequested");
     }
 
     /** A listener that reads the entry as it is posted must not leave the operating system showing it. */

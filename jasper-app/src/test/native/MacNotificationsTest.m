@@ -1,8 +1,10 @@
 // Headless: a fake center exercises production content, identifiers, withdrawal and the click
 // callback without requesting permission, registering an application, delivering a banner, or
-// creating a window.
+// creating a window; a fake JVM exercises binding the callback and handing a click to Java.
 #import "../../main/native/MacNotifications.m"
 #include <assert.h>
+#include <stdarg.h>
+#include <string.h>
 
 @interface TestNotificationCenter : NSObject
 @property NSError *deliveryError;
@@ -81,6 +83,61 @@ static void ReleaseCharacters(JNIEnv *env, jstring string, const jchar *characte
     released = YES;
 }
 
+// A JVM and a JNIEnv just large enough for bind() and a click: they record what the bridge asks of them.
+static JavaVM fakeVm;
+static JNIEnv fakeEnv;
+static BOOL methodExists;
+static int resolved, cleared, attached, deleted;
+static jclass clickedClass;
+static jmethodID clickedMethod;
+static NSString *clickedWith;
+static jclass const bridgeClass = (jclass)(uintptr_t)0x10;
+static jobject const bridgeGlobal = (jobject)(uintptr_t)0x20;
+static jmethodID const clickedId = (jmethodID)(uintptr_t)0x30;
+static jstring const javaIdentifier = (jstring)(uintptr_t)0x40;
+
+static jint JNICALL FakeGetJavaVM(JNIEnv *env, JavaVM **vm) {
+    *vm = &fakeVm;
+    return JNI_OK;
+}
+static jmethodID JNICALL FakeGetStaticMethodID(JNIEnv *env, jclass type, const char *name, const char *signature) {
+    resolved++;
+    assert(type == bridgeClass);
+    assert(strcmp(name, "clicked") == 0 && strcmp(signature, "(Ljava/lang/String;)V") == 0);
+    return methodExists ? clickedId : NULL; // A missing method leaves NoSuchMethodError pending.
+}
+static jobject JNICALL FakeNewGlobalRef(JNIEnv *env, jobject object) {
+    assert(object == bridgeClass);
+    return bridgeGlobal;
+}
+static void JNICALL FakeExceptionClear(JNIEnv *env) { cleared++; }
+static jboolean JNICALL FakeExceptionCheck(JNIEnv *env) { return JNI_FALSE; }
+static jstring JNICALL FakeNewString(JNIEnv *env, const jchar *characters, jsize length) {
+    clickedWith = [NSString stringWithCharacters:characters length:(NSUInteger)length];
+    return javaIdentifier;
+}
+static void JNICALL FakeCallStaticVoidMethod(JNIEnv *env, jclass type, jmethodID method, ...) {
+    va_list arguments;
+    va_start(arguments, method);
+    assert(va_arg(arguments, jstring) == javaIdentifier);
+    va_end(arguments);
+    clickedClass = type;
+    clickedMethod = method;
+}
+static void JNICALL FakeDeleteLocalRef(JNIEnv *env, jobject object) {
+    assert(object == javaIdentifier);
+    deleted++;
+}
+static jint JNICALL FakeGetEnv(JavaVM *vm, void **env, jint version) {
+    assert(vm == &fakeVm && version == JNI_VERSION_1_8);
+    return JNI_EDETACHED; // The delegate runs on a thread macOS owns.
+}
+static jint JNICALL FakeAttachAsDaemon(JavaVM *vm, void **env, void *arguments) {
+    attached++;
+    *env = &fakeEnv;
+    return JNI_OK;
+}
+
 int main(void) {
     @autoreleasepool {
         struct JNINativeInterface_ functions = {0};
@@ -157,6 +214,44 @@ int main(void) {
 
         // With no JVM loaded the bridge drops a click instead of calling into nothing.
         JasperDeliverClick(identifier);
+
+        struct JNINativeInterface_ jni = {0};
+        jni.GetJavaVM = FakeGetJavaVM;
+        jni.GetStaticMethodID = FakeGetStaticMethodID;
+        jni.NewGlobalRef = FakeNewGlobalRef;
+        jni.ExceptionClear = FakeExceptionClear;
+        jni.ExceptionCheck = FakeExceptionCheck;
+        jni.NewString = FakeNewString;
+        jni.CallStaticVoidMethod = FakeCallStaticVoidMethod;
+        jni.DeleteLocalRef = FakeDeleteLocalRef;
+        fakeEnv = &jni;
+        struct JNIInvokeInterface_ invocation = {0};
+        invocation.GetEnv = FakeGetEnv;
+        invocation.AttachCurrentThreadAsDaemon = FakeAttachAsDaemon;
+        fakeVm = &invocation;
+
+        // A Java class without clicked(String): nothing binds, the pending error is cleared, and a click is dropped.
+        methodExists = NO;
+        assert(Java_dev_jasper_app_platform_MacNotifications_bind(&fakeEnv, bridgeClass) == JNI_FALSE);
+        assert(cleared == 1);
+        assert(!JasperVM && !JasperBridge && !JasperClicked);
+        JasperDeliverClick(identifier);
+        assert(attached == 0);
+
+        // The real class binds once; a click then reaches clicked(String) with the identifier, on a daemon thread.
+        methodExists = YES;
+        assert(Java_dev_jasper_app_platform_MacNotifications_bind(&fakeEnv, bridgeClass) == JNI_TRUE);
+        assert(JasperVM == &fakeVm && JasperBridge == bridgeGlobal && JasperClicked == clickedId);
+        assert(Java_dev_jasper_app_platform_MacNotifications_bind(&fakeEnv, bridgeClass) == JNI_TRUE);
+        assert(resolved == 2); // Bound already: the second call resolves nothing.
+        JasperDeliverClick(identifier);
+        assert(attached == 1);
+        assert(clickedClass == bridgeGlobal && clickedMethod == clickedId);
+        assert([clickedWith isEqualToString:identifier]);
+        assert(deleted == 1);
+        JasperVM = NULL;
+        JasperBridge = NULL;
+        JasperClicked = NULL;
 
         // A plain headless process must return before touching JNI or notification services.
         Java_dev_jasper_app_platform_MacNotifications_post(NULL, NULL, NULL, NULL, NULL);

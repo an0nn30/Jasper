@@ -40,6 +40,20 @@ Linux, a stale resident remover, `raiseFor` and a click through the notifier int
 `NotificationRequest`'s ten-argument copies; expected warnings on test stderr. `./gradlew check --continue`:
 **8,497 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
 
+Merged with main e11961c8: presence follows main's IDLE/NO_WINDOW model (the user's choice), with banners in
+BACKGROUND and IDLE; the notification bridge lives in main's single libjasper-macos bridge, its click callback bound by
+an explicit bind() rather than JNI_OnLoad; `ResidentTray` owns the Windows icon for residency and balloons alongside
+main's macOS menu bar item. Interpretations 1 and 2 below are superseded by main's model: `Delivery.Presence` is
+`FOCUSED`, `BACKGROUND`, `NO_WINDOW` (no window focused yet: before the first window of a start, while one opens,
+until it is activated) and `IDLE` (a resident Jasper with no window open or opening, once start-up has settled through
+main's `startupSettled`); the operating system is asked for `CARD` and `STICKY` in `BACKGROUND` and `IDLE`, never in
+`NO_WINDOW`; a `CARD` in `IDLE` goes to history, as on main. `OPENING`, the `settled` flag and the Task 3 review's
+`JNI_OnLoad` that failed the library load are gone: a failed `bind()` sends no banners (logged once) and leaves the Dock
+bridge working. `WindowsTray` became `ResidentTray`'s balloon state, and `SystemTray.isSupported()` no longer runs at
+bootstrap; the native harness now binds through a fake JVM and delivers a click past the no-VM early return.
+`NotificationCenter.presence()` is back for main's `JasperApplicationBackgroundTest`. After the merge,
+`./gradlew check --continue`: **8,712 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
+
 **Goal:** While Jasper is not focused, its notifications appear as the operating system's own (macOS banners, Windows
 tray balloons, Linux `notify-send`), a click on one takes you to what it is about, and reading it in Jasper withdraws it.
 

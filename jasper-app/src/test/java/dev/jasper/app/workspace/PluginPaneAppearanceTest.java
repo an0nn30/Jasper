@@ -85,7 +85,7 @@ class PluginPaneAppearanceTest {
             contributions.content().open("fixture", "pane", "Pane", owner.id(), panel);
             themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             assertThat(list.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION));
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
+            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());
             assertThat(list.getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SURFACE_SUNKEN));
             assertThat(list.getSelectionBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.SELECTION_INACTIVE));
             assertThat(((java.util.Map<?, ?>) list.getClientProperty("Jasper.workspaceStyle")).get("selectionBackground"))
@@ -107,7 +107,7 @@ class PluginPaneAppearanceTest {
             removed.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
                 if (armed[0]) { armed[0] = false; contributions.content().remove(entry); }
             });
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
+            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());
             assertThat(contributions.content().entries()).doesNotContain(entry);
             assertThat(removed.getClientProperty("Jasper.zone")).isNull();
             assertThat(removed.getClientProperty("Jasper.workspaceTheme")).isNull();
@@ -136,7 +136,7 @@ class PluginPaneAppearanceTest {
             moved.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
                 if (armed[0]) { armed[0] = false; contributions.content().move(entry, true); }
             });
-            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), Theme.DARCULA, UiFontConfig.defaults());
+            themes.configure(Theme.JASPER_LIGHT, new WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());
             assertThat(entry.window()).isEqualTo(detached.id());
             assertThat(moved.getClientProperty("Jasper.zone")).isEqualTo("workspace");
             assertThat(moved.getClientProperty("Jasper.workspaceTheme")).isNull();
@@ -177,7 +177,7 @@ class PluginPaneAppearanceTest {
 
     @Test void completeChromeWithoutOptionalToolWindowKeyStillStylesHostedPane() throws Exception {
         edt(() -> {
-            var base = Theme.DARCULA.source().document();
+            var base = dev.jasper.app.appearance.ThemeFixtures.DARCULA.source().document();
             var ui = new java.util.LinkedHashMap<>(base.ui());
             ui.remove("ToolWindow.background");
             ui.put("Panel.background", "#17232f");

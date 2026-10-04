@@ -123,19 +123,20 @@ public final class SystemNotifier implements AutoCloseable {
      *
      * @param osName the {@code os.name} property
      * @param dirs where Jasper keeps the icon {@code notify-send} shows
-     * @param tray Jasper's Windows notification-area icon, which a resident Jasper shares
+     * @param tray Jasper's icon outside its windows, the one the resident indicator shows: on Windows its icon carries the
+     *     balloons
      */
-    public static SystemNotifier forThisPlatform(String osName, AppDirs dirs, WindowsTray tray) {
+    public static SystemNotifier forThisPlatform(String osName, AppDirs dirs, ResidentTray tray) {
         String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
         if (os.startsWith("mac"))
-            return MacNotifications.libraryPath(System.getProperty("jpackage.app-path")) == null ? none() : onWorker(SystemNotifier::mac);
+            return MacNative.libraryPath(System.getProperty("jpackage.app-path")) == null ? none() : onWorker(SystemNotifier::mac);
         if (os.startsWith("linux"))
             return onWorker(clicked -> LinuxNotifications.backend(dirs.notificationIcon(), clicked));
-        if (os.startsWith("windows")) return onWorker(clicked -> WindowsTray.backend(tray, clicked));
+        if (os.startsWith("windows")) return onWorker(clicked -> ResidentTray.backend(tray, clicked));
         return none();
     }
 
-    /** macOS: the UserNotifications bridge, which hands a click's id to {@code clicked}. */
+    /** macOS: the UserNotifications bridge in {@code libjasper-macos.dylib}, which hands a click's id to {@code clicked}. */
     static Backend mac(Consumer<String> clicked) {
         MacNotifications.onClick(clicked);
         return new Backend(message -> MacNotifications.send(message.id(), message.title(), message.body()),

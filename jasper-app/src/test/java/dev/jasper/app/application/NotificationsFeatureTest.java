@@ -128,7 +128,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void notificationsFromBeforeTheFirstWindowShowWhenItIsFocused() {
-        presence = Delivery.Presence.OPENING;
+        presence = Delivery.Presence.NO_WINDOW;
         var feature = new NotificationsFeature(center, contributions);
         feature.error("Startup problem", "details");
         center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING, "config.toml has warnings"));
@@ -141,8 +141,8 @@ class NotificationsFeatureTest {
     }
 
     @Test void aCardPostedWhileAWindowOpensWaitsForItsFirstActivation() {
-        // The window is attached but the native activation event has not arrived yet: the application reports OPENING.
-        presence = Delivery.Presence.OPENING;
+        // The window is attached but the native activation event has not arrived yet: the application reports NO_WINDOW.
+        presence = Delivery.Presence.NO_WINDOW;
         var feature = new NotificationsFeature(center, contributions);
         var window = window();
         feature.attach(window);
@@ -152,6 +152,23 @@ class NotificationsFeatureTest {
         presence = Delivery.Presence.FOCUSED;
         feature.activated(window);
         assertThat(feature.layer(window.id()).showing()).hasSize(1);
+    }
+
+    @Test void anErrorPostedWhileResidentAndIdleIsHistoryOnlyButAConfigProblemWaitsForTheNextWindow() {
+        presence = Delivery.Presence.IDLE;
+        var feature = new NotificationsFeature(center, contributions);
+        feature.error("Background plugin failed", "details");
+        UUID configProblem = center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING,
+            "config.toml has warnings")).orElseThrow();
+        assertThat(center.history()).hasSize(2);
+        presence = Delivery.Presence.NO_WINDOW;
+        var window = window();
+        feature.attach(window);
+        assertThat(feature.layer(window.id()).showing()).isEmpty();
+        presence = Delivery.Presence.FOCUSED;
+        feature.activated(window);
+        assertThat(feature.layer(window.id()).showing())
+            .as("only the sticky one waited; the ordinary card is in the history").containsExactly(configProblem);
     }
 
     @Test void dismissCardsClosesTheInvokingWindowsCardsAndReadsThem() {

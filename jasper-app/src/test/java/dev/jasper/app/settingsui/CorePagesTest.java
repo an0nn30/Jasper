@@ -53,7 +53,7 @@ class CorePagesTest {
             .contains(CoreSettings.UI_FONT_FAMILY, CoreSettings.UI_FONT_SIZE);
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
         assertThat(page.searchTerms()).doesNotContain("Workspace");
-        assertThat(SchemaPageTest.sectionTitles(page.component())).containsExactly("Theme", "Interface font");
+        assertThat(SchemaPageTest.sectionTitles(page.component())).containsExactly("Theme", "Interface font", "View mode");
         page.dispose();
     }
 
@@ -70,8 +70,8 @@ class CorePagesTest {
     }
 
     @Test void theWorkspaceSectionFollowsTheThemeSectionOnlyOnMacOs() {
-        assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface font");
-        assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface font");
+        assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface font", "View mode");
+        assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface font", "View mode");
         assertThat(appearance(true).settings()).containsSubsequence(CoreSettings.UI_THEME_NAME, CoreSettings.UI_THEME_WORKSPACE,
             CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR, CoreSettings.UI_FONT_FAMILY);
     }

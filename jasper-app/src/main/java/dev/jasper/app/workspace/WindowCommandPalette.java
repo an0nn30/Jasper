@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.palette.CommandPalette;
 import dev.jasper.app.palette.PaletteController;
 import dev.jasper.app.palette.PaletteTarget;
@@ -198,7 +199,10 @@ final class WindowCommandPalette implements AutoCloseable {
             // No usable field: centre across the workspace, which spans the window including its rail and
             // tool panels. Panel dividers must not move or narrow the palette.
             Rectangle window = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this);
-            palette.setBounds(positioned(window, palette.getPreferredSize(), UIScale.scale(16)));
+            Dimension preferred = palette.getPreferredSize();
+            // Compact changes placement while retaining the title-anchored card's activated width.
+            if (owner.viewMode() == ViewMode.COMPACT) preferred.width = UIScale.scale(ANCHORED_MINIMUM_WIDTH);
+            palette.setBounds(positioned(window, preferred, UIScale.scale(16)));
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (!controller.isOpen()) return;

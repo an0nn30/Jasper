@@ -1,10 +1,14 @@
 Jasper native package
 ====================
 
-macOS: open the DMG and drag Jasper.app to Applications. The current development
-build has only a local ad-hoc signature and has no final application icon. It is
-not Developer ID signed or notarized, so macOS may require the usual confirmation
-for software from an unidentified developer.
+macOS: open the DMG and drag Jasper.app to Applications. Copy it with Finder or
+ditto: a copy that resets file modification times, such as cp -R, still runs but
+loses Jasper's start-up cache. The current development build has only a local
+ad-hoc signature and has no final application icon. It is not Developer ID
+signed or notarized, so macOS may require the usual confirmation for software
+from an unidentified developer. By default Jasper keeps running in the
+background after Cmd+Q, which only closes its windows: choose Quit Jasper
+Completely in its menu bar item before replacing Jasper.app with a newer version.
 
 Windows setup: run Jasper-<version>-windows-x64-setup.exe to install for your user,
 choose the folder and shortcuts, then launch Jasper from the Start menu. Quit Jasper

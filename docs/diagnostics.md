@@ -22,3 +22,30 @@ content, URLs, shell arguments, environment values, raw configuration content or
 Failure to create or write the log files does not prevent startup. Jasper prints one short fallback diagnostic and
 continues without file logging. Normal shutdown drains accepted records for at most two seconds and releases the process
 file lock.
+
+## Start-up timing
+
+A launch logs one INFO line from `dev.jasper.app.startup` once start-up settles: for a window launch when its first
+shell output is painted and every plugin has started, for a `--background` launch when its warm-up has finished and
+every plugin has started (that line reads `Startup (background, …)`), and otherwise 10 seconds after the process
+started. A launch that hands off to an already running Jasper, or quits before settling, logs none. For example:
+
+    Startup (cold, AOT cache used, CDS on): main entered 71 ms, config loaded 90 ms, … output painted 512 ms, plugins bound 980 ms | application 210 ms, plugins 280 ms
+
+Times before the `|` are milliseconds since the operating system started the process; after it, each phase is how long
+that piece of work took. Phases overlap (`application` includes `plugins`), so do not add them up. `AOT cache stale` means the cache in the
+package no longer matches its jars (for example after a copy that did not keep modification times) and costs more than
+having none. Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …, output painted …
+after the request`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the start-up benchmark
+uses it.
+
+## Start-up cache (packaged macOS app)
+
+The packaged macOS app starts with an AOT cache (`Contents/app/jasper.aot`) trained when it was built, and the start-up
+line in the log says whether the JVM used it. If it reports the cache as stale, a copy changed the application's file
+modification times (for example `cp -R`): Jasper works, but starts slower than an app without a cache, because the JVM
+then also skips the runtime's default CDS archive. Reinstall from the DMG with Finder. A stale or refused cache can
+also come from JVM options in the environment, not only from a copy that lost modification times: `JAVA_TOOL_OPTIONS`
+or `JDK_JAVA_OPTIONS` with a heap above about 32 GB, which turns compressed object pointers off, or a different garbage
+collector. The default heap is safe at any RAM size, because the JVM caps it to keep compressed pointers. See
+[keeping the cache valid](packaging.md#keeping-the-cache-valid).

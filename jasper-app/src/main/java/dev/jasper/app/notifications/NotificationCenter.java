@@ -65,7 +65,8 @@ public final class NotificationCenter {
      * @param ui runs {@link #submit}ted posts on the EDT ({@code SwingUtilities::invokeLater} in the application)
      * @param clock stamps posts and decides coalescing; its zone is the one times are shown in
      * @param presence where Jasper stands as delivery sees it now: {@code FOCUSED}, {@code BACKGROUND}, {@code NO_WINDOW}
-     *     (a resident Jasper with every window closed) or {@code OPENING} (starting, or a window not yet activated)
+     *     (no window focused yet: starting, or a window not yet activated) or {@code IDLE} (a resident Jasper with every
+     *     window closed)
      */
     public NotificationCenter(Executor ui, Clock clock, Supplier<Delivery.Presence> presence) {
         this.ui = Objects.requireNonNull(ui, "ui");
@@ -74,6 +75,12 @@ public final class NotificationCenter {
     }
 
     public Clock clock() { return clock; }
+
+    /** Where Jasper stands, as delivery sees it now. */
+    public Delivery.Presence presence() {
+        requireEdt();
+        return presence.get();
+    }
 
     /** Declares a group, or returns the one already declared under its id. */
     public NotificationGroup register(NotificationGroup group) {

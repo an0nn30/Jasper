@@ -62,7 +62,7 @@ class HostedUiTest {
             assertThat(appearance.syntaxPalette()).isEqualTo(dev.jasper.sdk.ui.SyntaxPalette.current()); });
         assertThat(seen).isEmpty();
         themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.Theme.DARCULA,
+            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
             dev.jasper.app.config.UiFontConfig.defaults());
         assertThat(seen).hasSize(1);
         assertThat(appearance.variant()).isEqualTo(Variant.DARK);
@@ -139,7 +139,7 @@ class HostedUiTest {
         assertThat(dev.jasper.sdk.ui.SyntaxPalette.current().style(dev.jasper.sdk.ui.SyntaxRole.KEYWORD).color())
             .isNotEqualTo(dev.jasper.sdk.ui.EditorPalette.current().foreground());
         themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.Theme.DARCULA,
+            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
             dev.jasper.app.config.UiFontConfig.defaults());
         var workspace = dev.jasper.sdk.ui.WorkspacePalette.current();
         var editor = dev.jasper.sdk.ui.EditorPalette.current();
@@ -165,7 +165,7 @@ class HostedUiTest {
         var subscription = hosted.appearance().onWorkspaceChanged(value -> calls.incrementAndGet());
         java.util.concurrent.CompletableFuture.runAsync(subscription::close).join();
         themes.configure(dev.jasper.app.appearance.Theme.DARK,
-            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.Theme.DARCULA,
+            new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA,
             dev.jasper.app.config.UiFontConfig.defaults());
         assertThat(calls).hasValue(0);
         hosted.closeAll();
@@ -453,7 +453,7 @@ class HostedUiTest {
             new ClassLoader(null) {}, () -> variant,
             handler -> () -> {}, auxiliary, terminals);
         try {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.INTELLIJ_LIGHT);
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             for (var name : dev.jasper.sdk.ui.IconName.values()) {
                 var icon = isolated.appearance().icon(name);
                 assertThat(icon.getIconWidth()).isEqualTo(16);

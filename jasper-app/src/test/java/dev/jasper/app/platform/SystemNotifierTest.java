@@ -136,7 +136,7 @@ class SystemNotifierTest {
 
     @Test void anUnpackagedMacAndUnknownSystemsShowNothing(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) {
         var dirs = new AppDirs(root, root.resolve("config.toml"), root.resolve("logs"));
-        var tray = new WindowsTray((action, menu) -> null);
+        var tray = new ResidentTray(false, (action, actions) -> null);
         // A test JVM has no jpackage.app-path, so no Jasper.app bundle to speak for.
         assertThat(SystemNotifier.forThisPlatform("Mac OS X", dirs, tray).silent()).isTrue();
         assertThat(SystemNotifier.forThisPlatform("FreeBSD", dirs, tray).silent()).isTrue();
@@ -147,7 +147,7 @@ class SystemNotifierTest {
 
     @Test void linuxHasNotifySendAndWindowsTheTray(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) {
         var dirs = new AppDirs(root, root.resolve("config.toml"), root.resolve("logs"));
-        var tray = new WindowsTray((action, menu) -> null);
+        var tray = new ResidentTray(false, (action, actions) -> null);
         // Nothing is looked up, started or shown until the first notification.
         try (var linux = SystemNotifier.forThisPlatform("Linux", dirs, tray);
              var windows = SystemNotifier.forThisPlatform("Windows 11", dirs, tray)) {

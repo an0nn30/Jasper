@@ -55,10 +55,6 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     public static final Theme JASPER_LIGHT = BuiltInThemes.toml("jasper-light", "jasper-light.toml");
     /** Jasper's own dark theme, the default. */
     public static final Theme DARK = BuiltInThemes.toml("jasper-dark", "jasper-dark.toml");
-    /** Classic IntelliJ Light, converted from intellij-community. */
-    public static final Theme INTELLIJ_LIGHT = BuiltInThemes.toml("intellij-light", "intellij-light.toml");
-    /** Darcula, converted from intellij-community. */
-    public static final Theme DARCULA = BuiltInThemes.toml("darcula", "darcula.toml");
 
     public Theme {
         Objects.requireNonNull(id);

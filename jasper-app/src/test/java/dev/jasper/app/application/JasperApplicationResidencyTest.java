@@ -5,6 +5,7 @@ import dev.jasper.app.bootstrap.ApplicationBootstrap;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.residency.LaunchRequest;
+import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -72,13 +73,49 @@ class JasperApplicationResidencyTest {
         assertThat(terminated.await(2, TimeUnit.SECONDS)).isTrue();
     }
 
-    @Test void warmingUpBuildsTheFontSetWithoutAWindow() throws Exception {
+    @Test void warmingUpFinishesWithoutAWindow() throws Exception {
         JasperApplication[] held = new JasperApplication[1];
+        var finished = new AtomicInteger();
+        var trace = StartupTrace.detached();
         try {
-            edt(() -> held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }));
-            // Warm-up pays the first window's costs and creates nothing; a thrown exception here fails the test.
-            edt(held[0]::warmUp);
-            edt(held[0]::warmUp);
+            edt(() -> {
+                held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { });
+                held[0].trace(trace);
+            });
+            // Headless there is no window to rehearse with: the font set is built and the warm-up reports it finished.
+            edt(() -> held[0].warmUp(finished::incrementAndGet));
+            edt(() -> held[0].warmUp(finished::incrementAndGet));
+            assertThat(finished).hasValue(2);
+            // The warm-up marks nothing itself (its caller marks WARMED_UP when it finishes), and it opens no window.
+            assertThat(trace.windows()).isEmpty();
+            assertThat(trace.millis(StartupTrace.Milestone.FIRST_PAINT)).isEmpty();
+            assertThat(trace.millis(StartupTrace.Milestone.OUTPUT_PAINTED)).isEmpty();
+            assertThat(trace.millis(StartupTrace.Milestone.WARMED_UP)).isEmpty();
+        } finally {
+            edt(() -> { if (held[0] != null) held[0].quit(); });
+        }
+    }
+
+    @Test void warmingUpStartsOneCollectionAfterDoneOffTheEdt() throws Exception {
+        JasperApplication[] held = new JasperApplication[1];
+        var events = new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var collected = new CountDownLatch(1);
+        var onEdt = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try {
+            edt(() -> {
+                held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { });
+                held[0].trace(StartupTrace.detached());
+                held[0].collector = () -> {
+                    onEdt.set(javax.swing.SwingUtilities.isEventDispatchThread());
+                    events.add("collect");
+                    collected.countDown();
+                };
+            });
+            edt(() -> held[0].warmUp(() -> events.add("done")));
+            assertThat(collected.await(5, TimeUnit.SECONDS)).as("the collection follows the warm-up").isTrue();
+            edt(() -> { });
+            assertThat(events).as("after done, once").containsExactly("done", "collect");
+            assertThat(onEdt).as("never on the EDT").isFalse();
         } finally {
             edt(() -> { if (held[0] != null) held[0].quit(); });
         }
@@ -119,11 +156,11 @@ class JasperApplicationResidencyTest {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
         edt(application::quit);
-        // Only that a late request is harmless: with no windows open this reaches newWindow, which
+        // Only that a late request is harmless: with no windows open this reaches openWindow, which
         // has its own quitting guard. The branch that openOrRaise's own guard protects -- raising an
         // existing window during shutdown -- needs a live window and cannot be covered headlessly.
         // It is on the manual checklist instead.
-        edt(() -> application.openOrRaise(DesktopTestSupport.HOME));
+        edt(() -> application.openOrRaise(DesktopTestSupport.HOME, "handoff"));
         edt(() -> { });
     }
 

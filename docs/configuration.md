@@ -45,14 +45,20 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
-Appearance holds the Theme and Workspace scheme dropdowns, and the theme gear's Import theme…; Terminal › Font &
-Colors links there. The old stores are retired; see [Themes](themes.md) for the offline collection and automatic
+Appearance holds View mode (Normal or Compact, applied after restart), the Theme and Workspace scheme dropdowns,
+and the theme gear's Import theme…; Terminal › Font & Colors links there. The old stores are retired; see [Themes](themes.md) for the offline collection and automatic
 legacy upgrade.
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
 needs review, failed to start, was skipped, for example because a plugin it requires is missing, or safe mode is on)
 shows why, with Open in Editor for its file.
+
+Appearance > View mode defaults to **Normal**, preserving the current window. **Compact** uses the native title
+bar, hides the title search field and all toolbar buttons (including plugin buttons and overflow), and opens the
+existing command palette as a floating card over the workspace. Menus and palette shortcuts stay available.
+The saved `window.toolbar` preference is retained; returning to Normal restores it after restart. A saved mode
+change takes effect only after restarting Jasper, including for windows opened before that restart.
 
 ## Supported settings
 
@@ -70,6 +76,7 @@ status_bar = true
 status_bar_height = 24
 columns = 100
 lines = 35
+view_mode = "normal"
 
 [buddy]
 enabled = false
@@ -79,7 +86,7 @@ long_command_seconds = 10
 system = true
 
 [system]
-run_in_background = false
+run_in_background = true  # false on Linux
 
 [palette]
 visible_rows = 5
@@ -136,11 +143,12 @@ workspace = "match"
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
+| `window.view_mode` | `"normal"` | `"normal"` or `"compact"`; Compact uses the native title bar, hides the workspace header and floats the command palette | After restart |
 | `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `notifications.system` | `true` | Boolean | Live |
-| `system.run_in_background` | `false` | Boolean | Next start (residency); live (login item) |
+| `system.run_in_background` | `true` on macOS and Windows, `false` on Linux | Boolean | Next start (residency); live (login item) |
 | `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
 | `ui.font.size` | Platform default (omit key) | Finite number 8–32 points | Live, app and plugins |
@@ -174,7 +182,7 @@ workspace = "match"
 terminal window is open and not minimized. Hover to make him wave; drag him anywhere (the
 position is saved in `buddy.toml` in the default Jasper application directory); double-click him to bring the last
 active terminal window forward. Left alone he sits down after 20 seconds and retreats into his
-shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show
+shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show/Hide → Show
 Jasper, the command palette and right-click → Hide Jasper toggle him for the current session; a
 saved change to `buddy.enabled` resets that session choice.
 
@@ -182,44 +190,62 @@ saved change to `buddy.enabled` resets that session choice.
 
 ```toml
 [system]
-run_in_background = false
+run_in_background = true  # the default on macOS and Windows; false on Linux
 ```
 
-With `enabled = true`, closing the last window no longer ends Jasper. The process stays with no
-windows, holding the initialized toolkit, fonts and theme, so the next launch reveals a window
-without a cold start. **Quit (Cmd+Q, the palette's Quit, or Quit from the Dock) still exits
-completely** — closing a window and quitting are different things, and quitting is the off switch.
+Jasper stays running when its last window closes, holding the initialized toolkit, fonts, theme and started plugins,
+so the next window opens without a cold start. It is on by default on macOS and Windows and off on Linux, which has no
+tray to reach a windowless process from. A resident process keeps no shell, PTY or child process: closing panes ends
+their shells as always (process cleanup is asynchronous, so a child can briefly be finishing after the last window
+disappears).
 
-On Windows, the resident process shows a Jasper icon in the notification area (it may sit in the
-taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens
-a window or raises the open one, except that while a notification's balloon is waiting unread, double-clicking the
-icon opens that notification instead; **Quit Jasper** exits completely, the same as Quit from a window.
-Launching Jasper again also reveals a window. macOS keeps using the Dock icon and has no tray icon.
+**macOS.** While residency is on, Jasper has a menu bar item, a terminal glyph that follows the light or dark menu bar,
+with **New Window**, **Settings…** and **Quit Jasper Completely**. The item appears once start-up has settled (the first
+output painted, a finished `--background` warm-up, or 2 s after the first paint), never on the start-up path.
 
-Residency keeps no pane session alive intentionally: once pane cleanup completes, it holds no shell, PTY or child process.
-Closing panes requests shell termination; process cleanup is asynchronous, so a child can briefly be finishing cleanup after the last window disappears.
+| | A window is open | No window is open |
+|---|---|---|
+| Dock icon and Cmd+Tab | shown | hidden |
+| Menu bar item | shown | shown |
+| Plugins and the configuration watcher | running | running; no shells |
 
-Enabling it also registers Jasper to start in the background at login:
+**Quit (Cmd+Q, Jasper › Quit, File › Quit, the palette's Quit or the Dock's Quit) closes every window and keeps Jasper
+running in the background.** Content tabs and plugin windows are asked first, exactly as when you close them, and a
+refusal leaves everything open. Plugins keep running, so a plugin's background work (a File Server share, for example)
+carries on after Cmd+Q, and a plugin's quit confirmation is not asked. Only **Quit Jasper Completely** ends the process
+and stops that work. Until start-up has settled, Quit
+still exits completely, as it does when residency is off. Logging out, restarting or shutting down quits Jasper by
+itself. Clicking the Dock icon, Spotlight or `open -a Jasper` opens a window in the running process; no new process
+starts. At login Jasper starts with no window and no Dock icon. A development run (`./gradlew run`) stays resident but
+never hides from the Dock, and Quit there still exits.
 
-- **macOS** writes `~/Library/LaunchAgents/dev.jasper.background.plist`. It takes effect at your
-  next login.
-- **Windows** adds a `Jasper` value under
-  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+**Windows.** Once start-up has settled, the resident process shows a Jasper icon in the notification area (it may sit
+in the taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens a window
+or raises the open one, except that while a notification's balloon is waiting unread, double-clicking the icon opens
+that notification instead; **Quit Jasper** exits completely, the same as Quit from a window. Launching Jasper again
+also reveals a window.
 
-Both are removed as soon as you set `enabled = false` and save. Autostart needs an installed
-Jasper: a `./gradlew run` development session stays resident but never registers a login item.
+Residency also registers Jasper to start in the background at login:
 
-The two halves of the key have different timing. The login item is reconciled every time the
-configuration is read, so turning it on or off applies at once. **Residency itself applies from
-the next start** — whether a given process owns the handoff endpoint is settled when it starts,
-not renegotiated while it runs.
+- **macOS** writes `~/Library/LaunchAgents/dev.jasper.background.plist`. It takes effect at your next login.
+- **Windows** adds a `Jasper` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 
-Jasper keeps a socket, a token and a lock in a `daemon` directory beside `config.toml`,
-owner-only. A second launch hands its request to the resident process over that socket and
-exits; on macOS a Dock click never creates a process at all. After you upgrade, the first launch
-of the new build retires the old resident process — which exits if it has no windows open, or
-otherwise keeps running, no longer resident, until those windows are closed or it is quit —
-rather than being served a window built from the old code.
+Both are removed as soon as you set `run_in_background = false` and save. Autostart needs an installed Jasper: a
+`./gradlew run` development session stays resident but never registers a login item.
+
+The two halves of the key have different timing. The login item is reconciled every time the configuration is read,
+so turning it on or off applies at once. **Residency itself applies from the next start**: whether a process owns the
+handoff endpoint, shows the menu bar item and quits into the background is settled when it starts. With the key off
+Jasper behaves as before: no login item, no menu bar item, Quit exits, and closing the last window ends the process.
+
+Jasper keeps a socket, a token and a lock in a `daemon` directory beside `config.toml`, owner-only. A second launch
+hands its request to the resident process over that socket and exits; on macOS a Dock click never creates a process.
+
+**Updates.** Finder will not replace a running app, so choose **Quit Jasper Completely** before installing a new
+version from the disk image. If the app is replaced some other way while Jasper runs, the next Dock click with no
+window open relaunches Jasper as the new build; with windows open it raises them, and the relaunch waits until they are
+closed. A plain launch of the new build likewise retires the old resident process, which exits if it has no windows
+open or otherwise keeps running, no longer resident, until those windows are closed.
 
 **A launch with `--config` is fully standalone.** It never hands off to a resident process, never
 binds the shared endpoint itself, is never itself resident, and never touches the login item. Any
@@ -392,7 +418,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices save: Toolbar, Status Bar, UI Theme and Workspace Scheme write `window.toolbar`, `window.status_bar`, `ui.theme.name` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
+View menu choices save: Toolbar and Status Bar write `window.toolbar` and `window.status_bar` to `config.toml`, and every window follows. Choose themes in Settings › Appearance and tab, rail, toolbar and status bar sizes in Settings › Window. The command palette’s Window Settings… command opens the Window page. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and the command palette’s Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -547,7 +573,43 @@ settings file and data there too; their jars are in the application image). A zi
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
 launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
-dock's sizes, stripe visibility and plugin window bounds; it is written by Jasper and is not meant to be edited.
+dock's sizes and split ratios, which panels are open, stripe visibility, main-window size/position and maximized
+state, and plugin window bounds. The last main window closed supplies the layout for the next launch, including
+the terminal area left between its panels; a resident Jasper (see [Background residency](#background-residency))
+uses it for its next window too, also after Quit sent it to the background, which closes every window as a real
+Quit does. Normal bounds are retained while maximized or minimized; relaunch
+never starts minimized. If a saved window no longer fits an available display, its bounds are fitted to a usable
+display. This file is written by Jasper and is not meant to be edited. Terminal sessions and editor documents
+are not recreated by this layout state.
+
+## View modes
+
+View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the status bar,
+tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
+controls remain available; the toolbar keeps its selected style. Toggle Zen again to restore your layout; pane zoom works independently.
+Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
+and floating command palette when Zen is toggled.
+
+Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
+New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last
+closed window saves its mode for the next launch. Missing or invalid values default to off. Normal status
+visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status and panel
+changes made while in Zen take effect when leaving it; toolbar changes apply immediately. Panel show/hide requests still update
+the normal dock layout, but panels remain hidden and newly requested panels are built only when Zen exits.
+Existing panel instances are retained and receive visibility notifications while hidden.
+
+View groups Toolbar, Status Bar and Rail under **Show/Hide**, and font controls under **Font Size**.
+The contributed **Tools** submenu remains available. Status/rail controls are disabled during Zen; leave Zen to use them. Toolbar controls stay available.
+
+Zen has no default shortcut. Assign **Zen** in Settings › Keymap, or add a binding to `[keybindings]`:
+
+```toml
+[keybindings]
+toggle_zen_mode = "ctrl+alt+z"
+```
+
+The same shortcut enters and exits Zen; `"none"` removes it. The command palette offers **Enter Zen Mode**
+or **Exit Zen Mode**, and the menu toggle remains usable even after removing its shortcut.
 
 ## Shortcuts
 
@@ -672,7 +734,7 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 `ui.theme.name` names the UI theme:
 - `"Jasper Dark"` (the default) or `"Jasper Light"`;
-- `"IntelliJ Light"` or `"Darcula"` (IntelliJ's classic themes, converted);
+- `"Nord"`, `"Clear Dark"` or `"Clear Light"`;
 - or a native Jasper TOML theme in the `themes` folder beside this file.
 
 The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers writing and importing
@@ -710,8 +772,8 @@ temporarily matches the chrome; its requested name stays saved for repair and re
 General hosted plugin pane controls also follow the workspace scheme.
 
 Settings › Appearance's **Workspace scheme** dropdown starts with **Same as UI theme**. Apply/OK saves choices;
-Cancel discards them. A confirmed Import theme… writes immediately and survives Cancel. View › UI Theme and Workspace
-Scheme save immediately; View › Themes… opens Settings at Appearance.
+Cancel discards them. A confirmed Import theme… writes immediately and survives Cancel. The command palette’s
+Themes… command opens Settings at Appearance.
 Native file edits, deletions and repairs reload automatically on the existing one-second poll, including inherited
 parent changes. Filesystem work runs off the EDT. A blank workspace value warns and uses `"match"`; a non-string
 value rejects the configuration. [Themes](themes.md#settings-and-importing) details importing and fallback.

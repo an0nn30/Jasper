@@ -26,6 +26,8 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
@@ -207,7 +209,7 @@ class ToolWindowAreaTest {
             DockTestSupport.show(area, Slot.LEFT_TOP, panel, 250);
             List<DockState.Change> changes = new ArrayList<>();
             state.addListener(changes::add);
-            for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 ThemeTestSupport.install(theme);
                 SwingUtilities.updateComponentTreeUI(area);
                 area.refreshTheme();
@@ -256,6 +258,74 @@ class ToolWindowAreaTest {
         mouse(divider, MouseEvent.MOUSE_RELEASED, 2, 100);
         assertThat(state.size(Side.LEFT)).as("a click keeps the saved size").isEqualTo(400);
         assertThat(changes).isEmpty();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"LEFT_TOP, LEFT_WIDTH, 260, 260", "RIGHT_TOP, RIGHT_WIDTH, 734, 260", "BOTTOM_LEFT, BOTTOM_HEIGHT, 394, 200"})
+    void dividerDragPreviewsTheSnapBreaksFreeAndCommitsTheReleasedSize(
+            Slot slot, DockGeometry.Handle handle, int target, int defaultSize) {
+        var state = new DockState();
+        var area = new ToolWindowArea(new JPanel(), state);
+        DockTestSupport.show(area, slot, new JPanel(), 300);
+        layout(area);
+        var divider = area.divider(handle);
+        List<DockState.Change> changes = new ArrayList<>();
+        state.addListener(changes::add);
+        mouse(divider, MouseEvent.MOUSE_PRESSED, 2, 2);
+        for (int offset : new int[]{-5, -9, 5, 9, -5}) {
+            mouseAtDividerPosition(area, handle, MouseEvent.MOUSE_DRAGGED, target + offset);
+            layout(area);
+            Rectangle bounds = divider.getBounds();
+            assertThat(handle.vertical() ? bounds.x : bounds.y)
+                .as("preview at pointer offset %s", offset).isEqualTo(target + (Math.abs(offset) <= 8 ? 0 : offset));
+            assertThat(state.size(slot.side())).as("preview has not committed").isEqualTo(300);
+            assertThat(changes).isEmpty();
+        }
+        // Release at a different point inside the zone, relative to the divider's snapped bounds.
+        mouseAtDividerPosition(area, handle, MouseEvent.MOUSE_RELEASED, target + 7);
+        layout(area);
+        assertThat(state.size(slot.side())).isEqualTo(defaultSize);
+        assertThat(changes).hasSize(1);
+        Rectangle bounds = divider.getBounds();
+        assertThat(handle.vertical() ? bounds.x : bounds.y).isEqualTo(target);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"LEFT_TOP, LEFT_RATIO, 297", "RIGHT_TOP, RIGHT_RATIO, 297", "BOTTOM_LEFT, BOTTOM_RATIO, 497"})
+    void pairedToolsPreviewEqualSharesBreakFreeAndCommitTheSnappedRatio(Slot slot, DockGeometry.Handle handle, int target) {
+        var state = new DockState();
+        var area = new ToolWindowArea(new JPanel(), state);
+        DockTestSupport.show(area, slot, new JPanel(), 300);
+        DockTestSupport.show(area, slot.partner(), new JPanel(), 300);
+        state.setRatio(slot.side(), 0.3);
+        layout(area);
+        var divider = area.divider(handle);
+        List<DockState.Change> changes = new ArrayList<>();
+        state.addListener(changes::add);
+        mouse(divider, MouseEvent.MOUSE_PRESSED, 2, 2);
+        for (int offset : new int[]{-5, -9, 5, 9, -5}) {
+            mouseAtDividerPosition(area, handle, MouseEvent.MOUSE_DRAGGED, target + offset);
+            layout(area);
+            Rectangle bounds = divider.getBounds();
+            assertThat(handle.vertical() ? bounds.x : bounds.y)
+                .as("preview at pointer offset %s", offset).isEqualTo(target + (Math.abs(offset) <= 8 ? 0 : offset));
+            assertThat(state.ratio(slot.side())).as("preview has not committed").isEqualTo(0.3);
+            assertThat(changes).isEmpty();
+        }
+        mouseAtDividerPosition(area, handle, MouseEvent.MOUSE_RELEASED, target + 7);
+        layout(area);
+        assertThat(state.ratio(slot.side())).isEqualTo(0.5);
+        assertThat(changes).hasSize(1);
+        Rectangle bounds = divider.getBounds();
+        assertThat(handle.vertical() ? bounds.x : bounds.y).isEqualTo(target);
+    }
+
+    private static void mouseAtDividerPosition(ToolWindowArea area, DockGeometry.Handle handle, int event, int position) {
+        var divider = area.divider(handle);
+        var bounds = divider.getBounds();
+        // Preserve the two-pixel grab offset while the preview moves the event source.
+        mouse(divider, event, handle.vertical() ? position + 2 - bounds.x : 2,
+            handle.vertical() ? 2 : position + 2 - bounds.y);
     }
 
     @Test void sizesAreClampedToAUsableMinimum() {

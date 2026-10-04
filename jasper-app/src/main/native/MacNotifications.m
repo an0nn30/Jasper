@@ -3,7 +3,8 @@
 #include <jni.h>
 #include <stdlib.h>
 
-// The JVM and the Java method a click calls, cached when the library loads.
+// The JVM, the Java class and the method a click calls, cached by MacNotifications.bind() before the first banner. The
+// library is shared with the Dock bridge, so nothing is bound when it loads: a failed bind never breaks the Dock.
 static JavaVM *JasperVM;
 static jclass JasperBridge;
 static jmethodID JasperClicked;
@@ -111,32 +112,27 @@ static void JasperThrow(JNIEnv *env, const char *message) {
     if (failure) (*env)->ThrowNew(env, failure, message);
 }
 
-// A library that cannot bind its click callback must not load: banners would post and every click would be
-// dropped without a trace. JNI_ERR makes System.load throw UnsatisfiedLinkError, which Java already tolerates.
-static void JasperUnbind(JNIEnv *env) {
-    if (JasperBridge) (*env)->DeleteGlobalRef(env, JasperBridge);
-    JasperBridge = NULL;
-    JasperClicked = NULL;
-}
-
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
-    JNIEnv *env = NULL;
-    if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_8) != JNI_OK) return JNI_ERR;
-    jclass bridge = (*env)->FindClass(env, "dev/jasper/app/platform/MacNotifications");
+// Binds the click callback to the calling class, MacNotifications, which Java does once, before the first banner and
+// under its own lock. True once bound, now or earlier; false, with nothing bound and no exception left pending, when the
+// JVM or the clicked(String) method cannot be resolved: Java then sends nothing, since every click would be dropped.
+JNIEXPORT jboolean JNICALL Java_dev_jasper_app_platform_MacNotifications_bind(JNIEnv *env, jclass type) {
+    if (JasperVM) return JNI_TRUE;
+    JavaVM *vm = NULL;
+    if ((*env)->GetJavaVM(env, &vm) != JNI_OK || !vm) return JNI_FALSE;
+    jmethodID clicked = (*env)->GetStaticMethodID(env, type, "clicked", "(Ljava/lang/String;)V");
+    if (!clicked) {
+        (*env)->ExceptionClear(env); // NoSuchMethodError
+        return JNI_FALSE;
+    }
+    jclass bridge = (*env)->NewGlobalRef(env, type);
     if (!bridge) {
         (*env)->ExceptionClear(env);
-        return JNI_ERR;
+        return JNI_FALSE;
     }
-    JasperBridge = (*env)->NewGlobalRef(env, bridge);
-    JasperClicked = (*env)->GetStaticMethodID(env, bridge, "clicked", "(Ljava/lang/String;)V");
-    (*env)->DeleteLocalRef(env, bridge);
-    if (!JasperBridge || !JasperClicked) {
-        (*env)->ExceptionClear(env);
-        JasperUnbind(env);
-        return JNI_ERR;
-    }
-    JasperVM = vm;
-    return JNI_VERSION_1_8;
+    JasperBridge = bridge;
+    JasperClicked = clicked;
+    JasperVM = vm; // Last: a click checks it first.
+    return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL Java_dev_jasper_app_platform_MacNotifications_post(

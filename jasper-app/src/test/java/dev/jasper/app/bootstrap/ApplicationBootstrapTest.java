@@ -8,12 +8,29 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class ApplicationBootstrapTest {
+    /** What {@code configureDesktopProperties} sets in this JVM: restored after every test, so nothing leaks into other suites. */
+    private static final java.util.List<String> DESKTOP_PROPERTIES = java.util.List.of(
+        "apple.laf.useScreenMenuBar", "apple.awt.application.appearance", "apple.awt.enableTemplateImages");
+    private final java.util.Map<String, String> savedDesktopProperties = new java.util.HashMap<>();
     @TempDir Path directory;
+
+    @BeforeEach void rememberDesktopProperties() {
+        for (String key : DESKTOP_PROPERTIES) savedDesktopProperties.put(key, System.getProperty(key));
+    }
+
+    @AfterEach void restoreDesktopProperties() {
+        savedDesktopProperties.forEach((key, value) -> {
+            if (value == null) System.clearProperty(key); else System.setProperty(key, value);
+        });
+    }
+
     @Test void upgradesSelectionsBeforeInitialServiceStateAndCarriesProblems() throws Exception {
         Path config = directory.resolve("config.toml");
         Files.writeString(config, "ui.theme.variant='light'\n");
@@ -29,19 +46,25 @@ class ApplicationBootstrapTest {
         });
         assertThat(result).isZero();
     }
+    @Test void anUpdateIsTheJarChangingOrVanishingOnDisk() throws Exception {
+        Path jar = Files.writeString(directory.resolve("jasper-app.jar"), "build 1");
+        long started = HandoffSocket.lastModified(jar);
+        var replaced = ApplicationBootstrap.replacedOnDisk(jar, started);
+        assertThat(replaced.getAsBoolean()).isFalse();
+        Files.setLastModifiedTime(jar, java.nio.file.attribute.FileTime.fromMillis(started + 60_000));
+        assertThat(replaced.getAsBoolean()).as("a new build in place").isTrue();
+        Files.delete(jar);
+        assertThat(replaced.getAsBoolean()).as("the old build's jar is gone").isTrue();
+        assertThat(ApplicationBootstrap.replacedOnDisk(null, 0).getAsBoolean())
+            .as("an unknown code source never counts as updated").isFalse();
+    }
     @Test void desktopPropertiesOverrideAnInheritedMenuBarSetting() {
         String menuKey = "apple.laf.useScreenMenuBar", appearanceKey = "apple.awt.application.appearance";
-        String previousMenu = System.getProperty(menuKey), previousAppearance = System.getProperty(appearanceKey);
-        try {
-            // Override an inherited JVM setting before desktop startup.
-            System.setProperty(menuKey, "false");
-            ApplicationBootstrap.configureDesktopProperties();
-            assertThat(System.getProperty(menuKey)).isEqualTo("true");
-            assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
-        } finally {
-            if (previousMenu == null) System.clearProperty(menuKey); else System.setProperty(menuKey, previousMenu);
-            if (previousAppearance == null) System.clearProperty(appearanceKey); else System.setProperty(appearanceKey, previousAppearance);
-        }
+        // Override an inherited JVM setting before desktop startup.
+        System.setProperty(menuKey, "false");
+        ApplicationBootstrap.configureDesktopProperties();
+        assertThat(System.getProperty(menuKey)).isEqualTo("true");
+        assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
     }
 
     @Test void helpAndErrorsExitBeforeConfigurationOrDesktopStartup() {
@@ -184,16 +207,36 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(null, false, false, false, plugin, true))).isFalse();
     }
 
+    @Test void onlyAPackagedMacLoginLaunchStartsHiddenFromTheDock() throws Exception {
+        // A real bundle layout, because a packaged image only counts when it carries the bridge beside the launcher.
+        Path bundle = directory.resolve("Jasper.app");
+        Path launcher = Files.createDirectories(bundle.resolve("Contents/MacOS")).resolve("Jasper");
+        Files.writeString(launcher, "placeholder");
+        String app = launcher.toString();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Mac OS X", app))
+            .as("a packaged image missing its bridge could never come back").isEmpty();
+        Files.writeString(Files.createDirectories(bundle.resolve("Contents/app")).resolve("libjasper-macos.dylib"), "placeholder");
+        assertThat(ApplicationBootstrap.launchProperties(true, "Mac OS X", app))
+            .containsExactly(java.util.Map.entry("apple.awt.UIElement", "true"));
+        assertThat(ApplicationBootstrap.launchProperties(false, "Mac OS X", app)).isEmpty();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Mac OS X", null))
+            .as("a development run has no bridge, so it could never come back").isEmpty();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Windows 11", "C:\\Program Files\\Jasper\\Jasper.exe")).isEmpty();
+        assertThat(ApplicationBootstrap.launchProperties(true, "Windows 11", app))
+            .as("the operating system decides even when the layout looks like a bundle").isEmpty();
+    }
+
     @Test void desktopPropertiesAlwaysUseTheMacScreenMenuBar() {
-        String previous = System.getProperty("apple.laf.useScreenMenuBar");
-        try {
-            System.clearProperty("apple.laf.useScreenMenuBar");
-            ApplicationBootstrap.configureDesktopProperties();
-            assertThat(System.getProperty("apple.laf.useScreenMenuBar")).isEqualTo("true");
-            assertThat(System.getProperty("apple.awt.application.appearance")).isEqualTo("system");
-        } finally {
-            if (previous == null) System.clearProperty("apple.laf.useScreenMenuBar");
-            else System.setProperty("apple.laf.useScreenMenuBar", previous);
-        }
+        System.clearProperty("apple.laf.useScreenMenuBar");
+        ApplicationBootstrap.configureDesktopProperties();
+        assertThat(System.getProperty("apple.laf.useScreenMenuBar")).isEqualTo("true");
+        assertThat(System.getProperty("apple.awt.application.appearance")).isEqualTo("system");
+    }
+
+    @Test void desktopPropertiesMakeTheMenuBarGlyphATemplateImage() {
+        String key = "apple.awt.enableTemplateImages";
+        System.clearProperty(key);
+        ApplicationBootstrap.configureDesktopProperties();
+        assertThat(System.getProperty(key)).isEqualTo("true");
     }
 }

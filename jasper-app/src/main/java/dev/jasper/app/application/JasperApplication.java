@@ -6,6 +6,7 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.config.TerminalConfig;
@@ -32,14 +33,18 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.platform.SystemFonts;
 import dev.jasper.app.platform.SystemNotifier;
+import dev.jasper.app.startup.StartupTrace;
+import dev.jasper.app.startup.WindowTrace;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
+import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.app.workspace.TerminalWindow;
 import dev.jasper.app.workspace.WindowCallbacks;
 import dev.jasper.app.workspace.WorkspaceActivity;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.rendering.FontSet;
 import dev.jasper.terminal.session.SessionLaunchOptions;
+import dev.jasper.terminal.view.TerminalView;
 
 import dev.jasper.terminal.session.TerminalSession;
 import java.awt.Component;
@@ -80,19 +85,34 @@ public final class JasperApplication {
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
-    /**
-     * Whether start-up has settled: a terminal window was activated, or a resident Jasper warmed up with none and the
-     * records start-up queued have run.
-     */
-    private boolean settled;
+    /** How many terminal windows are being opened right now (EDT): from the start of {@link #openWindow} until it returns or fails. */
+    private int openingWindows;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
+    private final ViewMode startupViewMode;
     private boolean quitting;
-    private boolean resident;
+    /** Written on the EDT, read by the native quit handler's thread too. */
+    private volatile boolean resident;
+    /** A packaged macOS Jasper's Dock presence while resident; null where Quit really quits (Windows, Linux, development runs). */
+    private volatile DockPresence dock;
+    /** Whether the application jar changed on disk since start-up: an update was installed under this process. */
+    private BooleanSupplier staleBuild = () -> false;
+    private volatile StartupTrace trace = StartupTrace.current();
+    private int windowsOpened;
+    /**
+     * The output watch of every local session this application started, until its first terminal claims it or the
+     * session exits. Strongly keyed: a watch holds its session, so a weak key could never clear.
+     */
+    private final java.util.Map<TerminalSession, SessionOutput> outputs = new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
-    private java.util.function.BinaryOperator<Runnable> residentIndicator = (open, quit) -> () -> { };
+    private Function<dev.jasper.app.platform.ResidentTray.Actions, Runnable> residentIndicator = actions -> () -> { };
     private Runnable removeIndicator;
+    /** Whether {@link #residencySettled()} has run: it does its work once per process, and idle presence begins with it. */
+    private boolean startupSettled;
+    /** How long after the first paint a shell that prints nothing still counts as settled. */
+    private Duration settleFallback = Duration.ofSeconds(2);
+    private Runnable cancelSettleFallback;
     private boolean shutdownQueued;
     private boolean stopped;
     private final java.util.List<Runnable> shutdownActions = new java.util.ArrayList<>();
@@ -123,6 +143,11 @@ public final class JasperApplication {
     private ResidentControl residentControl = ResidentControl.NONE;
     private boolean replacementHandsOff;
     private boolean standaloneNotice;
+    /**
+     * Test seam: the one collection that follows a {@link #warmUp}, started on its own daemon thread. Production is
+     * {@code System.gc()}: the rehearsal's garbage would otherwise stay in the resident process's heap.
+     */
+    Runnable collector = System::gc;
     /** Test seams. Production plans from this process's own command line and starts a real process. */
     Function<RestartMode, Optional<List<String>>> restartPlanner = RestartCommand::current;
     Consumer<List<String>> spawner = command -> {
@@ -192,6 +217,7 @@ public final class JasperApplication {
         migrationProblems = List.copyOf(startupThemeProblems);
         if (service != null) startupConfigProblems = startupThemeProblems.stream().filter(problem -> problem.file().equals(service.initialState().file())).toList();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
+        startupViewMode = startup.viewMode();
         themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
         if (service != null) scanThemes(service);
         Theme saved = themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK);
@@ -241,21 +267,14 @@ public final class JasperApplication {
             configuration.onProblems(problems::accept);
         }
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
-            Desktop.getDesktop().setQuitHandler((event, response) -> {
-                response.cancelQuit();
-                SwingUtilities.invokeLater(() -> {
-                    var focused = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
-                    var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.META_DOWN_MASK);
-                    if (!dev.jasper.app.platform.WindowInput.captureShortcut(focused, stroke)) quit();
-                });
-            });
+            Desktop.getDesktop().setQuitHandler((event, response) -> nativeQuitRequested(response));
             quitHandlerInstalled = true;
         }
         // Clicking the Dock icon of a running Jasper creates no process: AppKit sends this instead.
         // Registered whether or not residency is on, because a window that is merely minimized
         // should come back the same way.
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
-            reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise());
+            reopenListener = event -> SwingUtilities.invokeLater(this::reopened);
             Desktop.getDesktop().addAppEventListener(reopenListener);
         }
         if (supports(Desktop.Action.APP_PREFERENCES)) {
@@ -302,6 +321,18 @@ public final class JasperApplication {
         return timer::stop;
     }
 
+    /** Tests replace the process-wide trace. EDT. */
+    void trace(StartupTrace value) { trace = java.util.Objects.requireNonNull(value, "value"); }
+
+    /** Tests shorten the fallback that settles a shell printing nothing, 2 s by default. Set before {@link #residency}. EDT. */
+    void settleFallback(Duration delay) { settleFallback = java.util.Objects.requireNonNull(delay, "delay"); }
+
+    /**
+     * The first plain window of a process is its cold start, unless the process already warmed up (a {@code --background}
+     * launch rehearsed a window): then it comes from a menu or the Dock, like every later plain window.
+     */
+    static String windowTrigger(int windowsOpened, boolean warmedUp) { return windowsOpened == 0 && !warmedUp ? "cold" : "menu"; }
+
     /** The opacity in effect behind {@code component}: its terminal window's within that window's workspace area, else 1. */
     private double glassOpacity(Component component) {
         for (TerminalWindow window : windows) if (window.owns(component)) return window.content().workspaceOpacity(component);
@@ -311,79 +342,155 @@ public final class JasperApplication {
     private void glassChanged() { for (Runnable listener : List.copyOf(glassListeners)) listener.run(); }
 
     /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
-    public TerminalWindow newWindow() { return openWindow(null, false); }
+    public TerminalWindow newWindow() {
+        return openWindow(null, false,
+            windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent()));
+    }
 
     /** A window whose tab starts in {@code directory}; null opens a detached window with no tab. */
-    public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null); }
+    public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null, "menu"); }
 
-    private TerminalWindow openWindow(Path directory, boolean detached) {
+    /** New windows take live settings while retaining the application startup decoration choice. */
+    ConfigSnapshot windowConfiguration() {
+        ConfigSnapshot latest = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
+        return latest.toBuilder().viewMode(startupViewMode).build();
+    }
+
+    private TerminalWindow openWindow(Path directory, boolean detached, String trigger) {
         contributions.content().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
         });
         if (quitting) return null;
+        // Counted until composeWindow returns or fails. Incidents are always queued, so none lands inside the count; it
+        // protects what is posted directly on the EDT while composing (a plugin's panel factory posting inside
+        // connectContributions, say): that waits for the window's card, as it does before the first window of a start.
+        openingWindows++;
+        try {
+            return composeWindow(directory, detached, trigger);
+        } finally {
+            openingWindows--;
+        }
+    }
+
+    private TerminalWindow composeWindow(Path directory, boolean detached, String trigger) {
+        WindowTrace windowTrace = trace.window(trigger);
+        windowsOpened++;
         boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
-            (path, settings) -> track(startSession(path, settings)), shellIntegrationDir, shellProfiles::resolve,
+            (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
             () -> shellProfiles.awaitDetection(DETECTION_WAIT), this::shellProfileProblem);
-        TerminalWindow window = new TerminalWindow(new WindowCallbacks(
-            requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quit,
-            this::windowActivated, this::windowClosed,
-            state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-            launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
-        if (configuration != null) configuration.register(window.content());
-        window.content().connectContributions(contributions, uiState);
-        UUID windowId = window.content().id();
-        window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
-        window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
-        window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
-        notificationViews.attach(window.content());
-        window.content().connectTerminals(terminals, window::toFront);
-        if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
-        window.content().onToggleBuddy = this::toggleBuddy;
-        window.content().buddyEnabled = this::buddyEnabled;
-        window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
-        window.content().activity(event -> {
-            switch (event) {
-                case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
-                    value.elapsedNanos(), value.activate(), value.watched());
-                case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
-                    value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
-                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), windowId, value.activate());
-                case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
-                case WorkspaceActivity.PaneState value -> {
-                    switch (value.state()) {
-                        case OPENED -> notifications.opened(value.id());
-                        case CLOSED -> notifications.closed(value.id());
-                        case FOCUSED -> { }
-                        case BLURRED -> notifications.hidden(value.id());
+        // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
+        // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
+        windowOpening();
+        TerminalWindow window = null;
+        try {
+            window = new TerminalWindow(new WindowCallbacks(
+                requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quitRequested,
+                this::windowActivated, this::windowClosed,
+                state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
+                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history);
+            if (configuration != null) configuration.register(window.content());
+            window.content().connectContributions(contributions, uiState);
+            UUID windowId = window.content().id();
+            window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
+            window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
+            window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
+            notificationViews.attach(window.content());
+            window.content().connectTerminals(terminals, window::toFront);
+            if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
+            window.content().onToggleBuddy = this::toggleBuddy;
+            window.content().onFirstTerminal(pane -> timeFirstTerminal(pane, windowTrace));
+            window.content().buddyEnabled = this::buddyEnabled;
+            window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
+            window.content().activity(event -> {
+                switch (event) {
+                    case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
+                        value.elapsedNanos(), value.activate(), value.watched());
+                    case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
+                        value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
+                            value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), windowId, value.activate());
+                    case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
+                    case WorkspaceActivity.PaneState value -> {
+                        switch (value.state()) {
+                            case OPENED -> notifications.opened(value.id());
+                            case CLOSED -> notifications.closed(value.id());
+                            case FOCUSED -> { }
+                            case BLURRED -> notifications.hidden(value.id());
+                        }
                     }
                 }
+            });
+            windows.add(window); window.restoreLayout(uiState); window.show();
+        } catch (RuntimeException | Error failure) {
+            // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
+            try {
+                if (window != null) discard(window, failure);
+            } finally {
+                updateDock();
             }
-        });
-        windows.add(window); window.show();
+            throw failure;
+        }
+        windowTrace.mark(WindowTrace.Milestone.SHOWN);
+        trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
         return window;
     }
 
     /**
+     * Closes a window whose composition failed, without saving its bounds or dock layout: it must not become the last
+     * window closed, whose layout the next window restores. If closing it fails too, the window is still forgotten, as
+     * {@link #windowClosed} forgets one (by the window list, the notification cards and the Buddy, which would otherwise
+     * keep routing to it, and as the window used last) and its frame disposed, and each further failure is added to
+     * {@code failure} as suppressed. EDT.
+     */
+    private void discard(TerminalWindow window, Throwable failure) {
+        try {
+            window.discard();
+        } catch (RuntimeException | Error closing) {
+            failure.addSuppressed(closing);
+            try {
+                forget(window);
+            } catch (RuntimeException | Error forgetting) {
+                failure.addSuppressed(forgetting);
+            }
+            try {
+                window.nativeWindow().dispose();
+            } catch (RuntimeException | Error disposing) {
+                failure.addSuppressed(disposing);
+            }
+        }
+    }
+
+    /**
      * Whether this process outlives its windows. Decided once at startup: which process owns the
-     * handoff endpoint is not something to renegotiate while running.
+     * handoff endpoint is not something to renegotiate while running. The indicator appears once start-up has
+     * settled: the first output painted, a finished {@code --background} warm-up, or 2 s after the first paint.
      */
     public void residency(boolean resident) {
         this.resident = resident;
-        showIndicator(resident);
+        if (!resident) {
+            stopSettleFallback();
+            showIndicator(false);
+            return;
+        }
+        // Never on the start-up path: not at the first paint, which comes before the first shell output is shown.
+        Runnable settled = this::residencySettled;
+        trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, SwingUtilities::invokeLater, settled);
+        trace.when(StartupTrace.Milestone.WARMED_UP, SwingUtilities::invokeLater, settled);
+        // A shell that prints nothing never paints output; the first paint then starts a short countdown.
+        trace.when(StartupTrace.Milestone.FIRST_PAINT, SwingUtilities::invokeLater, this::armSettleFallback);
     }
 
     public boolean resident() { return resident; }
 
     /**
-     * Who shows that this process is resident, given its Open and Quit actions; it returns the way to
-     * remove what it showed. Injected, like {@link #loginItems}, so tests never touch the real
-     * notification area. Install before {@link #residency}.
+     * Who shows that this process is resident (the macOS menu bar item, the Windows notification-area icon), given its
+     * menu's actions; it returns the way to remove what it showed. Injected, like {@link #loginItems}, so tests never
+     * touch the real menu bar or notification area. Install before {@link #residency}.
      */
-    public void residentIndicator(java.util.function.BinaryOperator<Runnable> install) {
+    public void residentIndicator(Function<dev.jasper.app.platform.ResidentTray.Actions, Runnable> install) {
         residentIndicator = Objects.requireNonNull(install, "install");
     }
 
@@ -395,14 +502,100 @@ public final class JasperApplication {
         systemNotices.use(Objects.requireNonNull(notifier, "notifier"));
     }
 
+    /**
+     * macOS, a packaged Jasper: while resident, Quit closes every window and keeps the process, hidden from the Dock and
+     * Cmd+Tab until the next window opens. Install before {@link #residency}.
+     *
+     * @param control switches the Dock presence and watches for a log-out or shutdown
+     * @param visibleAtLaunch false for a {@code --background} launch, which starts hidden
+     */
+    public void backgroundOnQuit(DockControl control, boolean visibleAtLaunch) {
+        dock = new DockPresence(control, visibleAtLaunch);
+    }
+
+    /**
+     * Tells this process how to notice that it was updated on disk. Install before the first reopen.
+     *
+     * @param stale true once the application jar this process runs from has changed or gone
+     */
+    public void staleBuild(BooleanSupplier stale) {
+        staleBuild = Objects.requireNonNull(stale, "stale");
+    }
+
+    /**
+     * The macOS reopen event: a Dock click, Spotlight or {@code open -a} reaching the running Jasper. With no window open
+     * and the application replaced on disk since start-up, it relaunches as the new build through the restart path and
+     * exits; if that cannot happen (the command line is unknown, or a plugin refuses), the running build opens the
+     * window. With windows open it raises them: an update never takes a running terminal down. EDT.
+     */
+    void reopened() {
+        if (quitting || stopped) return;
+        if (resident && !windowsOpen() && staleBuild.getAsBoolean()) {
+            restart(RestartMode.SAME);
+            if (quitting || stopped) return;
+            LOG.log(System.Logger.Level.WARNING,
+                "Jasper was updated on disk but could not relaunch as the new build; this window comes from the running build");
+        }
+        openOrRaise("reopen");
+    }
+
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
-            removeIndicator = residentIndicator.apply(this::openOrRaise, this::quit);
+            removeIndicator = residentIndicator.apply(new dev.jasper.app.platform.ResidentTray.Actions(
+                () -> openOrRaise("menu"), this::newWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
         } else if (!show && removeIndicator != null) {
             Runnable remove = removeIndicator;
             removeIndicator = null;
             remove.run();
         }
+    }
+
+    /** The first paint is in: unless something settles start-up first, it does after {@link #settleFallback}. EDT. */
+    private void armSettleFallback() {
+        if (startupSettled || cancelSettleFallback != null || !resident || quitting || stopped) return;
+        cancelSettleFallback = afterDelay(settleFallback, this::residencySettled);
+    }
+
+    private void stopSettleFallback() {
+        Runnable cancel = cancelSettleFallback;
+        cancelSettleFallback = null;
+        if (cancel != null) cancel.run();
+    }
+
+    /**
+     * Start-up has settled while resident: the macOS bridge loads, so a log-out is recognised from here on, and the
+     * indicator appears. Runs once per process, whichever of the first output painted, a finished warm-up or the
+     * fallback after the first paint comes first. EDT.
+     */
+    private void residencySettled() {
+        if (startupSettled || !resident || quitting || stopped) return;
+        startupSettled = true;
+        stopSettleFallback();
+        try {
+            if (dock != null) dock.prepare();
+        } finally {
+            // Settling happens once and nothing retries it: a bridge that throws must not leave a resident process unseen.
+            showIndicator(true);
+        }
+    }
+
+    /** The menu bar item's New Window: always a new window, in front of other applications. EDT. */
+    private void newWindowFromMenuBar() {
+        if (quitting || stopped) return;
+        openWindow(null, false, "menu");
+        requestForeground();
+    }
+
+    /** The menu bar item's Settings\u2026: over the last active window, or on its own while Jasper has none. EDT. */
+    private void settingsFromMenuBar() {
+        if (quitting || stopped) return;
+        requestForeground();
+        openSettings(null, null);
+    }
+
+    /** Brings Jasper in front of other applications: choosing a menu bar item does not activate its application. */
+    private static void requestForeground() {
+        if (supports(Desktop.Action.APP_REQUEST_FOREGROUND)) Desktop.getDesktop().requestForeground(false);
     }
 
     /**
@@ -434,39 +627,103 @@ public final class JasperApplication {
 
     /**
      * The handoff, the macOS reopen event and the resident indicator share this: raise what is open, or open the
-     * first window where a new shell starts.
+     * first window where a new shell starts. {@code trigger} names the caller for start-up timing.
      */
-    public void openOrRaise() {
+    public void openOrRaise(String trigger) {
         if (quitting || stopped) return;
-        if (windows.isEmpty()) newWindow();
+        if (windows.isEmpty()) openWindow(null, false, trigger);
         else raiseTerminal();
     }
 
-    /** As {@link #openOrRaise()}, opening the first window in {@code directory}. */
-    public void openOrRaise(Path directory) {
+    /** As {@link #openOrRaise(String)}, opening the first window in {@code directory}. */
+    public void openOrRaise(Path directory, String trigger) {
         if (quitting || stopped) return;
-        if (windows.isEmpty()) newWindow(directory);
+        if (windows.isEmpty()) openWindow(directory, directory == null, trigger);
         else raiseTerminal();
     }
 
     /**
-     * Pays the first window's one-time costs with no window on screen. Constructing this
-     * application already installed the look and feel; the font set is the remaining expensive
-     * piece, and building one realizes the toolkit's font machinery and the cell metrics.
+     * Pays the first window's one-time costs with nothing on screen, then runs {@code done} on the EDT, whatever happens
+     * on the way: even if building the fonts or composing, painting or closing the rehearsal fails, and an
+     * {@link Error} propagates only after {@code done} ran. Constructing this application installed the look and
+     * feel; this builds the configured font set and rehearses a window: composed with the configured grid, theme and
+     * contributions, its terminal fed a canned prompt from memory (no shell, no PTY), painted once into an image
+     * through the window's own graphics pipeline, and disposed without ever being shown. Plugins never see its pane:
+     * it is not registered with the terminal registry, and it is not a place where plugin content opens. It opens no
+     * window timing and marks no first paint, so only {@code done} tells the trace the warm-up finished. Headless there
+     * is nothing to rehearse with. Once {@code done} has run, whatever the outcome, one explicit collection starts off the
+     * EDT, so the heap the rehearsal grew returns to the operating system. EDT.
      */
-    public void warmUp() {
-        ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
-        FontConfig font = snapshot.font();
+    public void warmUp(Runnable done) {
+        Objects.requireNonNull(done, "done");
+        Runnable finished = collectingAfter(done);
+        // What a new window gets, start-up view mode included, so the rehearsal warms the chrome the next window shows.
+        ConfigSnapshot snapshot = windowConfiguration();
+        boolean rehearsing = false;
         try {
-            new dev.jasper.terminal.rendering.FontSet(font.family(), font.size(), font.fallback(),
-                font.ligatures(), font.lineHeight());
-        } catch (RuntimeException failure) {
-            LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
+            FontConfig font = snapshot.font();
+            try {
+                new dev.jasper.terminal.rendering.FontSet(font.family(), font.size(), font.fallback(),
+                    font.ligatures(), font.lineHeight());
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
+            }
+            rehearsing = !GraphicsEnvironment.isHeadless() && !quitting && !stopped;
+        } finally {
+            // Nothing to rehearse, or the font set threw an Error: finished now. Otherwise the rehearsal reports it.
+            if (!rehearsing) finished.run();
         }
-        // A resident Jasper with no window has finished starting once the records start-up queued have run: a plugin
-        // that failed to start is recorded through invokeLater, after this task, and nobody is away from Jasper yet.
-        // Settling through the same queue puts it behind them, so a login start sends no banner for them.
-        SwingUtilities.invokeLater(() -> settled = true);
+        if (rehearsing) {
+            // This bypasses openWindow: no window timing and no FIRST_PAINT or OUTPUT_PAINTED, which would settle
+            // residency for a window nobody sees. Only done marks WARMED_UP.
+            Rehearsal.run(() -> Rehearsal.feed(snapshot.columns(), snapshot.lines()), feed -> rehearsalWindow(feed, snapshot),
+                finished, Rehearsal.FALLBACK);
+        }
+    }
+
+    /**
+     * {@code done} followed, whether it returned or threw, by one {@link #collector} run on a new daemon thread. The thread
+     * starts from a later EDT event, not from the one that finished the rehearsal: that event's frames still hold the
+     * closed window, which the collection could not free. An {@link Error} from {@code done} still propagates; the
+     * returned task runs on the EDT, like {@link #warmUp}.
+     */
+    Runnable collectingAfter(Runnable done) {
+        return () -> {
+            try {
+                done.run();
+            } finally {
+                SwingUtilities.invokeLater(() -> Thread.ofPlatform().daemon().name("jasper-warm-up-collection").start(collector));
+            }
+        };
+    }
+
+    /**
+     * The rehearsal's window around {@code feed}: wired to the contributions but registered nowhere else, and silent,
+     * so a problem is logged rather than shown. Its frame is always disposed, even when closing the window fails. If the
+     * window's own constructor fails there is no window to reach its frame through; nothing was shown. EDT.
+     */
+    private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
+        TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
+            new CommandHistory());
+        // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
+        Rehearsal.silence(window.content());
+        // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
+        Runnable close = () -> Rehearsal.closeAndDispose(window::discard, window.nativeWindow()::dispose);
+        // Its own layout state, in memory and never saved, carrying only Zen mode: it warms the Zen chrome when the next
+        // window will show it.
+        UiState rehearsalState = UiState.inMemory();
+        rehearsalState.setZenMode(uiState.zenMode());
+        try {
+            window.content().connectContributions(contributions, rehearsalState, false);
+        } catch (RuntimeException | Error failure) {
+            try {
+                close.run();
+            } catch (RuntimeException | Error closing) {
+                failure.addSuppressed(closing);
+            }
+            throw failure;
+        }
+        return new Rehearsal.Stage(() -> Rehearsal.paint(window.nativeWindow()), close);
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
@@ -487,7 +744,11 @@ public final class JasperApplication {
         shells = new NativeShells(themes, uiState, this::nativeWindow,
             () -> newWindow(), this::quit);
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
-        auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
+        auxiliary.onAllClosed = () -> {
+            if (windows.isEmpty() && !resident && !quitting) requestShutdown();
+            else updateDock();
+        };
+        auxiliary.onFirstOpened = this::windowOpening;
         logFolder = dirs.logs();
         errorsWindow = new ErrorsWindow(contributions, auxiliary, incidents, new ErrorsView.Hooks(this::pluginName,
             id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),
@@ -613,23 +874,31 @@ public final class JasperApplication {
             });
         }
 
-    /** Where Jasper stands for notifications: focused, in the background, windowless, or still opening. */
+    /**
+     * Where Jasper stands for notifications: focused, in the background, idle (resident, start-up settled, with no window
+     * of any kind open and no terminal window being opened) or with no window yet. Idle waits for start-up to settle
+     * because incidents raised while the application was built are recorded later through {@code invokeLater}, in a
+     * {@code --background} launch with the process already resident and windowless: they must wait for the first window
+     * like the problems posted directly. With only a plugin window open Jasper is not idle, because cards target
+     * terminal windows: the next one still shows what waited. EDT.
+     */
     private Delivery.Presence presence() {
+        boolean residentIdle = resident && startupSettled && !windowsOpen() && openingWindows == 0;
         return presence(!windows.isEmpty(), activatedSinceOpen,
-            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null, settled);
+            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null, residentIdle);
     }
 
     /**
-     * The rule behind {@link #presence()}. A window counts only once it has been activated: a failure raised while the
-     * first window opens is queued ahead of the native activation event, and judging it "background" would keep its
-     * card out of sight for good. Until then the card waits, and so does one posted while Jasper starts. Once start-up
-     * has settled, no window open is a resident Jasper with every window closed: its cards wait for the next window and
-     * the operating system shows them meanwhile.
+     * The rule behind {@link #presence()}. A resident Jasper whose start-up has settled, with no window open and none
+     * being opened, is idle ({@code residentIdle}), however long that lasts: an ordinary card would only pile up, so it
+     * goes to history, and the operating system shows it meanwhile. Otherwise a window counts only once it has been
+     * activated: a failure raised while the first window opens is queued ahead of the native activation event, and
+     * judging it "background" would keep its card out of sight for good. Until then the card waits, as it does with no
+     * window at all, and shows on activation; the operating system is left alone, since the card is about to show.
      */
-    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive,
-                                      boolean settled) {
-        if (!windowsOpen) return settled ? Delivery.Presence.NO_WINDOW : Delivery.Presence.OPENING;
-        if (!activatedSinceOpen) return Delivery.Presence.OPENING;
+    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive, boolean residentIdle) {
+        if (residentIdle) return Delivery.Presence.IDLE;
+        if (!windowsOpen || !activatedSinceOpen) return Delivery.Presence.NO_WINDOW;
         return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
     }
 
@@ -790,6 +1059,42 @@ public final class JasperApplication {
         }
     }
 
+    /** Marks the first spawn and watches the session's first output from right after its start. Any thread. */
+    private TerminalSession watchOutput(TerminalSession session) {
+        trace.mark(StartupTrace.Milestone.SHELL_SPAWNED);
+        trackOutput(session, SessionOutput.watch(session, () -> trace.mark(StartupTrace.Milestone.SHELL_OUTPUT)));
+        return session;
+    }
+
+    /** Keeps a session's output watch until its first terminal claims it or the session exits. Any thread. */
+    void trackOutput(TerminalSession session, SessionOutput output) {
+        outputs.put(session, output);
+        session.exitFuture().whenComplete((code, failure) -> outputs.remove(session));
+    }
+
+    /** Whether a session's output watch is still held. Any thread. */
+    boolean watchingOutput(TerminalSession session) { return outputs.containsKey(session); }
+
+    /** First paint, then the first paint after output: the window is usable. EDT. */
+    private void timeFirstTerminal(TerminalPane pane, WindowTrace windowTrace) {
+        TerminalView view = pane.view();
+        view.afterNextPaint(() -> {
+            windowTrace.mark(WindowTrace.Milestone.FIRST_PAINT);
+            trace.mark(StartupTrace.Milestone.FIRST_PAINT);
+        });
+        view.repaint();
+        SessionOutput output = outputs.remove(pane.session());
+        if (output == null) return; // A provider's connection or a supplied test launcher: no output timing.
+        output.whenSeen(() -> SwingUtilities.invokeLater(() -> {
+            if (pane.view() != view) return;
+            view.afterNextPaint(() -> {
+                windowTrace.mark(WindowTrace.Milestone.OUTPUT_PAINTED);
+                trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+            });
+            view.repaint();
+        }));
+    }
+
     /** Remembers a shell so shutdown can wait for it to leave before terminating the JVM. */
     TerminalSession track(TerminalSession session) { return launches.track(session); }
 
@@ -799,18 +1104,30 @@ public final class JasperApplication {
         return null;
     }
 
-    void windowClosed(TerminalWindow window) {
+    /**
+     * Forgets a window the application no longer holds: out of the window list, the notification cards and the Buddy's
+     * windows, no longer the one used last, and with no window left nothing counts as activated. The window list
+     * changes first, so a failure after it still leaves the window forgotten. EDT.
+     */
+    private void forget(TerminalWindow window) {
         windows.remove(window);
         if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
         if (windows.isEmpty()) activatedSinceOpen = false;
+    }
+
+    void windowClosed(TerminalWindow window) {
+        forget(window);
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.
         boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
         if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
-        else updateBuddyActions();
+        else {
+            updateBuddyActions();
+            updateDock();
+        }
     }
 
     void windowStateChanged(TerminalWindow window, boolean showing, boolean iconified) {
@@ -824,7 +1141,6 @@ public final class JasperApplication {
         if (!windows.contains(window)) return;
         lastActive = window;
         activatedSinceOpen = true;
-        settled = true;
         notificationViews.activated(window.content());
         systemNotices.focused();
         terminals.windowActivated(window.content().id());
@@ -975,9 +1291,120 @@ public final class JasperApplication {
 
     /** Plugin windows', content tabs' and quit guards, asked before quit or restart changes anything and before the exit deadline is armed. */
     private boolean pluginWindowsMayClose() {
+        return windowsMayClose() && contributions.quitGuards().mayQuit();
+    }
+
+    /** Content tabs' and plugin windows' closing guards: what closing every window asks. Quit guards are not asked. EDT. */
+    private boolean windowsMayClose() {
         var requested = contributions.content().entries();
         return contributions.content().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
-            && requested.equals(contributions.content().entries()) && contributions.quitGuards().mayQuit();
+            && requested.equals(contributions.content().entries());
+    }
+
+    /**
+     * macOS's quit request (Cmd+Q, the application menu, the Dock's Quit, a log-out or a shutdown). Any thread.
+     *
+     * <p>An ordinary request is cancelled here and goes through {@link #quitRequested} unless a window that is recording
+     * shortcuts takes the Cmd+Q. A system quit (see {@link #quitIsSystemQuit}) quits for real, with the request left
+     * unanswered; the one exception is a user recording Cmd+Q in the Shortcuts panel while macOS is not powering off:
+     * the recorder takes it and the request is cancelled.
+     */
+    void nativeQuitRequested(java.awt.desktop.QuitResponse response) {
+        nativeQuitRequested(response, JasperApplication::commandQCaptured);
+    }
+
+    /** As {@link #nativeQuitRequested(java.awt.desktop.QuitResponse)}; tests replace how a recording window is found. */
+    void nativeQuitRequested(java.awt.desktop.QuitResponse response, BooleanSupplier recorderTakesCommandQ) {
+        DockPresence presence = dock;
+        if (quitIsSystemQuit()) {
+            SwingUtilities.invokeLater(() -> {
+                // A log-out is never cancelled; a flag not yet watched (before the bridge is prepared) reads as no log-out.
+                if (!presence.poweringOff() && recorderTakesCommandQ.getAsBoolean()) response.cancelQuit();
+                else quitForSystem(response);
+            });
+            return;
+        }
+        response.cancelQuit();
+        SwingUtilities.invokeLater(() -> { if (!recorderTakesCommandQ.getAsBoolean()) quitRequested(); });
+    }
+
+    /** Whether the focused window is recording shortcuts and takes Cmd+Q for itself. EDT. */
+    private static boolean commandQCaptured() {
+        var focused = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
+        var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.META_DOWN_MASK);
+        return dev.jasper.app.platform.WindowInput.captureShortcut(focused, stroke);
+    }
+
+    /**
+     * Whether a native quit request is the system's (a log-out, restart or shutdown) or must be treated as one: a
+     * resident process with Dock presence, until its bridge is prepared and from the moment macOS is powering off.
+     * Before the bridge is prepared a log-out cannot be told from a user's Quit, so both quit for real and the request
+     * is never interrupted. A process that is not resident, or has no Dock presence (development runs, Windows, Linux),
+     * keeps today's handler: cancel, then quit. Any thread.
+     */
+    boolean quitIsSystemQuit() {
+        DockPresence presence = dock;
+        // The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a cancelled log-out a
+        // later Cmd+Q quits for real, which is the safe direction.
+        return presence != null && resident && (!presence.prepared() || presence.poweringOff());
+    }
+
+    /**
+     * Cmd+Q, Jasper \u203a Quit, the Dock's Quit and Jasper's own Quit action: on a resident macOS Jasper with Dock presence
+     * whose bridge is prepared, every window closes and the process stays in the background; anywhere else, and before
+     * start-up has settled, it quits. EDT.
+     */
+    void quitRequested() {
+        DockPresence presence = dock;
+        if (presence != null && resident && presence.prepared()) toBackground();
+        else quit();
+    }
+
+    /**
+     * macOS asked every application to quit (a log-out, restart or shutdown): a real quit. The request stays unanswered
+     * so the exiting process ends it and the log-out goes on; a plugin refusing the quit cancels it. EDT.
+     */
+    void quitForSystem(java.awt.desktop.QuitResponse response) {
+        quit();
+        if (!quitting && !stopped) response.cancelQuit();
+    }
+
+    /**
+     * Closes every window through the guards closing them asks (content tabs, plugin windows) and keeps the process, its
+     * plugins and configuration; with Dock presence Jasper leaves the Dock. A refusal leaves everything open. EDT.
+     */
+    public void toBackground() {
+        if (quitting || stopped) return;
+        if (!windowsMayClose()) return;
+        for (TerminalWindow window : List.copyOf(windows)) window.close();
+        if (auxiliary != null) auxiliary.close();
+        updateDock();
+    }
+
+    /** Whether any Jasper window, terminal or plugin, is open. EDT. */
+    private boolean windowsOpen() {
+        return !windows.isEmpty() || (auxiliary != null && !auxiliary.open().isEmpty());
+    }
+
+    /**
+     * Whether this process switches its Dock presence now: a resident macOS Jasper that is not quitting. Quitting for
+     * real never touches the Dock, so a log-out or shutdown never waits on AppKit. EDT.
+     */
+    private boolean dockFollowsWindows() {
+        return dock != null && resident && !quitting && !stopped;
+    }
+
+    /**
+     * Foreground with a window open, Background with none; only a resident process with Dock presence switches. Not to
+     * be confused with {@link #presence()}, which is where Jasper stands for notifications. EDT.
+     */
+    private void updateDock() {
+        if (dockFollowsWindows()) dock.windows(windowsOpen());
+    }
+
+    /** A window is about to open: Foreground first. EDT. */
+    private void windowOpening() {
+        if (dockFollowsWindows()) dock.windows(true);
     }
 
     /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
@@ -999,6 +1426,7 @@ public final class JasperApplication {
         if (stopped) return;
         stopped = true;
         quitting = true;
+        stopSettleFallback();
         showIndicator(false);
         // Armed before anything else: a plugin's stop() that blocks the EDT cannot be abandoned, and
         // await() below is never reached in that case.

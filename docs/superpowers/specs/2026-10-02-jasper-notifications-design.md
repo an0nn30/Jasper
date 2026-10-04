@@ -7,7 +7,7 @@ records the execution deviations and the final-review fixes. Plan 1 is merged to
 (incidents)](../plans/2026-10-02-notifications-2-incidents.md) is merged to main (`c02673cd`). [Plan 3
 (SDK)](../plans/2026-10-03-notifications-3-sdk.md) is merged to main (`3c64ea5c`). [Plan 4 (long commands and
 Buddy)](../plans/2026-10-03-notifications-4-commands-buddy.md) is merged to main. [Plan 5 (OS
-notifiers)](../plans/2026-10-03-notifications-5-os-notifiers.md) is implemented on branch `claude/notifications-5`.
+notifiers)](../plans/2026-10-03-notifications-5-os-notifiers.md) is merged to main.
 
 **Replaces, once implemented:** the modal `JOptionPane` defaults of `WindowContent.onError` / `onInfo`, the SDK's
 `Notices` (`PluginContext.notices()`), `CommandNotifier`'s private OS sink, and Buddy's finished-card history
@@ -296,8 +296,17 @@ post the same way.
 **Jasper is focused** when any Jasper-owned window is active — terminal window, Settings, plugin window or the Errors
 window (`KeyboardFocusManager`'s active window). Today only terminal windows count.
 
-**Target window:** the poster's window, else the terminal window used last. With no window open (startup, resident
-mode), cards wait until one opens and is focused.
+**Target window:** the poster's window, else the terminal window used last. ~~With no window open (startup, resident
+mode), cards wait until one opens and is focused.~~ *Amended 2026-10-04 (resident by default, start-up speed Plan 4):*
+with no window yet (a start before its first window, a window being opened, one opened but not yet activated, or a
+resident Jasper still starting up), cards wait until a window opens and is focused, as before, so a failure raised while
+the first window opens, or while a `--background` launch builds the application, still shows its card. A **resident**
+Jasper whose start-up has settled (the first output painted, the warm-up finished, or the fallback after the first
+paint), with no window open and none being opened, is **idle** (`Delivery.Presence.IDLE`), a state that can last for
+hours: an ordinary `CARD` notification posted then goes straight to history, as in the background, with no card later;
+only `STICKY` ones wait for the next window. `OFF` and `HISTORY` are unchanged. *Merged with plan 5 (2026-10-04):* idle
+also asks for the OS notification of the background column below, for `CARD` and `STICKY` alike; with no window yet
+nothing goes to the operating system, since the card is about to show.
 
 **`Delivery`:**
 

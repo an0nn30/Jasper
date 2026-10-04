@@ -1,0 +1,237 @@
+// Portable fixtures for gradle/packaging-support.gradle, in the style of mac-launcher-identity-test.gradle: no
+// jpackage, window, signing identity or network. Each plan task adds its own doLast block through verifySupport.
+def verifySupport = tasks.register('verifyPackagingSupport') {
+    group = 'verification'
+    description = 'Checks the packaging helpers with fixtures: runtime modules, bundled natives, launcher configuration and AOT training.'
+    doLast {
+        List<String> roots = runtimeRootModules('macos')
+        assert roots.containsAll(['java.se', 'jdk.httpserver', 'jdk.unsupported', 'jdk.jfr', 'jdk.attach', 'jdk.zipfs'])
+        assert roots.intersect(['jcef', 'jogl.all', 'gluegen.rt', 'jdk.compiler', 'jdk.jshell', 'jdk.jlink', 'jdk.jpackage',
+            'jdk.jdi', 'jdk.jdwp.agent', 'jdk.incubator.vector', 'jdk.dynalink']).isEmpty()
+        assert runtimeRootModules('linux') == roots
+        assert runtimeRootModules('windows') == roots + ['jdk.crypto.mscapi']
+        List<String> modules = runtimeModules('macos')
+        assert modules == modules.toSorted() && modules == modules.toUnique() && modules.size() == 41
+        assert modules.containsAll(roots + ['java.base', 'java.desktop', 'java.sql', 'jdk.internal.jvmstat'])
+        assert runtimeModules('linux') == modules
+        assert runtimeModules('windows') == (modules + ['jdk.crypto.mscapi']).toSorted()
+        assert jlinkOptions.tokenize(' ').containsAll(['--generate-cds-archive', '--strip-debug'])
+        assert !jlinkOptions.contains('--bind-services') && !jlinkOptions.contains('--compress') &&
+            !jlinkOptions.contains('--strip-native-commands')
+        // The list plugin authors may rely on is the list the build ships.
+        String guide = rootProject.file('docs/plugin-authoring.md').getText('UTF-8')
+        def block = guide =~ /(?s)<!-- runtime-modules:start -->(.*?)<!-- runtime-modules:end -->/
+        assert block.find() : 'docs/plugin-authoring.md has no runtime-modules block'
+        assert (block.group(1) =~ /`([a-z][a-z0-9.]*)`/).collect { it[1] } == modules :
+            'docs/plugin-authoring.md lists other runtime modules than gradle/packaging-support.gradle'
+        logger.lifecycle('Verified the runtime module list')
+    }
+}
+tasks.named('check') { dependsOn(verifySupport) }
+
+verifySupport.configure {
+    doLast {
+        def mac = bundledNatives('macos', 'aarch64')
+        assert mac*.path == ['native/libflatlaf-macos-arm64.dylib', 'native/libjnidispatch.jnilib',
+            'native/darwin/libpty.dylib', 'native/darwin/pty4j-unix-spawn-helper']
+        assert mac*.entry == ['com/formdev/flatlaf/natives/libflatlaf-macos-arm64.dylib',
+            'com/sun/jna/darwin-aarch64/libjnidispatch.jnilib', 'resources/com/pty4j/native/darwin/libpty.dylib',
+            'resources/com/pty4j/native/darwin/pty4j-unix-spawn-helper']
+        assert mac.findAll { it.executable }*.path == ['native/darwin/pty4j-unix-spawn-helper']
+        assert mac.findAll { it.loaded }*.path == ['native/libflatlaf-macos-arm64.dylib', 'native/libjnidispatch.jnilib']
+        assert bundledNatives('macos', 'x64')*.entry.take(2) == ['com/formdev/flatlaf/natives/libflatlaf-macos-x86_64.dylib',
+            'com/sun/jna/darwin-x86-64/libjnidispatch.jnilib']
+        assert bundledNatives('windows', 'x64')*.path == ['native/flatlaf-windows-x86_64.dll', 'native/jnidispatch.dll',
+            'native/win/x86-64/conpty.dll', 'native/win/x86-64/OpenConsole.exe', 'native/win/x86-64/cyglaunch.exe',
+            'native/win/x86-64/win-helper.dll', 'native/win/x86-64/winpty-agent.exe', 'native/win/x86-64/winpty.dll']
+        assert bundledNatives('windows', 'x64').findAll { it.loaded }*.path == ['native/flatlaf-windows-x86_64.dll', 'native/jnidispatch.dll']
+        assert bundledNatives('linux', 'x64').isEmpty() && bundledNatives('linux', 'aarch64').isEmpty()
+        // Each pattern names exactly its own jar among the packaged ones.
+        List<String> jars = ['flatlaf-3.7.jar', 'flatlaf-extras-3.7.jar', 'jna-5.14.0.jar', 'jna-platform-5.14.0.jar', 'pty4j-0.13.10.jar']
+        assert mac.collect { nativeFile -> jars.findAll { it ==~ nativeFile.jar } } ==
+            [['flatlaf-3.7.jar'], ['jna-5.14.0.jar'], ['pty4j-0.13.10.jar'], ['pty4j-0.13.10.jar']]
+        assert bundledNativeJvmOptions('macos') == ['-Dflatlaf.nativeLibraryPath=$APPDIR/native',
+            '-Djna.boot.library.path=$APPDIR/native', '-Djna.nosys=true', '-Dpty4j.preferred.native.folder=$APPDIR/native']
+        assert bundledNativeJvmOptions('windows') == bundledNativeJvmOptions('macos')
+        assert bundledNativeJvmOptions('linux').isEmpty()
+
+        // An app folder with a space, as under "/Applications/My Apps"; Windows writes CRLF.
+        File spaced = new File(temporaryDir, 'My Apps/Jasper.app/Contents/app')
+        String root = spaced.absolutePath
+        String config = '[Application]\napp.classpath=$APPDIR/jasper-app.jar\napp.mainclass=dev.jasper.app.Main\n' +
+            'app.classpath=$APPDIR/flatlaf-3.7.jar\n\n[JavaOptions]\njava-options=-Djpackage.app-version=1.0.0\n' +
+            'java-options=-Dflatlaf.nativeLibraryPath=$APPDIR/native\n'
+        assert launcherClasspath(config, spaced) == ["${root}/jasper-app.jar", "${root}/flatlaf-3.7.jar"]*.toString()
+        assert launcherJavaOptions(config, spaced) == ['-Djpackage.app-version=1.0.0', "-Dflatlaf.nativeLibraryPath=${root}/native".toString()]
+        assert launcherClasspath(config.replace('\n', '\r\n'), spaced) == launcherClasspath(config, spaced)
+        String log = '[0.212s][info][library] Loaded library /a b/native/libjnidispatch.jnilib, handle 0x000000007549ce80\n' +
+            '[0.212s][info][library] Found JNI_OnLoad in library with handle 0x000000007549ce80\n' +
+            '[0.300s][info][library] Loaded library C:\\J\\app\\native\\jnidispatch.dll, handle 0x00007ffa12340000\n'
+        assert loadedLibraries(log) == ['/a b/native/libjnidispatch.jnilib', 'C:\\J\\app\\native\\jnidispatch.dll']
+        logger.lifecycle('Verified bundled natives and launcher configuration parsing')
+    }
+}
+
+// BundledNativesProbeTest runs the probe with the packaged launcher's own native-library options.
+tasks.named('test', Test) { systemProperty('jasper.bundledNativeOptions', bundledNativeJvmOptions('macos').join('\n')) }
+
+verifySupport.configure {
+    doLast {
+        String config = '[Application]\napp.classpath=$APPDIR/jasper-app.jar\napp.classpath=$APPDIR/flatlaf-3.7.jar\n\n' +
+            '[JavaOptions]\njava-options=-Djpackage.app-version=1.0.0\n'
+        String trained = withJavaOption(config, aotCacheOption)
+        assert trained == config + 'java-options=-XX:AOTCache=$APPDIR/jasper.aot\n'
+        assert withJavaOption(trained, aotCacheOption) == trained
+        assert withJavaOption(trained.replace('jasper.aot', 'old.aot'), aotCacheOption) == trained
+        assert withJavaOption('[Application]\napp.mainclass=dev.jasper.app.Main\n', '-Dx=y') ==
+            '[Application]\napp.mainclass=dev.jasper.app.Main\n\n[JavaOptions]\njava-options=-Dx=y\n'
+        assert withJavaOption('[JavaOptions]\njava-options=-Da=1\n\n[Other]\nkey=v\n', '-Db=2') ==
+            '[JavaOptions]\njava-options=-Da=1\njava-options=-Db=2\n\n[Other]\nkey=v\n'
+
+        File appDir = new File(temporaryDir, 'My Apps/Jasper.app/Contents/app')
+        File javaBinary = new File(temporaryDir, 'runtime/bin/java')
+        String root = appDir.absolutePath
+        assert aotCheckCommand(javaBinary, trained, appDir) == [javaBinary.absolutePath, '-Djpackage.app-version=1.0.0',
+            "-XX:AOTCache=${root}/jasper.aot", '-XX:AOTMode=on', '-cp',
+            ["${root}/jasper-app.jar", "${root}/flatlaf-3.7.jar"].join(File.pathSeparator), '-version']*.toString()
+
+        assert javaToolOptions(['-Da=b c', "-Dq=it's", '-Dd="x"', '-Dplain']) == '''-Da=b' 'c -Dq=it"'"s -Dd='"'x'"' -Dplain'''
+
+        Map good = [pid: 42, kind: 'cold', settled: true, milestones: [WINDOW_SHOWN: 1.0, OUTPUT_PAINTED: 2.0, PLUGINS_BOUND: 3.0]]
+        assert trainingTraceProblem(good, 42L) == null
+        assert trainingTraceProblem(good + [pid: 7], 42L) == 'the trace belongs to process 7, not the training launch 42'
+        assert trainingTraceProblem(good + [kind: 'background'], 42L) == "the launch was 'background', not a cold start with a window"
+        assert trainingTraceProblem(good + [milestones: [WINDOW_SHOWN: 1.0]], 42L) == 'start-up settled without OUTPUT_PAINTED, PLUGINS_BOUND'
+        assert trainingTraceProblem(good + [milestones: null], 42L) == 'start-up settled without WINDOW_SHOWN, OUTPUT_PAINTED, PLUGINS_BOUND'
+        logger.lifecycle('Verified launcher configuration edits and the AOT checks')
+
+        // Training must not see the user's real Jasper home or any JVM option or class path a real launch would not have.
+        Map<String, String> inherited = [JASPER_HOME: '/Users/x/real-jasper', _JAVA_OPTIONS: '-Xmx1m', JDK_JAVA_OPTIONS: '-Xms1m',
+            CLASSPATH: '/some/classes', JAVA_TOOL_OPTIONS: '-Dinherited=1', HOME: '/Users/x', PATH: '/usr/bin:/bin']
+        Map<String, String> training = aotTrainingEnvironment(inherited, '-Dtraining=2')
+        ['JASPER_HOME', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'CLASSPATH'].each { assert !training.containsKey(it) : "${it} leaked into the training environment" }
+        assert training.JAVA_TOOL_OPTIONS == '-Dtraining=2'
+        assert training.HOME == '/Users/x' && training.PATH == '/usr/bin:/bin'
+        assert training.keySet() == ['JAVA_TOOL_OPTIONS', 'HOME', 'PATH'] as Set
+        assert inherited.size() == 7 && inherited.JASPER_HOME == '/Users/x/real-jasper' : 'the inherited map must not be modified'
+        logger.lifecycle('Verified the training environment scrub')
+    }
+}
+
+// runAotTraining against stand-ins for the launcher: /bin/sh scripts that read JAVA_TOOL_OPTIONS the way the JVM does,
+// write Plan 1's trace JSON and, on SIGTERM, the cache. Windows has no /bin/sh, and AOT training is macOS-only.
+verifySupport.configure {
+    doLast {
+        if (System.getProperty('os.name').startsWith('Windows')) return
+        File fakes = new File(temporaryDir, 'aot training')   // a space, as in a checkout under "My Projects"
+        fakes.deleteDir()
+        fakes.mkdirs()
+        String readOptions = '''eval "set -- $JAVA_TOOL_OPTIONS"
+for option in "$@"; do
+  case "$option" in
+    -Djasper.startupTrace=*) trace=${option#-Djasper.startupTrace=} ;;
+    -XX:AOTCacheOutput=*) cache=${option#-XX:AOTCacheOutput=} ;;
+  esac
+done
+printf '%s\\n' "$@" > "${cache%/*}/options.txt"
+'''
+        def settles = { String milestones, boolean writesCache ->
+            (writesCache ? 'trap \'printf cache > "$cache"; exit 143\' TERM\n' : 'trap \'exit 143\' TERM\n') +
+                'printf \'{"schema":1,"pid":%s,"kind":"cold","settled":true,"milestones":{' + milestones + '}}\' "$$" > "$trace.part"\n' +
+                'mv "$trace.part" "$trace"\n' +
+                'while :; do sleep 1; done\n'
+        }
+        def fake = { String name, String body ->
+            File script = new File(fakes, "${name}.sh")
+            script.setText('#!/bin/sh\n' + readOptions + body, 'UTF-8')
+            script.setExecutable(true, false)
+            script
+        }
+        def expectFailure = { String expected, Closure action ->
+            try {
+                action()
+                assert false : "expected a failure mentioning: ${expected}"
+            } catch (GradleException failure) {
+                assert failure.message.contains(expected) : failure.message
+            }
+        }
+        String complete = '"WINDOW_SHOWN":1.0,"OUTPUT_PAINTED":2.0,"PLUGINS_BOUND":3.0'
+        File work = new File(fakes, 'work')
+        File cache = runAotTraining(fake('trains', settles(complete, true)), work, 20, 20)
+        assert cache == new File(work, 'jasper.aot') && cache.getText('UTF-8') == 'cache'
+        assert new File(work, 'options.txt').readLines('UTF-8') == ["-XX:AOTCacheOutput=${cache.absolutePath}",
+            "-Duser.home=${new File(work, 'home').absolutePath}", "-Djasper.startupTrace=${new File(work, 'startup-trace.json').absolutePath}",
+            '-Dapple.awt.UIElement=true']*.toString()
+        String trainingConfig = new File(work, 'home/.config/jasper/config.toml').getText('UTF-8')
+        assert trainingConfig.contains('run_in_background = false') && trainingConfig.contains('program = "/bin/sh"')
+        assert trainingConfig.contains('args = ["' + new File(work, 'training-shell.sh').absolutePath + '"]')
+        assert new File(work, 'training-shell.sh').canExecute()
+        assert aotTrainingConfig(new File('/w/say "hi"/s.sh')).contains('args = ["/w/say \\"hi\\"/s.sh"]')
+        expectFailure('Jasper exited (3) before start-up settled') { runAotTraining(fake('exits', 'exit 3\n'), work, 20, 20) }
+        expectFailure('start-up settled without OUTPUT_PAINTED, so the cache would miss') {
+            runAotTraining(fake('no-output', settles('"WINDOW_SHOWN":1.0,"PLUGINS_BOUND":3.0', true)), work, 20, 20)
+        }
+        expectFailure('start-up did not settle within 1 s') { runAotTraining(fake('stalls', 'while :; do sleep 1; done\n'), work, 1, 20) }
+        expectFailure('the JVM wrote no cache') { runAotTraining(fake('no-cache', settles(complete, false)), work, 20, 20) }
+        logger.lifecycle('Verified AOT training orchestration against stand-in launchers')
+
+        // A launcher that ignores SIGTERM, with a child that does too (the JVM's cache-assembly child): once the bounded
+        // exit wait times out, runAotTraining must kill both rather than orphan the child.
+        String stubborn = 'trap \'\' TERM\n' +
+            'sleep 600 &\n' +
+            'printf \'%s %s\' "$$" "$!" > "${cache%/*}/pids.txt"\n' +
+            'printf \'{"schema":1,"pid":%s,"kind":"cold","settled":true,"milestones":{' + complete + '}}\' "$$" > "$trace.part"\n' +
+            'mv "$trace.part" "$trace"\n' +
+            'while :; do sleep 1; done\n'
+        expectFailure('did not exit within 1 s of SIGTERM') { runAotTraining(fake('stubborn', stubborn), work, 20, 1) }
+        List<Long> stubbornPids = new File(work, 'pids.txt').getText('UTF-8').tokenize().collect { it as Long }
+        assert stubbornPids.size() == 2 && stubbornPids.every { it > 1 } : stubbornPids
+        stubbornPids.each { Long pid ->
+            assert !ProcessHandle.of(pid).map { it.isAlive() }.orElse(false) : "process ${pid} outlived the failed training launch"
+        }
+        logger.lifecycle('Verified a timed-out training launch leaves no process behind')
+    }
+}
+
+// detachMount: hdiutil detach, once more after a pause, then hdiutil detach -force. The runner here answers from a list
+// of exit codes and the pause is counted, not slept, so the fixtures stay instant.
+verifySupport.configure {
+    doLast {
+        File mount = new File(temporaryDir, 'My Volume/mount')   // a space, as in a checkout under "My Projects"
+        List<String> plain = ['/usr/bin/hdiutil', 'detach', mount.absolutePath]
+        List<String> forced = ['/usr/bin/hdiutil', 'detach', '-force', mount.absolutePath]
+        def detach = { List<Integer> exitCodes ->
+            List<List<String>> commands = []
+            int pauses = 0
+            boolean detached = detachMount(mount, { List<String> command -> commands << command; exitCodes[commands.size() - 1] }, { pauses++ })
+            [detached: detached, commands: commands, pauses: pauses]
+        }
+        assert detach([0]) == [detached: true, commands: [plain], pauses: 0]
+        assert detach([1, 0]) == [detached: true, commands: [plain, plain], pauses: 1]
+        assert detach([1, 16, 0]) == [detached: true, commands: [plain, plain, forced], pauses: 1]
+        assert detach([1, 1, 1]) == [detached: false, commands: [plain, plain, forced], pauses: 1]
+        logger.lifecycle('Verified the DMG detach retry and force')
+    }
+}
+
+verifySupport.configure {
+    doLast {
+        File original = new File(temporaryDir, 'times/original')
+        File copied = new File(temporaryDir, 'times/copied')
+        [original, copied].each { it.deleteDir(); new File(it, 'plugins').mkdirs() }
+        long stamp = 1_759_400_000_000L
+        ['jasper-app.jar', 'plugins/tool.jar', 'jasper.aot'].each { String name ->
+            [original, copied].each { File root ->
+                File file = new File(root, name)
+                file.text = name
+                assert file.setLastModified(stamp)
+            }
+        }
+        assert modificationTimeMismatches(original, copied).isEmpty()
+        assert new File(copied, 'plugins/tool.jar').setLastModified(stamp + 1_000)
+        assert new File(copied, 'jasper.aot').delete()
+        assert new File(copied, 'jasper-app.jar').setLastModified(stamp + 400)   // same second: HFS+ and the JVM keep whole seconds
+        assert modificationTimeMismatches(original, copied) == ['jasper.aot', "plugins${File.separator}tool.jar".toString()]
+        logger.lifecycle('Verified modification-time comparison')
+    }
+}

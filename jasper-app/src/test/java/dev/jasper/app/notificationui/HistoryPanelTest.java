@@ -194,7 +194,7 @@ class HistoryPanelTest {
             show();
             HistoryRow before = panel.row(id);
             Color dark = before.titleColor();
-            new ThemeController(Theme.INTELLIJ_LIGHT);
+            new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             SwingUtilities.updateComponentTreeUI(panel);
             HistoryRow after = panel.row(id);
             assertThat(after).isNotNull().isNotSameAs(before);

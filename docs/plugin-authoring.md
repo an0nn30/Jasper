@@ -232,7 +232,9 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
   can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
 - `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after plugin windows and
   content tabs, even when your plugin has no window: a background server can ask "stop the running servers?".
-  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit.
+  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit. It is not asked
+  when a resident macOS Jasper only goes to the background (Cmd+Q closes the windows through their closing guards and
+  keeps the process), so a background server keeps running until Jasper really quits.
 - In SDK 0.8.4+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
   Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
   window close. The close button is not affected.
@@ -625,6 +627,40 @@ and add `--plugin-dir <its build/plugin/<id> directory>` to that configuration's
 (or `--args='--plugin-dir …'` to the Gradle `run`); it loads with consent pre-granted. To try the
 user-plugin path itself, unzip or copy a plugin directory into `jasper-app/build/dev-home/plugins/`
 and review it in File → Manage Plugins… as a user would, still without touching your system Jasper.
+
+## The Java runtime
+
+Packaged Jasper runs on its own trimmed JetBrains Runtime 25, not on every JDK module. The runtime has exactly these
+modules, and a plugin may rely on them; `verifyPackage` checks every packaged runtime against this list:
+
+<!-- runtime-modules:start -->
+`java.base`, `java.compiler`, `java.datatransfer`, `java.desktop`, `java.instrument`, `java.logging`,
+`java.management`, `java.management.rmi`, `java.naming`, `java.net.http`, `java.prefs`, `java.rmi`,
+`java.scripting`, `java.se`, `java.security.jgss`, `java.security.sasl`, `java.smartcardio`, `java.sql`,
+`java.sql.rowset`, `java.transaction.xa`, `java.xml`, `java.xml.crypto`, `jdk.accessibility`, `jdk.attach`,
+`jdk.charsets`, `jdk.crypto.cryptoki`, `jdk.httpserver`, `jdk.internal.jvmstat`, `jdk.jfr`, `jdk.localedata`,
+`jdk.management`, `jdk.management.agent`, `jdk.management.jfr`, `jdk.naming.dns`, `jdk.naming.rmi`, `jdk.net`,
+`jdk.security.auth`, `jdk.security.jgss`, `jdk.unsupported`, `jdk.unsupported.desktop`, `jdk.zipfs`
+<!-- runtime-modules:end -->
+
+On Windows it also has `jdk.crypto.mscapi`, the Windows certificate stores. That is all of Java SE (`java.se`) plus
+the charsets, locale data, ZIP file system, PKCS#11 and smart-card providers, Kerberos and JAAS login modules, DNS and
+RMI naming, `jdk.net`'s socket options, the JDK HTTP server, `sun.misc.Unsafe` (`jdk.unsupported`), and JFR, JMX and
+attach for diagnostics.
+
+Not there: the compiler and the other development tools (`jdk.compiler`, so `ToolProvider.getSystemJavaCompiler()`
+returns null; `jdk.javadoc`, `jdk.jshell`, `jdk.jlink`, `jdk.jpackage`, `jdk.jdeps`, `jdk.jartool`, `jdk.jconsole`,
+`jdk.jstatd`, `jdk.editpad`), the debugger (`jdk.jdi`, `jdk.jdwp.agent`, so `-agentlib:jdwp` does not work in the
+packaged app), `jdk.dynalink` (a bundled Nashorn cannot run), `jdk.incubator.vector`, `jdk.sctp`, `jdk.xml.dom`,
+`jdk.jsobject`, `jdk.nio.mapmode`, and the JetBrains Runtime's JCEF and JOGL (`jcef`, `jogl.all`, `gluegen.rt`). A
+library that needs one of them fails with `NoClassDefFoundError` in the packaged app although it works under
+`./gradlew :jasper-app:run`, which uses the full SDK. Bundle a jar instead, or ask for the module to be added
+(`runtimeRootModules` in `gradle/packaging-support.gradle`).
+
+The packaged JVM loads JNA's native library from Jasper's own copy (`jna.boot.library.path`, JNA 5.14.0) and points
+pty4j at Jasper's bundled files (`pty4j.preferred.native.folder`). Both properties are process-wide. A plugin that
+bundles JNA should bundle the same version: another version fails to load its native part if it is the first in the
+process to initialise JNA. Start terminals through `context.terminals()` rather than a pty4j of your own.
 
 ## Distributing a plugin
 

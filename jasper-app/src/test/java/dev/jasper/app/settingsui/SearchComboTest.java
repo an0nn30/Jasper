@@ -133,7 +133,7 @@ class SearchComboTest {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             var original = javax.swing.UIManager.getLookAndFeel();
             try {
-                for (var theme : List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.INTELLIJ_LIGHT)) {
+                for (var theme : List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     dev.jasper.app.appearance.ThemeTestSupport.install(theme);
                     var stock = new javax.swing.JComboBox<>(new String[]{"Nord"});
                     var stockList = ((javax.swing.plaf.basic.ComboPopup) stock.getUI().getAccessibleChild(stock, 0)).getList();

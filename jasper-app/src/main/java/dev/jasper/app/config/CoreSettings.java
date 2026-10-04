@@ -62,10 +62,17 @@ public final class CoreSettings {
         .applies(Applies.RESTART)
         .description("Windows and Linux only: use the operating system's title bar, with the menus and the toolbar in\n"
             + "rows of their own, instead of Jasper's title bar. macOS always uses its own title bar.").build();
+    public static final Setting<ViewMode> WINDOW_VIEW_MODE = Setting.of("window.view_mode", SettingKind.choice(List.of(
+            Map.entry("normal", ViewMode.NORMAL), Map.entry("compact", ViewMode.COMPACT))), ViewMode.NORMAL)
+        .label("View mode").keywords("title bar", "compact", "normal", "command palette")
+        .applies(Applies.RESTART)
+        .description("View mode: \"normal\" keeps the current workspace; \"compact\" uses the native title bar, hides the\n"
+            + "toolbar and title search field, and opens the command palette as a floating card. Takes effect after restart.\n"
+            + "The saved toolbar preference is retained for Normal.").build();
     public static final Setting<Boolean> BUDDY_ENABLED = Setting.of("buddy.enabled", SettingKind.bool(), false)
         .label("Show Jasper").keywords("buddy", "desk buddy", "mascot")
         .description("Show the pixel-art Jasper floating above your windows while a terminal is open; off by default,\n"
-            + "updates live. View > Show Jasper and a right-click on Jasper toggle him for this session only.").build();
+            + "updates live. The Show/Hide Jasper command and a right-click on Jasper toggle him for this session only.").build();
     public static final Setting<Integer> NOTIFICATIONS_LONG_COMMAND_SECONDS = Setting.of("notifications.long_command_seconds",
             SettingKind.integer(0, 3600, DEFAULT), 10)
         .label("Notify after (seconds)").keywords("notification", "long command", "finished", "alert")
@@ -74,15 +81,25 @@ public final class CoreSettings {
             + "Zero disables notifications. Range 0-3600.").build();
     public static final Setting<Boolean> NOTIFICATIONS_SYSTEM = Setting.of("notifications.system", SettingKind.bool(), true)
         .label("Show system notifications").keywords("notification", "system", "banner", "balloon", "desktop", "tray")
-        .description("Live. While Jasper is in the background, also show its notifications as the operating system's\n"
-            + "own: banners from the packaged macOS app, Windows tray balloons, or notify-send on Linux.").build();
-    public static final Setting<Boolean> SYSTEM_RUN_IN_BACKGROUND = Setting.of("system.run_in_background", SettingKind.bool(), false)
-        .alias("background.enabled").label("Run in background").keywords("resident", "login", "autostart", "background")
+        .description("Live. While Jasper is in the background, or idle as a resident Jasper with every window closed, also\n"
+            + "show its notifications as the operating system's own: banners from the packaged macOS app, Windows tray\n"
+            + "balloons, or notify-send on Linux.").build();
+    /**
+     * Residency is on by default where a windowless Jasper stays reachable: macOS (its menu bar item and Dock) and
+     * Windows (its notification-area icon). Linux has no tray, so it stays off there.
+     */
+    static boolean runsInBackgroundByDefault(String osName) {
+        return osName != null && (osName.startsWith("Mac") || osName.startsWith("Windows"));
+    }
+
+    public static final Setting<Boolean> SYSTEM_RUN_IN_BACKGROUND = Setting.of("system.run_in_background", SettingKind.bool(),
+            runsInBackgroundByDefault(System.getProperty("os.name")))
+        .alias("background.enabled").label("Run in background").keywords("resident", "login", "autostart", "background", "menu bar")
         .applies(Applies.RESTART)
-        .description("Keep Jasper running with no windows after the last one closes to reduce next-launch startup\n"
-            + "work, and start it in the background at login. Quit still exits completely.\n"
-            + "Residency applies from the next start; the login item updates as soon as you save.\n"
-            + "Autostart needs an installed Jasper, not a development run.").build();
+        .description("Keep Jasper running with no windows so a new window opens instantly, and start it in the background\n"
+            + "at login. On by default on macOS and Windows, off on Linux. On macOS, Quit (Cmd+Q) closes every window and\n"
+            + "keeps Jasper in the menu bar; Quit Jasper Completely there ends it. Residency applies from the next start;\n"
+            + "the login item updates as soon as you save. Autostart needs an installed Jasper, not a development run.").build();
     public static final Setting<Integer> PALETTE_VISIBLE_ROWS = Setting.of("palette.visible_rows",
             SettingKind.integer(PaletteSettings.MIN_VISIBLE_ROWS, PaletteSettings.MAX_VISIBLE_ROWS, DEFAULT), PaletteSettings.DEFAULT_VISIBLE_ROWS)
         .alias("palette.max_results").label("Visible rows").keywords("palette", "search", "results", "rows", "height")
@@ -201,8 +218,8 @@ public final class CoreSettings {
     public static final Setting<String> UI_THEME_NAME = Setting.of("ui.theme.name",
             SettingKind.string(text -> true, "", String::strip), ConfigSnapshot.DEFAULT_THEME)
         .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
-        .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"IntelliJ Light\",\n"
-            + "\"Darcula\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
+        .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"Nord\",\n"
+            + "\"Clear Dark\", \"Clear Light\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
     public static final Setting<Float> UI_WORKSPACE_OPACITY = Setting.of("ui.workspace.opacity", SettingKind.number(10, 100),
             GlassSettings.UNSET_OPACITY)
         .example(95f).label("Opacity").keywords("opacity", "transparency", "translucent", "glass", "workspace", "background")
@@ -215,7 +232,7 @@ public final class CoreSettings {
         .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows the workspace theme.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
-            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, SYSTEM_RUN_IN_BACKGROUND,
+            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,

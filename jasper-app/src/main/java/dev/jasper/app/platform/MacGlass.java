@@ -143,8 +143,8 @@ final class MacGlass {
     /** Under {@code ./gradlew run} the build passes {@code jasper.glassLibrary}; a packaged app has it in Contents/app. */
     static Path library(String override, String appPath) {
         if (override != null && !override.isBlank()) return Path.of(override);
-        Path notifications = MacNotifications.libraryPath(appPath);
-        return notifications == null ? null : notifications.resolveSibling("libjasper-glass.dylib");
+        Path bridge = MacNative.libraryPath(appPath);
+        return bridge == null ? null : bridge.resolveSibling("libjasper-glass.dylib");
     }
 
     @SuppressWarnings("restricted") // The launcher explicitly enables native access.

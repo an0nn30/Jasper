@@ -77,7 +77,9 @@ public final class CorePages {
                 .row(UI_WORKSPACE_BLUR, Editors.choice(Map.of("theme", "Use theme's value"))).shownWhen(glass)
                 .section("Interface font")
                 .row(UI_FONT_FAMILY, Editors.font(false))
-                .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt")),
+                .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt"))
+                .section("View mode")
+                .row(WINDOW_VIEW_MODE),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
                 .section("Toolbar and status bar")
                 .row(WINDOW_TOOLBAR)
