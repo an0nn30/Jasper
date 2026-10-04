@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-04
 
-- **Theme engine/UI kit overhaul: spec approved; three plans awaiting review** (2026-10-04), on
+- **Theme engine/UI kit overhaul: Plan 1 execution approved and in progress** (2026-10-04), on
   `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.
   [Approved specification](superpowers/specs/2026-10-04-jasper-theme-engine-design.md);
   [preserved source and nine visual references](design/theme-engine/reference/README.md).
@@ -22,8 +22,12 @@
   [shared API contracts](superpowers/plans/2026-10-04-theme-engine-contracts.md). The plans cover 14/12/11
   task groups, preserve the per-task implementer/reviewer workflow, and propose the coordinated SDK
   0.15.0 boundary. Planning self-review checked source paths, cross-plan signatures, spec coverage,
-  and panel capability gaps (including status dots and menu buttons). Product implementation has not
-  started. Next: user reviews the plans, then execute Plan 1 in this worktree. No workflow deviation.
+  and panel capability gaps (including status dots and menu buttons). The user requested “execute plan 1”. Plan 1 is now in progress; Plans 2–3 remain unexecuted.
+  Sequencing adjustments: Tasks 4–5 (context/icons/metrics) and 11–12 (SDK/host) are each integrated
+  implementation/review units to keep commits runnable; Task 14 supplies the single final branch review.
+  Task 1 pulls forward base ThemeToml parsing into `themeio` so the resolver tests retain real TOML
+  fixtures. Module `GlassLevels` retains independent value/validation behavior; app `GlassSettings`
+  translation remains in the existing app until the Plan 2 adapter.
   The prior fresh headless baseline `./gradlew check`
   passed all 91 tasks: **8,743 tests, 0 failures, 0 errors, 6 skipped**. Documentation link and
   placeholder checks passed; source attachments are preserved unchanged. No GUI or AOT training.

@@ -124,3 +124,5 @@ apply(from = "gradle/application-architecture.gradle.kts")
 apply(from = "gradle/sdk-architecture.gradle.kts")
 apply(from = "gradle/plugin-architecture.gradle.kts")
 apply(from = "gradle/plugin-packaging.gradle.kts")
+
+apply(from = "gradle/ui-architecture.gradle.kts")

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Shared contracts:** [Exact paths, types, signatures, defaults and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** Written for review; not executed. Baseline before documentation: 8,743 tests, zero failures/errors, six skipped. No deviations.
+**Status:** Execution approved on 2026-10-04; in progress. Baseline: 8,743 tests, zero failures/errors, six skipped. Sequencing adjustments: Tasks 4–5 and 11–12 are each integrated implementation/review units because their initial APIs are mutually dependent; Task 14 supplies the single final whole-branch review. Task 1 pulls forward base ThemeToml into themeio to retain real resolver fixtures; Task 2 adds canonical semantics and serialization. GlassLevels retains its independent value/validation API; the app-specific GlassSettings resolve overload stays in the existing app pending Plan 2 adapter translation.
 
 ## Global Constraints
 
