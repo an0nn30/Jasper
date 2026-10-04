@@ -27,6 +27,7 @@ class UiStateTest {
         assertThat(Files.readString(file)).isEqualTo("""
             version = 2
             rail_visible = false
+            zen_mode = false
 
             [dock]
             left_width = 300

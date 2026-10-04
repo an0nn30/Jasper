@@ -55,6 +55,7 @@ final class WorkspaceActions {
             case SPLIT_RIGHT -> tab.split(SplitTree.Axis.RIGHT);
             case SPLIT_DOWN -> tab.split(SplitTree.Axis.DOWN);
             case ZOOM_PANE -> tab.toggleZoom();
+            case TOGGLE_ZEN_MODE -> owner.toggleZenMode();
             case FOCUS_PANE_LEFT -> tab.navigate(SplitTree.Direction.LEFT);
             case FOCUS_PANE_RIGHT -> tab.navigate(SplitTree.Direction.RIGHT);
             case FOCUS_PANE_UP -> tab.navigate(SplitTree.Direction.UP);
@@ -114,7 +115,7 @@ final class WorkspaceActions {
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
+                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT, TOGGLE_ZEN_MODE -> true;
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,

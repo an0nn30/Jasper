@@ -77,6 +77,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private boolean traversalTyped;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
     private ViewMode viewMode = ViewMode.NORMAL;
+    private boolean zenMode;
+    private boolean statusVisible = true;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
@@ -671,6 +673,28 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowChrome chrome() { return chrome; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
+    boolean statusVisible() { return statusVisible; }
+    boolean zenMode() { return zenMode; }
+
+    /** Saves this window's mode without changing its normal visibility or dock layout. */
+    void toggleZenMode() {
+        if (closed) return;
+        setZenMode(!zenMode());
+        uiState.setZenMode(zenMode());
+        uiState.save();
+    }
+
+    private void setZenMode(boolean enabled) {
+        if (closed || zenMode == enabled) return;
+        dockDrag.cancel();
+        zenMode = enabled;
+        refreshChromeVisibility();
+        area.setToolsSuppressed(zenMode());
+        syncRailVisibility();
+        if (zenMode()) focusSelected();
+        if (contributed != null) contributed.viewModeChanged();
+        updateActions();
+    }
     ViewMode viewMode() { return viewMode; }
 
     /** Called only for the first configuration application, before any native chrome is installed. */
@@ -681,6 +705,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             area.setHeaderVisible(false);
         }
         chrome.setToolbarMode(toolbarMode);
+
     }
     public boolean isActiveAndOpen() { return active && !closed; }
 
@@ -711,6 +736,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
+        // Restore before contributions can build or show saved panels.
+        setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         contentRegistry = model.content();
         contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
@@ -797,7 +824,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * place to move windows to), unless the user hid them with View > Rail.
      */
     void syncRailVisibility() {
-        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && railVisible;
+        boolean wanted = !zenMode() && !(leftStripe.empty() && rightStripe.empty()) && railVisible;
         area.setStripesVisible(wanted);
         if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
             leftStripe.setVisible(wanted);
@@ -1300,12 +1327,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
-        toolbarMode = mode; chrome.setToolbarMode(mode);
-        updateActions(); revalidate(); onMinimumSizeChanged.run();
+        toolbarMode = Objects.requireNonNull(mode); refreshChromeVisibility(); updateActions();
     }
     void setStatusVisible(boolean visible) {
-        chrome.setStatusVisible(visible); area.setStatusVisible(visible);
-        updateActions(); revalidate(); onMinimumSizeChanged.run();
+        statusVisible = visible; refreshChromeVisibility(); updateActions();
+    }
+
+    private void refreshChromeVisibility() {
+        chrome.setToolbarMode(toolbarMode);
+        chrome.setStatusVisible(!zenMode() && statusVisible);
+        area.setStatusVisible(!zenMode() && statusVisible);
+        chrome.header().revalidate(); chrome.header().repaint();
+        revalidate(); repaint(); onMinimumSizeChanged.run();
     }
 
     @Override public void close() {

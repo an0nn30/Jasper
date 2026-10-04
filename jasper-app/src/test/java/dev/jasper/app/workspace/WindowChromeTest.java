@@ -62,7 +62,7 @@ class WindowChromeTest {
         edt(() -> {
             try(var owner=content(launcher(new ArrayDeque<>()))) {
                 var names=new java.util.ArrayList<String>();
-                for(var component:owner.menuBar().getMenu(2).getMenuComponents())if(component instanceof JMenuItem item)names.add(item.getText());
+                for(var component:ZenModeTest.child(owner.menuBar().getMenu(2), "Appearance").getMenuComponents())if(component instanceof JMenuItem item)names.add(item.getText());
                 assertThat(names).contains("UI Theme","Workspace Scheme","Themes…").doesNotContain("Terminal Colors");
                 assertThat(owner.commands().entries().stream().map(entry->entry.command().id())).contains("view.themes").noneMatch(id->id.startsWith("view.appearance."));
             }

@@ -22,7 +22,7 @@ import org.tomlj.TomlParseResult;
 import org.tomlj.TomlTable;
 
 /**
- * Application-owned layout state: where each panel docks, the dock's sizes, whether the stripes show, and where
+ * Application-owned layout state: where each panel docks, the dock's sizes, Zen mode, whether the stripes show, and where
  * main and auxiliary windows were. It is not user configuration. Caller-thread-confined. A bad panel or window entry or dock
  * key falls back alone; an unreadable file or an unknown version falls back to defaults rather than blocking
  * startup, and failed writes are only logged. Version 1 files (a region and a size per panel) are migrated on read;
@@ -91,6 +91,7 @@ public final class UiState {
     private final Map<String, Panel> panels = new TreeMap<>();
     private final Map<String, Bounds> windows = new TreeMap<>();
     private boolean railVisible = true;
+    private boolean zenMode;
     private Dock dock = Dock.DEFAULT;
     private MainWindow mainWindow;
     private static final int MAX_CHOOSER_PATHS = 50;
@@ -109,7 +110,7 @@ public final class UiState {
         } catch (IOException | RuntimeException invalid) {
             LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable UI state " + file, invalid);
             state.panels.clear(); state.windows.clear(); state.railVisible = true; state.dock = Dock.DEFAULT;
-            state.chooser = Chooser.DEFAULT; state.mainWindow = null;
+            state.chooser = Chooser.DEFAULT; state.mainWindow = null; state.zenMode = false;
         }
         return state;
     }
@@ -122,6 +123,7 @@ public final class UiState {
         else if (Long.valueOf(2).equals(version)) readDock(toml);
         else throw new IOException("Unknown UI state version: " + version);
         if (toml.get(List.of("rail_visible")) instanceof Boolean visible) railVisible = visible;
+        zenMode = Boolean.TRUE.equals(toml.get(List.of("zen_mode")));
         if (toml.get(List.of("windows")) instanceof TomlTable table)
             for (String id : table.keySet())
                 if (ID.matcher(id).matches() && table.get(List.of(id)) instanceof TomlTable entry)
@@ -230,6 +232,8 @@ public final class UiState {
     public void putWindow(String id, Bounds value) { if (ID.matcher(id).matches()) windows.put(id, value); }
     public boolean railVisible() { return railVisible; }
     public void setRailVisible(boolean value) { railVisible = value; }
+    public boolean zenMode() { return zenMode; }
+    public void setZenMode(boolean value) { zenMode = value; }
     public Chooser chooser() { return chooser; }
     public void setChooser(Chooser value) { chooser = Objects.requireNonNull(value); }
 
@@ -237,6 +241,7 @@ public final class UiState {
     public void save() {
         if (file == null) return;
         var text = new StringBuilder("version = 2\nrail_visible = ").append(railVisible).append('\n');
+        text.append("zen_mode = ").append(zenMode).append('\n');
         text.append("\n[dock]\nleft_width = ").append(dock.leftWidth()).append("\nright_width = ").append(dock.rightWidth())
             .append("\nbottom_height = ").append(dock.bottomHeight()).append("\nleft_ratio = ").append(dock.leftRatio())
             .append("\nright_ratio = ").append(dock.rightRatio()).append("\nbottom_ratio = ").append(dock.bottomRatio()).append('\n');

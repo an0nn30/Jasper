@@ -15,6 +15,33 @@
   headless renders were inspected; the local animation preview is `build/connection-preview/connection-overlay-faster.gif`. The speed-only follow-up passed all four focused connection tests.
   Native motion acceptance remains user-run. No GUI or benchmark launched, and no merge or push performed.
 
+- **Zen integration with current main** (2026-10-04): merged `origin/main` at `4c3c6bb0`, preserving its
+  Normal/Compact startup setting independently of the saved Zen toggle. A regression covers restoring and
+  toggling Zen in both modes and reloading configuration. Independent merge review approved with no findings.
+  `./gradlew --no-daemon build --continue` passed: **8,481 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. No GUI launched.
+
+- **Zen view mode and View menu organization** (2026-10-04; `codex/jasper-zen-mode`, based on freshly fetched
+  `origin/main` at `5979c030`): View now groups View Modes, Show/Hide, Font Size and Appearance; the contributed Tools
+  submenu remains. Zen hides the current window's status bar, tool windows and rails while
+  preserving toolbar icons, the command palette field, workspace tabs and native window/menu controls. The global-context `toggle_zen_mode` command is
+  unassigned on every platform and available through the menu, command palette and Settings › Keymap. Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before
+  plugin panel creation on launch. New windows inherit the saved mode; existing windows retain theirs and the
+  last closed window saves its mode, as with the dock layout. DockState, saved rail visibility and normal
+  toolbar/status preferences remain intact. Toolbar controls remain usable during Zen. Panels keep their instances and receive actual visibility notifications; panels
+  requested while Zen is active stay hidden and are built when it exits. Settings reloads update the normal
+  preferences underneath Zen. No terminal/plugin SDK architecture changes or historical-plan rewrite were needed;
+  this bounded follow-up used inline TDD and independent final review. The original six headless tests first failed
+  against the missing feature; the follow-up persistence and toolbar/palette correction was also verified RED/GREEN.
+  Focused Zen/dock/menu/shortcut/persistence coverage passed. Independent review approved with no
+  actionable findings. `./gradlew --no-daemon build --continue` passed: **8,450 tests, 0 failures, 0 errors, 6 skipped**,
+  including architecture/doclint and native headless checks. Changed-source hygiene and `git diff --check` passed.
+  `:jasper-app:run --dry-run` resolves successfully; no GUI was launched. Native GUI acceptance remains user-run.
+  User-run checks: open panels in all six dock slots, enter/exit Zen and confirm exact layout restoration; assign
+  Zen a shortcut in Settings › Keymap and invoke it from a terminal, tool window and editor tab; remove it while
+  in Zen and exit through the menu; change saved visibility in another window, and close/reopen while in Zen.
+  See [View modes](configuration.md#view-modes). Worktree: `/Users/dustin/.codex/worktrees/jasper-zen-mode/moray`.
+
 - **View modes: adversarial review complete, integration authorized** (2026-10-04). Updated `codex/appearance-view-modes` through origin/main `857f3020`. First adversarial review found one P2: Compact widened the activated palette from 560 to 680 logical pixels. Fixed in `c92cdf3e`: Compact retains scaled 560 width with existing floating geometry and clamps; Normal's fallback stays unchanged. Paired roomy/narrow regressions demonstrated RED then GREEN (29 focused tests). A second independent adversarial review approved spec compliance and code quality with no remaining findings. Full `./gradlew check` on the fix: **8,471 tests, 0 failures/errors, 6 skipped**, 88 tasks (10 executed, 78 up-to-date); changed-source hygiene and diff checks passed. The original position-only requirement takes precedence over the derived fallback-only plan. Native tabs were explicitly abandoned; built-in tabs remain. User authorized merge to main and push after review/fixes; final merged verification and publication follow this record. No GUI or benchmark launched; [native acceptance](superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md) remains user-run.
 
 - **View-modes branch updated from local main `ad1eb65a`** at the user's request. The merge retains workspace glass, window-layout restoration and picker fixes alongside Normal/Compact modes. Configuration snapshots preserve both view mode and glass through loading, builder copies and both prior constructor signatures; schema count is 38. Full merged `./gradlew check` passed: **8,460 tests, 0 failures/errors, 6 skipped**, all 88 tasks successful (33 executed, 55 up-to-date). Updated main's Appearance section-list expectations to include View mode; independent merge review and scoped test review approved. Source hygiene checked 1,767 Java files; diff checks passed. No GUI launched or push performed.
