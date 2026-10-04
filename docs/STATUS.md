@@ -2,6 +2,30 @@
 
 ## Current state — 2026-10-03
 
+- **Dock guides: a second slot's guide always shows its half; on branch `claude/dock-guide-halves`, awaiting the
+  user's GUI check** (2026-10-03; spec §3 "Guides" amended at the user's request). The user: the guides should show
+  the bottom half left or right when a tool panel moves there, "regardless if doing so would make the tool full
+  screen or not", because the guide only showed a bottom half while a tool already held the top half. Rule:
+  `DockGeometry.landing`, for a pair's second slot (Left Bottom, Right Bottom, Bottom Right; extended to Bottom Right
+  by the same principle, since its home is the right half of the bottom area), puts a stand-in window into the
+  partner slot of its what-if copy whenever the partner would show nothing, so the guide is the lower half of the side
+  or the right half of the bottom area. This covers a hidden partner window and the dragged window being the
+  partner's only one (Sessions alone in Left Top, dragged to Left Bottom). The stand-in id has spaces, so no panel id
+  can equal it, and it exists only in the copy: the real state and layout do not change, and a dropped lone window
+  still fills its side or the bottom area (spec §1, as in IntelliJ), so the guide and the first frame differ on
+  purpose until a window shows in the partner. The first slots (Left Top, Right Top, Bottom Left) keep the true
+  landing. `DockDropModelTest` 6 → 10 (the three second slots against a real split and the explicit rectangles, a
+  hidden partner, the partner's only window moving over, the first slots unchanged, the state passed in untouched; the
+  one existing assertion that expected the full-width bottom preview now expects the right half) and `WindowDragTest`
+  15 → 17 (Sessions alone on the left dragged toward Left Bottom: the guide is the lower half and equals the lower
+  frame once Files splits the side, while the real layout stays full height before and after the drop; a hidden Files
+  dragged toward Bottom Right likewise). Tests: **+6**. `./gradlew check --continue`: **8,456 tests, 0 failures, 0 errors, 6 skipped**, all architecture
+  gates and doclint included. No GUI launched. GUI check for the user: with only one tool window showing on the left
+  (or right) side, drag it, or a hidden one, toward that side's lower half and see the highlight cover the lower half,
+  not the whole side; the same toward the right half of the bottom with no bottom window showing. After the drop the
+  window fills the whole side or bottom area, as before. A drag toward an upper half or Bottom Left still previews the
+  whole side or bottom area.
+
 - **Dock drop zones: six edge zones replace the 3 × 2 grid; pushed to `main`, awaiting the user's GUI check**
   (2026-10-03; spec §3 "Targets" and "Guides" amended
   at the user's request). The user could not drop a tool window on the lower half of the left or right side and named
@@ -19,7 +43,8 @@
   of a hidden window previewing a frame that never appears, because the stripe drop keeps it hidden: `DockDrag` now
   shows no area highlight for it (the placeholder and the ghost stay). Unchanged: a window alone in a side's bottom
   slot still fills that side (spec §1, as in IntelliJ), so its preview looks like the top zone until the top slot
-  shows a window. Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
+  shows a window (superseded the same day by the entry above: the guide now shows the lower half).
+  Tests: **+16** (`DockDropResolverTest` 5 → 15, rewritten for the new rule with the probe's case, the
   diagonal, the half splits, ties, a wide and a tall workspace and the split line; `DockDragTest` 21 → 24 and
   `WindowDragTest` 12 → 15, including a lower-left drop beside a showing Sessions, the same under a showing bottom
   area and the hidden-window preview); the drag tests aim with `DockTestSupport.zone(workspace, slot)` instead of a

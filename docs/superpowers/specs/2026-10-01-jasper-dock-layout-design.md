@@ -182,7 +182,10 @@ group bounds, button bounds and workspace bounds:
 1. **Area highlight:** a translucent filled rectangle with a 1px border, exactly where the window would land,
    computed by `DockGeometry.compute` on a "what if" copy of the state (the dragged window active in the target
    slot). The real layout does not reflow during the drag. A stripe drop of a hidden window shows no area highlight,
-   because the window stays hidden and no frame would appear; the placeholder and the ghost still show.
+   because the window stays hidden and no frame would appear; the placeholder and the ghost still show. Amended
+   2026-10-03 at the user's request: for Left Bottom, Right Bottom and Bottom Right, the area highlight always shows
+   that half, as if its partner held a window, so the guide shows the slot's place even when the window will fill the
+   side or the bottom area because its partner is empty.
 2. **Stripe placeholder:** the target group's buttons part to open a gap at the insertion index, holding a
    highlighted rounded square. The source button is lifted out of its old place.
 3. **Ghost:** the dragged window's icon follows the cursor.

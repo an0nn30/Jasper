@@ -96,7 +96,9 @@ header with plain mouse events: `DockDropResolver` finds the target under the cu
 group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
 bottom edges, a side split at half the side panels' visible height and the bottom at half its
 width), the stripes open a gap, and `DockDropOverlay` on the layered pane's `DRAG_LAYER` previews
-the landing with `DockGeometry.landing`, the same function as the layout. A stripe drop moves the
+the landing with `DockGeometry.landing`, the layout's function on a copy of the state, except that the guide for a
+second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half, even where the window will fill the
+side or the bottom area. A stripe drop moves the
 window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
 drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
 Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
