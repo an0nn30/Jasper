@@ -172,7 +172,7 @@ workspace = "match"
 terminal window is open and not minimized. Hover to make him wave; drag him anywhere (the
 position is saved in `buddy.toml` in the default Jasper application directory); double-click him to bring the last
 active terminal window forward. Left alone he sits down after 20 seconds and retreats into his
-shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show
+shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show/Hide → Show
 Jasper, the command palette and right-click → Hide Jasper toggle him for the current session; a
 saved change to `buddy.enabled` resets that session choice.
 
@@ -388,7 +388,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices save: Toolbar, Status Bar, UI Theme and Workspace Scheme write `window.toolbar`, `window.status_bar`, `ui.theme.name` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
+View menu choices save: Toolbar, Status Bar, UI Theme and Workspace Scheme write `window.toolbar`, `window.status_bar`, `ui.theme.name` and `ui.theme.workspace` to `config.toml`, and every window follows. View › Appearance › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide › Show Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -549,6 +549,32 @@ the terminal area left between its panels. Normal bounds are retained while maxi
 never starts minimized. If a saved window no longer fits an available display, its bounds are fitted to a usable
 display. This file is written by Jasper and is not meant to be edited. Terminal sessions and editor documents
 are not recreated by this layout state.
+
+## View modes
+
+View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the toolbar,
+title search field, status bar, tool windows and their rails. Workspace tabs and native window/menu controls
+remain available. Toggle Zen again to restore your layout; pane zoom works independently.
+
+Zen is temporary and starts off in new windows. It does not overwrite saved toolbar/status preferences,
+rail visibility, tool-window positions, sizes or split ratios, including when closing the window in Zen.
+Changes made through Settings while in Zen take effect when leaving it. Panel show/hide requests still update
+the normal dock layout, but panels remain hidden and newly requested panels are built only when Zen exits.
+Existing panel instances are retained and receive visibility notifications while hidden.
+
+View groups Toolbar, Status Bar, Rail and Show Jasper under **Show/Hide**, font controls under **Font Size**,
+and UI Theme, Workspace Scheme, Themes… and Window Settings… under **Appearance**. The contributed **Tools**
+submenu remains available. Toolbar/status/rail controls are disabled during Zen; leave Zen to use them.
+
+Zen has no default shortcut. Assign **Zen** in Settings › Keymap, or add a binding to `[keybindings]`:
+
+```toml
+[keybindings]
+toggle_zen_mode = "ctrl+alt+z"
+```
+
+The same shortcut enters and exits Zen; `"none"` removes it. The command palette offers **Enter Zen Mode**
+or **Exit Zen Mode**, and the menu toggle remains usable even after removing its shortcut.
 
 ## Shortcuts
 
@@ -711,8 +737,8 @@ temporarily matches the chrome; its requested name stays saved for repair and re
 General hosted plugin pane controls also follow the workspace scheme.
 
 Settings › Appearance's **Workspace scheme** dropdown starts with **Same as UI theme**. Apply/OK saves choices;
-Cancel discards them. A confirmed Import theme… writes immediately and survives Cancel. View › UI Theme and Workspace
-Scheme save immediately; View › Themes… opens Settings at Appearance.
+Cancel discards them. A confirmed Import theme… writes immediately and survives Cancel. View › Appearance › UI Theme and Workspace
+Scheme save immediately; View › Appearance › Themes… opens Settings at Appearance.
 Native file edits, deletions and repairs reload automatically on the existing one-second poll, including inherited
 parent changes. Filesystem work runs off the EDT. A blank workspace value warns and uses `"match"`; a non-string
 value rejects the configuration. [Themes](themes.md#settings-and-importing) details importing and fallback.

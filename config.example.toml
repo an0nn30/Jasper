@@ -127,6 +127,8 @@ workspace = "match"
 blur = "theme"
 
 [keybindings]
+# Zen mode is unassigned by default. Assign it here or in Settings > Keymap.
+# toggle_zen_mode = "none"
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
 # On macOS, cmd is Command and alt/option is Option. Example:
 # new_tab = "cmd+t"

@@ -41,6 +41,7 @@ final class WindowCommands implements AutoCloseable {
                 case OPEN_SETTINGS -> List.of("preferences", "configuration");
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
                 case ZOOM_PANE -> List.of("maximize", "restore");
+                case TOGGLE_ZEN_MODE -> List.of("view mode", "focus", "distraction free", "hide tools", "restore layout");
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
                 case FONT_BIGGER, FONT_SMALLER, FONT_RESET -> List.of("text", "size");
@@ -79,7 +80,7 @@ final class WindowCommands implements AutoCloseable {
                       List<String> extraKeywords) {
         Action action = new AbstractAction(label) {
             @Override public void actionPerformed(ActionEvent event) {
-                if (owner.isActiveAndOpen() && !owner.commandPalette().isOpen()
+                if (isEnabled() && owner.isActiveAndOpen() && !owner.commandPalette().isOpen()
                         && !dev.jasper.app.platform.WindowInput.blocked(owner)) callback.run();
             }
         };
@@ -93,17 +94,25 @@ final class WindowCommands implements AutoCloseable {
     Action view(String id) { return views.get(id); }
 
     void refresh() {
+        boolean zen = owner.zenMode();
+        owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Action.SELECTED_KEY, zen);
+        owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Command.TITLE, zen ? "Exit Zen Mode" : "Enter Zen Mode");
         owner.action(ActionId.ZOOM_PANE).putValue(Command.TITLE,
             owner.currentTab() != null && owner.currentTab().tree().zoomed() ? "Restore Pane" : "Zoom Pane");
         view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
         view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
-        view("view.rail").putValue(Command.TITLE, owner.railVisible() ? "Hide Rail" : "Show Rail");
-        view("view.rail").putValue(Action.SELECTED_KEY, owner.railVisible());
+        view("view.status_bar").setEnabled(!zen);
+        view("view.rail").putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
+        view("view.rail").putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
+        view("view.rail").setEnabled(!zen);
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
-        for (var mode : ToolbarMode.values())
-            view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
+        for (var mode : ToolbarMode.values()) {
+            var action = view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT));
+            action.putValue(Action.SELECTED_KEY, (zen ? ToolbarMode.HIDDEN : owner.toolbarMode()) == mode);
+            action.setEnabled(!zen);
+        }
         for (var colors : TerminalColors.builtIns()) {
             var action = view("view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.terminalColorsSelected(colors));

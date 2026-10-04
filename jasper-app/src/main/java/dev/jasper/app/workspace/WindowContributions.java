@@ -232,21 +232,32 @@ final class WindowContributions implements AutoCloseable {
     private void docked(DockState.Change change) {
         // A dock change mid-drag (a plugin unloading, a panel showing itself) ends the drag: what it drew renders again.
         owner.dockDrag().cancel();
-        for (String id : change.shown()) build(id);
+        if (!owner.zenMode()) for (String id : change.shown()) build(id);
         if (change.layout()) owner.area().sync();
         if (change.stripes()) renderStripes();
         for (String id : change.hidden()) notifyVisibility(id, false);
         // Hiding a window by any route returns focus to the terminal.
         if (!change.hidden().isEmpty()) owner.focusSelected();
-        for (String id : change.shown()) notifyVisibility(id, true);
+        for (String id : change.shown()) notifyVisibility(id, !owner.zenMode());
         persist();
     }
+
+    /** Sends actual visibility to plugins while leaving the normal dock layout (and its saved state) alone. */
+    void viewModeChanged() {
+        if (!owner.zenMode()) {
+            for (String id : List.copyOf(panels.keySet())) if (dock.visible(id)) build(id);
+            owner.area().sync();
+        }
+        for (String id : List.copyOf(panels.keySet())) notifyVisibility(id, visible(id));
+    }
+
+    private boolean visible(String id) { return !owner.zenMode() && dock.visible(id); }
 
     /** Builds the panel's instance the first time it shows in this window; a failing factory yields a placeholder. */
     private void build(String id) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.component != null) return;
-        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> dock.visible(id));
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> visible(id));
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
@@ -260,7 +271,7 @@ final class WindowContributions implements AutoCloseable {
     /** Tells the panel only what is still true and not yet told: a listener's own show or hide may have changed it. */
     private void notifyVisibility(String id, boolean visible) {
         PanelInstance panel = panels.get(id);
-        if (panel == null || panel.site == null || dock.visible(id) != visible || panel.notified == visible) return;
+        if (panel == null || panel.site == null || visible(id) != visible || panel.notified == visible) return;
         panel.notified = visible;
         panel.site.notifyVisibility(visible);
     }
@@ -324,7 +335,7 @@ final class WindowContributions implements AutoCloseable {
     /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
     void refreshTheme() {
         for (PanelInstance panel : panels.values())
-            if (panel.component != null && !dock.visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
+            if (panel.component != null && !visible(panel.entry.id())) SwingUtilities.updateComponentTreeUI(panel.component);
     }
 
     private void changed(Contributions.Kind kind) {

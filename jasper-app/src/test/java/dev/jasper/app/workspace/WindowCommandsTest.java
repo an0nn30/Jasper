@@ -23,8 +23,8 @@ class WindowCommandsTest {
                 var windowSettings = entries.stream().map(CommandSearch.Entry::command)
                     .filter(c -> c.id().equals("view.window_settings")).findFirst().orElseThrow();
                 assertThat(windowSettings.title()).isEqualTo("Window Settings\u2026");
-                var view = owner.menuBar().getMenu(2);
-                assertThat(view.getItem(view.getItemCount() - 1).getAction()).as("View ends with Window Settings\u2026")
+                var view = ZenModeTest.child(owner.menuBar().getMenu(2), "Appearance");
+                assertThat(view.getItem(view.getItemCount() - 1).getAction()).as("Appearance ends with Window Settings\u2026")
                     .isSameAs(windowSettings.action());
                 owner.updateActions();
                 assertThat(windowSettings.action().isEnabled()).as("nothing to open without a configuration").isFalse();
@@ -45,7 +45,7 @@ class WindowCommandsTest {
                 assertThat(command.action().getValue(Action.SELECTED_KEY)).isEqualTo(true);
                 assertThat(CommandSearch.find(owner.commands().entries(), "jasper", java.util.List.of(), 5).stream().map(Command::id))
                     .contains("view.buddy");
-                var viewMenu = owner.menuBar().getMenu(2);
+                var viewMenu = ZenModeTest.child(owner.menuBar().getMenu(2), "Show/Hide");
                 var item = java.util.Arrays.stream(viewMenu.getMenuComponents())
                     .filter(javax.swing.JCheckBoxMenuItem.class::isInstance).map(javax.swing.JCheckBoxMenuItem.class::cast)
                     .filter(box -> box.getAction() == command.action()).findFirst().orElseThrow();

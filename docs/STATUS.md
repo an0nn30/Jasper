@@ -2,6 +2,25 @@
 
 ## Current state — 2026-10-03
 
+- **Zen view mode and View menu organization** (2026-10-04; `codex/jasper-zen-mode`, based on freshly fetched
+  `origin/main` at `5979c030`): View now groups View Modes, Show/Hide, Font Size and Appearance; the contributed Tools
+  submenu remains. Zen hides the current window's toolbar, title search, status bar, tool windows and rails while
+  preserving workspace tabs and native window/menu controls. The global-context `toggle_zen_mode` command is
+  unassigned on every platform and available through the menu, command palette and Settings › Keymap. Zen is a
+  temporary presentation override: DockState, saved rail visibility and normal toolbar/status preferences remain
+  intact, including on close. Panels keep their instances and receive actual visibility notifications; panels
+  requested while Zen is active stay hidden and are built when it exits. Settings reloads update the normal
+  preferences underneath Zen. No terminal/plugin SDK architecture changes or historical-plan rewrite were needed;
+  this bounded follow-up used inline TDD and independent final review. All six new headless tests first failed
+  against the missing feature; focused Zen/dock/menu/shortcut coverage passed. Independent review approved with no
+  actionable findings. `./gradlew build --continue` passed: **8,447 tests, 0 failures, 0 errors, 6 skipped**,
+  including architecture/doclint and native headless checks. Changed-source hygiene and `git diff --check` passed.
+  `:jasper-app:run --dry-run` resolves successfully; no GUI was launched. Native GUI acceptance remains user-run.
+  User-run checks: open panels in all six dock slots, enter/exit Zen and confirm exact layout restoration; assign
+  Zen a shortcut in Settings › Keymap and invoke it from a terminal, tool window and editor tab; remove it while
+  in Zen and exit through the menu; change saved visibility in another window, and close/reopen while in Zen.
+  See [View modes](configuration.md#view-modes). Worktree: `/Users/dustin/.codex/worktrees/jasper-zen-mode/moray`.
+
 - **Window layout restoration fix** (2026-10-03; `codex/restore-window-layout`, based on `main` at `f450112b`):
   main terminal frames previously never saved or restored their bounds; dock persistence intentionally used the
   last layout edit rather than the last window closed. Each window now snapshots its tool-panel slots/order,

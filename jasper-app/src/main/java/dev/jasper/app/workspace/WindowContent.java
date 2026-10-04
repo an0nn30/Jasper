@@ -75,6 +75,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final java.util.Set<Integer> traversalHeld = new java.util.HashSet<>();
     private boolean traversalTyped;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
+    enum ViewMode { NORMAL, ZEN }
+    private ViewMode viewMode = ViewMode.NORMAL;
+    private boolean statusVisible = true;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
@@ -656,6 +659,21 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowChrome chrome() { return chrome; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
+    boolean statusVisible() { return statusVisible; }
+    boolean zenMode() { return viewMode == ViewMode.ZEN; }
+
+    /** A temporary presentation override; saved visibility and the dock layout remain intact. */
+    void toggleZenMode() {
+        if (closed) return;
+        dockDrag.cancel();
+        viewMode = zenMode() ? ViewMode.NORMAL : ViewMode.ZEN;
+        refreshChromeVisibility();
+        area.setToolsSuppressed(zenMode());
+        syncRailVisibility();
+        if (zenMode()) focusSelected();
+        if (contributed != null) contributed.viewModeChanged();
+        updateActions();
+    }
     public boolean isActiveAndOpen() { return active && !closed; }
 
     /** Stable identity of this window for extensions; never a Swing object. */
@@ -771,7 +789,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * place to move windows to), unless the user hid them with View > Rail.
      */
     void syncRailVisibility() {
-        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && railVisible;
+        boolean wanted = !zenMode() && !(leftStripe.empty() && rightStripe.empty()) && railVisible;
         area.setStripesVisible(wanted);
         if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
             leftStripe.setVisible(wanted);
@@ -1274,12 +1292,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
-        toolbarMode = mode; chrome.setToolbarMode(mode);
-        updateActions(); revalidate(); onMinimumSizeChanged.run();
+        toolbarMode = Objects.requireNonNull(mode); refreshChromeVisibility(); updateActions();
     }
     void setStatusVisible(boolean visible) {
-        chrome.setStatusVisible(visible); area.setStatusVisible(visible);
-        updateActions(); revalidate(); onMinimumSizeChanged.run();
+        statusVisible = visible; refreshChromeVisibility(); updateActions();
+    }
+
+    private void refreshChromeVisibility() {
+        chrome.setToolbarMode(zenMode() ? ToolbarMode.HIDDEN : toolbarMode);
+        chrome.search().setVisible(!zenMode());
+        chrome.setStatusVisible(!zenMode() && statusVisible);
+        area.setStatusVisible(!zenMode() && statusVisible);
+        chrome.header().revalidate(); chrome.header().repaint();
+        revalidate(); repaint(); onMinimumSizeChanged.run();
     }
 
     @Override public void close() {

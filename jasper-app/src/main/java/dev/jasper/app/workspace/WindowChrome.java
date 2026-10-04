@@ -69,8 +69,20 @@ final class WindowChrome {
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);
-        JMenu view = menu("View", ActionId.COMMAND_PALETTE, ActionId.ZOOM_PANE, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET);
-        view.insertSeparator(1);
+        JMenu view = menu("View", ActionId.COMMAND_PALETTE);
+        view.addSeparator();
+        JMenu viewModes = menu("View Modes");
+        var zen = new MenuBarItems.CheckBox("Zen", false);
+        zen.setAction(owner.action(ActionId.TOGGLE_ZEN_MODE));
+        viewModes.add(zen);
+        view.add(viewModes);
+        view.add(new MenuBarItems.Item(owner.action(ActionId.ZOOM_PANE)));
+        view.addSeparator();
+        JMenu visibility = menu("Show/Hide");
+        view.add(visibility);
+        view.add(menu("Font Size", ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET));
+        JMenu appearance = menu("Appearance");
+        view.add(appearance);
         JMenu pane = menu("Pane", ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
             ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
             ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT);
@@ -87,15 +99,16 @@ final class WindowChrome {
             item.setActionCommand(mode.name());
             toolbarModes.add(item); modes.add(item);
         }
-        view.addSeparator(); view.add(modes); view.add(statusVisible); view.add(railVisible); view.add(buddyVisible);
+        visibility.add(modes); visibility.add(statusVisible); visibility.add(railVisible); visibility.add(buddyVisible);
         statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
         buddyVisible.setAction(owner.windowCommands().view("view.buddy"));
         railVisible.setAction(owner.windowCommands().view("view.rail"));
-        view.add(uiThemes); view.add(workspaceThemes);
-        view.add(new MenuBarItems.Item(owner.windowCommands().view("view.themes")));
+        appearance.add(uiThemes); appearance.add(workspaceThemes);
+        appearance.add(new MenuBarItems.Item(owner.windowCommands().view("view.themes")));
         view.addMenuListener(themeMenuListener);
         uiThemes.addMenuListener(themeMenuListener); workspaceThemes.addMenuListener(themeMenuListener);
-        view.add(new MenuBarItems.Item(owner.windowCommands().view("view.window_settings")));
+        appearance.addSeparator();
+        appearance.add(new MenuBarItems.Item(owner.windowCommands().view("view.window_settings")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
