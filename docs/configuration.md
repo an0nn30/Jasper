@@ -170,6 +170,7 @@ workspace = "match"
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
+| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
@@ -806,3 +807,15 @@ platform size; do not set it to zero. Remove both keys to restore the defaults.
 Changes update open and hidden panels,
 menus, tabs, dialogs and subsequent windows without restarting sessions. Headings and secondary
 labels retain their relative emphasis. Native OS dialogs and system menu rendering remain OS-owned.
+
+### Animations
+
+Settings → Appearance → Animations controls motion throughout the app. **Enable animations** is on by default;
+turning it off and clicking Apply finishes running transitions immediately in open windows. Future app animations
+use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
+
+Tab motion uses fixed timings: opening takes 80 ms, closing 100 ms, and selection 130 ms.
+The temporary **Open tab duration**, **Close tab duration**, and **Switch tab duration** tuning fields have been removed.
+Existing `ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms` values are
+ignored silently and left in the configuration file; they no longer affect motion. Other unknown animation keys
+still produce the usual diagnostics.

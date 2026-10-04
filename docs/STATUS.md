@@ -24,14 +24,15 @@
   notification with a cause, the resident icon's click, the Windows "most recent notification", replace-by-id only on
   macOS) with the manual recipe's icon and denial checks restored. No GUI launched.
 
-  Merged with main e11961c8: presence follows main's IDLE/NO_WINDOW model (the user's choice), with banners in
-  BACKGROUND and IDLE; the notification bridge lives in main's single libjasper-macos bridge, its click callback bound
-  by an explicit bind() rather than JNI_OnLoad; `ResidentTray` owns the Windows icon for residency and balloons
-  alongside main's macOS menu bar item. Plan 5's `OPENING` and its `settled` flag are gone (main's `startupSettled`
+  Merged with main e11961c8 and again with main 086f3437: presence follows main's IDLE/NO_WINDOW model (the user's
+  choice), with banners in BACKGROUND and IDLE; the notification bridge lives in main's single libjasper-macos bridge,
+  its click callback bound by an explicit bind() rather than JNI_OnLoad; `ResidentTray` owns the Windows icon for
+  residency and balloons alongside main's macOS menu bar item. Plan 5's `OPENING` and its `settled` flag are gone (main's `startupSettled`
   gates `IDLE`, so a login launch's start-up failures send no banner); `NotificationCenter.presence()` is back, since
   main's `JasperApplicationBackgroundTest` reads it; `verifyPackage` also checks the bridge's `bind`, `remove` and
-  `removeAll` natives. `./gradlew check --continue` after the merge: **8,712 tests, 0 failures, 0 errors, 6
-  skipped**; source hygiene and `git diff --check main` clean. No GUI launched.
+  `removeAll` natives. The second merge brings main's folder tabs, tab motion and `ui.animations.enabled`; plan 5 adds
+  no animation, and the core schema now has 40 settings. `./gradlew check --continue` after it: **8,742 tests, 0
+  failures, 0 errors, 6 skipped**; source hygiene and `git diff --check main` clean. No GUI launched.
 
   GUI checks for the user:
   - macOS (packaged app): a long command finishing with Jasper in the background shows a banner with Jasper's icon,
@@ -42,6 +43,103 @@
     pane, and the resident icon carrying balloons with no window open.
   - Linux (GNOME or KDE): a notification with Jasper's icon, and a click focusing the pane.
   - `notifications.system = false` sends nothing.
+
+- **Wider folder tabs** (2026-10-04; user follow-up): doubled each tab's calculated width, including its
+  bounds (now 160–480 logical pixels). Fonts, control sizes, tab height and motion timings are unchanged.
+  The next user follow-up also doubles the active accent pill to 64 × 2 logical pixels.
+  Hidden rails now square the folder’s outer-left corner at the workspace edge, matching the terminal
+  for both manual Rail hiding and Zen mode. Interior corners stay rounded; showing the rails restores the curve.
+  A rendered-pixel regression reproduced the manual-hide gap before correction.
+  Updated the existing motion/overflow/drag fixtures for the wider geometry. Integrated main's file-chooser
+  changes (`f6a6ef34`). Final `./gradlew check --continue`: **8,681 tests, 0 failures, 0 errors, 6 skipped**.
+  Normal and 2× corner/geometry checks passed; headless Swing previews refreshed and inspected.
+  Changed-source hygiene and whitespace checks passed. No native GUI launched.
+
+- **File chooser visual continuity** (2026-10-04), on `codex/file-dialog-corners` in
+  `/Users/dustin/.codex/worktrees/file-dialog-corners/moray`, based on fetched `origin/main` at `a6d15621`.
+  Places and the file-list background use the workspace's scaled 16px corner arc, including opaque-child
+  repaints and the listing beside Preview. Places is a title-case column header aligned with the file headings;
+  the resize gutter follows the rail panels' plain chrome styling while retaining Swing dragging and keyboard
+  resizing. The file list uses a transient overlay scroll thumb: no column reflow, no idle track, and a one-second
+  idle timeout that stays suspended during a held drag. Hiding/removing/closing the chooser stops the timer.
+  This user-directed bounded cleanup used inline implementation and independent final review; no architecture
+  changes or historical-plan rewrites. Initial corner, heading and scrollbar regressions reproduced the old
+  behavior; focused rendering and scrolling/lifecycle tests pass. Independent review's listing/Preview corner
+  finding was corrected, and follow-up review approved with no remaining findings. The theme-refresh spacing regression also reproduced the original replacement and now passes.
+  Final `./gradlew check` passed all 88 tasks: **8,488 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. Dark/light headless previews were
+  inspected with Preview open and closed; see `jasper-app/build/file-dialog-preview/` in the worktree.
+  No GUI or benchmark launched; native scrolling/drag acceptance remains user-run. User approved merge to main and push.
+  Integrated current main `b51fb3b9` without conflicts; final combined `./gradlew check` passed all 91 tasks:
+  **8,680 tests, 0 failures, 0 errors, 6 skipped**. The reviewed chooser code is unchanged.
+  Headless previews are preserved in the main checkout at `jasper-app/build/file-dialog-preview/`.
+
+- **Folder tabs adversarial review and main integration** (2026-10-04; `codex/folder-tabs`): integrated
+  `main` at `e11961c8`, preserving saved view modes, workspace glass, current theme fixtures, startup/resident
+  behavior, and the Appearance View mode section alongside Animations. An independent adversarial review found
+  one reproducible bug: a shell/plugin title update during selection snapped the moving folder because only
+  slot-width motion contributed remaining time. Metadata retargeting now retains the folder position/width/alpha
+  transition deadline too. A deterministic regression failed before the fix; both unrelated-title and changing-width
+  cases pass after it. The repeated independent review approved the combined tree with no remaining actionable
+  findings. Final integrated `./gradlew check --continue`: **8,677 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doclint, headless native checks and a separate 2× tab-geometry check passed. Changed-Java hygiene
+  and whitespace checks passed.
+  No native GUI, benchmark or AOT training launched; native animation feel remains covered by user testing.
+
+- **Tab timings finalized and active indicator added** (2026-10-04; `codex/folder-tabs`): user native testing
+  selected **80 ms open, 100 ms close, 130 ms switch**. Temporary timing controls/schema keys are removed; exactly
+  their three old saved keys are silently ignored so old values cannot override the permanent motion. Unknown
+  siblings still warn, and existing config bytes remain untouched. Appearance → Animations retains the live global
+  toggle. A centered **32 × 2 logical-pixel pill** in the resolved workspace accent now marks the active folder,
+  follows its motion/opacity, and clips to the scrolling viewport. [Design and current previews](design/folder-tabs.md).
+  Config retirement and indicator regressions passed; dark/light Swing renders inspected, plus normal/2× geometry
+  and glass repaint checks. Final `./gradlew check --continue`: **8,465 tests, 0 failures, 0 errors,
+  6 skipped**; architecture/doclint, changed-Java hygiene and whitespace checks passed. Independent follow-up
+  review found no actionable findings. No GUI, benchmark, merge or push. Native indicator appearance remains user-run.
+
+- **Folder-tab motion and shared animation policy implemented** (2026-10-04; `codex/folder-tabs`; config
+  `9a2a43ca`, motion `6fdb0ddd`; [design and tuning](design/folder-tabs.md#tab-motion-and-shared-animation-setting)):
+  opening expands/fades, closing fades while its gap contracts, and selection glides the folder highlight.
+  Content/focus and close teardown remain immediate. Rapid actions retarget the current presentation; timers run
+  only during motion and stop on settlement/disposal. Exit visuals retain pixels rather than content, use native
+  device resolution, and clip text at natural size. The full-height folder geometry and glass alpha are preserved.
+  **Settings → Appearance → Animations → Enable animations** is a saved app-wide policy, on by default; Apply
+  disables running and future motion in every window. Future consumers check `ConfigSnapshot.animations().enabled()`.
+  At the user's request, temporary live **Open/Close/Switch tab duration** fields allow tuning without a rebuild:
+  **150/120/130 ms**, range 0–2000, with 0 instant. Apply/OK saves; Cancel preserves existing values. Keep these fields
+  until native testing establishes permanent timings. Unrelated animations were not scanned or modified.
+  This bounded approved extension used a workspace implementer, root configuration integration, and independent
+  final review, rather than re-executing historical motion plans. Regression fixes cover mixed durations, shell
+  title arrival mid-open, and rapid actual mouse clicks (the latter found by review); all were observed failing
+  before correction. Final `./gradlew check --continue`: **8,460 tests, 0 failures, 0 errors, 6 skipped**; architecture
+  gates/doclint, changed-Java hygiene and whitespace checks passed. Final review approved with no remaining findings.
+  Actual Swing dark/light/glass frames were inspected. No native GUI, benchmark, merge or push. User acceptance:
+  tune the three speeds with Apply; try rapid open/close/switch, mouse and shortcuts, overflow, glass and Retina
+  displays, then disable animations during motion. Native smoothness/compositor performance remain user-run checks.
+
+- **Folder tabs implemented** (2026-10-04; `codex/folder-tabs`, based on `main` at `5979c030`; source `2ab63b13`):
+  the selected workspace tab now rises from the terminal surface with rounded top corners and concave bottom
+  shoulders, matching the [approved reference and actual Swing renders](design/folder-tabs.md). Inactive tabs are
+  plain muted labels; the active tab retains its session/plugin icon and close control, and inactive close appears
+  on hover. A fixed new-tab plus sits at the far right beside the existing tab list. Selection, shortcuts, overflow,
+  wheel scrolling, drag reorder, middle-close, context menus and plugin-tab ownership remain on existing paths.
+  The selected folder uses the actual workspace background and glass alpha; the recessed strip stays solid and
+  derives from the workspace palette. Rectangular replacement painting and an opaque antialiased recess preserve
+  partial-repaint stability. Height and geometry scale with the existing configuration and UIScale.
+  This is a bounded approved visual follow-up using an implementer and independent final review, not re-execution
+  of historical tab-motion plans; no animation subsystem or setting was added. The initially attached clean worktree
+  was advanced from the old Moray revision to current Jasper before implementation. RED captured before the change;
+  **602 workspace tests** and a separate 2× scale check passed. Final `./gradlew check --continue`: **8,445 tests,
+  0 failures, 0 errors, 6 skipped**; architecture gates and doclint passed. Changed-Java source hygiene and
+  `git diff --check` passed. Independent review found no actionable findings. No GUI, benchmark, merge or push.
+  Native screenshot refinement (2026-10-04): removed the 3-pixel top inset and matched the upper corners to the
+  frame’s shared 8-pixel radius. Tabs and controls now fill the rail height; broad bottom shoulders remain. The
+  rendered-pixel regression failed on the old gap and passes at normal and 2× scale across configured heights;
+  dark/light render previews are refreshed. Independent follow-up review found no actionable findings. The full
+  check passed again: **8,445 tests, 0 failures/errors, 6 skipped**; source hygiene and whitespace checks passed.
+  User-run visual acceptance: first/middle selected tabs, dark/light and independent workspace themes, glass,
+  overflow/long titles, plugin tabs, new-tab plus and native pointer/trackpad behavior. Headless renders do not
+  establish native Metal/compositor performance.
 
 - **Merged `origin/main` (`a6d15621`) into `claude/startup-speed`** (2026-10-04; 21 commits past `857f3020`): view
   modes (Normal and Compact in `window.view_mode`, restart-only; Zen in `ui-state.toml`), the bundled theme shortlist

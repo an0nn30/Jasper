@@ -382,10 +382,10 @@ characters, a body of at most 300) and hands clicks back on the EDT as notificat
 functions, so tests bring their own; `SystemNotifier.using(Runnable::run, …)` runs it on the calling thread. The
 bootstrap injects the real notifier, as it does the resident indicator, so tests never reach the operating system.
 
-- **macOS**: `MacNotifications` lives in `Contents/app/libjasper-macos.dylib` beside the current jpackage launcher,
-  loaded through `MacNative`, shared with `MacDock`. The Objective-C bridge uses `UNUserNotificationCenter` in
-  Jasper's process: identity, icon and permission belong to `dev.jasper.app`. Each banner's identifier is its
-  notification's id, so a repeat replaces it and withdrawal removes it. The delegate's
+- **macOS**: `MacNotifications`'s native half lives in `Contents/app/libjasper-macos.dylib` beside the current
+  jpackage launcher, loaded through `MacNative` and shared with `MacDock`. The Objective-C bridge uses
+  `UNUserNotificationCenter` in Jasper's process: identity, icon and permission belong to `dev.jasper.app`. Each
+  banner's identifier is its notification's id, so a repeat replaces it and withdrawal removes it. The delegate's
   `didReceiveNotificationResponse` calls `MacNotifications.clicked` on a thread attached as a daemon, through the
   `JavaVM`, class and method id that `MacNotifications.bind()` cached. The library is shared, so it has no
   `JNI_OnLoad`: the first send loads the bridge and calls `bind()` once; if `clicked(String)` cannot be resolved,

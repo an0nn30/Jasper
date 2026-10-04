@@ -135,6 +135,10 @@ workspace = "match"
 # Blur behind a translucent workspace: "theme", "on" or "off".
 blur = "theme"
 
+[ui.animations]
+# Live app-wide switch. Turning off finishes active transitions immediately.
+enabled = true
+
 [keybindings]
 # Zen mode is unassigned by default. Assign it here or in Settings > Keymap.
 # toggle_zen_mode = "none"

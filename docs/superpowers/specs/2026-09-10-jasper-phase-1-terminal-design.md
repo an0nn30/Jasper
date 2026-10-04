@@ -1,5 +1,11 @@
 # Jasper — Phase 1: The Terminal — Design Spec
 
+> Final tab polish, 2026-10-04: after native testing the user selected permanent 80/100/130 ms open/close/switch timings and requested a slim theme-accent pill below the active tab. The [folder-tab design](../../design/folder-tabs.md) records the indicator geometry and retirement of temporary duration settings; the global animation toggle remains.
+
+> Folder-motion amendment, 2026-10-04: the user approved [opening, closing and selection transitions](../../design/folder-tabs.md#tab-motion-and-shared-animation-setting), with immediate content/focus changes and a saved, live app-wide Appearance → Animations switch. Temporary duration controls support native tuning before permanent values are chosen. This extends the current folder strip; historical underline animation is not reinstated.
+
+> Folder-tab amendment, 2026-10-04: the user approved the [folder-tab reference and behavior](../../design/folder-tabs.md). The active content-sized tab joins the workspace surface with rounded top corners and concave bottom shoulders; inactive labels are plain and the new-tab control sits at the right. This replaces the current inset outlined selection. Current workspace themes, translucency, overflow and tab interactions remain supported; historical title-bar and motion geometry below is not reinstated.
+
 > Visual amendment, 2026-09-11: the user's supplied screenshot and [mock UI design](2026-09-11-jasper-mock-ui-design.md) supersede earlier title/tab/toolbar geometry and app font defaults. Terminal-library defaults and behavior remain unchanged except the coordinated dark background specified there.
 
 > Tab follow-up amendment, 2026-09-11: the user requested a shorter configurable title/tab row, quick entry/underline motion, and Cmd/Ctrl tab navigation. The [tab motion design](2026-09-11-jasper-tab-motion-design.md) supersedes the fixed mock height and tab-specific defaults below: numbered tabs use Cmd on Mac / plain Ctrl elsewhere; previous/next use that modifier plus Shift+[ / ]. Unrelated `cmd` shortcut semantics remain unchanged.
