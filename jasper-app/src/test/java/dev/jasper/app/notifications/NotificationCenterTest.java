@@ -439,4 +439,15 @@ class NotificationCenterTest {
             .extracting(change -> ((NotificationCenter.Change.SystemRequested) change).notification().id())
             .containsExactly(first, first);
     }
+
+    /** Each incident has its own notification, so Show more… opens the right one (plan 2's deferred finding). */
+    @Test void differentIncidentsAreNeverOneEntryHoweverAlikeTheyRead() {
+        var center = center();
+        UUID first = center.post(request(CARDS, "boom").withIncident(UUID.randomUUID())).orElseThrow();
+        UUID second = center.post(request(CARDS, "boom").withIncident(UUID.randomUUID())).orElseThrow();
+        assertThat(second).isNotEqualTo(first);
+        UUID incident = UUID.randomUUID();
+        UUID third = center.post(request(CARDS, "again").withIncident(incident)).orElseThrow();
+        assertThat(center.post(request(CARDS, "again").withIncident(incident))).contains(third);
+    }
 }

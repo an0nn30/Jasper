@@ -73,4 +73,21 @@ class NotificationValuesTest {
         assertThatThrownBy(() -> new Notification(UUID.randomUUID(), titled("t"), Instant.EPOCH, 0, false, false))
             .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test void twoIncidentsNeverReadTheSameHoweverAlikeTheirText() {
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        var plain = NotificationRequest.of("g", Severity.ERROR, "Unexpected error in Jasper").withContent("boom");
+        assertThat(plain.withIncident(first).sameText(plain.withIncident(first))).isTrue();
+        assertThat(plain.withIncident(first).sameText(plain.withIncident(second))).isFalse();
+        assertThat(plain.withIncident(first).sameText(plain)).isFalse();
+        assertThat(plain.sameText(plain)).isTrue();
+    }
+
+    @Test void anExpiredEntryStillNamesItsIncident() {
+        UUID incident = UUID.randomUUID();
+        var request = NotificationRequest.of("g", Severity.ERROR, "t").withIncident(incident).withActivate(() -> { });
+        var entry = new Notification(UUID.randomUUID(), request, Instant.EPOCH, 1, false, false).withExpired();
+        assertThat(entry.request().incident()).contains(incident);
+        assertThat(entry.request().activate()).isEmpty();
+    }
 }
