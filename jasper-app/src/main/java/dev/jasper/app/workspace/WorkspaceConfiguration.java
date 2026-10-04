@@ -14,13 +14,14 @@ final class WorkspaceConfiguration {
     void apply(ConfigSnapshot next, boolean macOs) {
         if (owner.closed()) return;
         ConfigSnapshot previous = configured;
+        if (previous == null) owner.initializeViewMode(next.viewMode());
         configured = next;
         owner.setTabHeight(next.tabHeight());
         owner.setRailWidth(next.railWidth());
         owner.setToolbarHeight(next.toolbarHeight());
         owner.setStatusBarHeight(next.statusBarHeight());
         if (owner.toolbarMode() != next.toolbar()) owner.setToolbarMode(next.toolbar());
-        if (owner.status().isVisible() != next.statusBar()) owner.setStatusVisible(next.statusBar());
+        if (owner.statusVisible() != next.statusBar()) owner.setStatusVisible(next.statusBar());
         boolean sizeChanged = previous == null || previous.fontSize() != next.fontSize();
         boolean optionsChanged = previous == null || !previous.font().equals(next.font())
             || liveBehaviorChanged(previous.terminal(), next.terminal());

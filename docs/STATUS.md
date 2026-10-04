@@ -2,6 +2,25 @@
 
 ## Current state — 2026-10-04
 
+- **Merged `origin/main` (`a6d15621`) into `claude/startup-speed`** (2026-10-04; 21 commits past `857f3020`): view
+  modes (Normal and Compact in `window.view_mode`, restart-only; Zen in `ui-state.toml`), the bundled theme shortlist
+  (Jasper, Nord and Clear), the rounded connection overlay with its animated dots, and the View menu cleanup.
+  Conflicts: `JasperApplication.openWindow` keeps Plan 4's guarded composition (now `composeWindow`, with the
+  `openingWindows` count) and composes from main's `windowConfiguration()` (live settings with the start-up view
+  mode); `WindowContent.close()` keeps the discard-aware `contributed.close(rememberLayout)` without main's removed
+  theme menus. Semantics checked against the start-up plans: every window path (first window, reopen from the
+  background, the menu bar item's New Window, a handoff) goes through `composeWindow`, so it gets the start-up view
+  mode, its Zen state from `connectContributions` and its bounds from `restoreLayout`. The `--background` warm-up now
+  rehearses with `windowConfiguration()` and copies Zen mode into its own in-memory state, so it warms the chrome the
+  next window shows; it still saves nothing. The connection dots' timer runs only while working and showing, and
+  stops on `removeNotify`, so nothing animates in a resident process with no window or in the never-shown rehearsal.
+  No packaging, AOT training or benchmark code names a removed theme (training uses the default Jasper Dark). The menu
+  bar item's New Window and Settings… are `ResidentTray` actions, untouched by the View menu cleanup. `config.example.toml`
+  has both `view_mode = "normal"` and the commented per-platform `run_in_background`. `./gradlew check --continue`:
+  **8,617 tests, 0 failures, 0 errors, 6 skipped**; `:jasper-app:verifyPackage` passes; source hygiene clean. No GUI
+  launched, no AOT training. GUI checks for the user: with `view_mode = "compact"` or Zen on, a resident Mac's Cmd+Q and
+  Dock click bring the window back in that mode, and a login launch's first window shows it without a visible delay.
+
 - **A resident Jasper with no window sends cards to history** (user's decision of 2026-10-04; branch
   `claude/startup-speed`). Resident by default makes "no window open" last for hours, and the delivery rule held every
   CARD and STICKY notification posted then until a window was focused, so they would have piled up. Built:
@@ -204,6 +223,84 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
   per-plugin phases may push the start-up line past `AppLog`'s 512-character record cap
   (Plan 3B); no test drives `watchOutput`→`timeFirstTerminal` end to end; the diagnostics example's phase numbers
   contradict "phases overlap" and the benchmark doc's cleanup sentence is loose (docs pass).
+
+- **View menu cleanup** (2026-10-04; `codex/refine-bundled-themes`, updated from local main `79232532`):
+  removed the user-selected Show/Hide Jasper, UI Theme, Workspace Scheme, Themes… and Window Settings… entries
+  from View, including the now-empty Appearance submenu. Settings and command-palette access remain; Zen,
+  toolbar/status/rail visibility, font controls and contributed Tools remain. Removed obsolete theme-menu
+  listeners/caches and lifecycle hooks, updated existing tests and current help/docs. Bounded inline cleanup;
+  no architecture or historical-plan changes. The recursive absence regression failed before the removal and
+  passed afterward in both Buddy visibility states. Focused checks and independent review passed; all review
+  documentation findings corrected. Full `./gradlew check`: **8,485 tests, 0 failures/errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. No GUI launched. Merged into `main` after user approval, preserving the newer overlay handoff.
+  Fresh merged `./gradlew check` reproduced **8,485 tests, 0 failures/errors, 6 skipped**; publication is authorized.
+
+- **Bundled theme shortlist** (2026-10-04; `codex/refine-bundled-themes`, based on local main `ccd4868f`):
+  Jasper now ships only **Jasper Light, Jasper Dark, Nord, Clear Dark and Clear Light**. Their existing palettes
+  are unchanged, ready for individual refinement. The catalog, packaged TOMLs and offline generator agree on
+  those five; obsolete bundled palettes/licenses are removed. Import/conversion sources remain available for
+  custom themes, with two former palettes retained only as test fixtures. Saved removed-theme names retain
+  the existing warning/fallback and repair behavior. Settings help, configuration example and current theme
+  documentation reflect the shortlist. This bounded cleanup used inline implementation and independent review;
+  no architecture change or historical-plan rewrite. Independent review approved with no blocking findings; all documentation findings corrected.
+  `./gradlew check` passed: **8,481 tests, 0 failures/errors, 6 skipped**; architecture/doc checks included.
+  Regeneration parity, exact five-theme JAR inventory, changed-source hygiene and diff checks passed. No GUI launched.
+  Worktree: `/Users/dustin/.codex/worktrees/3941/moray`. Keep the branch here for the next refinement pass.
+
+- **Connection overlay polish** (2026-10-04), on `codex/connection-overlay` in
+  `/Users/dustin/.codex/worktrees/connection-overlay/moray`, based on fetched `origin/main` at `4c3c6bb0`.
+  Window overlays now use the workspace's scaled 16px corner arc, clip opaque plugin content and repaint their
+  border with the current theme. Remote connection progress replaces the loading bar with an accent-colored
+  dot that stretches into three bouncing dots and rejoins over a 1.6-second loop (sped up at the user’s request). The timer runs only while
+  working and showing; ancestor hiding, removal, failure and completion stop it, and retry restarts it.
+  This is a bounded follow-up implemented inline with independent final review; no historical plan changed.
+  Both original visual regressions were observed failing before the fixes. Focused rendering/lifecycle tests
+  pass, and independent review found no actionable issues. Initial full `./gradlew check` passed all 88 tasks:
+  **8,476 tests, 0 failures/errors, 6 skipped**. Changed-source hygiene and diff checks passed. Actual-component dark/light
+  headless renders were inspected; the local animation preview is `build/connection-preview/connection-overlay-faster.gif`. The speed-only follow-up passed all four focused connection tests.
+  Adversarial round 1 found one P2: opaque-child partial repaints skipped the rounded card's background,
+  damaging its corners. The fill now runs before clipped children in `paintChildren`; a regression failed before
+  the fix and passes at 1×/2×. A fresh second adversarial review approved the entire change with no findings,
+  including 75 exact-pixel repaint probes at 1×/1.25×/1.5×/2×/3× under Metal, FlatLight and FlatDark.
+  Full post-fix `./gradlew check` passed: **8,487 tests, 0 failures/errors, 6 skipped**, all 88 tasks successful.
+  Integrated into `main` at `79232532`, preserving Zen and the five-theme catalog update. Fresh merged
+  `./gradlew check` passed all 88 tasks: **8,487 tests, 0 failures/errors, 6 skipped**. Merged diff and source
+  hygiene checks passed. Publication is user-authorized. Native motion acceptance remains user-run;
+  no GUI or benchmark launched. The local preview is also preserved in the main checkout's
+  `build/connection-preview/connection-overlay-faster.gif`.
+
+- **Zen integration with current main** (2026-10-04): merged `origin/main` at `4c3c6bb0`, preserving its
+  Normal/Compact startup setting independently of the saved Zen toggle. A regression covers restoring and
+  toggling Zen in both modes and reloading configuration. Independent merge review approved with no findings.
+  `./gradlew --no-daemon build --continue` passed: **8,481 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. No GUI launched.
+
+- **Zen view mode and View menu organization** (2026-10-04; `codex/jasper-zen-mode`, based on freshly fetched
+  `origin/main` at `5979c030`): View now groups View Modes, Show/Hide, Font Size and Appearance; the contributed Tools
+  submenu remains. Zen hides the current window's status bar, tool windows and rails while
+  preserving toolbar icons, the command palette field, workspace tabs and native window/menu controls. The global-context `toggle_zen_mode` command is
+  unassigned on every platform and available through the menu, command palette and Settings › Keymap. Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before
+  plugin panel creation on launch. New windows inherit the saved mode; existing windows retain theirs and the
+  last closed window saves its mode, as with the dock layout. DockState, saved rail visibility and normal
+  toolbar/status preferences remain intact. Toolbar controls remain usable during Zen. Panels keep their instances and receive actual visibility notifications; panels
+  requested while Zen is active stay hidden and are built when it exits. Settings reloads update the normal
+  preferences underneath Zen. No terminal/plugin SDK architecture changes or historical-plan rewrite were needed;
+  this bounded follow-up used inline TDD and independent final review. The original six headless tests first failed
+  against the missing feature; the follow-up persistence and toolbar/palette correction was also verified RED/GREEN.
+  Focused Zen/dock/menu/shortcut/persistence coverage passed. Independent review approved with no
+  actionable findings. `./gradlew --no-daemon build --continue` passed: **8,450 tests, 0 failures, 0 errors, 6 skipped**,
+  including architecture/doclint and native headless checks. Changed-source hygiene and `git diff --check` passed.
+  `:jasper-app:run --dry-run` resolves successfully; no GUI was launched. Native GUI acceptance remains user-run.
+  User-run checks: open panels in all six dock slots, enter/exit Zen and confirm exact layout restoration; assign
+  Zen a shortcut in Settings › Keymap and invoke it from a terminal, tool window and editor tab; remove it while
+  in Zen and exit through the menu; change saved visibility in another window, and close/reopen while in Zen.
+  See [View modes](configuration.md#view-modes). Worktree: `/Users/dustin/.codex/worktrees/jasper-zen-mode/moray`.
+
+- **View modes: adversarial review complete, integration authorized** (2026-10-04). Updated `codex/appearance-view-modes` through origin/main `857f3020`. First adversarial review found one P2: Compact widened the activated palette from 560 to 680 logical pixels. Fixed in `c92cdf3e`: Compact retains scaled 560 width with existing floating geometry and clamps; Normal's fallback stays unchanged. Paired roomy/narrow regressions demonstrated RED then GREEN (29 focused tests). A second independent adversarial review approved spec compliance and code quality with no remaining findings. Full `./gradlew check` on the fix: **8,471 tests, 0 failures/errors, 6 skipped**, 88 tasks (10 executed, 78 up-to-date); changed-source hygiene and diff checks passed. The original position-only requirement takes precedence over the derived fallback-only plan. Native tabs were explicitly abandoned; built-in tabs remain. User authorized merge to main and push after review/fixes; final merged verification and publication follow this record. No GUI or benchmark launched; [native acceptance](superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md) remains user-run.
+
+- **View-modes branch updated from local main `ad1eb65a`** at the user's request. The merge retains workspace glass, window-layout restoration and picker fixes alongside Normal/Compact modes. Configuration snapshots preserve both view mode and glass through loading, builder copies and both prior constructor signatures; schema count is 38. Full merged `./gradlew check` passed: **8,460 tests, 0 failures/errors, 6 skipped**, all 88 tasks successful (33 executed, 55 up-to-date). Updated main's Appearance section-list expectations to include View mode; independent merge review and scoped test review approved. Source hygiene checked 1,767 Java files; diff checks passed. No GUI launched or push performed.
+
+- **Appearance view modes: SDD complete, native acceptance remains user-run** on `codex/appearance-view-modes`, based on `43894416`, in `/Users/dustin/.codex/worktrees/appearance-view-modes/moray`. User requested Normal (unchanged) and Compact (native macOS title, no toolbar, existing palette floating). [Design](superpowers/specs/2026-10-03-jasper-view-modes-design.md), [SDD plan](superpowers/plans/2026-10-03-jasper-view-modes.md). Restart-required is the announced implementation default; the optional preference question is unanswered. Plan text specifies existing-method changes by exact contracts/tests rather than copying large classes. Tasks 1 and 2 are implemented and independently approved; whole-branch code review approved with no critical or important findings. Its one minor docs finding, a stale reference to a nonexistent Task 3 in the manual checklist, is corrected. Compact captures startup mode, uses native workspace chrome, suppresses the complete header through reloads/menu actions/plugin contributions, and uses the existing floating palette fallback. Focused Task 2 tests: **97 tests, 0 failures, 0 errors, 0 skipped**; existing compiler warnings only. Final controller `./gradlew check` on `713b53b5`: **8,373 tests, 0 failures, 0 errors, 6 skipped**, 85 tasks (9 executed, 76 up-to-date), architecture/doc checks included. Source hygiene covered 1,747 Java files; diff checks passed. The controller inspected dark/default-font and light/18pt headless Appearance renders: the row and restart notice fit. `settingsPreview` was intentionally stopped after those renders with SIGTERM (exit 143) because it enumerates all bundled themes; full preview-matrix completion is not claimed. [Native manual checks](superpowers/plans/2026-10-03-jasper-view-modes-manual-check.md) remain user-run. Task 2 deviations: `TerminalWindow` needed no edits because its existing menu/root ownership satisfies the contract. Initial Task 2 left `WindowCommandPalette` unchanged; adversarial review later found its fallback enlarged Compact from 560 to 680 logical pixels. The position-only user requirement takes precedence over the derived fallback-reuse instruction: Compact now supplies scaled 560 width to the existing floating positioning/clamps, preserving Normal's fallback. Paired literal-width/narrow-clamp regressions cover the correction; the controller owns final full verification and publication status. Without a config service, the existing null initial window config and sizing are preserved (controller clarification). User explicitly authorized implementation with SDD and subsequently authorized merge and push; the controller owns integration/publication. Native GUI acceptance remains user-run; no GUI or benchmark was launched.
 
 - **Dock guides: a second slot's guide always shows its half; pushed to `main`, awaiting the user's GUI check**
   (2026-10-03; spec §3 "Guides" amended at the user's request). The user: the guides should show the bottom

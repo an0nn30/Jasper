@@ -15,6 +15,7 @@ public enum ActionId {
     SPLIT_DOWN("split_down", "Split Down", "cmd+shift+d", "ctrl+alt+shift+d"),
     CLOSE_PANE("close_pane", "Close Pane", "cmd+w", "ctrl+shift+w"),
     ZOOM_PANE("zoom_pane", "Zoom Pane", "cmd+shift+enter", "ctrl+alt+shift+enter"),
+    TOGGLE_ZEN_MODE("toggle_zen_mode", "Zen", "none", "none"),
     FOCUS_PANE_LEFT("focus_pane_left", "Focus Pane Left", "cmd+alt+left", "ctrl+alt+shift+left"),
     FOCUS_PANE_RIGHT("focus_pane_right", "Focus Pane Right", "cmd+alt+right", "ctrl+alt+shift+right"),
     FOCUS_PANE_UP("focus_pane_up", "Focus Pane Up", "cmd+alt+up", "ctrl+alt+shift+up"),

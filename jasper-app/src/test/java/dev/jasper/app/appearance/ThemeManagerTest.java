@@ -77,7 +77,7 @@ class ThemeManagerTest {
     @Test void intellijLightInstallsTheClassicLightColours() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            assertThat(ThemeManager.install(Theme.INTELLIJ_LIGHT)).isTrue();
+            assertThat(ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)).isTrue();
             assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("IntelliJ Light");
             assertThat(FlatLaf.isLafDark()).isFalse();
             assertColours(Map.ofEntries(
@@ -149,7 +149,7 @@ class ThemeManagerTest {
     @Test void restoredAndDerivedKeysSurviveReinstallingTheSameLookAndFeel() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(Theme.INTELLIJ_LIGHT);
+            ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             LookAndFeel light = UIManager.getLookAndFeel();
             ThemeManager.install(Theme.DARK);
             // ThemeController rolls back like this when a later install fails.
@@ -163,7 +163,7 @@ class ThemeManagerTest {
     @Test void switchingThemesLeavesNothingOfThePreviousOneBehind() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            ThemeManager.install(Theme.INTELLIJ_LIGHT);
+            ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNotNull();
             ThemeManager.install(Theme.DARK);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNull();
@@ -172,7 +172,7 @@ class ThemeManagerTest {
     }
 
     @Test void everyBuiltInThemeGeneratesUnderItsOwnName() {
-        assertThat(ThemeManager.builtIns()).hasSize(286).contains(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
+        assertThat(ThemeManager.builtIns()).hasSize(5).contains(Theme.JASPER_LIGHT, Theme.DARK);
         assertThat(ThemeManager.builtIns()).extracting(Theme::name).contains("Clear Dark", "Clear Light");
         for (Theme theme : ThemeManager.builtIns()) {
             GeneratedTheme generated = ThemeManager.generated(theme);
@@ -180,16 +180,16 @@ class ThemeManagerTest {
             assertThat(generated.dark()).isEqualTo(theme.dark());
             assertThat(generated.terminal()).isEqualTo(theme.palette());
         }
-        assertThat(Theme.INTELLIJ_LIGHT.id()).isEqualTo("intellij-light");
+        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.id()).isEqualTo("intellij-light");
         assertThat(Theme.DARK.id()).isEqualTo("jasper-dark");
-        assertThat(Theme.DARCULA).extracting(Theme::id, Theme::name, Theme::dark).containsExactly("darcula", "Darcula", true);
+        assertThat(dev.jasper.app.appearance.ThemeFixtures.DARCULA).extracting(Theme::id, Theme::name, Theme::dark).containsExactly("darcula", "Darcula", true);
     }
 
     @Test void intellijLightsTerminalPaletteIsItsEditorSchemes() {
-        assertThat(Theme.INTELLIJ_LIGHT.palette()).isNotEqualTo(Palette.jasperLight());
+        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette()).isNotEqualTo(Palette.jasperLight());
         // IntelliJ Light's scheme takes its console background from its parent, Default: CONSOLE_BACKGROUND_KEY ffffff.
-        assertThat(Theme.INTELLIJ_LIGHT.palette().background()).isEqualTo(new Color(0xffffff));
-        assertThat(Theme.INTELLIJ_LIGHT.palette()).isEqualTo(dev.jasper.app.themeimport.LegacyThemeTestSupport.palette("IntelliJ Light", false));
+        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background()).isEqualTo(new Color(0xffffff));
+        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette()).isEqualTo(dev.jasper.app.themeimport.LegacyThemeTestSupport.palette("IntelliJ Light", false));
     }
 
     @Test void theVendoredIntellijThemesLoadWithoutWarnings() {

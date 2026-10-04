@@ -8,7 +8,7 @@ import javax.swing.*;
 /** Compact connection progress, with retry after failure. Contains no network work. */
 public final class ConnectionPanel extends JPanel {
     final JLabel message = new JLabel("Preparing connection…");
-    final JProgressBar progress = new JProgressBar();
+    final ConnectionDots progress = new ConnectionDots();
     final JButton retry = new JButton("Retry"), cancel = new JButton("Cancel");
 
     public ConnectionPanel(String name, String address, Runnable retryAction, Runnable cancelAction) {
@@ -37,8 +37,8 @@ public final class ConnectionPanel extends JPanel {
         Dimension size = super.getPreferredSize();
         return new Dimension(Math.max(400, size.width), Math.max(190, size.height));
     }
-    public void working() { progress.setVisible(true); progress.setIndeterminate(true); retry.setVisible(false); cancel.setText("Cancel"); status("Preparing connection…"); }
+    public void working() { progress.setVisible(true); progress.setWorking(true); retry.setVisible(false); cancel.setText("Cancel"); status("Preparing connection…"); }
     public void status(String text) { message.setText(text); message.setToolTipText(text); }
-    public void failed(String text) { status(text); progress.setIndeterminate(false); progress.setVisible(false); retry.setVisible(true); cancel.setText("Close"); }
-    public void finished() { progress.setIndeterminate(false); }
+    public void failed(String text) { status(text); progress.setWorking(false); progress.setVisible(false); retry.setVisible(true); cancel.setText("Close"); }
+    public void finished() { progress.setWorking(false); }
 }

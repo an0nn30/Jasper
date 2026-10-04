@@ -15,6 +15,10 @@ import java.util.zip.ZipOutputStream;
 public final class ThemeFixtures {
     private ThemeFixtures() {}
 
+    /** Former bundled themes retained only as fixtures for imported-theme rendering coverage. */
+    public static final Theme INTELLIJ_LIGHT = BuiltInThemes.toml("intellij-light", "intellij-light.toml");
+    public static final Theme DARCULA = BuiltInThemes.toml("darcula", "darcula.toml");
+
     /** A converted native fixture with real archive/scheme provenance for installation tests. */
     public static Path nativePlugin(Path file, String name, boolean dark, String background, String console) {
         Path source = file.resolveSibling("." + file.getFileName() + ".jar");

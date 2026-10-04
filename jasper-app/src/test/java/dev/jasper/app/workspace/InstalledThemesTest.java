@@ -125,14 +125,14 @@ class InstalledThemesTest {
                 assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
                 assertThat(problem.key()).isEqualTo("ui.theme.name");
                 assertThat(problem.message()).contains("\"Nope\"").contains("using Jasper Dark")
-                    .contains("Available:", "Fixture Dark", "IntelliJ Light", "Jasper Dark", "Jasper Light");
+                    .contains("Available:", "Fixture Dark", "Nord", "Jasper Dark", "Jasper Light");
             });
         });
     }
 
     @Test void missingLightChromeAndWorkspaceKeepRequestsAndRecoverAfterRepair() throws Exception {
         ThemeFixtures.nativePlugin(themes().resolve("fixture.toml"), "Fixture Light", false, "#f1f2f3", "eeeeee");
-        var themes = start("ui.theme.name='Fixture Light'\nui.theme.workspace='Darcula'\n");
+        var themes = start("ui.theme.name='Fixture Light'\nui.theme.workspace='Nord'\n");
         Files.writeString(themes().resolve("fixture.toml"), "broken archive");
         ThemeFixtures.nativePlugin(themes().resolve("shadow.toml"), "Jasper Light", true, "#123456", "101820");
         reload("ui.theme.name='Fixture Light'\nui.theme.workspace='Missing'\n");

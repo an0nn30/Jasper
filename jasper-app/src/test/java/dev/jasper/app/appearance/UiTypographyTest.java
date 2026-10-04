@@ -25,7 +25,7 @@ class UiTypographyTest {
             var themes = new ThemeController();
             String platformFamily = UIManager.getFont("Label.font").getFamily();
             try {
-                themes.configure(Theme.INTELLIJ_LIGHT);
+                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 themes.configure(Theme.DARK, new UiFontConfig("NonexistentJasperFont394", 17));
                 assertThat(themes.current().chrome()).as("the theme just configured applies").isEqualTo(dev.jasper.app.appearance.ThemeManager.generated(Theme.DARK));
                 assertThat(new JLabel().getFont().getFamily()).isEqualTo(platformFamily);
@@ -50,10 +50,10 @@ class UiTypographyTest {
                     assertThat(component.getFont().getFamily()).isEqualTo(Font.SERIF);
                     assertThat(component.getFont().getSize2D()).isEqualTo(18);
                 }
-                themes.configure(Theme.INTELLIJ_LIGHT);
+                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
                 assertThat(label.getFont().getFamily()).isEqualTo(Font.SERIF);
                 assertThat(label.getFont().getSize2D()).isEqualTo(18);
-                themes.configure(Theme.INTELLIJ_LIGHT, UiFontConfig.defaults());
+                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, UiFontConfig.defaults());
                 assertThat(label.getFont().getFamily()).isEqualTo(original.getFamily());
                 assertThat(label.getFont().getSize2D()).isEqualTo(original.getSize2D());
             } finally { subscription.close(); themes.configure(Theme.DARK, UiFontConfig.defaults()); }

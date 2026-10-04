@@ -22,7 +22,7 @@ class BadgedIconTest {
     @AfterEach void resetTheme() throws Exception { SwingUtilities.invokeAndWait(ThemeController::new); }
 
     @Test void theDotTakesItsToneColourInDarkAndLightThemes() {
-        for (Theme theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+        for (Theme theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             new ThemeController(theme);
             for (PanelBadge.Tone tone : PanelBadge.Tone.values()) {
                 var icon = new BadgedIcon(new ImageIcon(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)), tone);

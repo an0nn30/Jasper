@@ -6,6 +6,7 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.config.TerminalConfig;
@@ -89,6 +90,7 @@ public final class JasperApplication {
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
+    private final ViewMode startupViewMode;
     private boolean quitting;
     /** Written on the EDT, read by the native quit handler's thread too. */
     private volatile boolean resident;
@@ -215,6 +217,7 @@ public final class JasperApplication {
         migrationProblems = List.copyOf(startupThemeProblems);
         if (service != null) startupConfigProblems = startupThemeProblems.stream().filter(problem -> problem.file().equals(service.initialState().file())).toList();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
+        startupViewMode = startup.viewMode();
         themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
         if (service != null) scanThemes(service);
         Theme saved = themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK);
@@ -345,6 +348,12 @@ public final class JasperApplication {
     /** A window whose tab starts in {@code directory}; null opens a detached window with no tab. */
     public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null, "menu"); }
 
+    /** New windows take live settings while retaining the application startup decoration choice. */
+    ConfigSnapshot windowConfiguration() {
+        ConfigSnapshot latest = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
+        return latest.toBuilder().viewMode(startupViewMode).build();
+    }
+
     private TerminalWindow openWindow(Path directory, boolean detached, String trigger) {
         contributions.content().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
@@ -380,7 +389,7 @@ public final class JasperApplication {
                 requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quitRequested,
                 this::windowActivated, this::windowClosed,
                 state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-                launcher, directory, detached, themes, configuration == null ? null : configuration.snapshot(), history);
+                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history);
             if (configuration != null) configuration.register(window.content());
             window.content().connectContributions(contributions, uiState);
             UUID windowId = window.content().id();
@@ -638,7 +647,8 @@ public final class JasperApplication {
     public void warmUp(Runnable done) {
         Objects.requireNonNull(done, "done");
         Runnable finished = collectingAfter(done);
-        ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
+        // What a new window gets, start-up view mode included, so the rehearsal warms the chrome the next window shows.
+        ConfigSnapshot snapshot = windowConfiguration();
         boolean rehearsing = false;
         try {
             FontConfig font = snapshot.font();
@@ -689,8 +699,12 @@ public final class JasperApplication {
         Rehearsal.silence(window.content());
         // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
         Runnable close = () -> Rehearsal.closeAndDispose(window::discard, window.nativeWindow()::dispose);
+        // Its own layout state, in memory and never saved, carrying only Zen mode: it warms the Zen chrome when the next
+        // window will show it.
+        UiState rehearsalState = UiState.inMemory();
+        rehearsalState.setZenMode(uiState.zenMode());
         try {
-            window.content().connectContributions(contributions, UiState.inMemory(), false);
+            window.content().connectContributions(contributions, rehearsalState, false);
         } catch (RuntimeException | Error failure) {
             try {
                 close.run();

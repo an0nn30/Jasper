@@ -18,7 +18,7 @@ class NativeThemeUpgradeTest {
         var warnings = ThemeUpgrade.prepare(config, false);
         assertThat(warnings).anyMatch(p -> p.file().equals(bad));
         var catalog = ThemeCatalog.beside(config); catalog.scan();
-        assertThat(catalog.latest().find("Studio Dark")).isPresent();
+        assertThat(catalog.latest().find("Nord")).isPresent();
         try (var service = new ConfigService(config, false)) {
             assertThat(service.initialState().snapshot().theme()).isEqualTo("Example 2");
             edt(() -> {

@@ -328,8 +328,9 @@ change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 
 
 `tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
 refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
-assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 286 native files, index, legacy
-aliases and third-party notices entirely offline. Normal build/test never fetches. Do not normalize upstream bytes.
+assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates the five shipped native files (Jasper Light/Dark, Clear Dark/Light and Nord), index, legacy
+aliases and third-party notices entirely offline. The wider source lock remains for import/converter coverage; it does not expand the shipped catalog.
+Normal build/test never fetches. Do not normalize upstream bytes.
 Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
 colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.
 

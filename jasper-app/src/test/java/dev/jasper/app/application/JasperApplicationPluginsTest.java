@@ -358,7 +358,7 @@ class JasperApplicationPluginsTest {
 
     @Test void pluginsStartInTheSavedVariantBeforeAnyWindowExists() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-        java.nio.file.Files.writeString(dirs.configFile(), "ui.theme.name='IntelliJ Light'\n");
+        java.nio.file.Files.writeString(dirs.configFile(), "ui.theme.name='Jasper Light'\n");
         Path dev = home.resolve("look-plugin");
         PluginJars.build(dev, "look.jar", PluginJars.descriptor("dev.example.look", "1.0.0", "fix.look.Main"),
             Map.of("fix.look.Main", APPEARANCE_FIXTURE), List.of());

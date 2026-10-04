@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class ZoneIconsTest {
     @Test void retainedArtworkFollowsReparentingBoundariesAndMatch() {
-        var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             var label = new JLabel();
             var root = new JPanel();
@@ -57,12 +57,12 @@ class ZoneIconsTest {
     }
 
     @Test void keyUsesZoneTextWhilePluginArtworkKeepsItsAuthoredColor() {
-        new ThemeController(Theme.INTELLIJ_LIGHT);
+        new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             var label = new JLabel();
             var root = new JPanel();
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
-            themes.configure(Theme.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new dev.jasper.app.config.WorkspaceThemeChoice("Jasper Dark"),
                 Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
             dev.jasper.app.workspace.WorkspaceTheme.apply(root, themes.current());
             var key = AppIcons.named("KEY");

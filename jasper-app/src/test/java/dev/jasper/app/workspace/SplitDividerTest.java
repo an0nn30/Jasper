@@ -17,7 +17,7 @@ class SplitDividerTest {
             ThemeController themes = new ThemeController();
             JSplitPane split = new JSplitPane();
             try {
-                for (Theme theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                     themes.configure(theme);
                     SwingUtilities.updateComponentTreeUI(split);
                     split.setBorder(null);
