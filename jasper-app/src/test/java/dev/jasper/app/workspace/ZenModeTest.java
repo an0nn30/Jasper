@@ -58,7 +58,8 @@ class ZenModeTest {
             List<JComponent> contents = Arrays.stream(Slot.values()).map(owner.area()::content).toList();
             var tab = owner.currentTab();
             toggle(owner); LayoutTestSupport.layoutTree(owner);
-            assertThat(owner.toolbar().isVisible()).isFalse(); assertThat(owner.status().isVisible()).isFalse();
+            assertThat(owner.toolbar().isVisible()).isTrue(); assertThat(owner.status().isVisible()).isFalse();
+            assertThat(owner.chrome().search().isVisible()).isTrue();
             assertThat(owner.leftStripe().isVisible()).isFalse(); assertThat(owner.rightStripe().isVisible()).isFalse();
             for (Slot slot : Slot.values()) assertThat(owner.area().content(slot)).isNull();
             assertThat(sites).allSatisfy(site -> assertThat(site.visible()).isFalse());
@@ -80,8 +81,8 @@ class ZenModeTest {
             var first = window(); first.connectContributions(model, state);
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.RIGHT_BOTTOM, site -> new JLabel("panel"));
             show(model, first, "test.panel"); first.setRailVisible(true);
-            toggle(first);
             var second = window(); second.connectContributions(model, state);
+            toggle(first);
             assertThat(second.toolbar().isVisible()).isTrue();
             assertThat(second.area().content(Slot.RIGHT_BOTTOM)).isNotNull();
             first.close();
@@ -120,7 +121,7 @@ class ZenModeTest {
             assertThat(owner.status().isVisible()).isFalse(); assertThat(owner.leftStripe().isVisible()).isFalse();
             toggle(owner);
             owner.applyConfiguration(ConfigSnapshot.defaults(), true);
-            assertThat(owner.toolbar().isVisible()).isFalse(); assertThat(owner.status().isVisible()).isFalse();
+            assertThat(owner.toolbar().isVisible()).isTrue(); assertThat(owner.status().isVisible()).isFalse();
             var next = ConfigLoader.parse(directory.resolve("config.toml"), "window.status_bar=false\nwindow.toolbar='icons'", true);
             assertThat(next.diagnostics()).isEmpty(); owner.applyConfiguration(next.snapshot(), true);
             toggle(owner);
@@ -139,7 +140,7 @@ class ZenModeTest {
                 assertThat(owner.bindings().strokeFor(action)).isEmpty(); assertThat(zen.getAccelerator()).isNull();
                 owner.setBindings(KeyBindings.withOverrides(mac, Map.of("toggle_zen_mode", "f10")));
                 assertThat(zen.getAccelerator()).isEqualTo(key); assertThat(root.activate(key)).isTrue();
-                assertThat(zen.isSelected()).isTrue(); assertThat(owner.toolbar().isVisible()).isFalse();
+                assertThat(zen.isSelected()).isTrue(); assertThat(owner.toolbar().isVisible()).isTrue();
                 owner.dispatchCommand(owner.commands().find("toggle_zen_mode").orElseThrow());
                 assertThat(zen.isSelected()).isFalse(); assertThat(owner.toolbar().isVisible()).isTrue();
                 zen.doClick(); owner.setBindings(KeyBindings.defaults(mac));
@@ -167,8 +168,73 @@ class ZenModeTest {
             var visibility = child(view, "Show/Hide");
             assertThat(item(visibility, "Status Bar").isEnabled()).isFalse();
             assertThat(item(visibility, "Rail").isEnabled()).isFalse();
-            assertThat(item(child(visibility, "Toolbar"), "Icons Only").isEnabled()).isFalse();
+            assertThat(item(child(visibility, "Toolbar"), "Icons Only").isEnabled()).isTrue();
             toggle(owner); assertThat(item(visibility, "Status Bar").isEnabled()).isTrue();
+        });
+    }
+
+    @Test void zenSavesImmediatelyRestoresBeforePanelCreationAndPersistsExit() throws Exception {
+        edt(() -> {
+            var file = directory.resolve("ui-state.toml");
+            var model = new Contributions(); var builds = new ArrayList<PanelSite>();
+            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> {
+                builds.add(site); return new JLabel("panel");
+            });
+            var first = window(); first.connectContributions(model, UiState.load(file));
+            show(model, first, "test.panel"); toggle(first);
+            // Read from disk before close: the toggle itself must save.
+            var restored = window(); restored.connectContributions(model, UiState.load(file));
+            assertThat(restored.zenMode()).isTrue();
+            assertThat(restored.action(zenAction()).getValue(Action.SELECTED_KEY)).isEqualTo(true);
+            assertThat(restored.status().isVisible()).isFalse();
+            assertThat(restored.leftStripe().isVisible()).isFalse();
+            assertThat(restored.area().content(Slot.LEFT_TOP)).isNull();
+            assertThat(builds).as("no panel is constructed during Zen startup").hasSize(1);
+            assertThat(restored.toolbar().isVisible()).isTrue();
+            assertThat(restored.chrome().search().isVisible()).isTrue();
+            toggle(restored);
+            assertThat(restored.area().content(Slot.LEFT_TOP)).isNotNull();
+            var normal = window(); normal.connectContributions(model, UiState.load(file));
+            assertThat(normal.zenMode()).isFalse();
+            assertThat(normal.area().content(Slot.LEFT_TOP)).isNotNull();
+            // Last-closed layout ownership includes its mode, even if another window toggled most recently.
+            first.close();
+            var last = window(); last.connectContributions(model, UiState.load(file));
+            assertThat(last.zenMode()).isTrue();
+            assertThat(last.area().content(Slot.LEFT_TOP)).isNull();
+        });
+    }
+
+    @Test void absentOrMalformedSavedZenFallsBackWithoutLosingOtherLayout() throws Exception {
+        for (String value : new String[]{"", "zen_mode = 'yes'\n", "zen_mode = 42\n"}) {
+            var file = directory.resolve("legacy.toml");
+            java.nio.file.Files.writeString(file, "version = 2\nrail_visible = false\n" + value);
+            edt(() -> {
+                var owner = window(); owner.connectContributions(new Contributions(), UiState.load(file));
+                assertThat(owner.zenMode()).isFalse();
+                assertThat(owner.railVisible()).isFalse();
+                assertThat(owner.toolbar().isVisible()).isTrue();
+                assertThat(owner.status().isVisible()).isTrue();
+            });
+        }
+    }
+
+    @Test void toolbarStyleAndPaletteRemainUsableWhileZenIsActive() throws Exception {
+        edt(() -> {
+            var owner = window(); var root = new JRootPane(); root.setContentPane(owner);
+            owner.installRootBindings(root); root.setSize(1200, 800);
+            toggle(owner);
+            assertThat(owner.chrome().search().isVisible()).isTrue();
+            owner.windowCommands().view("view.toolbar.icons").actionPerformed(null);
+            assertThat(owner.toolbarMode()).isEqualTo(ToolbarMode.ICONS);
+            assertThat(owner.toolbar().isVisible()).isTrue();
+            owner.invoke(ActionId.COMMAND_PALETTE);
+            assertThat(owner.commandPalette().isOpen()).isTrue();
+            owner.commandPalette().dismiss();
+            owner.windowCommands().view("view.toolbar.hidden").actionPerformed(null);
+            assertThat(owner.toolbar().isVisible()).isFalse();
+            toggle(owner);
+            assertThat(owner.toolbar().isVisible()).as("Zen never overrides the chosen toolbar style").isFalse();
         });
     }
 

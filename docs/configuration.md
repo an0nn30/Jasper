@@ -552,19 +552,21 @@ are not recreated by this layout state.
 
 ## View modes
 
-View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the toolbar,
-title search field, status bar, tool windows and their rails. Workspace tabs and native window/menu controls
-remain available. Toggle Zen again to restore your layout; pane zoom works independently.
+View › View Modes › Zen toggles a workspace-focused view in the current window. It hides the status bar,
+tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
+controls remain available; the toolbar keeps its selected style. Toggle Zen again to restore your layout; pane zoom works independently.
 
-Zen is temporary and starts off in new windows. It does not overwrite saved toolbar/status preferences,
-rail visibility, tool-window positions, sizes or split ratios, including when closing the window in Zen.
-Changes made through Settings while in Zen take effect when leaving it. Panel show/hide requests still update
+Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
+New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last
+closed window saves its mode for the next launch. Missing or invalid values default to off. Normal status
+visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status and panel
+changes made while in Zen take effect when leaving it; toolbar changes apply immediately. Panel show/hide requests still update
 the normal dock layout, but panels remain hidden and newly requested panels are built only when Zen exits.
 Existing panel instances are retained and receive visibility notifications while hidden.
 
 View groups Toolbar, Status Bar, Rail and Show Jasper under **Show/Hide**, font controls under **Font Size**,
 and UI Theme, Workspace Scheme, Themes… and Window Settings… under **Appearance**. The contributed **Tools**
-submenu remains available. Toolbar/status/rail controls are disabled during Zen; leave Zen to use them.
+submenu remains available. Status/rail controls are disabled during Zen; leave Zen to use them. Toolbar controls stay available.
 
 Zen has no default shortcut. Assign **Zen** in Settings › Keymap, or add a binding to `[keybindings]`:
 

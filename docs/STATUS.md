@@ -4,16 +4,18 @@
 
 - **Zen view mode and View menu organization** (2026-10-04; `codex/jasper-zen-mode`, based on freshly fetched
   `origin/main` at `5979c030`): View now groups View Modes, Show/Hide, Font Size and Appearance; the contributed Tools
-  submenu remains. Zen hides the current window's toolbar, title search, status bar, tool windows and rails while
-  preserving workspace tabs and native window/menu controls. The global-context `toggle_zen_mode` command is
-  unassigned on every platform and available through the menu, command palette and Settings › Keymap. Zen is a
-  temporary presentation override: DockState, saved rail visibility and normal toolbar/status preferences remain
-  intact, including on close. Panels keep their instances and receive actual visibility notifications; panels
+  submenu remains. Zen hides the current window's status bar, tool windows and rails while
+  preserving toolbar icons, the command palette field, workspace tabs and native window/menu controls. The global-context `toggle_zen_mode` command is
+  unassigned on every platform and available through the menu, command palette and Settings › Keymap. Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before
+  plugin panel creation on launch. New windows inherit the saved mode; existing windows retain theirs and the
+  last closed window saves its mode, as with the dock layout. DockState, saved rail visibility and normal
+  toolbar/status preferences remain intact. Toolbar controls remain usable during Zen. Panels keep their instances and receive actual visibility notifications; panels
   requested while Zen is active stay hidden and are built when it exits. Settings reloads update the normal
   preferences underneath Zen. No terminal/plugin SDK architecture changes or historical-plan rewrite were needed;
-  this bounded follow-up used inline TDD and independent final review. All six new headless tests first failed
-  against the missing feature; focused Zen/dock/menu/shortcut coverage passed. Independent review approved with no
-  actionable findings. `./gradlew build --continue` passed: **8,447 tests, 0 failures, 0 errors, 6 skipped**,
+  this bounded follow-up used inline TDD and independent final review. The original six headless tests first failed
+  against the missing feature; the follow-up persistence and toolbar/palette correction was also verified RED/GREEN.
+  Focused Zen/dock/menu/shortcut/persistence coverage passed. Independent review approved with no
+  actionable findings. `./gradlew --no-daemon build --continue` passed: **8,450 tests, 0 failures, 0 errors, 6 skipped**,
   including architecture/doclint and native headless checks. Changed-source hygiene and `git diff --check` passed.
   `:jasper-app:run --dry-run` resolves successfully; no GUI was launched. Native GUI acceptance remains user-run.
   User-run checks: open panels in all six dock slots, enter/exit Zen and confirm exact layout restoration; assign

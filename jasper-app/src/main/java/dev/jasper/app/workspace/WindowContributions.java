@@ -297,6 +297,7 @@ final class WindowContributions implements AutoCloseable {
             }
         }
         state.setRailVisible(owner.railVisible());
+        state.setZenMode(owner.zenMode());
         state.setDock(new UiState.Dock(dock.size(Side.LEFT), dock.size(Side.RIGHT), dock.size(Side.BOTTOM),
             dock.ratio(Side.LEFT), dock.ratio(Side.RIGHT), dock.ratio(Side.BOTTOM)));
         state.save();

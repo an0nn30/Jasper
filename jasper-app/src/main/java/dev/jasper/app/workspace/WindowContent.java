@@ -662,11 +662,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean statusVisible() { return statusVisible; }
     boolean zenMode() { return viewMode == ViewMode.ZEN; }
 
-    /** A temporary presentation override; saved visibility and the dock layout remain intact. */
+    /** Saves this window's mode without changing its normal visibility or dock layout. */
     void toggleZenMode() {
         if (closed) return;
+        setViewMode(zenMode() ? ViewMode.NORMAL : ViewMode.ZEN);
+        uiState.setZenMode(zenMode());
+        uiState.save();
+    }
+
+    private void setViewMode(ViewMode mode) {
+        if (closed || viewMode == mode) return;
         dockDrag.cancel();
-        viewMode = zenMode() ? ViewMode.NORMAL : ViewMode.ZEN;
+        viewMode = mode;
         refreshChromeVisibility();
         area.setToolsSuppressed(zenMode());
         syncRailVisibility();
@@ -703,6 +710,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
+        // Restore before contributions can build or show saved panels.
+        setViewMode(state.zenMode() ? ViewMode.ZEN : ViewMode.NORMAL);
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         contentRegistry = model.content();
         contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
@@ -1299,8 +1308,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     private void refreshChromeVisibility() {
-        chrome.setToolbarMode(zenMode() ? ToolbarMode.HIDDEN : toolbarMode);
-        chrome.search().setVisible(!zenMode());
+        chrome.setToolbarMode(toolbarMode);
         chrome.setStatusVisible(!zenMode() && statusVisible);
         area.setStatusVisible(!zenMode() && statusVisible);
         chrome.header().revalidate(); chrome.header().repaint();
