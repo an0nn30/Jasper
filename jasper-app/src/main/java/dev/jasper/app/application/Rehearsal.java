@@ -2,6 +2,7 @@ package dev.jasper.app.application;
 
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.workspace.WindowCallbacks;
+import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.AttachedConnection;
 import dev.jasper.terminal.session.TerminalSession;
@@ -20,6 +21,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.swing.JRootPane;
@@ -119,9 +121,41 @@ final class Rehearsal {
             handedOff = true;
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING,
-                "The warm-up rehearsal could not compose a window; the first window will pay for it", failure);
+                "The warm-up rehearsal could not be built (its canned terminal or its window); the first window will pay for it",
+                failure);
         } finally {
             if (!handedOff) end(stage, feed, done);
+        }
+    }
+
+    /**
+     * A rehearsal window shows nothing, ever: what would open a dialog (a launch that failed, a rejected choice) is only
+     * logged. Without this a failed canned launch would reach {@code WindowContent}'s modal message dialog. EDT.
+     */
+    static void silence(WindowContent content) {
+        silence(content, message -> LOG.log(System.Logger.Level.WARNING,
+            "The warm-up rehearsal's window reported a problem, which is not shown: " + message));
+    }
+
+    static void silence(WindowContent content, Consumer<String> report) {
+        content.onError = report;
+        content.onInfo = report;
+    }
+
+    /**
+     * Runs {@code close}. A window whose close failed part way may still have its frame up, so then {@code dispose} runs
+     * too, its own failure added to the original as suppressed, and the original propagates. EDT.
+     */
+    static void closeAndDispose(Runnable close, Runnable dispose) {
+        try {
+            close.run();
+        } catch (RuntimeException | Error failure) {
+            try {
+                dispose.run();
+            } catch (RuntimeException | Error disposing) {
+                failure.addSuppressed(disposing);
+            }
+            throw failure;
         }
     }
 

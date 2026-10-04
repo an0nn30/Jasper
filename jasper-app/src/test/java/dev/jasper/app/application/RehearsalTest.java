@@ -1,7 +1,9 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.testsupport.IdleTerminalSession;
 import dev.jasper.app.workspace.DesktopTestSupport;
+import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.terminal.session.TerminalSession;
 import dev.jasper.terminal.session.TerminalSessionListener;
 import java.time.Duration;
@@ -9,11 +11,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
@@ -25,6 +33,60 @@ class RehearsalTest {
     private static final class Boom extends Error {
         Boom(String message) { super(message); }
     }
+
+    /**
+     * Keeps the expected diagnostics out of the test output and records them: the rehearsal's warnings (and the pane's
+     * own error log for a failed launch), and what reaches the default uncaught-exception handler (an Error that leaves
+     * the EDT). Restores everything exactly.
+     */
+    private static final class Quiet implements AutoCloseable {
+        private final List<Logger> loggers = List.of(Logger.getLogger(Rehearsal.class.getName()),
+            Logger.getLogger(TerminalPane.class.getName()));
+        private final List<Boolean> parents = loggers.stream().map(Logger::getUseParentHandlers).toList();
+        private final List<Level> levels = loggers.stream().map(Logger::getLevel).toList();
+        private final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        private final List<LogRecord> records = new CopyOnWriteArrayList<>();
+        private final List<Throwable> uncaught = new CopyOnWriteArrayList<>();
+        private final Handler handler = new Handler() {
+            @Override public void publish(LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+
+        Quiet() {
+            for (Logger logger : loggers) {
+                logger.setUseParentHandlers(false);
+                logger.setLevel(Level.ALL);
+                logger.addHandler(handler);
+            }
+            Thread.setDefaultUncaughtExceptionHandler((thread, failure) -> uncaught.add(failure));
+        }
+
+        /** The rehearsal's warnings logged so far. */
+        List<String> warnings() {
+            return records.stream().filter(record -> record.getLoggerName().equals(Rehearsal.class.getName()))
+                .filter(record -> record.getLevel().equals(Level.WARNING)).map(LogRecord::getMessage).toList();
+        }
+
+        /** The pane's error logs so far. */
+        List<String> paneErrors() {
+            return records.stream().filter(record -> record.getLoggerName().equals(TerminalPane.class.getName()))
+                .filter(record -> record.getLevel().equals(Level.SEVERE)).map(LogRecord::getMessage).toList();
+        }
+
+        List<Throwable> uncaught() { return uncaught; }
+
+        @Override public void close() {
+            Thread.setDefaultUncaughtExceptionHandler(previous);
+            for (int i = 0; i < loggers.size(); i++) {
+                loggers.get(i).removeHandler(handler);
+                loggers.get(i).setLevel(levels.get(i));
+                loggers.get(i).setUseParentHandlers(parents.get(i));
+            }
+        }
+    }
+
+    @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
     @Test void theCannedTerminalPlaysOnlyOnceReleasedAndEndsWhenClosed() throws Exception {
         Rehearsal.Feed feed = Rehearsal.feed(100, 35);
@@ -78,7 +140,7 @@ class RehearsalTest {
         var silent = new Rehearsal.Feed(IdleTerminalSession.start(), () -> { });
         var paints = new AtomicInteger();
         var finished = new CountDownLatch(1);
-        try {
+        try (var quiet = new Quiet()) {
             edt(() -> Rehearsal.play(silent, () -> {
                 paints.incrementAndGet();
                 throw new IllegalStateException("no screen to paint on");
@@ -86,26 +148,32 @@ class RehearsalTest {
             assertThat(finished.await(5, TimeUnit.SECONDS)).isTrue();
             edt(() -> { });
             assertThat(paints).hasValue(1);
+            assertThat(quiet.warnings()).as("a failing paint is logged, not rethrown").hasSize(1)
+                .allSatisfy(message -> assertThat(message).contains("could not paint"));
+            assertThat(quiet.uncaught()).isEmpty();
         } finally {
             silent.session().close();
         }
     }
 
-    @Test void playFinishesOnceEvenWhenPaintingThrowsAnErrorAndBothTriggersFire() throws Exception {
+    @Test void playFinishesOnceAndLetsAnErrorFromPaintingPropagateEvenWhenBothTriggersFire() throws Exception {
         // The output and the short fallback both fire: whichever is first paints and finishes, the other does nothing.
         Rehearsal.Feed feed = Rehearsal.feed(80, 24);
         var paints = new AtomicInteger();
         var finishes = new AtomicInteger();
-        try {
+        try (var quiet = new Quiet()) {
             edt(() -> Rehearsal.play(feed, () -> {
                 paints.incrementAndGet();
                 throw new Boom("the toolkit failed while painting");
             }, finishes::incrementAndGet, Duration.ofMillis(50)));
             DesktopTestSupport.until(() -> finishes.get() > 0);
+            DesktopTestSupport.until(() -> !quiet.uncaught().isEmpty());
             Thread.sleep(300);
             edt(() -> { });
             assertThat(paints).as("one paint").hasValue(1);
             assertThat(finishes).as("finish ran despite the Error, and once").hasValue(1);
+            assertThat(quiet.uncaught()).as("the Error left the EDT, once, after finish").singleElement().isInstanceOf(Boom.class);
+            assertThat(quiet.warnings()).isEmpty();
         } finally {
             feed.session().close();
         }
@@ -139,58 +207,93 @@ class RehearsalTest {
         DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
     }
 
-    @Test void runClosesAndReportsDoneWhenPaintingFailsWithAnExceptionOrAnError() throws Exception {
-        for (Throwable failure : List.of(new IllegalStateException("no screen"), new Boom("no toolkit"))) {
-            var recording = new Recording();
-            var feeds = new AtomicReference<Rehearsal.Feed>();
-            var finished = new CountDownLatch(1);
+    @Test void runClosesAndReportsDoneWhenPaintingFailsWithAnException() throws Exception {
+        var recording = new Recording();
+        var feeds = new AtomicReference<Rehearsal.Feed>();
+        var finished = new CountDownLatch(1);
+        try (var quiet = new Quiet()) {
             edt(() -> Rehearsal.run(() -> {
                 feeds.set(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
                 return feeds.get();
-            }, feed -> recording.stage(() -> sneakyThrow(failure), () -> { }),
+            }, feed -> recording.stage(() -> { throw new IllegalStateException("no screen"); }, () -> { }),
                 () -> { recording.done().run(); finished.countDown(); }, Duration.ofMillis(50)));
-            assertThat(finished.await(5, TimeUnit.SECONDS)).as(failure.getClass().getSimpleName()).isTrue();
+            assertThat(finished.await(5, TimeUnit.SECONDS)).isTrue();
             edt(() -> { });
-            assertThat(recording.events).as(failure.getClass().getSimpleName()).containsExactly("paint", "close", "done");
+            assertThat(recording.events).containsExactly("paint", "close", "done");
             assertThat(recording.dones).hasValue(1);
-            DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
+            assertThat(quiet.warnings()).singleElement().asString().contains("could not paint");
+            assertThat(quiet.uncaught()).isEmpty();
         }
+        DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
+    }
+
+    @Test void runClosesAndReportsDoneWhenPaintingFailsWithAnErrorWhichStillPropagates() throws Exception {
+        var recording = new Recording();
+        var feeds = new AtomicReference<Rehearsal.Feed>();
+        var finished = new CountDownLatch(1);
+        try (var quiet = new Quiet()) {
+            edt(() -> Rehearsal.run(() -> {
+                feeds.set(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
+                return feeds.get();
+            }, feed -> recording.stage(() -> { throw new Boom("no toolkit"); }, () -> { }),
+                () -> { recording.done().run(); finished.countDown(); }, Duration.ofMillis(50)));
+            assertThat(finished.await(5, TimeUnit.SECONDS)).isTrue();
+            DesktopTestSupport.until(() -> !quiet.uncaught().isEmpty());
+            edt(() -> { });
+            assertThat(recording.events).containsExactly("paint", "close", "done");
+            assertThat(recording.dones).hasValue(1);
+            assertThat(quiet.uncaught()).as("the Error left the EDT, once, after done").singleElement().isInstanceOf(Boom.class);
+            assertThat(quiet.warnings()).isEmpty();
+        }
+        DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
     }
 
     @Test void runReportsDoneEvenWhenClosingTheWindowFails() throws Exception {
         var recording = new Recording();
         var feeds = new AtomicReference<Rehearsal.Feed>();
         var finished = new CountDownLatch(1);
-        edt(() -> Rehearsal.run(() -> {
-            feeds.set(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
-            return feeds.get();
-        }, feed -> recording.stage(() -> { }, () -> { throw new IllegalStateException("cannot dispose"); }),
-            () -> { recording.done().run(); finished.countDown(); }, Duration.ofMillis(50)));
-        assertThat(finished.await(5, TimeUnit.SECONDS)).isTrue();
-        edt(() -> { });
-        assertThat(recording.events).containsExactly("paint", "close", "done");
+        try (var quiet = new Quiet()) {
+            edt(() -> Rehearsal.run(() -> {
+                feeds.set(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
+                return feeds.get();
+            }, feed -> recording.stage(() -> { }, () -> { throw new IllegalStateException("cannot dispose"); }),
+                () -> { recording.done().run(); finished.countDown(); }, Duration.ofMillis(50)));
+            assertThat(finished.await(5, TimeUnit.SECONDS)).isTrue();
+            edt(() -> { });
+            assertThat(recording.events).containsExactly("paint", "close", "done");
+            assertThat(quiet.warnings()).singleElement().asString().contains("could not close its window");
+            assertThat(quiet.uncaught()).isEmpty();
+        }
         DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
     }
 
     @Test void runReportsDoneAtOnceWhenTheFeedCannotBeBuilt() throws Exception {
         var recording = new Recording();
         var composed = new AtomicInteger();
-        edt(() -> Rehearsal.run(() -> { throw new IllegalStateException("no canned session"); },
-            feed -> { composed.incrementAndGet(); return recording.stage(); }, recording.done(), Duration.ofSeconds(30)));
-        assertThat(recording.dones).as("done ran, and a plain failure did not escape").hasValue(1);
-        assertThat(composed).as("nothing was composed").hasValue(0);
-        assertThat(recording.events).containsExactly("done");
+        try (var quiet = new Quiet()) {
+            edt(() -> Rehearsal.run(() -> { throw new IllegalStateException("no canned session"); },
+                feed -> { composed.incrementAndGet(); return recording.stage(); }, recording.done(), Duration.ofSeconds(30)));
+            assertThat(recording.dones).as("done ran, and a plain failure did not escape").hasValue(1);
+            assertThat(composed).as("nothing was composed").hasValue(0);
+            assertThat(recording.events).containsExactly("done");
+            assertThat(quiet.warnings()).singleElement().asString().contains("could not be built");
+            assertThat(quiet.uncaught()).isEmpty();
+        }
     }
 
     @Test void runClosesTheFeedAndReportsDoneAtOnceWhenComposingFails() throws Exception {
         var recording = new Recording();
         var feeds = new AtomicReference<Rehearsal.Feed>();
-        edt(() -> Rehearsal.run(() -> {
-            feeds.set(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
-            return feeds.get();
-        }, feed -> { throw new IllegalStateException("cannot compose"); }, recording.done(), Duration.ofSeconds(30)));
-        assertThat(recording.dones).as("done ran, and a plain failure did not escape").hasValue(1);
-        assertThat(recording.events).containsExactly("done");
+        try (var quiet = new Quiet()) {
+            edt(() -> Rehearsal.run(() -> {
+                feeds.set(new Rehearsal.Feed(IdleTerminalSession.start(), () -> { }));
+                return feeds.get();
+            }, feed -> { throw new IllegalStateException("cannot compose"); }, recording.done(), Duration.ofSeconds(30)));
+            assertThat(recording.dones).as("done ran, and a plain failure did not escape").hasValue(1);
+            assertThat(recording.events).containsExactly("done");
+            assertThat(quiet.warnings()).singleElement().asString().contains("could not be built");
+            assertThat(quiet.uncaught()).isEmpty();
+        }
         DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
     }
 
@@ -212,6 +315,51 @@ class RehearsalTest {
         DesktopTestSupport.until(() -> feeds.get().session().exitFuture().isDone());
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T extends Throwable> void sneakyThrow(Throwable failure) throws T { throw (T) failure; }
+    @Test void aFailedCannedLaunchIsLoggedAndNeverOpensADialog() throws Exception {
+        // The pane reports a failed launch through its window's onError, which by default is a modal message dialog
+        // (headless, that throws a HeadlessException on the EDT). A silenced window reports to the log instead.
+        var reported = new CopyOnWriteArrayList<String>();
+        try (var quiet = new Quiet()) {
+            edt(() -> {
+                var failing = new ShellLauncher(Runnable::run, directory -> { throw new IllegalStateException("no canned session"); }, "shell");
+                Rehearsal.silence(DesktopTestSupport.content(failing), reported::add);
+            });
+            DesktopTestSupport.until(() -> !reported.isEmpty());
+            edt(() -> { });
+            assertThat(reported).singleElement().asString().contains("Could not start terminal").contains("no canned session");
+            assertThat(quiet.paneErrors()).as("the pane logged the failed launch").hasSize(1);
+            assertThat(quiet.uncaught()).as("no dialog was attempted").isEmpty();
+        }
+    }
+
+    @Test void aSilencedWindowLogsWhatWouldHaveOpenedADialog() throws Exception {
+        var failing = new ShellLauncher(Runnable::run, directory -> { throw new IllegalStateException("no canned session"); }, "shell");
+        try (var quiet = new Quiet()) {
+            edt(() -> Rehearsal.silence(DesktopTestSupport.content(failing)));
+            DesktopTestSupport.until(() -> !quiet.warnings().isEmpty());
+            edt(() -> { });
+            assertThat(quiet.warnings()).singleElement().asString()
+                .contains("not shown").contains("Could not start terminal");
+            assertThat(quiet.paneErrors()).as("the pane logged the failed launch").hasSize(1);
+            assertThat(quiet.uncaught()).isEmpty();
+        }
+    }
+
+    @Test void closingFailsOverToDisposingTheFrameAndKeepsTheOriginalFailure() {
+        var disposed = new AtomicInteger();
+        var closeFailure = new IllegalStateException("cannot close");
+        var disposeFailure = new IllegalStateException("cannot dispose");
+        assertThatThrownBy(() -> Rehearsal.closeAndDispose(() -> { throw closeFailure; }, () -> {
+            disposed.incrementAndGet();
+            throw disposeFailure;
+        })).isSameAs(closeFailure).hasSuppressedException(disposeFailure);
+        assertThat(disposed).as("the frame is disposed although closing failed").hasValue(1);
+
+        assertThatThrownBy(() -> Rehearsal.closeAndDispose(() -> { throw new Boom("close"); }, disposed::incrementAndGet))
+            .isInstanceOf(Boom.class);
+        assertThat(disposed).as("also for an Error, which still propagates").hasValue(2);
+
+        Rehearsal.closeAndDispose(() -> { }, disposed::incrementAndGet);
+        assertThat(disposed).as("a close that worked disposed the frame itself").hasValue(2);
+    }
 }

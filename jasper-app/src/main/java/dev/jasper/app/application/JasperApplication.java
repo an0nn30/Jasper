@@ -585,21 +585,28 @@ public final class JasperApplication {
         }
     }
 
-    /** The rehearsal's window around {@code feed}: wired to the contributions but registered nowhere else. EDT. */
+    /**
+     * The rehearsal's window around {@code feed}: wired to the contributions but registered nowhere else, and silent,
+     * so a problem is logged rather than shown. Its frame is always disposed, even when closing the window fails. If the
+     * window's own constructor fails there is no window to reach its frame through; nothing was shown. EDT.
+     */
     private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
         TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
             new CommandHistory());
+        // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
+        Rehearsal.silence(window.content());
+        Runnable close = () -> Rehearsal.closeAndDispose(window::close, window.nativeWindow()::dispose);
         try {
             window.content().connectContributions(contributions, UiState.inMemory(), false);
         } catch (RuntimeException | Error failure) {
             try {
-                window.close();
+                close.run();
             } catch (RuntimeException | Error closing) {
                 failure.addSuppressed(closing);
             }
             throw failure;
         }
-        return new Rehearsal.Stage(() -> Rehearsal.paint(window.nativeWindow()), window::close);
+        return new Rehearsal.Stage(() -> Rehearsal.paint(window.nativeWindow()), close);
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
