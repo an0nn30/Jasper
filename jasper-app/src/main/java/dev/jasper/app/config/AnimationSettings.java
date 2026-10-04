@@ -2,7 +2,7 @@ package dev.jasper.app.config;
 
 /**
  * Shared animation policy. Every future app animation must honor {@link #enabled()}.
- * Tab durations are temporary live tuning controls until the motion is finalized.
+ * Tab durations are fixed by the application; explicit values support internal motion consumers.
  *
  * @param enabled whether application animations may run
  * @param tabOpenMillis opening duration, 0-2000 ms; zero finishes immediately
@@ -10,8 +10,8 @@ package dev.jasper.app.config;
  * @param tabSwitchMillis selection duration, 0-2000 ms; zero finishes immediately
  */
 public record AnimationSettings(boolean enabled, int tabOpenMillis, int tabCloseMillis, int tabSwitchMillis) {
-    /** Initial tuning values; settings can override them without rebuilding. */
-    public static final int DEFAULT_OPEN_MILLIS = 150, DEFAULT_CLOSE_MILLIS = 120, DEFAULT_SWITCH_MILLIS = 130;
+    /** User-approved tab motion durations in milliseconds. */
+    public static final int DEFAULT_OPEN_MILLIS = 80, DEFAULT_CLOSE_MILLIS = 100, DEFAULT_SWITCH_MILLIS = 130;
 
     public AnimationSettings {
         if (tabOpenMillis < 0 || tabOpenMillis > 2000 || tabCloseMillis < 0 || tabCloseMillis > 2000

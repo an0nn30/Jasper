@@ -221,8 +221,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             values.get(CoreSettings.WINDOW_NATIVE_DECORATIONS),
             WorkspaceThemeChoice.parse(values.get(CoreSettings.UI_THEME_WORKSPACE)),
             new GlassSettings(values.get(CoreSettings.UI_WORKSPACE_OPACITY), values.get(CoreSettings.UI_WORKSPACE_BLUR)),
-            new AnimationSettings(values.get(CoreSettings.UI_ANIMATIONS_ENABLED), values.get(CoreSettings.UI_ANIMATIONS_TAB_OPEN_MS),
-                values.get(CoreSettings.UI_ANIMATIONS_TAB_CLOSE_MS), values.get(CoreSettings.UI_ANIMATIONS_TAB_SWITCH_MS)));
+            new AnimationSettings(values.get(CoreSettings.UI_ANIMATIONS_ENABLED), AnimationSettings.DEFAULT_OPEN_MILLIS,
+                AnimationSettings.DEFAULT_CLOSE_MILLIS, AnimationSettings.DEFAULT_SWITCH_MILLIS));
     }
 
     public KeyBindings bindings(boolean macOs) {

@@ -51,6 +51,9 @@ public final class ConfigLoader {
     private static final List<String> PLUGINS = List.of("plugins");
     private static final List<String> PALETTE_SCOPES = List.of("palette", "scopes");
     private static final List<String> VERSION_KEY = List.of("version");
+    private static final java.util.Set<List<String>> RETIRED_ANIMATION_TIMINGS = java.util.Set.of(
+        List.of("ui", "animations", "tab_open_ms"), List.of("ui", "animations", "tab_close_ms"),
+        List.of("ui", "animations", "tab_switch_ms"));
     private static final java.util.regex.Pattern PLUGIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
 
     private final Path file;
@@ -101,8 +104,9 @@ public final class ConfigLoader {
         return value;
     }
 
-    /** The version key and the tables other readers own. */
+    /** Retired tab tuning keys, the version key and the tables other readers own. */
     private boolean special(List<String> path, Object value) {
+        if (RETIRED_ANIMATION_TIMINGS.contains(path)) return true;
         if (path.equals(List.of("themes"))) { readRetiredThemes(path, value); return true; }
         if (path.equals(VERSION_KEY)) { readVersion(path, value); return true; }
         if (!path.equals(KEYBINDINGS) && !path.equals(PLUGINS) && !path.equals(PALETTE_SCOPES)) return false;

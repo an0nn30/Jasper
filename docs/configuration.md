@@ -161,9 +161,6 @@ workspace = "match"
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
-| `ui.animations.tab_open_ms` | `150` | Temporary tab opening duration, 0–2000 ms; zero is instant | Live |
-| `ui.animations.tab_close_ms` | `120` | Temporary tab closing duration, 0–2000 ms; zero is instant | Live |
-| `ui.animations.tab_switch_ms` | `130` | Temporary tab selection duration, 0–2000 ms; zero is instant | Live |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
 | `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
@@ -750,14 +747,14 @@ Changes update open and hidden panels,
 menus, tabs, dialogs and subsequent windows without restarting sessions. Headings and secondary
 labels retain their relative emphasis. Native OS dialogs and system menu rendering remain OS-owned.
 
-### Animations and temporary tab tuning
+### Animations
 
 Settings → Appearance → Animations controls motion throughout the app. **Enable animations** is on by default;
 turning it off and clicking Apply finishes running transitions immediately in open windows. Future app animations
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 
-During tuning, the same section exposes **Open tab duration**, **Close tab duration**, and **Switch tab duration**.
-Enter milliseconds and click Apply to test without restarting: defaults are 150, 120, and 130 ms respectively.
-The valid range is 0–2000 ms; 0 makes that operation instant. These temporary saved controls are
-`ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms`; they will be removed
-when the final motion timings are chosen. The app-wide enable switch will remain.
+Tab motion uses fixed timings: opening takes 80 ms, closing 100 ms, and selection 130 ms.
+The temporary **Open tab duration**, **Close tab duration**, and **Switch tab duration** tuning fields have been removed.
+Existing `ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms` values are
+ignored silently and left in the configuration file; they no longer affect motion. Other unknown animation keys
+still produce the usual diagnostics.

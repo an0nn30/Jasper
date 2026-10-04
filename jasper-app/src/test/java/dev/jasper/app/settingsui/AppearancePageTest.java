@@ -55,19 +55,15 @@ class AppearancePageTest {
         assertThat(page.modified()).isTrue();
     }
 
-    @Test void animationControlsStageTheSharedPolicyAndIndependentDurations() {
+    @Test void animationSectionOnlyStagesTheSharedPolicyAndHasNoDurationEditors() {
         page.component();
-        var toggle = page.rows().stream().filter(row -> row.setting() == CoreSettings.UI_ANIMATIONS_ENABLED)
-            .findFirst().orElseThrow();
+        var animationRows = page.rows().stream().filter(row -> row.setting().table().equals(List.of("ui", "animations"))).toList();
+        assertThat(animationRows).extracting(row -> row.setting().name()).containsExactly("ui.animations.enabled");
+        var toggle = animationRows.getFirst();
         ((javax.swing.JCheckBox) toggle.editor().component()).doClick();
         assertThat(draft.value(CoreSettings.UI_ANIMATIONS_ENABLED)).isFalse();
-        var opening = page.rows().stream().filter(row -> row.setting() == CoreSettings.UI_ANIMATIONS_TAB_OPEN_MS)
-            .findFirst().orElseThrow();
-        ((Editors.Spin<?>) opening.editor()).spinner.setValue(280);
-        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_TAB_OPEN_MS)).isEqualTo(280);
-        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_TAB_CLOSE_MS)).isEqualTo(120);
-        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_TAB_SWITCH_MS)).isEqualTo(130);
         assertThat(page.modified()).isTrue();
+        assertThat(page.searchTerms()).doesNotContain("Open tab duration", "Close tab duration", "Switch tab duration");
     }
 
     @Test void bothDropdownsSearchAndEnterStagesTheMatch() {

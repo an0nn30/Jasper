@@ -79,11 +79,7 @@ public final class CorePages {
                 .row(UI_FONT_FAMILY, Editors.font(false))
                 .row(UI_FONT_SIZE, Editors.optionalNumber("Use platform size", 0.5, "pt"))
                 .section("Animations")
-                .row(UI_ANIMATIONS_ENABLED)
-                .row(UI_ANIMATIONS_TAB_OPEN_MS, Editors.integer("ms"))
-                .row(UI_ANIMATIONS_TAB_CLOSE_MS, Editors.integer("ms"))
-                .row(UI_ANIMATIONS_TAB_SWITCH_MS, Editors.integer("ms"))
-                .note("Tab durations are temporary tuning controls. Set a duration to 0 for an instant transition."),
+                .row(UI_ANIMATIONS_ENABLED),
             SchemaPage.page("window", "Window").parent("appearance-behavior")
                 .section("Toolbar and status bar")
                 .row(WINDOW_TOOLBAR)
