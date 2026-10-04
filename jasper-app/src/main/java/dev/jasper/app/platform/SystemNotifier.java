@@ -7,6 +7,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.SwingUtilities;
@@ -95,11 +96,24 @@ public final class SystemNotifier implements AutoCloseable {
         return new SystemNotifier(worker, () -> { }, backend);
     }
 
-    /** A notifier whose calls run on one daemon worker thread, stopped by {@link #close()}. */
+    /**
+     * A notifier whose calls run on one daemon worker thread, stopped by {@link #close()}, which waits up to a second
+     * for the worker to run the backend's own close, so that it has run before Jasper exits.
+     */
     static SystemNotifier onWorker(Function<Consumer<String>, Backend> backend) {
         ExecutorService worker = Executors.newSingleThreadExecutor(
             Thread.ofPlatform().daemon().name("jasper-system-notifications").factory());
-        return new SystemNotifier(worker, worker::shutdown, backend);
+        return new SystemNotifier(worker, () -> stopped(worker), backend);
+    }
+
+    /** Stops accepting work and waits up to a second for what is queued, the backend's close included, to finish. */
+    private static void stopped(ExecutorService worker) {
+        worker.shutdown();
+        try {
+            worker.awaitTermination(1, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -151,7 +165,10 @@ public final class SystemNotifier implements AutoCloseable {
     /** Whether this notifier shows nothing at all. */
     boolean silent() { return backend == Backend.NONE; }
 
-    /** Lets the backend release what it holds, then stops the worker; nothing is shown afterwards. */
+    /**
+     * Lets the backend release what it holds, then stops the worker, waiting up to a second for the backend's own
+     * close to run; nothing is shown afterwards.
+     */
     @Override public synchronized void close() {
         if (closed) return;
         try {

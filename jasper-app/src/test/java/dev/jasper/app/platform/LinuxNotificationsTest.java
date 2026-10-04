@@ -31,8 +31,13 @@ class LinuxNotificationsTest {
         FakeProcess(List<String> arguments) { this.arguments = List.copyOf(arguments); }
 
         void finish(String printed) {
-            output = printed.getBytes(StandardCharsets.UTF_8);
+            printing(printed);
             exit.complete(this);
+        }
+
+        /** Has printed {@code printed} already but not exited, as a notification clicked just before Jasper kills it. */
+        void printing(String printed) {
+            output = printed.getBytes(StandardCharsets.UTF_8);
         }
 
         @Override public OutputStream getOutputStream() { return OutputStream.nullOutputStream(); }
@@ -129,7 +134,9 @@ class LinuxNotificationsTest {
 
     @Test void atMostEightWaitAndTheOldestIsKilled() {
         var linux = linux();
-        for (int i = 0; i <= LinuxNotifications.MAX_WAITING; i++) linux.show(message("id-" + i, "n" + i, ""));
+        for (int i = 0; i < LinuxNotifications.MAX_WAITING; i++) linux.show(message("id-" + i, "n" + i, ""));
+        shown().getFirst().printing("default\n"); // clicked, but crowded out before its exit was seen
+        linux.show(message("id-" + LinuxNotifications.MAX_WAITING, "n" + LinuxNotifications.MAX_WAITING, ""));
         List<FakeProcess> shown = shown();
         assertThat(shown).hasSize(LinuxNotifications.MAX_WAITING + 1);
         assertThat(shown.getFirst().destroyed).isTrue();
@@ -142,15 +149,22 @@ class LinuxNotificationsTest {
         linux.show(message("id-1", "first", ""));
         linux.show(message("id-2", "second", ""));
         linux.show(message("id-3", "third", ""));
+        shown().get(0).printing("default\n"); // clicked, but killed before its exit was seen
         linux.withdraw("id-1");
         assertThat(shown().get(0).destroyed).isTrue();
         assertThat(shown().get(1).destroyed).isFalse();
+        assertThat(clicks).as("a withdrawn notification is no click").isEmpty();
+        shown().get(1).printing("default\n");
+        shown().get(2).printing("default\n");
         linux.withdrawAll();
         assertThat(shown().get(1).destroyed).isTrue();
         assertThat(shown().get(2).destroyed).isTrue();
+        assertThat(clicks).as("withdrawing all is no click").isEmpty();
         linux.show(message("id-4", "fourth", ""));
+        shown().get(3).printing("default\n");
         linux.close();
         assertThat(shown().get(3).destroyed).isTrue();
+        assertThat(clicks).as("shutting down is no click").isEmpty();
         linux.show(message("id-5", "after", ""));
         assertThat(shown()).hasSize(4);
         shown().get(3).finish("default");

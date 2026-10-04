@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -107,13 +108,19 @@ class SystemNotifierTest {
         assertThat(heard).containsExactly(id);
     }
 
-    @Test void theWorkerRunsOffTheCallingThreadAsADaemon() throws Exception {
+    @Test void theWorkerRunsOffTheCallingThreadAsADaemonAndClosingWaitsForTheBackendsClose() throws Exception {
         var delivered = new CountDownLatch(1);
+        var released = new AtomicBoolean();
         var threads = new CopyOnWriteArrayList<Thread>();
         var notifier = SystemNotifier.onWorker(clicks -> new SystemNotifier.Backend(message -> {
             threads.add(Thread.currentThread());
             delivered.countDown();
-        }, id -> { }, () -> { }, () -> { }, () -> { }));
+        }, id -> { }, () -> { }, () -> { }, () -> {
+            // Slow cleanup, like killing processes; it spins because shutting the worker down interrupts a sleep.
+            long end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100);
+            while (System.nanoTime() < end) Thread.onSpinWait();
+            released.set(true);
+        }));
         notifier.send(UUID.randomUUID(), SystemNotifier.Level.INFO, "build", "Finished");
         assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(threads).singleElement().satisfies(thread -> {
@@ -122,6 +129,9 @@ class SystemNotifierTest {
             assertThat(thread.getName()).isEqualTo("jasper-system-notifications");
         });
         notifier.close();
+        assertThat(released).as("close() returns only after the backend released what it holds").isTrue();
+        threads.getFirst().join(2_000);
+        assertThat(threads.getFirst().isAlive()).as("the worker thread has ended").isFalse();
     }
 
     @Test void anUnpackagedMacAndUnknownSystemsShowNothing(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) {
