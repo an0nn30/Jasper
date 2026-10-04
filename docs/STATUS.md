@@ -33,6 +33,21 @@
   unknown tables/non-string fields remain invalid. Additional pure color mapping helpers omit theme
   geometry/delegates from generated UI data, and generated snapshots reuse the document's bounded
   deep-freeze logic. Headless `:jasper-ui:test verifyUiArchitecture`: **40 tests, 0 failures/errors/skips**.
+  Task 3 import extraction is implemented and self-reviewed (independent review pending):
+  bounded native/IntelliJ/Alacritty conversion, bundled parents, provenance/license assets, archive/XML/path
+  protections and color-reference/wildcard precedence now also live in the independent module.
+  Color-only filtering follows named-color resolution, retains alpha/platform colors and diagnoses
+  discarded typography/geometry/delegates once per key. Named `ColorPalette.*`, existing Jasper chrome
+  color aliases and `Jasper.headerHighlight` survive the shared generator/import policy.
+  Concrete extraction additions: import-owned data-only `FlatLafThemeData`/`WorkspaceTokenKeys`, exact
+  `ImportPalettes` fallbacks, `NativeThemeParents` plus byte-identical native parent TOML/index, and a
+  pure `UiColorKeys.chromeAliases()` accessor. App filesystem publication, locking and migration stay
+  in the app for Plan 2. Architecture now rejects vendor dependencies in JDK-only theme/model and Swing
+  in themeimport; a temporary vendor probe was rejected and removed. Headless
+  `:jasper-ui:test verifyUiArchitecture`: **104 tests, 0 failures/errors/skips** (60 import tests),
+  plus static golden color parity, source hygiene, byte-identical resource checks and authored-source whitespace checks.
+  Byte-preserved upstream IntelliJ assets retain five pre-existing trailing-whitespace lines;
+  exact-file attributes exempt only their upstream end-of-line spaces, keeping the full diff check clean.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

@@ -17,8 +17,14 @@ public final class UiColorKeys {
 
     private UiColorKeys() {}
 
+    /** Legacy Jasper color aliases used to avoid inventing explicit tokens during import conversion. */
+    public static Map<String, Token> chromeAliases() { return UiTemplate.JASPER; }
+
     /** Whether a legacy UI key describes a color or a referenced color variable. */
     public static boolean supports(String key) {
+        if (key.endsWith("UI")) return false;
+        if (key.startsWith("ColorPalette.")) return NAME.matcher(key.substring("ColorPalette.".length())).matches();
+        if (UiTemplate.JASPER.containsKey(key) || key.equals("Jasper.headerHighlight")) return true;
         String lower = key.toLowerCase(Locale.ROOT);
         // FlatLaf's border slots parse insets, line thickness and arcs, even without a class name.
         if (!key.startsWith("@") && lower.endsWith("border")) return false;

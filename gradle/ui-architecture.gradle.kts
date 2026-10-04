@@ -21,7 +21,7 @@ val verifyUiArchitecture = tasks.register("verifyUiArchitecture") {
         val output = process.inputStream.bufferedReader().readText()
         check(process.waitFor() == 0) { output }
         val edge = Regex("^\\s*(dev\\.jasper\\.ui\\.\\S+)\\s+->\\s+(\\S+).*$")
-        val pure = setOf("dev.jasper.ui.theme", "dev.jasper.ui.model", "dev.jasper.ui.themeio")
+        val pure = setOf("dev.jasper.ui.theme", "dev.jasper.ui.model", "dev.jasper.ui.themeio", "dev.jasper.ui.themeimport")
         val graph = mutableMapOf<String, MutableSet<String>>()
         output.lineSequence().forEach { line ->
             val match = edge.matchEntire(line) ?: return@forEach
@@ -32,6 +32,12 @@ val verifyUiArchitecture = tasks.register("verifyUiArchitecture") {
             }
             check(pure.none { from == it || from.startsWith("$it.") } || !toClass.startsWith("javax.swing.")) {
                 "Swing dependency in pure UI package: $line"
+            }
+            val jdkOnly = from == "dev.jasper.ui.theme" || from.startsWith("dev.jasper.ui.theme.")
+                || from == "dev.jasper.ui.model" || from.startsWith("dev.jasper.ui.model.")
+            check(!jdkOnly || toClass.startsWith("dev.jasper.ui.") || toClass.startsWith("java.")
+                || toClass.startsWith("javax.") || toClass.startsWith("jdk.")) {
+                "Vendor dependency in JDK-only UI package: $line"
             }
             if (toClass.startsWith("dev.jasper.ui.")) {
                 val to = toClass.substringBeforeLast('.')

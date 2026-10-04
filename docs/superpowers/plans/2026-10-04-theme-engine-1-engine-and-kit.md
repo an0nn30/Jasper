@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Shared contracts:** [Exact paths, types, signatures, defaults and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** Execution approved on 2026-10-04; in progress. Baseline: 8,743 tests, zero failures/errors, six skipped. Sequencing adjustments: Tasks 4–5 and 11–12 are each integrated implementation/review units because their initial APIs are mutually dependent; Task 14 supplies the single final whole-branch review. Task 1 pulls forward base ThemeToml into themeio to retain real resolver fixtures; Task 2 adds canonical semantics and serialization. GlassLevels retains its independent value/validation API; the app-specific GlassSettings resolve overload stays in the existing app pending Plan 2 adapter translation. Task 2 retains unknown top-level string metadata (other unknown types remain invalid), extracts color-only UiTemplate/UiColorKeys helpers, filters authored geometry from generated UI data, and reuses the bounded document deep snapshot for generated nested data. Task 2 verification: 40 module tests, zero failures/errors/skips; verifyUiArchitecture passed.
+**Status:** Execution approved on 2026-10-04; in progress. Baseline: 8,743 tests, zero failures/errors, six skipped. Sequencing adjustments: Tasks 4–5 and 11–12 are each integrated implementation/review units because their initial APIs are mutually dependent; Task 14 supplies the single final whole-branch review. Task 1 pulls forward base ThemeToml into themeio to retain real resolver fixtures; Task 2 adds canonical semantics and serialization. GlassLevels retains its independent value/validation API; the app-specific GlassSettings resolve overload stays in the existing app pending Plan 2 adapter translation. Task 2 retains unknown top-level string metadata (other unknown types remain invalid), extracts color-only UiTemplate/UiColorKeys helpers, filters authored geometry from generated UI data, and reuses the bounded document deep snapshot for generated nested data. Task 2 verification: 40 module tests, zero failures/errors/skips; verifyUiArchitecture passed. Task 3 implementation and self-review complete (independent review pending): 60 import tests / 104 module tests, zero failures/errors/skips; verifyUiArchitecture passed, including a temporary negative vendor probe. Task 3 additionally extracts data-only FlatLafThemeData/WorkspaceTokenKeys into themeimport, provides exact module-owned ImportPalettes and NativeThemeParents with byte-identical native parent inputs, exposes the pure chrome-alias map through UiColorKeys, and admits named ColorPalette definitions and the existing Jasper.headerHighlight color. App publication/migration/locking stay untouched pending Plan 2. The gate now enforces JDK-only theme/model vendor boundaries and Swing-free themeimport.
 
 ## Global Constraints
 
@@ -95,7 +95,7 @@ permanent copies of a generator. Keep old app behavior until its explicit migrat
 **Files:** Create `UI/themeimport/{AlacrittyConversion,AlacrittyTheme,ConversionResult,EditorScheme,IntellijConversion,SafeXml,ThemeArchive,ThemeConverter,ThemeLoader,ThemeParents,ThemeSources}.java`, `UI/themeimport/ImportedColors.java`; mirror existing pure conversion resources under `jasper-ui/src/main/resources/dev/jasper/ui/themeimport/`; tests `UT/themeimport/{ImportParityTest,ImportedColorsTest,ThemeArchiveTest}.java`.
 **Interfaces:** Preserve `ThemeConverter.convertAll(Path)` and its existing report/failure record fields, returning module `ThemeDocument`. `ImportedColors.filter(Map<String,Object>): Result` returns supported color entries and discarded-override diagnostics; define `Result(Map<String,Object> colors,List<String> warnings)` in that class.
 
-- [ ] Port existing conversion golden fixtures, safe-XML/archive rejection tests, duplicate parent ordering and Alacritty ANSI tests. Add this policy test:
+- [x] Port existing conversion golden fixtures, safe-XML/archive rejection tests, duplicate parent ordering and Alacritty ANSI tests. Add this policy test:
   ```java
   @Test void geometryOverridesAreReportedAndDiscarded() {
       var result = ImportedColors.filter(java.util.Map.of(
@@ -105,10 +105,10 @@ permanent copies of a generator. Keep old app behavior until its explicit migrat
       assertThat(result.warnings()).anyMatch(s -> s.contains("Button.arc"));
   }
   ```
-- [ ] Run `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.themeimport.*'`; confirm conversion extraction/policy failures.
-- [ ] Port conversion logic and bundled parent resources. Retain source/path limits, symlink/zip traversal checks, XML entity rejection, wildcard/reference resolution and source provenance. Filter font/size/inset/radius/delegate data after resolving imported color references. Preserve syntax/ANSI/glass and diagnostic identity; do not treat color-like arbitrary strings as trusted delegate specifications.
-- [ ] Keep `ThemeImporter`, `ThemeFiles`, `ThemeMigration` and their app filesystem publication/locking policies in the app for Plan 2. Run conversion suite and module architecture; compare color fixtures rather than old geometry blobs.
-- [ ] Review then commit `Extract color-only theme conversion with existing import protections`.
+- [x] Run `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.themeimport.*'`; confirm conversion extraction/policy failures.
+- [x] Port conversion logic and bundled parent resources. Retain source/path limits, symlink/zip traversal checks, XML entity rejection, wildcard/reference resolution and source provenance. Filter font/size/inset/radius/delegate data after resolving imported color references. Preserve syntax/ANSI/glass and diagnostic identity; do not treat color-like arbitrary strings as trusted delegate specifications.
+- [x] Keep `ThemeImporter`, `ThemeFiles`, `ThemeMigration` and their app filesystem publication/locking policies in the app for Plan 2. Run conversion suite and module architecture; compare color fixtures rather than old geometry blobs.
+- [x] Review then commit `Extract color-only theme conversion with existing import protections`.
 
 ## Task 4 — Fixed metrics, typography and transactional appearance binding
 

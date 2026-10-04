@@ -3,3 +3,10 @@
 # checkout (Git for Windows' default) breaks both the tests and a jar built on Windows.
 * text=auto eol=lf
 *.bat -text
+
+# These byte-identical vendored IntelliJ inputs retain upstream trailing spaces for checksum provenance.
+# Restrict the exception to the four files that contain those upstream blank-line spaces.
+jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/darcula.theme.json whitespace=-blank-at-eol
+jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/expUI/expUI_dark.theme.json whitespace=-blank-at-eol
+jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/expUI/expUI_light.theme.json whitespace=-blank-at-eol
+jasper-ui/src/main/resources/dev/jasper/ui/themeimport/intellij/islands/ManyIslandsDarcula.theme.json whitespace=-blank-at-eol
