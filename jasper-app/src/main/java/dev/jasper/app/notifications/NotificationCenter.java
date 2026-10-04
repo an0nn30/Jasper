@@ -108,7 +108,7 @@ public final class NotificationCenter {
         Notification earlier = repeatOf(request, now);
         Notification entry;
         if (earlier != null) {
-            entry = earlier.repeated(now);
+            entry = earlier.repeatedAs(request, now);
             history.remove(entry.id());
             history.put(entry.id(), entry);
         } else {
@@ -226,15 +226,18 @@ public final class NotificationCenter {
         emit(new Change.Cleared());
     }
 
-    /** Runs one of the entry's actions: the entry is read first, and expired afterwards when the action says so. */
+    /**
+     * Runs one of the entry's actions: the entry is read first, and an expiring action expires it before running, so
+     * what the action posts is never folded into the entry it ends.
+     */
     public void runAction(UUID id, int index) {
         requireEdt();
         Notification entry = history.get(id);
         if (entry == null || entry.expired() || index < 0 || index >= entry.request().actions().size()) return;
         NotificationAction action = entry.request().actions().get(index);
         markRead(id);
-        contained(action.run(), "A notification action failed");
         if (action.expires()) expire(id);
+        contained(action.run(), "A notification action failed");
     }
 
     /** A click on the body: the entry is read, and its default action runs when it has one (spec section 2). */

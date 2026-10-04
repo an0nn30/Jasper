@@ -129,6 +129,17 @@ public final class CardLayer extends JComponent implements AutoCloseable {
     /** The entries with a card showing, top to bottom. */
     public List<UUID> showing() { return slots.stream().map(Slot::id).toList(); }
 
+    /** Takes the entry's card out of this window, showing or waiting, because it now shows in another one. */
+    public void withdraw(UUID id) {
+        if (closed) return;
+        boolean waited = waiting.remove(id);
+        Slot slot = slot(id);
+        if (slot == null && !waited) return;
+        if (slot != null) discard(slot);
+        promote();
+        refresh();
+    }
+
     List<UUID> waitingIds() { return List.copyOf(waiting); }
 
     JButton moreButton() { return more; }

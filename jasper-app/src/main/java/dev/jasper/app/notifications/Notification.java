@@ -25,4 +25,12 @@ public record Notification(UUID id, NotificationRequest request, Instant posted,
 
     /** The same text posted {@code times} more times: counted once for each, re-stamped and unread again. */
     Notification repeated(Instant at, int times) { return new Notification(id, request, at, count + times, false, expired); }
+
+    /**
+     * The same text posted again by {@code request}: counted, re-stamped, unread again, and carrying the newest post's
+     * actions, default action, target, icon and source.
+     */
+    Notification repeatedAs(NotificationRequest request, Instant at) {
+        return new Notification(id, request, at, count + 1, false, expired);
+    }
 }

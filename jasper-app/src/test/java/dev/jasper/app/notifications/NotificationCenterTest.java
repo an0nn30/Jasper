@@ -332,4 +332,38 @@ class NotificationCenterTest {
         assertThatCode(() -> center.runAction(id, 0)).doesNotThrowAnyException();
         assertThat(center.find(id).orElseThrow().expired()).isTrue();
     }
+
+    @Test void aRepeatCarriesTheNewestPostsActionsDefaultActionAndTarget() {
+        var center = center();
+        var ran = new ArrayList<String>();
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        UUID id = center.post(request(CARDS, "same").withTarget(first).withActivate(() -> ran.add("first body"))
+            .withAction(NotificationAction.of("Open first", () -> ran.add("first")))).orElseThrow();
+        clock.advance(Duration.ofSeconds(5));
+        assertThat(center.post(request(CARDS, "same").withTarget(second).withActivate(() -> ran.add("second body"))
+            .withAction(NotificationAction.of("Open second", () -> ran.add("second"))))).contains(id);
+        Notification entry = center.find(id).orElseThrow();
+        assertThat(entry.count()).isEqualTo(2);
+        assertThat(entry.request().target()).contains(second);
+        assertThat(entry.request().actions()).extracting(NotificationAction::label).containsExactly("Open second");
+        center.activate(id);
+        center.runAction(id, 0);
+        assertThat(ran).containsExactly("second body", "second");
+    }
+
+    @Test void whatAnExpiringActionPostsIsNotFoldedIntoTheEntryItEnds() {
+        var center = center();
+        var posted = new ArrayList<UUID>();
+        var retry = new AtomicReference<Runnable>();
+        UUID id = center.post(request(CARDS, "Could not copy").withAction(NotificationAction.of("Retry", () -> retry.get().run())))
+            .orElseThrow();
+        retry.set(() -> center.post(request(CARDS, "Could not copy")).ifPresent(posted::add));
+        center.runAction(id, 0);
+        assertThat(center.find(id).orElseThrow().expired()).isTrue();
+        assertThat(posted).singleElement().isNotEqualTo(id);
+        assertThat(center.find(posted.getFirst()).orElseThrow()).satisfies(entry -> {
+            assertThat(entry.expired()).isFalse();
+            assertThat(entry.count()).isEqualTo(1);
+        });
+    }
 }
