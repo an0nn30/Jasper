@@ -94,12 +94,15 @@ public final class FakePluginHost implements AutoCloseable {
         dev.jasper.sdk.ui.EditorPalette.current(), dev.jasper.sdk.ui.SyntaxPalette.current());
     private Workspace requestedAppearance = appearance;
     private boolean workspaceMatches = true;
+    private volatile double workspaceOpacity = 1.0;
+    private double requestedOpacity = 1.0;
     private final List<Entry> workspaceHandlers = new CopyOnWriteArrayList<>();
 
     void requireAppearanceThread() {
         if (Thread.currentThread() != appearanceThread && !javax.swing.SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Appearance requires the UI thread");
     }
     Workspace workspaceAppearance() { return appearance; }
+    double workspaceOpacity() { return workspaceOpacity; }
     Subscription subscribeWorkspace(String pluginId, Consumer<Variant> handler) {
         requireAppearanceThread(); Objects.requireNonNull(handler, "handler");
         var entry = new Entry(pluginId, value -> handler.accept((Variant) value), new AtomicBoolean());
@@ -122,13 +125,28 @@ public final class FakePluginHost implements AutoCloseable {
         var next = new Workspace(Objects.requireNonNull(variant), Objects.requireNonNull(palette),
             Objects.requireNonNull(editor), Objects.requireNonNull(syntax));
         workspaceMatches = false;
-        publishWorkspace(next);
+        publishWorkspace(next, requestedOpacity);
     }
-    private void publishWorkspace(Workspace next) {
-        if (requestedAppearance.equals(next)) return;
+
+    /** Sets the opacity every component reports through {@code Appearance.workspaceOpacity} and announces it as a
+     * workspace change on the next {@link #flush()} (no announcement when unchanged). Like the other workspace values,
+     * components report the last flushed opacity until then.
+     * @param opacity from 0.1 to 1
+     * @since 0.14.1
+     */
+    public void setWorkspaceOpacity(double opacity) {
+        requireAppearanceThread();
+        if (!(opacity >= 0.1 && opacity <= 1)) throw new IllegalArgumentException("opacity must be from 0.1 to 1");
+        publishWorkspace(requestedAppearance, opacity);
+    }
+
+    private void publishWorkspace(Workspace next, double opacity) {
+        if (requestedAppearance.equals(next) && requestedOpacity == opacity) return;
         requestedAppearance = next;
+        requestedOpacity = opacity;
         events.add(() -> {
             appearance = next;
+            workspaceOpacity = opacity;
             // Subscription lifetime is judged when the state is published, including plugins started since enqueue.
             for (var entry : workspaceHandlers) {
                 if (!entry.closed().get()) {
@@ -390,7 +408,7 @@ public final class FakePluginHost implements AutoCloseable {
     public void setVariant(Variant next) {
         Objects.requireNonNull(next, "next");
         variant = next;
-        if (workspaceMatches) publishWorkspace(new Workspace(next, appearance.palette(), appearance.editor(), appearance.syntax()));
+        if (workspaceMatches) publishWorkspace(new Workspace(next, appearance.palette(), appearance.editor(), appearance.syntax()), requestedOpacity);
         publishApp(AppEvents.THEME_CHANGED, new AppEvents.ThemeChanged(next));
     }
 

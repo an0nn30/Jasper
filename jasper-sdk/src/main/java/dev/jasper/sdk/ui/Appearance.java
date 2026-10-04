@@ -41,7 +41,21 @@ public interface Appearance {
      */
     default SyntaxPalette syntaxPalette() { return SyntaxPalette.current(); }
 
-    /** Reports workspace changes, including changes within the same variant, on the UI thread.
+    /** How opaque the workspace behind {@code component} is: 1 unless the component is in the workspace area of a
+     * translucent window (where terminals and hosted content tabs live), in which case paint the component's own
+     * background with this alpha (the window shows the desktop through it). Chrome, tool windows and side panels stay
+     * opaque and report 1. Changes, including the component moving to another window, are reported through
+     * {@link #onWorkspaceChanged}. UI thread only.
+     * @param component a component of this plugin's, shown or not
+     * @return the opacity in effect, from 0.1 to 1
+     * @since 0.14.1
+     */
+    default double workspaceOpacity(java.awt.Component component) {
+        java.util.Objects.requireNonNull(component, "component");
+        return 1.0;
+    }
+
+    /** Reports workspace changes, including changes within the same variant and of {@link #workspaceOpacity}, on the UI thread.
      * @param handler receives the workspace variant after the new palettes are available
      * @return the registration, removed when closed or the plugin stops
      * @since 0.12.0

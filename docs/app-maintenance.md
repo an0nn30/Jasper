@@ -219,6 +219,54 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*StartupResourcesTest" --tests "*ApplicationBootstrapRollbackTest" --tests "*MacTitleBarTest"
 ```
 
+### Workspace glass
+
+A translucent, blurred terminal workspace on macOS. The workspace theme's `[workspace]` table and
+`ui.workspace.opacity`/`ui.workspace.blur` combine in `GlassLevels.resolve`; `WindowContent.requestGlass` sends the
+result to the window's `WindowGlass` after every theme or configuration change. `WindowGlass` decides, and reports the
+opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting never reads the raw settings, so any
+failure leaves an opaque window.
+
+- **macOS only.** Elsewhere the Opacity and Blur rows are hidden in Settings (`CorePages`, `shownWhen`), the keys stay
+  valid and are silently ignored, `TerminalWindow` constructs no `WindowGlass` (so neither it nor `MacGlass` is ever
+  loaded), `JasperApplication` gives plugins `GlassSource.NONE` and installs no glass listener, and the launcher
+  (`applicationDefaultJvmArgs`, `Jasper.cfg`) carries no `--add-opens`/`--add-exports`; `packaging.gradle` requires
+  them on a macOS host and requires them absent on others.
+- **Translucency** needs two JDK internals (AWT refuses alpha on a decorated frame): `MacGlass` sets
+  `Component.background` and calls `WindowPeer.setOpaque(false)`. The launcher passes
+  `--add-opens=java.desktop/java.awt=ALL-UNNAMED` and `--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED`;
+  `packaging.gradle` refuses a `Jasper.cfg` without them. After a JBR upgrade, check that a Clear theme is still
+  translucent; if the internals changed, `WindowGlass` logs one warning and windows stay opaque. A notified opaque
+  window background (FlatLaf sets the frame's a turn after a UI-theme switch, and AWT then makes the peer opaque) is
+  watched through `WindowGlass.Platform.watch`: `WindowGlass` reports opaque at once and re-applies on the next turn,
+  and `MacGlass` restores that newer background later.
+- **Blur** is on or off (`WindowGlass.Blur`: `NONE`, `DARK` or `LIGHT`, from the request's blur and whether the
+  workspace theme is dark) and lives in `libjasper-glass.dylib` (`src/main/native/MacGlass.m`, built and tested by
+  `gradle/mac-glass.gradle`). It finds the `NSWindow` whose content-view layer is JAWT's layer or any ancestor of it
+  and, on the main thread without waiting, places a public `NSVisualEffectView` behind the content view: material
+  `hudWindow` (13) in the dark appearance, or `underWindowBackground` (21) in the light one (`MacGlass.DARK_MATERIAL`
+  and `LIGHT_MATERIAL`). The view is masked to the window's rounded corners and a `JasperCornerObserver`, kept alive by
+  the view as an associated object, refreshes the mask on full-screen and screen changes (none in full screen); it
+  lives and dies with the view, and removing the view stops it. There is no private CoreGraphics call; the corner
+  radius comes from AppKit's private `_cornerRadius` when present, else 10 pt. `./gradlew :jasper-app:run` passes
+  `-Djasper.glassLibrary`; a packaged app loads it from `Contents/app/`.
+- **Painting**: the window peer is the only non-opaque ancestor. `ToolWindowArea`'s center host fills its rounded
+  surface with the terminal background at the opacity in effect (`Src`), so a strip no pane covers is glass too;
+  `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
+  `TerminalView` fill the default background with alpha using the `Src` composite, replacing the host's fill. Anything
+  new inside the terminal surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
+- **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.14.1). The answer comes from
+  `dev.jasper.app.plugins.GlassSource`, which `JasperApplication` builds from its windows: `owns(component)` finds the
+  window and `content().backgroundOpacity()` is the value in effect (1.0 for a component outside a translucent window).
+  `WindowContent.setGlassListener` notifies it on a real opacity change and when hosted content mounts or unmounts while
+  the window is translucent, and `HostedUi` turns that into an `onWorkspaceChanged` event. The Editor plugin paints
+  its text and gutter backgrounds once each from this value; see the SDK README for the painting rule.
+
+```sh
+./gradlew :jasper-app:test --tests "*WorkspaceGlassTest" --tests "*WindowGlassTest" --tests "*MacGlassTest" --tests "*ClearThemesTest"
+./gradlew :jasper-app:testMacGlass :jasper-terminal:test --tests "*TerminalPainterTest"
+```
+
 ## Session lifecycle change
 
 Begin with [SessionLaunchCoordinator](../jasper-app/src/main/java/dev/jasper/app/application/SessionLaunchCoordinator.java), [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/launch/ShellLauncher.java) and [TerminalPane](../jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java). Capture launch settings when requested, start off EDT, and validate lifetime after delivery to EDT. Close a late returned session and never attach it. Pane close owns admitted sessions; application shutdown stops admission and waits off EDT via ApplicationShutdown. Keep the coordinator drain future in that wait so accepted launch workers and their late children remain tracked even if no session existed at shutdown start. Register endpoint/process cleanup through JasperApplication.onShutdown: it runs on a daemon worker within the bounded application wait, so callbacks must not touch Swing. Keep TERM/COLORTERM and the terminal library threading contract. This example builds options only; it launches no shell.
@@ -249,12 +297,13 @@ boundaries; this refactor promises no plugin loading, binary compatibility or pe
 
 ## Themes
 
-Edit Jasper Light/Dark seed and token TOMLs under `jasper-app/src/main/resources/dev/jasper/app/themes/`;
+Edit the hand-written Jasper Light/Dark and Clear Dark/Light TOMLs under
+`jasper-app/src/main/resources/dev/jasper/app/themes/` (`ConvertThemes` copies these four unchanged);
 change shared mappings in `UiTemplate` and derivations in `ThemeGenerator`. The 256 KiB native cap remains.
 
 `tools/themes/sources.json` locks every source commit/artifact, variant decision and input hash. Maintainers may
 refresh exact upstream bytes with `tools/themes/fetch-themes.py`; retain each source's full license, SOURCE.md and
-assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 284 native files, index, legacy
+assets.tsv. `./gradlew :jasper-app:convertThemes` verifies all locks and regenerates 286 native files, index, legacy
 aliases and third-party notices entirely offline. Normal build/test never fetches. Do not normalize upstream bytes.
 Run `BundledThemeConversionTest` for drift/provenance and `BundledWorkspaceParityTest` for effective LAF/workspace
 colors; preserve golden converter tests for UI ordering, OS tables, syntax styles and icon palettes.

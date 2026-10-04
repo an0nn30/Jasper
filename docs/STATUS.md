@@ -33,7 +33,7 @@
   checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
   [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
   (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
-  removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15`. `plugins.HostedNotifications` posts into the
+  removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15` (Editor `>=0.14.1` since the workspace-glass merge). `plugins.HostedNotifications` posts into the
   center with the plugin id as source and contained links; a cause becomes the plugin's incident with Show more…
   (`IncidentNotices.pluginNotice`); a plugin's notifications expire when it stops. `PluginHost` posts succeeded and
   failed activities in `<plugin-id>.activities`. After launch, `PluginProblemNotices` posts each load failure, skipped
@@ -228,6 +228,67 @@
   match; Vim tries contains, starts-with, ends-with, exact and stops at the first with exactly one. With buffers `xab`
   and `abab`, Vim's `:b ab` selects `abab` where Jasper reports E93.
 
+- **Workspace glass, plans 1 (foundation) and 2 (editor)** (branch `claude/workspace-glass`, user request 2026-10-02):
+  2026-10-03 (user request): the terminal tab strip now always shows the workspace background instead of the theme's
+  `tab_bar` colour (called a bug by the user) and, being non-opaque over the centre host, is the same glass as the
+  terminal in a translucent window; pills, hover, close buttons and the list button stay solid. GUI check: the strip
+  reads as one surface with the terminal, opaque and glass, in Clear Dark and a theme with a distinct tab bar.
+  [spec](superpowers/specs/2026-10-02-jasper-workspace-glass-design.md),
+  [plan 1](superpowers/plans/2026-10-02-workspace-glass-1-foundation.md),
+  [plan 2](superpowers/plans/2026-10-02-workspace-glass-2-editor.md). Themes gain `[workspace] opacity/blur`; Settings
+  › Appearance › Workspace overrides them (`ui.workspace.opacity` in percent, `ui.workspace.blur`
+  `"theme"`/`"on"`/`"off"`); bundled Clear Dark (0.95, blur on) and Clear Light (0.93, blur on) are ported from
+  Terminal.app (catalog 286). On macOS, `WindowGlass` makes the window translucent through two JDK internals (new
+  launcher flags) and blurs behind it through `libjasper-glass.dylib`; terminal panes paint their default background
+  with alpha inside a cleared surface, and any failure keeps the window opaque; the whole path is macOS-only (rows hidden in Settings, no `WindowGlass`, no launcher flags, `GlassSource.NONE` elsewhere; the keys are silently ignored). Deviations from the spec: ancestors stay
+  opaque and the workspace host clears a hole (second spike); opacity is `TerminalView.setBackgroundOpacity` only (no
+  `TerminalOptions` field), and it takes a `float`; `WindowGlass` follows the root pane. Rulings made during execution:
+  `ClearThemesTest` runs under `EdtTestExtension`; the Workspace section kept its own "Choose workspace theme…" button (superseded by the 2026-10-03 merge: no button; the theme rows now sit in Appearance)
+  (Terminal › Font & Colors has one too). The final review's fix wave makes a window translucent again after a UI-theme
+  switch's deferred opaque frame background (restoring the newer background later), fills the whole terminal surface
+  with one glass fill instead of clearing it (the lower-arc strip was a hole), and finds the blurred `NSWindow` through
+  any layer ancestor. Typing lag and blank live resizes with glass on came from Java2D's Metal pipeline rendering
+  antialiased translucent `Src` fills in software (`fc127ca9`: plain rectangular fills, opaque chrome corners). Blur
+  then moved from the private CoreGraphics radius, which blurred the square corners outside the rounded window, to a
+  public `NSVisualEffectView` masked to the window's corners: on/off, `hudWindow` for dark workspace themes and a light
+  `underWindowBackground` for light ones; theme `blur` is a boolean and the CoreGraphics path is gone (spec amendment
+  2026-10-02). `GlassSettings`' blur component is `blurChoice` (a `WorkspaceBlur`), so `blur()` can stay the
+  `Optional<Boolean>` that `GlassLevels.resolve` reads. Review follow-ups: the corner-mask observer is a
+  `JasperCornerObserver` the effect view keeps alive, so its lifetime follows the view (and the window); the Blur row
+  shows "Use theme's value" for `"theme"`.
+  Plan 2 (editor glass) is done: SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0; `onWorkspaceChanged`
+  also reports it, including a component entering or leaving a translucent window), answered by the app's `GlassSource`
+  and `WindowContent.setGlassListener`; Editor 0.7.0 paints its text and gutter backgrounds once each in a `GlassSurface`
+  and makes the area, viewports and gutter non-opaque (the current-line band takes the opacity's alpha; selection, caret,
+  find/Vim bars, banner and loading state stay solid). Deviation: the spec's no-argument `workspaceOpacity()` became
+  `workspaceOpacity(Component)` because opacity is per window and content moves between windows. Rulings: the gutter
+  border is cleared in glass mode (it was an opaque stripe); `EditorTabTest` primes RSyntaxTextArea 3.6.0 font metrics by
+  reflection (headless, no peer). Final-review fix wave: `workspaceOpacity` answers the window's opacity only inside the
+  workspace centre (`WindowContent.workspaceOpacity`: the deck holding terminal and hosted content tabs) and 1.0 for
+  chrome, the rail and side/bottom panels; the applied opacity is kept as the double it arrived as (0.8 reads back as
+  0.8); the glass listener runs after `mountContent`'s try; gutter children reattached by RSyntaxTextArea (Vim
+  `:set nonumber`/`number`) take the gutter's opacity through a once-per-gutter container listener.
+  `./gradlew check --continue`: 8,043 tests, 0 errors, 6 skipped across all modules (jasper-app 1,815, jasper-terminal
+  394, jasper-buddy 163, jasper-sdk 44, jasper-sdk-testkit 85, plugins 5,542); its one failure was the known flake
+  `TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation` `[3 reflow]`
+  (jasper-terminal is untouched by plan 2), which passed an isolated rerun and the rerun of the check (BUILD
+  SUCCESSFUL): a timing flake under load, not investigated further. GUI checks (user-run) for plan 2: an editor tab
+  in Clear Dark and Clear Light, a split of terminal and editor tabs, moving an editor tab to a separate window and back,
+  opacity changes live, and the current-line and selection look; scroll bars stay solid in a glass editor (by design),
+  so check a long file looks acceptable; Vim `:set nonumber` then `:set number` in a glass window (digits do not smear);
+  a plugin tool panel (e.g. a side panel) in a glass window stays opaque. Plan 1 GUI checks: Clear Dark beside Terminal.app's, the Clear Dark
+  (`hudWindow`) versus Clear Light (light `underWindowBackground`) material, rounded corners without slivers and square
+  full-screen corners after entering and leaving full screen, live opacity/blur changes, splits, stripes hidden,
+  native fullscreen, switching back to an opaque theme, switch the UI theme live from Jasper Dark to Clear Dark, a
+  packaged build loading `Contents/app/libjasper-glass.dylib`, and Settings rows hidden (no Workspace header) off macOS.
+  Merged `origin/main` (`ffce7483`: dock layout, notifications, theme rows in Appearance, SDK 0.13.0) on 2026-10-03:
+  SDK 0.13.1 (Editor needs `>=0.13.1, <0.14`), the glass fill ported from the deleted `WorkspaceRegions.Host` to
+  `ToolWindowArea`'s centre host (`setGlass`), and Opacity/Blur in an Appearance › Workspace section after main's theme
+  rows, with no header off macOS (`SchemaPage` now hides a section whose rows are all hidden). `./gradlew check
+  --continue`: 8,288 tests, 0 failures, 0 errors, 6 skipped.
+  A second merge of `origin/main` (`43894416`: SDK 0.14.0, Notices replaced by notifications, dock polish) moved
+  `workspaceOpacity` to SDK 0.14.1 (Editor 0.7.0 needs `>=0.14.1, <0.15`); `PluginHost.Environment` carries both
+  main's failure sink and the `GlassSource`. `./gradlew check --continue`: 8,429 tests, 0 failures, 0 errors, 6 skipped.
 - **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
   user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
   failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT

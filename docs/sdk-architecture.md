@@ -423,6 +423,17 @@ and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `Synta
 `onWorkspaceChanged` compares the complete workspace generated value, skips initial replay, contains handler failures,
 and removes registrations on disposal or stop. Chrome `variant` and `onChanged` retain their existing meaning.
 
+SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0, UI thread, null rejected); `onWorkspaceChanged` also
+reports its changes. The method takes a component because opacity is per window and content moves between windows (the
+design's no-argument form was changed for that reason). `dev.jasper.app.plugins.GlassSource` is the per-component lookup
+plus change subscription; `JasperApplication` builds it from its `TerminalWindow`s (`owns(component)`, then the window
+content's `workspaceOpacity(component)`: the window's opacity inside the centre deck that holds terminal and hosted
+content tabs, 1.0 for chrome, the stripes and the tool windows), `PluginRuntime.glass(GlassSource)` hands it to `PluginHost.Environment` and `HostedUi`,
+and `WindowContent.setGlassListener(Runnable)` fires on a real opacity change and when hosted content mounts or unmounts
+while the window is translucent. A component outside a translucent window reports 1.0. `FakePluginHost.setWorkspaceOpacity`
+announces on `flush()` and reports one value for every component; the contract case
+`workspaceOpacityStartsOpaqueAndChangesAreWorkspaceChanges` runs on the fake and on the app.
+
 `PluginRuntime.appearance` accepts app-native `ResolvedTheme` suppliers and subscriptions. The `plugins` package
 alone adapts native tokens and syntax to SDK values (its allowed dependencies include `appearance`). The appearance
 controller publishes native Color/Boolean `Jasper.workspace.*` defaults after successful theme application, including

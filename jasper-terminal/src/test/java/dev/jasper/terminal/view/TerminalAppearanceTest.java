@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 
@@ -79,6 +80,31 @@ class TerminalAppearanceTest {
         int y = defaultFonts.cellHeight() / 2;
         assertThat(rgb(active, x, y)).isEqualTo(rgb(options.palette().ansi().get(2)));
         assertThat(rgb(inactive, x, y)).isEqualTo(rgb(options.palette().background()));
+    }
+
+    @Test
+    void translucentViewsAreNotOpaqueAndPaintTheirDefaultBackgroundWithThatAlpha() {
+        assertThat(view.isOpaque()).isTrue();
+        assertThat(view.backgroundOpacity()).isEqualTo(1f);
+
+        view.setBackgroundOpacity(0.5f);
+
+        assertThat(view.isOpaque()).isFalse();
+        assertThat(view.backgroundOpacity()).isEqualTo(0.5f);
+        BufferedImage image = new BufferedImage(view.getWidth(), view.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics();
+        try {
+            view.paint(graphics);
+        } finally {
+            graphics.dispose();
+        }
+        assertThat(new Color(image.getRGB(view.getWidth() - 2, view.getHeight() - 2), true).getAlpha()).isEqualTo(128);
+
+        view.setBackgroundOpacity(Float.NaN);
+        assertThat(view.backgroundOpacity()).isEqualTo(1f);
+        assertThat(view.isOpaque()).isTrue();
+        view.setBackgroundOpacity(-3f);
+        assertThat(view.backgroundOpacity()).isZero();
     }
 
     private BufferedImage paint() {
