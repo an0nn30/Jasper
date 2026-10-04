@@ -7,6 +7,11 @@ Replaces: the single left rail (`WindowRail`), the three-region nested-split doc
 "one panel per region" rule from the [plugin SDK design](2026-09-21-jasper-plugin-sdk-design.md) ("Rail and
 panels") and plan 3a's decision that regions have no header or close button.
 
+> User correction, 2026-10-03: the last window **closed** wins. Save that window's complete tool-panel layout
+> (placement/order, visibility, sizes, split ratios and rail visibility) and native size/position on close,
+> then restore them on relaunch. This supersedes the last-change-wins policy below and the earlier phase-1
+> exclusion of window-size persistence. Normal bounds and maximized axes are remembered; minimized state is not.
+
 ## Purpose
 
 `Anchor` lets a plugin dock a panel LEFT, RIGHT or BOTTOM, and the rail's "Move to …" menu lets the user move it,
