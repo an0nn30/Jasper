@@ -603,13 +603,22 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Connects this window to the application-wide contributions model, once, remembering panel
      * placement and rail visibility in {@code state}.
      */
-    public void connectContributions(Contributions model, UiState state) {
+    public void connectContributions(Contributions model, UiState state) { connectContributions(model, state, true); }
+
+    /**
+     * As {@link #connectContributions(Contributions, UiState)}. A window that does not {@code hostsContent} is wired to
+     * the model but never registered as a place where plugin content opens, so the content registry cannot choose it as
+     * the main window: the warm-up rehearsal is such a window, and content opened in it would vanish when it closes.
+     */
+    public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
-        contentRegistry = model.content();
-        contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
-            this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
+        if (hostsContent) {
+            contentRegistry = model.content();
+            contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
+                this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
+        }
         rebind();
     }
 

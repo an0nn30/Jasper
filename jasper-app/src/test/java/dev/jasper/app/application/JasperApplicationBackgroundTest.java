@@ -147,6 +147,27 @@ class JasperApplicationBackgroundTest {
         }
     }
 
+    @Test void aWindowFromAWarmedUpProcessIsLabelledMenuNotCold() throws Exception {
+        // Headless, composing fails at the JFrame, after the window's timing began: that timing carries the trigger.
+        StartupTrace cold = StartupTrace.detached();
+        JasperApplication coldApplication = application(cold, () -> { }, true);
+        try {
+            assertThatThrownBy(() -> edt(coldApplication::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(cold.windows()).extracting(window -> window.trigger()).containsExactly("cold");
+        } finally {
+            edt(coldApplication::quitNow);
+        }
+        StartupTrace warmed = StartupTrace.detached();
+        warmed.mark(StartupTrace.Milestone.WARMED_UP);
+        JasperApplication warmedApplication = application(warmed, () -> { }, true);
+        try {
+            assertThatThrownBy(() -> edt(warmedApplication::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(warmed.windows()).extracting(window -> window.trigger()).containsExactly("menu");
+        } finally {
+            edt(warmedApplication::quitNow);
+        }
+    }
+
     @Test void aWindowThatFailsToComposeInANonResidentProcessNeverTouchesTheDock() throws Exception {
         JasperApplication application = application(() -> { }, true);
         try {

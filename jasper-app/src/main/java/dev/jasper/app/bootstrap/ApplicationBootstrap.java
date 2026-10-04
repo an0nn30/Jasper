@@ -125,8 +125,7 @@ public final class ApplicationBootstrap {
                             : "Started with --background but the handoff endpoint is unavailable; exiting");
                         application.quitNow();
                     } else {
-                        application.warmUp();
-                        StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP);
+                        application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
                     }
                 });
         } catch (RuntimeException | Error failure) {

@@ -285,11 +285,17 @@ public final class JasperApplication {
     /** Tests shorten the fallback that settles a shell printing nothing, 2 s by default. Set before {@link #residency}. EDT. */
     void settleFallback(Duration delay) { settleFallback = java.util.Objects.requireNonNull(delay, "delay"); }
 
-    /** The first plain window of a process is its cold start; later plain windows come from a menu or shortcut. */
-    static String windowTrigger(int windowsOpened) { return windowsOpened == 0 ? "cold" : "menu"; }
+    /**
+     * The first plain window of a process is its cold start, unless the process already warmed up (a {@code --background}
+     * launch rehearsed a window): then it comes from a menu or the Dock, like every later plain window.
+     */
+    static String windowTrigger(int windowsOpened, boolean warmedUp) { return windowsOpened == 0 && !warmedUp ? "cold" : "menu"; }
 
     /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
-    public TerminalWindow newWindow() { return openWindow(null, false, windowTrigger(windowsOpened)); }
+    public TerminalWindow newWindow() {
+        return openWindow(null, false,
+            windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent()));
+    }
 
     /** A window whose tab starts in {@code directory}; null opens a detached window with no tab. */
     public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null, "menu"); }
@@ -544,19 +550,56 @@ public final class JasperApplication {
     }
 
     /**
-     * Pays the first window's one-time costs with no window on screen. Constructing this
-     * application already installed the look and feel; the font set is the remaining expensive
-     * piece, and building one realizes the toolkit's font machinery and the cell metrics.
+     * Pays the first window's one-time costs with nothing on screen, then runs {@code done} on the EDT, whatever happens
+     * on the way: even if building the fonts or composing, painting or closing the rehearsal fails, and an
+     * {@link Error} propagates only after {@code done} ran. Constructing this application installed the look and
+     * feel; this builds the configured font set and rehearses a window: composed with the configured grid, theme and
+     * contributions, its terminal fed a canned prompt from memory (no shell, no PTY), painted once into an image
+     * through the window's own graphics pipeline, and disposed without ever being shown. Plugins never see its pane:
+     * it is not registered with the terminal registry, and it is not a place where plugin content opens. It opens no
+     * window timing and marks no first paint, so only {@code done} tells the trace the warm-up finished. Headless there
+     * is nothing to rehearse with. EDT.
      */
-    public void warmUp() {
+    public void warmUp(Runnable done) {
+        Objects.requireNonNull(done, "done");
         ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
-        FontConfig font = snapshot.font();
+        boolean rehearsing = false;
         try {
-            new dev.jasper.terminal.rendering.FontSet(font.family(), font.size(), font.fallback(),
-                font.ligatures(), font.lineHeight());
-        } catch (RuntimeException failure) {
-            LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
+            FontConfig font = snapshot.font();
+            try {
+                new dev.jasper.terminal.rendering.FontSet(font.family(), font.size(), font.fallback(),
+                    font.ligatures(), font.lineHeight());
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
+            }
+            rehearsing = !GraphicsEnvironment.isHeadless() && !quitting && !stopped;
+        } finally {
+            // Nothing to rehearse, or the font set threw an Error: finished now. Otherwise the rehearsal reports it.
+            if (!rehearsing) done.run();
         }
+        if (rehearsing) {
+            // This bypasses openWindow: no window timing and no FIRST_PAINT or OUTPUT_PAINTED, which would settle
+            // residency for a window nobody sees. Only done marks WARMED_UP.
+            Rehearsal.run(() -> Rehearsal.feed(snapshot.columns(), snapshot.lines()), feed -> rehearsalWindow(feed, snapshot),
+                done, Rehearsal.FALLBACK);
+        }
+    }
+
+    /** The rehearsal's window around {@code feed}: wired to the contributions but registered nowhere else. EDT. */
+    private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
+        TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
+            new CommandHistory());
+        try {
+            window.content().connectContributions(contributions, UiState.inMemory(), false);
+        } catch (RuntimeException | Error failure) {
+            try {
+                window.close();
+            } catch (RuntimeException | Error closing) {
+                failure.addSuppressed(closing);
+            }
+            throw failure;
+        }
+        return new Rehearsal.Stage(() -> Rehearsal.paint(window.nativeWindow()), window::close);
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
