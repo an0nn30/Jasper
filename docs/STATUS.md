@@ -74,8 +74,8 @@
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-2-drag-and-drop.md)): tool windows drag by their stripe
   buttons and headers. `DockDropResolver` (pure) resolves a stripe group and position or one of the workspace's six edge
   zones (a 3 × 2 grid until 2026-10-03; see the first entry); `DockGeometry.landing` previews the landing on a copy of
-  the state; during a drag both stripes show all three groups, lift the dragged button and open a gap; `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the
-  placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
+  the state; during a drag both stripes show all three groups, lift the dragged button and open a gap;
+  `DockDropOverlay` on `DRAG_LAYER` paints the highlight, the placeholder and the ghost; `DockDrag` owns the gesture (5px threshold, Esc cancels, a resize resolves again). A stripe
   drop moves and keeps visibility; a workspace drop moves and shows (`DockState.moveAndShow`). Any dock change, View ›
   Rail, or the window closing or being deactivated cancels a drag. Deviations from the plan text: before execution
   (`728167c4`) the expected test counts and Task 6's `close()` anchor were aligned with plan 1 as executed; Task 4,

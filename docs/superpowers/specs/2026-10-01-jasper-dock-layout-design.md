@@ -160,11 +160,11 @@ group bounds, button bounds and workspace bounds:
   │      LEFT_TOP       │     RIGHT_TOP       │
   │                     │                     │
   ├─────────────────────┼─────────────────────┤
-  │ LEFT_BOTTOM      ╲     ╱     RIGHT_BOTTOM │
-  │              ╲      │      ╱              │
-  │          ╲          │          ╱          │
-  │       ╲             │             ╱       │
-  │    ╲    BOTTOM_LEFT │   BOTTOM_RIGHT ╱    │
+  │ LEFT_BOTTOM      ╱     ╲     RIGHT_BOTTOM │
+  │              ╱      │      ╲              │
+  │          ╱          │          ╲          │
+  │       ╱             │             ╲       │
+  │    ╱    BOTTOM_LEFT │   BOTTOM_RIGHT ╲    │
   │                     │                     │
   └─────────────────────┴─────────────────────┘
   ```
@@ -263,8 +263,8 @@ takes a minor version bump and declares the new SDK floor. Sessions, Tunnels, Fi
 
 - Pure `dock` tests: `DockStateTest` (one active per slot, order, move and index, events), `DockGeometryTest`
   (every combination of active slots, ratios, minimums, squeezed windows, full-width bottom),
-  `DockDropResolverTest` (grid thirds and halves, stripe groups and indices, empty groups during a drag, no target
-  outside).
+  `DockDropResolverTest` (the six edge zones, their ties and boundaries, stripe groups and indices, empty groups during
+  a drag, no target outside).
 - `UiStateTest`: version 2 round trip, v1 migration, per-entry fallback.
 - Headless Swing tests in the `DesktopTestSupport` style: stripe layout (foot pinned, separator only when needed,
   rail actions after the second group), header buttons and menus, area layout against the geometry, divider drag,
