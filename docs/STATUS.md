@@ -1,6 +1,25 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-03
+## Current state — 2026-10-04
+
+- **Folder tabs implemented** (2026-10-04; `codex/folder-tabs`, based on `main` at `5979c030`; source `2ab63b13`):
+  the selected workspace tab now rises from the terminal surface with rounded top corners and concave bottom
+  shoulders, matching the [approved reference and actual Swing renders](design/folder-tabs.md). Inactive tabs are
+  plain muted labels; the active tab retains its session/plugin icon and close control, and inactive close appears
+  on hover. A fixed new-tab plus sits at the far right beside the existing tab list. Selection, shortcuts, overflow,
+  wheel scrolling, drag reorder, middle-close, context menus and plugin-tab ownership remain on existing paths.
+  The selected folder uses the actual workspace background and glass alpha; the recessed strip stays solid and
+  derives from the workspace palette. Rectangular replacement painting and an opaque antialiased recess preserve
+  partial-repaint stability. Height and geometry scale with the existing configuration and UIScale.
+  This is a bounded approved visual follow-up using an implementer and independent final review, not re-execution
+  of historical tab-motion plans; no animation subsystem or setting was added. The initially attached clean worktree
+  was advanced from the old Moray revision to current Jasper before implementation. RED captured before the change;
+  **602 workspace tests** and a separate 2× scale check passed. Final `./gradlew check --continue`: **8,445 tests,
+  0 failures, 0 errors, 6 skipped**; architecture gates and doclint passed. Changed-Java source hygiene and
+  `git diff --check` passed. Independent review found no actionable findings. No GUI, benchmark, merge or push.
+  User-run visual acceptance: first/middle selected tabs, dark/light and independent workspace themes, glass,
+  overflow/long titles, plugin tabs, new-tab plus and native pointer/trackpad behavior. Headless renders do not
+  establish native Metal/compositor performance.
 
 - **Window layout restoration fix** (2026-10-03; `codex/restore-window-layout`, based on `main` at `f450112b`):
   main terminal frames previously never saved or restored their bounds; dock persistence intentionally used the
