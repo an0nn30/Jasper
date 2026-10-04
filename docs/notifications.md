@@ -57,6 +57,12 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 A configuration notification offers **Show Problems** (the same list as the status bar's configuration indicator)
 and **Open config.toml**. It goes away by itself once every problem is fixed.
 
+To change how a group appears, use **Settings › Notifications › Groups**. It lists every group known now: Jasper's,
+and each plugin's once the plugin has run. Each group gets a choice of **Card**, **Sticky card**, **History only**
+(the Notifications panel, unread, no card) or **Off**, with the default marked, and **Reset**. The change applies to
+the next notification; what is already in the panel or on screen stays. The same choices live in `config.toml` under
+[`[notifications.groups]`](configuration.md#notification-groups).
+
 ## Long-running commands
 
 A command that ran at least `notifications.long_command_seconds` (10 seconds by default) and finished anywhere but the

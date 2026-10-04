@@ -2,9 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/notifications-6` (worktree `.worktrees/notifications-6`, cut from main `0734c5c5`,
-where plans 1–5 are merged; `origin/main` was `192443b3`, two unrelated tab-width commits ahead, when this plan was
-written).
+**Status:** Implemented on branch `claude/notifications-6` (worktree `.worktrees/notifications-6`, cut from main
+`0734c5c5`, where plans 1–5 are merged; `origin/main` was `192443b3`, two unrelated tab-width commits ahead, when this
+plan was written). Executed natively, the user's choice, with one whole-branch review at the end. Deviations from the
+plan text: none in code. Task 2 added `import java.util.Map;` to `NotificationCenterTest`, as its note allows. Task 5
+wrote this banner and the STATUS entry before the final review, then updated both with its outcome. Final review:
+pending. `./gradlew check --continue`: **8767 tests, 0 failures, 0 errors, 6 skipped**.
 
 **Goal:** Let the user choose how each notification group appears (card, sticky card, history only or off), in
 `config.toml` under `[notifications.groups]` and on the Settings › Notifications page, applied live.

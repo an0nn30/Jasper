@@ -484,6 +484,8 @@ sync.error("Could not sync", "prod: connection refused", failure);
 - The returned `NotificationHandle` expires the notification. It also expires when the user removes it, when its
   group drops it, and when your plugin stops.
 - Group ids follow the panel id pattern and start with your plugin id and a dot; `<plugin-id>.activities` is Jasper's.
+- Your group's mode is a default. The user can choose another for any group in Settings › Notifications or in
+  `[notifications.groups]`, and theirs wins.
 - When one of your activities succeeds or fails, Jasper posts its outcome in `<plugin-id>.activities`; post nothing
   for it yourself.
 

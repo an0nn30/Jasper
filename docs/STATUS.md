@@ -2,6 +2,20 @@
 
 ## Current state — 2026-10-04
 
+- **Notifications plan 6: Settings, reviewed on branch `claude/notifications-6`; awaiting the user's GUI checks and
+  merge decision** (plan `docs/superpowers/plans/2026-10-04-notifications-6-settings.md`,
+  [guide](configuration.md#notification-groups)): `[notifications.groups]` maps a group id to `"card"`, `"sticky"`,
+  `"history"` or `"off"`, and Settings › Notifications gains a Groups section. It lists every group declared so far
+  (Jasper's, and each plugin's once it has run): its name, who declared it, a mode combo marking the default, and
+  Reset. Changes apply to the next notification, and entries for plugins that are not running are kept. An unusable
+  entry is a warning, and the group keeps its default: `SettingKind.MapRules` gains a severity, and a WARNING map
+  ignores even an entry of the wrong type instead of rejecting the file. Removing a table's last entry removes the
+  table, and an empty table counts as absent when saving, which also fixes Reset on `terminal.env`. Spec
+  interpretations: see the plan's list (1 to 10). `./gradlew check --continue`: **8767 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched. GUI checks for
+  the user: Settings › Notifications shows the Groups table in light and dark themes; choosing History only for
+  Long-running commands and applying it makes the next long command go to the panel without a card; Reset returns a
+  group to its default; editing `[notifications.groups]` by hand with an unknown mode shows a configuration warning;
+  a plugin's groups appear once the plugin has started.
 - **Notifications plan 5: OS notifiers, reviewed on branch `claude/notifications-5`; awaiting the user's GUI checks and
   merge decision** (2026-10-04; plan `docs/superpowers/plans/2026-10-03-notifications-5-os-notifiers.md`,
   [guide](notifications.md#system-notifications)): while Jasper is in the background, or idle as a resident Jasper with

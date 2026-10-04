@@ -309,6 +309,22 @@ on Linux, and clicking it focuses the pane. `notifications.system = false` turns
 off for everything (Settings › Notifications › Show system notifications). See
 [Notifications](notifications.md#system-notifications).
 
+### Notification groups
+
+`[notifications.groups]` sets how each group's notifications appear, by group id:
+
+```toml
+[notifications.groups]
+"jasper.commands" = "history"   # Long-running commands: the Notifications panel only
+"dev.jasper.remote" = "sticky"  # Remote's notifications stay until you close them
+```
+
+The modes are `"card"` (a card that hides itself), `"sticky"` (a card that stays until you close it), `"history"`
+(only the Notifications panel, unread) and `"off"`. A group you do not list keeps its default. Settings ›
+Notifications › Groups lists every group with its id, and changes there are saved here. An entry for a plugin that
+is not running is kept. An unknown mode, a value that is not a string, or a key that is not a group id is a warning,
+and that group keeps its default. See [Notifications](notifications.md#groups) for what each group covers.
+
 ### Automatic tab and notification titles
 
 On macOS, the title bar combines the native window controls, a compact working-context
