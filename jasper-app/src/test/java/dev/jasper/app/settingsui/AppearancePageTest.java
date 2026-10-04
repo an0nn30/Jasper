@@ -55,6 +55,21 @@ class AppearancePageTest {
         assertThat(page.modified()).isTrue();
     }
 
+    @Test void animationControlsStageTheSharedPolicyAndIndependentDurations() {
+        page.component();
+        var toggle = page.rows().stream().filter(row -> row.setting() == CoreSettings.UI_ANIMATIONS_ENABLED)
+            .findFirst().orElseThrow();
+        ((javax.swing.JCheckBox) toggle.editor().component()).doClick();
+        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_ENABLED)).isFalse();
+        var opening = page.rows().stream().filter(row -> row.setting() == CoreSettings.UI_ANIMATIONS_TAB_OPEN_MS)
+            .findFirst().orElseThrow();
+        ((Editors.Spin<?>) opening.editor()).spinner.setValue(280);
+        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_TAB_OPEN_MS)).isEqualTo(280);
+        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_TAB_CLOSE_MS)).isEqualTo(120);
+        assertThat(draft.value(CoreSettings.UI_ANIMATIONS_TAB_SWITCH_MS)).isEqualTo(130);
+        assertThat(page.modified()).isTrue();
+    }
+
     @Test void bothDropdownsSearchAndEnterStagesTheMatch() {
         var theme = editor(0);
         var keys = ((SearchCombo) theme.box).searchPopup().getKeyListener();

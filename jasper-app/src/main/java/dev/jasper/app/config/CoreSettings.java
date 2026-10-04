@@ -199,6 +199,21 @@ public final class CoreSettings {
         .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
         .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"IntelliJ Light\",\n"
             + "\"Darcula\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
+    public static final Setting<Boolean> UI_ANIMATIONS_ENABLED = Setting.of("ui.animations.enabled", SettingKind.bool(), true)
+        .label("Enable animations").keywords("animations", "motion", "transitions", "reduce motion")
+        .description("Enable animations throughout the app. Disabling finishes running transitions immediately. Updates live in every window.").build();
+    public static final Setting<Integer> UI_ANIMATIONS_TAB_OPEN_MS = Setting.of("ui.animations.tab_open_ms",
+            SettingKind.integer(0, 2000, CLAMP), AnimationSettings.DEFAULT_OPEN_MILLIS)
+        .label("Open tab duration").keywords("animations", "motion", "speed", "duration", "open")
+        .description("Temporary tuning: opening duration in milliseconds, 0-2000. Zero is instant. Updates live.").build();
+    public static final Setting<Integer> UI_ANIMATIONS_TAB_CLOSE_MS = Setting.of("ui.animations.tab_close_ms",
+            SettingKind.integer(0, 2000, CLAMP), AnimationSettings.DEFAULT_CLOSE_MILLIS)
+        .label("Close tab duration").keywords("animations", "motion", "speed", "duration", "close")
+        .description("Temporary tuning: closing duration in milliseconds, 0-2000. Zero is instant. Updates live.").build();
+    public static final Setting<Integer> UI_ANIMATIONS_TAB_SWITCH_MS = Setting.of("ui.animations.tab_switch_ms",
+            SettingKind.integer(0, 2000, CLAMP), AnimationSettings.DEFAULT_SWITCH_MILLIS)
+        .label("Switch tab duration").keywords("animations", "motion", "speed", "duration", "switch")
+        .description("Temporary tuning: selection duration in milliseconds, 0-2000. Zero is instant. Updates live.").build();
     public static final Setting<Float> UI_WORKSPACE_OPACITY = Setting.of("ui.workspace.opacity", SettingKind.number(10, 100),
             GlassSettings.UNSET_OPACITY)
         .example(95f).label("Opacity").keywords("opacity", "transparency", "translucent", "glass", "workspace", "background")
@@ -216,7 +231,8 @@ public final class CoreSettings {
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
             TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME, UI_THEME_WORKSPACE,
-            UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR),
+            UI_WORKSPACE_OPACITY, UI_WORKSPACE_BLUR, UI_ANIMATIONS_ENABLED,
+            UI_ANIMATIONS_TAB_OPEN_MS, UI_ANIMATIONS_TAB_CLOSE_MS, UI_ANIMATIONS_TAB_SWITCH_MS),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
             Map.entry(List.of("window"), "Workspace chrome. Heights and widths are logical pixels."),
@@ -230,5 +246,6 @@ public final class CoreSettings {
             Map.entry(List.of("terminal", "cursor"), "The cursor a program sees until it chooses its own."),
             Map.entry(List.of("ui", "font"), "Interface typography, independent of the terminal font."),
             Map.entry(List.of("ui", "theme"), "The UI theme and workspace scheme."),
-            Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values follow the workspace theme.")));
+            Map.entry(List.of("ui", "workspace"), "Translucent terminal and editor backgrounds on macOS; omitted values follow the workspace theme."),
+            Map.entry(List.of("ui", "animations"), "App-wide animation policy and temporary tab-motion tuning. Changes apply live.")));
 }

@@ -126,6 +126,14 @@ workspace = "match"
 # Blur behind a translucent workspace: "theme", "on" or "off".
 blur = "theme"
 
+[ui.animations]
+# Live app-wide switch. Turning off finishes active transitions immediately.
+enabled = true
+# Temporary tuning durations (milliseconds, 0-2000; zero is instant).
+tab_open_ms = 150
+tab_close_ms = 120
+tab_switch_ms = 130
+
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
 # On macOS, cmd is Command and alt/option is Option. Example:
