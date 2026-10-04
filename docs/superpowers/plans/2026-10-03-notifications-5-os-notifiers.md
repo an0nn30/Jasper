@@ -23,7 +23,22 @@ fixes:
   links now point at `app-maintenance.md#system-notifications` and their text is unchanged. STATUS names the plan's
   interpretations as 1 to 18, since the plan lists 18 (the task text said 17).
 
-Final review: pending. `./gradlew check --continue`: **8,495 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
+Final review (Opus): no critical findings; five re-graded important and fixed (`096f6a61`, and the documentation in
+the commit after it) — start-up plugin failures sent banners at a login start (start-up now settles after the queued
+start-up records), banners sent while quitting (none once Jasper is quitting), the dead `NotificationCenter.presence()`
+removed, and documentation statements corrected (title-only for a plugin's notification with a cause, the resident
+icon's click, the Windows "most recent notification", replace-by-id only on macOS) with the manual recipe's icon and
+denial checks restored. Deferred minor findings (from the task reviews and the final review): the macOS bridge never
+detaches the daemon threads it attaches for clicks, clears an Error thrown by the click sink, has no test past the
+no-VM early return, can show a banner withdrawn before its authorization completed, and gives an opaque
+`UnsatisfiedLinkError` on a failed bind; `SystemNotifier`'s close-versus-send ordering for non-EDT callers, its single
+non-volatile `warned` latch, and U+2028/U+0085 in titles; Linux leaves a withdrawn bubble on screen (killing only
+stops waiting), probes `--help` silently, and a close during that probe can time out; the Windows tray's EDT-side
+calls run outside `SystemNotifier`'s containment, a refusing tray retries and logs per balloon, and
+`SystemTray.isSupported()` runs at bootstrap; coalesced repeats ask the OS again; missing tests for a repeated id on
+Linux, a stale resident remover, `raiseFor` and a click through the notifier into `SystemNotices`;
+`NotificationRequest`'s ten-argument copies; expected warnings on test stderr. `./gradlew check --continue`:
+**8,497 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
 
 **Goal:** While Jasper is not focused, its notifications appear as the operating system's own (macOS banners, Windows
 tray balloons, Linux `notify-send`), a click on one takes you to what it is about, and reading it in Jasper withdraws it.

@@ -192,7 +192,8 @@ completely** — closing a window and quitting are different things, and quittin
 
 On Windows, the resident process shows a Jasper icon in the notification area (it may sit in the
 taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens
-a window or raises the open one; **Quit Jasper** exits completely, the same as Quit from a window.
+a window or raises the open one, except that while a notification's balloon is waiting unread, double-clicking the
+icon opens that notification instead; **Quit Jasper** exits completely, the same as Quit from a window.
 Launching Jasper again also reveals a window. macOS keeps using the Dock icon and has no tray icon.
 
 Residency keeps no pane session alive intentionally: once pane cleanup completes, it holds no shell, PTY or child process.
@@ -271,7 +272,7 @@ is too near the top of the screen, and the order inverts so the newest is still 
 to dismiss one and **Clear all** to empty it. Double-clicking him still raises the terminal and
 right-clicking still opens his menu.
 
-While Jasper is in the background the outcome is also a **system notification**: a banner from the
+While Jasper is in the background a long command's outcome is also a **system notification**: a banner from the
 packaged macOS `Jasper.app`, a balloon from Jasper's notification-area icon on Windows, or `notify-send`
 on Linux, and clicking it focuses the pane. `notifications.system = false` turns system notifications
 off for everything (Settings › Notifications › Show system notifications). See

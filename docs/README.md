@@ -29,7 +29,7 @@ then assembles the application distribution. It opens no native window. Native
 ## User and operational guides
 
 - [Configuration](configuration.md): defaults, saved/live settings, data paths and shell integration.
-- [Notifications](notifications.md): cards, the Notifications panel and its badge, groups.
+- [Notifications](notifications.md): cards, the Notifications panel and its badge, groups and system notifications.
 - [Themes](themes.md): choosing a theme, installing IntelliJ Marketplace themes and how a theme colours the terminal.
 - [Command palette](command-palette.md): commands, the bundled History and Snippets plugins, and scope registration.
 - [Editor](editor.md): editing local and remote files in tabs in the Editor window, saving safely, and outside changes; [verification](editor-verification.md). Vim mode: [supported keys](editor-vim-reference.md) and [differences from Vim](vim-divergences.md).

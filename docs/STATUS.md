@@ -1,9 +1,9 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-03
+## Current state — 2026-10-04
 
 - **Notifications plan 5: OS notifiers, reviewed on branch `claude/notifications-5`; awaiting the user's GUI checks and
-  merge decision** (plan `docs/superpowers/plans/2026-10-03-notifications-5-os-notifiers.md`,
+  merge decision** (2026-10-04; plan `docs/superpowers/plans/2026-10-03-notifications-5-os-notifiers.md`,
   [guide](notifications.md#system-notifications)): while Jasper is in the background, or a resident Jasper has every
   window closed, card and sticky notifications are also the operating system's own (`Change.SystemRequested`,
   `application.SystemNotices`, `platform.SystemNotifier`):
@@ -16,8 +16,12 @@
   system; two incidents never coalesce). `notifications.system` (default `true`, live) is on Settings ›
   Notifications. `Delivery.Presence` gains `OPENING`, so start-up posts send no banners. `CommandNotifier`'s interim
   sink and `NativeNotifier` are gone. Spec interpretations: see the plan's list (1 to 18); plan 4's open decision is
-  answered with option (c). `./gradlew check --continue`: **8,495 tests, 0 failures, 0 errors, 6 skipped**. No GUI
-  launched.
+  answered with option (c). `./gradlew check --continue`: **8,497 tests, 0 failures, 0 errors, 6 skipped**. Final
+  review (Opus): no critical findings; five re-graded important and fixed — start-up plugin failures sent banners at a
+  login start (start-up now settles after the queued start-up records), banners sent while quitting (none once Jasper
+  is quitting), the dead `NotificationCenter.presence()` removed, and documentation statements corrected (title-only
+  for a plugin's notification with a cause, the resident icon's click, the Windows "most recent notification",
+  replace-by-id only on macOS) with the manual recipe's icon and denial checks restored. No GUI launched.
 
   GUI checks for the user:
   - macOS (packaged app): a long command finishing with Jasper in the background shows a banner with Jasper's icon,

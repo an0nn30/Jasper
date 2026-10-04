@@ -21,8 +21,9 @@ card and while the window is in the background. A hidden card stays unread in th
 configuration problems, stay until you close them. When three sticky cards are showing, more wait behind a
 **+N more** link that opens the panel.
 
-When Jasper is in the background, notifications collect in the panel; sticky ones show their card when you come
-back. Notifications that arrive before the first window opens show when it does.
+When Jasper is in the background, notifications collect in the panel and the operating system shows them too (see
+[System notifications](#system-notifications)); sticky ones show their card when you come back. Notifications that
+arrive before the first window opens show when it does.
 
 ## The Notifications panel
 
@@ -106,7 +107,8 @@ While Jasper is in the background, or running with every window closed, a notifi
 appears as the operating system's own: a banner on macOS, a balloon from Jasper's notification-area icon on Windows,
 and a desktop notification through `notify-send` on Linux. Clicking it brings its window to the front (opening one
 when none is open) and does what clicking its card would; a notification with nothing to run opens the Errors window
-for an internal error or a plugin problem, or else the Notifications panel. Reading a notification in Jasper, its
+for an internal error, a plugin problem or a plugin's notification that carries a cause, or else the Notifications
+panel. Reading a notification in Jasper, its
 expiry and its removal take the system notification away where the system allows it. While Jasper starts or a window
 opens nothing is sent, since the card is about to show.
 
@@ -114,12 +116,14 @@ opens nothing is sent, since the card is about to show.
   Jasper in System Settings → Notifications. Gradle and IDE runs send none.
 - **Windows**: the balloon comes from Jasper's icon in the notification area, which stays while Jasper is out of focus
   (and for as long as a resident Jasper has no window). A click on the balloon or on the icon opens the most recent
-  unread notification.
+  notification, if it is still unread; once it is read, a click on the resident icon opens a window, and a click on
+  the icon shown only for balloons does nothing, even if an older notification is unread.
 - **Linux**: Jasper runs `notify-send` from `PATH` when there is one. When it supports actions, a click on the
   notification comes back to Jasper; otherwise the notification only informs.
 
-An internal error or a plugin problem sends only its title, since its details can name files and hosts and system
-notifications show on a locked screen. Turn system notifications off with `notifications.system = false`, or in
+An internal error, a plugin problem and a plugin's own notification that carries a cause (the ones that offer
+**Show more…**) send only their title and open the Errors window when clicked, since their details can name files and
+hosts and system notifications show on a locked screen. Turn system notifications off with `notifications.system = false`, or in
 Settings › Notifications ([configuration](configuration.md#finished-command-notifications)).
 
 ## Shortcuts

@@ -344,7 +344,7 @@ See [Remote](remote.md) for settings and native acceptance.
 `notifications.system` is on, an incident's notification with its title only. A read, expired or removed entry, and
 Clear All, withdraw what the operating system shows. A click raises the notification's window, then runs its default
 action, opens the Errors window for an incident, or shows the Notifications panel. `Delivery` decides when the
-operating system is asked: in `BACKGROUND` and `NO_WINDOW`, never in `OPENING`.
+operating system is asked: for card and sticky groups, in `BACKGROUND` and `NO_WINDOW`, never in `OPENING`.
 
 `SystemNotifier` runs every backend call on one daemon worker (`jasper-system-notifications`, closed at shutdown),
 makes text plain (no control, bidirectional-control or lone-surrogate characters; a one-line title of at most 120
@@ -359,7 +359,7 @@ bootstrap injects the real notifier, as it does the resident icon, so tests neve
   `JavaVM` that `JNI_OnLoad` cached, on a thread attached as a daemon. Never restore an `osascript` fallback; its
   notices carry AppleScript's icon. Java text is copied as UTF-16, never evaluated.
 - **Windows**: `WindowsTray` owns Jasper's one notification-area icon, the resident icon and the balloons' icon alike;
-  a click on a balloon or the icon activates the most recent unread notification.
+  a click on a balloon or the icon activates the most recent notification, if it is still unread.
 - **Linux**: `LinuxNotifications` runs `notify-send` without a shell, asks `--help` about `--action` once (waiting at
   most 2 s), keeps at most 8 processes waiting for a click and kills one when its notification is read; tests inject
   the process starter.
@@ -369,9 +369,10 @@ macOS. `check` runs its headless fake-center harness (permission granted/denied/
 Unicode, identifiers, withdrawal, the click callback, foreground presentation, non-bundle guard). Other platforms skip
 native compilation. Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it. Gradle/IDE
 runs intentionally send no macOS notifications because they lack Jasper's bundle identity. Test a packaged app
-manually: run `sleep 12`, switch to another app, allow Jasper's notification request, click the banner and check that
-the pane is focused; then let another finish, read it in Jasper and check that its banner goes. GUI acceptance is
-user-run; headless tests never show a prompt, banner or balloon.
+manually: run `sleep 12`, switch to another app, allow Jasper's notification request, check that the banner carries the
+Jasper icon, click it and check that the pane is focused; then let another finish, read it in Jasper and check that its
+banner goes. Last, turn Jasper's notifications off in System Settings → Notifications and check that nothing is shown
+and nothing breaks. GUI acceptance is user-run; headless tests never show a prompt, banner or balloon.
 
 API references: [Apple UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter),
 [requesting permission](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).
