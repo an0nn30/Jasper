@@ -73,7 +73,7 @@
   lever is in `jasper-terminal`: `TerminalView.paintComponent` takes a full snapshot and paints every row whatever its
   clip, so a terminal under a small dirty rectangle still pays the whole snapshot. No GUI launched; GUI checks for the
   user are the plan's last section.
-  Polish round (branch `claude/dock-polish`, 2026-10-03): the overlay repaints only what changed, the placeholder's
+  Polish round (2026-10-03, pushed to `main` with notifications plan 2 at the user's choice): the overlay repaints only what changed, the placeholder's
   border no longer stacks over its fill, and the placeholder's fill is concentric with its border (its corner
   diameter is `arc - 1`, where the border's inner edge lies); `DockState.dropIndex` is the one drop-index rule shared
   by the preview and the drop. 8 new tests pin behaviour that was already there: `HostedUiTest` maps all six anchor and
@@ -254,8 +254,8 @@
   whole-branch review's findings were fixed (`5aa67e75`, `ac407bbb`). Findings deferred to plans 3, 4 and 5, and the
   smaller ones left open, are listed under "Deferred findings" in the plan's status banner. `./gradlew check`:
   **8,161 tests, 0 failures, 0 errors, 6 skips** (all four architecture gates, doclint and compiled examples
-  included; source hygiene over the 34 changed Java files and `git diff --check` clean). No GUI was launched and
-  nothing was pushed. GUI checks for the user:
+  included; source hygiene over the 34 changed Java files and `git diff --check` clean). No GUI was launched. Pushed
+  to `origin` on 2026-10-03 with the dock polish round, at the user's choice. GUI checks for the user:
   - an uncaught exception (for example from a plugin under development) shows an "Unexpected error in Jasper" or
     plugin card; Show more… opens the Errors window at it, in light and dark themes;
   - the Errors window: list selection with the mouse and the arrow keys, the monospaced trace scrolls, Copy pastes a
