@@ -297,11 +297,13 @@ window (`KeyboardFocusManager`'s active window). Today only terminal windows cou
 
 **Target window:** the poster's window, else the terminal window used last. ~~With no window open (startup, resident
 mode), cards wait until one opens and is focused.~~ *Amended 2026-10-04 (resident by default, start-up speed Plan 4):*
-with no window yet (a start before its first window, a window being opened, or one opened but not yet activated),
-cards wait until a window opens and is focused, as before, so a failure raised while the first window opens still shows
-its card. A **resident** Jasper with no window open and none being opened is **idle** (`Delivery.Presence.IDLE`), a
-state that can last for hours: an ordinary `CARD` notification posted then goes straight to history, as in the
-background, with no card later; only `STICKY` ones wait for the next window. `OFF` and `HISTORY` are unchanged.
+with no window yet (a start before its first window, a window being opened, one opened but not yet activated, or a
+resident Jasper still starting up), cards wait until a window opens and is focused, as before, so a failure raised while
+the first window opens, or while a `--background` launch builds the application, still shows its card. A **resident**
+Jasper whose start-up has settled (the first output painted, the warm-up finished, or the fallback after the first
+paint), with no window open and none being opened, is **idle** (`Delivery.Presence.IDLE`), a state that can last for
+hours: an ordinary `CARD` notification posted then goes straight to history, as in the background, with no card later;
+only `STICKY` ones wait for the next window. `OFF` and `HISTORY` are unchanged.
 
 **`Delivery`:**
 

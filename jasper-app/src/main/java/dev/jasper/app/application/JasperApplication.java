@@ -84,8 +84,8 @@ public final class JasperApplication {
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
-    /** How many terminal windows are being opened right now (EDT): from the start of {@link #openWindow} until it ends. */
-    private int windowsOpening;
+    /** How many terminal windows are being opened right now (EDT): from the start of {@link #openWindow} until it returns or fails. */
+    private int openingWindows;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -106,7 +106,7 @@ public final class JasperApplication {
     private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
     private Function<dev.jasper.app.platform.ResidentTray.Actions, Runnable> residentIndicator = actions -> () -> { };
     private Runnable removeIndicator;
-    /** Whether {@link #residencySettled()} has run: it does its work once per process. */
+    /** Whether {@link #residencySettled()} has run: it does its work once per process, and idle presence begins with it. */
     private boolean startupSettled;
     /** How long after the first paint a shell that prints nothing still counts as settled. */
     private Duration settleFallback = Duration.ofSeconds(2);
@@ -352,12 +352,14 @@ public final class JasperApplication {
             return created.content().id();
         });
         if (quitting) return null;
-        // Counted until the window is added or composing failed: a failure raised meanwhile waits for the window's card.
-        windowsOpening++;
+        // Counted until composeWindow returns or fails. Incidents are always queued, so none lands inside the count; it
+        // protects what is posted directly on the EDT while composing (a plugin's panel factory posting inside
+        // connectContributions, say): that waits for the window's card, as it does before the first window of a start.
+        openingWindows++;
         try {
             return composeWindow(directory, detached, trigger);
         } finally {
-            windowsOpening--;
+            openingWindows--;
         }
     }
 
@@ -427,20 +429,20 @@ public final class JasperApplication {
 
     /**
      * Closes a window whose composition failed, without saving its bounds or dock layout: it must not become the last
-     * window closed, whose layout the next window restores. If closing it fails too, the window is still forgotten (by
-     * the window list and the notification cards, which would otherwise keep routing to it) and its frame disposed, and
-     * each further failure is added to {@code failure} as suppressed. EDT.
+     * window closed, whose layout the next window restores. If closing it fails too, the window is still forgotten, as
+     * {@link #windowClosed} forgets one (by the window list, the notification cards and the Buddy, which would otherwise
+     * keep routing to it, and as the window used last) and its frame disposed, and each further failure is added to
+     * {@code failure} as suppressed. EDT.
      */
     private void discard(TerminalWindow window, Throwable failure) {
         try {
             window.discard();
         } catch (RuntimeException | Error closing) {
             failure.addSuppressed(closing);
-            windows.remove(window);
             try {
-                notificationViews.detach(window.content());
-            } catch (RuntimeException | Error detaching) {
-                failure.addSuppressed(detaching);
+                forget(window);
+            } catch (RuntimeException | Error forgetting) {
+                failure.addSuppressed(forgetting);
             }
             try {
                 window.nativeWindow().dispose();
@@ -849,22 +851,25 @@ public final class JasperApplication {
         }
 
     /**
-     * Where Jasper stands for notifications: focused, in the background, idle (resident with no window of any kind open
-     * and no terminal window being opened) or with no window yet. With only a plugin window open Jasper is not idle,
-     * because cards target terminal windows: the next one still shows what waited. EDT.
+     * Where Jasper stands for notifications: focused, in the background, idle (resident, start-up settled, with no window
+     * of any kind open and no terminal window being opened) or with no window yet. Idle waits for start-up to settle
+     * because incidents raised while the application was built are recorded later through {@code invokeLater}, in a
+     * {@code --background} launch with the process already resident and windowless: they must wait for the first window
+     * like the problems posted directly. With only a plugin window open Jasper is not idle, because cards target
+     * terminal windows: the next one still shows what waited. EDT.
      */
     private Delivery.Presence presence() {
-        boolean residentIdle = resident && !windowsOpen() && windowsOpening == 0;
+        boolean residentIdle = resident && startupSettled && !windowsOpen() && openingWindows == 0;
         return presence(!windows.isEmpty(), activatedSinceOpen,
             java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null, residentIdle);
     }
 
     /**
-     * The rule behind {@link #presence()}. A resident Jasper with no window open and none being opened is idle, however
-     * long that lasts: an ordinary card would only pile up, so it goes to history. Otherwise a window counts only once
-     * it has been activated: a failure raised while the first window opens is queued ahead of the native activation
-     * event, and judging it "background" would keep its card out of sight for good. Until then the card waits, as it
-     * does with no window at all, and shows on activation.
+     * The rule behind {@link #presence()}. A resident Jasper whose start-up has settled, with no window open and none
+     * being opened, is idle ({@code residentIdle}), however long that lasts: an ordinary card would only pile up, so it
+     * goes to history. Otherwise a window counts only once it has been activated: a failure raised while the first
+     * window opens is queued ahead of the native activation event, and judging it "background" would keep its card out
+     * of sight for good. Until then the card waits, as it does with no window at all, and shows on activation.
      */
     static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive, boolean residentIdle) {
         if (residentIdle) return Delivery.Presence.IDLE;
@@ -1074,12 +1079,21 @@ public final class JasperApplication {
         return null;
     }
 
-    void windowClosed(TerminalWindow window) {
+    /**
+     * Forgets a window the application no longer holds: out of the window list, the notification cards and the Buddy's
+     * windows, no longer the one used last, and with no window left nothing counts as activated. The window list
+     * changes first, so a failure after it still leaves the window forgotten. EDT.
+     */
+    private void forget(TerminalWindow window) {
         windows.remove(window);
         if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
         if (windows.isEmpty()) activatedSinceOpen = false;
+    }
+
+    void windowClosed(TerminalWindow window) {
+        forget(window);
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.

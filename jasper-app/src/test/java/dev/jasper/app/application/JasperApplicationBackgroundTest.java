@@ -3,6 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.contributions.ContentHost;
 import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.restart.RestartMode;
 import dev.jasper.app.startup.StartupTrace;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -171,6 +173,44 @@ class JasperApplicationBackgroundTest {
             assertThat(presence(application)).as("a plain start before its first window").isEqualTo(Delivery.Presence.NO_WINDOW);
             assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(presence(application)).isEqualTo(Delivery.Presence.NO_WINDOW);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aFailureQueuedDuringStartUpWaitsForTheFirstWindowAndOneAfterSettlingGoesToHistory() throws Exception {
+        // A --background launch is resident with no window from the moment the application exists, and incidents are
+        // recorded through invokeLater: one raised while the application was built runs only now. Before start-up has
+        // settled it must still wait for the first window, as the plugin and configuration problems posted directly do.
+        StartupTrace trace = StartupTrace.detached();
+        JasperApplication application = application(trace, () -> { }, false);
+        List<NotificationCenter.Change> changes = new ArrayList<>();
+        try {
+            edt(() -> {
+                application.settleFallback(Duration.ofHours(1));
+                application.residency(true);
+                application.notificationCenter().onChange(changes::add);
+                application.unexpected(Thread.currentThread(), new IllegalStateException("queued during start-up"));
+            });
+            edt(() -> { });
+            assertThat(prepared).as("start-up has not settled").hasValue(0);
+            assertThat(presence(application)).as("resident, no window, but start-up is still under way")
+                .isEqualTo(Delivery.Presence.NO_WINDOW);
+            trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
+            edt(() -> { });
+            assertThat(prepared).as("start-up has settled").hasValue(1);
+            assertThat(presence(application)).isEqualTo(Delivery.Presence.IDLE);
+            edt(() -> application.unexpected(Thread.currentThread(), new UnsupportedOperationException("after start-up")));
+            edt(() -> { });
+            edt(() -> {
+                assertThat(application.notificationCenter().history()).extracting(entry -> entry.request().content())
+                    .containsExactly("UnsupportedOperationException: after start-up", "IllegalStateException: queued during start-up");
+                application.notificationCenter().focusReturned();
+            });
+            assertThat(changes).filteredOn(NotificationCenter.Change.CardRequested.class::isInstance)
+                .extracting(change -> ((NotificationCenter.Change.CardRequested) change).notification().request().content())
+                .as("the start-up failure waited for a window; the one after settling went to history")
+                .containsExactly("IllegalStateException: queued during start-up");
         } finally {
             edt(application::quitNow);
         }

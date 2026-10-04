@@ -5,33 +5,45 @@
 - **A resident Jasper with no window sends cards to history** (user's decision of 2026-10-04; branch
   `claude/startup-speed`). Resident by default makes "no window open" last for hours, and the delivery rule held every
   CARD and STICKY notification posted then until a window was focused, so they would have piled up. Built:
-  `Delivery.Presence` has a fourth value, `IDLE`: a resident Jasper with no window open and none being opened.
-  `Delivery.route` sends `CARD` + `IDLE` to history (as `BACKGROUND` does, with no card later) and `STICKY` + `IDLE`
-  to pending (the card waits for the next focus); `OFF` and `HISTORY` are unchanged. `JasperApplication.presence(...)`
-  gains a `residentIdle` input that wins; the instance method computes it as `resident`, no Jasper window of any kind
-  open (`windowsOpen()`: terminal and plugin windows) and no terminal window being opened (`windowsOpening`, an
-  EDT-confined count raised by `openWindow` and lowered in its `finally`, so it covers composing, adding and a failed
-  open). Start-up is unchanged: `NO_WINDOW` still covers a normal start before its first window, a window being
-  composed (including a resident one) and a window attached but not yet activated, so a failure raised while the first
-  window opens, such as an `IncidentNotices` plugin problem or internal error, still shows its card when the window
-  activates; a resident Jasper with only a plugin window open stays `NO_WINDOW`, as before. Consequences: a
-  `--background` login launch before the first click is `IDLE`; problems found by `startPlugins` and the
-  configuration notices are posted from `createApplication`, before `ApplicationBootstrap` calls `residency(true)`, so
-  they still wait for the first window, while anything posted later in an idle process (a plugin's background outcome,
-  an incident, a late plugin problem) goes to the panel as unread. `CommandNotifier` sends an operating-system
-  notification whenever Jasper is not `FOCUSED`, so it does for `IDLE` too. Docs: notifications spec section 7 (dated
-  amendment, original sentence kept and struck through), `docs/notifications.md`. Tests: `DeliveryTest` (the four
-  `IDLE` rows), `JasperApplicationPresenceTest` (idle wins; every earlier assertion kept), `NotificationCenterTest`
-  (a CARD posted while idle is history only and never requested on focus; a STICKY waits and shows on the next focus),
-  `NotificationsFeatureTest` (history only, and the sticky config problem alone shows when the next window activates)
-  and `JasperApplicationBackgroundTest` (resident and idle is `IDLE`; the Dock switch inside `openWindow` sees
-  `NO_WINDOW`; a failed open ends the opening; a process that is not resident is `NO_WINDOW`, never `IDLE`; checked to
-  fail with the counter removed). A resident Jasper with only a plugin window open cannot be built headless, so it is
-  covered by reading. `./gradlew check`: **8,579 tests, 0 failures, 0 errors, 6 skipped** (the previous merge's 8,569
-  and these 10), all architecture gates and doclint included; `AppDocumentationTest` and the source hygiene check pass.
-  No GUI launched, no AOT training. GUI checks for the user: Cmd+Q on a resident Mac, then something that posts an
-  ordinary notification (a plugin's background outcome): no card and an unread dot in the next window's Notifications
-  button; a sticky notification still shows its card; a normal start with a broken plugin still shows its card.
+  `Delivery.Presence` has a fourth value, `IDLE`: a resident Jasper whose start-up has settled, with no window open and
+  none being opened. `Delivery.route` sends `CARD` + `IDLE` to history (as `BACKGROUND` does, with no card later) and
+  `STICKY` + `IDLE` to pending (the card waits for the next focus); `OFF` and `HISTORY` are unchanged.
+  `JasperApplication.presence(...)` gains a `residentIdle` input that wins; the instance method computes it as all of:
+  `resident`; `startupSettled` (the existing EDT flag `residencySettled` sets: the first output painted, a finished
+  `--background` warm-up, or 2 s after the first paint); no Jasper window of any kind open (`windowsOpen()`: terminal
+  and plugin windows); and no terminal window being opened (`openingWindows`, an EDT-confined count raised by
+  `openWindow` and lowered in its `finally`, so it lasts until `composeWindow` returns or fails). The settled gate
+  matters because incidents (`IncidentNotices`: `pluginFailure`, `jasperFailure`, `launchFailure`, `pluginNotice`) and
+  the plugin start failures and problems with a cause are recorded through `invokeLater`; in a `--background` launch
+  `compose` has made the process resident before they run, so without the gate they would have been `IDLE` and gone to
+  history, while problems posted directly (no cause, configuration) wait for the first window. Everything queued while
+  the application is built runs before the warm-up finishes, so it is `NO_WINDOW` and waits. The opening count is a
+  second guard and covers only what is posted directly on the EDT while a window composes (a plugin's panel factory
+  posting inside `connectContributions`, say); incidents never land inside it, being always queued. Start-up is
+  otherwise unchanged: `NO_WINDOW` still covers a normal start before its first window, a window being composed
+  (including a resident one) and a window attached but not yet activated, so a failure raised while the first window
+  opens still shows its card when the window activates; a resident Jasper with only a plugin window open stays
+  `NO_WINDOW`, as before. Consequences: a `--background` login launch is `NO_WINDOW` until its warm-up finishes and
+  `IDLE` after, so only what arrives later (a plugin's background outcome, an incident) goes to the panel as unread.
+  `CommandNotifier` sends an operating-system notification whenever Jasper is not `FOCUSED`, so it does for `IDLE` too.
+  Also: the `discard()` fallback of a window whose composition failed and whose own close failed now forgets it through
+  the same private helper as `windowClosed` (window list, cards, Buddy, `lastActive`, `activatedSinceOpen`); before it
+  skipped Buddy and `lastActive`. `TerminalWindow` cannot be built headless, so that fallback is covered by reading.
+  Docs: notifications spec section 7 (dated amendment, original sentence kept and struck through),
+  `docs/notifications.md`. Tests: `DeliveryTest` (the four `IDLE` rows), `JasperApplicationPresenceTest` (idle wins;
+  every earlier assertion kept), `NotificationCenterTest` (a CARD posted while idle is history only and never requested
+  on focus; a STICKY waits and shows on the next focus), `NotificationsFeatureTest` (history only, and the sticky
+  config problem alone shows when the next window activates) and `JasperApplicationBackgroundTest` (resident and idle
+  is `IDLE`; the Dock switch inside `openWindow` sees `NO_WINDOW`; a failed open ends the opening; a process that is not
+  resident is `NO_WINDOW`, never `IDLE`; an incident queued before start-up settles waits for a window, and one after
+  settling goes to history, checked to fail without the gate). A resident Jasper with only a plugin window open cannot
+  be built headless, so it is covered by reading. `./gradlew check`: **8,580 tests, 0 failures, 0 errors, 6 skipped**
+  (the previous merge's 8,569 and these 11), all architecture gates and doclint included; `AppDocumentationTest` and
+  the source hygiene check pass. No GUI launched, no AOT training. GUI checks for the user: Cmd+Q on a resident Mac,
+  then something that posts an ordinary notification (a plugin's background outcome): no card and an unread dot in the
+  next window's Notifications button; a sticky notification still shows its card; a normal start with a broken plugin
+  still shows its card; a login (`--background`) launch with a broken plugin shows its card when the first window
+  opens.
 
 - **Merged `main` into `claude/startup-speed` again** (2026-10-04; `main` at `857f3020`, 11 commits past the first
   merge's `a23d0f15`): the dock guide halves, the window layout restoration (`ad1eb65a`: `[main_window]` bounds, the
