@@ -185,4 +185,25 @@ class CorePagesTest {
         assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).as("back at the default, nothing to save").isFalse();
         page.dispose();
     }
+
+    /** A config.toml Jasper made holds the template's empty [notifications.groups]; going back to a default is no change. */
+    @Test void aGroupBackAtItsDefaultIsNoChangeInAFileMadeFromTheTemplate() {
+        var groups = new NotificationGroupChoices(() -> List.of(
+            new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
+        var spec = CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+            .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), dev.jasper.app.config.ConfigTemplate.text(true), true).values());
+        var page = spec.build(new PageContext(draft, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
+        page.component();
+        var editor = (NotificationGroupsEditor) page.rows().stream()
+            .filter(candidate -> candidate.setting() == CoreSettings.NOTIFICATIONS_GROUPS).findFirst().orElseThrow().editor();
+        editor.combo("jasper.commands").setSelectedItem("history");
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).isTrue();
+        editor.combo("jasper.commands").setSelectedItem("card");
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).as("back at the default, nothing to save").isFalse();
+        editor.combo("jasper.commands").setSelectedItem("off");
+        editor.reset("jasper.commands").doClick();
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).as("reset, nothing to save").isFalse();
+        page.dispose();
+    }
 }

@@ -100,6 +100,7 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
             for (var group : groups) {
                 var name = new JLabel(group.name());
                 name.putClientProperty("html.disable", true);
+                name.setToolTipText(group.id());
                 component.add(name, cell(0, y));
                 component.add(muted(group.owner()), cell(1, y));
                 var combo = new JComboBox<>(MODES.keySet().toArray(String[]::new));

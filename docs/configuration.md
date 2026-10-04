@@ -321,9 +321,10 @@ off for everything (Settings › Notifications › Show system notifications). S
 
 The modes are `"card"` (a card that hides itself), `"sticky"` (a card that stays until you close it), `"history"`
 (only the Notifications panel, unread) and `"off"`. A group you do not list keeps its default. Settings ›
-Notifications › Groups lists every group with its id, and changes there are saved here. An entry for a plugin that
-is not running is kept. An unknown mode, a value that is not a string, or a key that is not a group id is a warning,
-and that group keeps its default. See [Notifications](notifications.md#groups) for what each group covers.
+Notifications › Groups lists every group, shows a group's id when you point at its name, and saves changes here. An
+entry for a plugin that is not running is kept. An unknown mode, a value that is not a string, or a key that is not a
+group id is a warning, and that group keeps its default. [Notifications](notifications.md#groups) lists the groups
+with their ids.
 
 ### Automatic tab and notification titles
 

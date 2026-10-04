@@ -6,8 +6,31 @@
 `0734c5c5`, where plans 1–5 are merged; `origin/main` was `192443b3`, two unrelated tab-width commits ahead, when this
 plan was written). Executed natively, the user's choice, with one whole-branch review at the end. Deviations from the
 plan text: none in code. Task 2 added `import java.util.Map;` to `NotificationCenterTest`, as its note allows. Task 5
-wrote this banner and the STATUS entry before the final review, then updated both with its outcome. Final review:
-pending. `./gradlew check --continue`: **8767 tests, 0 failures, 0 errors, 6 skipped**.
+wrote this banner and the STATUS entry before the final review, then updated both with its outcome.
+
+Final review (one Opus reviewer over the whole branch): no critical findings and three important ones. Two were fixed
+and one was ruled on.
+- Fixed: a config.toml made from the template holds an empty `[notifications.groups]`, so going back to a default
+  left a phantom unsaved change in Settings. `Setting.sameSaved` now holds the "empty table is no table" rule;
+  `ConfigService.save` and `SettingsDraft.stage`/`rebase` share it (`anEmptyTableIsTheSameAsNoTable`,
+  `aGroupBackAtItsDefaultIsNoChangeInAFileMadeFromTheTemplate`).
+- Fixed: configuration.md promised that Settings shows group ids. A group's name now shows its id on hover
+  (`eachGroupsNameShowsItsId`), and the group table in notifications.md gains an Id column.
+- Ruled: an unapplied edit to the table in Settings overwrites a hand edit of the same table made meanwhile. The
+  code stands: Apply writes what the dialog shows, as for `terminal.env` and for every other setting with a pending
+  edit. STATUS records it as a known limitation.
+
+Deferred minors:
+- Removing an emptied header leaves the template's comments under the previous table.
+- A sticky card waiting in the background shows as auto-hiding once its group is switched to card or off; interpretation
+  7 holds for whether it shows, not for how.
+- Any groups save drops hand-written unusable entries, and a nested `[notifications.groups.x]` keeps a bare header and
+  its warning.
+- The row's Reset also removes entries for plugins that are not running (interpretation 8).
+- Settings search does not find group or plugin names.
+- No dialog-level test for a nested table or for Keymap saves next to warning entries; the reviewer verified both.
+
+`./gradlew check --continue`: **8770 tests, 0 failures, 0 errors, 6 skipped**.
 
 **Goal:** Let the user choose how each notification group appears (card, sticky card, history only or off), in
 `config.toml` under `[notifications.groups]` and on the Settings › Notifications page, applied live.

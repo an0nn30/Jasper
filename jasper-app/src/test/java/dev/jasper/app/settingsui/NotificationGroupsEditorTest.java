@@ -135,4 +135,20 @@ class NotificationGroupsEditorTest {
         assertThat(editor.removesAtDefault()).isTrue();
         assertThat(factory.terms()).contains("card", "sticky", "history only", "off");
     }
+
+    /** config.toml names groups by id, so each group's name shows its id on hover. */
+    @Test void eachGroupsNameShowsItsId() {
+        var editor = editor();
+        editor.show(Map.of());
+        var tooltips = new java.util.HashMap<String, String>();
+        collectTooltips(editor.component(), tooltips);
+        assertThat(tooltips).containsEntry("Long-running commands", COMMANDS.id()).containsEntry("Configuration", CONFIG.id());
+    }
+
+    private static void collectTooltips(Container container, Map<String, String> tooltips) {
+        for (Component child : container.getComponents()) {
+            if (child instanceof JLabel label && label.getToolTipText() != null) tooltips.put(label.getText(), label.getToolTipText());
+            if (child instanceof Container nested) collectTooltips(nested, tooltips);
+        }
+    }
 }

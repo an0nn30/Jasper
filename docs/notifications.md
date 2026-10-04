@@ -43,16 +43,16 @@ longer applies). `✕` removes one row; **Clear All** removes them all.
 
 ## Groups
 
-| Group | What it covers | Shows as |
-|---|---|---|
-| Jasper | errors and results of Jasper's own commands: a shell that could not start, a theme that could not be applied, Migrate Config | card |
-| Configuration | problems in `config.toml`, themes and plugin settings files | sticky card |
-| Long-running commands | a command that ran at least `notifications.long_command_seconds` and finished anywhere but the pane you were typing in | card |
-| Plugin problems | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
-| Internal errors | unexpected errors in Jasper itself | card |
-| *Plugin name*, one per plugin | the plugin's own messages, such as a host that could not be saved | card |
-| *Plugin name* activities | a plugin's background work that finished or failed, such as a sync or an upload | card |
-| Tunnels | Remote's tunnel failures | card |
+| Group | Id | What it covers | Shows as |
+|---|---|---|---|
+| Jasper | `jasper.general` | errors and results of Jasper's own commands: a shell that could not start, a theme that could not be applied, Migrate Config | card |
+| Configuration | `jasper.config` | problems in `config.toml`, themes and plugin settings files | sticky card |
+| Long-running commands | `jasper.commands` | a command that ran at least `notifications.long_command_seconds` and finished anywhere but the pane you were typing in | card |
+| Plugin problems | `jasper.plugins` | a plugin that failed while Jasper asked it to do something, or that could not be loaded, started or read at launch | card |
+| Internal errors | `jasper.errors` | unexpected errors in Jasper itself | card |
+| *Plugin name*, one per plugin | *plugin id* | the plugin's own messages, such as a host that could not be saved | card |
+| *Plugin name* activities | *plugin id*`.activities` | a plugin's background work that finished or failed, such as a sync or an upload | card |
+| Tunnels | `dev.jasper.remote.tunnels` | Remote's tunnel failures | card |
 
 A configuration notification offers **Show Problems** (the same list as the status bar's configuration indicator)
 and **Open config.toml**. It goes away by itself once every problem is fixed.
