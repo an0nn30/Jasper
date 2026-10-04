@@ -376,6 +376,27 @@ class DockDragTest {
         assertThat(w.drag.overlay().highlight()).as("b is hidden and a stripe drop keeps it hidden: no frame to preview").isNull();
     }
 
+    @Test void withABottomAreaShowingASideSplitsAtHalfOfTheSidePanelsVisibleHeight() {
+        var w = window();
+        w.state.add("z", Slot.BOTTOM_LEFT);
+        w.area.setContent("z", "Z", new JLabel("z"));
+        w.state.show("a");
+        w.state.show("z");
+        Rectangle workspace = w.workspace();
+        Rectangle bottom = SwingUtilities.convertRectangle(w.area, w.area.content(Slot.BOTTOM_LEFT).getParent().getBounds(), w.content);
+        int visibleHalf = (bottom.y - workspace.y) / 2, workspaceHalf = workspace.height / 2;
+        assertThat(visibleHalf).as("the side panels end above the bottom area: their half is higher").isLessThan(workspaceHalf - 20);
+        Point lowerHalfOfTheSidePanel = new Point(workspace.x + 130, workspace.y + (visibleHalf + workspaceHalf) / 2);
+        var source = w.dragTo(w.button(w.left, "b"), lowerHalfOfTheSidePanel);
+        assertThat(w.drag.target()).as("below the side panel's half, above the workspace's")
+            .hasValue(DockDropResolver.Target.workspace(Slot.LEFT_BOTTOM));
+        w.mouse(source, MouseEvent.MOUSE_RELEASED, lowerHalfOfTheSidePanel);
+        assertThat(w.state.slot("b")).hasValue(Slot.LEFT_BOTTOM);
+        assertThat(w.state.active(Slot.LEFT_TOP)).as("a stays in the top slot").hasValue("a");
+        assertThat(w.state.active(Slot.LEFT_BOTTOM)).hasValue("b");
+        assertThat(w.state.visible("z")).as("the bottom area stays").isTrue();
+    }
+
     @Test void aStripeDropOfAHiddenWindowPreviewsNoFrameBecauseItStaysHidden() {
         var w = window();
         Point aboveD = w.center(w.button(w.right, "d"));

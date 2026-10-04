@@ -125,6 +125,63 @@ class DockDropResolverTest {
         assertThat(DockDropResolver.resolve(new Point(100, 29), List.of(), WORKSPACE)).as("above the top edge").isEmpty();
     }
 
+    private static Target split(Rectangle workspace, int splitY, int x, int y) {
+        return DockDropResolver.resolve(new Point(x, y), List.of(), workspace, splitY).orElseThrow();
+    }
+
+    @Test void aSplitLineAboveTheMiddleMovesWhereASideTurnsFromTopToBottom() {
+        // A bottom area 200px tall under the sides leaves them 400px of the 600: their visible half is at 200, not 300.
+        int splitY = WORKSPACE.y + 200;
+        int between = WORKSPACE.y + 250;
+        assertThat(split(WORKSPACE, splitY, WORKSPACE.x + 100, between)).as("left, between the split line and the middle")
+            .isEqualTo(Target.workspace(Slot.LEFT_BOTTOM));
+        assertThat(at(WORKSPACE.x + 100, between)).as("the three-argument form splits at the middle").isEqualTo(Target.workspace(Slot.LEFT_TOP));
+        assertThat(split(WORKSPACE, splitY, WORKSPACE.x + 900, between)).as("right, between the split line and the middle")
+            .isEqualTo(Target.workspace(Slot.RIGHT_BOTTOM));
+        assertThat(at(WORKSPACE.x + 900, between)).isEqualTo(Target.workspace(Slot.RIGHT_TOP));
+        assertThat(split(WORKSPACE, splitY, WORKSPACE.x + 100, splitY - 1)).as("just above the line").isEqualTo(Target.workspace(Slot.LEFT_TOP));
+        assertThat(split(WORKSPACE, splitY, WORKSPACE.x + 100, splitY)).as("the line belongs to the bottom slot")
+            .isEqualTo(Target.workspace(Slot.LEFT_BOTTOM));
+        assertThat(split(WORKSPACE, splitY, WORKSPACE.x + 900, splitY - 1)).isEqualTo(Target.workspace(Slot.RIGHT_TOP));
+        assertThat(split(WORKSPACE, splitY, WORKSPACE.x + 900, splitY)).isEqualTo(Target.workspace(Slot.RIGHT_BOTTOM));
+    }
+
+    @Test void theSplitLineChangesNeitherTheBottomZonesNorTheTies() {
+        for (int splitY : new int[] {WORKSPACE.y, WORKSPACE.y + 200, WORKSPACE.y + 300, WORKSPACE.y + 599}) {
+            assertThat(split(WORKSPACE, splitY, 280, 600)).as("bottom, left half, split %s", splitY).isEqualTo(Target.workspace(Slot.BOTTOM_LEFT));
+            assertThat(split(WORKSPACE, splitY, 780, 600)).as("bottom, right half, split %s", splitY).isEqualTo(Target.workspace(Slot.BOTTOM_RIGHT));
+            assertThat(split(WORKSPACE, splitY, 28 + 499, 30 + 595)).isEqualTo(Target.workspace(Slot.BOTTOM_LEFT));
+            assertThat(split(WORKSPACE, splitY, 28 + 500, 30 + 595)).as("the bottom's half width").isEqualTo(Target.workspace(Slot.BOTTOM_RIGHT));
+        }
+        Rectangle w = new Rectangle(28, 30, 1000, 500);
+        int splitY = w.y + 150;
+        assertThat(split(w, splitY, 28 + 20, 30 + 490)).as("level with the bottom, the left edge wins")
+            .isEqualTo(Target.workspace(Slot.LEFT_BOTTOM));
+        assertThat(split(w, splitY, 28 + 21, 30 + 490)).as("one pixel farther, the bottom is nearer").isEqualTo(Target.workspace(Slot.BOTTOM_LEFT));
+        assertThat(split(w, splitY, 28 + 980, 30 + 490)).as("level with the bottom, the right edge wins")
+            .isEqualTo(Target.workspace(Slot.RIGHT_BOTTOM));
+        assertThat(split(w, splitY, 28 + 979, 30 + 490)).isEqualTo(Target.workspace(Slot.BOTTOM_RIGHT));
+        assertThat(split(w, splitY, 28 + 500, 30 + 100)).as("level between left and right, left wins").isEqualTo(Target.workspace(Slot.LEFT_TOP));
+        assertThat(split(w, splitY, 28 + 501, 30 + 100)).isEqualTo(Target.workspace(Slot.RIGHT_TOP));
+        assertThat(split(w, splitY, 28 + 500, 30 + 200)).as("the same lines, below the split").isEqualTo(Target.workspace(Slot.LEFT_BOTTOM));
+        assertThat(split(w, splitY, 28 + 501, 30 + 200)).isEqualTo(Target.workspace(Slot.RIGHT_BOTTOM));
+    }
+
+    @Test void theThreeArgumentFormSplitsAtTheWorkspacesHalfLikeTheFourArgumentFormEvenForAnOddHeight() {
+        for (Rectangle w : new Rectangle[] {new Rectangle(28, 30, 1000, 600), new Rectangle(28, 30, 1000, 601)}) {
+            int half = w.y + (w.height + 1) / 2;
+            for (int x : new int[] {w.x + 10, w.x + w.width - 10}) {
+                for (int y = w.y + 295; y < w.y + 306; y++) {
+                    assertThat(DockDropResolver.resolve(new Point(x, y), List.of(), w))
+                        .as("%s at %s,%s", w, x, y).isEqualTo(DockDropResolver.resolve(new Point(x, y), List.of(), w, half));
+                }
+            }
+        }
+        Rectangle odd = new Rectangle(28, 30, 1000, 601);
+        assertThat(at(odd, odd.x + 10, odd.y + 300)).as("2 * 300 < 601").isEqualTo(Target.workspace(Slot.LEFT_TOP));
+        assertThat(at(odd, odd.x + 10, odd.y + 301)).as("2 * 301 is not").isEqualTo(Target.workspace(Slot.LEFT_BOTTOM));
+    }
+
     @Test void aStripeGroupWinsOverTheWorkspaceWhereTheyOverlap() {
         var group = new Group(Slot.BOTTOM_RIGHT, new Rectangle(900, 500, 100, 100), List.of());
         assertThat(DockDropResolver.resolve(new Point(950, 550), List.of(group), WORKSPACE)).hasValue(Target.stripe(Slot.BOTTOM_RIGHT, 0));

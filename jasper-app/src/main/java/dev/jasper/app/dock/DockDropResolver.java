@@ -54,18 +54,29 @@ public final class DockDropResolver {
     }
 
     /**
+     * {@link #resolve(Point, List, Rectangle, int)} with the sides splitting at the workspace's half height.
+     */
+    public static Optional<Target> resolve(Point cursor, List<Group> groups, Rectangle workspace) {
+        return resolve(cursor, groups, workspace, workspace.y + (workspace.height + 1) / 2);
+    }
+
+    /**
      * Over a stripe group: that group, at the number of its buttons whose middle is above the cursor; the stripes win
      * over the workspace. Over the workspace: the zone of the nearest of its left, right and bottom edges, each
      * distance taken as a share of the workspace's own width (left, right) or height (bottom), so a wide or a tall
      * workspace splits the same way as any other. The top edge is no target, as there are no top slots. The left
-     * edge's zone is {@link Slot#LEFT_TOP} above the workspace's half height and {@link Slot#LEFT_BOTTOM} from it
-     * down; the right edge's zone splits the same way; the bottom edge's is {@link Slot#BOTTOM_LEFT} left of the
-     * workspace's half width and {@link Slot#BOTTOM_RIGHT} from it on. The zones meet at the middle, along a diagonal
-     * from each lower corner and the vertical line above it. A tie goes to a side over the bottom, and to the left
-     * over the right: the exact middle of the workspace is {@link Slot#LEFT_BOTTOM}. The workspace's left and top
-     * edges lie inside it, its right and bottom edges do not. Anywhere else: nothing.
+     * edge's zone is {@link Slot#LEFT_TOP} above {@code splitY} and {@link Slot#LEFT_BOTTOM} from it down; the right
+     * edge's zone splits the same way; the bottom edge's is {@link Slot#BOTTOM_LEFT} left of the workspace's half
+     * width and {@link Slot#BOTTOM_RIGHT} from it on. The zones meet at the middle, along a diagonal from each lower
+     * corner and the vertical line above it. A tie goes to a side over the bottom, and to the left over the right: the
+     * exact middle of the workspace is {@link Slot#LEFT_BOTTOM}. The workspace's left and top edges lie inside it, its
+     * right and bottom edges do not. Anywhere else: nothing.
+     *
+     * @param splitY where a side turns from its top slot to its bottom slot, in the cursor's coordinates: half of the
+     *               side panels' visible height, which is above the workspace's half height while a bottom area
+     *               shows under them. It changes neither which edge is nearest nor the bottom edge's split.
      */
-    public static Optional<Target> resolve(Point cursor, List<Group> groups, Rectangle workspace) {
+    public static Optional<Target> resolve(Point cursor, List<Group> groups, Rectangle workspace, int splitY) {
         for (Group group : groups) {
             if (!group.bounds.contains(cursor)) continue;
             int index = 0;
@@ -78,7 +89,7 @@ public final class DockDropResolver {
         long width = workspace.width, height = workspace.height;
         long dx = cursor.x - workspace.x, dy = cursor.y - workspace.y;
         long left = dx * height, right = (width - dx) * height, bottom = (height - dy) * width;
-        boolean upper = dy * 2 < height;
+        boolean upper = cursor.y < splitY;
         if (left <= right && left <= bottom) return Optional.of(Target.workspace(upper ? Slot.LEFT_TOP : Slot.LEFT_BOTTOM));
         if (right <= bottom) return Optional.of(Target.workspace(upper ? Slot.RIGHT_TOP : Slot.RIGHT_BOTTOM));
         return Optional.of(Target.workspace(dx * 2 < width ? Slot.BOTTOM_LEFT : Slot.BOTTOM_RIGHT));

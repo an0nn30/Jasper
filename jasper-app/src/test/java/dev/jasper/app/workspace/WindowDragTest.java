@@ -154,6 +154,35 @@ class WindowDragTest {
         });
     }
 
+    @Test void withABottomAreaShowingASideSplitsAtHalfOfTheSidePanelsVisibleHeight() throws Exception {
+        edt(() -> {
+            var f = new Fixture();
+            f.model.addPanel("dev.x.logs", "Logs", new ImageIcon(), Slot.BOTTOM_LEFT, site -> new JLabel("logs"));
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.sessions", Contributions.PanelRequest.Op.SHOW));
+            f.model.requestPanel(new Contributions.PanelRequest(f.owner.id(), "dev.x.logs", Contributions.PanelRequest.Op.SHOW));
+            f.layout();
+            Rectangle workspace = f.workspace();
+            Rectangle sessionsFrame = frame(f, Slot.LEFT_TOP), logsFrame = frame(f, Slot.BOTTOM_LEFT);
+            int visibleHalf = (logsFrame.y - workspace.y) / 2, workspaceHalf = workspace.height / 2;
+            assertThat(visibleHalf).as("the side panel is shorter than the workspace: its half is higher").isLessThan(workspaceHalf - 20);
+            int down = (visibleHalf + workspaceHalf) / 2;
+            assertThat(workspace.y + down).as("the point is over the side panel").isLessThan(sessionsFrame.y + sessionsFrame.height);
+            Point lowerHalfOfTheSidePanel = new Point(workspace.x + 130, workspace.y + down);
+            f.drag(f.button("Files"), lowerHalfOfTheSidePanel);
+            assertThat(f.owner.dockDrag().target()).as("below the side panel's half, above the workspace's")
+                .hasValue(DockDropResolver.Target.workspace(Slot.LEFT_BOTTOM));
+            f.mouse(f.button("Files"), MouseEvent.MOUSE_RELEASED, lowerHalfOfTheSidePanel);
+            f.layout();
+            assertThat(f.owner.dock().slot("dev.x.files")).hasValue(Slot.LEFT_BOTTOM);
+            assertThat(f.owner.dock().visible("dev.x.files")).isTrue();
+            assertThat(f.owner.dock().visible("dev.x.sessions")).isTrue();
+            assertThat(f.owner.dock().visible("dev.x.logs")).as("the bottom area stays").isTrue();
+            Rectangle upper = frame(f, Slot.LEFT_TOP), lower = frame(f, Slot.LEFT_BOTTOM);
+            assertThat(upper.y + upper.height).as("both left frames show, the lower one below").isLessThanOrEqualTo(lower.y);
+            assertThat(lower.y + lower.height).as("above the bottom area").isLessThanOrEqualTo(frame(f, Slot.BOTTOM_LEFT).y);
+        });
+    }
+
     @Test void aStripeDropOfAHiddenPanelPreviewsNoFrameAndAVisibleOneDoes() throws Exception {
         edt(() -> {
             var f = new Fixture();

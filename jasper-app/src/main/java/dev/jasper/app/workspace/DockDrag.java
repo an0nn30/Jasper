@@ -191,7 +191,7 @@ final class DockDrag {
         Rectangle workspace = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), root);
         if (home != null && !nearHome(at)) forgetHome();
         target = home != null ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex))
-            : DockDropResolver.resolve(at, groups, workspace);
+            : DockDropResolver.resolve(at, groups, workspace, sideSplit(workspace));
         for (ToolStripe stripe : stripes)
             stripe.showGap(target.filter(DockDropResolver.Target::onStripe).map(DockDropResolver.Target::slot).orElse(null),
                 target.map(where -> where.index().orElse(0)).orElse(0));
@@ -210,6 +210,18 @@ final class DockDrag {
         }
         overlay.setBounds(0, 0, layers.getWidth(), layers.getHeight());
         overlay.show(highlight, placeholder, icons.apply(dragging), SwingUtilities.convertPoint(root, at, layers));
+    }
+
+    /**
+     * Where a side's top slot ends and its bottom slot begins, in root coordinates: half of the side panels' visible
+     * height in the layout as it shows now. While a bottom area shows, the sides end above it, so their half lies
+     * above the workspace's; otherwise it is the workspace's half.
+     */
+    private int sideSplit(Rectangle workspace) {
+        DockGeometry.Layout layout = DockGeometry.compute(new Rectangle(0, 0, area.getWidth(), area.getHeight()), state, ToolWindowArea.metrics());
+        int visibleHeight = layout.slot(Slot.BOTTOM_LEFT).or(() -> layout.slot(Slot.BOTTOM_RIGHT))
+            .map(bottomArea -> bottomArea.y).orElse(area.getHeight());
+        return workspace.y + (visibleHeight + 1) / 2;
     }
 
     private void finish() {
