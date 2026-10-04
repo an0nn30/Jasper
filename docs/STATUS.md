@@ -30,9 +30,11 @@
   the fix and passes at 1×/2×. A fresh second adversarial review approved the entire change with no findings,
   including 75 exact-pixel repaint probes at 1×/1.25×/1.5×/2×/3× under Metal, FlatLight and FlatDark.
   Full post-fix `./gradlew check` passed: **8,487 tests, 0 failures/errors, 6 skipped**, all 88 tasks successful.
-  The branch includes Zen integration through `ccd4868f`; the user's authorized merge will also preserve newer
-  main changes. Native motion acceptance remains user-run. No GUI or benchmark launched. Merge and push are
-  explicitly authorized; final merged verification and publication follow this record.
+  Integrated into `main` at `79232532`, preserving Zen and the five-theme catalog update. Fresh merged
+  `./gradlew check` passed all 88 tasks: **8,487 tests, 0 failures/errors, 6 skipped**. Merged diff and source
+  hygiene checks passed. Publication is user-authorized. Native motion acceptance remains user-run;
+  no GUI or benchmark launched. The local preview is also preserved in the main checkout's
+  `build/connection-preview/connection-overlay-faster.gif`.
 
 - **Zen integration with current main** (2026-10-04): merged `origin/main` at `4c3c6bb0`, preserving its
   Normal/Compact startup setting independently of the saved Zen toggle. A regression covers restoring and
