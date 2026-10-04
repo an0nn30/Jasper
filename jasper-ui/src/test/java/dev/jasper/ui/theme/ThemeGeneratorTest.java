@@ -269,4 +269,40 @@ class ThemeGeneratorTest {
             "os.mac", "rgba(1, 2, 3, 50%)", "os.default", "mix(#12345680, darken(@base, 10%), 25%)"));
     }
 
+    @Test void generatedUiDataRetainsBorderNamedColorVariablesWithoutBorderObjects() {
+        var theme = generate(SEEDS + """
+            [ui]
+            "@border" = "#ff0000"
+            "@hoverBorder" = "lighten(@border, 8%)"
+            "Button.borderColor" = "@border"
+            "Button.hoverBorderColor" = "@hoverBorder"
+            "@unsafeBorder" = "20,20,20,20,#ff0000,4,30"
+            "Button.border" = "@border"
+            """
+        );
+        assertThat(theme.uiKeys()).containsEntry("@border", "#ff0000")
+            .containsEntry("@hoverBorder", "lighten(@border, 8%)")
+            .containsEntry("Button.borderColor", "@border")
+            .containsEntry("Button.hoverBorderColor", "@hoverBorder")
+            .doesNotContainKeys("@unsafeBorder", "Button.border");
+    }
+
+    @Test void generatedUiDataRetainsOptionalColorReferencesWithoutOptionalBorderReferences() {
+        var theme = generate(SEEDS + """
+            [ui]
+            "HelpButton.hoverBorderColor" = "$?Button.hoverBorderColor"
+            "@optionalColor" = "$?Button.borderColor"
+            "Panel.background" = "mix($?Button.hoverBorderColor, #fff, 25%)"
+            "@unsafeBorderReference" = "$?Button.border"
+            "@unsafeWildcardBorder" = "$?border"
+            "@malformedOptional" = "$??Button.borderColor"
+            "Button.border" = "$?Button.borderColor"
+            """
+        );
+        assertThat(theme.uiKeys()).containsEntry("HelpButton.hoverBorderColor", "$?Button.hoverBorderColor")
+            .containsEntry("@optionalColor", "$?Button.borderColor")
+            .containsEntry("Panel.background", "mix($?Button.hoverBorderColor, #fff, 25%)")
+            .doesNotContainKeys("@unsafeBorderReference", "@unsafeWildcardBorder", "@malformedOptional", "Button.border");
+    }
+
 }

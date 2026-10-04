@@ -21,7 +21,7 @@ public final class UiColorKeys {
     public static boolean supports(String key) {
         String lower = key.toLowerCase(Locale.ROOT);
         // FlatLaf's border slots parse insets, line thickness and arcs, even without a class name.
-        if (lower.endsWith("border")) return false;
+        if (!key.startsWith("@") && lower.endsWith("border")) return false;
         return key.startsWith("@") || lower.endsWith("background") || lower.endsWith("foreground")
             || lower.endsWith("color") || lower.endsWith("thumb") || lower.endsWith("track")
             || lower.endsWith("caret") || lower.startsWith("actions.") || lower.startsWith("objects.");
@@ -78,6 +78,8 @@ public final class UiColorKeys {
     }
 
     private static boolean property(String text) {
+        // FlatLaf allows one optional marker after '$' (and inside lazy property names).
+        if (text.startsWith("?")) text = text.substring(1);
         return NAME.matcher(text).matches() && supports(text) && !CLASS_NAME.matcher(text).matches();
     }
 
