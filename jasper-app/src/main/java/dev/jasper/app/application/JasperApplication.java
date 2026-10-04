@@ -356,7 +356,7 @@ public final class JasperApplication {
                 }
             }
         });
-        windows.add(window); window.show();
+        windows.add(window); window.restoreLayout(uiState); window.show();
         return window;
     }
 

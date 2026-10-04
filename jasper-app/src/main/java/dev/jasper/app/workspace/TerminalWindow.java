@@ -8,6 +8,7 @@ import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.platform.WindowGlass;
+import dev.jasper.app.persistence.UiState;
 import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -28,6 +29,11 @@ public final class TerminalWindow implements AutoCloseable {
     private final MacTitleBar titleBar;
     private final WindowGlass glass;
     private boolean closed;
+    private WindowPlacement placement;
+    private final java.awt.event.ComponentAdapter geometry = new java.awt.event.ComponentAdapter() {
+        @Override public void componentMoved(java.awt.event.ComponentEvent event) { rememberBounds(); }
+        @Override public void componentResized(java.awt.event.ComponentEvent event) { rememberBounds(); }
+    };
     private final WindowAdapter events = new WindowAdapter() {
         @Override public void windowClosing(WindowEvent event) { if (content.mayClose()) close(); }
         @Override public void windowActivated(WindowEvent event) { setActive(true); callbacks.activated().accept(TerminalWindow.this); }
@@ -81,6 +87,27 @@ public final class TerminalWindow implements AutoCloseable {
         content.update();
     }
 
+    /** Restore after configuration and tool panels are connected, before the native window is shown. */
+    public void restoreLayout(UiState state) {
+        placement = new WindowPlacement(state);
+        updateMinimumSize();
+        var screens = new java.util.ArrayList<Rectangle>();
+        var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        screens.add(usableBounds(environment.getDefaultScreenDevice().getDefaultConfiguration()));
+        for (var device : environment.getScreenDevices()) {
+            Rectangle bounds = usableBounds(device.getDefaultConfiguration());
+            if (!screens.contains(bounds)) screens.add(bounds);
+        }
+        placement.restore(frame.getMinimumSize(), screens).ifPresent(frame::setBounds);
+        placement.observe(frame.getBounds(), java.awt.Frame.NORMAL);
+        frame.setExtendedState(placement.extendedState());
+        frame.addComponentListener(geometry);
+    }
+
+    private void rememberBounds() {
+        if (!closed && placement != null && frame.isShowing()) placement.observe(frame.getBounds(), frame.getExtendedState());
+    }
+
     static Dimension minimumSize(JRootPane root, Insets decorations) {
         Dimension contentMinimum = root.getMinimumSize();
         return new Dimension(contentMinimum.width + decorations.left + decorations.right,
@@ -94,7 +121,10 @@ public final class TerminalWindow implements AutoCloseable {
     }
 
     private Rectangle usableBounds() {
-        var graphics = frame.getGraphicsConfiguration();
+        return usableBounds(frame.getGraphicsConfiguration());
+    }
+
+    private static Rectangle usableBounds(java.awt.GraphicsConfiguration graphics) {
         Rectangle bounds = new Rectangle(graphics.getBounds());
         Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(graphics);
         bounds.x += insets.left; bounds.y += insets.top;
@@ -135,7 +165,13 @@ public final class TerminalWindow implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
-        closed = true; if (glass != null) glass.close(); content.close();
+        rememberBounds();
+        closed = true;
+        frame.removeComponentListener(geometry);
+        // Save the intact dock first; plugin disposal callbacks must not change the closing window's snapshot.
+        if (glass != null) glass.close();
+        content.close();
+        if (placement != null) placement.save(frame.getExtendedState());
         if (titleBar != null) titleBar.close();
         frame.removeWindowListener(events); frame.dispose();
         callbacks.closed().accept(this);

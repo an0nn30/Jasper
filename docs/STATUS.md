@@ -27,6 +27,26 @@
   a window already alone in a lower half shows the lower-half guide as soon as its drag starts, while the window itself
   still fills the side.
 
+- **Window layout restoration fix** (2026-10-03; `codex/restore-window-layout`, based on `main` at `f450112b`):
+  main terminal frames previously never saved or restored their bounds; dock persistence intentionally used the
+  last layout edit rather than the last window closed. Each window now snapshots its tool-panel slots/order,
+  visibility, dock sizes/ratios and its own rail visibility before teardown. `ui-state.toml` version 2 also stores
+  `[main_window]` normal pixel bounds and maximized axes. The app restores these after configuration and panel
+  attachment, before showing the frame. Minimized state is not restored; unavailable display space is fitted to a
+  current usable display, while intentional spans across adjacent displays remain exact. Auxiliary windows and
+  file-chooser state are preserved. The original dock spec is amended to the user's last-closed-wins requirement.
+  This is a bounded bug-fix follow-up with inline TDD and independent final review, not a re-execution of the
+  historical dock plans. Regressions cover close order, all six open slots with exact terminal-area restoration,
+  rail ownership, persistence across reload, maximized/minimized normal bounds, removed monitors, spanning displays,
+  and malformed main-window data. Independent review's spanning-display finding was fixed with a failing/passing
+  regression and approved in re-review. Final `./gradlew check --continue`: **8,439 tests, 0 failures, 0 errors, 6 skipped**; architecture gates and
+  native headless checks passed. Changed Java source hygiene and `git diff --check` passed. No GUI launched, merge
+  or push performed.
+  User-run acceptance: resize/reposition a window, open/move/resize panels, quit/relaunch; repeat with two differently
+  arranged windows closed in both orders, and with maximization/minimization and multiple displays. Native macOS
+  fullscreen is distinct from AWT maximization and is not restored by this change. Terminal sessions/editor
+  documents are not resurrected by this layout state.
+
 - **Notifications plan 4: long commands and Buddy, merged to local `main` 2026-10-03 (not pushed); awaiting the user's
   GUI checks and their call on a background finish's route to its pane** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
   [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
@@ -49,6 +69,7 @@
   on, the capsule shows while it runs and goes when it ends, and clicking it focuses the pane and keeps the column; the
   drawer lists only running work; in the packaged app with Jasper in the background, the macOS banner still arrives
   and the notification waits unread.
+
 - **Dock drop zones: six edge zones replace the 3 × 2 grid; pushed to `main`, awaiting the user's GUI check**
   (2026-10-03; spec §3 "Targets" and "Guides" amended
   at the user's request). The user could not drop a tool window on the lower half of the left or right side and named

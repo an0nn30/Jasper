@@ -88,6 +88,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
     private UiState uiState = UiState.inMemory();
+    private boolean railVisible = true;
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
     private final ThemeController themes;
@@ -683,6 +684,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void connectContributions(Contributions model, UiState state) {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
+        railVisible = state.railVisible();
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         contentRegistry = model.content();
         contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
@@ -752,11 +754,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     ToolStripe leftStripe() { return leftStripe; }
     ToolStripe rightStripe() { return rightStripe; }
     DockDrag dockDrag() { return dockDrag; }
-    boolean railVisible() { return uiState.railVisible(); }
+    boolean railVisible() { return railVisible; }
 
     void setRailVisible(boolean value) {
         // A drag shows its view on the stripes that showed when it began; showing or hiding them ends it.
         dockDrag.cancel();
+        railVisible = value;
         uiState.setRailVisible(value);
         uiState.save();
         syncRailVisibility();
@@ -768,7 +771,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * place to move windows to), unless the user hid them with View > Rail.
      */
     void syncRailVisibility() {
-        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && uiState.railVisible();
+        boolean wanted = !(leftStripe.empty() && rightStripe.empty()) && railVisible;
         area.setStripesVisible(wanted);
         if (leftStripe.isVisible() != wanted || rightStripe.isVisible() != wanted) {
             leftStripe.setVisible(wanted);
