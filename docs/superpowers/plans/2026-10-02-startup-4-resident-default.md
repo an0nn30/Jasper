@@ -26,10 +26,10 @@ amending the [background residency design](../specs/2026-09-17-jasper-background
 `openOrRaise(String trigger)`, the `reopen`/`handoff`/`menu` triggers, `startupBench` warm mode) and on Plan 2
 (`2026-10-02-startup-2-jvm-packaging.md`, packaging), both executed first. Read [STATUS](../../STATUS.md) too.
 
-**Status:** Written 2026-10-02 against `claude/startup-speed@3b1a1544` plus the text of Plan 1; executing on
-`claude/startup-speed` from `5fc658db` (after Plans 1 and 2). Third of five plans (1 → 2 → 4 → 3A → 3B). Task 1 (spike)
-and Task 9 (measurements) are user-run GUI work: ask the user before each. Record the spike answers, every deviation and
-the measured numbers in this banner and in `docs/STATUS.md`.
+**Status:** Written 2026-10-02 against `claude/startup-speed@3b1a1544` plus the text of Plan 1; executed on
+`claude/startup-speed` from `5fc658db` (after Plans 1 and 2; the result is under "Executed" below). Third of five plans
+(1 → 2 → 4 → 3A → 3B). Task 1 (spike) and Task 9 (measurements) are user-run GUI work: ask the user before each. Record
+the spike answers, every deviation and the measured numbers in this banner and in `docs/STATUS.md`.
 
 **Spike 2026-10-03 (user-run):** Q1 (a): the Dock tile, Spotlight and `open -a` each delivered a reopen event to the one
 running process (three reopens, no second process), also after a launchd-style `Contents/MacOS/Jasper --background` exec
@@ -43,6 +43,67 @@ spike was assembled in the session scratchpad instead of `/tmp/jasper-spike`.
 **Workspace / execution:** worktree `.claude/worktrees/startup-speed`, branch `claude/startup-speed`, after Plans 1 and
 2 are merged into it. TDD and one commit per task. Line numbers below are from `3b1a1544`; Plans 1 and 2 shift them, so
 every edit quotes the text it replaces.
+
+**Executed 2026-10-03** on `claude/startup-speed` with subagent-driven development (per-task implementer and review; the
+final whole-branch review follows this task). Final `./gradlew check`: BUILD SUCCESSFUL, 8,067 tests (Plan 2's 7,991
+plus 76: the plan counted 35, and the controller's rulings and the fix rounds added the rest), 0 failures,
+0 errors, 6 skips; the native harnesses print "all headless checks passed". Measured on the trained
+image built at `0f3138b1` (Task 9): warm reopen first paint 252 ms median from the click (target 150, missed; window
+shown 209 ms, output painted 1,246 ms); idle resident RSS 455.3 MiB (A, 2 s after settle) and 188.3 MiB (B, 60 s after a
+heavy session); G1 periodic collection not needed (see the
+[Plan 4 benchmark record](../../benchmarks/2026-10-02-startup-plan4.md)). The task text below is unchanged; the result
+differs from it in these ways:
+
+Deviations:
+
+1. Pre-flight scan rulings (`rulings.md` in the session workspace, summarised here):
+   - the menu bar item, the bridge and `prepare()` wait for the first output painted, a finished warm-up, or 2 s after
+     the first paint, never the first paint itself (the spec: never on the start-up path), and so does the Windows
+     notification-area icon;
+   - `MacDock.available(os, appPath)` also requires the dylib to exist;
+   - the window-composition guard covers the whole composition;
+   - the rehearsal's `done` always runs (`try`/`finally`);
+   - the rehearsal window is not a content host;
+   - `windowTrigger` labels a warmed-up process's first window `menu` (fixes Plan 1's "a resident's first plain window is
+     labelled `cold`");
+   - AOT training stays non-resident, while the cold benchmark measures the resident default;
+   - several plan miscounts corrected (`[system]` comment lines, packaging checklist items).
+2. Task 3 (`0db84a94`, `181b6a2f`): one bridge, `libjasper-macos.dylib`. Later, `watchPowerOff` returns `jboolean` and
+   `MacDock.prepare()` returns `boolean`, not the planned `static void prepare()`; `DockControl.prepare` is a
+   `BooleanSupplier`. A bridge that cannot install the power-off observer leaves the presence unprepared.
+3. Task 4 (`5b73f734`):
+   - `compileOnly("com.github.weisj:jsvg:2.0.0")`, because `FlatSVGUtils.svg2image` needs jsvg types at compile time.
+     The version matches flatlaf-extras' runtime dependency, and no jsvg type reaches the bytecode.
+   - The settle fallback is injectable (`settleFallback(Duration)`).
+   - `ResidentIndicatorTest` has 12 tests, not 9.
+4. Task 5 (`746a7b91`, fix round `181b6a2f`):
+   - the native quit handler's decision is `quitIsSystemQuit()`, defined as resident and (not prepared or powering off);
+   - before the bridge is prepared, a quit is a real quit that is never cancelled;
+   - the Shortcuts recorder keeps Cmd+Q unless macOS is powering off;
+   - `nativeQuitRequested(QuitResponse)` is extracted for tests, and the composition failure path disposes the window
+     (`discard`);
+   - 29 tests in `JasperApplicationBackgroundTest` after this task (35 by the end of the plan), not 14, and 6 in
+     `DockPresenceTest`, not 3. One fix round.
+5. Task 6 (`a52599b0`): the test builds a fake bundle with the dylib.
+6. Task 7 (`0cced861`): added the plugin-refuses-the-relaunch test and the window-open-never-relaunches test.
+7. Task 8 (`a96f705a`, fix round `0f3138b1`):
+   - `Rehearsal.run(…)` holds the hand-off and `finally` logic, so it is testable headlessly;
+   - `connectContributions(model, state, hostsContent)` keeps the rehearsal out of the content registry;
+   - the rehearsal window's error and info callbacks are logged, never shown, and its frame is always disposed;
+   - `RehearsalTest` has 15 tests, not 4. One fix round.
+8. Task 9 (`356f8037`):
+   - the image was trained before measuring (the user approved);
+   - the image lives under `~/jasper-bench/startup-plan4`, and the raw JSON is not committed;
+   - the target was missed (252 ms against 150), so the pre-built hidden window will be planned separately: the user
+     decided on 2026-10-03 on its own spec amendment and plan after this one, ahead of Plans 3A and 3B;
+   - G1 periodic collection was not needed.
+9. GUI steps: the controller ran Task 3's `verifyPackage`, Task 9's training, the warm benchmark and the idle-memory
+   reading after the user approved each one. The user ran the spike and the heavy session.
+10. Known and deferred (the final review triages these):
+    - some failure paths are covered by reading only, because a headless JVM cannot build a `TerminalWindow`;
+    - a hidden start whose bridge fails to prepare shows no Dock icon, although the menu bar item, the reopen and the
+      handoff still reach it, and there is no loud log line yet;
+    - a nested reopen during a slow plugin quit guard can close the window it opened.
 
 ## Global Constraints
 

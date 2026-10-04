@@ -135,3 +135,9 @@ not exit is `did-not-exit`. Only `ok` runs feed the medians; any other outcome m
 the exit status 1. Every Jasper the benchmark started is stopped when it finishes, on an error and on Ctrl-C. The JSON
 at the output path holds each run's outcome, JVM status, phases and milliseconds from the click, plus a summary of
 count, median, minimum and maximum per milestone; a `.json.md` companion lists the same summary as a table.
+
+Jasper is resident by default on macOS and Windows since start-up Plan 4, so a Jasper usually runs: on macOS choose
+Quit Jasper Completely in its menu bar item before the benchmark. Plan 4's warm-path results are [recorded here](benchmarks/2026-10-02-startup-plan4.md).
+Cold numbers measured from Plan 4 on include residency (for example the handoff endpoint is bound before the first
+window), so they are not strictly comparable with the Plan 1 and Plan 2 baselines; the AOT training launch stays
+non-resident.

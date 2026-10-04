@@ -84,7 +84,19 @@ wait, not a promise that every cleanup succeeds or the JVM exits within two seco
 The process shutdown hook backs up endpoint cleanup and drains logging separately.
 Residency retains indexes/config/history after the last window,
 and does not intentionally retain pane sessions; asynchronous child cleanup may
-briefly continue after the last window closes. Quit closes all owners.
+briefly continue after the last window closes. On a packaged macOS Jasper that is
+resident, Quit (`JasperApplication.quitRequested`) closes every window through the
+windows' closing guards and keeps every owner (`toBackground`); `DockPresence` hides
+Jasper from the Dock while no window is open and brings it back before the next window
+is composed, through the injected `DockControl` (`platform.MacDock`). Only Quit Jasper
+Completely in the menu bar item (`platform.ResidentTray`), macOS logging out, a retire
+request or a restart reaches `quit()`, which closes all owners; so does any Quit
+before start-up has settled, and any Quit by a process that is not resident or has no
+Dock presence. The indicator and the macOS bridge arrive once start-up has settled (the
+first output painted, a finished `--background` warm-up, or 2 s after the first paint).
+A reopen with no window open relaunches the process when its application jar changed on
+disk. A `--background` launch rehearses one window (`application.Rehearsal`): composed
+with a canned terminal and no shell, painted once into an image, disposed unseen.
 
 ## Threading and cancellation
 

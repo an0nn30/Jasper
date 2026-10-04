@@ -2,6 +2,33 @@
 
 ## Current state — 2026-10-02
 
+- **Start-up speed Plan 4 (Resident by default)** (branch `claude/startup-speed`, worktree
+  `.claude/worktrees/startup-speed`, [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) Part 4,
+  [plan](superpowers/plans/2026-10-02-startup-4-resident-default.md); executed 2026-10-03):
+  `system.run_in_background` is on by default on macOS and Windows, off on Linux. On macOS a resident Jasper has a menu
+  bar item (New Window, Settings…, Quit Jasper Completely); Quit closes every window and keeps the process, hidden from
+  the Dock and Cmd+Tab until the next window (`DockPresence`, `platform.MacDock`; the bridge is now
+  `libjasper-macos.dylib`); a log-out or shutdown still quits; a login launch starts hidden; a Dock click after an
+  update relaunches the new build; the `--background` warm-up rehearses one unseen window (`application.Rehearsal`).
+  The indicator (the menu bar item, and the Windows tray icon) and the bridge arrive once start-up has settled: the
+  first output painted, a finished warm-up, or 2 s after the first paint. Until the bridge is prepared, and whenever its
+  preparation failed, a quit is a real quit that is never cancelled, so a log-out is never blocked
+  (`quitIsSystemQuit()`; `MacDock.prepare()` returns whether the power-off observer is installed). Spike (user-run
+  2026-10-03): Q1 (a), the Dock tile, Spotlight and `open -a` each reopen the one running process, also after a
+  launchd-style `--background` exec; Q2 variant A; Q3 yes. Warm reopen: first paint 252 ms median from the click (target
+  150, **missed**; window shown 209 ms, output painted 1,246 ms), see the
+  [Plan 4 benchmark record](benchmarks/2026-10-02-startup-plan4.md); idle RSS 455.3 MiB (2 s after settle), 188.3 MiB
+  60 s after a heavy session; G1 periodic collection not needed. Full check: 8,067/0/0/6
+  (Plan 2's 7,991 plus 76 new tests; the plan counted 35, and the rulings and the fix rounds added the rest).
+  The other Plan 1 leftover, "a resident's first plain window is labelled `cold`", is fixed here: a warmed-up process
+  labels it `menu`. Cold numbers from here on include residency, so they are not strictly comparable with the Plan 1
+  and Plan 2 baselines. Next: a spec amendment and plan for a pre-built hidden window (user decision 2026-10-03), then
+  Plans 3A and 3B. Not done: the macOS and Windows checklist items in `docs/packaging.md` (user-run), the final
+  whole-branch review, push. Known and deferred: some failure paths are covered by reading only, because a headless
+  JVM cannot build a `TerminalWindow`; a hidden start whose bridge fails to prepare shows no Dock icon (the menu bar
+  item, the reopen and the handoff still reach it) and logs nothing loud yet; a nested reopen during a slow plugin quit
+  guard can close the window it opened.
+
 - **Start-up Part 2: JVM and packaging** (branch `claude/startup-speed`, worktree `.claude/worktrees/startup-speed`,
   plan `docs/superpowers/plans/2026-10-02-startup-2-jvm-packaging.md`): packaged Jasper ships a trimmed runtime (41
   modules, 42 on Windows; `runtimeRootModules` in `gradle/packaging-support.gradle`, documented in plugin-authoring
@@ -60,9 +87,10 @@
   "incomplete" runs and guaranteed Jasper cleanup in the benchmark), listed in the plan's status banner.
   `./gradlew check`: 7,990/0/0/6. Next: Plan 2 (JVM and packaging). Not done: a recorded `startupBench` run (user-run).
   Carried forward from the final review: the first `StartupTrace.current()` in `main` costs ~4–5 ms net
-  (`ProcessHandle.info`, a virtual-thread cap timer; move them off `main` in Plan 2 or 3A); a resident's first plain
-  window is labelled `cold`, and a window's request time is taken on the EDT rather than at reopen/handoff receipt
-  (fix with Plan 4's triggers); per-plugin phases may push the start-up line past `AppLog`'s 512-character record cap
+  (`ProcessHandle.info`, a virtual-thread cap timer; move them off `main` in Plan 2 or 3A); a window's request time is
+  taken on the EDT rather than at reopen/handoff receipt (re-routed to Plan 3A: Plan 4 left it, because `startupBench`
+  reads absolute paint times; the other leftover, a resident's first plain window labelled `cold`, was fixed in Plan 4);
+  per-plugin phases may push the start-up line past `AppLog`'s 512-character record cap
   (Plan 3B); no test drives `watchOutput`→`timeFirstTerminal` end to end; the diagnostics example's phase numbers
   contradict "phases overlap" and the benchmark doc's cleanup sentence is loose (docs pass).
 

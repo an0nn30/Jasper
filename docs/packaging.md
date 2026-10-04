@@ -309,12 +309,17 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm links, working-directory status, config live reload, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
 - [ ] Connect a Remote SSH host by Vault key, by agent and on a LAN address; the first LAN connection shows the Local Network prompt, and after allowing it the host connects.
-- [ ] With `[system] run_in_background = true`, confirm `~/Library/LaunchAgents/dev.jasper.background.plist` appears, log out and back in, and confirm Jasper is running with no windows.
-- [ ] Confirm the Dock icon is present with no windows open and that clicking it produces a window noticeably faster than a cold start; record both times.
-- [ ] Confirm Cmd+Q exits completely and that the next launch is cold.
-- [ ] Record the resident process's idle memory (`ps -o rss= -p <pid>`).
-- [ ] Confirm Jasper survives sleep/wake and a monitor change while resident.
-- [ ] Set `enabled = false`, save, and confirm the plist is removed without restarting Jasper.
+- [ ] With the default configuration, confirm `~/Library/LaunchAgents/dev.jasper.background.plist` appears after the first launch; log out and back in and confirm Jasper is running with no window, no Dock icon at any moment during login, and its menu bar item present.
+- [ ] Confirm the menu bar glyph follows the menu bar in Light and Dark appearance (and with a tinted menu bar); New Window, Settings… and Quit Jasper Completely work with Jasper in the background and with windows open, and New Window and Settings… come to the front.
+- [ ] Press Cmd+Q with two windows open: both close, the Dock icon and the Cmd+Tab entry disappear, the menu bar item stays, and `pgrep -fl Jasper.app` still lists the process. Repeat with Jasper › Quit, File › Quit and the Dock icon's Quit.
+- [ ] With an editor content tab holding unsaved changes (or another plugin window that asks before closing), press Cmd+Q and refuse: nothing closes and Jasper stays in the Dock.
+- [ ] Click the pinned Dock icon in the background: a window opens in the running process (still one process in `pgrep`), the Dock icon, Cmd+Tab entry and Jasper's menu bar return, and typing reaches the shell without a click. Repeat from Spotlight and with `open -a Jasper`.
+- [ ] Open Settings… from the menu bar item in the background: Jasper returns to the Dock for the dialog and leaves it when the dialog closes.
+- [ ] Quit Jasper Completely exits, and the next launch is cold.
+- [ ] Log out, and separately restart, once with Jasper in the background and once with a window open: Jasper never stops it.
+- [ ] Replace the installed app with a newer build while Jasper is in the background (for example `ditto` over it), then click the Dock icon: the old process exits and a window opens from the new build (the new log's start-up line). With a window open, the same click only raises it.
+- [ ] Record the warm reopen time and idle memory with the start-up benchmark's warm mode ([benchmarks](benchmarks.md#start-up-benchmark)); confirm Jasper survives sleep/wake and a monitor change in the background.
+- [ ] Set `run_in_background = false`, save, and confirm the plist is removed without restarting Jasper; after the next start Cmd+Q exits and no menu bar item appears.
 - [ ] Confirm a handoff request or a Dock click arriving while Jasper is quitting does not raise a window that is being disposed (the guard lives in `openOrRaise`; it needs a live window in flight and cannot be exercised headlessly).
 
 ### Windows
@@ -336,9 +341,9 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm split, close, zoom, pane navigation, search, and prompt navigation.
 - [ ] Confirm links, working-directory status, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
-- [ ] Confirm `AF_UNIX` sockets work: with `[system] run_in_background = true`, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
+- [ ] Confirm `AF_UNIX` sockets work: with the default configuration, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
 - [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident.
-- [ ] Confirm Quit exits completely and that setting `enabled = false` removes the Run value.
+- [ ] Confirm Quit exits completely, that the notification-area icon appears only once start-up has settled (the first output painted, or 2 s after the first paint) rather than at launch, and that setting `run_in_background = false` removes the Run value.
 
 ### Linux
 

@@ -273,6 +273,45 @@ is user-run; headless tests never show a prompt or banner.
 API references: [Apple UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter),
 [requesting permission](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).
 
+### macOS Dock presence and the menu bar item
+
+`platform.MacDock` switches the activation policy through `libjasper-macos.dylib` (`MacDock.m`): regular (Dock icon,
+Cmd+Tab, Jasper's menu bar) while a window is open, accessory with none. The switch runs on the AppKit thread and the
+EDT waits for it, in AWT's run loop mode too, so a window shown next always meets the policy. `MacDock.show` is called
+only on the EDT, with no AWT lock held (the EDT blocks until AppKit's main thread has run the block), and never on the
+quit-for-real path. The same bridge watches `NSWorkspaceWillPowerOffNotification`: a quit request during a log-out or
+shutdown quits for real and is not cancelled. `JasperApplication` holds the state (`DockPresence`) and receives the
+bridge as a `DockControl`, so tests use a recording stand-in. A `--background` launch sets `apple.awt.UIElement` before
+the toolkit initialises, only when `MacDock.available(osName, appPath)` holds (macOS, and the bundle carries the
+library), so a development run or an image without the bridge never starts hidden. `platform.ResidentTray` is the macOS
+menu bar item (a template image of the TERMINAL artwork; `apple.awt.enableTemplateImages` is set with the desktop
+properties) and the Windows notification-area icon.
+
+Start-up does not wait for any of this. The bridge is prepared, and the menu bar item or notification-area icon
+appears, in one idempotent step once start-up has settled (`residencySettled`: the first output painted, a finished
+`--background` warm-up, or 2 s after the first paint, whichever comes first), and never at the first paint itself.
+`DockControl.prepare` is a `BooleanSupplier`: `MacDock.prepare()` returns whether the bridge loaded and the power-off
+observer is installed, and `DockPresence.prepared()` holds only then. Until it does, and whenever preparation reported
+failure, Jasper cannot tell a log-out from a user's Quit, so a quit is a real quit that is never cancelled and a log-out
+is never blocked. `quitIsSystemQuit()` is that decision: a resident process with a Dock presence that is not prepared or
+whose power-off flag is set. A process that is not resident keeps the ordinary quit (cancel, then `quit()`) even with a
+presence installed, as does one with no presence (a development run, Windows, Linux). On the system branch only two
+things cancel: a user recording Cmd+Q in the Shortcuts panel while macOS is not powering off, and a plugin quit guard
+that refuses. The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a cancelled log-out
+a later Cmd+Q quits for real, which is the safe direction. One exception is accepted: during a log-out with Jasper
+hidden, a plugin quit guard that opens a window or an ownerless dialog brings Jasper back into the Dock first (the
+dialog needs the menu bar and focus to be answered).
+
+The `--background` warm-up rehearses a window (`JasperApplication.warmUp`, `application.Rehearsal`) as well as
+building the fonts. The window is composed with the configured grid, theme and contributions around a canned terminal
+session fed from memory, so it starts no shell, PTY or child process; it is painted once into an image and disposed,
+never shown. It must stay invisible to everything else: it opens no `WindowTrace` and marks no `FIRST_PAINT` or
+`OUTPUT_PAINTED` (those would settle residency for a window nobody sees), only `WARMED_UP`, which the `done` callback
+passed to `warmUp` marks whether the rehearsal succeeded, failed or threw; it is not registered with the terminal registry and is not a
+content host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it;
+and its error and info callbacks are logged, never shown. A process that has warmed up labels its first plain window
+`menu` rather than `cold`. GUI behaviour is on the packaging checklist; `testMacDock` covers the native code
+headlessly, and a headless JVM cannot build a `TerminalWindow`, so some failure paths here are covered by reading only.
 
 ### Unified workspace header
 
