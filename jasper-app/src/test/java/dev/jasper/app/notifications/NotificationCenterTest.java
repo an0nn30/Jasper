@@ -366,4 +366,11 @@ class NotificationCenterTest {
             assertThat(entry.count()).isEqualTo(1);
         });
     }
+
+    @Test void presenceIsWhatDeliverySees() {
+        var center = center();
+        assertThat(center.presence()).isEqualTo(Delivery.Presence.FOCUSED);
+        presence = Delivery.Presence.BACKGROUND;
+        assertThat(center.presence()).isEqualTo(Delivery.Presence.BACKGROUND);
+    }
 }

@@ -1,15 +1,19 @@
 package dev.jasper.app.notifications;
 
-import dev.jasper.buddy.view.BuddyCompanion;
-import dev.jasper.buddy.notice.BuddyNoticeId;
 import dev.jasper.buddy.notice.BuddyNotice;
-
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.view.BuddyCompanion;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -17,32 +21,36 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
- * The terminal's producer for the buddy's drawer: it posts a running card once a command has taken
- * long enough to be worth remembering, replaces that card with the outcome, and sends the outcome to
- * the OS when the command did not finish under your hands.
+ * The terminal's producer for long commands (spec section 7, producer 3). A command that runs long enough, or runs out
+ * of sight, gets a live Buddy card and starts Buddy typing; when it ends the card goes. If it ran at least the threshold
+ * and did not finish in the pane you were typing in, its outcome is posted in {@link #GROUP}: the command as the
+ * title, "Finished in 2m 03s" (INFO) or "Exited 1 · 2m 03s" (WARNING) as the content, a click that focuses the pane, and
+ * a card in the pane's window. A pane closing expires its notifications, since there is no pane left to focus.
  *
- * <p>Holds no Swing state. Every seam is a standard functional type rather than a new interface —
- * including {@code schedule}, which is Swing's {@code Timer} in the application and a list a test
- * runs by hand. The previous {@code Channel} interface is gone: the buddy being hidden no longer
- * changes where a notice goes, so it had one real implementation left.
+ * <p>Until plan 5's OS notifiers, the outcome also goes to the operating system while Jasper is in the background; in
+ * the foreground the card says it.
  *
- * <p>EDT only.
+ * <p>Holds no Swing state. Every seam is a standard functional type, including {@code schedule}, which is Swing's
+ * {@code Timer} in the application and a list a test runs by hand. EDT only.
  */
 public final class CommandNotifier implements AutoCloseable {
-    private final java.util.Set<Object> activeProducers = new java.util.HashSet<>();
-    private boolean disposed;
-
-    public void opened(Object key) { if (!disposed) activeProducers.add(Objects.requireNonNull(key)); }
-    private boolean accepts(Object key) { return !disposed && activeProducers.contains(key); }
-    /** Every notice this class posts is the terminal's; a transfer or an SSH session brings its own. */
+    /** Where long commands' outcomes go. */
+    public static final NotificationGroup GROUP = new NotificationGroup("jasper.commands", "Long-running commands",
+        NotificationRequest.JASPER, DisplayMode.CARD);
+    /** Every card this class posts is the terminal's; a transfer or an SSH session brings its own. */
     static final String SOURCE = "terminal";
 
+    private final Set<Object> activeProducers = new HashSet<>();
+    private final Map<Object, InFlight> inFlight = new HashMap<>();
+    /** The notifications each pane's commands posted, expired when the pane closes. */
+    private final Map<Object, Set<UUID>> outcomes = new HashMap<>();
+    private boolean disposed;
     private Supplier<Duration> threshold;
     private BuddyCompanion deck;
+    private NotificationCenter center;
     private BiConsumer<String, String> operatingSystem;
     private Consumer<Boolean> onWorkingChanged;
     private BiFunction<Duration, Runnable, Runnable> schedule;
-    private final Map<Object, InFlight> inFlight = new HashMap<>();
     /** Commands that have been running past the threshold. */
     private int running;
 
@@ -50,27 +58,43 @@ public final class CommandNotifier implements AutoCloseable {
     private static final class InFlight {
         Runnable cancel = () -> {};
         boolean passed;
-        /** How long it has been going, so a pane closed mid-command can freeze the real figure. */
-        LongSupplier elapsed = () -> 0L;
         String title = "";
-        java.util.function.Supplier<String> detail = () -> "";
+        Supplier<String> detail = () -> "";
         Runnable activate = () -> {};
     }
 
-    public CommandNotifier(Supplier<Duration> threshold, BuddyCompanion deck,
-                    BiConsumer<String, String> operatingSystem, Consumer<Boolean> onWorkingChanged,
-                    BiFunction<Duration, Runnable, Runnable> schedule) {
+    /**
+     * EDT: registers {@link #GROUP} with the center.
+     *
+     * @param threshold how long a command must run to be worth telling; zero turns the feature off
+     * @param deck shows running commands
+     * @param center receives the outcomes
+     * @param operatingSystem receives an outcome's title and content while Jasper is in the background (plan 5 replaces
+     *     it with the OS notifiers)
+     * @param onWorkingChanged hears whether any long command is running, for Buddy's typing
+     * @param schedule runs a task after a delay and returns the way to cancel it
+     */
+    public CommandNotifier(Supplier<Duration> threshold, BuddyCompanion deck, NotificationCenter center,
+                           BiConsumer<String, String> operatingSystem, Consumer<Boolean> onWorkingChanged,
+                           BiFunction<Duration, Runnable, Runnable> schedule) {
         this.threshold = Objects.requireNonNull(threshold, "threshold");
         this.deck = Objects.requireNonNull(deck, "deck");
+        this.center = Objects.requireNonNull(center, "center");
         this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
         this.onWorkingChanged = Objects.requireNonNull(onWorkingChanged, "onWorkingChanged");
         this.schedule = Objects.requireNonNull(schedule, "schedule");
+        center.register(GROUP);
     }
 
+    /** A pane opened: events for it count from now. */
+    public void opened(Object key) { if (!disposed) activeProducers.add(Objects.requireNonNull(key)); }
+
+    private boolean accepts(Object key) { return !disposed && activeProducers.contains(key); }
+
     /**
-     * A command began. Nothing is shown yet: after {@code threshold} it becomes a running card, so
-     * the buddy does not twitch for every {@code ls}. {@code elapsedNanos} lets the card tick without
-     * being re-posted every second.
+     * A command began. Nothing is shown yet: after {@code threshold} it becomes a running card, so Buddy does not twitch
+     * for every {@code ls}, unless it started out of sight. {@code elapsedNanos} lets the card tick without being
+     * re-posted every second.
      */
     public void started(Object key, String command, LongSupplier elapsedNanos, Runnable activate, boolean watched) {
         if (!accepts(key)) return;
@@ -78,13 +102,12 @@ public final class CommandNotifier implements AutoCloseable {
         cancel(key);
         if (wait.isZero()) return;
         InFlight flight = new InFlight();
-        flight.elapsed = elapsedNanos;
         flight.title = title(command);
         flight.detail = () -> "Running · " + humanize(Duration.ofNanos(elapsedNanos.getAsLong()));
         flight.activate = activate;
         inFlight.put(key, flight);
-        // Out of sight is the whole reason a bubble exists, so there is nothing to wait for. The
-        // threshold stays as the fallback for a command running in the pane you are still watching.
+        // Out of sight is the whole reason a card exists, so there is nothing to wait for. The threshold stays as the
+        // fallback for a command running in the pane you are still watching.
         if (!watched) { promote(key, flight); return; }
         flight.cancel = schedule.apply(wait, () -> promote(key, flight));
     }
@@ -96,7 +119,7 @@ public final class CommandNotifier implements AutoCloseable {
         if (flight != null && !flight.passed) promote(key, flight);
     }
 
-    /** Turns an in-flight command into a bubble, once. */
+    /** Turns an in-flight command into a running card, once. */
     private void promote(Object key, InFlight flight) {
         if (!accepts(key)) return;
         if (inFlight.get(key) != flight || flight.passed) return;
@@ -104,75 +127,70 @@ public final class CommandNotifier implements AutoCloseable {
         flight.cancel.run();
         flight.cancel = () -> {};
         if (running++ == 0) onWorkingChanged.accept(true);
-        deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, flight.title, BuddyNotice.State.RUNNING, flight.detail, flight.activate));
+        deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, flight.title,
+            BuddyNotice.State.RUNNING, flight.detail, flight.activate));
     }
 
-    /** Refresh wording without promoting the card, clearing acknowledgement, or replaying arrival. */
+    /** Refreshes a running card's wording without promoting it or replaying its arrival. */
     public void titleChanged(Object key, String programTitle) {
         if (!accepts(key)) return;
         InFlight flight = inFlight.get(key);
-        if (flight == null) return; // Prompt titles cannot rename completed history.
+        if (flight == null) return; // Nothing is running, so a prompt title has nothing to rename.
         String updated = singleLine(programTitle);
         if (updated.isBlank() || updated.equals(flight.title)) return;
         flight.title = updated;
         if (flight.passed) deck.updateTitle(new BuddyNoticeId(SOURCE, key), updated);
     }
 
-    /** A command ended. Its card becomes the outcome, and the OS hears about it if you were elsewhere. */
+    /**
+     * A command ended. Its running card goes; the outcome is posted unless it was short or finished in the pane you were
+     * typing in.
+     *
+     * @param window the pane's window, where the card shows; null for the window used last
+     * @param activate focuses the pane
+     */
     public void finished(Object key, String command, OptionalInt exitStatus, Duration ran,
-                  CommandNotice.Origin origin, Runnable activate) {
+                         CommandNotice.Origin origin, UUID window, Runnable activate) {
         if (!accepts(key)) return;
-        // Shell/program titles can still name the working directory (for example "~").
-        // Completion events carry the command that actually ran, including its arguments.
+        // Shell and program titles can name the working directory (for example "~"); completion carries the command
+        // that actually ran, arguments included.
         String title = title(command);
         cancel(key);
-        Duration wait = threshold.get();
-        if (wait.isZero() || ran.compareTo(wait) < 0) return;
+        if (!CommandNotice.shouldNotify(origin, ran, threshold.get())) return;
         boolean succeeded = exitStatus.isEmpty() || exitStatus.getAsInt() == 0;
-        String detail = succeeded ? "Finished in " + humanize(ran)
-            : "Exited " + exitStatus.getAsInt() + " · " + humanize(ran);
-        deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, title, succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
-        // You were looking straight at it, so it is already seen and never reaches the column.
-        if (origin.ownPaneFocused()) deck.acknowledge(new BuddyNoticeId(SOURCE, key));
-        if (CommandNotice.shouldNotify(origin, ran, wait)) operatingSystem.accept(title, detail);
+        String detail = succeeded ? "Finished in " + humanize(ran) : "Exited " + exitStatus.getAsInt() + " · " + humanize(ran);
+        var request = NotificationRequest.of(GROUP.id(), succeeded ? Severity.INFO : Severity.WARNING, title)
+            .withContent(detail).withActivate(Objects.requireNonNull(activate, "activate"));
+        if (window != null) request = request.withTarget(window);
+        center.post(request).ifPresent(id -> outcomes.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(id));
+        if (center.presence() != Delivery.Presence.FOCUSED) operatingSystem.accept(title, detail);
     }
 
-    /** That pane took focus: whatever it posted has now been seen. */
-    public void looked(Object key) {
-        if (!accepts(key)) return;
-        deck.acknowledge(new BuddyNoticeId(SOURCE, key));
-    }
-
-    /**
-     * The pane is gone. Its card stays — the drawer is what you look at to remember — but stops
-     * ticking and stops responding, because there is no longer anywhere for a click to go.
-     */
+    /** The pane is gone: its running card goes, and its notifications expire, since there is no pane to focus. */
     public void closed(Object key) {
         if (disposed || !activeProducers.remove(key)) return;
-        InFlight flight = inFlight.get(key);
-        boolean stillRunning = flight != null && flight.passed;
-        Duration ran = flight == null ? Duration.ZERO : Duration.ofNanos(flight.elapsed.getAsLong());
         cancel(key);
-        // Only a running card is rewritten. One that already finished keeps what it said - a pane
-        // closed after a successful build must still say the build succeeded.
-        if (stillRunning) deck.orphan(new BuddyNoticeId(SOURCE, key) , "Stopped after " + humanize(ran));
-        else deck.orphan(new BuddyNoticeId(SOURCE, key));
-        // Its pane is gone, so it can never be looked at and would sit in the column all session.
-        deck.acknowledge(new BuddyNoticeId(SOURCE, key));
+        Set<UUID> posted = outcomes.remove(key);
+        if (posted != null) for (UUID id : posted) center.expire(id);
     }
 
-    /** Drops any in-flight command for this key, releasing the typing animation if it had claimed it. */
+    /** Drops any in-flight command for this key: its card goes and it releases the typing animation if it held it. */
     private void cancel(Object key) {
         InFlight flight = inFlight.remove(key);
         if (flight == null) return;
         flight.cancel.run();
-        flight.cancel = () -> {}; flight.activate = () -> {}; flight.detail = () -> ""; flight.elapsed = () -> 0L;
-        if (flight.passed && running > 0 && --running == 0) onWorkingChanged.accept(false);
+        flight.cancel = () -> {};
+        flight.activate = () -> {};
+        flight.detail = () -> "";
+        if (!flight.passed) return;
+        deck.dismiss(new BuddyNoticeId(SOURCE, key));
+        if (running > 0 && --running == 0) onWorkingChanged.accept(false);
     }
 
-    /** Keep the full content; the tab and capsule renderers fit it to their own available width. */
+    /** One line; the card and notification renderers fit it to their width. A command showing nothing is "Command". */
     static String title(String command) {
-        return singleLine(command.strip());
+        String line = singleLine(command.strip());
+        return NotificationText.visible(line) ? line : "Command";
     }
 
     private static String singleLine(String title) {
@@ -181,15 +199,19 @@ public final class CommandNotifier implements AutoCloseable {
 
     @Override public void close() {
         if (disposed) return;
+        for (Object key : List.copyOf(inFlight.keySet())) cancel(key);
         disposed = true;
-        for (Object key : java.util.List.copyOf(inFlight.keySet())) cancel(key);
         activeProducers.clear();
-        threshold = () -> Duration.ZERO; deck = null;
-        operatingSystem = (title, detail) -> {}; onWorkingChanged = value -> {};
+        outcomes.clear();
+        threshold = () -> Duration.ZERO;
+        deck = null;
+        center = null;
+        operatingSystem = (title, detail) -> {};
+        onWorkingChanged = value -> {};
         schedule = (delay, action) -> () -> {};
     }
 
-    /** "45s", "1m 12s", "2m", "2h 5m" — the way a person would say it, not ISO-8601. */
+    /** "45s", "1m 12s", "2m", "2h 5m": the way a person would say it, not ISO-8601. */
     static String humanize(Duration ran) {
         long seconds = Math.max(0, ran.toSeconds());
         if (seconds < 60) return seconds + "s";

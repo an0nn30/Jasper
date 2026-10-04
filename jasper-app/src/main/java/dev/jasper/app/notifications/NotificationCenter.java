@@ -69,6 +69,12 @@ public final class NotificationCenter {
 
     public Clock clock() { return clock; }
 
+    /** Whether Jasper is focused, in the background, or has no window open, as delivery sees it now. */
+    public Delivery.Presence presence() {
+        requireEdt();
+        return presence.get();
+    }
+
     /** Declares a group, or returns the one already declared under its id. */
     public NotificationGroup register(NotificationGroup group) {
         requireEdt();
