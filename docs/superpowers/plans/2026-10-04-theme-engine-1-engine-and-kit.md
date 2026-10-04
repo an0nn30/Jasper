@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-10-04-jasper-theme-engine-design.md).
 **Shared contracts:** [Exact paths, types, signatures, defaults and test conventions](2026-10-04-theme-engine-contracts.md).
-**Status:** Execution approved on 2026-10-04; in progress. Baseline: 8,743 tests, zero failures/errors, six skipped. Sequencing adjustments: Tasks 4–5 and 11–12 are each integrated implementation/review units because their initial APIs are mutually dependent; Task 14 supplies the single final whole-branch review. Task 1 pulls forward base ThemeToml into themeio to retain real resolver fixtures; Task 2 adds canonical semantics and serialization. GlassLevels retains its independent value/validation API; the app-specific GlassSettings resolve overload stays in the existing app pending Plan 2 adapter translation. Task 2 retains unknown top-level string metadata (other unknown types remain invalid), extracts color-only UiTemplate/UiColorKeys helpers, filters authored geometry from generated UI data, and reuses the bounded document deep snapshot for generated nested data. Task 2 verification: 40 module tests, zero failures/errors/skips; verifyUiArchitecture passed. Task 3 implementation and self-review complete (independent review pending): 60 import tests / 104 module tests, zero failures/errors/skips; verifyUiArchitecture passed, including a temporary negative vendor probe. Task 3 additionally extracts data-only FlatLafThemeData/WorkspaceTokenKeys into themeimport, provides exact module-owned ImportPalettes and NativeThemeParents with byte-identical native parent inputs, exposes the pure chrome-alias map through UiColorKeys, and admits named ColorPalette definitions and the existing Jasper.headerHighlight color. App publication/migration/locking stay untouched pending Plan 2. The gate now enforces JDK-only theme/model vendor boundaries and Swing-free themeimport. Task 3 review fix rejects true/false literals in shared color positions while preserving boolean conditions and named-color resolution; 79 focused import/generator tests and architecture pass after RED.
+**Status:** Execution approved on 2026-10-04; in progress. Baseline: 8,743 tests, zero failures/errors, six skipped. Sequencing adjustments: Tasks 4–5 and 11–12 are each integrated implementation/review units because their initial APIs are mutually dependent; Task 14 supplies the single final whole-branch review. Task 1 pulls forward base ThemeToml into themeio to retain real resolver fixtures; Task 2 adds canonical semantics and serialization. GlassLevels retains its independent value/validation API; the app-specific GlassSettings resolve overload stays in the existing app pending Plan 2 adapter translation. Task 2 retains unknown top-level string metadata (other unknown types remain invalid), extracts color-only UiTemplate/UiColorKeys helpers, filters authored geometry from generated UI data, and reuses the bounded document deep snapshot for generated nested data. Task 2 verification: 40 module tests, zero failures/errors/skips; verifyUiArchitecture passed. Task 3 implementation and self-review complete (independent review pending): 60 import tests / 104 module tests, zero failures/errors/skips; verifyUiArchitecture passed, including a temporary negative vendor probe. Task 3 additionally extracts data-only FlatLafThemeData/WorkspaceTokenKeys into themeimport, provides exact module-owned ImportPalettes and NativeThemeParents with byte-identical native parent inputs, exposes the pure chrome-alias map through UiColorKeys, and admits named ColorPalette definitions and the existing Jasper.headerHighlight color. App publication/migration/locking stay untouched pending Plan 2. The gate now enforces JDK-only theme/model vendor boundaries and Swing-free themeimport. Task 3 review fix rejects true/false literals in shared color positions while preserving boolean conditions and named-color resolution; 79 focused import/generator tests and architecture pass after RED. Task 4–5 integrated implementation and self-review complete (joint independent review pending): 22 focused tests pass at default/2x scale; :jasper-ui:check and verifyUiArchitecture pass with 129 tests, zero failures/errors/skips. Approved API rulings expose the existing data-only FlatLafThemeData adapter to swing and scope data-item ids to their owning control; fixed metric/typography/motion/icon accessors are recorded in the shared contracts. Original monochrome paths cover all 29 source icon names. No fake renderer fixtures were added.
 
 ## Global Constraints
 
@@ -112,21 +112,27 @@ permanent copies of a generator. Keep old app behavior until its explicit migrat
 
 ## Task 4 — Fixed metrics, typography and transactional appearance binding
 
+Execution: integrated with Task 5 as approved. Implementation and self-review complete; joint independent
+review pending. Combined RED/GREEN commands exercised both tasks together. Fixed metrics, role fonts,
+EDT bindings, real FlatLaf installation and two-layer rollback are implemented; publication failure and
+2x font scaling regressions were reproduced and fixed. Test fixtures provide supported appearances/context;
+form/panel/render fixtures remain with the subsequent real renderer tasks.
+
 **Files:** Create `UI/metrics/{DesignMetrics,Typography,MotionPolicy}.java`, `UI/theme/{ThemePair,ThemeRoute,ThemeBinding}.java`, `UI/swing/{KitContext,FlatLafInstaller,AppearanceTransaction}.java`; tests `UT/metrics/DesignMetricsTest.java`, `UT/swing/AppearanceTransactionTest.java`, `UT/testsupport/{Edt,KitFixtures}.java`.
 **Interfaces:** Use shared defaults and signatures. `AppearanceTransaction(ThemeBinding,Consumer<GeneratedTheme> install,Consumer<GeneratedTheme> restore)`; `apply(ThemePair): void`. Consumer callbacks are real production installer and injected failure test hooks, not a new service interface.
 
-- [ ] Write tests asserting default fields 28, hero fields 32, label 96, gap 12, radii 6/9/12, focus 3; assert 18pt font settings enlarge content bounds without clipping. Add transaction tests where installation changes UIManager then throws: old LAF, fonts, semantic defaults and published pair are restored and subscribers receive no success event.
-- [ ] Run `./gradlew :jasper-ui:test --tests '*DesignMetricsTest' --tests '*AppearanceTransactionTest'`; confirm missing metrics/binding or rollback failures.
-- [ ] Implement role-based metric access and font resolution, same-variant publication and listener containment. Capture/restorable global state before install; publish only after success. Replaying subscribers receive a complete pair; close removes them. `animationsEnabled` comes from the context's supplier and can settle effects already running.
-- [ ] Implement `Edt.run` and deterministic fixtures from the appendix. Tests must restore the previous global LAF in finally. Run the focused command with default scale and `-Dflatlaf.uiScale=2`; ensure the Gradle test task forwards that property explicitly.
-- [ ] Review then commit `Centralize metrics typography and atomic appearance installation`.
+- [x] Write tests asserting default fields 28, hero fields 32, label 96, gap 12, radii 6/9/12, focus 3; assert 18pt font settings enlarge content bounds without clipping. Add transaction tests where installation changes UIManager then throws: old LAF, fonts, semantic defaults and published pair are restored and subscribers receive no success event.
+- [x] Run `./gradlew :jasper-ui:test --tests '*DesignMetricsTest' --tests '*AppearanceTransactionTest'`; confirm missing metrics/binding or rollback failures.
+- [x] Implement role-based metric access and font resolution, same-variant publication and listener containment. Capture/restorable global state before install; publish only after success. Replaying subscribers receive a complete pair; close removes them. `animationsEnabled` comes from the context's supplier and can settle effects already running.
+- [x] Implement `Edt.run` and deterministic fixtures from the appendix. Tests must restore the previous global LAF in finally. Run the focused command with default scale and `-Dflatlaf.uiScale=2`; ensure the Gradle test task forwards that property explicitly.
+- [x] Review then commit `Centralize metrics typography and atomic appearance installation`.
 
 ## Task 5 — Named icons and immutable view descriptors
 
 **Files:** Create `UI/icons/{IconRegistry,IconArtwork,IconRegistration}.java`, `UI/model/{Nodes,ControlState,Option,MenuItem,ListItem,Column,TableRow,TreeItem,ViewSpec,UiEvent}.java`; tests `UT/model/ViewSpecTest.java`, `UT/icons/IconRegistryTest.java`.
 **Interfaces:** Produce the full record/enum vocabulary in the appendix. The registry signature is `icon(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize): javax.swing.Icon`.
 
-- [ ] Write duplicate-id/invalid-reference, immutable-list, blank-label and invalid-strength tests, plus icon tint and selected-tile tests. Include all source named icons in registry enumeration. Add a secret descriptor regression:
+- [x] Write duplicate-id/invalid-reference, immutable-list, blank-label and invalid-strength tests, plus icon tint and selected-tile tests. Include all source named icons in registry enumeration. Add a secret descriptor regression:
   ```java
   @Test void secretsHaveNoValueProperty() {
       assertThat(java.util.Arrays.stream(Nodes.Secret.class.getRecordComponents())
@@ -134,9 +140,9 @@ permanent copies of a generator. Keep old app behavior until its explicit migrat
           .doesNotContain("value", "password", "text");
   }
   ```
-- [ ] Run `./gradlew :jasper-ui:test --tests '*ViewSpecTest' --tests '*IconRegistryTest'`; observe red.
-- [ ] Implement immutable validating records and typed enums. Central artwork uses existing suitable outline assets or new vector paths, not raster-generated UI assets; strip authored colors from kit icons. Registration validates namespaced ids and monochrome size/stroke metadata; close removes plugin registrations. Keep licensing/attribution with reused artwork.
-- [ ] Test all names render at caption/control/rail/hero sizes in light, dark and selected states. Run focused tests plus `verifyUiArchitecture`; review then commit `Define typed view vocabulary and theme-tinted icon registry`.
+- [x] Run `./gradlew :jasper-ui:test --tests '*ViewSpecTest' --tests '*IconRegistryTest'`; observe red.
+- [x] Implement immutable validating records and typed enums. Central artwork uses existing suitable outline assets or new vector paths, not raster-generated UI assets; strip authored colors from kit icons. Registration validates namespaced ids and monochrome size/stroke metadata; close removes plugin registrations. Keep licensing/attribution with reused artwork.
+- [x] Test all names render at caption/control/rail/hero sizes in light, dark and selected states. Run focused tests plus `verifyUiArchitecture`; review then commit `Define typed view vocabulary and theme-tinted icon registry`.
 
 ## Task 6 — View reconciliation, basic controls and lifecycle
 

@@ -52,6 +52,18 @@
   values are discarded in scalar/platform/nested color positions, while boolean conditions and
   resolved named-color references survive. Static color golden corrected; **79 focused import/generator
   tests, 0 failures/errors/skips**, and architecture passed after observed regression failures.
+  Tasks 4–5 integrated implementation and self-review complete (joint independent review pending):
+  fixed logical metrics, user font role resolution, EDT appearance pairs/bindings, real FlatLaf install
+  and two-layer global rollback, all typed immutable descriptors/events, and 29 original monochrome
+  named icons with scoped registrations. Same-variant updates and listener containment are covered.
+  Self-review reproduced/fixed double consumption of the FlatLaf 2x font and publication failure leaving
+  a partially installed LAF. Restore-hook failures still restore exact fonts/semantic defaults; strict SVG
+  validation rejects malformed separators while accepting compact arc flags. Approved rulings add the
+  narrow swing → public data-only FlatLafThemeData adapter edge and make data-item ids local to each
+  owning control while node ids remain global. Concrete role/font/motion/tile accessors are documented
+  in the shared contracts; form/panel/render test fixtures arrive with the real renderer tasks.
+  Headless focused tests: **22 at default and 2x scale**, zero failures/errors/skips; module check and
+  architecture: **129 tests, 0 failures/errors/skips**. Source hygiene and diff checks are clean.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

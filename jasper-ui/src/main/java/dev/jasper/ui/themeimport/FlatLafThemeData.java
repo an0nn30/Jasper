@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /** Data-only FlatLaf adapter shared by native runtime themes and legacy conversion. */
-final class FlatLafThemeData {
+public final class FlatLafThemeData {
     private static final Pattern HEX = Pattern.compile("#?([0-9a-fA-F]{6}|[0-9a-fA-F]{8})|#[0-9a-fA-F]{3}");
     private FlatLafThemeData() {}
 

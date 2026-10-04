@@ -28,3 +28,11 @@ Use Java 25 on JetBrains Runtime and the repository wrapper:
 Checks are headless. The bytecode architecture gate rejects other Jasper modules,
 Swing dependencies in pure packages and package cycles. It requires only UI classes,
 so it introduces no circular dependency on application checks.
+
+The kit foundation now provides immutable `Nodes`/`ViewSpec`/`UiEvent` values, fixed logical
+`DesignMetrics`, centrally resolved `Typography`, and monochrome `IconRegistry` artwork.
+`ThemeBinding` publishes complete chrome/workspace pairs on EDT; subscriptions replay and
+close independently. `AppearanceTransaction` installs real FlatLaf global defaults before
+publication and restores the old LAF, LAF defaults and developer overrides on failure.
+`KitContext` selects each view's theme route and supplies host-owned values. Renderer and
+form/panel fixtures are supplied in subsequent implementation tasks.

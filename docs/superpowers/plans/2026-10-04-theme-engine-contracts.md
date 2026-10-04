@@ -21,7 +21,8 @@ An entry `UI/model/Nodes.java` therefore names one exact file, not an unspecifie
 `themeio` depends on `theme` and TOML parsing; `themeimport` depends on those two and parser libraries.
 `model` contains JDK-only view descriptors and events; it does not depend on Swing or theme internals.
 `metrics` depends on theme values where required for typography; `icons` depends on theme/metrics/model.
-`swing` depends on model/theme/metrics/icons and owns all FlatLaf delegates and kit rendering.
+`swing` depends on model/theme/metrics/icons and the public data-only `themeimport.FlatLafThemeData`
+adapter for real FlatLaf installation, and owns all FlatLaf delegates and kit rendering.
 Keep renderer implementations in `swing` until an actual acyclic subdivision is justified; do not
 create mutually dependent `components`, `forms`, `panels` and `rendering` packages.
 `gallery` is test code only. Each production package gets a package-info dependency/lifetime contract.
@@ -118,11 +119,39 @@ and do not prevent later listeners. Publication and teardown are idempotent wher
 IconRegistry, BooleanSupplier animationsEnabled)` supplies rendering context.
 The app owns transaction/rollback around `FlatLafInstaller.install(GeneratedTheme): void`.
 
+Tasks 4–5 concrete API choices (approved execution rulings): `DesignMetrics.DEFAULT` and
+`value(DesignMetrics.Role)` expose fixed logical geometry. `contentHeight(Role,Font,FontRenderContext)`
+fits real font line metrics plus named vertical padding without changing catalog values.
+`Typography` owns its own identically named `Role` enum, keeping metrics independent of model;
+`Typography(String family,float bodySize)` resolves roles proportionally to a 13-point body base.
+`font(Role,boolean selected)` applies medium selected-label weight. `KitContext` exposes the supplied
+values through named accessors, `theme()` selects its route, and `typography()` uses the unscaled
+host `UIManager` `defaultFont` override (otherwise central platform defaults), never FlatLaf's already
+scaled font. Renderer code applies Swing user scaling exactly once. `motionPolicy()` creates a
+view-owned `MotionPolicy` backed by the context supplier; effects `register(Runnable settle)` and
+poll `enabled()` each frame/appearance refresh so disabled motion settles running effects once.
+
+`ThemeBinding(ThemePair,Consumer<Throwable>)` confines every operation and subscription close to EDT,
+suppresses equal pairs, rejects reentrant publication, contains listener/error-handler exceptions,
+and uses independent subscription identities. `AppearanceTransaction` snapshots raw LAF and developer
+defaults separately (merged `entrySet` must not be used), invokes restore hooks on failure, and restores
+the exact previous LAF and both layers even if a restore hook throws. Success publishes only after install.
+
+`IconArtwork(String pathData)` uses kit-owned 16-grid/1.5 stroke; the metadata constructor rejects
+other grids and stroke outside 1.4–1.6. Paths are fully validated before the tolerant SVG parser is used,
+with no markup, resources or colors and bounded size/commands/geometry. `IconRegistry.names()` returns
+an immutable name snapshot; `register` returns idempotent `IconRegistration` (an `AutoCloseable`).
+The required hue-based `icon` method is joined by an explicit `SemanticColor` tint overload, `size(IconSize)`,
+and `tile(name,palette,hue,logicalSize,selected)` for shared 16% category/18% selected tile treatment.
+Built-in paths are original Jasper artwork. JSVG 2.0.0 (already FlatLaf Extras' runtime dependency) is
+explicitly declared for its vector path parser; no vendor types appear in public signatures.
+
 ## Declarative view contract
 
 Use the following small value vocabulary in `UI/model/Nodes.java`. Each record has `String id` and
 `ControlState state` first, followed by the fields listed below. Collections are immutable copies;
-ids are nonblank and unique within a view. Do not use an untyped property map or arbitrary pixel grid.
+node ids are nonblank and unique within a view. Option/item/row/column/tree data ids are
+unique within their owning control; references resolve only in that control. Do not use an untyped property map or arbitrary pixel grid.
 `Node` is sealed; the records below implement it. `ControlState` is a record of `boolean visible`,
 `boolean enabled`, `boolean busy`, and `String error`, with constant `READY`.
 
