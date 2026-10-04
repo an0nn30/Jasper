@@ -111,19 +111,31 @@ static void JasperThrow(JNIEnv *env, const char *message) {
     if (failure) (*env)->ThrowNew(env, failure, message);
 }
 
+// A library that cannot bind its click callback must not load: banners would post and every click would be
+// dropped without a trace. JNI_ERR makes System.load throw UnsatisfiedLinkError, which Java already tolerates.
+static void JasperUnbind(JNIEnv *env) {
+    if (JasperBridge) (*env)->DeleteGlobalRef(env, JasperBridge);
+    JasperBridge = NULL;
+    JasperClicked = NULL;
+}
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
-    JasperVM = vm;
     JNIEnv *env = NULL;
-    if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_8) != JNI_OK) return JNI_VERSION_1_8;
+    if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_8) != JNI_OK) return JNI_ERR;
     jclass bridge = (*env)->FindClass(env, "dev/jasper/app/platform/MacNotifications");
     if (!bridge) {
         (*env)->ExceptionClear(env);
-        return JNI_VERSION_1_8;
+        return JNI_ERR;
     }
     JasperBridge = (*env)->NewGlobalRef(env, bridge);
     JasperClicked = (*env)->GetStaticMethodID(env, bridge, "clicked", "(Ljava/lang/String;)V");
-    if (!JasperClicked) (*env)->ExceptionClear(env);
     (*env)->DeleteLocalRef(env, bridge);
+    if (!JasperBridge || !JasperClicked) {
+        (*env)->ExceptionClear(env);
+        JasperUnbind(env);
+        return JNI_ERR;
+    }
+    JasperVM = vm;
     return JNI_VERSION_1_8;
 }
 
