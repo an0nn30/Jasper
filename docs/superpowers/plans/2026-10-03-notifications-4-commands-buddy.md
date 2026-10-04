@@ -8,8 +8,19 @@ pushed) and is merged in at `81f71fe2`. Deviations from the plan text: Task 3, t
 `PluginRuntime.forward` block had a period glued to it and so never closed (fixed here; no code change); Task 4, the three
 `BuddyTestSupport` lines Step 4 removes are not adjacent in the file, so each was deleted on its own; Task 5, main was
 merged before the full check so the counts cover the tree that will land, and STATUS's plan 3 heading says "merged to
-`main` (`3c64ea5c`) and pushed" rather than "merged to local `main`". Final review: pending. `./gradlew check
---continue`: **8,337 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
+`main` (`3c64ea5c`) and pushed" rather than "merged to local `main`". Final review (Opus, one pass): three important findings fixed — only the pane a coalesced command
+outcome last came from expires it (`b35fc8db`, `aRepeatFromAnotherPaneIsEndedOnlyByThePaneItLastCameFrom`); an expired
+entry keeps its text, labels and target but drops its poster's callbacks, which held closed panes, their windows and
+stopped plugins (`28810afb`, `anExpiredEntryKeepsItsLabelsButLetsGoOfItsPostersCallbacks`); clicking a running Buddy
+capsule keeps the column (`be5a344d`, `clickingABubbleRunsItsActionAndKeepsTheColumn`). One is left for the user: a
+command that finishes while Jasper is in the background has no click route to its pane until plan 5, since interpretation
+2's "body disabled" assumed a history-row body action the spec never gave (section 4); the guides now say a history row
+has no click of its own. Deferred minor findings: the app and SDK `NotificationAction` docs still say an expiring action
+expires "afterwards", and the testkit's `FakeNotifications.runAction` still expires after running;
+`Notification.repeated(Instant)` is used only by a test; `CommandNotifier.titleChanged` accepts a title of only invisible characters;
+a pane's posted outcome ids grow while it stays open; no test withdraws a waiting card; STATUS said "reviewed" before
+the review ran; the "Posting a notification" recipe does not mention that a repeat replaces actions and target.
+`./gradlew check --continue`: **8,339 tests, 0 failures, 0 errors, 6 skipped**. No GUI launched.
 
 **Goal:** Finished long commands become notifications in "Long-running commands", and Buddy keeps only live work:
 running commands and activities, input requests and connections.

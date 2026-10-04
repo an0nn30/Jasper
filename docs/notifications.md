@@ -56,10 +56,11 @@ and **Open config.toml**. It goes away by itself once every problem is fixed.
 
 A command that ran at least `notifications.long_command_seconds` (10 seconds by default) and finished anywhere but the
 pane you were typing in is posted in Long-running commands: the command, and "Finished in 2m 03s" or "Exited 1 · 2m
-03s". Its card shows in the pane's window, and clicking it focuses the pane; closing the pane expires it. The same
-command finishing the same way within a minute counts on one entry, which then points at the pane it last came from.
-While a command runs, Buddy (when it is on) shows it above his head; Buddy keeps only work that is still going. See
-[configuration](configuration.md#finished-command-notifications).
+03s". Its card shows in the pane's window, and clicking the card focuses the pane (a history row has no click of its
+own, so a command that finished while Jasper was in the background is found by its tab); closing the pane expires it.
+The same command finishing the same way within a minute counts on one entry, which then points at the pane it last
+came from. While a command runs, Buddy (when it is on) shows it above his head; Buddy keeps only work that is still
+going. See [configuration](configuration.md#finished-command-notifications).
 
 ## Plugin notifications
 

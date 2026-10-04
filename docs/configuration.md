@@ -247,8 +247,8 @@ When a command that ran at least `long_command_seconds` finishes anywhere except
 typing in (a visible but unfocused split pane included), Jasper posts a notification in **Long-running
 commands**: the command as its title, and "Finished in 2m 03s" or "Exited 1 · 2m 03s" below it. While
 Jasper is focused it shows as a card in the pane's window; otherwise it waits, unread, in the
-Notifications panel. Clicking it focuses the pane, and closing the pane expires it. See
-[Notifications](notifications.md#long-running-commands).
+Notifications panel. Clicking the card focuses the pane (a row in the panel has no click of its own),
+and closing the pane expires the notification. See [Notifications](notifications.md#long-running-commands).
 
 While a command runs, a **capsule above the buddy's head** shows it, and he sits down and types. The
 capsule appears **the moment you look away** — switching tab, switching window, or sending Jasper to

@@ -11,11 +11,19 @@
   overloads are gone; `CommandNotifier` and `ActivityNotifier` dismiss a card when its work ends. A coalesced repeat
   now carries the newest post's actions, default action and target, and its card moves to that window; an expiring
   action expires its entry before it runs. The macOS banner for long commands stays, background only, until plan 5.
-  Spec interpretations: see the plan's list (1 to 12). `./gradlew check --continue`: **8,337 tests, 0 failures, 0
-  errors, 6 skipped** (on the branch with main `43894416` merged in). No GUI launched. GUI checks for the user: a long
-  command finishing in another tab shows a card in its window and a click focuses the pane; with
-  Buddy on, the capsule shows while it runs and goes when it ends; the drawer lists only running work; in the packaged
-  app with Jasper in the background, the macOS banner still arrives and the notification waits unread.
+  Spec interpretations: see the plan's list (1 to 12). Final review (Opus): three important findings fixed —
+  closing the older of two panes whose identical outcomes coalesced expired the newer pane's entry (`b35fc8db`); an
+  expired entry kept its poster's callbacks, and with them a closed pane, its buffers and its window (`28810afb`;
+  expiry now keeps text, labels and target only, which also releases a stopped plugin); clicking a running capsule hid
+  the whole column until the deck next changed (`be5a344d`). A fourth is a decision for the user: a command that
+  finishes while Jasper is in the background has no click route to its pane until plan 5 (a history row has no click
+  of its own; options: a "Show pane" action, a clickable history row, or wait for plan 5's clickable OS notification).
+  Seven minor findings are deferred in the plan's status banner. `./gradlew check --continue`: **8,339 tests, 0
+  failures, 0 errors, 6 skipped** (on the branch with main `43894416` merged in). No GUI launched. GUI checks for the
+  user: a long command finishing in another tab shows a card in its window and a click focuses the pane; with Buddy
+  on, the capsule shows while it runs and goes when it ends, and clicking it focuses the pane and keeps the column; the
+  drawer lists only running work; in the packaged app with Jasper in the background, the macOS banner still arrives
+  and the notification waits unread.
 - **Notifications plan 3: SDK notifications, merged to `main` (`3c64ea5c`) and pushed; awaiting the user's GUI
   checks** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
   [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
