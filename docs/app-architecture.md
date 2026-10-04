@@ -91,7 +91,8 @@ Jasper from the Dock while no window is open and brings it back before the next 
 is composed, through the injected `DockControl` (`platform.MacDock`). `quit()` asks the
 plugin quit guards and then closes all owners. It is reached by Quit Jasper Completely in
 the menu bar item and Quit Jasper in the Windows notification-area icon
-(`platform.ResidentTray`), the Plugin Manager's Quit Jasper button (shown when a restart
+(`platform.ResidentTray`, whose Windows icon also carries the system notifications'
+balloons), the Plugin Manager's Quit Jasper button (shown when a restart
 cannot be planned), a plugin window's File › Quit, a retire request from another
 launch, and macOS logging out, restarting or shutting down; a restart asks the same
 guards and then quits through `quitNow()`. Any Quit before start-up has settled, and any
@@ -167,7 +168,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, plus terminal and activity notice production for Buddy. Application owns the center and the incidents and closes notifiers before companion. |
 | `notificationui` | EDT Swing views of the center: each window's CardLayer, the history panel, the Errors window's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors window closes its view when it closes. |
 | `residency` | Bounded interprocess protocol and endpoint workers. Bootstrap transfers endpoint close to application shutdown and process-hook backup. |
-| `platform` | OS adapters, icons, fonts, title-bar paint and logging. Callers own registrations and native handles; Swing operations run on EDT and logging has its own worker. |
+| `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, and logging and system notifications each have their own worker. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |

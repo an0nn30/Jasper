@@ -37,6 +37,10 @@ enabled = false
 # Live. Notify when a command that ran at least this long finishes in a pane you are not looking at.
 # Needs shell integration: the duration comes from its command marks. Zero disables. Range 0-3600.
 long_command_seconds = 10
+# Live. While Jasper is in the background, or idle as a resident Jasper with every window closed, also
+# show its notifications as the operating system's own: banners from the packaged macOS app, Windows tray
+# balloons, or notify-send on Linux.
+system = true
 
 [system]
 # Keep Jasper running with no windows so a new window opens instantly, and start it in the background at login.

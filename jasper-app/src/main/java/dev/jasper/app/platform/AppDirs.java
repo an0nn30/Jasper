@@ -22,6 +22,11 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return root.resolve("buddy.toml");
     }
 
+    /** Jasper's icon as a PNG file, written for Linux's {@code notify-send}. */
+    public Path notificationIcon() {
+        return root.resolve("notification-icon.png");
+    }
+
     public Path shellIntegration() {
         return root.resolve("shell-integration");
     }

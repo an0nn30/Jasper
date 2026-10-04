@@ -94,4 +94,9 @@ class AppDirsTest {
         assertThat(relative.root()).as("a relative override resolves from the working directory").isAbsolute()
             .isEqualTo(Path.of("build/dev-home").toAbsolutePath().normalize());
     }
+
+    @Test void theNotificationIconLivesInTheRoot() {
+        AppDirs dirs = AppDirs.resolve("Linux", Map.of(), home);
+        assertThat(dirs.notificationIcon()).isEqualTo(dirs.root().resolve("notification-icon.png"));
+    }
 }

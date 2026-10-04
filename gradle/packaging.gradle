@@ -458,9 +458,10 @@ def verifyPackage = tasks.register('verifyPackage') {
             // (notifications and the Dock presence) and the workspace glass blur.
             String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
             [
-                [label: 'native', name: 'libjasper-macos.dylib', symbols: ['Java_dev_jasper_app_platform_MacNotifications_post',
-                    'Java_dev_jasper_app_platform_MacDock_setRegular', 'Java_dev_jasper_app_platform_MacDock_watchPowerOff',
-                    'Java_dev_jasper_app_platform_MacDock_poweringOffNow']],
+                [label: 'native', name: 'libjasper-macos.dylib', symbols: ['Java_dev_jasper_app_platform_MacNotifications_bind',
+                    'Java_dev_jasper_app_platform_MacNotifications_post', 'Java_dev_jasper_app_platform_MacNotifications_remove',
+                    'Java_dev_jasper_app_platform_MacNotifications_removeAll', 'Java_dev_jasper_app_platform_MacDock_setRegular',
+                    'Java_dev_jasper_app_platform_MacDock_watchPowerOff', 'Java_dev_jasper_app_platform_MacDock_poweringOffNow']],
                 [label: 'glass', name: 'libjasper-glass.dylib', symbols: ['Java_dev_jasper_app_platform_MacGlass_setEffect']],
             ].each { Map bridge ->
                 File library = new File(appDir, bridge.name as String)

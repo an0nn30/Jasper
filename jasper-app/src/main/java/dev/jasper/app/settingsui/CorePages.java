@@ -96,6 +96,7 @@ public final class CorePages {
                 .row(WINDOW_COLUMNS, Editors.integer("columns"))
                 .row(WINDOW_LINES, Editors.integer("lines")),
             SchemaPage.page("notifications", "Notifications").parent("appearance-behavior").anchor("finished-command-notifications")
+                .row(NOTIFICATIONS_SYSTEM)
                 .row(NOTIFICATIONS_LONG_COMMAND_SECONDS, Editors.integer("s")).note("0 turns these notifications off."),
             SchemaPage.page("command-palette", "Command Palette").parent("appearance-behavior").anchor("palette")
                 .row(PALETTE_VISIBLE_ROWS, Editors.integer("")),

@@ -41,7 +41,7 @@ class TerminalTitleIntegrationTest {
     }
 
     private record Fixture(WindowContent content, BuddyTestSupport deck, List<String> nativeTitles,
-                           List<String> notificationTitles, NotificationCenter center) { }
+                           NotificationCenter center) { }
 
     private Fixture open(String script) throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(
@@ -60,11 +60,10 @@ class TerminalTitleIntegrationTest {
         edt(() -> {
             WindowContent window = content(launcher);
             BuddyTestSupport deck = new BuddyTestSupport();
-            List<String> notificationTitles = new ArrayList<>();
-            // In the background, so the interim OS sink hears the outcome as well as the center.
+            // In the background, as when a command finishes out of sight.
             var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> Delivery.Presence.BACKGROUND);
             CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck.companion(), center,
-                (title, detail) -> notificationTitles.add(title), working -> {}, (delay, run) -> () -> {});
+                working -> {}, (delay, run) -> () -> {});
             window.activity(event -> {
             switch (event) {
                 case WorkspaceActivity.Started value -> notifier.started(value.id(), value.command(),
@@ -85,7 +84,7 @@ class TerminalTitleIntegrationTest {
             });
             List<String> titles = new ArrayList<>();
             window.onTitle = titles::add;
-            fixture[0] = new Fixture(window, deck, titles, notificationTitles, center);
+            fixture[0] = new Fixture(window, deck, titles, center);
         });
         pending.remove().run();
         until(() -> fixture[0].content.currentPane().view() != null);
@@ -177,7 +176,6 @@ class TerminalTitleIntegrationTest {
         edt(() -> {
             assertThat(f.center.history()).singleElement()
                 .satisfies(entry -> assertThat(entry.request().title()).isEqualTo("sleep 12"));
-            assertThat(f.notificationTitles).containsExactly("sleep 12");
             assertThat(f.deck.notices()).as("Buddy keeps live work only").isEmpty();
             assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory");
         });

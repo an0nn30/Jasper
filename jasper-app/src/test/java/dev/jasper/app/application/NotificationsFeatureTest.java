@@ -192,4 +192,16 @@ class NotificationsFeatureTest {
             assertThat(entry.request().severity()).isEqualTo(Severity.ERROR);
         });
     }
+
+    @Test void showHistoryShowsThePanelInAnAttachedWindowOnly() {
+        var feature = new NotificationsFeature(center, contributions);
+        var requests = new ArrayList<Contributions.PanelRequest>();
+        contributions.onPanelRequest(requests::add);
+        var window = window();
+        feature.attach(window);
+        feature.showHistory(window.id());
+        feature.showHistory(UUID.randomUUID());
+        assertThat(requests).containsExactly(
+            new Contributions.PanelRequest(window.id(), NotificationsFeature.PANEL_ID, Contributions.PanelRequest.Op.SHOW));
+    }
 }

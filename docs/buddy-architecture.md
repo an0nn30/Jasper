@@ -107,7 +107,8 @@ See [sprite maintenance](../packaging/buddy/README.md) for the generated master 
 [Jasper's BuddyIntegration](../jasper-app/src/main/java/dev/jasper/app/application/BuddyIntegration.java)
 applies app visibility and appearance, converts saved position into options and owns the
 typing-activity listener. [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java)
-owns producer identities, thresholds, command completion and native notifications.
+owns producer identities, thresholds and command completion. A long command's outcome reaches the operating system
+through the notification center's delivery and `application.SystemNotices`, not through CommandNotifier.
 Workspace events are translated by application wiring; Buddy imports none of those owners.
 
 [Maintenance recipes](buddy-maintenance.md) name the focused tests for each owner.

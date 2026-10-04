@@ -8,6 +8,51 @@
   reproduced the SSH title consuming 390 pixels before correction and now covers short, SSH and long titles,
   including shrinking back to the starting size. Full `./gradlew check --continue` passed: **8,682 tests,
   0 failures, 0 errors, 6 skipped**. Headless previews refreshed; no native GUI launched.
+  Integrated remote main's OS notification work (`0734c5c5`); only status notes conflicted, and both entries
+  were retained. Final combined `./gradlew check --continue`: **8,743 tests, 0 failures, 0 errors, 6 skipped**.
+  Changed-source hygiene and whitespace checks passed.
+
+- **Notifications plan 5: OS notifiers, reviewed on branch `claude/notifications-5`; awaiting the user's GUI checks and
+  merge decision** (2026-10-04; plan `docs/superpowers/plans/2026-10-03-notifications-5-os-notifiers.md`,
+  [guide](notifications.md#system-notifications)): while Jasper is in the background, or idle as a resident Jasper with
+  every window closed, card and sticky notifications are also the operating system's own (`Change.SystemRequested`,
+  `application.SystemNotices`, `platform.SystemNotifier`):
+  - macOS banners keyed by the notification's id, withdrawn when read, with clicks back through a cached `JavaVM`;
+  - Windows balloons from one `ResidentTray` icon shared with residency;
+  - Linux `notify-send` with `--action` when supported, at most 8 waiting.
+
+  A click raises the notification's window and runs its default action, or opens the Errors window for an incident,
+  or shows the Notifications panel. An incident's notification names its incident (title only to the operating
+  system; two incidents never coalesce). `notifications.system` (default `true`, live) is on Settings ›
+  Notifications. With no window yet (`NO_WINDOW`: a start before its first window, a window opening, a login launch
+  before start-up has settled) nothing is sent, and nothing once Jasper quits. `CommandNotifier`'s interim sink and
+  `NativeNotifier` are gone. Spec interpretations: see the plan's list (1 to 18); plan 4's open decision is answered
+  with option (c). Before the merge with main, `./gradlew check --continue`: **8,497 tests, 0 failures, 0 errors, 6
+  skipped**. Final review (Opus): no critical findings; five re-graded important and fixed — start-up plugin failures
+  sent banners at a login start, banners sent while quitting (none once Jasper is quitting), a then-dead
+  `NotificationCenter.presence()` removed, and documentation statements corrected (title-only for a plugin's
+  notification with a cause, the resident icon's click, the Windows "most recent notification", replace-by-id only on
+  macOS) with the manual recipe's icon and denial checks restored. No GUI launched.
+
+  Merged with main e11961c8 and again with main 086f3437: presence follows main's IDLE/NO_WINDOW model (the user's
+  choice), with banners in BACKGROUND and IDLE; the notification bridge lives in main's single libjasper-macos bridge,
+  its click callback bound by an explicit bind() rather than JNI_OnLoad; `ResidentTray` owns the Windows icon for
+  residency and balloons alongside main's macOS menu bar item. Plan 5's `OPENING` and its `settled` flag are gone (main's `startupSettled`
+  gates `IDLE`, so a login launch's start-up failures send no banner); `NotificationCenter.presence()` is back, since
+  main's `JasperApplicationBackgroundTest` reads it; `verifyPackage` also checks the bridge's `bind`, `remove` and
+  `removeAll` natives. The second merge brings main's folder tabs, tab motion and `ui.animations.enabled`; plan 5 adds
+  no animation, and the core schema now has 40 settings. `./gradlew check --continue` after it: **8,742 tests, 0
+  failures, 0 errors, 6 skipped**; source hygiene and `git diff --check main` clean. No GUI launched.
+
+  GUI checks for the user:
+  - macOS (packaged app): a long command finishing with Jasper in the background shows a banner with Jasper's icon,
+    and a click focuses the pane; reading it in Jasper removes the banner; an internal error's banner shows only its
+    title, and a click opens the Errors window; after Cmd+Q (resident, no window) a plugin's failure shows a banner and
+    a click opens a window; the menu bar item is unchanged.
+  - Windows: a balloon from the tray icon, the icon gone once Jasper is focused, a click on the balloon focusing the
+    pane, and the resident icon carrying balloons with no window open.
+  - Linux (GNOME or KDE): a notification with Jasper's icon, and a click focusing the pane.
+  - `notifications.system = false` sends nothing.
 
 - **Wider folder tabs** (2026-10-04; user follow-up): doubled each tab's calculated width, including its
   bounds (now 160–480 logical pixels). Fonts, control sizes, tab height and motion timings are unchanged.
@@ -105,6 +150,7 @@
   User-run visual acceptance: first/middle selected tabs, dark/light and independent workspace themes, glass,
   overflow/long titles, plugin tabs, new-tab plus and native pointer/trackpad behavior. Headless renders do not
   establish native Metal/compositor performance.
+
 - **Merged `origin/main` (`a6d15621`) into `claude/startup-speed`** (2026-10-04; 21 commits past `857f3020`): view
   modes (Normal and Compact in `window.view_mode`, restart-only; Zen in `ui-state.toml`), the bundled theme shortlist
   (Jasper, Nord and Clear), the rounded connection overlay with its animated dots, and the View menu cleanup.
@@ -474,7 +520,6 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
   arranged windows closed in both orders, and with maximization/minimization and multiple displays. Native macOS
   fullscreen is distinct from AWT maximization and is not restored by this change. Terminal sessions/editor
   documents are not resurrected by this layout state.
-
 - **Notifications plan 4: long commands and Buddy, merged to local `main` 2026-10-03 (not pushed); awaiting the user's
   GUI checks and their call on a background finish's route to its pane** (plan `docs/superpowers/plans/2026-10-03-notifications-4-commands-buddy.md`,
   [guide](notifications.md#long-running-commands)): a command that ran past `notifications.long_command_seconds` and
@@ -2181,7 +2226,7 @@ s
   `packageDist` and strict package signature checks passed. Independent review found
   no actionable issues. Native icon/permission acceptance remains user-run; no GUI
   launched. Not merged or pushed.
-  See [maintenance and acceptance](app-maintenance.md#macos-notification-identity).
+  See [maintenance and acceptance](app-maintenance.md#system-notifications).
 - **Editable keyboard shortcuts** (branch `codex/shortcut-editor`, worktree
   `/Users/dustin/.codex/worktrees/shortcut-editor/moray`, 2026-09-27): approved bounded
   in-chat design, implemented inline with test-first coverage; no plan document.
