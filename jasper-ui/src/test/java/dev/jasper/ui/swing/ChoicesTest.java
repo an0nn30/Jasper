@@ -14,6 +14,34 @@ class ChoicesTest {
     static Choice choice(ChoiceKind kind, String selected, ControlState state) {
         return new Choice("choice", state, kind, List.of(new Option("a", "<html>Alpha", Optional.of(Hue.BLUE)), new Option("b", "Beta", Optional.empty())), selected, "Protocol", "choose-protocol");
     }
+    @Test void pickerUsesChoiceSurfaceWhileSecondaryButtonsRetainTheirIndependentColors() {
+        Edt.run(() -> {
+            var base = KitFixtures.dark();
+            var colors = new EnumMap<dev.jasper.ui.theme.SemanticColor, java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
+            for (var role : dev.jasper.ui.theme.SemanticColor.values()) colors.put(role, base.semantic().color(role));
+            colors.put(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL, new java.awt.Color(23, 87, 139));
+            colors.put(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER, new java.awt.Color(42, 121, 175));
+            colors.put(dev.jasper.ui.theme.SemanticColor.BUTTON_SECONDARY_BG, new java.awt.Color(193, 32, 68));
+            colors.put(dev.jasper.ui.theme.SemanticColor.BUTTON_SECONDARY_BG_HOVER, new java.awt.Color(228, 61, 102));
+            var theme = new dev.jasper.ui.theme.GeneratedTheme(base.name(), base.dark(), base.author(), base.tokens(), base.syntax(),
+                base.terminal(), base.uiKeys(), base.icons(), base.glass(), new dev.jasper.ui.theme.SemanticPalette(colors));
+            var context = KitFixtures.context(); context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme, theme));
+            var secondary = new Nodes.Button("secondary", ControlState.READY, "Browse", "", ButtonKind.SECONDARY, "browse", "");
+            try (var view = new KitView(context, stack(choice(ChoiceKind.DROPDOWN, "a", ControlState.READY), secondary), e -> {})) {
+                var dropdown = find(view, "choice.input", JComboBox.class); dropdown.setSize(240, 40); dropdown.doLayout();
+                assertThat(ButtonsTest.paint(dropdown).getRGB(120, 6)).isEqualTo(new java.awt.Color(23, 87, 139).getRGB());
+                view.update(stack(choice(ChoiceKind.PICKER, "a", ControlState.READY), secondary));
+                var picker = find(view, "choice.input", JButton.class); picker.setSize(240, 40);
+                assertThat(ButtonsTest.paint(picker).getRGB(120, 6)).isEqualTo(new java.awt.Color(23, 87, 139).getRGB());
+                picker.getModel().setRollover(true);
+                assertThat(ButtonsTest.paint(picker).getRGB(120, 6)).isEqualTo(new java.awt.Color(42, 121, 175).getRGB());
+                var button = find(view, "secondary", JButton.class); button.setSize(240, 40);
+                assertThat(ButtonsTest.paint(button).getRGB(120, 6)).isEqualTo(new java.awt.Color(193, 32, 68).getRGB());
+                button.getModel().setRollover(true);
+                assertThat(ButtonsTest.paint(button).getRGB(120, 6)).isEqualTo(new java.awt.Color(228, 61, 102).getRGB());
+            } finally { release(context); }
+        });
+    }
     @Test void dropdownDispatchesNodeAndImmutableSelectionWithoutEventsFromUpdates() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
@@ -48,7 +76,7 @@ class ChoicesTest {
                 var picker = find(view, "choice.input", JButton.class); assertThat(picker.getText()).isEqualTo("Choose…");
                 assertThat(picker.getForeground()).isEqualTo(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
                 picker.setSize(180, 34); var image = ButtonsTest.paint(picker); int right = picker.getWidth()-com.formdev.flatlaf.util.UIScale.scale(16);
-                int count=0; int color=context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.BUTTON_SECONDARY_BG).getRGB();
+                int count=0; int color=context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL).getRGB();
                 for (int x=right-5; x<right+5; x++) for (int y=10; y<24; y++) if (image.getRGB(x,y)!=color) count++;
                 assertThat(count).isPositive();
             } finally { release(context); }

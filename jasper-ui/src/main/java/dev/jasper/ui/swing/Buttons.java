@@ -61,19 +61,23 @@ final class Buttons {
             int height = ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
+        /** Shared painter permits a real specialized owner to select its semantic surface. */
+        Color fill(boolean hover) {
+            return switch (kind) {
+                case PRIMARY -> ThemePainting.color(context, hover ? SemanticColor.ACCENT_HOVER : SemanticColor.ACCENT);
+                case SECONDARY -> ThemePainting.color(context, hover ? SemanticColor.BUTTON_SECONDARY_BG_HOVER : SemanticColor.BUTTON_SECONDARY_BG);
+                case GHOST -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.HOVER_OVERLAY), .08) : null;
+                case DESTRUCTIVE_GHOST -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.STATUS_DANGER), .15) : null;
+                case LINK -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.ACCENT), .08) : null;
+            };
+        }
         @Override protected void paintComponent(Graphics graphics) {
             if (kind == null) return;
             var g = (Graphics2D)graphics.create();
             try {
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 boolean hover = isEnabled() && getModel().isRollover();
-                Color fill = switch (kind) {
-                    case PRIMARY -> ThemePainting.color(context, hover ? SemanticColor.ACCENT_HOVER : SemanticColor.ACCENT);
-                    case SECONDARY -> ThemePainting.color(context, hover ? SemanticColor.BUTTON_SECONDARY_BG_HOVER : SemanticColor.BUTTON_SECONDARY_BG);
-                    case GHOST -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.HOVER_OVERLAY), .08) : null;
-                    case DESTRUCTIVE_GHOST -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.STATUS_DANGER), .15) : null;
-                    case LINK -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.ACCENT), .08) : null;
-                };
+                Color fill = fill(hover);
                 if (isEnabled() && getModel().isPressed() && fill != null) {
                     Color darkened = ColorMath.mix(ThemePainting.color(context, SemanticColor.SURFACE_APP), fill, .08);
                     fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());

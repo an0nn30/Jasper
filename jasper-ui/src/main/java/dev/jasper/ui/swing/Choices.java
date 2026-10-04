@@ -144,6 +144,9 @@ final class Choices {
     static final class PickerButton extends Buttons.KitButton {
         final KitContext context; boolean empty;
         PickerButton(KitContext context) { super(context); this.context = context; }
+        @Override Color fill(boolean hover) {
+            return ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL);
+        }
         @Override SemanticColor textRole(boolean hover) { return empty ? SemanticColor.TEXT_TERTIARY : SemanticColor.TEXT_PRIMARY; }
         @Override protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);

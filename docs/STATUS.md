@@ -92,6 +92,10 @@
   **174 tests, 0 failures/errors/skips**. Approved cross-task handoff: Task 9 verifies actual first/last
   ordered-action 30% painting through the shared button painter once the real ordered owner exists;
   no unused alpha setter was added. Source hygiene/diff checks clean; no GUI/AOT.
+  Task 7 independent review fix round gives pickers the dropdown's `surface.control` chrome and
+  `surface.control.hover` treatment while ordinary secondary buttons retain their own colors.
+  Contrasting-role regression reproduced the mismatch; **10 focused choice/button tests pass**,
+  zero failures/errors/skips. The minor segment-label medium-weight finding stays with final review.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`
