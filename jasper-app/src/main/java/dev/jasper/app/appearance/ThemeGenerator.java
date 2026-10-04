@@ -80,7 +80,7 @@ public final class ThemeGenerator {
         generation.tokens.putAll(document.tokens());
         var updated = generation.result();
         return new GeneratedTheme(original.name(), original.dark(), original.author(), updated.tokens(), updated.syntax(),
-            original.terminal(), original.uiKeys(), original.icons());
+            original.terminal(), original.uiKeys(), original.icons(), original.glass());
     }
 
     private static final class Generation {
@@ -121,7 +121,7 @@ public final class ThemeGenerator {
             var syntax = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
             for (SyntaxRole role : SyntaxRole.values()) syntax.put(role, syntax(role));
             return new GeneratedTheme(document.name(), dark, document.metadata().getOrDefault("author", "Jasper"), tokens, syntax,
-                new Palette(foreground, background, cursor, selection, ansi), uiKeys(), document.icons());
+                new Palette(foreground, background, cursor, selection, ansi), uiKeys(), document.icons(), document.workspace().levels());
         }
 
         private Color token(Token token) {

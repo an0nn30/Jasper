@@ -36,7 +36,7 @@ class NativeThemeCatalogTest {
 
     @Test void indexedCollectionIsNativeAndReusesClassicSingletons() throws Exception {
         var snapshot = ThemeCatalog.builtIn().scan();
-        assertThat(snapshot.themes()).hasSize(284).allMatch(theme -> theme.source() instanceof Theme.Bundled);
+        assertThat(snapshot.themes()).hasSize(286).allMatch(theme -> theme.source() instanceof Theme.Bundled);
         assertThat(snapshot.find("Studio Dark")).isPresent(); assertThat(snapshot.find("Catppuccin Mocha")).isPresent();
         assertThat(snapshot.find("Jasper Dark")).containsSame(Theme.DARK);
         assertThat(snapshot.find("Darcula")).containsSame(Theme.DARCULA);

@@ -742,6 +742,11 @@ The no-argument `current()` reads the published workspace palette. A popup or to
 opened from a workspace pane. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
 workspace event; an event can change colors while `workspaceVariant()` remains `DARK` or `LIGHT`. Keep the document
 and undo model when changing only its styles.
+Since SDK 0.14.1, a surface that should follow a translucent window reads `Appearance.workspaceOpacity(component)` on
+the UI thread (it is 1 unless the component is in the workspace area of a translucent window, so tool and side panels
+stay opaque), fills its own background once with that alpha (`AlphaComposite.Src`, unantialiased rectangles) and keeps
+the components above it non-opaque; `onWorkspaceChanged` also fires when the opacity changes or the component moves to
+another window. Keep selection, carets and bars solid. The Editor plugin's `GlassSurface` is the reference.
 
 
 ### Hosted pane control styling

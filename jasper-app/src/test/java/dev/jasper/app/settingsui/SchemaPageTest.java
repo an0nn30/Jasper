@@ -146,6 +146,28 @@ class SchemaPageTest {
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.WINDOW_NATIVE_DECORATIONS.label());
     }
 
+    @Test void aSectionWhoseRowsAreAllHiddenShowsNoHeader() {
+        var spec = SchemaPage.page("window", "Window")
+            .section("Bars")
+            .row(CoreSettings.WINDOW_STATUS_BAR)
+            .section("Elsewhere")
+            .row(CoreSettings.WINDOW_NATIVE_DECORATIONS).shownWhen(false)
+            .section("Empty")
+            .section("Size")
+            .row(CoreSettings.WINDOW_COLUMNS);
+        var page = spec.build(context);
+        assertThat(sectionTitles(page.component())).containsExactly("Bars", "Empty", "Size");
+        assertThat(page.searchTerms()).contains("Bars", "Empty", "Size").doesNotContain("Elsewhere");
+    }
+
+    static List<String> sectionTitles(java.awt.Component component) {
+        var titles = new ArrayList<String>();
+        if (component instanceof TitledSeparator separator) titles.add(separator.title.getText());
+        else if (component instanceof java.awt.Container container)
+            for (var child : container.getComponents()) titles.addAll(sectionTitles(child));
+        return titles;
+    }
+
     private static void layOut(java.awt.Component component) {
         component.doLayout();
         if (component instanceof java.awt.Container container) for (var child : container.getComponents()) layOut(child);

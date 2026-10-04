@@ -6,6 +6,7 @@ import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -20,6 +21,7 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -50,6 +52,8 @@ final class ToolWindowArea extends JPanel {
     private static final class Host extends JPanel {
         private final int[] gutters = {-1, -1, -1, -1};
         private boolean rounded = true;
+        /** The opacity in effect for the surface, 1 being opaque; only the centre host follows the window's glass. */
+        private float opacity = 1f;
         private JComponent content;
 
         Host(boolean toolWindow) {
@@ -78,12 +82,37 @@ final class ToolWindowArea extends JPanel {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
-                g.setColor(UIManager.getColor("Jasper.titleBackground"));
+                Color chrome = UIManager.getColor("Jasper.titleBackground");
+                g.setColor(chrome);
                 g.fillRect(0, 0, getWidth(), getHeight());
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                // The terminal column (tab strip included) is one surface in the terminal palette, so every
-                // theme follows the same frame, including its optional rounded corners.
-                g.setColor(getBackground()); g.fill(surface());
+                if (opacity < 1f) {
+                    // A translucent window: the surface is glass of the terminal background, replacing what lies
+                    // beneath. Panes replace it again with the same fill, so every pixel gets exactly one alpha
+                    // fill, and a strip no pane covers (the lower arc) is glass rather than a hole. Java2D's Metal
+                    // pipeline renders a translucent Src fill in software, reading the GPU back, unless it is an
+                    // unantialiased rectangle (200 ms instead of 1 ms per frame): fill the bounds as a plain
+                    // rectangle, then round the corners with opaque, antialiased chrome over it.
+                    Color background = getBackground();
+                    Rectangle bounds = surface().getBounds();
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+                    g.setComposite(AlphaComposite.Src);
+                    g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(),
+                        Math.round(255 * opacity)));
+                    g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                    if (rounded && chrome != null) {
+                        var corners = new Area(bounds);
+                        corners.subtract(new Area(surface()));
+                        g.setComposite(AlphaComposite.SrcOver);
+                        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g.setColor(chrome);
+                        g.fill(corners);
+                    }
+                } else {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    // The terminal column (tab strip included) is one surface in the terminal palette, so every
+                    // theme follows the same frame, including its optional rounded corners.
+                    g.setColor(getBackground()); g.fill(surface());
+                }
             } finally { g.dispose(); }
         }
 
@@ -275,6 +304,16 @@ final class ToolWindowArea extends JPanel {
 
     /** The terminal palette background of the whole center, including the tab strip and any lower arc. */
     void setTerminalBackground(Color background) { center.setBackground(background); }
+
+    /**
+     * The opacity in effect for the center surface, 1 being opaque. Below 1 the surface is filled with the terminal
+     * background at that opacity, the same fill the panes inside paint over it.
+     */
+    void setGlass(float opacity) {
+        if (center.opacity == opacity) return;
+        center.opacity = opacity;
+        center.repaint();
+    }
 
     /** Reapplies the tool window colour after a theme change reset the frame backgrounds. */
     void refreshTheme() {

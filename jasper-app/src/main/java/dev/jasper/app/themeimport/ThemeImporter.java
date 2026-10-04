@@ -141,7 +141,7 @@ public final class ThemeImporter {
     static String key(String name) { return name.strip().toLowerCase(Locale.ROOT); }
     static ThemeDocument rename(ThemeDocument base, String name) {
         return new ThemeDocument(base.origin(), name, base.dark(), base.parent(), base.parentLine(), base.uiComplete(), base.metadata(),
-            base.seeds(), base.ansi(), base.tokens(), base.syntax(), base.ui(), base.icons());
+            base.seeds(), base.ansi(), base.tokens(), base.syntax(), base.ui(), base.icons(), base.workspace());
     }
     private static void worker() { if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Theme import requires a worker thread"); }
     private static String message(Throwable failure) { return failure.getMessage() == null ? failure.toString() : failure.getMessage(); }

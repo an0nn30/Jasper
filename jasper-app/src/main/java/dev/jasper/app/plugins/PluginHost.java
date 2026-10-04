@@ -40,8 +40,8 @@ final class PluginHost {
                        Consumer<java.net.URI> browser,
                        java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
                        java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber,
-                       Consumer<PluginRuntime.Failure> failures) {
-        /** Contained failures are only logged and counted. */
+                       Consumer<PluginRuntime.Failure> failures, GlassSource glass) {
+        /** Contained failures are only logged and counted; no workspace glass. */
         Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
@@ -51,7 +51,35 @@ final class PluginHost {
                        java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
                        java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber) {
             this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
-                editor, settingsFiles, clearReports, profiles, browser, appearance, appearanceSubscriber, failure -> { });
+                editor, settingsFiles, clearReports, profiles, browser, appearance, appearanceSubscriber, failure -> { }, GlassSource.NONE);
+        }
+
+        /** No workspace glass. */
+        Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
+                       Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
+                       Duration drainGrace, Contributions contributions, BooleanSupplier dark,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
+                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
+                       Consumer<java.net.URI> browser,
+                       java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+                       java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber,
+                       Consumer<PluginRuntime.Failure> failures) {
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
+                editor, settingsFiles, clearReports, profiles, browser, appearance, appearanceSubscriber, failures, GlassSource.NONE);
+        }
+
+        /** Contained failures are only logged and counted. */
+        Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
+                       Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
+                       Duration drainGrace, Contributions contributions, BooleanSupplier dark,
+                       AuxiliaryWindows windows, TerminalRegistry terminals, PluginRuntime.NotificationHost notifications, Consumer<Path> editor,
+                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
+                       Consumer<java.net.URI> browser,
+                       java.util.function.Supplier<dev.jasper.app.appearance.ResolvedTheme> appearance,
+                       java.util.function.Function<Consumer<dev.jasper.app.appearance.ResolvedTheme>, dev.jasper.app.lifecycle.Subscription> appearanceSubscriber,
+                       GlassSource glass) {
+            this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
+                editor, settingsFiles, clearReports, profiles, browser, appearance, appearanceSubscriber, failure -> { }, glass);
         }
 
         Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
@@ -61,7 +89,7 @@ final class PluginHost {
                        PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles,
                        Consumer<java.net.URI> browser) {
             this(ui, onUi, dataDirectory, configReport, drainGrace, contributions, dark, windows, terminals, notifications,
-                editor, settingsFiles, clearReports, profiles, browser, null, null, failure -> { });
+                editor, settingsFiles, clearReports, profiles, browser, null, null, failure -> { }, GlassSource.NONE);
         }
     }
 
