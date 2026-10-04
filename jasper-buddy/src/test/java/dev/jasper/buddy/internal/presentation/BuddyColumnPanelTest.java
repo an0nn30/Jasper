@@ -49,16 +49,6 @@ class BuddyColumnPanelTest {
         assertThat(panel.getPreferredSize()).isEqualTo(new Dimension(0, 0));
     }
 
-    /** The resting state: he has nothing to think about, so there is nothing above his head. */
-    @Test void aColumnOfOnlyAcknowledgedFinishedThingsIsEmpty() {
-        post("a", "one", BuddyNotice.State.DONE);
-        deck.acknowledge(new BuddyNoticeId("terminal", "a"));
-        layout();
-
-        assertThat(panel.getPreferredSize()).isEqualTo(new Dimension(0, 0));
-        assertThat(deck.notices()).as("still in the drawer").hasSize(1);
-    }
-
     @Test void theColumnIsAsTallAsItsBubblesAndTail() {
         post("a", "one", BuddyNotice.State.RUNNING);
         post("b", "two", BuddyNotice.State.RUNNING);
@@ -78,24 +68,13 @@ class BuddyColumnPanelTest {
     }
 
     @Test void clickingABubbleRunsItsActionAndSaysTheColumnShouldGo() {
-        post("a", "one", BuddyNotice.State.DONE);
-        post("b", "two", BuddyNotice.State.DONE);
+        post("a", "one", BuddyNotice.State.RUNNING);
+        post("b", "two", BuddyNotice.State.RUNNING);
         layout();
 
         assertThat(panel.handleClick(inBubble(0))).isFalse();
 
         assertThat(activated).containsExactly("two");
-        assertThat(drawerOpened).isZero();
-    }
-
-    @Test void clickingAnOrphanDoesNothingAtAll() {
-        post("a", "one", BuddyNotice.State.DONE);
-        deck.orphan(new BuddyNoticeId("terminal", "a"));
-        layout();
-
-        assertThat(panel.handleClick(inBubble(0))).isTrue();
-
-        assertThat(activated).isEmpty();
         assertThat(drawerOpened).isZero();
     }
 
@@ -143,7 +122,7 @@ class BuddyColumnPanelTest {
     @Test void everyArrangementPaintsWithoutBlowingUp() {
         post("a", "running", BuddyNotice.State.RUNNING);
         post("b", "waiting", BuddyNotice.State.NEEDS_INPUT);
-        post("c", "failed", BuddyNotice.State.FAILED);
+        post("c", "another", BuddyNotice.State.RUNNING);
         layout();
         assertThat(paintDoesNotThrow()).isTrue();
 
@@ -197,11 +176,11 @@ class BuddyColumnPanelTest {
     @Test void updatingTheSameNoticeKeepsItsPositionAndDoesNotReplayArrival() {
         post("a", "one", BuddyNotice.State.RUNNING);
         Rectangle before = panel.cardBounds(0);
-        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "one", BuddyNotice.State.DONE, () -> "Finished", () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "one", BuddyNotice.State.NEEDS_INPUT, () -> "Waiting", () -> { }));
         panel.refresh();
         assertThat(panel.cardBounds(0)).isEqualTo(before);
         assertThat(panel.animating()).isFalse();
-        assertThat(panel.needsDetailUpdates()).isFalse();
+        assertThat(panel.needsDetailUpdates()).as("every retained card is live work").isTrue();
     }
 
     @Test void resizingForANewArrivalDoesNotTeleportTheExistingCapsuleOnScreen() {

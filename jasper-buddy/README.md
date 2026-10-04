@@ -37,9 +37,9 @@ var options = BuddyOptions.builder(new java.awt.Font("Dialog", java.awt.Font.PLA
     .dark(true).activateHost(() -> {}).toggleRequested(() -> {}).build();
 try (var buddy = new BuddyCompanion(options)) {
     var id = new BuddyNoticeId("example", new Object());
-    buddy.post(new BuddyNotice(id, BuddyNotice.Kind.TASK, "Build", BuddyNotice.State.DONE,
-        () -> "Finished", () -> {}));
-    buddy.acknowledge(id);
+    buddy.post(new BuddyNotice(id, BuddyNotice.Kind.TASK, "Build", BuddyNotice.State.RUNNING,
+        () -> "Compiling", () -> {}));
+    buddy.dismiss(id);
     buddy.hide();
     buddy.applyOptions(options.toBuilder().dark(false).build());
 }
