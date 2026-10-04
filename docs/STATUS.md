@@ -5,8 +5,32 @@
 - **Wider folder tabs** (2026-10-04; user follow-up): doubled each tab's calculated width, including its
   bounds (now 160–480 logical pixels). Fonts, control sizes, tab height and motion timings are unchanged.
   The next user follow-up also doubles the active accent pill to 64 × 2 logical pixels.
-  Updated the existing motion/overflow/drag fixtures for the wider geometry. All **645 workspace tests**
-  passed; headless Swing previews refreshed and inspected. No native GUI launched.
+  Hidden rails now square the folder’s outer-left corner at the workspace edge, matching the terminal
+  for both manual Rail hiding and Zen mode. Interior corners stay rounded; showing the rails restores the curve.
+  A rendered-pixel regression reproduced the manual-hide gap before correction.
+  Updated the existing motion/overflow/drag fixtures for the wider geometry. Integrated main's file-chooser
+  changes (`f6a6ef34`). Final `./gradlew check --continue`: **8,681 tests, 0 failures, 0 errors, 6 skipped**.
+  Normal and 2× corner/geometry checks passed; headless Swing previews refreshed and inspected.
+  Changed-source hygiene and whitespace checks passed. No native GUI launched.
+
+- **File chooser visual continuity** (2026-10-04), on `codex/file-dialog-corners` in
+  `/Users/dustin/.codex/worktrees/file-dialog-corners/moray`, based on fetched `origin/main` at `a6d15621`.
+  Places and the file-list background use the workspace's scaled 16px corner arc, including opaque-child
+  repaints and the listing beside Preview. Places is a title-case column header aligned with the file headings;
+  the resize gutter follows the rail panels' plain chrome styling while retaining Swing dragging and keyboard
+  resizing. The file list uses a transient overlay scroll thumb: no column reflow, no idle track, and a one-second
+  idle timeout that stays suspended during a held drag. Hiding/removing/closing the chooser stops the timer.
+  This user-directed bounded cleanup used inline implementation and independent final review; no architecture
+  changes or historical-plan rewrites. Initial corner, heading and scrollbar regressions reproduced the old
+  behavior; focused rendering and scrolling/lifecycle tests pass. Independent review's listing/Preview corner
+  finding was corrected, and follow-up review approved with no remaining findings. The theme-refresh spacing regression also reproduced the original replacement and now passes.
+  Final `./gradlew check` passed all 88 tasks: **8,488 tests, 0 failures, 0 errors, 6 skipped**;
+  architecture/doc checks, changed-source hygiene and diff checks passed. Dark/light headless previews were
+  inspected with Preview open and closed; see `jasper-app/build/file-dialog-preview/` in the worktree.
+  No GUI or benchmark launched; native scrolling/drag acceptance remains user-run. User approved merge to main and push.
+  Integrated current main `b51fb3b9` without conflicts; final combined `./gradlew check` passed all 91 tasks:
+  **8,680 tests, 0 failures, 0 errors, 6 skipped**. The reviewed chooser code is unchanged.
+  Headless previews are preserved in the main checkout at `jasper-app/build/file-dialog-preview/`.
 
 - **Folder tabs adversarial review and main integration** (2026-10-04; `codex/folder-tabs`): integrated
   `main` at `e11961c8`, preserving saved view modes, workspace glass, current theme fixtures, startup/resident

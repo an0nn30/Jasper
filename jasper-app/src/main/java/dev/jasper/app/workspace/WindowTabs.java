@@ -270,11 +270,14 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         double upper = Math.min(Math.min(UIScale.scale(ToolWindowArea.SURFACE_ARC) / 2.0, w / 2), Math.max(0, h / 2));
         double k = r * .5522847498;
         double upperK = upper * .5522847498;
+        // Hidden rails remove the workspace frame, so a folder at its left edge joins it squarely.
+        double leftUpper = !owner.leftStripe().isVisible() && x <= 0 ? 0 : upper;
+        double leftUpperK = leftUpper * .5522847498;
         var shape = new java.awt.geom.Path2D.Double();
         shape.moveTo(x - r, h);
         shape.curveTo(x - r + k, h, x, h - r + k, x, h - r);
-        shape.lineTo(x, upper);
-        shape.curveTo(x, upper - upperK, x + upper - upperK, 0, x + upper, 0);
+        shape.lineTo(x, leftUpper);
+        shape.curveTo(x, leftUpper - leftUpperK, x + leftUpper - leftUpperK, 0, x + leftUpper, 0);
         shape.lineTo(x + w - upper, 0);
         shape.curveTo(x + w - upper + upperK, 0, x + w, upper - upperK, x + w, upper);
         shape.lineTo(x + w, h - r);

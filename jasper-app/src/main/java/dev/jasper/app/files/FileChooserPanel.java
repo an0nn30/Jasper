@@ -1,6 +1,8 @@
 package dev.jasper.app.files;
 
+import com.formdev.flatlaf.ui.FlatEmptyBorder;
 import com.formdev.flatlaf.util.SystemInfo;
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -15,7 +17,10 @@ import java.awt.Graphics2D;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.LayoutManager;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Shape;
+import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusAdapter;
@@ -66,6 +71,8 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.UIManager;
+import javax.swing.plaf.basic.BasicSplitPaneDivider;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.AbstractTableModel;
@@ -102,6 +109,7 @@ public final class FileChooserPanel extends JPanel {
     private final JList<Object> navigation = new JList<>(navigationItems);
     private final EntryTable tableModel = new EntryTable();
     private final JTable table = new JTable(tableModel);
+    private final FileListScrollPane tableScroll = new FileListScrollPane(table);
     private final CardLayout centerCards = new CardLayout();
     private final JPanel center = new JPanel(centerCards);
     private final JLabel message = plain(new JLabel("", SwingConstants.CENTER));
@@ -171,6 +179,7 @@ public final class FileChooserPanel extends JPanel {
     /** Stops listening to the sources; call once the dialog has closed. */
     public void close() {
         loadingDelay.stop();
+        tableScroll.stop();
         sourceRemovals.forEach(Runnable::run);
         sourceRemovals.clear();
     }
@@ -242,6 +251,18 @@ public final class FileChooserPanel extends JPanel {
         var navigationScroll = new JScrollPane(navigation);
         navigationScroll.setBorder(BorderFactory.createEmptyBorder());
         navigationScroll.setMinimumSize(new Dimension(140, 0));
+        var placesHeading = new JLabel("Places") {
+            @Override public void updateUI() {
+                super.updateUI();
+                setFont(UIManager.getFont("TableHeader.font"));
+                setForeground(UIManager.getColor("TableHeader.foreground"));
+            }
+            @Override public Dimension getPreferredSize() {
+                return new Dimension(super.getPreferredSize().width, table.getTableHeader().getPreferredSize().height);
+            }
+        };
+        placesHeading.setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, 10, 0, 6), null));
+        navigationScroll.setColumnHeaderView(placesHeading);
 
         table.setAutoCreateRowSorter(false);
         table.setShowGrid(false);
@@ -272,7 +293,6 @@ public final class FileChooserPanel extends JPanel {
                 if ((event.getModifiersEx() & (MENU | InputEvent.ALT_DOWN_MASK)) == 0) typeToSelect(event.getKeyChar());
             }
         });
-        var tableScroll = new JScrollPane(table);
         tableScroll.setBorder(BorderFactory.createEmptyBorder());
         message.setForeground(UIManager.getColor("Label.disabledForeground"));
         message.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -286,8 +306,8 @@ public final class FileChooserPanel extends JPanel {
         messageBox.add(centerButton);
         var messageArea = new JPanel(new GridBagLayout());
         messageArea.add(messageBox);
-        center.add(tableScroll, "table");
-        center.add(messageArea, "message");
+        center.add(new RoundedPane(tableScroll), "table");
+        center.add(new RoundedPane(messageArea), "message");
 
         previewText.setEditable(false);
         previewText.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
@@ -305,10 +325,67 @@ public final class FileChooserPanel extends JPanel {
         var main = new JPanel(new BorderLayout());
         main.add(center, BorderLayout.CENTER);
         main.add(previewPane, BorderLayout.EAST);
-        var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, navigationScroll, main);
+        var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new RoundedPane(navigationScroll), main) {
+            @Override public void updateUI() {
+                // The rail dividers are unpainted resize gutters. Keep Swing's keyboard and drag handling.
+                setUI(new BasicSplitPaneUI() {
+                    @Override public BasicSplitPaneDivider createDefaultDivider() {
+                        return new BasicSplitPaneDivider(this) {
+                            @Override public void paint(Graphics graphics) {
+                                graphics.setColor(splitPane.getBackground());
+                                graphics.fillRect(0, 0, getWidth(), getHeight());
+                            }
+                        };
+                    }
+                });
+                setDividerSize(UIScale.scale(6));
+            }
+        };
+        split.setContinuousLayout(true);
         split.setDividerLocation(190);
-        split.setBorder(BorderFactory.createEmptyBorder());
+        split.setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, 10, 0, 10), null));
         return split;
+    }
+
+    /** The same scaled 16px arc as the workspace hosts, including opaque scroll panes. */
+    private static final class RoundedPane extends JPanel {
+        private final JComponent content;
+
+        RoundedPane(JComponent content) {
+            super(new BorderLayout());
+            this.content = content;
+            add(content, BorderLayout.CENTER);
+        }
+
+        private int surfaceTop() {
+            // Keep the column headings on the chrome, rounding the listing below them.
+            return content instanceof JScrollPane scroll ? scroll.getViewport().getY() : 0;
+        }
+
+        private Shape surface() {
+            int arc = UIScale.scale(16);
+            int top = surfaceTop();
+            return new RoundRectangle2D.Double(0, top, getWidth(), Math.max(0, getHeight() - top), arc, arc);
+        }
+
+        @Override protected boolean isPaintingOrigin() { return true; }
+        @Override public boolean contains(int x, int y) {
+            return y < surfaceTop() ? super.contains(x, y) : surface().contains(x, y);
+        }
+
+        @Override protected void paintChildren(Graphics graphics) {
+            super.paintChildren(graphics);
+            var g = (Graphics2D) graphics.create();
+            try {
+                // Mask after the children: Swing can skip paintComponent during an opaque child's repaint.
+                int top = surfaceTop();
+                var corners = new Area(new Rectangle(0, top, getWidth(), Math.max(0, getHeight() - top)));
+                corners.subtract(new Area(surface()));
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(getBackground());
+                g.fill(corners);
+            } finally { g.dispose(); }
+        }
     }
 
     /**
@@ -585,7 +662,7 @@ public final class FileChooserPanel extends JPanel {
                 if (place.section() != section || !place.heading().equals(heading)) {
                     section = place.section();
                     heading = place.heading();
-                    navigationItems.addElement(heading);
+                    if (section != Places.Section.PLACES) navigationItems.addElement(heading);
                 }
                 navigationItems.addElement(place);
             }

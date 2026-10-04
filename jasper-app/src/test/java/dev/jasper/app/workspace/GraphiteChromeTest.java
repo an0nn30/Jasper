@@ -39,7 +39,7 @@ class GraphiteChromeTest {
                         int terminal = owner.theme().palette().background().getRGB();
                         for (int x : new int[]{0, image.getWidth() - 1}) for (int y : new int[]{0, image.getHeight() - 1}) {
                             assertThat(image.getRGB(x, y)).as("square workspace corner (%s,%s), %s", x, y, theme)
-                                .isEqualTo(y == 0 ? owner.windowTabs().getBackground().getRGB() : terminal);
+                                .isEqualTo(y == 0 && x > 0 ? owner.windowTabs().getBackground().getRGB() : terminal);
                             assertThat(column.getParent().contains(x, y)).as("edge receives input").isTrue();
                         }
                         var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);

@@ -166,9 +166,8 @@ class FileChooserPanelTest {
     @Test void theNavigationPaneListsPlacesAndPinnedFolders() {
         var panel = panel(OPEN, Optional.empty());
         var items = panel.navigation().getModel();
-        assertThat(items.getElementAt(0)).isEqualTo("Places");
-        assertThat(((Places.Place) items.getElementAt(1)).label()).isEqualTo("Terminal folder");
-        assertThat(panel.navigation().getSelectedValue()).as("the folder shown is highlighted").isEqualTo(items.getElementAt(1));
+        assertThat(((Places.Place) items.getElementAt(0)).label()).isEqualTo("Terminal folder");
+        assertThat(panel.navigation().getSelectedValue()).as("the folder shown is highlighted").isEqualTo(items.getElementAt(0));
         panel.togglePin(here("docs"));
         assertThat(prefs.pinned()).containsExactly(here("docs"));
         panel.navigation().setSelectedValue(place(panel, "docs"), false);
@@ -265,6 +264,82 @@ class FileChooserPanelTest {
         assertThat(image.getRGB(299, height / 2) >>> 24).as("an outline at the right edge").isNotZero();
         java.awt.Color fill = javax.swing.UIManager.getColor("TextField.background");
         assertThat(new java.awt.Color(image.getRGB(296, height / 2), true)).as("the field's background inside").isEqualTo(fill);
+    }
+
+    @Test void placesAndFilesKeepRoundedCornersWithOpaqueContents() {
+        var panel = panel(OPEN, Optional.empty());
+        try {
+            for (boolean preview : new boolean[] {false, true}) {
+                if (panel.previewToggle().isSelected() != preview) panel.previewToggle().doClick();
+                for (var view : List.of(panel.navigation(), panel.table())) {
+                    var scroll = (javax.swing.JScrollPane) javax.swing.SwingUtilities
+                        .getAncestorOfClass(javax.swing.JScrollPane.class, view);
+                    // JTable installs this on addNotify in a displayed dialog.
+                    if (view == panel.table()) scroll.setColumnHeaderView(panel.table().getTableHeader());
+                    var pane = (JComponent) scroll.getParent();
+                    pane.setSize(320, 240);
+                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree((java.awt.Container) pane);
+                    int top = scroll.getViewport().getY();
+                    for (int scale : new int[] {1, 2}) {
+                        var image = new java.awt.image.BufferedImage(320 * scale, 240 * scale,
+                            java.awt.image.BufferedImage.TYPE_INT_RGB);
+                        var graphics = image.createGraphics();
+                        try {
+                            graphics.scale(scale, scale);
+                            pane.paint(graphics);
+                        } finally { graphics.dispose(); }
+                        int background = panel.getBackground().getRGB();
+                        for (int x : new int[] {0, image.getWidth() - 1}) {
+                            for (int y : new int[] {top * scale, image.getHeight() - 1}) {
+                                assertThat(image.getRGB(x, y)).as("corner with preview=%s at %sx", preview, scale)
+                                    .isEqualTo(background);
+                            }
+                        }
+                        assertThat(pane.contains(0, top)).as("outside the rounded surface").isFalse();
+                        assertThat(pane.contains(8, top)).as("workspace's 16px arc reaches the top at 8px").isTrue();
+                        int[] before = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+                        graphics = image.createGraphics();
+                        try {
+                            graphics.scale(scale, scale);
+                            graphics.setClip(0, top, 12, 12);
+                            pane.paint(graphics);
+                        } finally { graphics.dispose(); }
+                        assertThat(image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth()))
+                            .as("partial repaint preserves the rounded edge").containsExactly(before);
+                    }
+                }
+            }
+        } finally { panel.close(); }
+    }
+
+    @Test void placesHeadingAlignsWithFileColumnsAndTheResizeGutterHasNoGrip() {
+        var panel = panel(OPEN, Optional.empty());
+        try {
+            panel.setSize(900, 560);
+            var navigationScroll = (javax.swing.JScrollPane) javax.swing.SwingUtilities
+                .getAncestorOfClass(javax.swing.JScrollPane.class, panel.navigation());
+            var files = (javax.swing.JScrollPane) javax.swing.SwingUtilities
+                .getAncestorOfClass(javax.swing.JScrollPane.class, panel.table());
+            files.setColumnHeaderView(panel.table().getTableHeader());
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(panel);
+            assertThat(panel.navigation().getModel().getElementAt(0)).isInstanceOf(Places.Place.class);
+            assertThat(navigationScroll.getColumnHeader()).isNotNull();
+            assertThat(((JLabel) navigationScroll.getColumnHeader().getView()).getText()).isEqualTo("Places");
+            assertThat(navigationScroll.getViewport().getY()).isEqualTo(files.getViewport().getY());
+            var split = (javax.swing.JSplitPane) ((java.awt.BorderLayout) panel.getLayout())
+                .getLayoutComponent(java.awt.BorderLayout.CENTER);
+            var gutter = split.getInsets();
+            javax.swing.SwingUtilities.updateComponentTreeUI(panel);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(panel);
+            assertThat(split.getInsets()).as("theme refresh preserves the exterior gutter").isEqualTo(gutter);
+            var divider = ((javax.swing.plaf.basic.BasicSplitPaneUI) split.getUI()).getDivider();
+            var image = new java.awt.image.BufferedImage(divider.getWidth(), divider.getHeight(),
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var graphics = image.createGraphics();
+            try { divider.paint(graphics); } finally { graphics.dispose(); }
+            assertThat(image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth()))
+                .as("only chrome in the draggable gutter").containsOnly(split.getBackground().getRGB());
+        } finally { panel.close(); }
     }
 
     @Test void crumbsSitCloseToTheirSeparators() {

@@ -110,6 +110,44 @@ class WindowTabsTest {
         });
     }
 
+    @Test void hiddenRailsSquareOnlyTheFolderCornerAtTheWorkspaceEdge() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var contributions = new dev.jasper.app.contributions.Contributions();
+            owner.connectContributions(contributions);
+            contributions.addPanel("test.panel", "Panel", new ImageIcon(), dev.jasper.app.dock.Slot.LEFT_TOP,
+                site -> new JLabel("panel"));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 80, 100, 130));
+            owner.currentTab().rename("first");
+            var first = owner.currentTab();
+            owner.newTab(HOME); owner.currentTab().rename("second");
+            var strip = owner.windowTabs();
+            for (boolean zen : new boolean[]{false, true}) {
+                owner.selectTab(first); owner.update(); layout(strip, 800, 30);
+                assertThat(owner.leftStripe().isVisible()).isTrue();
+                assertThat(pixel(strip, 0, 0)).isEqualTo(strip.getBackground());
+                if (zen) owner.toggleZenMode(); else owner.setRailVisible(false);
+                layout(strip, 800, 30);
+                assertThat(owner.leftStripe().isVisible()).isFalse();
+                assertThat(pixel(strip, 0, 0)).as("hidden rails join the folder to the workspace edge, Zen=%s", zen)
+                    .isEqualTo(owner.workspaceSurface());
+                var entry = named(strip, "select:first").getParent();
+                assertThat(pixel(strip, entry.getWidth() - 1, 0)).as("the inner right corner stays rounded")
+                    .isEqualTo(strip.getBackground());
+                owner.selectTab(owner.terminalTabs().get(1)); owner.update(); layout(strip, 800, 30);
+                var second = named(strip, "select:second").getParent();
+                assertThat(pixel(strip, second.getX(), 0)).as("interior tabs retain their rounded left corner")
+                    .isEqualTo(strip.getBackground());
+                owner.selectTab(first);
+                if (zen) owner.toggleZenMode(); else owner.setRailVisible(true);
+                layout(strip, 800, 30);
+                assertThat(owner.leftStripe().isVisible()).isTrue();
+                assertThat(pixel(strip, 0, 0)).as("showing rails restores the rounded outer corner")
+                    .isEqualTo(strip.getBackground());
+            }
+        });
+    }
+
     @Test void activeFolderHasAThinPillInTheWorkspaceAccent() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
