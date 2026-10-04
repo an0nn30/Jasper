@@ -1,6 +1,6 @@
 # Normal and Compact view modes
 
-Status: Tasks 1 and 2 implemented with SDD in an isolated worktree based on main `43894416`; independent Task 2 review and final full check are pending. Focused headless verification passed 97 tests with no failures/errors/skips. Native acceptance remains [user-run](../plans/2026-10-03-jasper-view-modes-manual-check.md). The user supplied the visual contract; restart-required remains an implementation assumption open to correction.
+Status: SDD complete in an isolated worktree based on main `43894416`: both task reviews and the whole-branch code review approved the implementation with no critical or important findings. The minor stale checklist reference is corrected. Final controller full check on `713b53b5` passed 8,373 tests with no failures/errors and 6 skipped; focused headless verification passed 97 tests with no failures/errors/skips. Source hygiene (1,747 Java files) and diff checks passed. Inspected dark/default-font and light/18pt headless Appearance previews fit the row and restart notice; the full theme preview matrix was intentionally stopped after these renders (SIGTERM, exit 143). Native acceptance remains [user-run](../plans/2026-10-03-jasper-view-modes-manual-check.md). The user supplied the visual contract; restart-required remains the announced implementation default; the optional user preference question is unanswered.
 
 ## Intent
 
@@ -10,7 +10,7 @@ Add Settings > Appearance > View mode with Normal and Compact. Normal is the cur
 
 Reuse the existing settings schema, native decorations, and palette's existing `positioned` fallback. Do not create a second palette or emulate a native title bar with a Swing label. The saved key is `window.view_mode = "normal" | "compact"`, default `normal`.
 
-Switching mode takes effect after application restart (the optional user preference question is pending; this is the default assumption). Appearance displays the existing restart notice. The application captures the startup mode once; all windows created before the next restart retain it, including windows opened after saving a different mode. Reloading other settings does not change the active mode.
+Switching mode takes effect after application restart (the optional user preference question is unanswered; this is the announced implementation default). Appearance displays the existing restart notice. The application captures the startup mode once; all windows created before the next restart retain it, including windows opened after saving a different mode. Reloading other settings does not change the active mode.
 
 Compact removes the entire workspace header, including plugin toolbar contributions and overflow. Toolbar menu commands cannot reveal controls in Compact. Keep the saved toolbar preference so Normal restores it after restart. The native title uses existing working-context metadata. Native appearance follows the selected UI theme. macOS Compact does not install full-window content, transparent title bar, hidden native title text, or JBR custom title geometry. Normal retains those exact existing behaviors.
 
