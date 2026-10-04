@@ -11,7 +11,8 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Notices`, `Platform` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform` |
+| `dev.jasper.sdk.notifications` | `Notifications`, `NotificationGroup`, `GroupSpec`, `NotificationSpec`, `NotificationAction`, `NotificationHandle`, `Severity`, `DisplayMode` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
 | `dev.jasper.sdk.files` | Places plugins add to Jasper's file chooser (`FileSources`, `FileSource`, `FileBrowser`) and what `Windows.choose` returns (`FileLocation`). |
@@ -84,7 +85,7 @@ SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it ac
 programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. `FakePluginHost.requestQuit` asks these
-guards too. Plugins declare `sdk = ">=0.13.0, <0.14"`.
+guards too. Plugins declare `sdk = ">=0.14.0, <0.15"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -129,7 +130,19 @@ five-argument constructors remain, so plugins written for 0.12 compile unchanged
 Jasper gives every tool window a header with its title, so a panel should not show its own title. The user's placement
 wins over the default. The testkit lists a split panel as `id|title|LEFT+split`.
 
-## Workspace opacity (SDK 0.13.1)
+## Notifications (SDK 0.14.0)
+
+`PluginContext.notifications()` replaces `Notices`, which is gone. `group()` is the plugin's default group, named after
+the plugin; `group(GroupSpec)` declares another inside the plugin's namespace. Posting is safe from any thread: `info`,
+`warning` and `error` take a title and content; `error(title, cause)` and `error(title, content, cause)` carry a cause
+that Jasper records as the plugin's incident, with Show more…; `post(NotificationSpec)` adds actions, a default
+action, an icon or a window. Jasper posts a succeeded or failed activity in `<plugin-id>.activities` by itself.
+`FakePluginHost.notifications()` records posts as `group|SEVERITY|title|content[|Cause]`, lists declared groups and
+runs an action (`runAction`) or the body (`click`); `new FakeNotifications().group(id)` records for a component under
+test. A plugin built for 0.13 that called `notices()` moves to `notifications()` and declares
+`sdk = ">=0.14.0, <0.15"`.
+
+## Workspace opacity (SDK 0.14.1)
 
 `Appearance.workspaceOpacity(Component)` returns how opaque the workspace is behind a component: 1.0 unless the
 component is in the workspace area (terminals and hosted content tabs) of a translucent ("glass") window, where it is
@@ -144,4 +157,4 @@ unantialiased rectangles (antialiased translucent fills fall back to software re
 lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
 carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
 announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
-outside a translucent window. Plugins that use it declare `sdk = ">=0.13.1, <0.14"`.
+outside a translucent window. Plugins that use it declare `sdk = ">=0.14.1, <0.15"`.

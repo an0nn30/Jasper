@@ -49,7 +49,10 @@ final class ConfigImportController implements AutoCloseable {
             if (!live(version)) return;
             if (failure != null) {
                 if (panel != null) panel.failed("Hosts could not be read. Fix hosts.toml and refresh.");
-                else { context.notices().error("Hosts could not be read. Fix hosts.toml before importing."); close(); }
+                else {
+                    context.notifications().group().error("Could not import hosts", "Hosts could not be read. Fix hosts.toml before importing.", failure);
+                    close();
+                }
                 return;
             }
             readPreview(version);
@@ -68,7 +71,12 @@ final class ConfigImportController implements AutoCloseable {
                     dialog.setContent(panel); dialog.show();
                 });
             } catch (Exception unreadable) {
-                ui.execute(() -> { if (live(version)) { context.notices().error("Could not read SSH config"); close(); } });
+                ui.execute(() -> {
+                    if (!live(version)) return;
+                    context.notifications().group().error("Could not read the SSH config", sshDir.resolve("config") + ": "
+                        + (unreadable.getMessage() == null ? unreadable.getClass().getSimpleName() : unreadable.getMessage()), unreadable);
+                    close();
+                });
             }
         });
     }
@@ -134,7 +142,8 @@ final class ConfigImportController implements AutoCloseable {
                         .whenComplete((ignored, saveFailure) -> ui.execute(() -> {
                             saving = false;
                             if (saveFailure != null) {
-                                context.notices().error("Keys were saved in Vault; hosts were not updated. Refresh the import and retry.");
+                                context.notifications().group().error("Hosts were not updated",
+                                    "Keys were saved in Vault, but hosts.toml was not. Refresh the import and retry.", saveFailure);
                                 if (live(version)) panel.failed("Hosts were not saved. Refresh the preview and retry.");
                             } else if (live(version)) {
                                 long updates = selected.stream().filter(c -> c.previous().isPresent()).count();

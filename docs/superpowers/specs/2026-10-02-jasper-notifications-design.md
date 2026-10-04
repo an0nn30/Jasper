@@ -3,7 +3,9 @@
 **Status:** Design approved in chat by the user on 2026-10-02, section by section; the written spec was approved the
 same day. [Plan 1 (core)](../plans/2026-10-02-notifications-1-core.md) is implemented on branch
 `claude/notifications` (worktree `.worktrees/notifications`, cut from main `e91512f6`); the plan's status banner
-records the execution deviations and the final-review fixes.
+records the execution deviations and the final-review fixes. Plan 1 is merged to main (`63e3b95c`). [Plan 2
+(incidents)](../plans/2026-10-02-notifications-2-incidents.md) is merged to main (`c02673cd`). [Plan 3
+(SDK)](../plans/2026-10-03-notifications-3-sdk.md) is implemented on branch `claude/notifications-3`.
 
 **Replaces, once implemented:** the modal `JOptionPane` defaults of `WindowContent.onError` / `onInfo`, the SDK's
 `Notices` (`PluginContext.notices()`), `CommandNotifier`'s private OS sink, and Buddy's finished-card history

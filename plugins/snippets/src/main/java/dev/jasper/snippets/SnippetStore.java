@@ -1,6 +1,7 @@
 package dev.jasper.snippets;
 
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.notifications.NotificationGroup;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -111,14 +112,20 @@ public final class SnippetStore implements AutoCloseable {
         });
     }
 
-        /** Creates the file with its header when missing, then hands it to the editor (which reports its own failures). */
-        public void openInEditor(Consumer<String> onError) {
+        /**
+         * Creates the file with its header when missing, then hands it to the editor (which reports its own failures).
+         * A failure here is posted in {@code notifications}, with its cause.
+         */
+        public void openInEditor(NotificationGroup notifications) {
             submit(() -> {
                 try {
                     if (!Files.exists(file)) StateFile.writeAtomically(file, ".snippets-", SnippetFile.HEADER);
                     editor.accept(file);
                 } catch (IOException | RuntimeException failure) {
-                    deliver.execute(() -> { if (!closed) onError.accept("Could not open " + file + ": " + failure.getMessage()); });
+                    String reason = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+                    deliver.execute(() -> {
+                        if (!closed) notifications.error("Could not open the snippets file", file + ": " + reason, failure);
+                    });
                 }
             });
         }

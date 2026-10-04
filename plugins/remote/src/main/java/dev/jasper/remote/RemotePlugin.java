@@ -181,7 +181,7 @@ public class RemotePlugin implements Plugin {
             var editor=context.services().find(dev.jasper.editor.api.Editor.class);
             if(editor.isPresent()) {
                 editChannels=new dev.jasper.remote.edit.EditChannels((identity,owner)->endpoints.open(Optional.of(identity),owner.orElse(null),status->{}),connections::authenticated,transferBackground,ui);
-                var editing=new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notices()::error,
+                var editing=new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notifications().group(),
                     id->store.hosts().stream().filter(host->host.id().equals(id)).findFirst());
                 sftpUi.editing(editing);
                 try { reopener=editing.registerReopener(); } catch(NoSuchMethodError older) { /* an Editor before 0.4 keeps no recent files */ }
@@ -407,7 +407,10 @@ public class RemotePlugin implements Plugin {
                 var unused = ready.getAndSet(null); if (unused != null) unused.connection().close().run();
                 throw failure;
             }
-        }); } catch (RuntimeException failure) { context.notices().error(message(failure)); return; }
+        }); } catch (RuntimeException failure) {
+            context.notifications().group().error("Could not start the connection", host.name() + ": " + message(failure), failure);
+            return;
+        }
         attempts.add(attempt); attempt.start();
     }
 
@@ -458,7 +461,11 @@ public class RemotePlugin implements Plugin {
             if (future != null && !future.isDone()) return;
             panel.working();
             try { dialog.show(); }
-            catch (RuntimeException failure) { context.notices().error(message(failure)); close(); return; }
+            catch (RuntimeException failure) {
+                context.notifications().group().error("Could not show the connection dialog", host.name() + ": " + message(failure), failure);
+                close();
+                return;
+            }
             var dimensions = window.activeTab().flatMap(tab -> tab.activePane()).map(PaneHandle::info);
             int cols = dimensions.map(info -> Math.max(1, info.columns())).orElse(80);
             int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);
@@ -486,7 +493,7 @@ public class RemotePlugin implements Plugin {
     private void splitSameHost(PaneHandle pane) {
         UUID hostId = panes.get(pane.id());
         Optional<RemoteHost> host = hostId == null ? Optional.empty() : store.host(hostId);
-        if (host.isEmpty()) { context.notices().error("Split with Same Host needs a connected SSH pane"); return; }
+        if (host.isEmpty()) { context.notifications().group().warning("Split with Same Host needs a connected SSH pane", ""); return; }
         splitHost(pane, host.get());
     }
 
@@ -535,7 +542,10 @@ public class RemotePlugin implements Plugin {
             host -> store.put(host).whenComplete((ignored, failure) -> ui.execute(() -> {
                 if (stopped) return;
                 if (failure == null) dialog.close();
-                else { if (!closed[0]) editor[0].showError(message(failure)); context.notices().error(message(failure)); }
+                else {
+                    if (!closed[0]) editor[0].showError(message(failure));
+                    context.notifications().group().error("Could not save the host", message(failure), failure);
+                }
             })),
             dialog::close);
         editor[0].setDefaultGroupName(panelState.defaultGroup());
@@ -548,7 +558,10 @@ public class RemotePlugin implements Plugin {
     private void deleteHost(WindowHandle window, RemoteHost host) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Delete " + host.name() + "?", window, true));
         currentConfirm = new ConfirmPanel(deleteHostText(host), "Delete",
-            () -> store.remove(host.id()).whenComplete((ignored, failure) -> ui.execute(() -> { if (failure != null) context.notices().error(message(failure)); dialog.close(); })), dialog::close);
+            () -> store.remove(host.id()).whenComplete((ignored, failure) -> ui.execute(() -> {
+                if (failure != null) context.notifications().group().error("Could not delete the host", message(failure), failure);
+                dialog.close();
+            })), dialog::close);
         dialog.setContent(currentConfirm);
         dialog.onClosed(() -> currentConfirm = null);
         dialog.show();
@@ -573,8 +586,8 @@ public class RemotePlugin implements Plugin {
     private javax.swing.JComponent createPanel(PanelHost host) {
         WindowHandle window = host.window();
         var panel = new HostsPanel(new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
-            editing -> editHost(window, editing), h -> reportMutation(store.put(duplicate(h))), h -> deleteHost(window, h),
-            (h, favorite) -> reportMutation(store.put(h.withFavorite(favorite))), () -> importConfig(window)), context.appearance()::icon);
+            editing -> editHost(window, editing), h -> reportMutation("Could not duplicate the host", store.put(duplicate(h))), h -> deleteHost(window, h),
+            (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), context.appearance()::icon);
         panel.setCredentialLabels(this::credentialLabel);
         panel.setDefaultGroup(panelState.defaultGroup());
         panel.onRenameDefaultGroup(() -> renameDefaultGroup(window));
@@ -594,9 +607,9 @@ public class RemotePlugin implements Plugin {
         return panel;
     }
 
-    private void reportMutation(CompletableFuture<Void> mutation) {
+    private void reportMutation(String title, CompletableFuture<Void> mutation) {
         mutation.whenComplete((ignored, failure) -> ui.execute(() -> {
-            if (!stopped && failure != null) context.notices().error(message(failure));
+            if (!stopped && failure != null) context.notifications().group().error(title, message(failure), failure);
         }));
     }
 

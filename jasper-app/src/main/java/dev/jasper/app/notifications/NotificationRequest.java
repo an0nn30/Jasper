@@ -19,14 +19,12 @@ public record NotificationRequest(String group, Severity severity, String title,
     public static final int MAX_CONTENT = 4_000;
     public static final int MAX_ACTIONS = 8;
     public static final String JASPER = "jasper";
-    /** The room a title gets when it is only the opening of a longer message. */
-    static final int SHORT_TITLE = 120;
 
     public NotificationRequest {
         Objects.requireNonNull(group, "group");
         Objects.requireNonNull(severity, "severity");
         title = NotificationText.line(Objects.requireNonNull(title, "title"), MAX_TITLE);
-        if (title.isEmpty()) throw new IllegalArgumentException("A notification needs a title");
+        if (!NotificationText.visible(title)) throw new IllegalArgumentException("A notification needs a title");
         content = NotificationText.block(Objects.requireNonNull(content, "content"), MAX_CONTENT);
         Objects.requireNonNull(icon, "icon");
         actions = List.copyOf(actions);
@@ -39,19 +37,6 @@ public record NotificationRequest(String group, Severity severity, String title,
     /** A notification of Jasper's own with only a title. */
     public static NotificationRequest of(String group, Severity severity, String title) {
         return new NotificationRequest(group, severity, title, "", Optional.empty(), List.of(), Optional.empty(), JASPER, Optional.empty());
-    }
-
-    /**
-     * A message of unknown shape, such as a plugin's one-or-two-sentence notice: a short single line is the title;
-     * otherwise its first line, cut, is the title and the whole message the content.
-     */
-    public static NotificationRequest message(String group, Severity severity, String text) {
-        String whole = NotificationText.block(Objects.requireNonNull(text, "text"), MAX_CONTENT);
-        if (whole.isEmpty()) return of(group, severity, "No message");
-        int newline = whole.indexOf('\n');
-        String first = newline < 0 ? whole : whole.substring(0, newline);
-        if (newline < 0 && first.length() <= SHORT_TITLE) return of(group, severity, first);
-        return of(group, severity, NotificationText.cut(first, SHORT_TITLE)).withContent(whole);
     }
 
     public NotificationRequest withContent(String value) {

@@ -211,7 +211,8 @@ class RemoteEditingPluginTest {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var panel = browse(host, server, files, dir, Optional.of(editor), 1);
             enter(panel, "notes.toml");
-            assertThat(host.notices()).containsExactly("dev.jasper.remote: Could not open /notes.toml in the Editor: the Editor window is closing");
+            assertThat(host.notifications().lines()).containsExactly(
+                "dev.jasper.remote|ERROR|Could not open a file in the Editor|/notes.toml: the Editor window is closing|IllegalStateException");
             editor.failure = null;
             enter(panel, "notes.toml");
             assertThat(editor.documents).hasSize(1);

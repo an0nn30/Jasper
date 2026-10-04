@@ -4,6 +4,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.testing.FakePluginHost;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
+import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.vault.model.Note;
 import dev.jasper.vault.model.Grant;
 import dev.jasper.vault.service.VaultService;
@@ -24,7 +25,7 @@ class VaultManagerWindowTest {
             var context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
             host.addTerminalWindow();
             var owner = context.terminals().windows().getFirst();
-            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, text -> { });
+            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
             var window = new VaultManagerWindow(context, f.lock, f.manager, service,
                 new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "test", () -> { });
             window.show(owner, Optional.empty());
@@ -46,7 +47,7 @@ class VaultManagerWindowTest {
             PluginContext context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
             host.addTerminalWindow();
             WindowHandle owner = context.terminals().windows().getFirst();
-            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, text -> { });
+            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
             var window = new VaultManagerWindow(context, f.lock, f.manager, service,
                 new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "Device secret: test", () -> { });
             UUID id = UUID.randomUUID();
@@ -69,7 +70,7 @@ class VaultManagerWindowTest {
             var controller = new AtomicReference<VaultManagerWindow>();
             var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> {
                 prompts[0]++; assertThat(controller.get().showUnlock(prompt)).isTrue();
-            }, p -> { }, p -> { }, text -> { });
+            }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
             var window = new VaultManagerWindow(context, f.lock, f.manager, service,
                 new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "status", () -> { });
             controller.set(window);
@@ -101,7 +102,7 @@ class VaultManagerWindowTest {
         try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
             PluginContext context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
             host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
-            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, text -> { });
+            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
             var window = new VaultManagerWindow(context, f.lock, f.manager, service,
                 new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "status", () -> { });
             UUID id = UUID.randomUUID();
@@ -119,7 +120,7 @@ class VaultManagerWindowTest {
         try (var f = new VaultUiFixture(java.nio.file.Files.createDirectories(directory.resolve("modern"))); var host = new FakePluginHost()) {
             PluginContext context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
             host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
-            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> {}, p -> {}, p -> {}, text -> {});
+            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> {}, p -> {}, p -> {}, new FakeNotifications().group("dev.jasper.vault"));
             var window = new VaultManagerWindow(context, f.lock, f.manager, service,
                 new SecretClipboard(text -> {}, Optional::empty, clear -> {}), () -> "status", () -> {});
             window.show(owner, Optional.empty());

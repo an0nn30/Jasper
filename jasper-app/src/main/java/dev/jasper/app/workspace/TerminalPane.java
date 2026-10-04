@@ -64,7 +64,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     Runnable onChanged = () -> {};
     Runnable onFocused = () -> {};
     Runnable onClose = () -> {};
-    Consumer<String> onFailure = message -> {};
+    BiConsumer<String, Throwable> onFailure = (message, cause) -> {};
     Consumer<TerminalView> onReady = terminal -> {};
 
     /** A command finished: its text, exit status, how long it ran and where, locally or remotely. Delivered on the EDT. */
@@ -235,7 +235,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 var message = new JLabel("Could not start terminal: " + cause.getMessage());
                 message.setForeground(getForeground()); add(message);
                 revalidate(); repaint();
-                onFailure.accept("Could not start terminal in " + launchDirectory + ":\n" + cause.getMessage());
+                onFailure.accept("Could not start terminal in " + launchDirectory + ":\n" + cause.getMessage(), failure);
                 return;
             }
             adopt(created);
@@ -557,7 +557,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         onDirectoryChanged = (directory, remote) -> {}; onBell = () -> {}; onStarted = () -> {}; onExited = status -> {};
         onConnecting = () -> {};
         allowLaunchFocus = () -> false;
-        onReady = terminal -> {}; onFailure = message -> {};
+        onReady = terminal -> {}; onFailure = (message, cause) -> {};
         removeAll();
     }
 }

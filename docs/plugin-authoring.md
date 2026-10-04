@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.13.0, <0.14"
+sdk = ">=0.14.0, <0.15"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
@@ -459,13 +459,36 @@ private static void installPaletteDemo(PluginContext context) {
 }
 ```
 
-## Notices and the editor
+## Notifications and the editor
 
-`context.notices().error(message)` shows an error the way the application shows its own, in the
-window the user is using. `context.platform().openInEditor(file)` opens a file with the user's
-editor (configured editor, then the desktop, then revealing the file), in the background; a failure
-is reported as a notice. `context.platform().browse(uri)` opens an http or https address in the
-user's browser the same way (SDK 0.10.2); any other address throws `IllegalArgumentException`.
+`context.notifications()` (SDK 0.14.0) posts into Jasper's notifications, from any thread. Every plugin has a default
+group, named after the plugin and shown as cards. Declare another group during `start` when some of your notifications
+should be muted apart from the rest:
+
+```java
+NotificationGroup sync = context.notifications().group(new GroupSpec("dev.example.tool.sync", "Tool sync", DisplayMode.CARD));
+context.notifications().group().info("Synced", "3 hosts");
+sync.error("Could not sync", "prod: connection refused", failure);
+```
+
+- A title says what happened in a few words and carries no paths, host names or messages; those go in the content.
+  A title is one line of at most 200 characters and content at most 4,000; the shortcuts cut longer content.
+- Pass the cause whenever you have a `Throwable`. Jasper records it as your plugin's incident and adds **Show more…**,
+  which opens the Errors window at its stack trace. `error(title, cause)` uses the cause's class and message as the
+  content, reading through a `CompletionException` or `ExecutionException` to the failure behind it.
+- `post(NotificationSpec)` takes the whole spec: up to 8 actions (7 with a cause), each run on the UI thread and
+  expiring the notification unless made with `new NotificationAction(label, run, false)`; `withActivate` for a click
+  on the body; `withIcon`; `withWindow` to show the card in a particular window.
+- The returned `NotificationHandle` expires the notification. It also expires when the user removes it, when its
+  group drops it, and when your plugin stops.
+- Group ids follow the panel id pattern and start with your plugin id and a dot; `<plugin-id>.activities` is Jasper's.
+- When one of your activities succeeds or fails, Jasper posts its outcome in `<plugin-id>.activities`; post nothing
+  for it yourself.
+
+`context.platform().openInEditor(file)` opens a file with the user's editor (configured editor, then the desktop, then
+revealing the file), in the background; a failure is posted in your plugin's group. `context.platform().browse(uri)`
+opens an http or https address in the user's browser the same way (SDK 0.10.2); any other address throws
+`IllegalArgumentException`.
 
 ## Rules that matter
 
@@ -553,9 +576,12 @@ A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`
 `cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
 and closes inline where Jasper uses its cleanup thread.
 `host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
-drive a contributed scope as the palette would; `paletteOpens()`, `notices()`, `openedInEditor()`
+drive a contributed scope as the palette would; `paletteOpens()`, `openedInEditor()`
 and `browsed()` record what the plugin asked for. `connectionLog()` lists delivered connection events, as
-`activityLog()` does activities.
+`activityLog()` does activities. `host.notifications()` records what the plugin posted: `lines()` as
+`group|SEVERITY|title|content`, with `|` and the cause's simple class name when it had one, `posts()` with their specs
+and whether they expired, `groups()` as `id|name|MODE`, and `runAction(title, label)` and `click(title)` act as the
+user would. A component that takes a `NotificationGroup` can be given `new FakeNotifications().group(id)`.
 
 ## Building the in-repo plugins
 
@@ -716,7 +742,7 @@ The no-argument `current()` reads the published workspace palette. A popup or to
 opened from a workspace pane. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
 workspace event; an event can change colors while `workspaceVariant()` remains `DARK` or `LIGHT`. Keep the document
 and undo model when changing only its styles.
-Since SDK 0.13.1, a surface that should follow a translucent window reads `Appearance.workspaceOpacity(component)` on
+Since SDK 0.14.1, a surface that should follow a translucent window reads `Appearance.workspaceOpacity(component)` on
 the UI thread (it is 1 unless the component is in the workspace area of a translucent window, so tool and side panels
 stay opaque), fills its own background once with that alpha (`AlphaComposite.Src`, unantialiased rectangles) and keeps
 the components above it non-opaque; `onWorkspaceChanged` also fires when the opacity changes or the component moves to

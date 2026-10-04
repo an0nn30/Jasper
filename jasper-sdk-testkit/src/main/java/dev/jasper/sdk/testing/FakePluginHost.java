@@ -77,9 +77,9 @@ public final class FakePluginHost implements AutoCloseable {
     private final java.util.ArrayDeque<List<dev.jasper.sdk.files.FileLocation>> fileChoiceQueue = new java.util.ArrayDeque<>();
     private final List<dev.jasper.sdk.files.FileChoice> fileChoices = new ArrayList<>();
         final List<String> paletteOpens = new ArrayList<>();
-        final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
     final List<java.net.URI> browsed = new CopyOnWriteArrayList<>();
+    final FakeNotifications notifications = new FakeNotifications(this);
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
@@ -132,7 +132,7 @@ public final class FakePluginHost implements AutoCloseable {
      * workspace change on the next {@link #flush()} (no announcement when unchanged). Like the other workspace values,
      * components report the last flushed opacity until then.
      * @param opacity from 0.1 to 1
-     * @since 0.13.1
+     * @since 0.14.1
      */
     public void setWorkspaceOpacity(double opacity) {
         requireAppearanceThread();
@@ -193,6 +193,7 @@ public final class FakePluginHost implements AutoCloseable {
                 return context;
             }
         }
+        notifications.declareDefaults(info.id(), info.name());
         for (var provider : committed.entrySet()) {
             if (!context.requires.contains(provider.getValue().pluginId())) continue;
             try { context.services.put(provider.getKey(), provider.getValue().factory().apply(info)); }
@@ -350,6 +351,14 @@ public final class FakePluginHost implements AutoCloseable {
      * @return the events in delivery order
      */
     public List<ConnectionEvent> connectionLog() { return List.copyOf(connectionLog); }
+
+    /**
+     * What plugins posted and the groups declared for them.
+     *
+     * @return the host's notifications
+     * @since 0.14.0
+     */
+    public FakeNotifications notifications() { return notifications; }
 
     /**
      * Contained failures: throwing starts, stops, handlers, factories and background tasks.
@@ -529,6 +538,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.ui.closeAll();
         context.palette.closeAll();
         context.fileSources.closeAll();
+        notifications.stopped(context.plugin().id());
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
         for (ActivityEvent open : List.copyOf(running.values())) {
@@ -578,13 +588,33 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     private void deliver(String topicId, Object payload) {
-        if (payload instanceof ActivityEvent event && topicId.equals(Activities.TOPIC.id())) activityLog.add(event);
+        if (payload instanceof ActivityEvent event && topicId.equals(Activities.TOPIC.id())) {
+            activityLog.add(event);
+            outcome(event);
+        }
         if (payload instanceof ConnectionEvent event && topicId.equals(Activities.CONNECTIONS.id())) connectionLog.add(event);
         for (Entry entry : subscribers.getOrDefault(topicId, new CopyOnWriteArrayList<>())) {
             if (entry.closed().get()) continue;
             try { entry.handler().accept(payload); }
             catch (RuntimeException | LinkageError failure) { failures.add(entry.pluginId() + " handler: " + failure); }
         }
+    }
+
+    /**
+     * As the host does: an activity that succeeded or failed is posted in its plugin's activities group, unless the
+     * plugin is no longer running.
+     */
+    private void outcome(ActivityEvent event) {
+        FakePluginContext owner = contexts.get(event.sourcePluginId());
+        if (owner == null || !active(event.sourcePluginId())) return;
+        // Like the host: only the source plugin's own action, run in the window used last.
+        Optional<Runnable> activate = event.activateActionId().filter(owner.ui.actions::containsKey)
+            .<Runnable>map(id -> () -> {
+                var window = workspace.lastActive;
+                if (window != null) invoke(id, window.id, workspace.activePane().map(pane -> pane.id).orElse(null));
+            });
+        try { notifications.outcome(event, activate); }
+        catch (IllegalArgumentException unshowable) { failures.add(event.sourcePluginId() + " activity outcome: " + unshowable); }
     }
 
     void stage(String pluginId, Class<?> api, Function<PluginInfo, ?> factory) {
@@ -1294,9 +1324,6 @@ public final class FakePluginHost implements AutoCloseable {
 
         /** Every {@code Palette.open} call as {@code windowId scopeId query rowId}, with {@code -} for an absent value. */
         public List<String> paletteOpens() { return List.copyOf(paletteOpens); }
-
-        /** Every error notice as {@code pluginId: message}. */
-        public List<String> notices() { return List.copyOf(notices); }
 
         /** Every file a plugin asked to open in the editor. */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }

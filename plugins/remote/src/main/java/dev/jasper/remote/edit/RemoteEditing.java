@@ -9,6 +9,7 @@ import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.notifications.NotificationGroup;
 import dev.jasper.sdk.terminal.WindowHandle;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +17,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -32,30 +32,30 @@ public final class RemoteEditing {
     private final Editor editor;
     private final EditChannels channels;
     private final Supplier<Optional<WindowHandle>> activeWindow;
-    private final Consumer<String> notice;
+    private final NotificationGroup notifications;
     private final Function<UUID, Optional<RemoteHost>> hosts;
 
     /**
      * @param editor the Editor's service
      * @param channels where documents queue their operations
      * @param activeWindow the terminal window used last, for sign-in prompts once the origin window has closed
-     * @param notice shows an error notice
+     * @param notifications where a file the Editor cannot open is posted
      */
-    public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, Consumer<String> notice) {
-        this(editor, channels, activeWindow, notice, id -> Optional.empty());
+    public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, NotificationGroup notifications) {
+        this(editor, channels, activeWindow, notifications, id -> Optional.empty());
     }
 
     /**
      * @param editor the Editor's service
      * @param channels where documents queue their operations
      * @param activeWindow the terminal window used last, for sign-in prompts once the origin window has closed
-     * @param notice shows an error notice
+     * @param notifications where a file the Editor cannot open is posted
      * @param hosts finds a saved host by id, in memory, for reopening recent files
      */
-    public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, Consumer<String> notice,
+    public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, NotificationGroup notifications,
                          Function<UUID, Optional<RemoteHost>> hosts) {
         this.editor = Objects.requireNonNull(editor); this.channels = Objects.requireNonNull(channels);
-        this.activeWindow = Objects.requireNonNull(activeWindow); this.notice = Objects.requireNonNull(notice);
+        this.activeWindow = Objects.requireNonNull(activeWindow); this.notifications = Objects.requireNonNull(notifications);
         this.hosts = Objects.requireNonNull(hosts);
     }
 
@@ -126,8 +126,8 @@ public final class RemoteEditing {
             editor.open(new RemoteDocument(identity, path, channels, owner(from)), from);
         } catch (RuntimeException failure) {
             // The host does not contain calls between plugins.
-            notice.accept("Could not open " + path + " in the Editor: "
-                + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
+            notifications.error("Could not open a file in the Editor", path + ": "
+                + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()), failure);
         }
     }
 

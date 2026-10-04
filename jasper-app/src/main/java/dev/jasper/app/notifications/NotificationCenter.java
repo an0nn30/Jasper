@@ -54,6 +54,7 @@ public final class NotificationCenter {
     private final List<Consumer<Change>> listeners = new ArrayList<>();
     private final ArrayDeque<Change> queue = new ArrayDeque<>();
     private boolean delivering;
+    private Consumer<Throwable> actionFailures = failure -> { };
 
     /**
      * @param ui runs {@link #submit}ted posts on the EDT ({@code SwingUtilities::invokeLater} in the application)
@@ -115,13 +116,7 @@ public final class NotificationCenter {
             history.put(entry.id(), entry);
             trim();
         }
-        if (outcome.card()) {
-            pending.remove(entry.id()); // a repeat may still wait from an earlier background post; its card shows now
-            emit(new Change.Upserted(entry), new Change.CardRequested(entry));
-        } else {
-            if (outcome.pending()) pending.add(entry.id());
-            emit(new Change.Upserted(entry));
-        }
+        announce(entry, outcome);
         return Optional.of(entry.id());
     }
 
@@ -130,6 +125,48 @@ public final class NotificationCenter {
         Objects.requireNonNull(request, "request");
         if (SwingUtilities.isEventDispatchThread()) post(request);
         else ui.execute(() -> post(request));
+    }
+
+    /**
+     * An incident happened again (spec section 5): the entry is counted, re-stamped, unread again and moved to the
+     * top, whatever its text. With {@code showCard} its card shows again as its group's mode routes it; otherwise a
+     * card already showing only updates.
+     *
+     * @param id the entry
+     * @param showCard whether the card may show again
+     * @return false when the entry is gone or expired, so the caller posts a new notification instead
+     */
+    public boolean repeat(UUID id, boolean showCard) { return repeat(id, showCard, 1); }
+
+    /**
+     * An incident happened {@code times} more times since its entry was last updated: as
+     * {@link #repeat(UUID, boolean)}, counted once for each, in one update.
+     *
+     * @param id the entry
+     * @param showCard whether the card may show again
+     * @param times how many more times, at least 1
+     * @return false when the entry is gone or expired, so the caller posts a new notification instead
+     */
+    public boolean repeat(UUID id, boolean showCard, int times) {
+        requireEdt();
+        if (times < 1) throw new IllegalArgumentException("A repeat happened at least once");
+        Notification earlier = history.get(id);
+        if (earlier == null || earlier.expired()) return false;
+        Notification entry = earlier.repeated(clock.instant(), times);
+        history.remove(id);
+        history.put(id, entry);
+        announce(entry, showCard ? Delivery.route(mode(entry.request().group()), presence.get()) : Delivery.Outcome.HISTORY);
+        return true;
+    }
+
+    /**
+     * Where an action's or a default action's exception goes after it is logged; the application records an incident.
+     *
+     * @param sink hears each failure on the EDT
+     */
+    public void reportActionFailuresTo(Consumer<Throwable> sink) {
+        requireEdt();
+        actionFailures = Objects.requireNonNull(sink, "sink");
     }
 
     public Optional<Notification> find(UUID id) {
@@ -226,6 +263,17 @@ public final class NotificationCenter {
         return new Subscription(() -> listeners.remove(listener));
     }
 
+    /** Emits the entry's change, with its card when the outcome shows one now, or remembers that the card waits. */
+    private void announce(Notification entry, Delivery.Outcome outcome) {
+        if (outcome.card()) {
+            pending.remove(entry.id()); // a repeat may still wait from an earlier background post; its card shows now
+            emit(new Change.Upserted(entry), new Change.CardRequested(entry));
+        } else {
+            if (outcome.pending()) pending.add(entry.id());
+            emit(new Change.Upserted(entry));
+        }
+    }
+
     private Notification repeatOf(NotificationRequest request, Instant now) {
         for (Notification entry : history.values())
             if (!entry.expired() && entry.request().sameText(request) && !now.isAfter(entry.posted().plus(COALESCE))) return entry;
@@ -269,9 +317,15 @@ public final class NotificationCenter {
         } finally { delivering = false; }
     }
 
-    private static void contained(Runnable task, String failed) {
+    private void contained(Runnable task, String failed) {
         try { task.run(); }
-        catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, failed, failure); }
+        catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, failed, failure);
+            try { actionFailures.accept(failure); }
+            catch (RuntimeException unrecorded) {
+                LOG.log(System.Logger.Level.WARNING, "A notification action's failure could not be recorded", unrecorded);
+            }
+        }
     }
 
     private static void requireEdt() {

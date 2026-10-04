@@ -28,7 +28,7 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     private Icon terminalIcon;
     Runnable onChanged = () -> {};
     Runnable onEmpty = () -> {};
-    Consumer<String> onError = message -> {};
+    java.util.function.BiConsumer<String, Throwable> onError = (message, cause) -> {};
     /** Whether this tab is the only one its window holds; set by the window. */
     java.util.function.BooleanSupplier lastInWindow = () -> false;
     Consumer<TerminalPane> onPaneCreated = pane -> {};
@@ -60,8 +60,8 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
         pane.onChanged = () -> onChanged.run();
         pane.onFocused = () -> focus(pane);
         pane.onClose = () -> closePane(pane);
-        pane.onFailure = message -> {
-            onError.accept(message);
+        pane.onFailure = (message, cause) -> {
+            onError.accept(message, cause);
             // The window's only pane stays, showing why it failed: closing it would close the window before anyone read the error.
             if (panes.size() > 1 || !lastInWindow.getAsBoolean()) closePane(pane);
         };
@@ -251,7 +251,7 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
         if (closed) return;
         closed = true; ++renderGeneration;
         panes.values().forEach(TerminalPane::close); panes.clear(); splits.clear(); removeAll();
-        onChanged = () -> {}; onEmpty = () -> {}; configure = pane -> {}; onPaneCreated = pane -> {}; onError = message -> {};
+        onChanged = () -> {}; onEmpty = () -> {}; configure = pane -> {}; onPaneCreated = pane -> {}; onError = (message, cause) -> {};
         lastInWindow = () -> false;
     }
 }

@@ -68,7 +68,7 @@ public final class EditorPlugin implements Plugin {
         Reopeners reopeners = new Reopeners(file -> new LocalDocument(file, context.background()));
         recent = RecentFiles.load(context.dataDirectory().resolve("recent-files.toml"), context.background(), settings::recentFilesDays, Instant.now());
         var scope = new RecentFilesScope(recent, reopeners, Instant::now, (document, owner) -> window().open(document, owner),
-            context.notices()::error, context.appearance().icon(IconName.FILE));
+            context.notifications().group(), context.appearance().icon(IconName.FILE));
         context.settings().onChanged(() -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.settings().onChanged(() -> ui.execute(() -> { recent.prune(Instant.now()); scope.changed(); }));
         context.appearance().onWorkspaceChanged(variant -> ui.execute(() -> { if (window != null) window.apply(); }));

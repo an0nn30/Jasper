@@ -33,14 +33,16 @@ public interface ActivityHandle {
     void detail(String detail);
 
     /**
-     * Ends the activity successfully.
+     * Ends the activity successfully. The host posts the outcome as a notification in the plugin's activities group;
+     * see {@link Activities}.
      *
      * @param detail final detail line
      */
     void succeed(String detail);
 
     /**
-     * Ends the activity as failed.
+     * Ends the activity as failed. The host posts the outcome as a notification in the plugin's activities group; see
+     * {@link Activities}.
      *
      * @param detail final detail line
      */

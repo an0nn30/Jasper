@@ -21,9 +21,12 @@ import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.CommandNotice;
 import dev.jasper.app.notifications.CommandNotifier;
 import dev.jasper.app.notifications.Delivery;
+import dev.jasper.app.notifications.IncidentReport;
+import dev.jasper.app.notifications.Incidents;
 import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.notifications.NotificationRequest;
 import dev.jasper.app.notifications.Severity;
+import dev.jasper.app.notificationui.ErrorsView;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
@@ -128,6 +131,12 @@ public final class JasperApplication {
     private ActivityNotifier activityNotifier;
     private final NotificationCenter notificationCenter;
     private final NotificationsFeature notificationViews;
+    private final Incidents incidents;
+    private final IncidentNotices incidentNotices;
+    /** Built once plugins start, with the auxiliary windows it opens in. */
+    private ErrorsWindow errorsWindow;
+    /** Where Open Log Folder points, known once plugins start. */
+    private Path logFolder;
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
@@ -191,6 +200,10 @@ public final class JasperApplication {
         themes = created;
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions);
+        incidents = new Incidents(notificationCenter.clock());
+        incidentNotices = new IncidentNotices(notificationCenter, incidents, SwingUtilities::invokeLater,
+            JasperApplication::afterDelay, this::pluginName, this::disablePlugin, this::showErrors);
+        notificationCenter.reportActionFailuresTo(failure -> incidentNotices.jasperFailure("a notification action", failure));
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
@@ -318,6 +331,7 @@ public final class JasperApplication {
         UUID windowId = window.content().id();
         window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
         window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
+        window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
         notificationViews.attach(window.content());
         window.content().connectTerminals(terminals, window::toFront);
         if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
@@ -455,17 +469,26 @@ public final class JasperApplication {
             () -> newWindow(), this::quit);
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
+        logFolder = dirs.logs();
+        errorsWindow = new ErrorsWindow(contributions, auxiliary, incidents, new ErrorsView.Hooks(this::pluginName,
+            id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),
+            this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone());
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
             new PluginRuntime.SettingsReports(
                 diagnostic -> { if (configuration != null) configuration.report(diagnostic); },
                 file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
-            this::notice, new dev.jasper.app.platform.ConfigEditor()::open,
+            new PluginRuntime.NotificationHost(notificationCenter,
+                caused -> incidentNotices.pluginNotice(caused.pluginId(), caused.request(), caused.cause(), caused.posted()),
+                (title, details) -> notificationCenter.submit(NotificationRequest.of(IncidentNotices.PLUGINS.id(), Severity.ERROR, title)
+                    .withContent(details))),
+            new dev.jasper.app.platform.ConfigEditor()::open,
             new PluginRuntime.ShellProfiles(shellProfiles::current, shellProfiles::onChanged));
         plugins.glass(WORKSPACE_GLASS ? new dev.jasper.app.plugins.GlassSource(this::glassOpacity, listener -> {
             glassListeners.add(listener);
             return new Subscription(() -> glassListeners.remove(listener));
         }) : dev.jasper.app.plugins.GlassSource.NONE);
+        plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
@@ -481,6 +504,8 @@ public final class JasperApplication {
             return created.content().id();
         });
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
+        new PluginProblemNotices(notificationCenter, incidentNotices,
+            () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         var keymap = new dev.jasper.app.shortcuthelp.KeymapPage.Hooks(contributions,
             () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).keybindings(),
@@ -569,11 +594,6 @@ public final class JasperApplication {
             });
         }
 
-        /** A plugin's error notice, until plugins post notifications themselves: one message, split into title and details. */
-        void notice(String message) {
-            notificationCenter.submit(NotificationRequest.message(NotificationsFeature.GENERAL.id(), Severity.ERROR, message));
-        }
-
     /** Where Jasper stands for notifications: focused, in the background, or with no window open. */
     private Delivery.Presence presence() {
         return presence(!windows.isEmpty(), activatedSinceOpen,
@@ -588,6 +608,49 @@ public final class JasperApplication {
     static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive) {
         if (!windowsOpen || !activatedSinceOpen) return Delivery.Presence.NO_WINDOW;
         return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
+    }
+
+    /** An uncaught failure, after the default handler logged it: an incident (spec section 7, producer 6). Any thread. */
+    public void unexpected(Thread thread, Throwable failure) {
+        incidentNotices.jasperFailure(thread == null ? "an unknown thread" : "thread " + thread.getName(), failure);
+    }
+
+    private String pluginName(String id) {
+        PluginRuntime running = plugins;
+        return running == null ? id : running.pluginNames().getOrDefault(id, id);
+    }
+
+    /** Disable Plugin on an incident: the Plugins page's operation, effective from the next launch. */
+    private void disablePlugin(String id, Consumer<Optional<String>> done) {
+        if (plugins == null || stopped) {
+            done.accept(Optional.of("Plugins are not running."));
+            return;
+        }
+        plugins.setEnabled(id, false, outcome -> done.accept(outcome.ok() ? Optional.empty()
+            : Optional.of(outcome.message() == null ? "" : outcome.message())));
+    }
+
+    /** Show more… on an incident's notification: the Errors window, with that incident selected. */
+    private void showErrors(UUID incident) {
+        if (errorsWindow != null && !quitting && !stopped) errorsWindow.show(Optional.of(incident));
+    }
+
+    private void copyReport(String text) {
+        try {
+            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
+                .setContents(new java.awt.datatransfer.StringSelection(text), null);
+        } catch (RuntimeException failure) {
+            notificationViews.error("Could not copy the report", failure.getMessage());
+        }
+    }
+
+    private void openLogFolder() {
+        Path folder = logFolder;
+        if (folder == null) return;
+        CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().openFolder(folder))
+            .whenComplete((ignored, failure) -> {
+                if (failure != null) SwingUtilities.invokeLater(() -> notificationViews.error("Could not open the log folder", folder.toString()));
+            });
     }
 
     /** Show Problems on the configuration notification: the details over the window used last. */
@@ -820,6 +883,10 @@ public final class JasperApplication {
 
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
 
+    NotificationCenter notificationCenter() { return notificationCenter; }
+
+    Incidents incidents() { return incidents; }
+
     /** The Plugins page's controller, created the first time Settings builds that page. */
     private PluginManager pluginManager() {
         if (pluginManager == null) {
@@ -885,6 +952,7 @@ public final class JasperApplication {
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();
         buddy.close();
+        incidentNotices.close();
         notificationViews.close();
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }

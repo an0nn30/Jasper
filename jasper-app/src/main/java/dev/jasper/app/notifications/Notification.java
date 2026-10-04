@@ -21,5 +21,8 @@ public record Notification(UUID id, NotificationRequest request, Instant posted,
     Notification withExpired() { return new Notification(id, request, posted, count, read, true); }
 
     /** The same text posted again: counted, re-stamped and unread again. */
-    Notification repeated(Instant at) { return new Notification(id, request, at, count + 1, false, expired); }
+    Notification repeated(Instant at) { return repeated(at, 1); }
+
+    /** The same text posted {@code times} more times: counted once for each, re-stamped and unread again. */
+    Notification repeated(Instant at, int times) { return new Notification(id, request, at, count + times, false, expired); }
 }

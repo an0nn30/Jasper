@@ -2,6 +2,29 @@
 
 ## Current state — 2026-10-03
 
+- **Notifications plan 3: SDK notifications, reviewed on branch `claude/notifications-3`; awaiting the user's GUI
+  checks and merge decision** (2026-10-03; plan `docs/superpowers/plans/2026-10-03-notifications-3-sdk.md`,
+  [guide](notifications.md#plugin-notifications)): SDK 0.14.0 adds `dev.jasper.sdk.notifications`
+  (`PluginContext.notifications()`, groups, specs with actions, a default action, an icon, a window and a cause) and
+  removes `Notices`; every bundled plugin declares `>=0.14.0, <0.15`. `plugins.HostedNotifications` posts into the
+  center with the plugin id as source and contained links; a cause becomes the plugin's incident with Show more…
+  (`IncidentNotices.pluginNotice`); a plugin's notifications expire when it stops. `PluginHost` posts succeeded and
+  failed activities in `<plugin-id>.activities`. After launch, `PluginProblemNotices` posts each load failure, skipped
+  plugin and unreadable plugin directory in Plugin problems with Open Plugins. The model now strips bidi controls,
+  treats invisible-only text as blank, fits poster icons to 16 px and bounds group names. Snippets, Editor, File
+  Server, Vault and Remote post titled notifications with their causes; Remote declares `dev.jasper.remote.tunnels`.
+  Spec interpretations: see the plan's list (1 to 17). `./gradlew check --continue`: **8,333 tests, 0 failures, 0
+  errors, 6 skipped** (39 new, after the final-review fix; one run in between failed only the known
+  `TerminalAppIntegrationTest` "reflow" row-reset flake, which passed in three isolated reruns and in the full rerun),
+  all four architecture gates and doclint included; the source hygiene check and `git diff --check c02673cd` are
+  clean. Final review: one important finding fixed (a plugin whose manifest `name` showed nothing stopped Jasper from
+  launching; `DescriptorParser` now rejects such a name, making it an unreadable-plugin problem); seven minor findings
+  are deferred in the plan's status banner. No GUI launched. Pushed to `origin` on 2026-10-03 with the dock polish
+  round, at the user's choice. GUI checks for the user: a plugin error card with Show
+  more… opening the Errors window; a long File Server transfer (one that runs past the activity threshold), whose
+  outcome is posted in "File Server activities" as "Sending <file>" or "Receiving <file>" (an interrupted one as an
+  error); a plugin directory without `plugin.toml` in the user plugins folder, reported at launch with Open Plugins.
+
 - **Merged `main` into `claude/dock-layout`** (2026-10-03; `main` at `63e3b95c`, merge base `cc0429f5`): main's
   features that touch the dock now use it. Unread badges are on the stripes: `ToolStripe.Button` carries the
   `PanelBadge`, a badged button shows a `BadgedIcon` and names the badge in its tooltip and accessible description, and
@@ -66,9 +89,22 @@
   (an action's enable or title change now refreshes the stripe in place, so only adding or removing an action or a
   rail placement, or a dock or panel change, re-renders it; follow-up pushed to main on 2026-10-03; GUI check: lock the
   vault, or otherwise change an action, while dragging a tool window, and the drag carries on); on stripes shorter than about 200px the
-  foot can clip by one step during a drag; and the overlay repaints the whole window on each drag event, which may
-  lag on large HiDPI windows (the GUI checks will tell). No GUI launched; GUI checks for the user are the plan's last
-  section.
+  foot can clip by one step during a drag; and the overlay now repaints only what changed on each drag event (each
+  changed guide's old and new bounds, nothing when none changed, no longer the whole window and every terminal under
+  it), and the placeholder's fill sits inside its border like the highlight's, so the two no longer stack; GUI check:
+  the ghost should not lag while dragging on a large HiDPI window; if the ghost still lags over a terminal, the next
+  lever is in `jasper-terminal`: `TerminalView.paintComponent` takes a full snapshot and paints every row whatever its
+  clip, so a terminal under a small dirty rectangle still pays the whole snapshot. No GUI launched; GUI checks for the
+  user are the plan's last section.
+  Polish round (2026-10-03, pushed to `main` with notifications plans 2 and 3 at the user's choice): the overlay repaints only what changed, the placeholder's
+  border no longer stacks over its fill, and the placeholder's fill is concentric with its border (its corner
+  diameter is `arc - 1`, where the border's inner edge lies); `DockState.dropIndex` is the one drop-index rule shared
+  by the preview and the drop. 8 new tests pin behaviour that was already there: `HostedUiTest` maps all six anchor and
+  split combinations to their slots (`everyAnchorAndSplitCombinationMapsToItsOwnSlot`); `UiStateTest` gains 7 cases: a
+  version 1 side takes its size from the visible panel, else from the first panel (2), the dock's sizes and ratios
+  exactly at their limits are accepted and one step outside each falls back alone (2), and a scalar where the `dock`
+  or `panels` table belongs, or where a panel entry does, loses only that part (3). `./gradlew check --continue`:
+  **8,314 tests, 0 failures, 0 errors, 6 skipped** (8,306 before).
 - **Dock layout plan 1: six slots** (branch `claude/dock-layout`,
   [plan](superpowers/plans/2026-10-02-jasper-dock-layout-plan-1-six-slots.md),
   [spec](superpowers/specs/2026-10-01-jasper-dock-layout-design.md)): IntelliJ-style tool windows apart from dragging.
@@ -189,7 +225,7 @@
   `Optional<Boolean>` that `GlassLevels.resolve` reads. Review follow-ups: the corner-mask observer is a
   `JasperCornerObserver` the effect view keeps alive, so its lifetime follows the view (and the window); the Blur row
   shows "Use theme's value" for `"theme"`.
-  Plan 2 (editor glass) is done: SDK 0.13.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0; `onWorkspaceChanged`
+  Plan 2 (editor glass) is done: SDK 0.14.1 adds `Appearance.workspaceOpacity(Component)` (default 1.0; `onWorkspaceChanged`
   also reports it, including a component entering or leaving a translucent window), answered by the app's `GlassSource`
   and `WindowContent.setGlassListener`; Editor 0.7.0 paints its text and gutter backgrounds once each in a `GlassSurface`
   and makes the area, viewports and gutter non-opaque (the current-line band takes the opacity's alpha; selection, caret,
@@ -219,6 +255,9 @@
   `ToolWindowArea`'s centre host (`setGlass`), and Opacity/Blur in an Appearance › Workspace section after main's theme
   rows, with no header off macOS (`SchemaPage` now hides a section whose rows are all hidden). `./gradlew check
   --continue`: 8,288 tests, 0 failures, 0 errors, 6 skipped.
+  A second merge of `origin/main` (`43894416`: SDK 0.14.0, Notices replaced by notifications, dock polish) moved
+  `workspaceOpacity` to SDK 0.14.1 (Editor 0.7.0 needs `>=0.14.1, <0.15`); `PluginHost.Environment` carries both
+  main's failure sink and the `GlassSource`. `./gradlew check --continue`: 8,429 tests, 0 failures, 0 errors, 6 skipped.
 - **Contended-endpoint rollback test: cold-JVM warm-up, not a lock bug** (branch `claude/suspicious-sinoussi-327047`,
   user request 2026-10-02): `ApplicationBootstrapRollbackTest.contendedEndpointCannotBlockEdtOrBoundedTermination[1]`
   failed every isolated run. EDT stack sampling showed the first composition in a JVM taking 1.6 s on the EDT
@@ -277,6 +316,36 @@
   suite then passed three isolated re-runs (160/160) and the next full run, so it is a load-dependent passive-port
   flake, not a regression (the branch does not touch File Server). Pushed to `origin` on 2026-10-03 with the dock
   layout, at the user's choice; the GUI checks are still the user's.
+
+- **Notifications plan 2: incidents and the Errors window, merged to local `main` (`c02673cd`); awaiting the user's
+  GUI checks** (2026-10-02 to 2026-10-03; plan
+  `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-window)):
+  uncaught exceptions on any thread, contained plugin failures, failed shell launches and failing notification
+  actions are in-memory incidents (at most 100, coalesced by source, class and root-cause frames, traces taken on the
+  catching thread and capped at 256 KiB). Each is announced by one ERROR notification in `jasper.errors`,
+  `jasper.plugins` or, for a shell, `jasper.general`, with Disable Plugin for plugins and Show more… last; a repeat
+  updates it at most once a second (failures waiting for the EDT are merged first, and the count catches up), with a
+  card at most once a minute. The Errors window lists them with Copy, Disable Plugin, Open Log Folder and Clear. The
+  log is unchanged. Recorded interpretations are in the plan's "Spec interpretations" section; the execution
+  deviations are in its status banner: each shell launch failure is announced in its own window (the repeat rules
+  cover Jasper and plugin incidents only), the center's 60 s coalescing still ignores the target, no package-info
+  files changed beyond `notifications` and `notificationui`, and the final review's fixes (the once-a-second update
+  with the merge, Show more… last, Open Log Folder opening the folder). Every task passed its review, and the final
+  whole-branch review's findings were fixed (`5aa67e75`, `ac407bbb`). Findings deferred to plans 3, 4 and 5, and the
+  smaller ones left open, are listed under "Deferred findings" in the plan's status banner. `./gradlew check`:
+  **8,161 tests, 0 failures, 0 errors, 6 skips** (all four architecture gates, doclint and compiled examples
+  included; source hygiene over the 34 changed Java files and `git diff --check` clean). No GUI was launched. Pushed
+  to `origin` on 2026-10-03 with the dock polish round, at the user's choice. GUI checks for the user:
+  - an uncaught exception (for example from a plugin under development) shows an "Unexpected error in Jasper" or
+    plugin card; Show more… opens the Errors window at it, in light and dark themes;
+  - the Errors window: list selection with the mouse and the arrow keys, the monospaced trace scrolls, Copy pastes a
+    report, Open Log Folder opens the folder, Clear empties the list and disables the cleared notifications' links;
+  - a plugin that keeps failing shows one card, counts up `×N`, and shows its card again no sooner than a minute later;
+  - with the Notifications panel open, a plugin failing in a tight loop keeps Jasper responsive and its card counts up;
+  - Disable Plugin posts "… will be disabled when Jasper restarts", and the Plugins page agrees after a restart;
+  - a broken shell profile shows "Could not start the terminal" with Show more…, and the window's only pane stays
+    open showing the failure;
+  - Notifications: Show Errors from the palette; the window remembers its size and position.
 
 - **Theme system Plan 5 complete and independently reviewed; awaiting integration** (2026-10-01):
   [Themes page and live reload](superpowers/plans/2026-10-01-theme-system-5-themes-page.md) is written and self-reviewed

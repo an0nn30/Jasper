@@ -79,6 +79,15 @@ class DescriptorParserTest {
             "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen"));
     }
 
+    @Test void aNameThatShowsNothingIsRejected() {
+        for (int[] points : new int[][] {{0x200B}, {0xA0, 0xA0}, {0x202E, 0x2066}, {0xFEFF}}) {
+            String invisible = new String(points, 0, points.length);
+            assertThatThrownBy(() -> DescriptorParser.parse(FULL.replace("name = \"SSH\"", "name = \"" + invisible + "\"")))
+                .as("%s", java.util.Arrays.toString(points)).isInstanceOf(DescriptorParser.InvalidDescriptor.class)
+                .hasMessageContaining("name");
+        }
+    }
+
     @Test void acceptsTheNetworkListenCapability() throws Exception {
         PluginDescriptor descriptor = DescriptorParser.parse(FULL.replace("\"session.provide\"", "\"network.listen\""));
         assertThat(descriptor.capabilities()).contains("network.listen");

@@ -7,6 +7,12 @@ import java.util.List;
  * Begins activities, announces connections and lists the running activities. Anyone may subscribe to
  * {@link #TOPIC} and {@link #CONNECTIONS}; only handles returned by {@link #begin} and {@link #connection}
  * publish to them, so each lifecycle is well-formed and its source is verified.
+ *
+ * <p>When an activity succeeds or fails, the host posts its outcome as a notification in the plugin's
+ * {@code <plugin-id>.activities} group: INFO or ERROR, titled after the activity, with the final detail as content and
+ * the activity's action as a click on its body. A cancelled activity posts nothing, and neither does one the host failed
+ * because the plugin stopped or failed to start. The user can mute that group without muting the plugin's own
+ * notifications.
  */
 public interface Activities {
     /** Every activity's events, from every plugin. */

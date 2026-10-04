@@ -1,5 +1,6 @@
 package dev.jasper.snippets;
 
+import dev.jasper.sdk.testing.FakeNotifications;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -88,22 +89,23 @@ class SnippetStoreTest {
         });
     }
 
-    @Test void openInEditorCreatesAMissingFileAndReportsEditorFailures() throws Exception {
+    @Test void openInEditorCreatesAMissingFileAndPostsEditorFailures() throws Exception {
         Path file = dir.resolve("snippets.toml");
         var opened = new ArrayList<Path>();
         SwingUtilities.invokeAndWait(() -> {
             try (var store = inline(file, opened)) {
-                var errors = new ArrayList<String>();
-                store.openInEditor(errors::add);
+                var notifications = new FakeNotifications();
+                store.openInEditor(notifications.group("dev.jasper.snippets"));
                 assertThat(opened).containsExactly(file);
-                assertThat(errors).isEmpty();
+                assertThat(notifications.lines()).isEmpty();
                 try { assertThat(Files.readString(file)).isEqualTo(SnippetFile.HEADER); }
                 catch (IOException e) { throw new UncheckedIOException(e); }
             }
             try (var failing = new SnippetStore(file, path -> { throw new IllegalStateException("no editor"); }, inlineWorker(), Runnable::run)) {
-                var errors = new ArrayList<String>();
-                failing.openInEditor(errors::add);
-                assertThat(errors).singleElement().asString().contains("no editor");
+                var notifications = new FakeNotifications();
+                failing.openInEditor(notifications.group("dev.jasper.snippets"));
+                assertThat(notifications.lines()).containsExactly(
+                    "dev.jasper.snippets|ERROR|Could not open the snippets file|" + file + ": no editor|IllegalStateException");
             }
         });
     }

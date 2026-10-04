@@ -1,24 +1,34 @@
 package dev.jasper.app.plugins;
 
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 /**
  * Every call from the application into plugin code goes through here: {@link Exception} and
- * {@link LinkageError} are caught, logged against the plugin and counted; other errors propagate.
- * While a callback runs on the UI thread it is remembered, so an exit deadline that fires can say
- * whose callback blocked. Safe from any thread.
+ * {@link LinkageError} are caught, logged against the plugin, counted and reported, so the
+ * application records an incident; other errors propagate. While a callback runs on the UI thread
+ * it is remembered, so an exit deadline that fires can say whose callback blocked. Safe from any thread.
  */
 final class Containment {
+    private static final System.Logger LOG = System.getLogger(Containment.class.getName());
     private static final long SLOW_NANOS = TimeUnit.MILLISECONDS.toNanos(100);
     private final ConcurrentHashMap<String, AtomicInteger> failures = new ConcurrentHashMap<>();
     private final BooleanSupplier onUi;
+    private final Consumer<PluginRuntime.Failure> reported;
     private volatile String executing;
 
-    Containment(BooleanSupplier onUi) { this.onUi = onUi; }
+    Containment(BooleanSupplier onUi) { this(onUi, failure -> { }); }
+
+    /** {@code reported} hears each failure after it is logged, on the thread it happened on. */
+    Containment(BooleanSupplier onUi, Consumer<PluginRuntime.Failure> reported) {
+        this.onUi = onUi;
+        this.reported = Objects.requireNonNull(reported, "reported");
+    }
 
     /** Returns the contained failure, or null when the action completed. */
     Throwable attempt(String pluginId, String what, Callable<?> action) {
@@ -48,6 +58,8 @@ final class Containment {
     void record(String pluginId, String what, Throwable failure) {
         failures.computeIfAbsent(pluginId, id -> new AtomicInteger()).incrementAndGet();
         logger(pluginId).log(System.Logger.Level.WARNING, "Plugin " + pluginId + " failed in " + what, failure);
+        try { reported.accept(new PluginRuntime.Failure(pluginId, what, failure)); }
+        catch (RuntimeException unreported) { LOG.log(System.Logger.Level.WARNING, "A plugin failure could not be reported", unreported); }
     }
 
     int failures(String pluginId) {

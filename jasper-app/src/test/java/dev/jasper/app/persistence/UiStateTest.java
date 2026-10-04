@@ -1,5 +1,6 @@
 package dev.jasper.app.persistence;
 
+import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -126,6 +127,48 @@ class UiStateTest {
         assertThat(UiState.load(file).panel("dev.a.sessions")).hasValue(new UiState.Panel(Slot.LEFT_TOP, UiState.Panel.LAST, true));
     }
 
+    @Test void aVersionOneSideTakesItsSizeFromTheVisiblePanelNotTheFirst() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 1
+
+            [panels."dev.a.first"]
+            region = "LEFT"
+            visible = false
+            size = 200
+
+            [panels."dev.b.second"]
+            region = "LEFT"
+            visible = true
+            size = 400
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.panel("dev.b.second")).hasValue(new UiState.Panel(Slot.LEFT_TOP, UiState.Panel.LAST, true));
+        assertThat(state.panel("dev.a.first")).hasValue(new UiState.Panel(Slot.LEFT_TOP, UiState.Panel.LAST, false));
+        assertThat(state.dock().leftWidth()).as("the panel that showed, not the first one").isEqualTo(400);
+        assertThat(state.dock()).isEqualTo(new UiState.Dock(400, 260, 200, 0.5, 0.5, 0.5));
+    }
+
+    @Test void aVersionOneSideWithNoVisiblePanelTakesTheFirstPanelsSize() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 1
+
+            [panels."dev.a.first"]
+            region = "LEFT"
+            visible = false
+            size = 350
+
+            [panels."dev.b.second"]
+            region = "LEFT"
+            visible = false
+            size = 180
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.dock().leftWidth()).as("none showed, so the first panel's size").isEqualTo(350);
+        assertThat(state.dock()).isEqualTo(new UiState.Dock(350, 260, 200, 0.5, 0.5, 0.5));
+    }
+
     @Test void aBadVersionTwoEntryOrKeyFallsBackAlone() throws Exception {
         Path file = dir.resolve("ui-state.toml");
         Files.writeString(file, """
@@ -161,6 +204,95 @@ class UiStateTest {
         assertThat(state.panel("dev.x.good")).hasValue(new UiState.Panel(Slot.BOTTOM_RIGHT, 2, true));
         assertThat(state.panel("dev.x.unknown")).isEmpty();
         assertThat(state.panel("dev.x.disordered")).hasValue(new UiState.Panel(Slot.LEFT_TOP, UiState.Panel.LAST, false));
+    }
+
+    @Test void dockValuesExactlyAtTheirLimitsAreAccepted() throws Exception {
+        assertThat(loadDock("left_width = 120", "right_width = 120", "bottom_height = 120",
+            "left_ratio = 0.1", "right_ratio = 0.1", "bottom_ratio = 0.1")).as("every minimum")
+            .isEqualTo(new UiState.Dock(120, 120, 120, 0.1, 0.1, 0.1));
+        assertThat(loadDock("left_width = 4000", "right_width = 4000", "bottom_height = 4000",
+            "left_ratio = 0.9", "right_ratio = 0.9", "bottom_ratio = 0.9")).as("every maximum")
+            .isEqualTo(new UiState.Dock(4000, 4000, 4000, 0.9, 0.9, 0.9));
+    }
+
+    @Test void aDockValueOneStepOutsideItsLimitsFallsBackAloneAndTheOtherKeysKeepTheirValues() throws Exception {
+        String[] keys = {"left_width", "right_width", "bottom_height", "left_ratio", "right_ratio", "bottom_ratio"};
+        UiState.Dock defaults = UiState.Dock.DEFAULT;
+        int[] sizes = {300, 310, 320}, defaultSizes = {defaults.leftWidth(), defaults.rightWidth(), defaults.bottomHeight()};
+        double[] ratios = {0.2, 0.3, 0.4};
+        for (int bad = 0; bad < keys.length; bad++) {
+            for (Object value : bad < 3 ? new Object[]{119, 4001} : new Object[]{0.09, 0.91}) {
+                String[] lines = dockLines(sizes, ratios);
+                lines[bad] = keys[bad] + " = " + value;
+                int[] expectedSizes = sizes.clone();
+                double[] expectedRatios = ratios.clone();
+                if (bad < 3) expectedSizes[bad] = defaultSizes[bad]; else expectedRatios[bad - 3] = DockState.DEFAULT_RATIO;
+                assertThat(loadDock(lines)).as(lines[bad]).isEqualTo(new UiState.Dock(expectedSizes[0], expectedSizes[1], expectedSizes[2],
+                    expectedRatios[0], expectedRatios[1], expectedRatios[2]));
+            }
+        }
+    }
+
+    @Test void aScalarWhereTheDockTableBelongsFallsBackToDefaultsAndKeepsThePanels() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 2
+            rail_visible = false
+            dock = 5
+
+            [panels."dev.x.good"]
+            slot = "RIGHT_BOTTOM"
+            order = 1
+            visible = true
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.dock()).isEqualTo(UiState.Dock.DEFAULT);
+        assertThat(state.panel("dev.x.good")).hasValue(new UiState.Panel(Slot.RIGHT_BOTTOM, 1, true));
+        assertThat(state.railVisible()).as("the rest of the file is read").isFalse();
+    }
+
+    @Test void aScalarWhereThePanelsTableBelongsLeavesNoPanelsAndKeepsTheDock() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 2
+            panels = "x"
+
+            [dock]
+            left_width = 300
+            right_width = 310
+            bottom_height = 320
+            left_ratio = 0.2
+            right_ratio = 0.3
+            bottom_ratio = 0.4
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.panels()).isEmpty();
+        assertThat(state.dock()).isEqualTo(new UiState.Dock(300, 310, 320, 0.2, 0.3, 0.4));
+    }
+
+    @Test void aPanelEntryThatIsAScalarIsSkippedAndTheOthersSurvive() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, """
+            version = 2
+
+            [panels]
+            "dev.x.scalar" = 3
+
+            [panels."dev.x.good"]
+            slot = "BOTTOM_RIGHT"
+            order = 2
+            visible = true
+
+            [panels."dev.x.other"]
+            slot = "LEFT_BOTTOM"
+            order = 0
+            visible = false
+            """);
+        UiState state = UiState.load(file);
+        assertThat(state.panel("dev.x.scalar")).isEmpty();
+        assertThat(state.panels()).containsOnlyKeys("dev.x.good", "dev.x.other");
+        assertThat(state.panel("dev.x.good")).hasValue(new UiState.Panel(Slot.BOTTOM_RIGHT, 2, true));
+        assertThat(state.panel("dev.x.other")).hasValue(new UiState.Panel(Slot.LEFT_BOTTOM, 0, false));
     }
 
     @Test void aBadWindowEntryFallsBackAlone() throws Exception {
@@ -253,5 +385,18 @@ class UiStateTest {
         Path file = dir.resolve("ui-state.toml");
         Files.writeString(file, "version = 2\n[chooser]\nrecent = [1, \"/ok\"]\npinned = \"not a list\"\npreview = \"yes\"\n");
         assertThat(UiState.load(file).chooser()).isEqualTo(new UiState.Chooser(List.of("/ok"), List.of(), false, true));
+    }
+
+    /** The six dock keys as lines, in order: the three sizes, then the three ratios. */
+    private static String[] dockLines(int[] sizes, double[] ratios) {
+        return new String[]{"left_width = " + sizes[0], "right_width = " + sizes[1], "bottom_height = " + sizes[2],
+            "left_ratio = " + ratios[0], "right_ratio = " + ratios[1], "bottom_ratio = " + ratios[2]};
+    }
+
+    /** Loads a version 2 file whose {@code [dock]} table holds exactly these lines. */
+    private UiState.Dock loadDock(String... dockLines) throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        Files.writeString(file, "version = 2\n\n[dock]\n" + String.join("\n", dockLines) + "\n");
+        return UiState.load(file).dock();
     }
 }

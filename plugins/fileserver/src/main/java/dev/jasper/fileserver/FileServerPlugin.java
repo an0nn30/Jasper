@@ -298,13 +298,14 @@ public final class FileServerPlugin implements Plugin {
     }
 
     private void duplicate(UUID id) {
-        registry.server(id).ifPresent(view -> report(store.put(view.definition().copyAs(uniqueName(view.definition().name() + " copy")))));
+        registry.server(id).ifPresent(view ->
+            report("Could not duplicate the server", store.put(view.definition().copyAs(uniqueName(view.definition().name() + " copy")))));
     }
 
     private void delete(WindowHandle window, UUID id) {
         registry.server(id).ifPresent(view -> confirm(window, "Delete " + view.definition().name() + "?",
             "Delete ‘" + view.definition().name() + "’? Its settings are removed; the shared folder is not touched.", "Delete", "Cancel",
-            () -> registry.stop(id).thenRun(() -> report(store.remove(id))), () -> { }));
+            () -> registry.stop(id).thenRun(() -> report("Could not delete the server", store.remove(id))), () -> { }));
     }
 
     private void reveal(UUID id) {
@@ -312,7 +313,11 @@ public final class FileServerPlugin implements Plugin {
             Path folder = view.definition().folder();
             context.background().execute(() -> {
                 try { environment.reveal().accept(folder); }
-                catch (RuntimeException failure) { environment.ui().execute(() -> { if (!stopped) context.notices().error("Could not show " + folder + ": " + message(failure)); }); }
+                catch (RuntimeException failure) {
+                    environment.ui().execute(() -> {
+                        if (!stopped) context.notifications().group().error("Could not show a server's folder", folder + ": " + message(failure), failure);
+                    });
+                }
             });
         });
     }
@@ -359,11 +364,12 @@ public final class FileServerPlugin implements Plugin {
         List<String> warnings = store.warnings();
         if (!warnings.isEmpty() && !warnings.equals(reportedWarnings)) for (String warning : warnings) {
             context.log().log(System.Logger.Level.WARNING, "servers.toml: {0}", warning);
-            context.notices().error("servers.toml: " + warning);
+            context.notifications().group().warning("servers.toml has a problem", warning);
         }
         reportedWarnings = warnings;
         String error = store.error().orElse(null);
-        if (error != null && !error.equals(reportedError)) context.notices().error(error + ". File Server will not save changes until it is fixed.");
+        if (error != null && !error.equals(reportedError))
+            context.notifications().group().error("servers.toml has errors", error + ". File Server will not save changes until it is fixed.");
         reportedError = error;
         refreshPanels();
     }
@@ -424,13 +430,13 @@ public final class FileServerPlugin implements Plugin {
         confirm(window, "Regenerate the TLS certificate?",
             "Clients that trusted the old certificate will warn about the new one. Running TLS servers keep the old one until they restart.",
             "Regenerate", "Cancel", () -> context.background().execute(() -> {
-                String failure = null;
+                EngineFailure failure = null;
                 try { tls.regenerate(); }
-                catch (EngineFailure unwritable) { failure = unwritable.getMessage(); }
-                String error = failure;
+                catch (EngineFailure unwritable) { failure = unwritable; }
+                EngineFailure error = failure;
                 environment.ui().execute(() -> {
                     if (stopped) return;
-                    if (error != null) context.notices().error(error);
+                    if (error != null) context.notifications().group().error("Could not regenerate the TLS certificate", message(error), error);
                     refreshPanels();
                 });
             }), () -> { });
@@ -454,9 +460,9 @@ public final class FileServerPlugin implements Plugin {
         for (int n = 2; ; n++) if (!taken.contains((base + " " + n).toLowerCase(Locale.ROOT))) return base + " " + n;
     }
 
-    private void report(CompletableFuture<Void> mutation) {
+    private void report(String title, CompletableFuture<Void> mutation) {
         mutation.whenComplete((ignored, failure) -> environment.ui().execute(() -> {
-            if (!stopped && failure != null) context.notices().error(message(failure));
+            if (!stopped && failure != null) context.notifications().group().error(title, message(failure), failure);
         }));
     }
 

@@ -95,10 +95,7 @@ class DockDragTest {
             // The drop, as WindowContributions applies it.
             drag.onDrop = (id, target) -> {
                 if (target.onStripe()) state.move(id, target.slot(), target.index().getAsInt());
-                else {
-                    List<String> ids = state.ids(target.slot());
-                    state.moveAndShow(id, target.slot(), ids.contains(id) ? ids.indexOf(id) : ids.size());
-                }
+                else state.moveAndShow(id, target.slot(), state.dropIndex(id, target.slot()));
             };
             for (String id : List.of("a", "b", "c")) { state.add(id, Slot.LEFT_TOP); area.setContent(id, id.toUpperCase(), new JLabel(id)); }
             state.add("d", Slot.RIGHT_TOP); area.setContent("d", "D", new JLabel("d"));

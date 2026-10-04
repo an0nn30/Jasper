@@ -133,6 +133,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public java.util.function.BiConsumer<String, String> onError = WindowContent::unheard;
     /** Information to tell the user, such as the result of Migrate Config; the application posts it as a notification. */
     public java.util.function.BiConsumer<String, String> onInfo = WindowContent::unheard;
+    /**
+     * A shell could not start in this window: the directory and cause to show, and what was thrown. By default an
+     * error with a fixed title; the application records an incident instead.
+     */
+    public java.util.function.BiConsumer<String, Throwable> onLaunchFailure =
+        (details, cause) -> onError.accept("Could not start the terminal", details);
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     public Runnable onToggleBuddy = () -> {};
     public java.util.function.BooleanSupplier buddyEnabled = () -> false;
@@ -808,7 +814,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             update();
         };
         tab.onEmpty = () -> closeTab(tab);
-        tab.onError = message -> onError.accept("Could not start the terminal", message);
+        tab.onError = (message, cause) -> onLaunchFailure.accept(message, cause);
         tab.lastInWindow = () -> tabs.getTabCount() == 1;
         tab.configure = pane -> configurePane(tab, pane);
         tab.onPaneCreated = pane -> connectActivity(tab, pane);
@@ -1291,7 +1297,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         refreshTabs();
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
-        onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onMinimumSizeChanged = () -> {};
+        onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();
         anyWindowActive = () -> false;

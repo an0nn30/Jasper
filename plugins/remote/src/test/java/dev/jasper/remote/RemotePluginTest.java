@@ -538,7 +538,9 @@ class RemotePluginTest {
             save(plugin.currentEditor()).doClick();
             host.requestClose("dialog");
             settle(host);
-            assertThat(host.notices()).hasSize(3);
+            assertThat(host.notifications().posts()).extracting(post -> post.spec().title())
+                .containsExactlyInAnyOrder("Could not duplicate the host", "Could not update favorites", "Could not save the host");
+            assertThat(host.notifications().posts()).allSatisfy(post -> assertThat(post.spec().cause()).isPresent());
             assertThat(host.failures()).isEmpty();
         }
     }

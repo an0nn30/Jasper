@@ -158,6 +158,45 @@ Application code never opens a message dialog to tell the user something; it pos
   accessible description. Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner
   of the `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
 
+## Recording an incident
+
+An unexpected failure is an incident: it is kept for the Errors window, and a Jasper or plugin incident is announced by
+one error notification
+([guide](notifications.md#the-errors-window), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+`application.IncidentNotices` is the only producer, and its entry points are safe from any thread:
+
+- `jasperFailure(operation, failure)` is for Jasper's own failures. The default uncaught-exception handler (every
+  thread, the EDT included) forwards through `JasperApplication.unexpected`, and a notification action that throws
+  arrives through `NotificationCenter.reportActionFailuresTo`.
+- `pluginFailure(pluginId, operation, failure)` receives every failure `plugins.Containment` catches, through
+  `PluginRuntime.reportFailuresTo`. Give each contained call a short operation ("panel <id>", "action <id>"): it is
+  the incident's header and the notification's title.
+- `launchFailure(window, details, failure)` is for a shell that could not start, from `WindowContent.onLaunchFailure`.
+  Every occurrence is announced in its own window with its details and Show more…, while the incident itself still
+  counts up.
+
+Expected failures the user can act on, such as a file that cannot be read or a host that cannot be reached, are not
+incidents: post a notification with the details instead.
+
+A `Capture` takes the trace once, on the thread that caught the failure (trace at most 256 KiB, message at most
+16 KiB), so later changes to the throwable never reach the incident. Incidents coalesce by source, exception class
+and the root cause's top five frames; at most 100 are kept, and a repeating incident's notification is updated at
+most once a second (its count catches up). Capture never throws and does not re-enter on the same thread. A failure
+whose first Jasper frame lies in `dev.jasper.app.notifications`, `dev.jasper.app.notificationui`,
+`IncidentNotices`, `NotificationsFeature`, `ErrorsWindow` or `ConfigProblemNotices` is left to the log, so the
+notification system can never report its own failures in a loop; a launch failure rejected that way still gets its
+plain "Could not start the terminal" notification. The log is unchanged: incidents add no messages or traces to it.
+
+## A plugin's notifications
+
+Plugins post through `PluginContext.notifications()`, which `plugins.HostedNotifications` implements over the
+application's `NotificationCenter` ([design](superpowers/specs/2026-10-02-jasper-notifications-design.md)). The
+runtime gets a `PluginRuntime.NotificationHost`: the center; `caused`, for a plugin's notification with a cause, which
+`JasperApplication` hands to `IncidentNotices.pluginNotice`; and `problem`, for a plugin problem of the runtime's own,
+such as a settings file that cannot be opened. `PluginHost` posts activity outcomes, and
+`application.PluginProblemNotices` posts `PluginRuntime.problems()` after `PluginRuntime.start`. Change the SDK side
+in `PluginContractTest` first, so the testkit's `FakeNotifications` and the application keep one contract.
+
 ## Platform integration
 
 Place OS behavior in [MacTitleBar](../jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java)-style adapters or the existing platform package. Supply narrow JDK callbacks and values rather than WindowContent/JasperApplication back-references. Register cleanup immediately using [StartupResources](../jasper-app/src/main/java/dev/jasper/app/bootstrap/StartupResources.java) during startup, then transfer it to the long-lived owner only after wiring succeeds. Keep handoff before AWT; distinguish unsupported capability from failed startup. Tests inject boundary callbacks and do not open a real desktop window.
@@ -216,7 +255,7 @@ failure leaves an opaque window.
   `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
   `TerminalView` fill the default background with alpha using the `Src` composite, replacing the host's fill. Anything
   new inside the terminal surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
-- **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.13.1). The answer comes from
+- **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.14.1). The answer comes from
   `dev.jasper.app.plugins.GlassSource`, which `JasperApplication` builds from its windows: `owns(component)` finds the
   window and `content().backgroundOpacity()` is the value in effect (1.0 for a component outside a translucent window).
   `WindowContent.setGlassListener` notifies it on a real opacity change and when hosted content mounts or unmounts while

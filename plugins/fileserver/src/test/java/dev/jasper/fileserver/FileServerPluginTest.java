@@ -209,7 +209,8 @@ class FileServerPluginTest {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
             settle(host);
-            assertThat(host.notices()).containsExactly("dev.jasper.fileserver: servers.toml: server 2: 'protocol' is required");
+            assertThat(host.notifications().lines())
+                .containsExactly("dev.jasper.fileserver|WARNING|servers.toml has a problem|server 2: 'protocol' is required");
             assertThat(plugin.registry().server(vaulted.id()).orElseThrow().state().phase()).isEqualTo(Phase.WAITING_FOR_VAULT);
             vault.unlock();
             await(host, () -> plugin.registry().server(vaulted.id()).orElseThrow().state().phase() == Phase.RUNNING, "the server starts on unlock");

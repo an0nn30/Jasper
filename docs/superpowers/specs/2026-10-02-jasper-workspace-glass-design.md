@@ -259,3 +259,5 @@ Merging main (2026-10-03, SDK 0.13.0, dock layout and theme rows in Appearance):
 Editor needs `>=0.13.1, <0.14`; the Workspace section follows Appearance's Theme section with only the Opacity and Blur
 rows (no "Choose workspace theme…" button, since the theme pickers are rows) and shows no header off macOS; the glass
 fill moved from the deleted `WorkspaceRegions.Host` to `ToolWindowArea`'s centre host.
+A second merge (main at `43894416`, SDK 0.14.0, notifications replacing Notices) moved the method to `@since 0.14.1`;
+the Editor needs `>=0.14.1, <0.15`.
