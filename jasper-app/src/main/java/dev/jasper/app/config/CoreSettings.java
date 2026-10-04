@@ -204,8 +204,8 @@ public final class CoreSettings {
     public static final Setting<String> UI_THEME_NAME = Setting.of("ui.theme.name",
             SettingKind.string(text -> true, "", String::strip), ConfigSnapshot.DEFAULT_THEME)
         .alias("ui.theme.variant").label("Theme").keywords("theme", "dark", "light", "appearance", "look")
-        .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"IntelliJ Light\",\n"
-            + "\"Darcula\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
+        .description("The UI theme by name: \"Jasper Dark\" (the default), \"Jasper Light\", \"Nord\",\n"
+            + "\"Clear Dark\", \"Clear Light\", or a native TOML theme in the themes folder beside this file. Choose it in Settings > Appearance, whose theme gear imports theme files. Switches live across windows.").build();
     public static final Setting<Float> UI_WORKSPACE_OPACITY = Setting.of("ui.workspace.opacity", SettingKind.number(10, 100),
             GlassSettings.UNSET_OPACITY)
         .example(95f).label("Opacity").keywords("opacity", "transparency", "translucent", "glass", "workspace", "background")

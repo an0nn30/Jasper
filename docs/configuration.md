@@ -711,7 +711,7 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 `ui.theme.name` names the UI theme:
 - `"Jasper Dark"` (the default) or `"Jasper Light"`;
-- `"IntelliJ Light"` or `"Darcula"` (IntelliJ's classic themes, converted);
+- `"Nord"`, `"Clear Dark"` or `"Clear Light"`;
 - or a native Jasper TOML theme in the `themes` folder beside this file.
 
 The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers writing and importing

@@ -2,6 +2,18 @@
 
 ## Current state — 2026-10-03
 
+- **Bundled theme shortlist** (2026-10-04; `codex/refine-bundled-themes`, based on local main `ccd4868f`):
+  Jasper now ships only **Jasper Light, Jasper Dark, Nord, Clear Dark and Clear Light**. Their existing palettes
+  are unchanged, ready for individual refinement. The catalog, packaged TOMLs and offline generator agree on
+  those five; obsolete bundled palettes/licenses are removed. Import/conversion sources remain available for
+  custom themes, with two former palettes retained only as test fixtures. Saved removed-theme names retain
+  the existing warning/fallback and repair behavior. Settings help, configuration example and current theme
+  documentation reflect the shortlist. This bounded cleanup used inline implementation and independent review;
+  no architecture change or historical-plan rewrite. Independent review approved with no blocking findings; all documentation findings corrected.
+  `./gradlew check` passed: **8,481 tests, 0 failures/errors, 6 skipped**; architecture/doc checks included.
+  Regeneration parity, exact five-theme JAR inventory, changed-source hygiene and diff checks passed. No GUI launched.
+  Worktree: `/Users/dustin/.codex/worktrees/3941/moray`. Keep the branch here for the next refinement pass.
+
 - **Zen integration with current main** (2026-10-04): merged `origin/main` at `4c3c6bb0`, preserving its
   Normal/Compact startup setting independently of the saved Zen toggle. A regression covers restoring and
   toggling Zen in both modes and reloading configuration. Independent merge review approved with no findings.

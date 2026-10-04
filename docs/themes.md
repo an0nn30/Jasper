@@ -1,10 +1,12 @@
 # Themes
 
 Jasper's themes are Jasper theme files: TOML that colours the app, workspace, terminal palette and editor syntax.
-Jasper ships **286 native themes**, including Jasper Light/Dark, Clear Dark/Light (ported from Terminal.app), IntelliJ Light/Darcula, Dracula,
-Catppuccin, Solarized, Nord, Gruvbox, One Dark, Material Lite, Code, Studio and converted Alacritty palettes.
-The complete offline collection, pinned sources, licenses, exclusions and explicit renames are in
-[third-party theme notices](../THIRD-PARTY-THEMES.md). No Marketplace network client remains.
+Jasper ships **five themes**: Jasper Light, Jasper Dark, Nord, Clear Dark and Clear Light.
+Clear Dark/Light are ported from Terminal.app. Nord's pinned source and license are in
+[third-party theme notices](../THIRD-PARTY-THEMES.md). Additional themes can be imported from local files.
+
+Saved selections for removed built-ins remain in the configuration and show as "(not found)" in Settings.
+Jasper uses its existing safe fallback until you select an available theme or import the missing one.
 
 ## Choosing a theme
 
@@ -12,7 +14,7 @@ Name the theme in `config.toml`:
 
 ```toml
 [ui.theme]
-name = "Dracula"
+name = "Nord"
 workspace = "match" # or "Jasper Dark", another native theme
 ```
 
@@ -43,7 +45,7 @@ test results.
 
 Both dropdowns list every installed theme by name and update when theme files are added, imported, edited or removed.
 Start typing in an open (or focused) dropdown to search: a search bar appears at the top and the list keeps the names
-holding every typed word, ignoring case, so `cat mocha` finds Catppuccin Mocha. **Same as UI theme** stays at the top.
+holding every typed word, ignoring case, so `clear light` finds Clear Light. **Same as UI theme** stays at the top.
 Up, Down, Home and End move, Enter picks, Backspace edits the search, × clears it and Escape closes the list.
 Running windows change only on **Apply** or **OK**; Cancel discards the choices. A saved name that no installed theme
 has shows as "(not found)" and stays saved for repair; Jasper uses the fallback described in
@@ -93,7 +95,7 @@ Everything else is derived. A theme can also set:
 - `extends = "<theme>"`: start from any other theme and change only what you write; a file may even be named like the
   theme it extends ("Jasper Dark" extending "Jasper Dark") to replace it. Invalid candidates are skipped when
   resolving a parent, so a broken file cannot hide a valid theme with that name. `dark` and `ui_complete` are inherited too:
-  a file extending IntelliJ Light, Darcula or a converted theme inherits `ui_complete = true`, so its `[colors]` and
+  a file extending Nord or another complete imported theme inherits `ui_complete = true`, so its `[colors]` and
   `[tokens]` mostly reach only the terminal and Jasper's own chrome (`Jasper.*` keys, which tokens you set
   explicitly reach), not FlatLaf's controls; change those through `[ui]`;
 - `cursor` and `selection` (in `[colors]`) and `[colors.bright]` (otherwise each bright colour is its normal colour
@@ -164,7 +166,7 @@ follow `ui.theme.name`. A named workspace theme supplies its own effective surfa
 values without installing a second look and feel. A converted IntelliJ theme with an editor colour scheme
 supplies the terminal's console background, text, cursor, selection and 16 ANSI colours.
 - **Missing colours:** colours the scheme leaves out come from its parent schemes, as in IntelliJ's console. A theme's `editorScheme` or a scheme's `parent_scheme` may name any scheme IntelliJ bundles: `Default`, `Darcula`, `IntelliJ Light`, `Light`, `Dark`, `Darcula Contrast`, `High contrast` and `Islands Dark`.
-- **No scheme:** Jasper theme files, Jasper Dark and Jasper Light included, take their terminal palette from their own `[colors]`, and IntelliJ Light and Darcula from their own editor scheme. Only an installed plugin theme without a scheme uses Jasper Dark's or Jasper Light's palette by the theme's darkness.
+- **No scheme:** Jasper theme files, Jasper Dark and Jasper Light included, take their terminal palette from their own `[colors]`, and converted IntelliJ themes take it from their editor scheme. Only an installed plugin theme without a scheme uses Jasper Dark's or Jasper Light's palette by the theme's darkness.
 - **Choosing Jasper's palettes:** `"Jasper Light"` and `"Jasper Dark"` select the complete native themes.
   Legacy `terminal.colors = "light"` or `"dark"` maps to these names when read. Jasper Dark's native terminal
   background is `#191c20`.

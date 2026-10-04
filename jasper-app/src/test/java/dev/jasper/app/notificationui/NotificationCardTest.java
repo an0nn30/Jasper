@@ -106,7 +106,7 @@ class NotificationCardTest {
             new ThemeController(Theme.DARK);
             Color dark = UIManager.getColor("Jasper.notification.background");
             var card = new NotificationCard(center, posted(titled("Theme")), false);
-            new ThemeController(Theme.INTELLIJ_LIGHT);
+            new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             SwingUtilities.updateComponentTreeUI(card);
             Color light = UIManager.getColor("Jasper.notification.background");
             assertThat(light).isNotEqualTo(dark);

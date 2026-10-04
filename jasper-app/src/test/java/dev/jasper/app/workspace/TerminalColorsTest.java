@@ -25,7 +25,7 @@ class TerminalColorsTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[2];
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             owners[0] = content(launcher(pending), themes);
             owners[1] = content(launcher(pending), themes);
         });
@@ -43,7 +43,7 @@ class TerminalColorsTest {
             assertThat(hidden.view().palette()).isEqualTo(Theme.DARK.palette());
             assertThat(hidden.view().palette().ansi()).as("retained terminal preserves all 16 workspace ANSI colors")
                 .containsExactlyElementsOf(Theme.DARK.palette().ansi());
-            assertThat(hidden.view().palette().ansi()).isNotEqualTo(Theme.INTELLIJ_LIGHT.palette().ansi());
+            assertThat(hidden.view().palette().ansi()).isNotEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().ansi());
             assertThat(owners[1].currentPane().view().palette()).as("another window").isEqualTo(Theme.DARK.palette());
             assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             var find = hidden.findBar();
@@ -56,8 +56,8 @@ class TerminalColorsTest {
             var session = hidden.session();
             owner.selectTerminalColors(TerminalColors.MATCH);
             assertThat(hidden.session()).isSameAs(session);
-            assertThat(hidden.view().palette()).isEqualTo(Theme.INTELLIJ_LIGHT.palette());
-            assertThat(hidden.getBackground()).isEqualTo(Theme.INTELLIJ_LIGHT.palette().background());
+            assertThat(hidden.view().palette()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette());
+            assertThat(hidden.getBackground()).isEqualTo(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background());
         });
     }
 
@@ -73,10 +73,10 @@ class TerminalColorsTest {
     @Test void namedWorkspaceIsCheckedByNameAndMissingNamesCheckNothing() throws Exception {
         edt(() -> {
             var themes = new ThemeController(Theme.DARK);var owner=content(launcher(new ArrayDeque<>()),themes);
-            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"),Theme.DARCULA,UiFontConfig.defaults());
+            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Nord"),dev.jasper.app.appearance.ThemeCatalog.builtIn().scan().find("Nord").orElseThrow(),UiFontConfig.defaults());
             var menu=WindowThemeMenuTest.workspace(owner);
-            assertThat(WindowThemeMenuTest.item(menu,"Darcula").isSelected()).isTrue();
-            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Light"),Theme.DARCULA,UiFontConfig.defaults());
+            assertThat(WindowThemeMenuTest.item(menu,"Nord").isSelected()).isTrue();
+            themes.configure(Theme.DARK,new dev.jasper.app.config.WorkspaceThemeChoice("Light"),dev.jasper.app.appearance.ThemeCatalog.builtIn().scan().find("Nord").orElseThrow(),UiFontConfig.defaults());
             menu=WindowThemeMenuTest.workspace(owner);
             assertThat(WindowThemeMenuTest.leaves(menu)).noneMatch(JMenuItem::isSelected);
         });

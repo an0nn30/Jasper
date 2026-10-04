@@ -21,10 +21,10 @@ class ThemeCatalogTest {
         var snapshot = ThemeCatalog.builtIn().scan();
         assertThat(snapshot.themes()).containsExactlyElementsOf(ThemeManager.builtIns());
         assertThat(snapshot.find("  jasper DARK ")).contains(Theme.DARK);
-        assertThat(snapshot.find("intellij light")).contains(Theme.INTELLIJ_LIGHT);
+        assertThat(snapshot.find("jasper light")).contains(Theme.JASPER_LIGHT);
         assertThat(snapshot.find("")).isEmpty();
-        assertThat(snapshot.find("Dracula")).isPresent();
-        assertThat(snapshot.names()).contains("Darcula", "IntelliJ Light", "Jasper Dark", "Jasper Light", "Catppuccin Mocha");
+        assertThat(snapshot.find("Dracula")).isEmpty();
+        assertThat(snapshot.names()).containsExactly("Clear Dark", "Clear Light", "Jasper Dark", "Jasper Light", "Nord");
         assertThat(snapshot.problems()).isEmpty();
     }
 

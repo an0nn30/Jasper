@@ -207,7 +207,7 @@ class ToolWindowAreaTest {
             DockTestSupport.show(area, Slot.LEFT_TOP, panel, 250);
             List<DockState.Change> changes = new ArrayList<>();
             state.addListener(changes::add);
-            for (var theme : List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+            for (var theme : List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                 ThemeTestSupport.install(theme);
                 SwingUtilities.updateComponentTreeUI(area);
                 area.refreshTheme();

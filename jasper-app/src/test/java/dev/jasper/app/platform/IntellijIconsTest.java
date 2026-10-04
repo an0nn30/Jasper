@@ -56,9 +56,9 @@ class IntellijIconsTest {
     }
 
     @Test void completeCatalogParsesAndPaintsInBothThemesAtBothScales() {
-        var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
-            for (var theme : List.of(Theme.INTELLIJ_LIGHT, Theme.DARK)) {
+            for (var theme : List.of(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, Theme.DARK)) {
                 themes.configure(theme);
                 for (String id : AppIcons.bundledIds()) {
                     var raw = new FlatSVGIcon(BASE + id + ".svg");
@@ -78,9 +78,9 @@ class IntellijIconsTest {
     }
 
     @Test void nonSquareArtworkIsCenteredWithoutStretching() {
-        var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
-            for (var theme : List.of(Theme.INTELLIJ_LIGHT, Theme.DARK)) {
+            for (var theme : List.of(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, Theme.DARK)) {
                 themes.configure(theme);
                 var raw = new FlatSVGIcon(BASE + "breakpoints/questionBadge.svg");
                 var expected = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
@@ -97,7 +97,7 @@ class IntellijIconsTest {
     }
 
     @Test void retainedIconKeepsProportionsWhenDarkArtworkHasDifferentDimensions() {
-        var theme = new ThemeController(Theme.INTELLIJ_LIGHT);
+        var theme = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             var icon = AppIcons.bundled("welcome/open");
             pixels(icon);
@@ -125,7 +125,7 @@ class IntellijIconsTest {
     }
 
     @Test void flatLafRemapsIntellijPaletteColoursForTheRunningTheme() {
-        var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+        var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
         try {
             var probe = new FlatSVGIcon("dev/jasper/app/icons/palette-probe.svg", 16, 16);
             assertThat(probe.hasFound()).isTrue();

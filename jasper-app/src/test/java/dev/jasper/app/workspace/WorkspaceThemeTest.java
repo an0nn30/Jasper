@@ -16,7 +16,7 @@ class WorkspaceThemeTest {
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void completeThemeCanCreateAndRefreshWindowWithOptionalToolWindowBackground(boolean authored) throws Exception {
         edt(() -> {
-            var base = Theme.DARCULA.source().document();
+            var base = dev.jasper.app.appearance.ThemeFixtures.DARCULA.source().document();
             var ui = new java.util.LinkedHashMap<>(base.ui());
             ui.remove("ToolWindow.background");
             ui.put("Panel.background", "#17232f");
@@ -48,9 +48,9 @@ class WorkspaceThemeTest {
 
     @Test void independentWorkspaceMarksNewTabsAndPaintsStripWithoutChangingChrome() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             owner.newTab(HOME);
             var root = owner.currentPane();
             assertThat(root.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
@@ -66,7 +66,7 @@ class WorkspaceThemeTest {
     }
     @Test void titleSidebarStatusAndDialogContentKeepCapturedChromeDefaults() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var titleBackground = UIManager.getColor("Jasper.titleBackground");
             var statusBackground = UIManager.getColor("StatusBar.background");
@@ -78,7 +78,7 @@ class WorkspaceThemeTest {
             var root = new JRootPane();
             try (var title = WindowContent.installTitleBar(root, owner, true, text -> {})) {
                 owner.installRootBindings(root);
-                themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+                themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
                 assertThat(themes.current().workspace().dark()).isTrue();
                 assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).isFalse();
                 title.setSize(400, 30);
@@ -106,8 +106,8 @@ class WorkspaceThemeTest {
 
     @Test void lookupFollowsReparentingButStopsAtChromePopupAndWindowRoots() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
-            themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
+            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var workspace = new JPanel(); WorkspaceTheme.apply(workspace, themes.current());
             var child = new JLabel(); workspace.add(child);
             assertThat(WorkspaceTheme.color(child, Token.TEXT, "Label.foreground"))
@@ -125,9 +125,9 @@ class WorkspaceThemeTest {
 
     @Test void hostedContentIsMarkedOnMountAndClearedOnRemovalWithoutChangingItsOwnStyle() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             var panel = new JPanel(); panel.putClientProperty("FlatLaf.style", "arc: 7");
             var entry = model.content().open("test", "file", "File", owner.id(), panel);
@@ -144,9 +144,9 @@ class WorkspaceThemeTest {
 
     @Test void dividerPaintUsesWorkspaceColorWhileChromeDefaultsStayLight() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             var chromeDivider = UIManager.getColor("Jasper.splitDivider");
-            themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var split = new JSplitPane(); WorkspaceTheme.apply(split, themes.current());
             split.setSize(400, 300); split.setDividerLocation(180); split.doLayout();
             var divider = ((javax.swing.plaf.basic.BasicSplitPaneUI) split.getUI()).getDivider();
@@ -160,12 +160,12 @@ class WorkspaceThemeTest {
 
     @Test void movingHostedContentReplacesItsWorkspaceZoneAndRetainsTheDocument() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             try (var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
-                    new ThemeController(Theme.INTELLIJ_LIGHT))) {
+                    new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT))) {
                 detached.connectContributions(model); model.content().setFactory(separate -> detached.id());
                 var text = new JTextArea("retained document"); var document = text.getDocument();
                 var entry = model.content().open("test", "move", "Move", owner.id(), text);
@@ -186,10 +186,10 @@ class WorkspaceThemeTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> {
-            var themes = new ThemeController(Theme.INTELLIJ_LIGHT);
+            var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             owner[0] = content(new dev.jasper.app.launch.ShellLauncher(pending::add,
                 path -> { throw new IllegalStateException("expected launch failure"); }, "fixture"), themes);
-            themes.configure(Theme.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
+            themes.configure(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, new WorkspaceThemeChoice("Jasper Dark"), Theme.DARK, UiFontConfig.defaults());
         });
         pending.remove().run();
         edt(() -> {

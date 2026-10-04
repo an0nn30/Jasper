@@ -26,7 +26,7 @@ public final class TitleBarPreview {
                     dev.jasper.app.platform.AppIcons.named("SERVER"), "Sessions", java.util.List.of("preview.ssh")));
                 var root = new JRootPane();
                 try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                    for (Theme theme : java.util.List.of(Theme.DARK, Theme.INTELLIJ_LIGHT)) {
+                    for (Theme theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
                         owner.selectTheme(theme);
                         while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());
                         owner.currentTab().rename("zsh");

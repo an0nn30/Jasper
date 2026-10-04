@@ -61,11 +61,11 @@ class SidePanelRenderTest {
     @Test void aSidePanelShowsTheThemesToolWindowFieldButtonAndListColours() throws Exception {
         var original = UIManager.getLookAndFeel();
         try {
-            ThemeTestSupport.install(Theme.INTELLIJ_LIGHT);
+            ThemeTestSupport.install(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             var panel = new HostsLike();
             var area = new ToolWindowArea(new JPanel(), new DockState());
             DockTestSupport.show(area, Slot.LEFT_TOP, panel.root, 280);
-            assertThemeColours(area, panel, Theme.INTELLIJ_LIGHT);
+            assertThemeColours(area, panel, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
 
             ThemeTestSupport.install(Theme.DARK);
             SwingUtilities.updateComponentTreeUI(area);

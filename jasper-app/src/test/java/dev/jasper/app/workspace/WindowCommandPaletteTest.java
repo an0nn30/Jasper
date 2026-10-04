@@ -323,7 +323,7 @@ class WindowCommandPaletteTest {
             assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(toggle.get()).isEqualTo("Show Status Bar");
-            owner.selectTheme(Theme.INTELLIJ_LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
+            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);
             assertThat(owner.commands().entries()).isEmpty();

@@ -38,7 +38,7 @@ class ViewModeChromeTest {
             owner.selectTab(first); owner.update();
             assertThat(titles.getLast()).isEqualTo(System.getProperty("user.name") + "@~ : sh");
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
-            owner.selectTheme(Theme.INTELLIJ_LIGHT);
+            owner.selectTheme(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
             owner.selectTheme(Theme.DARK);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");

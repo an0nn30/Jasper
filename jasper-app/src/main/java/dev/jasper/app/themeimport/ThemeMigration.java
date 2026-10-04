@@ -160,9 +160,9 @@ public final class ThemeMigration {
             if (folder.equals("themes") && archive)
                 batch.results().forEach(result -> candidates.add(new Candidate(result.document(), relative, result.sourceEntry(), false)));
         }
-        // Restore the pre-upgrade catalog's combined native/archive filename order and only its four native built-ins.
+        // Restore native/archive filename order, then the retained original built-ins.
         candidates.sort(Comparator.comparing(Candidate::source, String.CASE_INSENSITIVE_ORDER).thenComparing(Candidate::source));
-        List<Theme> classic = List.of(Theme.JASPER_LIGHT, Theme.DARK, Theme.INTELLIJ_LIGHT, Theme.DARCULA);
+        List<Theme> classic = List.of(Theme.JASPER_LIGHT, Theme.DARK);
         var documents = new ArrayList<>(candidates.stream().map(Candidate::document).toList());
         classic.forEach(theme -> documents.add(theme.source().document()));
         var chrome = new LinkedHashMap<String, Owner>();
