@@ -2,6 +2,26 @@
 
 ## Current state — 2026-10-04
 
+- **Plugin panel visual refresh** (2026-10-04; `codex/plugin-panel-redesign`, isolated worktree
+  `/Users/dustin/.codex/worktrees/plugin-panel-redesign/moray`): implements the user's supplied mock as the direction
+  for Remote's Sessions panel and disconnected SFTP / empty Tunnels and File Servers. Sessions shows addresses beside
+  names, leading status dots, trailing favorites, rounded selection and an icon-led selected-host footer with a local
+  accent Connect action. SFTP shows a centered folder prompt and a window-owned Choose Session action, plus a separated
+  Follow terminal folder switch. Empty tunnel/server views use centered icon/title/help/action stacks, retaining visible
+  parse errors and existing creation flows. Existing host grouping, favorites-first ordering and app-owned title bars
+  are retained; populated SFTP/tunnel/server layouts await the user's next reference. No SDK or connection architecture
+  changes. Helpers stay inside each plugin's boundary and read the active component-zone palette.
+  This bounded screenshot-directed follow-up used independent SFTP and empty-panel implementers and a whole-change
+  review, without re-executing historical plans. Meaningful state/action regressions were observed failing before
+  implementation. Review found narrow-row wrapping, live font refresh and missing keyboard focus on the custom
+  primary button; all are corrected. Font and focus regressions were observed failing before their fixes, and
+  independent follow-up review approved with no remaining findings. Final `./gradlew check --continue` passed:
+  **8,689 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and documentation gates.
+  Changed-source hygiene and whitespace checks passed. Dark/light, 220/300px rails and 18pt UI-font previews were
+  inspected; native desktop acceptance remains user-run. Headless previews are reproducible with
+  `./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview` and written under
+  `jasper-app/build/plugin-panel-preview/`. No native GUI, benchmark or AOT training launched.
+
 - **Wider folder tabs** (2026-10-04; user follow-up): doubled each tab's calculated width, including its
   bounds (now 160–480 logical pixels). Fonts, control sizes, tab height and motion timings are unchanged.
   The next user follow-up also doubles the active accent pill to 64 × 2 logical pixels.

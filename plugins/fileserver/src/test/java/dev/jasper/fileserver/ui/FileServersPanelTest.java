@@ -30,7 +30,7 @@ class FileServersPanelTest {
             try (var colors = new ZoneColors()) {
                 var panel = panel();
                 colors.workspace.add(panel);
-                colors.assertStableSemanticStyle(panel.empty, "textMuted");
+                colors.assertStableSemanticStyle(panel.cardTls, "textMuted");
             }
         });
     }
@@ -59,8 +59,8 @@ class FileServersPanelTest {
                         assertThat(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, value, 0, false, false).getForeground()).isEqualTo(value instanceof ServerRows.Problem ? p.error() : p.textMuted());
                         assertThat(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, value, 0, true, false).getForeground()).isEqualTo(panel.list.getSelectionForeground());
                     }
-                    panel.empty.updateUI(); ZoneColors.paint(panel.empty);
-                    assertThat(panel.empty.getForeground()).isEqualTo(p.textMuted());
+                    panel.cardTls.updateUI(); ZoneColors.paint(panel.cardTls);
+                    assertThat(panel.cardTls.getForeground()).isEqualTo(p.textMuted());
                     colors.put("Jasper.workspace.success", new java.awt.Color(0x123456));
                 }
             }
@@ -95,6 +95,41 @@ class FileServersPanelTest {
 
     static void click(JPopupMenu menu, String title) {
         Arrays.stream(menu.getComponents()).filter(c -> c instanceof JMenuItem item && item.getText().equals(title)).map(c -> (JMenuItem) c).findFirst().orElseThrow().doClick();
+    }
+
+
+    @Test void emptyPanelOffersSharingAndHidesListAndDetailControls() {
+        var panel = panel();
+        assertThat(panel.list.isVisible()).isFalse();
+        assertThat(panel.split.isVisible()).isFalse();
+        var buttons = new ArrayList<javax.swing.JButton>();
+        buttons(panel, buttons);
+        buttons.stream().filter(button -> "Share Folder…".equals(button.getText())).findFirst().orElseThrow().doClick();
+        assertThat(events).containsExactly("edit new");
+        view("docs", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        assertThat(panel.list.isVisible()).isTrue();
+        assertThat(panel.split.isVisible()).isTrue();
+        assertThat(panel.details.isVisible()).isTrue();
+        panel.setServers(List.of(), Optional.of("line 2"));
+        assertThat(panel.list.isVisible()).isFalse();
+        assertThat(panel.split.isVisible()).isFalse();
+        var notes = new ArrayList<javax.swing.JTextArea>();
+        notes(panel, notes);
+        assertThat(notes).anySatisfy(note -> {
+            assertThat(note.getText()).contains("servers.toml: line 2");
+            assertThat(note.isVisible()).isTrue();
+        });
+    }
+
+    static void buttons(java.awt.Component component, List<javax.swing.JButton> found) {
+        if (component instanceof javax.swing.JButton button) found.add(button);
+        if (component instanceof java.awt.Container parent) for (var child : parent.getComponents()) buttons(child, found);
+    }
+
+    static void notes(java.awt.Component component, List<javax.swing.JTextArea> found) {
+        if (component instanceof javax.swing.JTextArea note) found.add(note);
+        if (component instanceof java.awt.Container parent) for (var child : parent.getComponents()) notes(child, found);
     }
 
     @Test void showsTheSelectedServersDetailsAndRunsItsActions() {
@@ -191,7 +226,7 @@ class FileServersPanelTest {
         var found = new ArrayList<javax.swing.JLabel>();
         for (int i = 0; i < panel.list.getModel().getSize(); i++)
             labels(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(i), i, false, false), found);
-        labels(panel, found);
+        labels(panel.details, found);
         assertThat(found).isNotEmpty().allSatisfy(label -> assertThat(label.getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey)).isNull());
         assertThat(found).extracting(javax.swing.JLabel::getText).contains("<html><b>x</b>   HTTP :8080", "servers.toml: <html><i>broken</i>");
         assertThat(panel.cardName.getText()).isEqualTo("<html><b>x</b>");
@@ -209,10 +244,10 @@ class FileServersPanelTest {
 
     @Test void theEmptyHintWrapsAndTheDividerShowsOnlyWithDetails() {
         var panel = panel();
-        assertThat(panel.empty.getLineWrap()).isTrue();
-        assertThat(panel.empty.getWrapStyleWord()).isTrue();
-        assertThat(panel.empty.isEditable()).isFalse();
-        assertThat(panel.empty.getText()).isEqualTo("No file servers yet — press + to share a folder");
+        var labels = new ArrayList<javax.swing.JLabel>();
+        labels(panel.empty, labels);
+        assertThat(labels).extracting(javax.swing.JLabel::getText).contains("No File Servers");
+        assertThat(panel.emptyAction.isFocusable()).isTrue();
         assertThat(panel.split.getDividerSize()).as("nothing selected").isZero();
         view("docs", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
         panel.setServers(views, Optional.empty());
@@ -228,7 +263,12 @@ class FileServersPanelTest {
         layoutAll(panel);
         panel.setServers(List.of(), Optional.empty());
         layoutAll(panel);
-        assertThat(panel.empty.getPreferredSize().height).as("a few lines at most").isLessThan(100);
+        var labels = new ArrayList<javax.swing.JLabel>();
+        labels(panel.empty, labels);
+        var description = labels.stream().filter(label -> label.getText() != null && label.getText().startsWith("<html>")).findFirst().orElseThrow();
+        assertThat(description.getHeight()).as("a few lines at most").isBetween(1, 100);
+        assertThat(description.getWidth()).isLessThanOrEqualTo(panel.empty.getWidth());
+        assertThat(panel.emptyAction.getY() + panel.emptyAction.getHeight()).isLessThanOrEqualTo(panel.empty.getHeight());
     }
 
     static void layoutAll(java.awt.Container container) {

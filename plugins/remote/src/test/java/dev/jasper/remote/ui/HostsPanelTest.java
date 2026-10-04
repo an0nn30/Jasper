@@ -259,11 +259,16 @@ class HostsPanelTest {
             var panel = new HostsPanel(actions);
             panel.setHosts(List.of(prod), Optional.empty()); panel.select(prod.id());
             var progress = new ConnectionPanel("prod", "user@host", () -> {}, () -> {});
+            var emptyState = PanelStyle.emptyState(null, "Empty", "No items", new javax.swing.JButton("Add"));
             Object previous = javax.swing.UIManager.get("Label.font");
             try {
                 javax.swing.UIManager.put("Label.font", new javax.swing.plaf.FontUIResource("Serif", java.awt.Font.PLAIN, 20));
                 javax.swing.SwingUtilities.updateComponentTreeUI(panel);
                 javax.swing.SwingUtilities.updateComponentTreeUI(progress);
+                javax.swing.SwingUtilities.updateComponentTreeUI(emptyState);
+                assertThat(panel.cardAddress.getFont().getSize2D()).isEqualTo(20);
+                var emptyHeading = ZoneColors.labels(emptyState).stream().filter(label -> "Empty".equals(label.getText())).findFirst().orElseThrow();
+                assertThat(emptyHeading.getFont().getSize2D()).isEqualTo(20);
                 assertThat(panel.cardName.getFont().getFamily()).isEqualTo(java.awt.Font.SERIF);
                 assertThat(panel.cardName.getFont().getSize2D()).isEqualTo(20);
                 assertThat(panel.cardName.getFont().isBold()).isTrue();
@@ -336,7 +341,7 @@ class HostsPanelTest {
         panel.list.getActionMap().get(action).actionPerformed(new java.awt.event.ActionEvent(panel.list, 0, ""));
         panel.list.setSize(300, 100);
         var bounds = panel.list.getCellBounds(1, 1);
-        var click = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 8, bounds.y + bounds.height / 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
+        var click = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 288, bounds.y + bounds.height / 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
         for (var listener : panel.list.getMouseListeners()) listener.mouseClicked(click);
         assertThat(events).containsExactly("connect nas", "favorite nas true");
         panel.setHosts(List.of(), Optional.empty());
@@ -357,6 +362,36 @@ class HostsPanelTest {
         assertThat(panel.cardAddress.getText()).isEqualTo("me@nas.local:2222");
         assertThat(panel.cardInfo.getText()).isEqualTo("Ubuntu \u00B7 10.0.0.2");
     }
+    @Test void sessionRowsShowAddressAndFavoriteAtTheTrailingEdge() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var panel = new HostsPanel(actions);
+            panel.setHosts(List.of(prod), Optional.empty());
+            panel.list.setSize(300, 100);
+            var row = (javax.swing.JPanel) render(panel, 1);
+            row.setSize(300, row.getPreferredSize().height);
+            layout(row);
+            var address = ZoneColors.labels(row).stream().filter(label -> prod.hostname().equals(label.getText())).findFirst();
+            assertThat(address).as("the host address is visible alongside its name").isPresent();
+            row.setSize(180, row.getPreferredSize().height); layout(row);
+            var at = javax.swing.SwingUtilities.convertRectangle(address.orElseThrow().getParent(), address.orElseThrow().getBounds(), row);
+            assertThat(at.width).isPositive();
+            assertThat(at.y + at.height).as("narrow rows keep address on the visible baseline").isLessThanOrEqualTo(row.getHeight());
+            row.setSize(300, row.getPreferredSize().height); layout(row);
+            var star = ZoneColors.labels(row).stream().filter(label -> "\u2606".equals(label.getText())).findFirst().orElseThrow();
+            assertThat(javax.swing.SwingUtilities.convertPoint(star, 0, 0, row).x).isGreaterThan(260);
+            var bounds = panel.list.getCellBounds(1, 1);
+            var click = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0,
+                8, bounds.y + bounds.height / 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
+            for (var listener : panel.list.getMouseListeners()) listener.mouseClicked(click);
+            assertThat(events).as("the leading status dot is not a favorite toggle").isEmpty();
+        });
+    }
+
+    private static void layout(java.awt.Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layout(nested);
+    }
+
     private static List<String> labels(java.awt.Component component) {
         var out = new ArrayList<String>();
         if (component instanceof javax.swing.JLabel label) out.add(label.getText());

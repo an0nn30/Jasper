@@ -103,6 +103,38 @@ class TunnelsPanelTest {
         return lines;
     }
 
+
+    @Test void emptyPanelOffersNewTunnelAndHidesTheListAndFilter() {
+        panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
+        assertThat(panel.list.isVisible()).isFalse();
+        assertThat(panel.filter.isVisible()).isFalse();
+        var buttons = new ArrayList<javax.swing.JButton>();
+        buttons(panel, buttons);
+        buttons.stream().filter(button -> "New Tunnel".equals(button.getText())).findFirst().orElseThrow().doClick();
+        assertThat(events).containsExactly("add");
+        show();
+        assertThat(panel.list.isVisible()).isTrue();
+        assertThat(panel.filter.isVisible()).isTrue();
+        panel.setTunnels(List.of(), List.of(), Optional.of("line 2"), id -> TunnelState.STOPPED, id -> Optional.empty());
+        assertThat(panel.list.isVisible()).isFalse();
+        var notes = new ArrayList<javax.swing.JTextArea>();
+        notes(panel, notes);
+        assertThat(notes).anySatisfy(note -> {
+            assertThat(note.getText()).contains("tunnels.toml has errors: line 2");
+            assertThat(note.isVisible()).isTrue();
+        });
+    }
+
+    static void buttons(Component component, List<javax.swing.JButton> found) {
+        if (component instanceof javax.swing.JButton button) found.add(button);
+        if (component instanceof Container parent) for (var child : parent.getComponents()) buttons(child, found);
+    }
+
+    static void notes(Component component, List<javax.swing.JTextArea> found) {
+        if (component instanceof javax.swing.JTextArea note) found.add(note);
+        if (component instanceof Container parent) for (var child : parent.getComponents()) notes(child, found);
+    }
+
     @Test void savedTunnelsByNameThenQuickForwardsUnderTheirHeading() {
         show();
         assertThat(rows()).containsExactly("API", "db", "heading Quick forwards", "localhost:3000");
@@ -123,8 +155,8 @@ class TunnelsPanelTest {
 
     @Test void anEmptyPanelSaysHowToStartAndABrokenFileShowsOneRow() {
         panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
-        assertThat(panel.empty.getText()).isEqualTo("No tunnels yet — add one with +, or use Forward a Port… from an SSH pane");
-        assertThat(panel.empty.isVisible()).isTrue();
+        assertThat(texts(panel)).contains("No Tunnels");
+        assertThat(panel.emptyState.isVisible()).isTrue();
         panel.setTunnels(List.of(db), List.of(), Optional.of("line 2"), id -> TunnelState.STOPPED, id -> Optional.of("prod"));
         assertThat(rows()).containsExactly("problem tunnels.toml has errors: line 2", "db");
         assertThat(panel.menuFor(0)).isNull();
@@ -135,17 +167,19 @@ class TunnelsPanelTest {
         panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
         panel.setSize(260, 400);
         layOut(panel);
-        int line = panel.empty.getFontMetrics(panel.empty.getFont()).getHeight();
-        int padding = panel.empty.getInsets().top + panel.empty.getInsets().bottom;
-        assertThat(panel.empty.getWidth()).as("it takes the panel's width, not the text's").isLessThanOrEqualTo(260);
-        assertThat(panel.empty.getPreferredSize().width).as("and asks for no more").isLessThanOrEqualTo(260);
-        assertThat(panel.empty.getHeight() - padding).as("the text runs over several lines").isGreaterThanOrEqualTo(2 * line);
+        var labels = new ArrayList<JLabel>();
+        collect(panel.emptyState, labels);
+        var description = labels.stream().filter(label -> label.getText() != null && label.getText().startsWith("<html>")).findFirst().orElseThrow();
+        int line = description.getFontMetrics(description.getFont()).getHeight();
+        assertThat(description.getWidth()).as("it takes the panel's width, not the text's").isLessThanOrEqualTo(260);
+        assertThat(description.getHeight()).as("the text runs over several lines").isGreaterThanOrEqualTo(2 * line);
         panel.setTunnels(List.of(db), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
         layOut(panel);
         panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
         layOut(panel);
-        assertThat(panel.empty.getHeight() - padding).as("hidden at 0x0 in between, it still measures at the panel's width")
+        assertThat(description.getHeight()).as("hidden at 0x0 in between, it still measures at the panel's width")
             .isBetween(2 * line, 8 * line);
+        assertThat(panel.emptyAction.getY() + panel.emptyAction.getHeight()).isLessThanOrEqualTo(panel.emptyState.getHeight());
     }
 
     /** Container.validateTree lays out hidden children too, as the real window does; revalidate needs a showing window, so run what it would. */

@@ -1,0 +1,25 @@
+// ./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview
+// Opt-in, headless rendering. No windows, shells, network sessions or user settings.
+gradle.projectsEvaluated {
+    def app = rootProject.project(':jasper-app')
+    def remote = rootProject.project(':jasper-plugin-remote')
+    def servers = rootProject.project(':jasper-plugin-fileserver')
+    def previewClasspath = app.sourceSets.main.runtimeClasspath + remote.sourceSets.main.runtimeClasspath + servers.sourceSets.main.runtimeClasspath
+    def output = app.layout.buildDirectory.dir('plugin-panel-preview-classes')
+    def compile = app.tasks.register('compilePluginPanelsPreview', JavaCompile) {
+        dependsOn app.tasks.named('classes'), remote.tasks.named('classes'), servers.tasks.named('classes')
+        source rootProject.file('tools/previews/PluginPanelsPreview.java')
+        classpath = previewClasspath
+        destinationDirectory = output
+        javaCompiler = app.javaToolchains.compilerFor(app.java.toolchain)
+        options.encoding = 'UTF-8'
+    }
+    app.tasks.register('pluginPanelsPreview', JavaExec) {
+        dependsOn compile
+        classpath = previewClasspath + rootProject.files(output)
+        mainClass = 'dev.jasper.app.workspace.PluginPanelsPreview'
+        javaLauncher = app.javaToolchains.launcherFor(app.java.toolchain)
+        jvmArgs '-Djava.awt.headless=true', '--enable-native-access=ALL-UNNAMED'
+        args app.layout.buildDirectory.dir('plugin-panel-preview').get().asFile.absolutePath
+    }
+}

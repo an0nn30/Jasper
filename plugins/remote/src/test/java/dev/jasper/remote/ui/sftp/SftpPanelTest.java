@@ -62,12 +62,72 @@ class SftpPanelTest {
             panel.showPage("prod","/srv",List.of(new FileEntry("a",FileEntry.Kind.FILE,1,1000,0644,"")),200,450,false);
             named(panel,"Next page").doClick();named(panel,"Previous page").doClick();
             assertThat(pages).containsExactly(400L,0L);
-            var follow=find(panel,JCheckBox.class,box->"Follow terminal folder".equals(box.getText())).orElseThrow();
-            for(var row:follow.getParent().getComponents()) assertThat(row.getAlignmentX()).as("bottom row "+row.getClass().getSimpleName()).isEqualTo(Component.LEFT_ALIGNMENT);
+            var follow=find(panel,JCheckBox.class,box->"Follow terminal folder".equals(box.getAccessibleContext().getAccessibleName())).orElseThrow();
+            assertThat(follow.getParent().getLayout()).isInstanceOf(BorderLayout.class);
+            assertThat(((BorderLayout)follow.getParent().getLayout()).getLayoutComponent(BorderLayout.EAST)).isSameAs(follow);
             assertThat(named(panel,"Next page").getIcon())
                 .isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(IconName.NEXT));
         });
     }
+    @Test void disconnectedStateHidesBrowserAndRestoresItAfterLoading() throws Exception {
+        SwingUtilities.invokeAndWait(()-> {
+            var panel=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);
+            var choose=named(panel,"Choose Session");
+            assertThat(visible(choose)).isTrue();
+            assertThat(find(panel,JLabel.class,label->"Not Connected".equals(label.getText()))).isPresent();
+            assertThat(visible(panel.table())).isFalse();
+            assertThat(visible(named(panel,"Up"))).isFalse();
+            assertThat(visible(named(panel,"Next page"))).isFalse();
+            assertThat(visible(find(panel,JTextField.class,field->true).orElseThrow())).isFalse();
+            panel.showPage("prod","/data",List.of(new FileEntry("a",FileEntry.Kind.FILE,1,0,0644,"")),0,1,false);
+            assertThat(visible(choose)).isFalse();
+            assertThat(visible(panel.table())).isTrue();
+            assertThat(visible(named(panel,"Up"))).isTrue();
+            panel.clear("SSH session closed");
+            assertThat(visible(choose)).isTrue();
+            assertThat(panel.selection()).isEmpty();
+            assertThat(visible(panel.table())).isFalse();
+            assertThat(visible(find(panel,JLabel.class,label->"SSH session closed".equals(label.getText())).orElseThrow())).isTrue();
+        });
+    }
+
+    @Test void connectingAndErrorsRemainVisibleWithTransfersAndFollowControl() throws Exception {
+        SwingUtilities.invokeAndWait(()-> {
+            var panel=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);
+            var strip=new JLabel("Active transfers");panel.transfers(strip);
+            panel.busy(true,"Connecting…");
+            assertThat(visible(find(panel,JButton.class,button->"Cancel".equals(button.getText())).orElseThrow())).isTrue();
+            assertThat(visible(find(panel,JLabel.class,label->"Connecting…".equals(label.getText())).orElseThrow())).isTrue();
+            assertThat(visible(strip)).isTrue();
+            assertThat(named(panel,"Choose Session").isEnabled()).isFalse();
+            panel.error("Connection denied");
+            assertThat(named(panel,"Choose Session").isEnabled()).isTrue();
+            assertThat(visible(find(panel,JLabel.class,label->"Connection denied".equals(label.getText())).orElseThrow())).isTrue();
+            var follow=find(panel,JCheckBox.class,box->"Follow terminal folder".equals(box.getAccessibleContext().getAccessibleName())).orElseThrow();
+            var followed=new ArrayList<Boolean>();
+            panel.actions(new SftpPanel.Actions(p->{},()->{},()->{},followed::add,()->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},p->{}));
+            follow.doClick();assertThat(followed).containsExactly(false);
+            panel.following(true);assertThat(follow.isSelected()).isTrue();
+            panel.enableBrowsing(false);follow.doClick();assertThat(followed).containsExactly(false);
+        });
+    }
+
+    @Test void destinationModeRetainsItsOwnHostPickerAndBrowser() throws Exception {
+        SwingUtilities.invokeAndWait(()-> {
+            var panel=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);panel.destinationMode();
+            assertThat(visible(panel.table())).isTrue();
+            assertThat(visible(named(panel,"Choose Session"))).isFalse();
+            assertThat(visible(find(panel,JCheckBox.class,box->true).orElseThrow())).isFalse();
+            assertThat(panel.table().getSelectionModel().getSelectionMode()).isEqualTo(ListSelectionModel.SINGLE_SELECTION);
+            assertThat(panel.table().getComponentPopupMenu()).isNull();
+        });
+    }
+
+    private static boolean visible(Component component) {
+        for(Component current=component;current!=null;current=current.getParent()) if(!current.isVisible()) return false;
+        return true;
+    }
+
     static JButton named(Container root,String name) { return find(root,JButton.class,button->name.equals(button.getAccessibleContext().getAccessibleName())).orElseThrow(()->new AssertionError("no button "+name)); }
     static <T> Optional<T> find(Component component,Class<T> type,java.util.function.Predicate<T> match) {
         if(type.isInstance(component) && match.test(type.cast(component))) return Optional.of(type.cast(component));

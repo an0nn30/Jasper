@@ -1,11 +1,13 @@
 package dev.jasper.remote.ui.tunnels;
 
 import dev.jasper.sdk.ui.WorkspacePalette;
+import dev.jasper.remote.ui.PanelStyle;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelState;
 import dev.jasper.sdk.ui.BundledIcon;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.CardLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -73,6 +75,11 @@ public final class TunnelsPanel extends JPanel {
     final JButton add = new JButton("+");
     final JTextArea empty = new WrappedNote();
     final JList<Row> list;
+    final JButton emptyAction = new JButton("New Tunnel");
+    final JPanel emptyState;
+    private final JTextArea emptyProblem = new WrappedNote(true);
+    private final JPanel cards = new JPanel(new CardLayout());
+    private final JPanel north = new JPanel(new BorderLayout(0, 6));
     private final DefaultListModel<Row> model = new DefaultListModel<>();
     private final Actions actions;
     private final Function<BundledIcon, Icon> icons;
@@ -83,6 +90,10 @@ public final class TunnelsPanel extends JPanel {
     private Supplier<Instant> clock = Instant::now;
 
     public TunnelsPanel(Actions actions, Function<BundledIcon, Icon> icons) {
+        this(actions, icons, icons.apply(BundledIcon.ACTIONS_SWAP_PANELS));
+    }
+
+    public TunnelsPanel(Actions actions, Function<BundledIcon, Icon> icons, Icon emptyIcon) {
         super(new BorderLayout(0, 6));
         this.actions = actions;
         this.icons = icons;
@@ -92,8 +103,9 @@ public final class TunnelsPanel extends JPanel {
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
         header.add(Box.createHorizontalGlue()); header.add(add);
         add.setToolTipText("New Tunnel…");
+        add.putClientProperty("JButton.buttonType", "toolBarButton");
         filter.putClientProperty("JTextField.placeholderText", "Filter tunnels…");
-        var north = new JPanel(new BorderLayout(0, 6));
+
         north.add(header, BorderLayout.NORTH);
         north.add(filter, BorderLayout.SOUTH);
         add(north, BorderLayout.NORTH);
@@ -114,7 +126,15 @@ public final class TunnelsPanel extends JPanel {
         var center = new JPanel(new BorderLayout());
         center.add(scroll, BorderLayout.CENTER);
         center.add(empty, BorderLayout.SOUTH);
-        add(center, BorderLayout.CENTER);
+        cards.add(center, "populated");
+        emptyState = PanelStyle.emptyState(emptyIcon, "No Tunnels",
+            "Forward a local port to a remote host, or use Forward Port from an SSH pane.", emptyAction);
+        var emptyPage = new JPanel(new BorderLayout());
+        emptyPage.add(emptyProblem, BorderLayout.NORTH);
+        emptyPage.add(emptyState, BorderLayout.CENTER);
+        cards.add(emptyPage, "empty");
+        add(cards, BorderLayout.CENTER);
+        emptyAction.addActionListener(event -> actions.add().run());
 
         filter.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent e) { rebuild(); }
@@ -223,8 +243,17 @@ public final class TunnelsPanel extends JPanel {
             quickShown.forEach(tunnel -> model.addElement(new Item(tunnel)));
         }
         boolean none = saved.isEmpty() && quick.isEmpty();
-        empty.setText(none ? "No tunnels yet — add one with +, or use Forward a Port… from an SSH pane" : "No tunnels match");
-        empty.setVisible(none || model.size() == (error.isPresent() ? 1 : 0));
+        empty.setText("No tunnels match");
+        empty.setVisible(!none && model.size() == (error.isPresent() ? 1 : 0));
+        north.setVisible(!none);
+        filter.setVisible(!none);
+        list.setVisible(!none);
+        emptyState.setVisible(none);
+        emptyProblem.setText(error.map(message -> "tunnels.toml has errors: " + message).orElse(""));
+        emptyProblem.setVisible(none && error.isPresent());
+        ((CardLayout) cards.getLayout()).show(cards, none ? "empty" : "populated");
+        revalidate();
+        repaint();
         keep.ifPresent(id -> {
             for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof Item item && item.tunnel().id().equals(id)) { list.setSelectedIndex(i); return; }
         });
@@ -306,7 +335,10 @@ public final class TunnelsPanel extends JPanel {
      */
     static final class WrappedNote extends JTextArea {
         private Color semanticForeground;
-        WrappedNote() {
+        private final boolean problem;
+        WrappedNote() { this(false); }
+        WrappedNote(boolean problem) {
+            this.problem = problem;
             setEditable(false);
             setFocusable(false);
             setOpaque(false);
@@ -323,7 +355,8 @@ public final class TunnelsPanel extends JPanel {
         }
 
         @Override protected void paintComponent(java.awt.Graphics graphics) {
-            Color foreground = WorkspacePalette.current(this).text();
+            var palette = WorkspacePalette.current(this);
+            Color foreground = problem ? palette.error() : palette.text();
             // The host may compose more keys into FlatLaf.style; compare our semantic value instead.
             if (!foreground.equals(semanticForeground)) {
                 semanticForeground = foreground;

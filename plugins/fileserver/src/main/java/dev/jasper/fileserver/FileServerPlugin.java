@@ -218,7 +218,8 @@ public final class FileServerPlugin implements Plugin {
             this::duplicate, id -> delete(window, id), this::reveal, environment.clipboard(),
             id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity,
             id -> showFingerprints(window, id)),
-            registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone());
+            registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
+            context.appearance().icon(IconName.SERVER));
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
         panels.put(window.id(), panel);

@@ -8,6 +8,7 @@ import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.CardLayout;
 import java.awt.Component;
 import java.awt.Font;
 import java.awt.Rectangle;
@@ -32,6 +33,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -63,7 +65,11 @@ public final class FileServersPanel extends JPanel {
 
     final JButton add = new JButton("+");
     final JList<ServerRows.Row> list;
-    final JTextArea empty = note("No file servers yet — press + to share a folder");
+    final JPanel empty;
+    final JButton emptyAction = new JButton("Share Folder…");
+    private final JTextArea emptyProblem = note("", true);
+    private final JPanel cards = new JPanel(new CardLayout());
+    private final JPanel header = new JPanel();
     final JPanel details = new JPanel(new BorderLayout(0, 6));
     final JLabel cardName = label(""), cardState = label(""), cardFolder = label(""), cardAccess = label(""), cardWarnings = label("");
     final JTextArea cardTls = note("");
@@ -87,14 +93,18 @@ public final class FileServersPanel extends JPanel {
     private boolean rebuilding;
 
     public FileServersPanel(Actions actions, Function<UUID, List<ActivityLog.Entry>> log, Path home, String firewallHint, ZoneId zone) {
+        this(actions, log, home, firewallHint, zone, null);
+    }
+
+    public FileServersPanel(Actions actions, Function<UUID, List<ActivityLog.Entry>> log, Path home, String firewallHint, ZoneId zone, Icon emptyIcon) {
         super(new BorderLayout(0, 6));
         this.actions = actions; this.log = log; this.home = home; this.firewall = firewallHint; this.zone = zone;
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         // The tool window header carries the title.
-        var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
         header.add(Box.createHorizontalGlue());
         add.setToolTipText("New file server");
+        add.putClientProperty("JButton.buttonType", "toolBarButton");
         header.add(add);
         add(header, BorderLayout.NORTH);
 
@@ -114,8 +124,6 @@ public final class FileServersPanel extends JPanel {
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         top.add(scroll, BorderLayout.CENTER);
-        empty.setBorder(BorderFactory.createEmptyBorder(12, 4, 12, 4));
-        top.add(empty, BorderLayout.SOUTH);
 
         var card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
@@ -152,7 +160,16 @@ public final class FileServersPanel extends JPanel {
         dividerSize = split.getDividerSize();
         split.setResizeWeight(0.5);
         split.setBorder(BorderFactory.createEmptyBorder());
-        add(split, BorderLayout.CENTER);
+        cards.add(split, "populated");
+        empty = PanelStyle.emptyState(emptyIcon, "No File Servers",
+            "Share a local folder over HTTP with devices on your network.", emptyAction);
+        emptyProblem.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
+        var emptyPage = new JPanel(new BorderLayout());
+        emptyPage.add(emptyProblem, BorderLayout.NORTH);
+        emptyPage.add(empty, BorderLayout.CENTER);
+        cards.add(emptyPage, "empty");
+        add(cards, BorderLayout.CENTER);
+        emptyAction.addActionListener(event -> actions.edit().accept(Optional.empty()));
 
         list.addListSelectionListener(event -> { if (!event.getValueIsAdjusting() && !rebuilding) selectionChanged(); });
         list.addMouseListener(new MouseAdapter() {
@@ -259,7 +276,13 @@ public final class FileServersPanel extends JPanel {
         } finally {
             rebuilding = false;
         }
-        empty.setVisible(views.isEmpty());
+        boolean none = views.isEmpty();
+        empty.setVisible(none);
+        list.setVisible(!none);
+        header.setVisible(!none);
+        emptyProblem.setText(problem.map(message -> "servers.toml: " + message).orElse(""));
+        emptyProblem.setVisible(none && problem.isPresent());
+        ((CardLayout) cards.getLayout()).show(cards, none ? "empty" : "populated");
         refreshCard();
         refreshActivity();
     }
@@ -351,7 +374,9 @@ public final class FileServersPanel extends JPanel {
     }
 
     /** Wrapping, read-only text that looks like a label; a JTextArea never renders HTML. */
-    private static JTextArea note(String text) {
+    private static JTextArea note(String text) { return note(text, false); }
+
+    private static JTextArea note(String text, boolean problem) {
         var note = new JTextArea(text) {
             private Color semanticForeground;
             @Override public void setBounds(int x, int y, int width, int height) {
@@ -360,7 +385,8 @@ public final class FileServersPanel extends JPanel {
                 super.setBounds(x, y, width, height);
             }
             @Override protected void paintComponent(java.awt.Graphics graphics) {
-                Color foreground = WorkspacePalette.current(this).textMuted();
+                var palette = WorkspacePalette.current(this);
+                Color foreground = problem ? palette.error() : palette.textMuted();
                 // The host may compose more keys into FlatLaf.style; compare our semantic value instead.
                 if (!foreground.equals(semanticForeground)) {
                     semanticForeground = foreground;
