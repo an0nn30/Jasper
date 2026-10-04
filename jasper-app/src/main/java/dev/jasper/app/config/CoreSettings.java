@@ -84,6 +84,24 @@ public final class CoreSettings {
         .description("Live. While Jasper is in the background, or idle as a resident Jasper with every window closed, also\n"
             + "show its notifications as the operating system's own: banners from the packaged macOS app, Windows tray\n"
             + "balloons, or notify-send on Linux.").build();
+    /** The modes notifications.groups accepts. */
+    static final Set<String> NOTIFICATION_MODES = Set.of("card", "sticky", "history", "off");
+    private static final java.util.regex.Pattern NOTIFICATION_GROUP = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,159}");
+
+    /** Whether {@code id} is shaped like a notification group id: lowercase, a plugin's id or one under it. */
+    static boolean notificationGroupId(String id) {
+        return NOTIFICATION_GROUP.matcher(id).matches();
+    }
+
+    public static final Setting<Map<String, String>> NOTIFICATIONS_GROUPS = Setting.of("notifications.groups",
+            SettingKind.stringMap(new SettingKind.MapRules(CoreSettings::notificationGroupId,
+                "Use a notification group id such as \"jasper.commands\"; entry ignored.", Set.of(), "",
+                NOTIFICATION_MODES::contains, "Use \"card\", \"sticky\", \"history\" or \"off\"; the group's default applies.",
+                "a display mode", dev.jasper.app.settings.Reading.Severity.WARNING)), Map.<String, String>of())
+        .label("Notification groups").keywords("notification", "group", "card", "sticky", "history", "off", "mute", "quiet")
+        .description("Live. How each group's notifications appear: \"card\" (a card that hides itself), \"sticky\" (a card\n"
+            + "that stays until you close it), \"history\" (only the Notifications panel) or \"off\". Settings > Notifications\n"
+            + "lists every group; a group not listed here keeps its default.").build();
     /**
      * Residency is on by default where a windowless Jasper stays reachable: macOS (its menu bar item and Dock) and
      * Windows (its notification-area icon). Linux has no tray, so it stays off there.
@@ -236,7 +254,7 @@ public final class CoreSettings {
         .description("macOS only (ignored on other platforms), live: blur the desktop behind a translucent workspace. \"theme\" follows the workspace theme.").build();
     public static final SettingsSchema SCHEMA = SettingsSchema.of(List.<Setting<?>>of(
             WINDOW_TAB_HEIGHT, WINDOW_RAIL_WIDTH, WINDOW_TOOLBAR, WINDOW_TOOLBAR_HEIGHT, WINDOW_STATUS_BAR, WINDOW_STATUS_BAR_HEIGHT,
-            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, SYSTEM_RUN_IN_BACKGROUND,
+            WINDOW_COLUMNS, WINDOW_LINES, WINDOW_NATIVE_DECORATIONS, WINDOW_VIEW_MODE, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, NOTIFICATIONS_SYSTEM, NOTIFICATIONS_GROUPS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_VISIBLE_ROWS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
             TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,

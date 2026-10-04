@@ -263,6 +263,10 @@ public final class JasperApplication {
             updateMigrateAction();
         });
         if (configuration != null) {
+            applyGroupModes(configuration.state());
+            configuration.onState(this::applyGroupModes);
+        }
+        if (configuration != null) {
             var problems = new ConfigProblemNotices(notificationCenter, this::showConfigurationProblems, this::openConfigFile);
             configuration.onProblems(problems::accept);
         }
@@ -813,7 +817,9 @@ public final class JasperApplication {
                 return new dev.jasper.app.settingsui.ThemeChoices.Import(imports::start, imports::close);
             });
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
-                dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells, new dev.jasper.app.settingsui.CorePages.Pages(
+                dev.jasper.app.settingsui.CorePages.pages(themeChoices, system, shells,
+                    new dev.jasper.app.settingsui.NotificationGroupChoices(() -> groupChoices(notificationCenter.groups(), this::pluginName)),
+                    new dev.jasper.app.settingsui.CorePages.Pages(
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
                         context -> plugins.settingsPages(context))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
@@ -905,6 +911,26 @@ public final class JasperApplication {
     /** An uncaught failure, after the default handler logged it: an incident (spec section 7, producer 6). Any thread. */
     public void unexpected(Thread thread, Throwable failure) {
         incidentNotices.jasperFailure(thread == null ? "an unknown thread" : "thread " + thread.getName(), failure);
+    }
+
+    /** {@code notifications.groups}, live: each listed group's mode replaces its default from the next post on. */
+    private void applyGroupModes(dev.jasper.app.config.ConfigService.State state) {
+        notificationCenter.useModes(groupModes(state.values().get(dev.jasper.app.config.CoreSettings.NOTIFICATIONS_GROUPS)));
+    }
+
+    /** The configured modes the center understands; the reader has already left out anything else. */
+    static Map<String, dev.jasper.app.notifications.DisplayMode> groupModes(Map<String, String> configured) {
+        var modes = new LinkedHashMap<String, dev.jasper.app.notifications.DisplayMode>();
+        configured.forEach((id, token) -> dev.jasper.app.notifications.DisplayMode.parse(token).ifPresent(mode -> modes.put(id, mode)));
+        return modes;
+    }
+
+    /** What Settings › Notifications lists: every group declared so far, with who declared it as people know them. */
+    static List<dev.jasper.app.settingsui.NotificationGroupChoices.Group> groupChoices(
+            List<dev.jasper.app.notifications.NotificationGroup> groups, java.util.function.Function<String, String> pluginName) {
+        return groups.stream().map(group -> new dev.jasper.app.settingsui.NotificationGroupChoices.Group(group.id(), group.name(),
+            group.owner().equals(dev.jasper.app.notifications.NotificationRequest.JASPER) ? "Jasper" : pluginName.apply(group.owner()),
+            group.defaultMode().token())).toList();
     }
 
     private String pluginName(String id) {

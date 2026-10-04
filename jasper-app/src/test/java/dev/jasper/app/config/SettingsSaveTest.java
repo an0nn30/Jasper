@@ -149,4 +149,31 @@ class SettingsSaveTest {
             assertThat(state.diagnostics()).isEmpty();
         }
     }
+
+    @Test void notificationGroupsKeepOtherGroupsAndAnEmptiedTableLeavesNoHeader() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "[notifications.groups]\n\"dev.jasper.remote.activities\" = \"off\"\n");
+        try (var service = new ConfigService(file, true)) {
+            var both = Map.of("dev.jasper.remote.activities", "off", "jasper.commands", "history");
+            var state = save(service, edit(Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(both)),
+                Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(Map.of("dev.jasper.remote.activities", "off")))));
+            assertThat(state.values().get(CoreSettings.NOTIFICATIONS_GROUPS)).isEqualTo(both);
+            assertThat(Files.readString(file)).containsOnlyOnce("[notifications.groups]");
+            state = save(service, edit(Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.empty()),
+                Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(both))));
+            assertThat(state.values().saved(CoreSettings.NOTIFICATIONS_GROUPS)).isEmpty();
+            assertThat(Files.readString(file)).doesNotContain("[notifications.groups]");
+        }
+    }
+
+    @Test void aFirstGroupModeIsSavedIntoTheTemplate() throws Exception {
+        Path file = directory.resolve("new/config.toml");
+        try (var service = new ConfigService(file, true)) {
+            var state = save(service, edit(Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(Map.of("jasper.commands", "off"))),
+                Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.empty())));
+            assertThat(state.values().get(CoreSettings.NOTIFICATIONS_GROUPS)).isEqualTo(Map.of("jasper.commands", "off"));
+            assertThat(Files.readString(file)).containsOnlyOnce("[notifications.groups]");
+            assertThat(state.diagnostics()).isEmpty();
+        }
+    }
 }

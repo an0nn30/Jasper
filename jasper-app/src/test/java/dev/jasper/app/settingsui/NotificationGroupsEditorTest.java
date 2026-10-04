@@ -129,7 +129,7 @@ class NotificationGroupsEditorTest {
         var context = new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
             id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
         var factory = Editors.notificationGroups(new NotificationGroupChoices(() -> groups));
-        var editor = factory.build().apply(CoreSettings.TERMINAL_ENV, context);
+        var editor = factory.build().apply(CoreSettings.NOTIFICATIONS_GROUPS, context);
         assertThat(editor).isInstanceOf(NotificationGroupsEditor.class);
         assertThat(editor.labelled()).isTrue();
         assertThat(editor.removesAtDefault()).isTrue();

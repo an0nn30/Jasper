@@ -9,6 +9,7 @@ import dev.jasper.app.settings.Setting;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -167,4 +168,21 @@ class CorePagesTest {
         page.dispose();
     }
 
+    @Test void theNotificationsPageListsEveryGroupInItsOwnSection() {
+        var groups = new NotificationGroupChoices(() -> List.of(
+            new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
+        var spec = CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+            .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+        var page = spec.build(new PageContext(draft, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
+        assertThat(SchemaPageTest.sectionTitles(page.component())).containsExactly("Groups");
+        var row = page.rows().stream().filter(candidate -> candidate.setting() == CoreSettings.NOTIFICATIONS_GROUPS)
+            .findFirst().orElseThrow();
+        var editor = (NotificationGroupsEditor) row.editor();
+        editor.combo("jasper.commands").setSelectedItem("history");
+        assertThat(draft.value(CoreSettings.NOTIFICATIONS_GROUPS)).isEqualTo(Map.of("jasper.commands", "history"));
+        editor.combo("jasper.commands").setSelectedItem("card");
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).as("back at the default, nothing to save").isFalse();
+        page.dispose();
+    }
 }
