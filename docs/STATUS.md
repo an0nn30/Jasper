@@ -2,6 +2,26 @@
 
 ## Current state — 2026-10-04
 
+- **Folder-tab motion and shared animation policy implemented** (2026-10-04; `codex/folder-tabs`; config
+  `9a2a43ca`, motion `6fdb0ddd`; [design and tuning](design/folder-tabs.md#tab-motion-and-shared-animation-setting)):
+  opening expands/fades, closing fades while its gap contracts, and selection glides the folder highlight.
+  Content/focus and close teardown remain immediate. Rapid actions retarget the current presentation; timers run
+  only during motion and stop on settlement/disposal. Exit visuals retain pixels rather than content, use native
+  device resolution, and clip text at natural size. The full-height folder geometry and glass alpha are preserved.
+  **Settings → Appearance → Animations → Enable animations** is a saved app-wide policy, on by default; Apply
+  disables running and future motion in every window. Future consumers check `ConfigSnapshot.animations().enabled()`.
+  At the user's request, temporary live **Open/Close/Switch tab duration** fields allow tuning without a rebuild:
+  **150/120/130 ms**, range 0–2000, with 0 instant. Apply/OK saves; Cancel preserves existing values. Keep these fields
+  until native testing establishes permanent timings. Unrelated animations were not scanned or modified.
+  This bounded approved extension used a workspace implementer, root configuration integration, and independent
+  final review, rather than re-executing historical motion plans. Regression fixes cover mixed durations, shell
+  title arrival mid-open, and rapid actual mouse clicks (the latter found by review); all were observed failing
+  before correction. Final `./gradlew check --continue`: **8,460 tests, 0 failures, 0 errors, 6 skipped**; architecture
+  gates/doclint, changed-Java hygiene and whitespace checks passed. Final review approved with no remaining findings.
+  Actual Swing dark/light/glass frames were inspected. No native GUI, benchmark, merge or push. User acceptance:
+  tune the three speeds with Apply; try rapid open/close/switch, mouse and shortcuts, overflow, glass and Retina
+  displays, then disable animations during motion. Native smoothness/compositor performance remain user-run checks.
+
 - **Folder tabs implemented** (2026-10-04; `codex/folder-tabs`, based on `main` at `5979c030`; source `2ab63b13`):
   the selected workspace tab now rises from the terminal surface with rounded top corners and concave bottom
   shoulders, matching the [approved reference and actual Swing renders](design/folder-tabs.md). Inactive tabs are
