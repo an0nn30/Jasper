@@ -8,8 +8,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Where a dragged tool window would drop, from the cursor alone: a stripe group and a position in it, a cell of the
- * workspace's 3 x 2 grid, or nothing. Pure; every rectangle and the cursor are in the caller's one coordinate space.
+ * Where a dragged tool window would drop, from the cursor alone: a stripe group and a position in it, one of the
+ * workspace's six edge zones, or nothing. Pure; every rectangle and the cursor are in the caller's one coordinate space.
  */
 public final class DockDropResolver {
     private DockDropResolver() { }
@@ -53,13 +53,17 @@ public final class DockDropResolver {
         public boolean onStripe() { return index.isPresent(); }
     }
 
-    /** The workspace grid mirrors the stripes: rows are the top, second and foot groups; columns the two stripes. */
-    private static final Slot[][] GRID = {
-        {Slot.LEFT_TOP, Slot.RIGHT_TOP}, {Slot.LEFT_BOTTOM, Slot.RIGHT_BOTTOM}, {Slot.BOTTOM_LEFT, Slot.BOTTOM_RIGHT}};
-
     /**
-     * Over a stripe group: that group, at the number of its buttons whose middle is above the cursor. Over the
-     * workspace: the grid cell, rows a third of its height and columns half its width. Anywhere else: nothing.
+     * Over a stripe group: that group, at the number of its buttons whose middle is above the cursor; the stripes win
+     * over the workspace. Over the workspace: the zone of the nearest of its left, right and bottom edges, each
+     * distance taken as a share of the workspace's own width (left, right) or height (bottom), so a wide or a tall
+     * workspace splits the same way as any other. The top edge is no target, as there are no top slots. The left
+     * edge's zone is {@link Slot#LEFT_TOP} above the workspace's half height and {@link Slot#LEFT_BOTTOM} from it
+     * down; the right edge's zone splits the same way; the bottom edge's is {@link Slot#BOTTOM_LEFT} left of the
+     * workspace's half width and {@link Slot#BOTTOM_RIGHT} from it on. The zones meet at the middle, along a diagonal
+     * from each lower corner and the vertical line above it. A tie goes to a side over the bottom, and to the left
+     * over the right: the exact middle of the workspace is {@link Slot#LEFT_BOTTOM}. The workspace's left and top
+     * edges lie inside it, its right and bottom edges do not. Anywhere else: nothing.
      */
     public static Optional<Target> resolve(Point cursor, List<Group> groups, Rectangle workspace) {
         for (Group group : groups) {
@@ -69,8 +73,14 @@ public final class DockDropResolver {
             return Optional.of(Target.stripe(group.slot, index));
         }
         if (workspace.isEmpty() || !workspace.contains(cursor)) return Optional.empty();
-        int row = (int) Math.min(2, (long) (cursor.y - workspace.y) * 3 / workspace.height);
-        int column = (cursor.x - workspace.x) * 2 < workspace.width ? 0 : 1;
-        return Optional.of(Target.workspace(GRID[row][column]));
+        // The distances to the left, right and bottom edges are dx / w, (w - dx) / w and (h - dy) / h. Scaled by w * h
+        // they are whole numbers, so ties are exact.
+        long width = workspace.width, height = workspace.height;
+        long dx = cursor.x - workspace.x, dy = cursor.y - workspace.y;
+        long left = dx * height, right = (width - dx) * height, bottom = (height - dy) * width;
+        boolean upper = dy * 2 < height;
+        if (left <= right && left <= bottom) return Optional.of(Target.workspace(upper ? Slot.LEFT_TOP : Slot.LEFT_BOTTOM));
+        if (right <= bottom) return Optional.of(Target.workspace(upper ? Slot.RIGHT_TOP : Slot.RIGHT_BOTTOM));
+        return Optional.of(Target.workspace(dx * 2 < width ? Slot.BOTTOM_LEFT : Slot.BOTTOM_RIGHT));
     }
 }

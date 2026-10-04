@@ -32,11 +32,12 @@ import javax.swing.SwingUtilities;
  * One window's dock drag: press on a stripe button or a tool window header and move more than 5px. It uses plain mouse
  * events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
  * synthetic events. While it runs, both stripes show all three groups with the dragged button lifted out, the target
- * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}; the real
- * layout does not change. Until the cursor first leaves a stripe button's old place, its square grown by the drag
- * threshold and one more pixel on every side, that place is its own target, so pressing, moving a few pixels and
- * releasing on the spot changes nothing even near the button's edge, where the drag layout shifts the stripe; after
- * that the resolver decides from what the stripes show. Releasing the left button over a target hands the drop to
+ * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}, except for
+ * a stripe drop of a hidden window, which stays hidden and so lands in no frame; the real layout does not change.
+ * Until the cursor first leaves a stripe button's old place, its square grown by the drag threshold and one more
+ * pixel on every side, that place is its own target, so pressing, moving a few pixels and releasing on the spot
+ * changes nothing even near the button's edge, where the drag layout shifts the stripe; after that the resolver
+ * decides from what the stripes show. Releasing the left button over a target hands the drop to
  * {@link #onDrop}; releasing it anywhere else, Esc in its window, {@link #cancel} or another press (a right or middle
  * click, or a left press after a lost release) ends the drag without one. A window resize while dragging forgets the
  * old place and resolves the target again. EDT only.
@@ -196,9 +197,12 @@ final class DockDrag {
                 target.map(where -> where.index().orElse(0)).orElse(0));
         JLayeredPane layers = layers();
         if (layers == null) return;
-        Rectangle highlight = target.flatMap(where -> DockGeometry.landing(new Rectangle(0, 0, area.getWidth(), area.getHeight()),
-                state, dragging, where.slot(), ToolWindowArea.metrics()))
-            .map(landing -> SwingUtilities.convertRectangle(area, landing, layers)).orElse(null);
+        // A stripe drop keeps the window's visibility, so a hidden window stays hidden: no frame would appear to preview.
+        boolean staysHidden = target.filter(DockDropResolver.Target::onStripe).isPresent() && !state.visible(dragging);
+        Rectangle highlight = staysHidden ? null
+            : target.flatMap(where -> DockGeometry.landing(new Rectangle(0, 0, area.getWidth(), area.getHeight()),
+                    state, dragging, where.slot(), ToolWindowArea.metrics()))
+                .map(landing -> SwingUtilities.convertRectangle(area, landing, layers)).orElse(null);
         Rectangle placeholder = null;
         for (ToolStripe stripe : stripes) {
             Optional<Rectangle> gap = stripe.gapBounds();

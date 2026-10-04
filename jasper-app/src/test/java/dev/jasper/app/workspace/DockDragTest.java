@@ -127,11 +127,8 @@ class DockDragTest {
 
         Rectangle workspace() { return SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), content); }
 
-        /** The middle of one cell of the workspace's 3 x 2 grid. */
-        Point cell(int row, int column) {
-            Rectangle w = workspace();
-            return new Point(w.x + w.width * (2 * column + 1) / 4, w.y + w.height * (2 * row + 1) / 6);
-        }
+        /** A point well inside the slot's workspace zone. */
+        Point zone(Slot slot) { return DockTestSupport.zone(workspace(), slot); }
 
         void mouse(JComponent source, int id, Point inContent) {
             Point at = SwingUtilities.convertPoint(content, inContent, source);
@@ -246,7 +243,7 @@ class DockDragTest {
         List<DockDropResolver.Target> dropped = new ArrayList<>();
         var apply = w.drag.onDrop;
         w.drag.onDrop = (id, target) -> { dropped.add(target); apply.accept(id, target); };
-        w.dragTo(source, w.cell(1, 1));
+        w.dragTo(source, w.zone(Slot.RIGHT_BOTTOM));
         assertThat(w.drag.target()).as("away from home").hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_BOTTOM));
         w.mouse(source, MouseEvent.MOUSE_DRAGGED, home);
         assertThat(w.left.dropGroups().get(0).bounds().contains(SwingUtilities.convertPoint(w.content, home, w.left)))
@@ -290,7 +287,7 @@ class DockDragTest {
         w.dragTo(source, lowerInHome);
         assertThat(w.drag.target()).as("pressed, moved and still on the spot: its own place")
             .hasValue(DockDropResolver.Target.stripe(Slot.LEFT_TOP, 1));
-        w.mouse(source, MouseEvent.MOUSE_DRAGGED, w.cell(1, 1));
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, w.zone(Slot.RIGHT_BOTTOM));
         assertThat(w.drag.target()).hasValue(DockDropResolver.Target.workspace(Slot.RIGHT_BOTTOM));
         w.mouse(source, MouseEvent.MOUSE_DRAGGED, lowerInHome);
         assertThat(w.drag.target()).as("coming back is resolved from what the stripe shows: c slid up into b's square, below its middle")
@@ -327,7 +324,7 @@ class DockDragTest {
 
     @Test void aWorkspaceDropMovesTheWindowAndShowsIt() {
         var w = window();
-        Point bottomRight = w.cell(2, 1);
+        Point bottomRight = w.zone(Slot.BOTTOM_RIGHT);
         var source = w.dragTo(w.button(w.left, "b"), bottomRight);
         assertThat(w.drag.target()).hasValue(DockDropResolver.Target.workspace(Slot.BOTTOM_RIGHT));
         w.mouse(source, MouseEvent.MOUSE_RELEASED, bottomRight);
@@ -351,7 +348,7 @@ class DockDragTest {
         var w = window();
         w.state.show("a");
         w.shown.clear();
-        Point rightTop = w.cell(0, 1);
+        Point rightTop = w.zone(Slot.RIGHT_TOP);
         var source = w.dragTo(w.area.headerOf(Slot.LEFT_TOP).titleLabel(), rightTop);
         assertThat(w.drag.dragged()).isEqualTo("a");
         w.mouse(source, MouseEvent.MOUSE_RELEASED, rightTop);
@@ -362,7 +359,7 @@ class DockDragTest {
 
     @Test void theGuidesShowWhereTheWindowWouldLandWithoutMovingTheRealLayout() {
         var w = window();
-        w.dragTo(w.button(w.left, "b"), w.cell(2, 0));
+        w.dragTo(w.button(w.left, "b"), w.zone(Slot.BOTTOM_LEFT));
         Rectangle area = new Rectangle(0, 0, w.area.getWidth(), w.area.getHeight());
         Rectangle expected = SwingUtilities.convertRectangle(w.area,
             DockGeometry.landing(area, w.state, "b", Slot.BOTTOM_LEFT, ToolWindowArea.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
@@ -376,7 +373,45 @@ class DockDragTest {
         w.mouse(w.button(w.left, "b"), MouseEvent.MOUSE_DRAGGED, onStripe);
         Rectangle gap = w.right.gapBounds().orElseThrow();
         assertThat(w.drag.overlay().placeholder()).isEqualTo(SwingUtilities.convertRectangle(w.right, gap, w.rootPane.getLayeredPane()));
-        assertThat(w.drag.overlay().highlight()).as("where it lands if shown there").isNotNull();
+        assertThat(w.drag.overlay().highlight()).as("b is hidden and a stripe drop keeps it hidden: no frame to preview").isNull();
+    }
+
+    @Test void aStripeDropOfAHiddenWindowPreviewsNoFrameBecauseItStaysHidden() {
+        var w = window();
+        Point aboveD = w.center(w.button(w.right, "d"));
+        aboveD.translate(0, -8);
+        var source = w.dragTo(w.button(w.left, "b"), aboveD);
+        assertThat(w.state.visible("b")).isFalse();
+        assertThat(w.drag.target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+        assertThat(w.drag.overlay().highlight()).as("no frame would appear, so none is previewed").isNull();
+        Rectangle gap = w.right.gapBounds().orElseThrow();
+        assertThat(w.drag.overlay().placeholder()).as("the stripe gap still shows where the button goes")
+            .isEqualTo(SwingUtilities.convertRectangle(w.right, gap, w.rootPane.getLayeredPane()));
+
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, w.zone(Slot.BOTTOM_RIGHT));
+        assertThat(w.drag.overlay().highlight()).as("a workspace drop shows the window, so its frame is previewed").isNotNull();
+        assertThat(w.drag.overlay().placeholder()).isNull();
+
+        w.mouse(source, MouseEvent.MOUSE_DRAGGED, aboveD);
+        assertThat(w.drag.overlay().highlight()).as("and back over the stripe, none again").isNull();
+        assertThat(w.drag.overlay().placeholder()).isNotNull();
+        w.mouse(source, MouseEvent.MOUSE_RELEASED, aboveD);
+        assertThat(w.state.ids(Slot.RIGHT_TOP)).containsExactly("b", "d");
+        assertThat(w.state.visible("b")).as("it stayed hidden, as previewed").isFalse();
+    }
+
+    @Test void aStripeDropOfAVisibleWindowStillPreviewsItsFrame() {
+        var w = window();
+        w.state.show("a");
+        Point aboveD = w.center(w.button(w.right, "d"));
+        aboveD.translate(0, -8);
+        w.dragTo(w.button(w.left, "a"), aboveD);
+        assertThat(w.drag.target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
+        Rectangle area = new Rectangle(0, 0, w.area.getWidth(), w.area.getHeight());
+        Rectangle expected = SwingUtilities.convertRectangle(w.area,
+            DockGeometry.landing(area, w.state, "a", Slot.RIGHT_TOP, ToolWindowArea.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
+        assertThat(w.drag.overlay().highlight()).as("a visible window keeps its visibility, so its frame moves with it").isEqualTo(expected);
+        assertThat(w.drag.overlay().placeholder()).isNotNull();
     }
 
     private static KeyEvent escape(Component source) {
@@ -386,7 +421,7 @@ class DockDragTest {
     @Test void anEscInAnotherWindowIsLeftToItAndTheDragGoesOn() {
         var w = window();
         var other = window();
-        w.dragTo(w.button(w.left, "b"), w.cell(2, 1));
+        w.dragTo(w.button(w.left, "b"), w.zone(Slot.BOTTOM_RIGHT));
         assertThat(keys.dispatchers).as("the running drag's Esc dispatcher").hasSize(1);
         assertThat(keys.send(escape(other.button(other.left, "a")))).as("a dialog's or another window's Esc is its own").isFalse();
         assertThat(w.drag.active()).as("and the drag goes on").isTrue();
@@ -398,11 +433,11 @@ class DockDragTest {
 
     @Test void escapeOrAReleaseWithoutATargetCancels() {
         var w = window();
-        var source = w.dragTo(w.button(w.left, "b"), w.cell(1, 1));
+        var source = w.dragTo(w.button(w.left, "b"), w.zone(Slot.RIGHT_BOTTOM));
         assertThat(w.drag.dispatchKeyEvent(new KeyEvent(w.content, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0,
             KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).as("the drag owns Esc").isTrue();
         assertThat(w.drag.active()).isFalse();
-        w.mouse(source, MouseEvent.MOUSE_RELEASED, w.cell(1, 1));
+        w.mouse(source, MouseEvent.MOUSE_RELEASED, w.zone(Slot.RIGHT_BOTTOM));
         assertThat(w.state.slot("b")).as("cancelled: nothing moves").hasValue(Slot.LEFT_TOP);
         assertThat(w.drag.dispatchKeyEvent(new KeyEvent(w.content, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0,
             KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED))).as("no drag, no claim on Esc").isFalse();
@@ -428,7 +463,7 @@ class DockDragTest {
 
     @Test void aDockChangeOrCancelEndsTheDragAndAPendingPress() {
         var w = window();
-        w.dragTo(w.button(w.left, "b"), w.cell(0, 1));
+        w.dragTo(w.button(w.left, "b"), w.zone(Slot.RIGHT_TOP));
         w.state.show("c");
         assertThat(w.drag.active()).as("any dock change ends the drag").isFalse();
         assertThat(w.drag.overlay().getParent()).as("no overlay is left mounted").isNull();
@@ -441,7 +476,7 @@ class DockDragTest {
         w.mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(start.x + 40, start.y));
         assertThat(w.drag.active()).as("a cancelled press never becomes a drag").isFalse();
 
-        w.dragTo(w.button(w.left, "b"), w.cell(0, 1));
+        w.dragTo(w.button(w.left, "b"), w.zone(Slot.RIGHT_TOP));
         assertThat(w.drag.active()).isTrue();
         w.drag.cancel();
         assertThat(w.drag.active()).as("cancel() ends a running drag").isFalse();
@@ -457,7 +492,7 @@ class DockDragTest {
             List<String> drops = new ArrayList<>();
             var apply = w.drag.onDrop;
             w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
-            Point bottomRight = w.cell(2, 1);
+            Point bottomRight = w.zone(Slot.BOTTOM_RIGHT);
             var source = w.dragTo(w.button(w.left, "b"), bottomRight);
             assertThat(w.drag.target()).as("a left release here would drop").hasValue(DockDropResolver.Target.workspace(Slot.BOTTOM_RIGHT));
 
@@ -481,7 +516,7 @@ class DockDragTest {
         List<String> drops = new ArrayList<>();
         var apply = w.drag.onDrop;
         w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
-        Point bottomRight = w.cell(2, 1);
+        Point bottomRight = w.zone(Slot.BOTTOM_RIGHT);
         var source = w.dragTo(w.button(w.left, "b"), bottomRight);
         w.send(source, MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON3, false, bottomRight);
         w.send(source, MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON2, false, bottomRight);
@@ -510,7 +545,7 @@ class DockDragTest {
         List<String> drops = new ArrayList<>();
         var apply = w.drag.onDrop;
         w.drag.onDrop = (id, target) -> { drops.add(id); apply.accept(id, target); };
-        w.dragTo(w.button(w.left, "b"), w.cell(2, 1));
+        w.dragTo(w.button(w.left, "b"), w.zone(Slot.BOTTOM_RIGHT));
         assertThat(w.drag.active()).isTrue();
 
         var next = w.button(w.left, "a");
