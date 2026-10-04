@@ -22,8 +22,10 @@ configuration problems, stay until you close them. When three sticky cards are s
 **+N more** link that opens the panel.
 
 When Jasper is in the background, notifications collect in the panel; sticky ones show their card when you come
-back. Notifications that arrive while no window is open (before the first one, or while a resident Jasper has none
-open) show when the next window does.
+back. A resident Jasper with no window open (after Quit on macOS, once the last window closed on Windows, or after a
+login launch) works the same way, however long it stays so: what arrives goes to the panel as unread, and only sticky
+notifications show their card when the next window opens. A notification that arrives while a window is opening, or
+before the first window of a normal start, waits and shows its card when that window is focused.
 
 ## The Notifications panel
 

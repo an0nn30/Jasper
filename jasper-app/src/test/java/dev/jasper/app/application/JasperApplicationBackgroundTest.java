@@ -2,6 +2,7 @@ package dev.jasper.app.application;
 
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.contributions.ContentHost;
+import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.restart.RestartMode;
 import dev.jasper.app.startup.StartupTrace;
@@ -40,6 +41,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class JasperApplicationBackgroundTest {
     private final List<Boolean> dock = new CopyOnWriteArrayList<>();
+    /** Where Jasper stood for notifications at each Dock switch: the first switch happens inside the window's opening. */
+    private final List<Delivery.Presence> presenceAtSwitch = new CopyOnWriteArrayList<>();
     private final AtomicInteger prepared = new AtomicInteger();
     private final AtomicBoolean poweringOff = new AtomicBoolean();
     /** What the bridge's prepare reports: false stands for a library that did not load or a missing power-off observer. */
@@ -59,7 +62,10 @@ class JasperApplicationBackgroundTest {
         edt(() -> {
             held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminate);
             held[0].trace(trace);
-            held[0].backgroundOnQuit(new DockControl(dock::add, () -> {
+            held[0].backgroundOnQuit(new DockControl(shown -> {
+                presenceAtSwitch.add(held[0].notificationCenter().presence());
+                dock.add(shown);
+            }, () -> {
                 prepared.incrementAndGet();
                 return prepareSucceeds.get();
             }, poweringOff::get), visibleAtLaunch);
@@ -129,6 +135,42 @@ class JasperApplicationBackgroundTest {
             // nothing opened.
             assertThatThrownBy(() -> edt(() -> application.openOrRaise("reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).containsExactly(true, false);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    private static Delivery.Presence presence(JasperApplication application) throws Exception {
+        Delivery.Presence[] held = new Delivery.Presence[1];
+        edt(() -> held[0] = application.notificationCenter().presence());
+        return held[0];
+    }
+
+    @Test void aResidentJasperWithNoWindowIsIdleExceptWhileOneIsBeingOpened() throws Exception {
+        JasperApplication application = settled(() -> { }, false);
+        try {
+            assertThat(presence(application)).as("resident, nothing open, nothing opening: it may stay so for hours")
+                .isEqualTo(Delivery.Presence.IDLE);
+            // Headless, composing fails at the JFrame; the Dock switch inside the opening sees the open in progress.
+            assertThatThrownBy(() -> edt(() -> application.openOrRaise("reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(presenceAtSwitch).as("a failure raised while the window opens still waits for it")
+                .startsWith(Delivery.Presence.NO_WINDOW);
+            assertThat(presence(application)).as("the failed open is over: idle again").isEqualTo(Delivery.Presence.IDLE);
+            assertThatThrownBy(() -> edt(application::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(presence(application)).as("every open, failed or not, ends its opening").isEqualTo(Delivery.Presence.IDLE);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aProcessThatIsNotResidentHasNoWindowButIsNeverIdle() throws Exception {
+        JasperApplication application = application(() -> { }, true);
+        try {
+            assertThat(presence(application)).as("before residency is decided (start-up)").isEqualTo(Delivery.Presence.NO_WINDOW);
+            edt(() -> application.residency(false));
+            assertThat(presence(application)).as("a plain start before its first window").isEqualTo(Delivery.Presence.NO_WINDOW);
+            assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(presence(application)).isEqualTo(Delivery.Presence.NO_WINDOW);
         } finally {
             edt(application::quitNow);
         }

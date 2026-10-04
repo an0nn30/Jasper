@@ -154,6 +154,23 @@ class NotificationsFeatureTest {
         assertThat(feature.layer(window.id()).showing()).hasSize(1);
     }
 
+    @Test void anErrorPostedWhileResidentAndIdleIsHistoryOnlyButAConfigProblemWaitsForTheNextWindow() {
+        presence = Delivery.Presence.IDLE;
+        var feature = new NotificationsFeature(center, contributions);
+        feature.error("Background plugin failed", "details");
+        UUID configProblem = center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING,
+            "config.toml has warnings")).orElseThrow();
+        assertThat(center.history()).hasSize(2);
+        presence = Delivery.Presence.NO_WINDOW;
+        var window = window();
+        feature.attach(window);
+        assertThat(feature.layer(window.id()).showing()).isEmpty();
+        presence = Delivery.Presence.FOCUSED;
+        feature.activated(window);
+        assertThat(feature.layer(window.id()).showing())
+            .as("only the sticky one waited; the ordinary card is in the history").containsExactly(configProblem);
+    }
+
     @Test void dismissCardsClosesTheInvokingWindowsCardsAndReadsThem() {
         var feature = new NotificationsFeature(center, contributions);
         var window = window();

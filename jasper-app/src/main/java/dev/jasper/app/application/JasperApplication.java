@@ -84,6 +84,8 @@ public final class JasperApplication {
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
+    /** How many terminal windows are being opened right now (EDT): from the start of {@link #openWindow} until it ends. */
+    private int windowsOpening;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -350,6 +352,16 @@ public final class JasperApplication {
             return created.content().id();
         });
         if (quitting) return null;
+        // Counted until the window is added or composing failed: a failure raised meanwhile waits for the window's card.
+        windowsOpening++;
+        try {
+            return composeWindow(directory, detached, trigger);
+        } finally {
+            windowsOpening--;
+        }
+    }
+
+    private TerminalWindow composeWindow(Path directory, boolean detached, String trigger) {
         WindowTrace windowTrace = trace.window(trigger);
         windowsOpened++;
         boolean first = windows.isEmpty();
@@ -836,18 +848,26 @@ public final class JasperApplication {
             });
         }
 
-    /** Where Jasper stands for notifications: focused, in the background, or with no window open. */
+    /**
+     * Where Jasper stands for notifications: focused, in the background, idle (resident with no window of any kind open
+     * and no terminal window being opened) or with no window yet. With only a plugin window open Jasper is not idle,
+     * because cards target terminal windows: the next one still shows what waited. EDT.
+     */
     private Delivery.Presence presence() {
+        boolean residentIdle = resident && !windowsOpen() && windowsOpening == 0;
         return presence(!windows.isEmpty(), activatedSinceOpen,
-            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null);
+            java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null, residentIdle);
     }
 
     /**
-     * The rule behind {@link #presence()}. A window counts only once it has been activated: a failure raised while the
-     * first window opens is queued ahead of the native activation event, and judging it "background" would keep its
-     * card out of sight for good. Until then the card waits, as it does with no window at all, and shows on activation.
+     * The rule behind {@link #presence()}. A resident Jasper with no window open and none being opened is idle, however
+     * long that lasts: an ordinary card would only pile up, so it goes to history. Otherwise a window counts only once
+     * it has been activated: a failure raised while the first window opens is queued ahead of the native activation
+     * event, and judging it "background" would keep its card out of sight for good. Until then the card waits, as it
+     * does with no window at all, and shows on activation.
      */
-    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive) {
+    static Delivery.Presence presence(boolean windowsOpen, boolean activatedSinceOpen, boolean jasperWindowActive, boolean residentIdle) {
+        if (residentIdle) return Delivery.Presence.IDLE;
         if (!windowsOpen || !activatedSinceOpen) return Delivery.Presence.NO_WINDOW;
         return jasperWindowActive ? Delivery.Presence.FOCUSED : Delivery.Presence.BACKGROUND;
     }

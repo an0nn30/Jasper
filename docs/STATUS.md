@@ -2,6 +2,37 @@
 
 ## Current state — 2026-10-04
 
+- **A resident Jasper with no window sends cards to history** (user's decision of 2026-10-04; branch
+  `claude/startup-speed`). Resident by default makes "no window open" last for hours, and the delivery rule held every
+  CARD and STICKY notification posted then until a window was focused, so they would have piled up. Built:
+  `Delivery.Presence` has a fourth value, `IDLE`: a resident Jasper with no window open and none being opened.
+  `Delivery.route` sends `CARD` + `IDLE` to history (as `BACKGROUND` does, with no card later) and `STICKY` + `IDLE`
+  to pending (the card waits for the next focus); `OFF` and `HISTORY` are unchanged. `JasperApplication.presence(...)`
+  gains a `residentIdle` input that wins; the instance method computes it as `resident`, no Jasper window of any kind
+  open (`windowsOpen()`: terminal and plugin windows) and no terminal window being opened (`windowsOpening`, an
+  EDT-confined count raised by `openWindow` and lowered in its `finally`, so it covers composing, adding and a failed
+  open). Start-up is unchanged: `NO_WINDOW` still covers a normal start before its first window, a window being
+  composed (including a resident one) and a window attached but not yet activated, so a failure raised while the first
+  window opens, such as an `IncidentNotices` plugin problem or internal error, still shows its card when the window
+  activates; a resident Jasper with only a plugin window open stays `NO_WINDOW`, as before. Consequences: a
+  `--background` login launch before the first click is `IDLE`; problems found by `startPlugins` and the
+  configuration notices are posted from `createApplication`, before `ApplicationBootstrap` calls `residency(true)`, so
+  they still wait for the first window, while anything posted later in an idle process (a plugin's background outcome,
+  an incident, a late plugin problem) goes to the panel as unread. `CommandNotifier` sends an operating-system
+  notification whenever Jasper is not `FOCUSED`, so it does for `IDLE` too. Docs: notifications spec section 7 (dated
+  amendment, original sentence kept and struck through), `docs/notifications.md`. Tests: `DeliveryTest` (the four
+  `IDLE` rows), `JasperApplicationPresenceTest` (idle wins; every earlier assertion kept), `NotificationCenterTest`
+  (a CARD posted while idle is history only and never requested on focus; a STICKY waits and shows on the next focus),
+  `NotificationsFeatureTest` (history only, and the sticky config problem alone shows when the next window activates)
+  and `JasperApplicationBackgroundTest` (resident and idle is `IDLE`; the Dock switch inside `openWindow` sees
+  `NO_WINDOW`; a failed open ends the opening; a process that is not resident is `NO_WINDOW`, never `IDLE`; checked to
+  fail with the counter removed). A resident Jasper with only a plugin window open cannot be built headless, so it is
+  covered by reading. `./gradlew check`: **8,579 tests, 0 failures, 0 errors, 6 skipped** (the previous merge's 8,569
+  and these 10), all architecture gates and doclint included; `AppDocumentationTest` and the source hygiene check pass.
+  No GUI launched, no AOT training. GUI checks for the user: Cmd+Q on a resident Mac, then something that posts an
+  ordinary notification (a plugin's background outcome): no card and an unread dot in the next window's Notifications
+  button; a sticky notification still shows its card; a normal start with a broken plugin still shows its card.
+
 - **Merged `main` into `claude/startup-speed` again** (2026-10-04; `main` at `857f3020`, 11 commits past the first
   merge's `a23d0f15`): the dock guide halves, the window layout restoration (`ad1eb65a`: `[main_window]` bounds, the
   last window closed wins) and the repository rename to `an0nn30/Jasper`. Conflicts: `AGENTS.md` keeps the AOT
@@ -44,12 +75,13 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
   errors, 6 skipped** (main's 8,435 plus the start-up plans' 119), all architecture gates, doclint, `testMacGlass`,
   `testMacDock`, `testMacNotifications` and `verifyPackagingSupport` included; `:jasper-app:verifyPackage` (untrained
   image) passes with both bridges and the glass options; source hygiene clean. No GUI launched, no AOT training.
-  **Open, for the user:** with residency on by default, "no window open" is now a long-lived state, and the delivery
-  rule (notifications spec section 7) keeps every CARD and STICKY notification posted then (a plugin's background
-  activity outcome after Cmd+Q, an incident) pending until the next window, which then shows them at once; whether a
-  CARD should go to history only in that state is a product decision. GUI checks: in the packaged resident app, a
-  Clear theme stays translucent after Cmd+Q and a Dock click; a plugin notification posted while no window is open
-  shows when the next window opens.
+  **Resolved by the user's decision of 2026-10-04 (see the first entry above):** with residency on by default, "no
+  window open" is a long-lived state, and the delivery rule (notifications spec section 7) kept every CARD and STICKY
+  notification posted then (a plugin's background activity outcome after Cmd+Q, an incident) pending until the next
+  window. Now a resident Jasper with no window sends ordinary CARD notifications to history and only STICKY ones wait.
+  GUI checks: in the packaged resident app, a Clear theme stays translucent after Cmd+Q and a Dock click; a sticky
+  notification posted while no window is open shows when the next window opens, and an ordinary one is waiting unread
+  in the Notifications panel.
 
 - **Start-up speed Plan 4 (Resident by default)** (branch `claude/startup-speed`, worktree
   `.claude/worktrees/startup-speed`, [spec](superpowers/specs/2026-10-02-jasper-startup-speed-design.md) Part 4,

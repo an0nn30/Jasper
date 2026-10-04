@@ -295,8 +295,13 @@ post the same way.
 **Jasper is focused** when any Jasper-owned window is active — terminal window, Settings, plugin window or the Errors
 window (`KeyboardFocusManager`'s active window). Today only terminal windows count.
 
-**Target window:** the poster's window, else the terminal window used last. With no window open (startup, resident
-mode), cards wait until one opens and is focused.
+**Target window:** the poster's window, else the terminal window used last. ~~With no window open (startup, resident
+mode), cards wait until one opens and is focused.~~ *Amended 2026-10-04 (resident by default, start-up speed Plan 4):*
+with no window yet (a start before its first window, a window being opened, or one opened but not yet activated),
+cards wait until a window opens and is focused, as before, so a failure raised while the first window opens still shows
+its card. A **resident** Jasper with no window open and none being opened is **idle** (`Delivery.Presence.IDLE`), a
+state that can last for hours: an ordinary `CARD` notification posted then goes straight to history, as in the
+background, with no card later; only `STICKY` ones wait for the next window. `OFF` and `HISTORY` are unchanged.
 
 **`Delivery`:**
 
