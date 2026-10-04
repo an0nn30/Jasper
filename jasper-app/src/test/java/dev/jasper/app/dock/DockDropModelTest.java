@@ -64,7 +64,7 @@ class DockDropModelTest {
         state.show("a");
         state.addListener(changes::add);
         assertThat(DockGeometry.landing(BOUNDS, state, "b", Slot.BOTTOM_RIGHT, Metrics.DEFAULT))
-            .as("alone in the bottom area: its full width").hasValue(new Rectangle(0, 400, 1000, 200));
+            .as("alone in the bottom area it would fill it, but the guide shows the slot's half").hasValue(new Rectangle(503, 400, 497, 200));
         assertThat(DockGeometry.landing(BOUNDS, state, "a", Slot.RIGHT_TOP, Metrics.DEFAULT)).hasValue(new Rectangle(740, 0, 260, 600));
         assertThat(DockGeometry.landing(BOUNDS, state, "b", Slot.LEFT_BOTTOM, Metrics.DEFAULT))
             .as("under the window the upper half shows").hasValue(new Rectangle(0, 303, 260, 297));
@@ -74,5 +74,116 @@ class DockDropModelTest {
         assertThat(changes).as("the real state never changes").isEmpty();
         assertThat(state.slot("a")).hasValue(Slot.LEFT_TOP);
         assertThat(state.visible("b")).isFalse();
+    }
+
+    /** A hidden window "m" docked on another side than the target's, so the target and its partner both start empty. */
+    private DockState emptyPair(Slot target) {
+        var fresh = new DockState();
+        fresh.add("m", target.side() == Side.LEFT ? Slot.RIGHT_TOP : Slot.LEFT_TOP);
+        return fresh;
+    }
+
+    /** The target's rectangle in the layout that really shows the window there with a window in its partner. */
+    private Rectangle splitHalf(Slot target) {
+        var split = new DockState();
+        split.add("m", target); split.add("p", target.partner());
+        split.show("m"); split.show("p");
+        return DockGeometry.compute(BOUNDS, split, Metrics.DEFAULT).slot(target).orElseThrow();
+    }
+
+    private static final List<Slot> SECOND_SLOTS = List.of(Slot.LEFT_BOTTOM, Slot.RIGHT_BOTTOM, Slot.BOTTOM_RIGHT);
+
+    @Test void aSecondSlotsGuideShowsItsHalfEvenWhenItsPartnerIsEmpty() {
+        for (Slot target : SECOND_SLOTS) {
+            Rectangle guide = DockGeometry.landing(BOUNDS, emptyPair(target), "m", target, Metrics.DEFAULT).orElseThrow();
+            assertThat(guide).as(target + " previews its half, as with a window in its partner").isEqualTo(splitHalf(target));
+            Rectangle full = DockGeometry.compute(BOUNDS, onlyShowing(target), Metrics.DEFAULT).slot(target).orElseThrow();
+            assertThat(full).as("where the window really lands: the whole side or bottom area").isNotEqualTo(guide);
+            if (target.side() == Side.BOTTOM) {
+                assertThat(guide.width).as(target + " is the right half of the bottom area").isLessThan(full.width);
+                assertThat(guide.x).isGreaterThan(full.x);
+                assertThat(guide.height).isEqualTo(full.height);
+            } else {
+                assertThat(guide.height).as(target + " is the lower half of its side").isLessThan(full.height);
+                assertThat(guide.y).isGreaterThan(full.y);
+                assertThat(guide.width).isEqualTo(full.width);
+            }
+        }
+        assertThat(DockGeometry.landing(BOUNDS, emptyPair(Slot.LEFT_BOTTOM), "m", Slot.LEFT_BOTTOM, Metrics.DEFAULT))
+            .hasValue(new Rectangle(0, 303, 260, 297));
+        assertThat(DockGeometry.landing(BOUNDS, emptyPair(Slot.RIGHT_BOTTOM), "m", Slot.RIGHT_BOTTOM, Metrics.DEFAULT))
+            .hasValue(new Rectangle(740, 303, 260, 297));
+        assertThat(DockGeometry.landing(BOUNDS, emptyPair(Slot.BOTTOM_RIGHT), "m", Slot.BOTTOM_RIGHT, Metrics.DEFAULT))
+            .hasValue(new Rectangle(503, 400, 497, 200));
+    }
+
+    /** The layout where the window shows alone in the slot: what a drop there really gives. */
+    private static DockState onlyShowing(Slot slot) {
+        var alone = new DockState();
+        alone.add("m", slot);
+        alone.show("m");
+        return alone;
+    }
+
+    @Test void aSecondSlotsGuideShowsItsHalfWhenItsPartnerOnlyHoldsAHiddenWindow() {
+        for (Slot target : SECOND_SLOTS) {
+            var hiddenPartner = emptyPair(target);
+            hiddenPartner.add("h", target.partner());
+            assertThat(DockGeometry.landing(BOUNDS, hiddenPartner, "m", target, Metrics.DEFAULT))
+                .as(target + " with a hidden window in its partner").hasValue(splitHalf(target));
+            assertThat(hiddenPartner.visible("h")).isFalse();
+        }
+    }
+
+    @Test void movingThePartnersOnlyWindowIntoASecondSlotStillGuidesItsHalf() {
+        for (Slot target : SECOND_SLOTS) {
+            var alone = new DockState();
+            alone.add("s", target.partner());
+            alone.show("s");
+            assertThat(DockGeometry.compute(BOUNDS, alone, Metrics.DEFAULT).slot(target.partner()).orElseThrow())
+                .as("alone in " + target.partner() + " it fills the side or the bottom area").isNotEqualTo(splitHalf(target.partner()));
+            assertThat(DockGeometry.landing(BOUNDS, alone, "s", target, Metrics.DEFAULT))
+                .as("moved to " + target + " the partner is left empty, and the guide still shows the half").hasValue(splitHalf(target));
+        }
+    }
+
+    @Test void aFirstSlotsGuideStaysTheWholeSideOrBottomAreaWhenItsPartnerIsEmpty() {
+        for (Slot target : List.of(Slot.LEFT_TOP, Slot.RIGHT_TOP, Slot.BOTTOM_LEFT)) {
+            assertThat(DockGeometry.landing(BOUNDS, emptyPair(target), "m", target, Metrics.DEFAULT))
+                .as(target + " alone is the whole side or bottom area")
+                .isEqualTo(DockGeometry.compute(BOUNDS, onlyShowing(target), Metrics.DEFAULT).slot(target));
+        }
+        assertThat(DockGeometry.landing(BOUNDS, emptyPair(Slot.LEFT_TOP), "m", Slot.LEFT_TOP, Metrics.DEFAULT))
+            .hasValue(new Rectangle(0, 0, 260, 600));
+        assertThat(DockGeometry.landing(BOUNDS, emptyPair(Slot.BOTTOM_LEFT), "m", Slot.BOTTOM_LEFT, Metrics.DEFAULT))
+            .hasValue(new Rectangle(0, 400, 1000, 200));
+    }
+
+    @Test void theGuideForASecondSlotLeavesTheStateItWasGivenAsItWas() {
+        for (Slot target : SECOND_SLOTS) {
+            var before = emptyPair(target);
+            before.add("h", target.partner());
+            before.add("k", target);
+            before.show("k");
+            before.resize(Side.LEFT, 300);
+            before.setRatio(Side.BOTTOM, 0.3);
+            before.addListener(changes::add);
+            DockGeometry.landing(BOUNDS, before, "m", target, Metrics.DEFAULT);
+            DockGeometry.landing(BOUNDS, before, "k", target.partner(), Metrics.DEFAULT);
+            assertThat(changes).as("no listener hears the what-if").isEmpty();
+            var untouched = before.copy();
+            for (Slot slot : Slot.values()) {
+                assertThat(before.ids(slot)).as(target + " " + slot).isEqualTo(untouched.ids(slot));
+                assertThat(before.active(slot)).isEqualTo(untouched.active(slot));
+            }
+            assertThat(before.ids(target.partner())).as("the guide's stand-in window is not docked").containsExactly("h");
+            assertThat(before.active(target.partner())).isEmpty();
+            assertThat(before.ids(target)).containsExactly("k");
+            assertThat(before.active(target)).hasValue("k");
+            assertThat(before.slot("m")).isPresent();
+            assertThat(before.visible("m")).isFalse();
+            assertThat(before.size(Side.LEFT)).isEqualTo(300);
+            assertThat(before.ratio(Side.BOTTOM)).isEqualTo(0.3);
+        }
     }
 }
