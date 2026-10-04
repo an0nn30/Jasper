@@ -8,7 +8,7 @@ Add Settings > Appearance > View mode with Normal and Compact. Normal is the cur
 
 ## Chosen approach
 
-Reuse the existing settings schema, native decorations, and palette's existing `positioned` fallback. Do not create a second palette or emulate a native title bar with a Swing label. The saved key is `window.view_mode = "normal" | "compact"`, default `normal`.
+Reuse the existing settings schema, native decorations, and palette's existing `positioned` geometry with Compact's activated width retained at scaled 560 logical pixels. Normal's existing fallback width remains unchanged. Do not create a second palette or emulate a native title bar with a Swing label. The saved key is `window.view_mode = "normal" | "compact"`, default `normal`.
 
 Switching mode takes effect after application restart (the optional user preference question is unanswered; this is the announced implementation default). Appearance displays the existing restart notice. The application captures the startup mode once; all windows created before the next restart retain it, including windows opened after saving a different mode. Reloading other settings does not change the active mode.
 
@@ -16,7 +16,7 @@ Compact removes the entire workspace header, including plugin toolbar contributi
 
 On Windows/Linux, Compact likewise uses native decorations with menus available and no workspace header. Normal continues to respect `window.native_decorations`. On macOS, auxiliary windows and dialogs keep their existing appearance; header/palette changes govern workspace windows. Windows/Linux share the existing global native-decoration defaults when Compact is selected.
 
-Palette activation through existing menu/keyboard/plugin paths remains available. Compact uses the existing floating geometry: horizontally centered over the complete workspace including docked panels, with its top anchored one fifth down, clamped inside small windows. Reuse the existing component, styling, scope selection, keyboard handling, dismissal, focus restoration and captured target lifecycle.
+Palette activation through existing menu/keyboard/plugin paths remains available. Compact retains the scaled 560-logical-pixel activated-card width, clamped to narrow workspaces, and uses the existing floating geometry: horizontally centered over the complete workspace including docked panels, with its top anchored one fifth down, clamped inside small windows. Reuse the existing component, styling, scope selection, keyboard handling, dismissal, focus restoration and captured target lifecycle.
 
 ## Boundaries and verification
 

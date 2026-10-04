@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-jasper-view-modes-design.md`
 
-**Status:** SDD complete: Tasks 1 and 2 implemented and independently approved; whole-branch code review approved with no critical or important findings. The minor stale Task 3 reference in the manual checklist is corrected. Restart-required remains the announced implementation default; the optional user preference question is unanswered. Final controller full check on `713b53b5`: 8,373 tests, 0 failures/errors, 6 skipped; Task 2 focused verification: 97 tests, 0 failures/errors/skips; native acceptance is [user-run](2026-10-03-jasper-view-modes-manual-check.md). Deviations: existing-method edits use exact contracts/tests instead of duplicated large classes; `TerminalWindow` and `WindowCommandPalette` required no changes because existing root installation/menu ownership and palette fallback already satisfy the behavior. Controller clarification: service-null windows keep their existing null initial configuration and sizing; `windowConfiguration()` supplies the default snapshot when called without a service. No merge/push/GUI is authorized.
+**Status:** SDD complete: Tasks 1 and 2 implemented and independently approved; whole-branch code review approved with no critical or important findings. The minor stale Task 3 reference in the manual checklist is corrected. Restart-required remains the announced implementation default; the optional user preference question is unanswered. Final controller full check on `713b53b5`: 8,373 tests, 0 failures/errors, 6 skipped; Task 2 focused verification: 97 tests, 0 failures/errors/skips; native acceptance is [user-run](2026-10-03-jasper-view-modes-manual-check.md). Deviations: existing-method edits use exact contracts/tests instead of duplicated large classes; `TerminalWindow` required no changes because existing root installation/menu ownership satisfies the behavior. Initial Task 2 left `WindowCommandPalette` unchanged; adversarial review later found that its fallback enlarged Compact from the existing activated width of 560 to 680 logical pixels. The position-only user requirement takes precedence over the derived reuse-fallback instruction: Compact now supplies scaled 560 width to the existing floating positioning/clamps; Normal fallback remains unchanged. This is a recorded deviation from the initial fallback-only implementation. Controller clarification: service-null windows keep their existing null initial configuration and sizing; `windowConfiguration()` supplies the default snapshot when called without a service. The user has subsequently authorized merge and push; the controller owns integration/publication. GUI and benchmark execution remain unauthorized.
 
 ## Global Constraints
 
@@ -20,7 +20,7 @@
 - The saved key is `window.view_mode = "normal" | "compact"`, default `normal`.
 - Switching mode takes effect after application restart. All windows created before the next restart retain the startup mode.
 - No terminal, SDK, plugin API or theme format changes. Java 25 on JBR; wrapper only; headless tests; no GUI or benchmark.
-- Work only in `/Users/dustin/.codex/worktrees/appearance-view-modes/moray`, branch `codex/appearance-view-modes`. No merge or push. End commits with `Co-Authored-By: Codex <noreply@openai.com>`.
+- Work only in `/Users/dustin/.codex/worktrees/appearance-view-modes/moray`, branch `codex/appearance-view-modes`. Merge and push are now user-authorized and controller-owned. End commits with `Co-Authored-By: Codex <noreply@openai.com>`.
 
 ## Review Focus
 
@@ -81,4 +81,9 @@ Fresh `./gradlew check` on `713b53b5` passed all 85 tasks (9 executed, 76 up-to-
 
 The controller inspected actual headless `settingsPreview` Appearance PNGs in dark/default-font and light/18pt variants: the View mode row and restart notice fit. The preview task enumerates every bundled theme, so it was intentionally stopped with SIGTERM after the relevant renders (exit 143). This verifies those inspected renders only; the full preview matrix did not complete.
 
-Native GUI acceptance remains [user-run](2026-10-03-jasper-view-modes-manual-check.md). No GUI, benchmark, merge or push was performed. Restart-required is the announced implementation default pending a response to the optional preference question, not a separately confirmed user choice.
+Native GUI acceptance remains [user-run](2026-10-03-jasper-view-modes-manual-check.md). At this verification checkpoint no GUI, benchmark, merge or push was performed. Merge and push were subsequently authorized by the user; GUI acceptance remains user-run. Restart-required is the announced implementation default pending a response to the optional preference question, not a separately confirmed user choice.
+
+
+## Adversarial width correction
+
+Round 1 adversarial review found P2: the Compact fallback enlarged the activated card from 560 to 680 logical pixels in a roomy workspace. The controller ruled that the original user requirement to change only position takes precedence over the derived instruction to reuse the fallback as-is. `WindowCommandPalette` now supplies scaled 560 width in Compact while retaining its existing floating positioning/clamps and leaving Normal's fallback unchanged. Paired real Normal/Compact tests assert literal scaled 560 width and narrow-window clamps; another regression retains Normal's unanchored scaled 680 width. Focused RED/GREEN evidence is recorded in `build/reports/view-modes-adversarial/fix-1-report.md`; the controller owns final suite and publication status.

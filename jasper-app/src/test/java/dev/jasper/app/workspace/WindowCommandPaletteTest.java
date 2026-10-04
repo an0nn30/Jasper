@@ -38,6 +38,46 @@ class WindowCommandPaletteTest {
             @Override public void actionPerformed(ActionEvent event) { run.run(); }
         }, List.of());
     }
+    @Test void normalAndCompactKeepTheSameActivatedWidthAndClampToNarrowWorkspaces() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            for (var mode : dev.jasper.app.config.ViewMode.values()) {
+                try (var owner = owner(new CommandHistory())) {
+                    owner.applyConfiguration(dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder().viewMode(mode).build(), true);
+                    var root = install(owner);
+                    root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                    owner.action(ActionId.COMMAND_PALETTE).actionPerformed(new ActionEvent(owner, 0, "fixture"));
+                    LayoutTestSupport.layoutTree(root);
+                    var card = owner.commandPalette().component();
+                    assertThat(card.getWidth()).as("roomy activated card in %s", mode)
+                        .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(560));
+                    for (int width : new int[] {350, 80}) {
+                        root.setSize(com.formdev.flatlaf.util.UIScale.scale(width), 210);
+                        LayoutTestSupport.layoutTree(root);
+                        root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED));
+                        LayoutTestSupport.layoutTree(root);
+                        assertThat(card.getWidth()).as("clamped card in %s, workspace width %d", mode, width)
+                            .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(width - 32));
+                        var overlay = (JComponent) card.getParent();
+                        var workspace = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
+                        assertThat(workspace.contains(card.getBounds())).isTrue();
+                    }
+                }
+            }
+        });
+    }
+
+    @Test void normalWithoutAnAnchorKeepsItsExistingFloatingPreferredWidth() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                owner.chrome().search().setVisible(false);
+                var root = install(owner); root.setSize(1400, 900); LayoutTestSupport.layoutTree(root);
+                owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(owner.commandPalette().component().getWidth())
+                    .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(680));
+            }
+        });
+    }
+
     @Test void compactActionUsesFloatingWorkspaceBoundsWithDockPanelsAndDismissesNormally() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
@@ -55,7 +95,7 @@ class WindowCommandPaletteTest {
                 var overlay = (JComponent) card.getParent();
                 var workspace = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
                 assertThat(card.getBounds()).isEqualTo(WindowCommandPalette.positioned(workspace,
-                    card.getPreferredSize(), com.formdev.flatlaf.util.UIScale.scale(16)));
+                    new Dimension(com.formdev.flatlaf.util.UIScale.scale(560), card.getPreferredSize().height), com.formdev.flatlaf.util.UIScale.scale(16)));
                 assertThat(card.getX() + card.getWidth() / 2).isEqualTo(workspace.x + workspace.width / 2);
                 assertThat(card.getY()).isEqualTo(workspace.y + workspace.height / 5);
                 int top = card.getY(); int initialHeight = card.getHeight();
@@ -70,7 +110,7 @@ class WindowCommandPaletteTest {
                     LayoutTestSupport.layoutTree(root);
                     workspace = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), overlay);
                     assertThat(card.getBounds()).isEqualTo(WindowCommandPalette.positioned(workspace,
-                        card.getPreferredSize(), com.formdev.flatlaf.util.UIScale.scale(16)));
+                        new Dimension(com.formdev.flatlaf.util.UIScale.scale(560), card.getPreferredSize().height), com.formdev.flatlaf.util.UIScale.scale(16)));
                     assertThat(workspace.contains(card.getBounds())).isTrue();
                 }
                 owner.commandPalette().escape();
