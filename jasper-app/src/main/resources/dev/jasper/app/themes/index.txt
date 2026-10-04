@@ -170,6 +170,8 @@ catppuccin-frappe.toml
 catppuccin-latte.toml
 catppuccin-macchiato.toml
 catppuccin-mocha.toml
+clear-dark.toml
+clear-light.toml
 darcula.toml
 dracula-alucard.toml
 dracula-dracula-colorful.toml

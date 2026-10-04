@@ -76,6 +76,9 @@ public final class JasperApplication {
     private final ThemeController themes;
     private final ThemeCatalog themeCatalog;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
+    /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
+    private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+    private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
@@ -295,6 +298,14 @@ public final class JasperApplication {
         return timer::stop;
     }
 
+    /** The opacity in effect behind {@code component}: its terminal window's within that window's workspace area, else 1. */
+    private double glassOpacity(Component component) {
+        for (TerminalWindow window : windows) if (window.owns(component)) return window.content().workspaceOpacity(component);
+        return 1.0;
+    }
+
+    private void glassChanged() { for (Runnable listener : List.copyOf(glassListeners)) listener.run(); }
+
     /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
     public TerminalWindow newWindow() { return openWindow(null, false); }
 
@@ -332,6 +343,7 @@ public final class JasperApplication {
         window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
         notificationViews.attach(window.content());
         window.content().connectTerminals(terminals, window::toFront);
+        if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
@@ -353,7 +365,7 @@ public final class JasperApplication {
                 }
             }
         });
-        windows.add(window); window.show();
+        windows.add(window); window.restoreLayout(uiState); window.show();
         return window;
     }
 
@@ -481,6 +493,10 @@ public final class JasperApplication {
                     .withContent(details))),
             new dev.jasper.app.platform.ConfigEditor()::open,
             new PluginRuntime.ShellProfiles(shellProfiles::current, shellProfiles::onChanged));
+        plugins.glass(WORKSPACE_GLASS ? new dev.jasper.app.plugins.GlassSource(this::glassOpacity, listener -> {
+            glassListeners.add(listener);
+            return new Subscription(() -> glassListeners.remove(listener));
+        }) : dev.jasper.app.plugins.GlassSource.NONE);
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.

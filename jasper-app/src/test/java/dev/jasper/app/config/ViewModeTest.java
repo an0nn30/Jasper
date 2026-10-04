@@ -61,6 +61,31 @@ class ViewModeTest {
         assertThat(changed.toBuilder().toolbarHeight(compact.toolbarHeight()).build()).isEqualTo(compact);
     }
 
+    @Test void modeAndGlassSettingsSurviveParsingCopiesAndCompatibilityConstructors() {
+        var result = parse("window.view_mode = 'compact'\nui.workspace.opacity = 65\nui.workspace.blur = 'on'");
+        assertThat(result.diagnostics()).isEmpty();
+        var compact = result.snapshot();
+        var glass = new GlassSettings(65, WorkspaceBlur.ON);
+        assertThat(compact.viewMode()).isEqualTo(ViewMode.COMPACT);
+        assertThat(compact.glass()).isEqualTo(glass);
+        var normal = compact.toBuilder().viewMode(ViewMode.NORMAL).build();
+        assertThat(normal.glass()).isEqualTo(glass);
+        assertThat(normal.toBuilder().viewMode(ViewMode.COMPACT).build()).isEqualTo(compact);
+        assertThat(compact.toBuilder().glass(GlassSettings.UNSET).build().viewMode()).isEqualTo(ViewMode.COMPACT);
+
+        var d = ConfigSnapshot.defaults();
+        var legacyViewMode = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), d.keybindings(),
+            d.columns(), d.lines(), d.terminal(), d.buddyEnabled(), d.visibleRows(), d.longCommandSeconds(),
+            d.backgroundEnabled(), d.plugins(), d.uiFont(), d.terminalColors(), d.railWidth(), d.toolbarHeight(),
+            d.statusBarHeight(), d.nativeDecorations(), d.workspaceTheme(), ViewMode.COMPACT);
+        assertThat(legacyViewMode).isEqualTo(d.toBuilder().viewMode(ViewMode.COMPACT).build());
+        var legacyGlass = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), d.keybindings(),
+            d.columns(), d.lines(), d.terminal(), d.buddyEnabled(), d.visibleRows(), d.longCommandSeconds(),
+            d.backgroundEnabled(), d.plugins(), d.uiFont(), d.terminalColors(), d.railWidth(), d.toolbarHeight(),
+            d.statusBarHeight(), d.nativeDecorations(), d.workspaceTheme(), glass);
+        assertThat(legacyGlass).isEqualTo(d.toBuilder().glass(glass).build());
+    }
+
     @Test void theBuilderSetsTheModeAndRejectsNull() {
         assertThat(ConfigSnapshot.builder().viewMode(ViewMode.COMPACT).build().viewMode()).isEqualTo(ViewMode.COMPACT);
         assertThatThrownBy(() -> ConfigSnapshot.builder().viewMode(null).build())

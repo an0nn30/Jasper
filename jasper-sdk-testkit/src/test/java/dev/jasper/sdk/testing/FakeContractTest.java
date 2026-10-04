@@ -27,6 +27,7 @@ class FakeContractTest extends PluginContractTest {
                     dev.jasper.sdk.ui.EditorPalette editor, dev.jasper.sdk.ui.SyntaxPalette syntax) {
                 host.setWorkspace(variant, palette, editor, syntax);
             }
+            @Override public void setWorkspaceOpacity(double opacity) { host.setWorkspaceOpacity(opacity); }
             @Override public void ui(Runnable action) { action.run(); }
             @Override public void flush() { host.flush(); }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.publishApp(topic, payload); }

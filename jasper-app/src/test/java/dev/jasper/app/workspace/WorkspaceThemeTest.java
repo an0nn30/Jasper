@@ -30,12 +30,13 @@ class WorkspaceThemeTest {
             var background = new java.awt.Color(authored ? 0x314159 : 0x17232f);
             assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(authored ? background : null);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(background);
+            // The tab strip is part of the workspace surface: the terminal background, whatever the tab bar colour.
+            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
             themes.configure(chrome, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.TAB_BAR));
+            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
             themes.configure(chrome, WorkspaceThemeChoice.MATCH, null, UiFontConfig.defaults());
             owner.update();
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(background);
+            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
             owner.windowTabs().setSize(600, 32);
             owner.windowTabs().doLayout();
             var image = new java.awt.image.BufferedImage(600, 32, java.awt.image.BufferedImage.TYPE_INT_RGB);
@@ -54,7 +55,7 @@ class WorkspaceThemeTest {
             var root = owner.currentPane();
             assertThat(root.getClientProperty("Jasper.workspaceTheme")).isSameAs(themes.current().workspace());
             assertThat(((JLabel) root.getComponent(0)).getForeground()).isEqualTo(themes.current().palette().foreground());
-            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().workspace().tokens().get(Token.TAB_BAR));
+            assertThat(owner.windowTabs().getBackground()).isEqualTo(themes.current().palette().background());
             assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             assertThat(new JPopupMenu().getBackground()).isEqualTo(UIManager.getColor("PopupMenu.background"));
             themes.configureTerminal(TerminalColors.MATCH);

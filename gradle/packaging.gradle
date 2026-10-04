@@ -185,6 +185,7 @@ def stage = tasks.register('stagePackage', Sync) {
 }
 
 apply from: rootProject.file('gradle/mac-notifications.gradle')
+apply from: rootProject.file('gradle/mac-glass.gradle')
 
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'
@@ -246,6 +247,9 @@ def packageApp = tasks.register('packageApp') {
                 Files.copy(new File(inputDirectory.get().asFile, 'libjasper-notifications.dylib').toPath(),
                     new File(image, 'Contents/app/libjasper-notifications.dylib').toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-glass.dylib').toPath(),
+                    new File(image, 'Contents/app/libjasper-glass.dylib').toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 resignImage(image)
             } else if (context.host.os == 'linux') {
                 removePluginClasspath(new File(imageDir, 'Jasper/lib/app/Jasper.cfg'))
@@ -301,6 +305,11 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Jasper')) {
             throw new GradleException('Package verification failed: required JVM options are missing from Jasper.cfg')
         }
+        // Workspace glass is macOS-only: only the macOS launcher opens the JDK internals it reaches into.
+        boolean glassOptions = cfg.contains('--add-opens=java.desktop/java.awt=ALL-UNNAMED') && cfg.contains('--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED')
+        boolean anyGlassOption = cfg.contains('--add-opens=java.desktop/java.awt=ALL-UNNAMED') || cfg.contains('--add-exports=java.desktop/java.awt.peer=ALL-UNNAMED')
+        if (context.host.os == 'macos' && !glassOptions) throw new GradleException('Package verification failed: the workspace glass JVM options are missing from Jasper.cfg')
+        if (context.host.os != 'macos' && anyGlassOption) throw new GradleException('Package verification failed: Jasper.cfg opens JDK internals for workspace glass, which exists only on macOS')
         String normalizedCfg = cfg.replace('\\', '/')
         configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
             if (!normalizedCfg.contains("\$APPDIR/${dependency.name}")) throw new GradleException("Package verification failed: classpath omits ${dependency.name}")
@@ -337,14 +346,15 @@ def verifyPackage = tasks.register('verifyPackage') {
             } finally { zip.close() }
         }
         if (context.host.os == 'macos') {
-            File notificationBridge = new File(appDir, 'libjasper-notifications.dylib')
-            if (!notificationBridge.isFile()) throw new GradleException('Package verification failed: notification bridge missing')
-            String bridgeArchitecture = executeNative(['/usr/bin/lipo', '-archs', notificationBridge.absolutePath],
-                'notification bridge architecture').stdout.trim()
             String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
-            if (bridgeArchitecture != expectedBridgeArchitecture) throw new GradleException('Package verification failed: notification bridge architecture mismatch')
-            executeNative(['/usr/bin/codesign', '--verify', '--strict', notificationBridge.absolutePath],
-                'notification bridge signature')
+            ['notification': 'libjasper-notifications.dylib', 'glass': 'libjasper-glass.dylib'].each { label, name ->
+                File bridge = new File(appDir, name)
+                if (!bridge.isFile()) throw new GradleException("Package verification failed: ${label} bridge missing")
+                String bridgeArchitecture = executeNative(['/usr/bin/lipo', '-archs', bridge.absolutePath],
+                    "${label} bridge architecture").stdout.trim()
+                if (bridgeArchitecture != expectedBridgeArchitecture) throw new GradleException("Package verification failed: ${label} bridge architecture mismatch")
+                executeNative(['/usr/bin/codesign', '--verify', '--strict', bridge.absolutePath], "${label} bridge signature")
+            }
             File plist = new File(image, 'Contents/Info.plist')
             if (!plist.isFile()) throw new GradleException("Package verification failed: missing ${plist}")
             def identifier = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath], 'plutil identifier').stdout.trim()

@@ -36,7 +36,7 @@ public final class ConvertThemes {
         ThemeSources.verify(manifest, sources);
         var generated = new TreeMap<String, byte[]>();
         var notice = new StringBuilder("# Bundled themes\n\nGenerated offline from tools/themes/sources.json. Original authors and licenses are retained.\n\n");
-        for (String id : List.of("jasper-dark", "jasper-light")) {
+        for (String id : List.of("jasper-dark", "jasper-light", "clear-dark", "clear-light")) {
             String resource = "/dev/jasper/app/themes/" + id + ".toml";
             try (var input = ConvertThemes.class.getResourceAsStream(resource)) {
                 if (input == null) throw new IOException("Missing Jasper source " + resource);

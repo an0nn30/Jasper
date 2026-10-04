@@ -48,6 +48,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         list.setIcon(AppIcons.named("DROPDOWN"));
         list.setToolTipText("Show all tabs"); list.getAccessibleContext().setAccessibleName("Show all tabs");
         list.addActionListener(event -> tabList().show(list, 0, list.getHeight()));
+        setOpaque(false);
         viewport.setOpaque(false);
         viewport.setName("tabViewport");
         add(viewport); add(list);
@@ -68,7 +69,9 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             revealSelection = true;
         }
         if (selected != owner.selectedComponent()) { selected = owner.selectedComponent(); revealSelection = true; }
-        setBackground(WorkspaceTheme.color(this, Token.TAB_BAR, "ToolWindow.background", "Panel.background"));
+        // The strip is part of the workspace surface, which the centre host paints beneath it (opaque or glass);
+        // this colour is only what the overflow fade blends into.
+        setBackground(owner.workspaceSurface());
         boolean retitled = false;
         for (Component tab : order) retitled |= entries.get(tab).refresh();
         // A tab that grows can push the selected tab out; keep it shown if it was shown.

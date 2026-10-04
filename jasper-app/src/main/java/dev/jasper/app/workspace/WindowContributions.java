@@ -285,6 +285,7 @@ final class WindowContributions implements AutoCloseable {
                 state.putPanel(id, new UiState.Panel(slot, Math.min(i, UiState.Panel.LAST), visible));
             }
         }
+        state.setRailVisible(owner.railVisible());
         state.setDock(new UiState.Dock(dock.size(Side.LEFT), dock.size(Side.RIGHT), dock.size(Side.BOTTOM),
             dock.ratio(Side.LEFT), dock.ratio(Side.RIGHT), dock.ratio(Side.BOTTOM)));
         state.save();
@@ -388,9 +389,10 @@ final class WindowContributions implements AutoCloseable {
 
     @Override public void close() {
         if (listening == null) return;
+        persist();
         listening.close();
         listening = null;
-        // Closing the window is not hiding its panels, and every change was saved as it happened: just let go of the dock.
+        // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };
         owner.dockDrag().icons = id -> null;

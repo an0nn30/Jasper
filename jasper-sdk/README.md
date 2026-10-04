@@ -141,3 +141,20 @@ action, an icon or a window. Jasper posts a succeeded or failed activity in `<pl
 runs an action (`runAction`) or the body (`click`); `new FakeNotifications().group(id)` records for a component under
 test. A plugin built for 0.13 that called `notices()` moves to `notifications()` and declares
 `sdk = ">=0.14.0, <0.15"`.
+
+## Workspace opacity (SDK 0.14.1)
+
+`Appearance.workspaceOpacity(Component)` returns how opaque the workspace is behind a component: 1.0 unless the
+component is in the workspace area (terminals and hosted content tabs) of a translucent ("glass") window, where it is
+less than 1.0. Chrome, tool windows and side panels stay opaque and report 1.0, as does a host that does not implement
+it. Opacity
+belongs to the window, so ask about the component you paint and ask again after it moves; call it on the UI thread
+(a null component throws `NullPointerException`). `onWorkspaceChanged` also reports changes of it, including a
+component entering or leaving a translucent window, and an opacity change alone fires it.
+
+A surface that follows the glass paints its own background once, with that alpha, using `AlphaComposite.Src` and
+unantialiased rectangles (antialiased translucent fills fall back to software rendering and make typing and resizing
+lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
+carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
+announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
+outside a translucent window. Plugins that use it declare `sdk = ">=0.14.1, <0.15"`.

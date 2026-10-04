@@ -170,6 +170,8 @@ workspace = "match"
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in theme, or a theme file or plugin in the `themes` folder ([Themes](themes.md)) | Live |
 | `ui.theme.workspace` | `"match"` | `"match"`, a native theme name, or an Alacritty theme name ([Themes](themes.md)) | Live |
+| `ui.workspace.opacity` | Workspace theme's value (omit key) | Number 10–100 percent; macOS only, ignored elsewhere | Live |
+| `ui.workspace.blur` | `"theme"` | `"theme"` (the workspace theme's value), `"on"`, `"off"`; macOS only, ignored elsewhere | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -550,7 +552,12 @@ settings file and data there too; their jars are in the application image). A zi
 unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
 launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
-dock's sizes, stripe visibility and plugin window bounds; it is written by Jasper and is not meant to be edited.
+dock's sizes and split ratios, which panels are open, stripe visibility, main-window size/position and maximized
+state, and plugin window bounds. The last main window closed supplies the layout for the next launch, including
+the terminal area left between its panels. Normal bounds are retained while maximized or minimized; relaunch
+never starts minimized. If a saved window no longer fits an available display, its bounds are fitted to a usable
+display. This file is written by Jasper and is not meant to be edited. Terminal sessions and editor documents
+are not recreated by this layout state.
 
 ## Shortcuts
 

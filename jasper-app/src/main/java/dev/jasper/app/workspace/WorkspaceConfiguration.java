@@ -48,6 +48,7 @@ final class WorkspaceConfiguration {
         }
         if (previous == null || !previous.keybindings().equals(next.keybindings())) owner.setBindings(next.bindings(macOs));
         if (previous == null || previous.visibleRows() != next.visibleRows()) owner.commandPalette().setVisibleRows(next.visibleRows());
+        owner.requestGlass();
     }
 
     private static boolean liveBehaviorChanged(TerminalConfig previous, TerminalConfig next) {
