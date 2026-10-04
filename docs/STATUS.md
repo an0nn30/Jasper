@@ -226,7 +226,8 @@
   stripe, and a `ToolWindowHeader` comment names `ToolWindowArea.Host` instead of `WorkspaceRegions.Host`; Tasks 1, 3,
   4, 6 and 9 none; final review: `WindowContributions.close()` no longer saves, because every dock change is saved as
   it happens and saving again on close overwrote other windows' later changes (new test
-  `closingAWindowKeepsTheChangesAnotherWindowSaved`); `DockGeometry` reserves above the bottom area the larger of the
+  `closingAWindowKeepsTheChangesAnotherWindowSaved`; superseded on 2026-10-03 by the user's correction that the last
+  window closed wins, so `close()` saves again: see the window layout restoration entry); `DockGeometry` reserves above the bottom area the larger of the
   terminal's minimum height and two tool window minimums plus a divider when the left or the right side shows both
   halves, in the squeeze and in the bottom divider's range (new tests
   `theBottomAreaGrowsOnlyUntilASplitSidesHalvesReachTheirMinimum`,

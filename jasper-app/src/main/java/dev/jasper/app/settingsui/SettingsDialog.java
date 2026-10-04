@@ -34,7 +34,7 @@ import javax.swing.event.DocumentListener;
  */
 public final class SettingsDialog {
     /** The configuration guide; a page's help anchor follows the {@code #}. */
-    public static final String HELP_URL = "https://github.com/an0nn30/moray/blob/main/docs/configuration.md#";
+    public static final String HELP_URL = "https://github.com/an0nn30/Jasper/blob/main/docs/configuration.md#";
 
     /**
      * What the dialog needs from the application.
