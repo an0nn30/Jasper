@@ -143,6 +143,7 @@ public final class IndexerPlugin implements Plugin {
         context.settings().page(new IndexerSettingsPanel(settings, projects, indexer, ProjectKey::root,
             () -> context.terminals().activeWindow().ifPresent(this::indexFolder), environment.confirm()));
         watcher = new CwdWatcher(projects, indexer, settings, prompts, new CwdWatcher.Hooks(this::detect,
+            pane -> Optional.empty(), place -> CompletableFuture.completedFuture(Optional.empty()),
             pane -> context.terminals().pane(pane).map(handle -> handle.tab().window()), environment.after(), environment.home()));
         context.events().subscribe(TerminalEvents.CWD_CHANGED, watcher::cwd);
         context.events().subscribe(TerminalEvents.COMMAND_FINISHED, watcher::finished);
