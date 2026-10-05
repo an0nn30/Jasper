@@ -85,6 +85,9 @@ enabled = false
 long_command_seconds = 10
 system = true
 
+[notifications.groups]
+# "jasper.commands" = "history"
+
 [system]
 run_in_background = true  # false on Linux
 
@@ -148,6 +151,7 @@ workspace = "match"
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `notifications.system` | `true` | Boolean | Live |
+| `notifications.groups` | `{}` | Table of notification group id to `"card"`, `"sticky"`, `"history"` or `"off"` | Live |
 | `system.run_in_background` | `true` on macOS and Windows, `false` on Linux | Boolean | Next start (residency); live (login item) |
 | `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
@@ -304,6 +308,23 @@ packaged macOS `Jasper.app`, a balloon from Jasper's notification-area icon on W
 on Linux, and clicking it focuses the pane. `notifications.system = false` turns system notifications
 off for everything (Settings › Notifications › Show system notifications). See
 [Notifications](notifications.md#system-notifications).
+
+### Notification groups
+
+`[notifications.groups]` sets how each group's notifications appear, by group id:
+
+```toml
+[notifications.groups]
+"jasper.commands" = "history"   # Long-running commands: the Notifications panel only
+"dev.jasper.remote" = "sticky"  # Remote's notifications stay until you close them
+```
+
+The modes are `"card"` (a card that hides itself), `"sticky"` (a card that stays until you close it), `"history"`
+(only the Notifications panel, unread) and `"off"`. A group you do not list keeps its default. Settings ›
+Notifications › Groups lists every group, shows a group's id when you point at its name, and saves changes here. An
+entry for a plugin that is not running is kept. An unknown mode, a value that is not a string, or a key that is not a
+group id is a warning, and that group keeps its default. [Notifications](notifications.md#groups) lists the groups
+with their ids.
 
 ### Automatic tab and notification titles
 

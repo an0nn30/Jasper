@@ -158,16 +158,22 @@ public sealed interface SettingKind<T> {
      * The rules a table of string values follows. Each message is the whole diagnostic text.
      *
      * @param validName which entry names are allowed
-     * @param invalidName the error for any other name; the entry is omitted
+     * @param invalidName the diagnostic for any other name; the entry is omitted
      * @param reserved names the application owns
      * @param reservedName the warning for a reserved name; the entry is omitted
      * @param validValue which values are allowed
-     * @param invalidValue the error for any other value; the entry is omitted
+     * @param invalidValue the diagnostic for any other value; the entry is omitted
      * @param valueType what a value must be, for the wrong-type message ("a string environment value")
+     * @param severity how serious an unusable entry is: ERROR where every entry matters (environment variables);
+     *     WARNING where an unusable entry just leaves its default in place, which also ignores an entry of the wrong
+     *     TOML type instead of rejecting the file
      */
     record MapRules(Predicate<String> validName, String invalidName, Set<String> reserved, String reservedName,
-                    Predicate<String> validValue, String invalidValue, String valueType) {
-        public MapRules { reserved = Set.copyOf(reserved); }
+                    Predicate<String> validValue, String invalidValue, String valueType, Reading.Severity severity) {
+        public MapRules {
+            reserved = Set.copyOf(reserved);
+            java.util.Objects.requireNonNull(severity, "severity");
+        }
     }
 
     record StringMap(MapRules rules) implements SettingKind<Map<String, String>> {
@@ -178,12 +184,16 @@ public sealed interface SettingKind<T> {
             for (String name : table.keySet()) {
                 Object entry = table.get(List.of(name));
                 List<String> at = List.of(name);
-                if (!(entry instanceof String text))
-                    issues.add(new Reading.Issue(at, Reading.Severity.ERROR,
-                        "Expected " + rules.valueType() + "; configuration was not applied.", true));
-                else if (!rules.validName().test(name)) issues.add(new Reading.Issue(at, Reading.Severity.ERROR, rules.invalidName(), false));
+                if (!(entry instanceof String text)) {
+                    if (rules.severity() == Reading.Severity.ERROR)
+                        issues.add(new Reading.Issue(at, Reading.Severity.ERROR,
+                            "Expected " + rules.valueType() + "; configuration was not applied.", true));
+                    else issues.add(new Reading.Issue(at, Reading.Severity.WARNING,
+                        "Expected " + rules.valueType() + "; entry ignored.", false));
+                }
+                else if (!rules.validName().test(name)) issues.add(new Reading.Issue(at, rules.severity(), rules.invalidName(), false));
                 else if (rules.reserved().contains(name)) issues.add(new Reading.Issue(at, Reading.Severity.WARNING, rules.reservedName(), false));
-                else if (!rules.validValue().test(text)) issues.add(new Reading.Issue(at, Reading.Severity.ERROR, rules.invalidValue(), false));
+                else if (!rules.validValue().test(text)) issues.add(new Reading.Issue(at, rules.severity(), rules.invalidValue(), false));
                 else values.put(name, text);
             }
             return new Reading<>(Map.copyOf(values), issues);

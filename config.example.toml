@@ -42,6 +42,12 @@ long_command_seconds = 10
 # balloons, or notify-send on Linux.
 system = true
 
+[notifications.groups]
+# Live. How each group's notifications appear: "card" (a card that hides itself), "sticky" (a card
+# that stays until you close it), "history" (only the Notifications panel) or "off". Settings > Notifications
+# lists every group; a group not listed here keeps its default.
+# "jasper.commands" = "history"
+
 [system]
 # Keep Jasper running with no windows so a new window opens instantly, and start it in the background at login.
 # On by default on macOS and Windows and off on Linux, so it is commented out here: uncomment it to choose.
