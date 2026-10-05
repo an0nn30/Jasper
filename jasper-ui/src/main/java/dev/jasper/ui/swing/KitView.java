@@ -64,7 +64,7 @@ public final class KitView extends JPanel implements AutoCloseable {
         throw new IllegalArgumentException("Node is not a secret field: " + id);
     }
     void revealSecrets(SecretFields.SecretControl source, boolean revealed) { reconciler.revealSecrets(source, revealed); }
-    /** Focus an existing control without replacing its component or document. */
+    /** Focus a control; an offscreen inline row control is first scrolled into view and mounted. */
     public void focus(String id) { requireOpen(); reconciler.control(Objects.requireNonNull(id)).focusTarget().requestFocusInWindow(); }
     /** Register only explicit Custom content; ordinary Swing trees cannot enter through this method. */
     public void registerContent(String id, JComponent component, AutoCloseable lifetime) { requireOpen(); throw new UnsupportedOperationException("Custom content is not implemented yet"); }

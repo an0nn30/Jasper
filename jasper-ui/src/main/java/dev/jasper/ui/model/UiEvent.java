@@ -18,7 +18,10 @@ public sealed interface UiEvent {
         public Selected { ModelChecks.id(id); ids = Set.copyOf(ids); ids.forEach(ModelChecks::id); }
     }
     record Toggled(String id, boolean checked) implements UiEvent { public Toggled { ModelChecks.id(id); } }
-    record Expanded(String id, boolean expanded) implements UiEvent { public Expanded { ModelChecks.id(id); } }
+    /** Expansion intent: id is the tree owner, itemId is local to that tree. */
+    record Expanded(String id, String itemId, boolean expanded) implements UiEvent { public Expanded { ModelChecks.id(id); ModelChecks.id(itemId); } }
+    /** Ordered-list removal intent; the domain owner confirms removal through an updated view. */
+    record Removed(String id, String itemId) implements UiEvent { public Removed { ModelChecks.id(id); ModelChecks.id(itemId); } }
     record Reordered(String id, String itemId, int destination) implements UiEvent {
         public Reordered { ModelChecks.id(id); ModelChecks.id(itemId); if (destination < 0) throw new IllegalArgumentException("Negative destination"); }
     }

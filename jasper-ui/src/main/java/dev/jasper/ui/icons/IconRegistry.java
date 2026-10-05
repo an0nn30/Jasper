@@ -86,6 +86,7 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("more", "M 3 8 H 3.1 M 8 8 H 8.1 M 13 8 H 13.1"),
             Map.entry("collapse", "M 4 6 L 8 10 L 12 6"),
             Map.entry("chevron.down", "M 4 6 L 8 10 L 12 6"),
+            Map.entry("chevron.right", "M 6 4 L 10 8 L 6 12"),
             Map.entry("chevron.up", "M 4 10 L 8 6 L 12 10"),
             Map.entry("search", "M 11 7 A 4 4 0 1 1 3 7 A 4 4 0 1 1 11 7 M 10 10 L 14 14"),
             Map.entry("lock", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 3 7 H 13 V 14 H 3 Z M 8 10 V 11"),

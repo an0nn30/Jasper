@@ -37,6 +37,7 @@ public record ViewSpec(Node root) {
             case Panel n -> { children.add(n.header()); n.searchOrNavigation().ifPresent(children::add); children.add(n.body()); n.footer().ifPresent(children::add); }
             case Form n -> { n.hero().ifPresent(children::add); children.addAll(n.sections()); n.preview().ifPresent(children::add); children.addAll(n.actions()); }
             case ItemList n -> {
+                n.addAction().ifPresent(children::add);
                 references(n.selectedIds(), new HashSet<>(n.items().stream().map(ListItem::id).toList()));
                 for (var item : n.items()) { item.leading().ifPresent(children::add); children.addAll(item.title()); children.addAll(item.subtitle()); children.addAll(item.trailing()); }
             }

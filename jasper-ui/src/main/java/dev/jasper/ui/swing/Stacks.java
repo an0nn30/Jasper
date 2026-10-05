@@ -34,7 +34,7 @@ final class Stacks {
             component.setLayout(
                     stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
-                            : new StackLayout(context(), stack.role()));
+                            : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context()) : new StackLayout(context(), stack.role()));
             component.revalidate();
             component.repaint();
         }

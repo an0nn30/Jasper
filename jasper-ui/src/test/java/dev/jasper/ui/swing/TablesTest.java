@@ -1,0 +1,136 @@
+package dev.jasper.ui.swing;
+
+import static dev.jasper.ui.swing.KitViewTest.*;
+
+import static org.assertj.core.api.Assertions.*;
+
+import dev.jasper.ui.model.*;
+import dev.jasper.ui.model.Nodes.*;
+import dev.jasper.ui.testsupport.*;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.*;
+
+class TablesTest {
+    @Test
+    void largeTableUsesBoundedMountedRows() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    var rows =
+                            java.util.stream.IntStream.range(0, 10000)
+                                    .mapToObj(
+                                            i ->
+                                                    new TableRow(
+                                                            "r" + i,
+                                                            Map.of(
+                                                                    "name",
+                                                                    "File " + i,
+                                                                    "size",
+                                                                    "1234"),
+                                                            Optional.empty()))
+                                    .toList();
+                    try (var view =
+                            new KitView(
+                                    context,
+                                    new ViewSpec(
+                                            new Table(
+                                                    "files",
+                                                    ControlState.READY,
+                                                    List.of(
+                                                            new Column(
+                                                                    "name",
+                                                                    "Name",
+                                                                    TextRole.BODY,
+                                                                    false),
+                                                            new Column(
+                                                                    "size",
+                                                                    "Size",
+                                                                    TextRole.MONO_SMALL,
+                                                                    true)),
+                                                    rows,
+                                                    Set.of(),
+                                                    "open",
+                                                    List.of())),
+                                    e -> {})) {
+                        view.setSize(400, 260);
+                        InteractiveRowsTest.layout(view);
+                        assertThat(InteractiveRowsTest.count(view)).isLessThan(180);
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
+
+    @Test
+    void numericColumnsAlignWithHeadersAndCheckboxesSelectWithoutActivation() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    var events = new ArrayList<UiEvent>();
+                    var columns =
+                            List.of(
+                                    new Column("name", "Name", TextRole.BODY, false),
+                                    new Column("size", "Size", TextRole.MONO_SMALL, true));
+                    var rows =
+                            List.of(
+                                    new TableRow(
+                                            "a",
+                                            Map.of("name", "alpha", "size", "100"),
+                                            Optional.of("file")),
+                                    new TableRow(
+                                            "b",
+                                            Map.of("name", "beta", "size", "9"),
+                                            Optional.empty()));
+                    try (var view =
+                            new KitView(
+                                    context,
+                                    new ViewSpec(
+                                            new Table(
+                                                    "files",
+                                                    ControlState.READY,
+                                                    columns,
+                                                    rows,
+                                                    Set.of(),
+                                                    "open",
+                                                    List.of(),
+                                                    SelectionMode.MULTIPLE)),
+                                    events::add)) {
+                        view.setSize(400, 260);
+                        InteractiveRowsTest.layout(view);
+                        var owner = (Tables.TableControl) view.control("files");
+                        var row = owner.mounted.get("a");
+                        var number = (javax.swing.JLabel) row.title.getComponent(1);
+                        var name = (javax.swing.JLabel) row.title.getComponent(0);
+                        assertThat(number.getHorizontalAlignment())
+                                .isEqualTo(javax.swing.SwingConstants.RIGHT);
+                        assertThat(name.getIcon()).isNotNull();
+                        row.check.doClick(0);
+                        owner.mounted.get("b").check.doClick(0);
+                        assertThat(events)
+                                .containsExactly(
+                                        new UiEvent.Selected("files", Set.of("a")),
+                                        new UiEvent.Selected("files", Set.of("a", "b")));
+                        var header = owner.header.getComponent(1);
+                        assertThat(header.getX() + header.getWidth())
+                                .isEqualTo(row.title.getX() + number.getX() + number.getWidth());
+                        view.update(
+                                new ViewSpec(
+                                        new Table(
+                                                "files",
+                                                ControlState.READY,
+                                                columns,
+                                                List.of(rows.get(1), rows.get(0)),
+                                                Set.of(),
+                                                "open",
+                                                List.of(),
+                                                SelectionMode.MULTIPLE)));
+                        assertThat(owner.selected).containsExactlyInAnyOrder("a", "b");
+                        assertThat(owner.mounted.get("a")).isSameAs(row);
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
+}

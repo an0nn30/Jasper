@@ -16,6 +16,8 @@ final class ControlRegistry {
             case Nodes.Secret ignored -> {} case Nodes.Choice ignored -> {} case Nodes.Toggle ignored -> {}
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
             case Nodes.MenuButton ignored -> {}
+            case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
+            case Nodes.Table _, Nodes.Tree _ -> {}
             case Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _ -> children(node).forEach(ControlRegistry::validate);
             default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         }
@@ -42,6 +44,9 @@ final class ControlRegistry {
             case Nodes.Form form -> new Forms.FormControl(view, form);
             case Nodes.Split split -> new SplitViews.SplitControl(view, split);
             case Nodes.MenuButton menu -> new Menus.MenuControl(view, menu);
+            case Nodes.ItemList list -> new ItemLists.ListControl(view,list);
+            case Nodes.Table table -> new Tables.TableControl(view,table);
+            case Nodes.Tree tree -> new Trees.TreeControl(view,tree);
             default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         };
     }
@@ -49,6 +54,7 @@ final class ControlRegistry {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {
             case Nodes.Stack n -> result.addAll(n.children());
+            case Nodes.ItemList n -> n.addAction().ifPresent(result::add);
             case Nodes.Card n -> result.addAll(n.children());
             case Nodes.Split n -> result.addAll(n.children());
             case Nodes.FormRow n -> { result.add(n.control()); n.trailing().ifPresent(result::add); }

@@ -72,16 +72,20 @@ final class ViewReconciler implements AutoCloseable {
     }
     boolean dismissPopup() {
         boolean dismissed = false;
+        for(var owner:mounted.values()) if(owner instanceof InteractiveRows.RowsControl rows) dismissed |= rows.dismiss();
         for (var owner : mounted.values()) if (owner instanceof Menus.MenuControl menu) dismissed |= menu.dismiss();
         for (var owner : mounted.values()) if (owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible()) { combo.hidePopup(); dismissed = true; }
         return dismissed;
     }
     boolean popupOpen() {
+        if(mounted.values().stream().anyMatch(owner -> owner instanceof InteractiveRows.RowsControl rows && rows.popupOpen()))return true;
         return mounted.values().stream().anyMatch(owner -> owner instanceof Menus.MenuControl menu && menu.popup.isVisible()
             || owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible());
     }
     ControlRegistry.Control control(String id) {
-        var control = mounted.get(id); if (control == null) throw new IllegalArgumentException("Unknown node: " + id); return control;
+        var control = mounted.get(id);
+        if(control == null) for(var owner:mounted.values()) if(owner instanceof InteractiveRows.RowsControl rows) { control=rows.inline(id); if(control!=null)break; }
+        if (control == null) throw new IllegalArgumentException("Unknown node: " + id); return control;
     }
     void revealSecrets(SecretFields.SecretControl source, boolean revealed) {
         String group = ((Nodes.Secret)source.node).revealGroup();

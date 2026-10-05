@@ -18,7 +18,9 @@ final class Labels {
                 ThemePainting.antialias(g); g.setFont(getFont()); g.setColor(getForeground());
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
                 Rectangle bounds = new Rectangle(insets.left, insets.top, getWidth() - insets.left - insets.right, getHeight() - insets.top - insets.bottom);
-                String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(),
+                String display=getText();
+                if(Boolean.TRUE.equals(getClientProperty("Jasper.leadingEllipsis")) && display!=null) display=Navigation.leadingEllipsis(display,g.getFontMetrics(),Math.max(0,bounds.width-(getIcon()==null?0:getIcon().getIconWidth()+getIconTextGap())));
+                String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), display, getIcon(),
                     getVerticalAlignment(), getHorizontalAlignment(), getVerticalTextPosition(), getHorizontalTextPosition(), bounds, icon, text, getIconTextGap());
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 if (getIcon() != null) getIcon().paintIcon(this, g, icon.x, icon.y);
@@ -30,6 +32,7 @@ final class Labels {
         TextControl(KitView view, Nodes.Text node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var text = (Nodes.Text)node; var label = (JLabel)component; state();
+            label.putClientProperty("Jasper.leadingEllipsis",text.role()==Nodes.TextRole.MONO || text.role()==Nodes.TextRole.MONO_SMALL);
             label.setText(text.text()); label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name())));
             label.setForeground(ThemePainting.color(context(), switch (text.role()) {
                 case LABEL, DESCRIPTION, CAPTION, COUNT -> SemanticColor.TEXT_SECONDARY;

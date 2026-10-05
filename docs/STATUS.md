@@ -115,6 +115,23 @@
   pre-fix evidence; no broad rerun or GUI was needed for these bounded repairs.
   Package-private Composition.java supplies width-aware layout and literal wrapping; screenshot calibration
   and native desktop focus remain later/user-run. No GUI, screen queries, AOT, push or merge.
+  Task 9 interactive data implementation/self-review complete (independent review pending): viewport
+  row shells and bounded live inline controls for lists/tables/trees, owner-scoped selection/context/
+  expansion/reorder/removal events, ordered add footer, numeric columns and semantic navigation.
+  Approved schema corrections add explicit SelectionMode to lists/tables, itemId to Expanded,
+  typed Removed and optional ItemList.addAction; old constructors preserve single selection.
+  Inline slots deliberately accept controlled presentation/actions plus INLINE Stacks; mutable fields,
+  secrets, Custom and nested data/forms are rejected, so offscreen recycling never loses typed input.
+  Focus(global inline id) indexes descriptors and materializes the row; recycling closes old listeners,
+  while surviving rows retain controls. Host-owned filtered-out selection remains outside ViewSpec.
+  Self-review reproduced/fixed stale checkbox visuals, navigation ellipsis, disabled inline ancestry,
+  context-menu ownership/theming, overly strict synchronous selection echoes and ordered button
+  reattachment. Popup routing includes mounted row controls. Actual ordered buttons consume the shared
+  30% disabled painter once; ordinary disabled buttons remain 42%, preserving authored alpha.
+  Final headless normal/2x focused: **18 tests**; module check/architecture: **217 tests,
+  0 failures/errors/skips**. Source hygiene/diff checks clean. Query preservation is verified in the
+  stable parent Stack; real Panel integration follows in Task 10. Native focus acceptance and visual
+  gallery calibration remain later/user-run. No GUI, benchmark, AOT, push or merge.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

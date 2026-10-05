@@ -180,12 +180,12 @@ unique within their owning control; references resolve only in that control. Do 
 | Card | `CardKind kind, List<Node> children` |
 | Section | `String title, Node body` |
 | Empty | `Node icon, String title, String description, List<Node> actions` |
-| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions` |
+| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction` |
 | Header | `String title, OptionalInt count, Optional<Node> context, Optional<Node> primary, List<MenuItem> overflow` |
 | Panel | `Header header, Optional<Node> searchOrNavigation, Node body, Optional<Node> footer` |
 | Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction` |
 | Split | `SplitKind kind, List<Node> children` (semantic manager/sidebar/document divisions) |
-| Table | `List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions` |
+| Table | `List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode` |
 | Tree | `List<TreeItem> roots, Set<String> expandedIds, Set<String> selectedIds, String activateAction` |
 | Custom | `String contentId, CustomKind kind, String accessibleName` |
 
@@ -202,7 +202,7 @@ BLUE/GREEN/AMBER/PURPLE/NEUTRAL/NONE; IconSize is CAPTION/CONTROL/RAIL/EMPTY/HER
 ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK;
 StatusKind is SUCCESS/WARNING/DANGER/IDLE;
 FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA; ChoiceKind is DROPDOWN/PICKER/SEGMENTED;
-CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED;
+CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED; SelectionMode is SINGLE/MULTIPLE;
 FormKind is HERO/SHEET/FULL/SETTINGS; LayoutRole is VERTICAL/INLINE/ACTIONS/HERO/DETAIL/FOOTER/NAVIGATION;
 SplitKind is SIDEBAR_DETAIL/THREE_COLUMN/DOCUMENT; CustomKind is EDITOR/TERMINAL/CHART/PREVIEW.
 Header primary nodes are restricted to Button or MenuButton. MenuButton's `action` is blank for a
@@ -227,16 +227,52 @@ Widths/gaps come from these semantic roles; plugins cannot pass dimensions or UI
 
 `ViewSpec(Node root)` validates the tree and references. `UiEvent` is sealed with nested records
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,
-`Toggled(String id,boolean checked)`, `Expanded(String id,boolean expanded)`,
-`Reordered(String id,String itemId,int destination)`, `SecretChanged(String id)`.
+`Toggled(String id,boolean checked)`, `Expanded(String id,String itemId,boolean expanded)`,
+`Reordered(String id,String itemId,int destination)`, `Removed(String id,String itemId)`, `SecretChanged(String id)`.
 Event identifier mapping (approved Task 7 ruling): `Action.id` is the configured action key
 (Button/MenuButton/menu item, Browse, or Choice PICKER opening). Every payload-bearing event
-(`Edited`, `Selected`, `Toggled`, `Expanded`, `Reordered`, `SecretChanged`) identifies its owning
+(`Edited`, `Selected`, `Toggled`, `Expanded`, `Reordered`, `Removed`, `SecretChanged`) identifies its owning
 node. For Choice DROPDOWN/SEGMENTED, `Selected.id` is the Choice node id and `ids` contains its
 local option id; for Toggle, `Toggled.id` is the Toggle node id. Hosts/plugins resolve the node's
 configured `action` from the current spec when routing selection/toggle intent. These operations
 emit no additional generic Action, preserving the payload and node context for inline rows.
 Secret content never appears in an event, immutable descriptor or `toString()`.
+
+Task 9 approved corrections (mirror exactly in the later SDK projection):
+- ItemList/Table explicitly select SINGLE or MULTIPLE; the old constructors default to SINGLE,
+  and the ItemList old constructor has no add footer. SINGLE rejects more than one selected id.
+  MULTIPLE displays real checkboxes; mode never depends on selectedIds cardinality.
+- ItemList.addAction is an optional Button inside the bounded list surface, below the data rows.
+  It emits its configured Action and is never a selectable item. ORDERED rows emit Reordered with
+  the list owner id, stable local itemId and zero-based destination, or Removed(owner,itemId).
+  Impossible first/last direction buttons use the ordinary button painter at 30% exactly once;
+  other disabled buttons remain 42%, preserving authored alpha.
+- Expanded identifies the tree owner in id and the tree-local item in itemId. Expansion and
+  inline toggle/choice values are confirmed by the next descriptor. Tree flattening is bounded
+  in mounted components, including large expanded branches.
+- Row pointer selection (single click), keyboard navigation and multi-checkbox selection emit
+  Selected(owner,ids). Double click/Enter activation first emits Selected for the activated item,
+  then Action(activateAction), when nonblank. Context opening selects an unselected clicked row;
+  context invocation emits current Selected(owner,ids), then Action(menuItem.action). A synchronous
+  selection-confirming update keeps the intended action. Closing/removing the owner/item or rebinding
+  that action during Selected suppresses the stale subsequent Action. Inline controls never activate
+  the containing row; Toggle emits only Toggled with its globally unique node id.
+- ListItem slots accept Text/Icon/Chip/StatusDot/Progress/Strength, Button/MenuButton/Toggle/Choice,
+  and recursively INLINE Stacks only. Mutable Field/Secret, Custom, nested data and other composition
+  kinds are rejected, rather than silently losing edits during recycling. Ordinary fields/query
+  inputs remain outside virtual rows in the stable parent composition. Standalone inputs are unchanged.
+- Only viewport rows plus two overscan rows on each side own live controls. Row shells are reused;
+  same mounted node id/kind retains its control, while a recycled row closes old control listeners,
+  popups and motion owners. Controlled values remain in descriptors. Offscreen focus is remembered by
+  list item/control identity; KitView.focus(globalInlineNodeId) indexes data and scrolls/mounts the
+  target instead of allocating every offscreen widget. Removal clears that logical identity. Native
+  desktop focus acceptance remains a user-run check; headless coverage verifies identity and teardown.
+- Reorder/filter retains local selection for surviving item ids when the declared selection is
+  unchanged. ViewSpec still rejects selected ids absent from current data; the host owns selection
+  outside a filtered dataset and may restore it on repopulation. No removed domain objects are cached.
+  Mono row/navigation text uses leading ellipsis; navigation reserves action width before path width.
+- Current consumers remain unchanged until Plan 2. Task 10 composes these owners into real Panels;
+  this task verifies query-document preservation through the existing parent Stack composition.
 
 `KitView` in `UI/swing/KitView.java` is a final `JPanel implements AutoCloseable`:
 

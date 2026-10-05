@@ -47,6 +47,7 @@ final class Buttons {
         private final KitContext context;
         Nodes.ButtonKind kind;
         boolean hero;
+        float disabledOpacity=.42f;
         ThemePainting.Focus focus;
         KitButton(KitContext context) { this.context = context; }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
@@ -78,7 +79,7 @@ final class Buttons {
             if (kind == null) return;
             var g = (Graphics2D)graphics.create();
             try {
-                if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
+                if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(disabledOpacity));
                 boolean hover = isEnabled() && getModel().isRollover();
                 Color fill = fill(hover);
                 if (isEnabled() && getModel().isPressed() && fill != null) {

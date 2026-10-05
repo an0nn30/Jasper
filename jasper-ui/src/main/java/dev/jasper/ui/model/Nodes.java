@@ -21,6 +21,7 @@ public final class Nodes {
     public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA }
     public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED }
     public enum CardKind { FORM, SETTINGS, MIXED }
+    public enum SelectionMode { SINGLE, MULTIPLE }
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED }
     public enum FormKind { HERO, SHEET, FULL, SETTINGS }
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION }
@@ -190,7 +191,8 @@ public final class Nodes {
         }
     }
 
-    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions) implements Node {
+    /** Virtual row collection. MULTIPLE shows checkboxes; addAction is a footer, never a data item. */
+    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction) implements Node {
         public ItemList {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -198,8 +200,13 @@ public final class Nodes {
             selectedIds = Set.copyOf(selectedIds);
             Objects.requireNonNull(activateAction);
             contextActions = List.copyOf(contextActions);
+            Objects.requireNonNull(selectionMode); Objects.requireNonNull(addAction);
+            if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
             ModelChecks.unique(items, ListItem::id);
             ModelChecks.unique(contextActions, MenuItem::id);
+        }
+        public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions) {
+            this(id, state, kind, items, selectedIds, activateAction, contextActions, SelectionMode.SINGLE, Optional.empty());
         }
     }
 
@@ -256,7 +263,8 @@ public final class Nodes {
         }
     }
 
-    public record Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions) implements Node {
+    /** Column collection with explicit single or checkbox-based multiple selection. */
+    public record Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode) implements Node {
         public Table {
             ModelChecks.id(id); Objects.requireNonNull(state);
             columns = List.copyOf(columns);
@@ -264,9 +272,14 @@ public final class Nodes {
             selectedIds = Set.copyOf(selectedIds);
             Objects.requireNonNull(activateAction);
             contextActions = List.copyOf(contextActions);
+            Objects.requireNonNull(selectionMode);
+            if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
             ModelChecks.unique(columns, Column::id);
             ModelChecks.unique(rows, TableRow::id);
             ModelChecks.unique(contextActions, MenuItem::id);
+        }
+        public Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions) {
+            this(id, state, columns, rows, selectedIds, activateAction, contextActions, SelectionMode.SINGLE);
         }
     }
 
