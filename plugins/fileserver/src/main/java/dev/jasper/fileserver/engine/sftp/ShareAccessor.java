@@ -23,7 +23,9 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.AclEntry;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.GroupPrincipal;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Collection;
@@ -156,6 +158,16 @@ final class ShareAccessor implements SftpFileSystemAccessor {
 
     @Override public void setFilePermissions(SftpSubsystemProxy subsystem, Path file, Set<PosixFilePermission> perms, LinkOption... options) throws IOException {
         Files.setPosixFilePermissions(writableTarget(file), perms);
+    }
+
+    /** Refused before any lookup: looking the name up would tell a client which users and groups the host has. */
+    @Override public UserPrincipal resolveFileOwner(SftpSubsystemProxy subsystem, Path file, UserPrincipal name) throws IOException {
+        throw new AccessDeniedException("/" + client(file), null, "Owners never change");
+    }
+
+    /** Refused before any lookup, as for owners. */
+    @Override public GroupPrincipal resolveGroupOwner(SftpSubsystemProxy subsystem, Path file, GroupPrincipal name) throws IOException {
+        throw new AccessDeniedException("/" + client(file), null, "Groups never change");
     }
 
     @Override public void setFileOwner(SftpSubsystemProxy subsystem, Path file, Principal value, LinkOption... options) throws IOException {

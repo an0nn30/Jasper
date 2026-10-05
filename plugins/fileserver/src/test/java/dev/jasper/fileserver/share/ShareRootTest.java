@@ -113,6 +113,21 @@ class ShareRootTest {
         assertThat(shared.resolve("docs/a.txt")).as("deleting a link removes the link, not its target").exists();
     }
 
+    @Test void aMissingFolderBehindAnOutwardLinkIsRefusedLikeAPresentOne() throws IOException {
+        Files.createDirectories(outside.resolve("present/deeper"));
+        link(shared.resolve("out"), outside);
+        link(shared.resolve("gone"), temp.resolve("nowhere"));
+        link(shared.resolve("inside"), shared.resolve("docs"));
+        var share = new ShareRoot(shared, false);
+        for (String path : new String[]{"out/present/b/x", "out/missing/b/x", "out/present/deeper/c/x", "out/missing/b", "gone/b/x"}) {
+            assertThatThrownBy(() -> share.resolve(path)).as(path).isInstanceOf(PathRefusedException.class);
+            assertThatThrownBy(() -> share.locate(path)).as("locate " + path).isInstanceOf(PathRefusedException.class);
+        }
+        for (String path : new String[]{"docs/missing/x", "missing/b/x", "inside/missing/x"})
+            assertThatThrownBy(() -> share.resolve(path)).as("a missing folder inside: " + path)
+                .isInstanceOf(NoSuchFileException.class).hasMessage(path.substring(0, path.lastIndexOf('/')) + "/x");
+    }
+
     @Test void aReadOnlyShareRefusesEveryWrite() throws IOException {
         var share = new ShareRoot(shared, true);
         assertThatThrownBy(() -> share.openWrite("new.txt", false)).isInstanceOf(ReadOnlyShareException.class);

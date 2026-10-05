@@ -22,6 +22,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.KeyPair;
 import java.time.Clock;
@@ -254,6 +255,34 @@ class SftpEngineTest {
             .satisfies(refused -> assertThat(refused.getMessage()).doesNotContain(temp.toString()).doesNotContain(temp.toRealPath().toString()));
         assertThatThrownBy(() -> sftp.stat("/out/secret.txt")).isInstanceOf(SftpException.class)
             .satisfies(refused -> assertThat(refused.getMessage()).doesNotContain(temp.toString()).doesNotContain(temp.toRealPath().toString()));
+    }
+
+    @Test void deepPathsBehindAnOutwardLinkAllFailAlike() throws Exception {
+        Files.createDirectories(outside.resolve("present/deeper"));
+        link(shared.resolve("out"), outside);
+        var sftp = start(true);
+        for (String path : new String[]{"/out/present/b/x", "/out/missing/b/x", "/out/present/deeper/c/x", "/out/missing/b"}) {
+            assertThat(refusal(() -> sftp.stat(path))).as("stat " + path).isEqualTo(SftpConstants.SSH_FX_PERMISSION_DENIED);
+            assertThat(refusal(() -> sftp.mkdir(path))).as("mkdir " + path).isEqualTo(SftpConstants.SSH_FX_PERMISSION_DENIED);
+        }
+        assertThat(refusal(() -> sftp.stat("/docs/missing/x"))).as("inside, missing is missing").isEqualTo(SftpConstants.SSH_FX_NO_SUCH_FILE);
+    }
+
+    @Test void ownersAndGroupsAreRefusedWithoutLookingTheNameUp() throws Exception {
+        if (!Files.getFileStore(shared).supportsFileAttributeView("posix")) abort("no POSIX owners here");
+        var attributes = Files.readAttributes(shared.resolve("docs/a.txt"), PosixFileAttributes.class);
+        String owner = attributes.owner().getName(), group = attributes.group().getName();
+        for (boolean writable : new boolean[]{false, true}) {
+            if (engine != null) engine.stop();
+            var sftp = start(writable);
+            assertThat(sftp.getVersion()).isEqualTo(SftpConstants.SFTP_V6);
+            // The client sends an owner only together with a group (SSH_FILEXFER_ATTR_OWNERGROUP).
+            String unknown = "no-such-principal-zz";
+            for (String[] pair : new String[][]{{owner, group}, {unknown, group}, {owner, unknown}, {unknown, unknown}}) {
+                assertThat(refusal(() -> sftp.setStat("/docs/a.txt", new SftpClient.Attributes().owner(pair[0]).group(pair[1]))))
+                    .as("owner %s, group %s, writable %s", pair[0], pair[1], writable).isEqualTo(SftpConstants.SSH_FX_PERMISSION_DENIED);
+            }
+        }
     }
 
     @Test void anUploadAppearsWhenItsHandleClosesAndNotBefore() throws Exception {

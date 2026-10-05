@@ -104,8 +104,28 @@ public final class ShareRoot {
         }
         Path parent;
         try { parent = candidate.getParent().toRealPath(); }
-        catch (NoSuchFileException missing) { throw new NoSuchFileException(clientPath); }
+        catch (IOException failure) {
+            refuseIfOutside(candidate.getParent());
+            if (failure instanceof NoSuchFileException) throw new NoSuchFileException(clientPath);
+            throw failure;
+        }
         return child(inside(parent), segments.getLast());
+    }
+
+    /**
+     * For a folder that cannot be resolved: refuses it when the deepest part of it that exists is a link leading
+     * outside the share, or a link that points nowhere. Otherwise a missing folder behind an outward link would
+     * answer "no such file" where a present one is refused, and a client could map the disk outside.
+     */
+    private void refuseIfOutside(Path folder) throws PathRefusedException {
+        for (Path prefix = folder; prefix != null && prefix.startsWith(root) && !prefix.equals(root); prefix = prefix.getParent()) {
+            if (!Files.exists(prefix, LinkOption.NOFOLLOW_LINKS)) continue;
+            Path real;
+            try { real = prefix.toRealPath(); }
+            catch (IOException dangling) { throw new PathRefusedException("The link points nowhere"); }
+            inside(real);
+            return;
+        }
     }
 
     /**
