@@ -4,6 +4,7 @@ import dev.jasper.ui.themeimport.ThemeSources;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.ui.theme.ThemeDocument;
 import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.theme.ThemeGenerator;
 import dev.jasper.ui.themeio.ThemeToml;
 import dev.jasper.ui.themeio.ThemeTomlWriter;
 import java.io.IOException;
@@ -130,7 +131,7 @@ public final class ThemeFiles {
             byte[] bytes = text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             if (bytes.length > ThemeCatalog.MAX_THEME_FILE) throw new IOException("Theme exceeds native file limit");
             var parsed = ThemeToml.parse(text, document.origin());
-            ThemeResolver.resolve(parsed);
+            ThemeGenerator.generate(ThemeResolver.resolve(parsed));
             return bytes;
         } catch (RuntimeException invalid) { throw new IOException("Invalid native theme: " + invalid.getMessage(), invalid); }
     }

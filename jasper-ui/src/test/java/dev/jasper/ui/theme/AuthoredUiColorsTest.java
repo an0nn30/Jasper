@@ -28,6 +28,21 @@ class AuthoredUiColorsTest {
                 platform);
     }
 
+    @Test void derivedTemplateReferenceUsesOneAuthoredValueForTokensAndSemantics() {
+        String source = ThemeGeneratorTest.SEEDS + "\n[ui]\n'Panel.background'='lighten($Button.startBackground,10%)'\n";
+        var theme = ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(source, "derived.toml")));
+        assertThat(theme.tokens().get(Token.SURFACE)).isEqualTo(new Color(0x484a64));
+        assertThat(theme.semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(theme.tokens().get(Token.SURFACE));
+        var explicit = ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(
+            source + "[tokens]\nsurface='#123456'\n", "explicit.toml")));
+        assertThat(explicit.tokens().get(Token.SURFACE)).isEqualTo(new Color(0x123456));
+        assertThat(explicit.semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0x123456));
+        var semantic = ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(
+            source + "[tokens]\nsurface='#123456'\n[semantic]\n'surface.panel'='#abcdef'\n", "semantic.toml")));
+        assertThat(semantic.tokens().get(Token.SURFACE)).isEqualTo(new Color(0x123456));
+        assertThat(semantic.semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0xabcdef));
+    }
+
     @Test void legacyUnresolvedBareNameFallsBackButRequiredReferencesStayStrict() {
         var fallback = generate("", RuntimePlatform.MAC).tokens().get(Token.SURFACE);
         assertThat(generate("\"Panel.background\"=\"panel\"", RuntimePlatform.MAC).tokens().get(Token.SURFACE)).isEqualTo(fallback);

@@ -15,6 +15,54 @@ import static org.assertj.core.api.Assertions.*;
 
 class ThemeImporterTest {
     @TempDir Path home;
+    @Test void planningRejectsUnresolvedColorsWithSourceDiagnostics() throws Exception {
+        var importer = new ThemeImporter(home);
+        for (var ui : ThemeFilesTest.invalidUi()) {
+            Path source = home.resolve("invalid.toml");
+            Files.writeString(source, ThemeTomlWriter.write(ThemeFilesTest.withUi("Invalid", ui)));
+            byte[] original = Files.readAllBytes(source);
+            var plan = importer.plan(source);
+            assertThat(plan.items()).isEmpty();
+            assertThat(plan.failures()).singleElement().satisfies(failure -> {
+                assertThat(failure.sourceEntry()).contains("invalid.toml");
+                assertThat(failure.message()).contains("cannot resolve [ui] color Panel.background");
+            });
+            assertThat(Files.readAllBytes(source)).isEqualTo(original);
+        }
+    }
+
+    @Test void invalidReplacementPreservesOriginalBytesCatalogAndSelectedTheme() throws Exception {
+        var files = new ThemeFiles(home);
+        Path target = files.create(named("Example"));
+        byte[] original = Files.readAllBytes(target);
+        var catalog = dev.jasper.app.appearance.ThemeCatalog.beside(home.resolve("config.toml"));
+        var selected = catalog.scan().find("Example").orElseThrow();
+        var controller = new dev.jasper.app.appearance.ThemeController[1];
+        javax.swing.SwingUtilities.invokeAndWait(() -> controller[0] = new dev.jasper.app.appearance.ThemeController(selected));
+        try {
+            var importer = new ThemeImporter(home);
+            var valid = importer.plan(source("Example")).items().getFirst();
+            for (var ui : ThemeFilesTest.invalidUi()) {
+                // Public frozen plans can be supplied directly: commit must independently validate them.
+                var invalid = new ThemeImporter.Item(valid.id(),
+                    new ConversionResult(ThemeFilesTest.withUi("Example", ui), List.of(), "invalid.toml"),
+                    valid.target(), valid.expectedSha256(), valid.shadowsBundled());
+                var report = importer.commit(new ThemeImporter.ImportPlan(List.of(invalid), List.of()),
+                    Map.of(valid.id(), ThemeImporter.ConflictChoice.REPLACE));
+                assertThat(report.imported()).isEmpty();
+                assertThat(report.failures()).singleElement().satisfies(failure ->
+                    assertThat(failure.message()).contains("cannot resolve [ui] color Panel.background"));
+                assertThat(Files.readAllBytes(target)).isEqualTo(original);
+                assertThat(catalog.scan().find("Example")).containsSame(selected);
+                assertThat(catalog.latest().problems()).isEmpty();
+                javax.swing.SwingUtilities.invokeAndWait(() -> {
+                    assertThat(controller[0].choice()).isSameAs(selected);
+                    assertThat(controller[0].current().chrome().name()).isEqualTo("Example");
+                });
+            }
+        } finally { javax.swing.SwingUtilities.invokeAndWait(controller[0]::close); }
+    }
+
     @Test void nativeSemanticIntentAndDiscardDiagnosticsSurviveKeepBothWithoutTouchingSource() throws Exception {
         new ThemeFiles(home).create(named("Authored"));
         Path source = home.resolve("authored.toml");

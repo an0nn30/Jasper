@@ -516,3 +516,10 @@ The pinned FlatLaf 3.7 properties/UI readers and unchanged Nord source provide t
 Conversion reports discarded geometry once per key and does not diagnose these restored color slots.
 The existing color-policy golden gains only four proven color lines; original upstream and legacy
 golden bytes remain untouched.
+
+Tasks 2–3 review correction: each generation resolves authored UI expressions once against the complete
+initial fallback map. Rebuilt dependent tokens and semantic colors reuse those resolved values and authored
+focus provenance; semantic construction must not reevaluate an expression against the rebuilt defaults.
+Explicit document tokens and final semantic overrides retain their precedence. App native-file publication
+validates full generation of the serialized/resolved candidate before staging or replacement; import planning
+uses the same validator for actionable source failures, and commit independently revalidates frozen plans.

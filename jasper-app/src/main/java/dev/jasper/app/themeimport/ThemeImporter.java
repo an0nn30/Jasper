@@ -49,6 +49,7 @@ public final class ThemeImporter {
                 snapshot.problems().forEach(problem -> failures.add(new ThemeConverter.Failure(problem.file().toString(), problem.message())));
                 for (var result : conversion.results()) {
                     try {
+                        ThemeFiles.serialized(result.document());
                         String id = ThemeSources.hash((source.toAbsolutePath().normalize() + "\0" + result.sourceEntry()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                         Path target = owners.get(key(result.document().name()));
                         items.add(new Item(id, result, Optional.ofNullable(target), target == null ? Optional.empty() : Optional.of(files.fingerprint(target)),

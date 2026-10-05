@@ -18,6 +18,30 @@ class ThemeFilesTest {
         return new ThemeDocument(base.origin(), name, base.dark(), base.parent(), 0, base.uiComplete(), base.metadata(),
             base.seeds(), base.ansi(), base.tokens(), base.syntax(), base.ui(), base.icons());
     }
+    static ThemeDocument withUi(String name, java.util.Map<String, Object> ui) {
+        var base = named(name);
+        return new ThemeDocument(base.origin(), name, base.dark(), base.parent(), 0, base.uiComplete(), base.metadata(),
+            base.seeds(), base.ansi(), java.util.Map.of(), base.syntax(), ui, base.icons(), base.workspace(), base.semanticOverrides());
+    }
+    static java.util.List<java.util.Map<String, Object>> invalidUi() {
+        return java.util.List.of(java.util.Map.of("Panel.background", "@missing"),
+            java.util.Map.of("Panel.background", "@one", "@one", "@two", "@two", "@one"));
+    }
+    @Test void unresolvedColorsCannotCreateOrReplaceNativeFiles() throws IOException {
+        var files = new ThemeFiles(home);
+        Path target = files.create(named("Example"));
+        byte[] original = Files.readAllBytes(target);
+        String expected = files.fingerprint(target);
+        for (var ui : invalidUi()) {
+            assertThatThrownBy(() -> files.replace(target, expected, withUi("Example", ui)))
+                .isInstanceOf(IOException.class).hasMessageContaining("cannot resolve [ui] color Panel.background");
+            assertThatThrownBy(() -> files.create(withUi("New", ui))).isInstanceOf(IOException.class);
+            assertThat(Files.readAllBytes(target)).isEqualTo(original);
+            try (var entries = Files.list(target.getParent())) {
+                assertThat(entries.map(path -> path.getFileName().toString())).containsExactly("example.toml");
+            }
+        }
+    }
     @Test void refusesStaleReplacement() throws IOException {
         var files = new ThemeFiles(home);
         Path target = files.create(named("Example")); String expected = files.fingerprint(target);

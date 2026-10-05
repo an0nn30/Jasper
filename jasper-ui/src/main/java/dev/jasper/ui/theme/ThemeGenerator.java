@@ -121,12 +121,13 @@ public final class ThemeGenerator {
             for (SyntaxRole role : SyntaxRole.values()) syntax.put(role, syntax(role));
             return new GeneratedTheme(document.name(), dark, document.metadata().getOrDefault("author", "Jasper"), tokens, syntax,
                 new TerminalColors(background, foreground, cursor, selection, ansi), uiKeys(), document.icons(), document.workspace().levels(),
-                semanticPalette());
+                semanticPalette(authored));
         }
 
-        private SemanticPalette semanticPalette() {
+        private SemanticPalette semanticPalette(Map<Token, Color> authored) {
+            // Tokens already include these authored values and their rebuilt dependents. Reusing
+            // their provenance avoids evaluating references against a second, different fallback map.
             var legacy = new EnumMap<Token,Color>(Token.class); legacy.putAll(tokens);
-            var authored = new AuthoredUiColors(document, platform, uiKeys()).tokens(); legacy.putAll(authored);
             var overrides = new EnumMap<SemanticColor,Color>(SemanticColor.class);
             // Focus is a dependent default only when no legacy focus color was authored.
             if (authored.containsKey(FOCUS_RING) || document.tokens().containsKey(FOCUS_RING))

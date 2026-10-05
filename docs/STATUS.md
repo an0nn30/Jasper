@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-05
 
-- **Theme engine Plan 2 Tasks 2–3 implemented, independent review pending** (2026-10-05).
+- **Theme engine Plan 2 Tasks 2–3 implemented; review round 1 fixes ready** (2026-10-05).
   App selection/catalog/import now consume the module engine directly; 27 duplicate pure types,
   WorkspaceValues, KitThemeBridge and copied production resources are removed. App filesystem
   locks/fingerprints/publication, names/config and terminal/syntax/workspace semantics remain owned
@@ -15,7 +15,11 @@
   Focused gate: module 128 tests, app 296 tests, zero failures/errors/skips; application/UI architecture
   pass. Separate 2× font/transaction scope: 8 tests, zero failures/errors/skips. Full repository gate
   remains Task 12; native acceptance remains user-run. See [contracts](superpowers/plans/2026-10-04-theme-engine-contracts.md)
-  and [removal ledger](design/theme-engine/temporary-paths.md). Tasks 2–3 are one approved integration
+  and [removal ledger](design/theme-engine/temporary-paths.md). Review round 1 fixes reuse authored
+  expression values in the semantic snapshot and validate complete generation before native-file
+  publication. Missing-reference/cycle replacement regressions preserve installed bytes and selection;
+  focused fix gate: 29 module + 61 app tests and both architecture checks pass. Independent fix review
+  remains pending. Tasks 2–3 are one approved integration
   unit; no SDK shape changed and no geometry/source golden recapture was performed.
 
 - **Theme engine Plan 2 execution started** (2026-10-05), baseline `f16ae32f`. Task 1 records
