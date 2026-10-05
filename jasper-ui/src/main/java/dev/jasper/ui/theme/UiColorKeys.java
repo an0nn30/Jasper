@@ -20,6 +20,19 @@ public final class UiColorKeys {
     /** Legacy Jasper color aliases used to avoid inventing explicit tokens during import conversion. */
     public static Map<String, Token> chromeAliases() { return UiTemplate.JASPER; }
 
+    /**
+     * Supported vendor UI keys translated straight into a dedicated canonical role. Each was read raw by a native
+     * consumer before the theme-engine migration, so an authored value wins over the legacy token for that role, as
+     * the raw key did; an explicit canonical {@code [semantic]} value still wins. Other vendor keys either reach
+     * canonical roles through their legacy token aliases (with token precedence) or have no canonical role
+     * (see the contracts appendix, Plan 2 Task 5).
+     */
+    public static Map<String, SemanticColor> semanticRoles() { return SEMANTIC_ROLES; }
+    private static final Map<String, SemanticColor> SEMANTIC_ROLES = Map.of(
+        "ToolWindow.background", SemanticColor.SURFACE_SIDEBAR,
+        "TextField.background", SemanticColor.SURFACE_INPUT,
+        "Separator.foreground", SemanticColor.BORDER_SUBTLE);
+
     /** Whether a legacy UI key describes a color or a referenced color variable. */
     public static boolean supports(String key) {
         if (key.endsWith("UI")) return false;

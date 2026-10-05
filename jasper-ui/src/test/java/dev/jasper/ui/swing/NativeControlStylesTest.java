@@ -94,7 +94,8 @@ class NativeControlStylesTest {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setColor(ColorMath.opacity(theme.semantic().color(SemanticColor.HOVER_OVERLAY), .08));
-                g.fillRoundRect(0, 0, 40, 24, 6, 6);
+                int arc = com.formdev.flatlaf.util.UIScale.scale(6);
+                g.fillRoundRect(0, 0, 40, 24, arc, arc);
             } finally { g.dispose(); }
             for (int y = 0; y < 6; y++) for (int x = 0; x < 6; x++)
                 assertThat(hovered.getRGB(x, y)).as("hover corner %d,%d", x, y).isEqualTo(reference.getRGB(x, y));

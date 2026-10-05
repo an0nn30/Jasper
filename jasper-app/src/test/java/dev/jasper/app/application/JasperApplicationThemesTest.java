@@ -38,6 +38,29 @@ class JasperApplicationThemesTest {
         }
     }
 
+    /** From a fresh look and feel (no Jasper snapshot), start-up installs its theme before any chrome reads the snapshot. */
+    @Test void aFreshProcessInstallsItsThemeBeforeAnyChromeReadsTheSnapshot() throws Exception {
+        Files.writeString(home.resolve("config.toml"), "ui.theme.name = 'Jasper Light'\n");
+        var service = new ConfigService(home.resolve("config.toml"), false);
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        try {
+            edt(() -> {
+                try { UIManager.setLookAndFeel(new javax.swing.plaf.metal.MetalLookAndFeel()); }
+                catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+                org.assertj.core.api.Assertions.assertThatIllegalStateException().isThrownBy(dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+                application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+                var light = dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+                assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(light);
+                assertThat(dev.jasper.app.platform.ThemeZone.theme(null)).isSameAs(light);
+            });
+        } finally {
+            if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
+            service.close();
+            edt(() -> new ThemeController());
+        }
+    }
+
     @Test void theApplicationStartsInTheInstalledThemeItsConfigurationNames() throws Exception {
         Files.writeString(home.resolve("config.toml"), "ui.theme.name = 'Fixture Dark'\n");
         ThemeFixtures.plugin(home.resolve("themes/fixture.jar"), "Fixture Dark", true, "#123456", "101820");

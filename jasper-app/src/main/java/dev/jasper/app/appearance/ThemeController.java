@@ -38,6 +38,22 @@ public final class ThemeController implements AutoCloseable {
     private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
 
+    /**
+     * Start-up selection: the saved theme, or Jasper Dark when the saved one cannot be installed. A failed attempt is
+     * rolled back completely, and the fallback is installed before this returns, so nothing can read the installed
+     * snapshot (ThemeZone, named icons, native chrome) before one exists. The fallback's own failure propagates.
+     */
+    public static ThemeController startup(Theme saved, java.util.function.Consumer<InstallationFailure> fallingBack) {
+        return startup(saved, ThemeManager::install, fallingBack);
+    }
+    static ThemeController startup(Theme saved, Predicate<Theme> installer, java.util.function.Consumer<InstallationFailure> fallingBack) {
+        try { return new ThemeController(saved, installer); }
+        catch (InstallationFailure failure) {
+            fallingBack.accept(failure);
+            return new ThemeController(Theme.DARK, installer);
+        }
+    }
+
     public ThemeController() { this(Theme.DARK); }
     public ThemeController(Theme saved) { this(saved, ThemeManager::install); }
     public ThemeController(Predicate<Theme> installer) { this(Theme.DARK, installer); }

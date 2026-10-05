@@ -15,14 +15,13 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.Objects;
 import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.UIManager;
 
 /**
  * The drag guides, on the layered pane's DRAG_LAYER: a translucent highlight with a 1px border where the dragged tool
  * window would land (for a second slot, always that slot's half; see {@link dev.jasper.app.dock.DockGeometry#landing}),
  * a highlighted rounded square in the stripe's gap, and the window's icon at the cursor. It takes no mouse input.
- * Colours: {@code DragAndDrop.areaBackground} and {@code DragAndDrop.borderColor} when the theme defines them,
- * otherwise {@code Component.accentColor} at 25 % for the fill and 60 % for the border. Both the highlight and the
+ * Colours: the canonical accent role at the named module alphas (25 % fill, 60 % border); vendor DragAndDrop.* keys
+ * have no canonical role and do not bypass it. Both the highlight and the
  * placeholder draw their fill inside their 1px border, so the translucent colours never stack. {@link #show} repaints
  * only the regions of the guides that changed, never the whole window under this transparent component. EDT only.
  */
@@ -35,7 +34,6 @@ final class DockDropOverlay extends JComponent {
      * stays inside its rectangle in the software pipeline.
      */
     private static final int BLEED = 1;
-    /** IntelliJ's accent, for a theme without an accent colour. */
 
     private Rectangle highlight;
     private Rectangle placeholder;
@@ -87,14 +85,8 @@ final class DockDropOverlay extends JComponent {
     /** Events pass through to whatever is underneath. */
     @Override public boolean contains(int x, int y) { return false; }
 
-    static Color fill() {
-        Color authored = dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(ThemeZone.theme(null).uiKeys()).get("DragAndDrop.areaBackground");
-        return authored == null ? withAlpha(accent(), FILL_ALPHA) : authored;
-    }
-    static Color border() {
-        Color authored = dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(ThemeZone.theme(null).uiKeys()).get("DragAndDrop.borderColor");
-        return authored == null ? withAlpha(accent(), BORDER_ALPHA) : authored;
-    }
+    static Color fill() { return withAlpha(accent(), FILL_ALPHA); }
+    static Color border() { return withAlpha(accent(), BORDER_ALPHA); }
     private static Color accent() { return ThemeZone.color(null, SemanticColor.ACCENT); }
 
     private static Color withAlpha(Color color, int alpha) { return new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha); }

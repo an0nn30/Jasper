@@ -106,6 +106,30 @@ final class AuthoredUiColors {
         return result;
     }
 
+    /**
+     * Explicit authored colors for exact supported vendor keys, resolved against the same fallback snapshot as the
+     * tokens. Wildcards do not apply; an unresolved bare vendor palette name is optional, as for token aliases.
+     */
+    Map<String, Color> explicit(Collection<String> keys) {
+        var result = new LinkedHashMap<String, Color>();
+        for (String key : keys) {
+            Object raw = document.ui().get(key);
+            if (raw == null || !UiColorKeys.supports(key, raw)) continue;
+            Object supplied = branch(raw);
+            if (supplied == null) continue;
+            if (supplied instanceof String text && text.matches("[A-Za-z][A-Za-z0-9_.-]*")
+                    && !text.equals("null") && !values.containsKey(text) && !values.containsKey("ColorPalette." + text)) continue;
+            try {
+                Color color = color(supplied, new LinkedHashSet<>(), 0);
+                if (color != null) result.put(key, color);
+            } catch (IllegalArgumentException failure) {
+                throw new IllegalArgumentException(document.origin() + ": cannot resolve [ui] color " + key
+                    + "; use a literal color or resolvable reference/systemColor fallback (" + failure.getMessage() + ")", failure);
+            }
+        }
+        return result;
+    }
+
     private Object branch(Object value) {
         if (value instanceof Map<?, ?> map)
             return branch(

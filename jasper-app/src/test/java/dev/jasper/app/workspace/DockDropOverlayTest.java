@@ -219,12 +219,18 @@ class DockDropOverlayTest {
         assertThat(overlay.contains(150, 90)).as("mouse events pass through").isFalse();
     }
 
-    @Test void theThemesOwnDragColoursWin() {
+    /**
+     * Drag guides use the canonical accent with the kit's fill/border alphas. DragAndDrop.* has no canonical role,
+     * so an authored value no longer bypasses the canonical route (recorded as an unsupported native override);
+     * an explicit canonical accent reaches the guides.
+     */
+    @Test void dragGuidesFollowTheCanonicalAccentRoute() {
         installDragTheme(new Color(0x3574f0), Map.of("DragAndDrop.areaBackground", "#0a141e28", "DragAndDrop.borderColor", "#c86432"));
-        assertThat(DockDropOverlay.fill()).isEqualTo(new Color(10, 20, 30, 40));
-        assertThat(DockDropOverlay.border()).isEqualTo(new Color(200, 100, 50, 255));
-        installDragTheme(new Color(0x3574f0), Map.of());
-        assertThat(DockDropOverlay.fill()).as("module accent supplies the missing drag color").isEqualTo(new Color(0x35, 0x74, 0xf0, 64));
+        assertThat(DockDropOverlay.fill()).isEqualTo(new Color(0x35, 0x74, 0xf0, 64));
+        assertThat(DockDropOverlay.border()).isEqualTo(new Color(0x35, 0x74, 0xf0, 153));
+        installDragTheme(new Color(0x2f80ed), Map.of());
+        assertThat(DockDropOverlay.fill()).isEqualTo(new Color(0x2f, 0x80, 0xed, 64));
+        assertThat(DockDropOverlay.border()).isEqualTo(new Color(0x2f, 0x80, 0xed, 153));
     }
 
     private void installDragTheme(Color accent, Map<String, Object> colors) {

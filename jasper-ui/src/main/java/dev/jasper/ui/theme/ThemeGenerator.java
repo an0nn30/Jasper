@@ -60,6 +60,10 @@ import static dev.jasper.ui.theme.Token.*;
  *   <li>{@code editor_current_line}: {@code mix(editor_foreground, editor_background, 0.05)}
  *   <li>{@code editor_gutter}: {@code editor_background}
  * </ul>
+ *
+ * <p>Semantic roles then follow the canonical fallback graph ({@link SemanticDefaults}) from these tokens, except that
+ * an authored supported vendor key in {@link UiColorKeys#semanticRoles()} supplies its dedicated role ahead of the
+ * token, and an explicit {@code [semantic]} value wins over both.
  */
 public final class ThemeGenerator {
     private ThemeGenerator() {}
@@ -113,7 +117,9 @@ public final class ThemeGenerator {
             for (Token token : Token.values()) token(token);
             // Resolve authored expressions against one complete fallback snapshot, then rebuild
             // dependent values from the final authored parents before deriving syntax.
-            var authored = new AuthoredUiColors(document, platform, uiKeys()).tokens();
+            var colors = new AuthoredUiColors(document, platform, uiKeys());
+            var authored = colors.tokens();
+            var vendor = colors.explicit(UiColorKeys.semanticRoles().keySet());
             tokens.clear();
             tokens.putAll(authored);
             for (Token token : Token.values()) token(token);
@@ -121,10 +127,10 @@ public final class ThemeGenerator {
             for (SyntaxRole role : SyntaxRole.values()) syntax.put(role, syntax(role));
             return new GeneratedTheme(document.name(), dark, document.metadata().getOrDefault("author", "Jasper"), tokens, syntax,
                 new TerminalColors(background, foreground, cursor, selection, ansi), uiKeys(), document.icons(), document.workspace().levels(),
-                semanticPalette(authored));
+                semanticPalette(authored, vendor));
         }
 
-        private SemanticPalette semanticPalette(Map<Token, Color> authored) {
+        private SemanticPalette semanticPalette(Map<Token, Color> authored, Map<String, Color> vendor) {
             // Tokens already include these authored values and their rebuilt dependents. Reusing
             // their provenance avoids evaluating references against a second, different fallback map.
             var legacy = new EnumMap<Token,Color>(Token.class); legacy.putAll(tokens);
@@ -132,6 +138,8 @@ public final class ThemeGenerator {
             // Focus is a dependent default only when no legacy focus color was authored.
             if (authored.containsKey(FOCUS_RING) || document.tokens().containsKey(FOCUS_RING))
                 overrides.put(SemanticColor.BORDER_FOCUS, legacy.get(FOCUS_RING));
+            // Supported vendor roles beat the legacy token; explicit canonical values beat both.
+            UiColorKeys.semanticRoles().forEach((key, role) -> { if (vendor.containsKey(key)) overrides.put(role, vendor.get(key)); });
             overrides.putAll(document.semanticOverrides());
             return SemanticDefaults.resolve(overrides, legacy, new TerminalColors(background, foreground, cursor, selection, ansi));
         }

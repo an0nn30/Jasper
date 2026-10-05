@@ -36,6 +36,25 @@ class ThemeGeneratorTest {
         assertThat(generate(source+"\n[tokens]\nsurface=\"#abcdef\"\n").semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0xabcdef));
         assertThat(generate(source+"\n[semantic]\n\"surface.panel\"=\"#fedcba\"\n").semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0xfedcba));
     }
+    /**
+     * The native-consumer vendor keys with a dedicated canonical role translate into that role in one module table:
+     * an authored [ui] value beats the legacy token (as the raw key did for the native consumer), and an explicit
+     * canonical [semantic] value still wins.
+     */
+    @Test void supportedVendorRolesTranslateIntoTheirCanonicalRoleBelowExplicitCanonicalValues() {
+        String tokens = "\n[tokens]\nsidebar=\"#3c3f41\"\ninput_background=\"#45494a\"\nseparator=\"#515151\"\n";
+        String ui = "\n[ui]\n\"ToolWindow.background\" = \"#314159\"\n\"TextField.background\" = { \"os.mac\" = \"#26a69a\", \"os.default\" = \"#26a69a\" }\n"
+            + "\"Separator.foreground\" = \"$Panel.background\"\n\"Panel.background\" = \"#5a5b5c\"\n";
+        var semantic = generate(SEEDS + tokens + ui).semantic();
+        assertThat(semantic.color(SemanticColor.SURFACE_SIDEBAR)).isEqualTo(new Color(0x314159));
+        assertThat(semantic.color(SemanticColor.SURFACE_INPUT)).isEqualTo(new Color(0x26a69a));
+        assertThat(semantic.color(SemanticColor.BORDER_SUBTLE)).as("references resolve as for tokens").isEqualTo(new Color(0x5a5b5c));
+        assertThat(generate(SEEDS + tokens).semantic().color(SemanticColor.SURFACE_SIDEBAR)).isEqualTo(new Color(0x3c3f41));
+        var explicit = generate(SEEDS + tokens + ui + "\n[semantic]\n\"surface.sidebar\"=\"#010203\"\n").semantic();
+        assertThat(explicit.color(SemanticColor.SURFACE_SIDEBAR)).isEqualTo(new Color(0x010203));
+        assertThat(UiColorKeys.semanticRoles()).containsOnlyKeys("ToolWindow.background", "TextField.background", "Separator.foreground");
+    }
+
     @Test void seedsAloneMakeACompleteTheme() {
         GeneratedTheme theme = generate(SEEDS);
         assertThat(theme.name()).isEqualTo("Mocha");

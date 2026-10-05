@@ -31,9 +31,12 @@ class WorkspaceThemeTest {
                 dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()), new Theme.UserFile(java.nio.file.Path.of("optional-tool-window.toml"), document));
             var themes = new ThemeController(chrome);
             var background = new java.awt.Color(authored ? 0x314159 : 0x17232f);
+            var sidebar = authored ? background : base.tokens().get(Token.SIDEBAR);
             assertThat(generated.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR))
-                .as("raw UI overrides do not replace canonical module roles")
-                .isEqualTo(ThemeGenerator.generate(base).semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+                .as("an authored ToolWindow.background reaches the canonical sidebar role").isEqualTo(sidebar);
+            var toolWindow = new JPanel();
+            ToolWindowSurface.apply(toolWindow);
+            assertThat(toolWindow.getBackground()).as("and the tool-window consumer paints it").isEqualTo(sidebar);
             var owner = content(launcher(new ArrayDeque<>()), themes);
             // The selected folder joins this workspace; the rest of the strip is recessed.
             assertStripSurfaces(owner);

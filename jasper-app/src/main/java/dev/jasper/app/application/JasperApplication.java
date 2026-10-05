@@ -221,14 +221,10 @@ public final class JasperApplication {
         themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
         if (service != null) scanThemes(service);
         Theme saved = themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK);
-        ThemeController created;
-        try { created = new ThemeController(saved); }
-        catch (ThemeController.InstallationFailure failure) {
-            // A theme that cannot be installed never stops start-up; the configuration reports it.
-            LOG.log(System.Logger.Level.WARNING, "Starting in Jasper Dark: " + failure.getMessage(), failure);
-            created = new ThemeController(Theme.DARK);
-        }
-        themes = created;
+        // First Swing work: every later component may read the installed snapshot. A theme that cannot be installed
+        // never stops start-up; the configuration reports it.
+        themes = ThemeController.startup(saved,
+            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Jasper Dark: " + failure.getMessage(), failure));
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions);
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
