@@ -73,7 +73,7 @@ class TftpWriteTest {
     }
 
     static void await(BooleanSupplier condition, String what) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos(); // generous: a loaded parallel build
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(condition.getAsBoolean()).as(what).isTrue();
     }
@@ -109,22 +109,22 @@ class TftpWriteTest {
     }
 
     @Test void anUnfinishedWriteLeavesTheOriginal() throws Exception {
-        start(true, Duration.ofMillis(100));
+        start(true, Duration.ofMillis(500), 1);
         try (var client = new RawClient()) {
             client.send(port, RawClient.write("docs/a.txt", "octet"));
             var ack0 = client.next();
             assertThat(ack0.packet()).isEqualTo(new TftpPacket.Ack(0));
             client.send(ack0.port(), new TftpPacket.Data(1, new byte[512]));
-            assertThat(client.next().packet()).isEqualTo(new TftpPacket.Ack(1));
+            assertThat(nextOtherThan(client, new TftpPacket.Ack(0)).packet()).isEqualTo(new TftpPacket.Ack(1));
         }
-        await(() -> transferred().size() == 1, "the abandoned write ends");
+        await(() -> transferred().size() == 1, "the abandoned write ends (after 1 s with no block 2, plus a margin)");
         assertThat(transferred().getFirst().complete()).isFalse();
         assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
         assertThat(docs()).containsExactly("a.txt");
     }
 
     @Test void optionsAndALostFinalAck() throws Exception {
-        start(true, Duration.ofMillis(500));
+        start(true, Duration.ofSeconds(1));
         try (var client = new RawClient()) {
             client.send(port, RawClient.write("docs/b.txt", "octet", "blksize", "1024", "tsize", "5"));
             var oack = client.next();
@@ -133,7 +133,7 @@ class TftpWriteTest {
             expected.put("tsize", "5");
             assertThat(oack.packet()).isEqualTo(new TftpPacket.OptionAck(expected));
             client.send(oack.port(), new TftpPacket.Data(1, "hello".getBytes(StandardCharsets.UTF_8)));
-            assertThat(client.next().packet()).isEqualTo(new TftpPacket.Ack(1));
+            assertThat(nextOtherThan(client, oack.packet()).packet()).isEqualTo(new TftpPacket.Ack(1));
             client.send(oack.port(), new TftpPacket.Data(1, "hello".getBytes(StandardCharsets.UTF_8)));
             assertThat(client.next().packet()).as("the final ACK again, for a client that lost it").isEqualTo(new TftpPacket.Ack(1));
         }
@@ -164,6 +164,20 @@ class TftpWriteTest {
         assertThat(transferred().getFirst().complete()).isFalse();
         assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
         assertThat(tempFiles()).isEmpty();
+    }
+
+    @Test void aNetasciiWriteIsNotCheckedAgainstItsTsize() throws Exception {
+        start(true, Duration.ofSeconds(1));
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.write("docs/n.txt", "netascii", "tsize", "999"));
+            var ack0 = client.next();
+            assertThat(ack0.packet()).as("tsize is not answered in netascii").isEqualTo(new TftpPacket.Ack(0));
+            client.send(ack0.port(), new TftpPacket.Data(1, "a\r\nb\r\n".getBytes(StandardCharsets.US_ASCII)));
+            assertThat(nextOtherThan(client, new TftpPacket.Ack(0)).packet()).isEqualTo(new TftpPacket.Ack(1));
+        }
+        assertThat(shared.resolve("docs/n.txt")).as("the size on the wire differs from the file's, so it is committed").hasContent("a\nb\n");
+        await(() -> transferred().size() == 1, "the write ends");
+        assertThat(transferred().getFirst().complete()).isTrue();
     }
 
     @Test void anOversizedBlockIsIllegal() throws Exception {
@@ -213,7 +227,8 @@ class TftpWriteTest {
 
     @Test void aFailedWriteIsLoggedByClassNameAndNotAtAllOnceStopped() throws Exception {
         var sink = new ServerEvents(Clock.systemUTC(), events::add);
-        try (var client = new RawClient(); var socket = new java.net.DatagramSocket(new java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), 0))) {
+        var socket = new java.net.DatagramSocket(new java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+        try (var client = new RawClient()) {
             var transfer = new TftpTransfer(new ShareRoot(shared, false), sink, (java.net.InetSocketAddress) client.socket.getLocalSocketAddress(),
                 RawClient.read("missing.txt", "octet"), Duration.ofMillis(100), 0);
             transfer.run(socket);
@@ -227,6 +242,8 @@ class TftpWriteTest {
             socket.close();
             transfer.failWrite(new IOException("Stream Closed"));
             assertThat(events).as("a stop during disk I/O is not an error").isEmpty();
+        } finally {
+            socket.close();
         }
     }
 

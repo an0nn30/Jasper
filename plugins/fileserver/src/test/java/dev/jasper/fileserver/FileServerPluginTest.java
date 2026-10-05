@@ -113,7 +113,7 @@ class FileServerPluginTest {
     @Test void servesTheFocusedFolderOverTftp() throws Exception {
         Path project = Files.createDirectories(home.resolve("project"));
         try (var host = new FakePluginHost(root)) {
-            var plugin = plugin(port -> port != 6969);
+            var plugin = plugin(port -> port != 6969 && FileServerPlugin.portFree(port));
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
             assertThat(host.actions()).contains("dev.jasper.fileserver.serve-tftp|Serve Current Folder over TFTP|true");
@@ -127,7 +127,7 @@ class FileServerPluginTest {
             assertThat(served.temporary()).isTrue();
             assertThat(served.definition().name()).isEqualTo("project (TFTP)");
             assertThat(served.definition().protocol()).isEqualTo(Protocol.TFTP);
-            assertThat(served.definition().port()).as("6969 was taken").isEqualTo(6970);
+            assertThat(served.definition().port()).as("6969 was taken; the next free port above it").isGreaterThanOrEqualTo(6970);
             assertThat(served.definition().writable()).isFalse();
             assertThat(served.definition().login()).isEqualTo(Login.ANONYMOUS);
             plugin.registry().stopAll();

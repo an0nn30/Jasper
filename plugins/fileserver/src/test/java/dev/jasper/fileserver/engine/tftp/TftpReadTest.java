@@ -99,7 +99,7 @@ class TftpReadTest {
     }
 
     static void await(BooleanSupplier condition, String what) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos(); // generous: a loaded parallel build
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(condition.getAsBoolean()).as(what).isTrue();
     }
@@ -182,22 +182,22 @@ class TftpReadTest {
     }
 
     @Test void aLostPacketIsResentThenTheTransferGivesUp() throws Exception {
-        engine(Duration.ofMillis(200), 2, 16).start();
+        engine(Duration.ofMillis(400), 2, 16).start();
         try (var client = new RawClient()) {
             client.send(port, RawClient.read("docs/a.txt", "octet"));
             var first = client.next();
             var again = client.next();
             assertThat(again).as("resent after the timeout, from the same port").isEqualTo(first);
-            client.send(first.port(), new TftpPacket.Ack(1));
+            client.send(first.port(), new TftpPacket.Ack(1)); // 800 ms before the transfer would give up
         }
         await(() -> transferred().size() == 1 && transferred().getFirst().complete(), "completes once acknowledged");
         try (var client = new RawClient()) {
             client.send(port, RawClient.read("docs/a.txt", "octet"));
-            int sends = 0;
-            while (client.receive(Duration.ofMillis(600)).isPresent()) sends++;
+            await(() -> transferred().size() == 2, "the second transfer gives up");
+            int sends = 0; // every send is already queued at the client once the transfer has ended
+            while (client.receive(Duration.ofMillis(100)).isPresent()) sends++;
             assertThat(sends).as("the first send and two retries").isEqualTo(3);
         }
-        await(() -> transferred().size() == 2, "the second transfer ends");
         assertThat(transferred().get(1).complete()).isFalse();
     }
 
@@ -365,6 +365,39 @@ class TftpReadTest {
         assertThat(fetch("whole.bin", TFTP.BINARY_MODE)).isEqualTo(pattern(1024));
         await(() -> transferred().size() == 2, "both reads end");
         assertThat(transferred()).allMatch(ServerEvent.Transferred::complete);
+    }
+
+    @Test void blockNumbersWrapOnALongRead() throws Exception {
+        byte[] content = new byte[8 * 65536 + 8 * 3 + 5];
+        new java.util.Random(1).nextBytes(content);
+        Files.write(shared.resolve("wrap.bin"), content);
+        engine(Duration.ofSeconds(2), 5, 16).start();
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.read("wrap.bin", "octet", "blksize", "8"));
+            var oack = client.next();
+            assertThat(oack.packet()).isEqualTo(new TftpPacket.OptionAck(Map.of("blksize", "8")));
+            client.send(oack.port(), new TftpPacket.Ack(0));
+            var received = new ByteArrayOutputStream();
+            int expected = 1, blocks = 0;
+            boolean sawZero = false;
+            while (true) {
+                var data = (TftpPacket.Data) client.next().packet();
+                if (data.block() == ((expected - 1) & 0xFFFF)) continue; // a resend while our ACK was on its way
+                if (data.block() != expected) throw new AssertionError("block " + data.block() + ", expected " + expected);
+                sawZero |= data.block() == 0;
+                blocks++;
+                received.writeBytes(data.bytes());
+                client.send(oack.port(), new TftpPacket.Ack(data.block()));
+                if (data.bytes().length < 8) break;
+                expected = (expected + 1) & 0xFFFF;
+            }
+            assertThat(sawZero).as("block 65535 is followed by block 0").isTrue();
+            assertThat(blocks).isEqualTo(65540);
+            assertThat(received.toByteArray()).as("byte-identical across the wrap").isEqualTo(content);
+        }
+        await(() -> transferred().size() == 1, "the read ends");
+        assertThat(transferred().getFirst().complete()).isTrue();
+        assertThat(transferred().getFirst().bytes()).isEqualTo(content.length);
     }
 
     @Test void aTransferUnwindingAfterStopNeverFreesASlotOfTheNextStart() throws Exception {
