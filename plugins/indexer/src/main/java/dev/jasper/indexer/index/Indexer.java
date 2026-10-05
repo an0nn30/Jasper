@@ -82,6 +82,9 @@ public final class Indexer implements AutoCloseable {
     private final Map<ProjectKey, Instant> attempted = new HashMap<>();
     private final Set<ProjectKey> warnedTruncated = new HashSet<>();
     private CompletableFuture<Void> saves = CompletableFuture.completedFuture(null);
+    private final Set<ProjectKey> removedWhileLoading = new HashSet<>();
+    private boolean loading;
+    private boolean saveWanted;
     private boolean closed;
 
     /**
@@ -110,21 +113,28 @@ public final class Indexer implements AutoCloseable {
      */
     public CompletableFuture<Void> load() {
         var done = new CompletableFuture<Void>();
+        loading = true;
         io.execute(() -> {
-            List<Project> saved;
-            try { saved = store.loadProjects(); }
-            catch (IOException unreadable) {
-                log.log(System.Logger.Level.WARNING, "Project Index could not read its project list", unreadable);
-                saved = List.of();
-            }
             var loaded = new ArrayList<Loaded>();
-            for (Project project : saved) loaded.add(new Loaded(project, store.loadIndex(project.key())));
+            try {
+                for (Project project : store.loadProjects()) loaded.add(new Loaded(project, store.loadIndex(project.key())));
+            } catch (IOException | RuntimeException unreadable) {
+                log.log(System.Logger.Level.WARNING, "Project Index could not read its project list", unreadable);
+            }
             ui.execute(() -> {
-                if (!closed) for (Loaded entry : loaded) {
-                    projects.loaded(entry.project(), entry.index());
-                    entry.index().ifPresent(index -> attempted.put(index.key(), index.indexedAt()));
+                try {
+                    if (!closed) for (Loaded entry : loaded) {
+                        if (removedWhileLoading.contains(entry.project().key())) continue;
+                        projects.loaded(entry.project(), entry.index());
+                        entry.index().ifPresent(index -> attempted.putIfAbsent(index.key(), index.indexedAt()));
+                    }
+                } finally {
+                    loading = false;
+                    removedWhileLoading.clear();
+                    if (saveWanted && !closed) persist();
+                    saveWanted = false;
+                    done.complete(null);
                 }
-                done.complete(null);
             });
         });
         return done;
@@ -143,6 +153,7 @@ public final class Indexer implements AutoCloseable {
         queued.remove(key);
         attempted.remove(key);
         warnedTruncated.remove(key);
+        if (loading) removedWhileLoading.add(key);
         projects.remove(key);
         persist();
         io.execute(() -> deleteQuietly(key));
@@ -206,7 +217,10 @@ public final class Indexer implements AutoCloseable {
         showProgress();
         String lane = job.key().host().map(UUID::toString).orElse(LOCAL_LANE);
         CompletableFuture<Void> previous = lanes.getOrDefault(lane, CompletableFuture.completedFuture(null));
-        lanes.put(lane, previous.thenCompose(ignored -> run(job)));
+        lanes.put(lane, previous.thenCompose(ignored -> run(job)).exceptionally(failure -> {
+            log.log(System.Logger.Level.WARNING, "Project Index lost track of a job for " + job.key().id(), failure);
+            return null;
+        }));
     }
 
     private CompletableFuture<Void> run(Job job) {
@@ -214,8 +228,10 @@ public final class Indexer implements AutoCloseable {
         CompletionStage<Listing> listing;
         if (job.cancelled()) listing = CompletableFuture.failedFuture(new CancellationException());
         else {
-            try { listing = lister.apply(job); }
-            catch (RuntimeException failure) { listing = CompletableFuture.failedFuture(failure); }
+            try {
+                listing = lister.apply(job);
+                if (listing == null) listing = CompletableFuture.failedFuture(new NullPointerException("The lister returned no listing"));
+            } catch (Throwable failure) { listing = CompletableFuture.failedFuture(failure); }
         }
         listing.toCompletableFuture()
             .thenApplyAsync(found -> save(job.key(), found), io)
@@ -236,12 +252,15 @@ public final class Indexer implements AutoCloseable {
     private void finish(Job job, ProjectIndex index, Throwable failure) {
         running.remove(job.key());
         if (closed) return;
-        Optional<Project> project = projects.get(job.key()).map(Projects.Entry::project);
-        if (project.isEmpty()) io.execute(() -> deleteQuietly(job.key()));
-        else report(job, project.get().name(), index, unwrap(failure));
-        Job next = queued.remove(job.key());
-        if (next != null) start(next);
-        showProgress();
+        try {
+            Optional<Project> project = projects.get(job.key()).map(Projects.Entry::project);
+            if (project.isEmpty()) io.execute(() -> deleteQuietly(job.key()));
+            else report(job, project.get().name(), index, unwrap(failure));
+        } finally {
+            Job next = queued.remove(job.key());
+            if (next != null) start(next);
+            showProgress();
+        }
     }
 
     private void report(Job job, String name, ProjectIndex index, Throwable cause) {
@@ -272,12 +291,21 @@ public final class Indexer implements AutoCloseable {
         progress.accept(text);
     }
 
+    /** Saves the list, or, while the saved list is still being read, once it has been merged in so it is not overwritten. */
     private void persist() {
+        if (loading) { saveWanted = true; return; }
         List<Project> snapshot = projects.entries().stream().map(Projects.Entry::project).toList();
-        saves = saves.thenRunAsync(() -> {
-            try { store.saveProjects(snapshot); }
-            catch (IOException failed) { log.log(System.Logger.Level.WARNING, "Project Index could not save its project list", failed); }
-        }, io);
+        try {
+            saves = saves.thenRunAsync(() -> {
+                try { store.saveProjects(snapshot); }
+                catch (IOException | RuntimeException failed) { log.log(System.Logger.Level.WARNING, "Project Index could not save its project list", failed); }
+            }, io).exceptionally(failed -> {
+                log.log(System.Logger.Level.WARNING, "Project Index could not save its project list", failed);
+                return null;
+            });
+        } catch (RuntimeException rejected) {
+            log.log(System.Logger.Level.WARNING, "Project Index could not save its project list", rejected);
+        }
     }
 
     private void deleteQuietly(ProjectKey key) {

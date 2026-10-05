@@ -15,7 +15,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,10 +46,14 @@ class IndexerTest {
     }
 
     Indexer indexer() {
-        return new Indexer(projects, store, job -> {
+        return indexer(job -> {
             calls.add(job);
             return pending.computeIfAbsent(job.key(), key -> new CompletableFuture<>());
-        }, io, ui, now::get, progress::add, notifications.group("dev.jasper.indexer.results"),
+        });
+    }
+
+    Indexer indexer(Function<Indexer.Job, CompletionStage<Listing>> lister) {
+        return new Indexer(projects, store, lister, io, ui, now::get, progress::add, notifications.group("dev.jasper.indexer.results"),
             notifications.group("dev.jasper.indexer"), System.getLogger("test"));
     }
 
@@ -196,6 +202,76 @@ class IndexerTest {
         assertThat(projects.entries()).isEmpty();
         assertThat(store.loadIndex(APP)).isEmpty();
         assertThat(projectsFile()).doesNotContain("[[project]]");
+    }
+
+    @Test void aListerThatThrowsAnErrorFailsItsJobAndNotTheLane() {
+        indexer = indexer(job -> {
+            if (job.key().equals(APP)) throw new NoClassDefFoundError("missing");
+            calls.add(job);
+            return pending.computeIfAbsent(job.key(), key -> new CompletableFuture<>());
+        });
+        indexer.add(new Project(APP, "app", false));
+        indexer.add(new Project(LIB, "lib", false));
+        indexer.request(APP, false, Optional.empty());
+        indexer.request(LIB, false, Optional.empty());
+        settle();
+        assertThat(projects.get(APP).orElseThrow().state()).isEqualTo(Projects.State.NEEDS_REINDEX);
+        assertThat(indexer.running(APP)).isFalse();
+        assertThat(notifications.posts()).singleElement().satisfies(post -> assertThat(post.spec().title()).isEqualTo("Couldn't index app"));
+        assertThat(calls).extracting(Indexer.Job::key).containsExactly(LIB);
+        finish(LIB, new Listing(List.of("a"), Strategy.WALK, false));
+        assertThat(projects.get(LIB).orElseThrow().state()).isEqualTo(Projects.State.FRESH);
+    }
+
+    @Test void aListerThatReturnsNothingFailsItsJobAndNotTheLane() {
+        indexer = indexer(job -> job.key().equals(APP) ? null : pending.computeIfAbsent(job.key(), key -> new CompletableFuture<>()));
+        indexer.add(new Project(APP, "app", false));
+        indexer.add(new Project(LIB, "lib", false));
+        indexer.request(APP, false, Optional.empty());
+        indexer.request(LIB, false, Optional.empty());
+        settle();
+        assertThat(projects.get(APP).orElseThrow().state()).isEqualTo(Projects.State.NEEDS_REINDEX);
+        assertThat(notifications.posts()).singleElement().satisfies(post -> assertThat(post.spec().content()).isEqualTo("The lister returned no listing"));
+        finish(LIB, new Listing(List.of("a"), Strategy.WALK, false));
+        assertThat(projects.get(LIB).orElseThrow().state()).isEqualTo(Projects.State.FRESH);
+    }
+
+    @Test void aProjectAddedWhileTheListLoadsDoesNotOverwriteTheSavedList() throws IOException {
+        store.saveProjects(List.of(new Project(APP, "app", false)));
+        indexer.load();
+        indexer.add(new Project(LIB, "lib", false));
+        settle();
+        assertThat(projects.entries()).extracting(entry -> entry.project().key()).containsExactlyInAnyOrder(APP, LIB);
+        assertThat(projectsFile()).contains("key = \"local:" + APP.root() + "\"").contains("key = \"local:" + LIB.root() + "\"");
+    }
+
+    @Test void aProjectRemovedWhileTheListLoadsStaysGone() throws IOException {
+        store.saveProjects(List.of(new Project(APP, "app", false), new Project(LIB, "lib", false)));
+        indexer.load();
+        indexer.add(new Project(LIB, "lib", false));
+        indexer.remove(LIB);
+        settle();
+        assertThat(projects.entries()).extracting(entry -> entry.project().key()).containsExactly(APP);
+        assertThat(projectsFile()).contains("local:" + APP.root()).doesNotContain("local:" + LIB.root());
+    }
+
+    @Test void anUnreadableProjectListStillCompletesTheLoad() throws IOException {
+        java.nio.file.Files.writeString(data.resolve("projects.toml"), "[[project]]\nkey = 5\n");
+        var done = indexer.load();
+        settle();
+        assertThat(done).isCompleted();
+        assertThat(projects.entries()).isEmpty();
+    }
+
+    @Test void aFailingReportStillStartsTheFollowUpAndClearsProgress() {
+        indexer.add(new Project(APP, "app", false));
+        projects.onChanged(() -> { if (projects.get(APP).map(entry -> entry.state() == Projects.State.FRESH).orElse(false)) throw new IllegalStateException("listener"); });
+        indexer.request(APP, true, Optional.empty());
+        indexer.request(APP, false, Optional.empty());
+        pending.remove(APP).complete(new Listing(List.of("a"), Strategy.WALK, false));
+        assertThatThrownBy(this::settle).isInstanceOf(IllegalStateException.class);
+        settle();
+        assertThat(calls).as("the follow-up still started").hasSize(2);
     }
 
     String projectsFile() {

@@ -95,11 +95,15 @@ public final class Projects {
     }
 
     /**
-     * @param project a saved project
+     * @param project a saved project; an entry registered meanwhile keeps its registration and takes the snapshot only when it has none
      * @param index its saved snapshot
      */
     public void loaded(Project project, Optional<ProjectIndex> index) {
-        entries.put(project.key(), new Entry(project, index, index.isPresent() ? Outcome.OK : Outcome.NONE, false));
+        Entry known = entries.get(project.key());
+        if (known == null) entries.put(project.key(), new Entry(project, index, index.isPresent() ? Outcome.OK : Outcome.NONE, false));
+        else if (known.index().isEmpty() && index.isPresent() && known.outcome() == Outcome.NONE) {
+            entries.put(project.key(), new Entry(known.project(), index, Outcome.OK, known.indexing()));
+        } else return;
         changed();
     }
 
