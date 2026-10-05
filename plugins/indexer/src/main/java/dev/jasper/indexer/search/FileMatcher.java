@@ -143,15 +143,23 @@ public final class FileMatcher {
      * starts a later hump (a capital after a lower-case letter or digit, or a letter or digit after {@code _ - .} or a
      * space). The first character must start a hump.
      */
-    static boolean initials(String lowerQuery, String name) { return humps(lowerQuery, 0, name, -1); }
+    static boolean initials(String lowerQuery, String name) {
+        return humps(lowerQuery, 0, name, -1, new boolean[lowerQuery.length()][name.length() + 1]);
+    }
 
-    private static boolean humps(String query, int next, String name, int last) {
+    /**
+     * Whether the query from {@code next} on matches after the name's character {@code last}. {@code failed[next][last + 1]}
+     * remembers states that cannot finish, so each is tried once and the search stays polynomial.
+     */
+    private static boolean humps(String query, int next, String name, int last, boolean[][] failed) {
         if (next == query.length()) return true;
+        if (failed[next][last + 1]) return false;
         char want = query.charAt(next);
         if (last >= 0 && last + 1 < name.length() && Character.toLowerCase(name.charAt(last + 1)) == want
-            && humps(query, next + 1, name, last + 1)) return true;
+            && humps(query, next + 1, name, last + 1, failed)) return true;
         for (int at = last + 1; at < name.length(); at++)
-            if (humpStart(name, at) && Character.toLowerCase(name.charAt(at)) == want && humps(query, next + 1, name, at)) return true;
+            if (humpStart(name, at) && Character.toLowerCase(name.charAt(at)) == want && humps(query, next + 1, name, at, failed)) return true;
+        failed[next][last + 1] = true;
         return false;
     }
 

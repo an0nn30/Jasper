@@ -43,6 +43,16 @@ class FileMatcherTest {
         assertThat(FileMatcher.initials("ilscope", "FilesScope.java")).as("must start at a hump").isFalse();
     }
 
+    @Test void initialsStayFastOnNamesWithManyHumps() {
+        String name = "a_".repeat(40) + "xb";
+        long start = System.nanoTime();
+        boolean matched = FileMatcher.initials("aaaaaaaaaab", name);
+        long took = Duration.ofNanos(System.nanoTime() - start).toMillis();
+        assertThat(matched).isFalse();
+        assertThat(took).as("milliseconds for one name").isLessThan(200);
+        assertThat(FileMatcher.initials("aaaaaaaaaax", name)).isTrue();
+    }
+
     @Test void everyWordMustMatchAndSlashesMatchSegmentsInOrder() {
         var app = index(APP, "plugins/indexer/ui/FilesScope.java", "plugins/editor/ui/Files.java", "ui/plugins/Other.java");
         assertThat(paths(search("files indexer", Optional.empty(), app))).containsExactly("plugins/indexer/ui/FilesScope.java");
