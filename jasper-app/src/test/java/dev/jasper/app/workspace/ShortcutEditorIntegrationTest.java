@@ -57,7 +57,7 @@ class ShortcutEditorIntegrationTest {
                     }
                     var palette = owners[0].commandPalette();
                     palette.open(PaletteScope.COMMANDS_ID);
-                    palette.component().queryField().setText("keyboard shortcuts");
+                    dev.jasper.app.palette.PaletteTestSupport.query(palette.component()).setText("keyboard shortcuts");
                     assertThat(PaletteTestSupport.selectedRow(palette.component()).id()).isEqualTo("app.shortcuts");
                     PaletteTestSupport.executeSelected(palette.component());
                     assertThat(palette.isOpen()).isFalse();

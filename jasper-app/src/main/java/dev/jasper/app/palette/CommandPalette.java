@@ -1,115 +1,94 @@
 package dev.jasper.app.palette;
 
-import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.util.UIScale;
-import com.formdev.flatlaf.ui.FlatLineBorder;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.ListItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Cursor;
+import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
+import java.awt.FocusTraversalPolicy;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.geom.RoundRectangle2D;
+import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.event.InputMethodEvent;
-import java.awt.event.InputMethodListener;
+import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.text.AttributedCharacterIterator;
+import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.ObjIntConsumer;
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
 import javax.swing.Icon;
-import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.ListCellRenderer;
-import javax.swing.ListSelectionModel;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
+import javax.swing.border.AbstractBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.text.JTextComponent;
 
 /**
- * Jasper's palette: a query row with an optional scope chip, a one-line result list with section headers
- * or the mode list, and a hint bar with the selected row's detail and its scope's other verbs. The card is one
- * surface, {@code List.background}, throughout; the field keeps its {@code SearchEverywhere.SearchField.borderColor}
- * border and the hint bar its separator rule. Every colour comes from the installed theme ({@code SearchEverywhere.*},
- * {@code List.*}, {@code Popup.borderColor}); a key a theme lacks falls back to one FlatLaf always defines. The host owns
- * placement, focus, chips and key routing.
+ * Jasper's palette: a query row with an optional scope chip, a one-line result list with section headings (or the
+ * empty line, or a step's small form), and a hint bar with the selected row's detail and its scope's other verbs.
+ * The card is a layout-only shell (Plan 3 recomposes it) on the chrome {@link KitContext}: every control in it is a kit
+ * view, and the card paints only module roles (its surface, outline and the hint bar's rule) with named geometry. The
+ * query field keeps focus; the host moves the selection and routes the keys. EDT only.
  */
-public final class CommandPalette extends JPanel {
-    static final int WIDTH = 680;
-    private static final int CORNER_ARC = 12;
-    static final int CHIP_HEIGHT = 22;
-    static final int FIELD_HEIGHT = 44;
-    static final int ROW_HEIGHT = 24;
-    static final int HEADER_HEIGHT = 22;
-    static final int HINT_HEIGHT = 26;
-    static final int STEP_ROW_HEIGHT = 40;
+public final class CommandPalette extends JPanel implements AutoCloseable {
+    static final String QUERY = "query", CHIP = "chip", RESULTS = "results", HINT = "hint", EMPTY = "empty", STEP = "step",
+        RUN = "run", VERB = "verb:";
+    private static final String STEP_FIELD = "step.field.";
+
+    private final KitContext kit;
+    private final boolean macOs;
+    private final Consumer<String> queryChanged;
+    private final ObjIntConsumer<PaletteEntry> execute;
+    private final Function<String, Optional<ScopePrefix>> prefixes;
+    private final Consumer<PaletteScope> chipTyped;
+    private final List<KitView> views = new ArrayList<>();
+    private final KitView chipView, queryView, resultsView, emptyView, hintView, stepView;
+    private final JPanel fieldRow, hintBar, cards;
+    private final CardLayout cardLayout = new CardLayout();
+    private final AutoCloseable themeSubscription;
     private int visibleRows = dev.jasper.app.config.PaletteSettings.DEFAULT_VISIBLE_ROWS;
 
-    private final boolean macOs;
-    private final ObjIntConsumer<PaletteEntry> execute;
-    private final java.util.function.Function<String, java.util.Optional<ScopePrefix>> prefixes;
-    private final Consumer<PaletteScope> chipTyped;
-    private final ChipLabel chip = new ChipLabel();
-    private final JPanel fieldRow = new FixedHeightPanel(FIELD_HEIGHT);
-    private final JTextField query = new JTextField();
-    private final DefaultListModel<PaletteEntry> model = new DefaultListModel<>();
-    private final JList<PaletteEntry> list = new JList<>(model);
-    private final JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-        JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-    private final JLabel empty = new JLabel("", SwingConstants.CENTER);
-    private final CardLayout cardLayout = new CardLayout();
-    private final JPanel cards = new JPanel(cardLayout);
-    private final JPanel stepPanel = new JPanel();
-    private final JLabel stepTitle = new JLabel();
-    private final List<JTextField> stepFields = new ArrayList<>();
-    private final List<String> stepNames = new ArrayList<>();
-    private final List<JLabel> stepLabels = new ArrayList<>();
-    private final JLabel stepError = new JLabel();
-    private JPanel errorRow;
-    private final JPanel hintBar = new FixedHeightPanel(HINT_HEIGHT);
-    private final JLabel hint = new JLabel();
-    private final JPanel hintActions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 0, 0));
-    private final List<Integer> hintVerbs = new ArrayList<>();
-    private String listCard = "empty";
-    private long resultCount;
+    private String query = "", placeholder = "Search everything", chip, emptyText = "";
+    private List<PaletteEntry> entries = List.of();
+    private int selected = -1;
+    private long resultCount, revision;
+    private String listCard = EMPTY;
+    private String stepTitle;
+    private List<PaletteStep.Field> stepFields = List.of();
+    private final List<String> stepTexts = new ArrayList<>();
+    private String stepError;
     private int stepFocus = -1;
-    private int hover = -1;
-    private boolean composing;
-    private Color chipBackground, foreground, infoForeground, separatorColor,
-        separatorForeground, selectionBackground, selectionForeground, hoverBackground, advertiserForeground, linkColor;
-    private Font font, smallFont, monoFont;
+    private boolean closed;
 
-    CommandPalette(boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
-                   java.util.function.Function<String, java.util.Optional<ScopePrefix>> prefixes,
-                   Consumer<PaletteScope> chipTyped) {
+    CommandPalette(KitContext kit, boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
+                   Function<String, Optional<ScopePrefix>> prefixes, Consumer<PaletteScope> chipTyped) {
         super(new BorderLayout());
+        this.kit = Objects.requireNonNull(kit);
         this.macOs = macOs;
+        this.queryChanged = Objects.requireNonNull(queryChanged);
         this.execute = Objects.requireNonNull(execute);
         this.prefixes = Objects.requireNonNull(prefixes);
         this.chipTyped = Objects.requireNonNull(chipTyped);
-        Objects.requireNonNull(queryChanged);
         setOpaque(false);
         // AWT retargets a press to the nearest ancestor that has mouse listeners. Without one here, a
         // press on the chip, the hint bar's detail text or the field row's padding would bubble past
@@ -117,376 +96,318 @@ public final class CommandPalette extends JPanel {
         var swallowClicks = new MouseAdapter() { };
         addMouseListener(swallowClicks);
         addMouseMotionListener(swallowClicks);
+        // Focus cycles within the palette and always lands on the query; the host routes Tab between a step's fields.
+        setFocusCycleRoot(true);
+        setFocusTraversalPolicy(new FocusTraversalPolicy() {
+            @Override public Component getComponentAfter(Container root, Component current) { return queryInput(); }
+            @Override public Component getComponentBefore(Container root, Component current) { return queryInput(); }
+            @Override public Component getFirstComponent(Container root) { return queryInput(); }
+            @Override public Component getLastComponent(Container root) { return queryInput(); }
+            @Override public Component getDefaultComponent(Container root) { return queryInput(); }
+        });
 
-        query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search everything");
-        ((javax.swing.text.AbstractDocument) query.getDocument()).setDocumentFilter(new ChipFilter());
-        query.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent event) { changed(); }
-            @Override public void removeUpdate(DocumentEvent event) { changed(); }
-            @Override public void changedUpdate(DocumentEvent event) { changed(); }
-            private void changed() { queryChanged.accept(query.getText()); }
-        });
-        query.addInputMethodListener(new InputMethodListener() {
-            @Override public void inputMethodTextChanged(InputMethodEvent event) { composing = uncommittedCharacters(event) > 0; }
-            @Override public void caretPositionChanged(InputMethodEvent event) {}
-        });
-        fieldRow.setLayout(new BorderLayout(UIScale.scale(6), 0));
-        fieldRow.add(chip, BorderLayout.WEST);
-        fieldRow.add(query, BorderLayout.CENTER);
+        chipView = view(chipSpec());
+        chipView.setVisible(false);
+        queryView = view(querySpec());
+        fieldRow = new FixedHeightPanel(DesignMetrics.Role.PALETTE_FIELD_HEIGHT);
+        fieldRow.setLayout(new BorderLayout());
+        fieldRow.setOpaque(false);
+        fieldRow.add(chipView, BorderLayout.WEST);
+        fieldRow.add(queryView, BorderLayout.CENTER);
         add(fieldRow, BorderLayout.NORTH);
 
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setFocusable(false);
-        list.setCellRenderer(new EntryRenderer());
-        list.getAccessibleContext().setAccessibleDescription("0 results");
-        list.addListSelectionListener(event -> updateHint());
-        var mouse = new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent event) {
-                if (!SwingUtilities.isLeftMouseButton(event)) return;
-                int index = entryAt(event.getPoint());
-                if (index < 0) return;
-                list.setSelectedIndex(index);
-                execute.accept(model.get(index), 0);
-            }
-            @Override public void mouseMoved(MouseEvent event) { setHover(entryAt(event.getPoint())); }
-            @Override public void mouseExited(MouseEvent event) { setHover(-1); }
-        };
-        list.addMouseListener(mouse);
-        list.addMouseMotionListener(mouse);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        empty.putClientProperty("html.disable", Boolean.TRUE);
-        stepPanel.setLayout(new BoxLayout(stepPanel, BoxLayout.Y_AXIS));
-        for (JLabel label : List.of(stepTitle, stepError, hint)) label.putClientProperty("html.disable", Boolean.TRUE);
-        cards.add(scroll, "results");
-        cards.add(empty, "empty");
-        cards.add(stepPanel, "step");
+        resultsView = view(resultsSpec());
+        emptyView = view(emptySpec());
+        var empty = new JPanel(new GridBagLayout());
+        empty.setOpaque(false);
+        empty.add(emptyView);
+        stepView = view(stepSpec());
+        cards = new JPanel(cardLayout);
+        cards.setOpaque(false);
+        cards.add(resultsView, RESULTS);
+        cards.add(empty, EMPTY);
+        cards.add(stepView, STEP);
         cardLayout.show(cards, listCard);
         add(cards, BorderLayout.CENTER);
 
-        hintActions.setOpaque(false);
-        hintBar.setLayout(new BorderLayout());
-        hintBar.add(hint, BorderLayout.CENTER);
-        hintBar.add(hintActions, BorderLayout.EAST);
+        hintView = view(hintSpec());
+        hintBar = new HintBar();
+        hintBar.add(hintView, BorderLayout.CENTER);
         add(hintBar, BorderLayout.SOUTH);
-        setChip(null, null);
+
+        setBorder(new CardOutline());
+        themeSubscription = kit.binding().subscribe(pair -> refreshTheme());
         refreshTheme();
+        setChip(null, null);
+        updateHint();
     }
 
-    // Repaint through this component so opaque header/footer children never square off its corners.
-    @Override protected boolean isPaintingOrigin() { return true; }
-
-    @Override protected void paintChildren(Graphics graphics) {
-        var clipped = (Graphics2D) graphics.create();
-        try {
-            int inset = UIScale.scale(1);
-            int arc = UIScale.scale(CORNER_ARC - 2);
-            clipped.clip(new RoundRectangle2D.Double(inset, inset,
-                Math.max(0, getWidth() - 2 * inset), Math.max(0, getHeight() - 2 * inset), arc, arc));
-            super.paintChildren(clipped);
-        } finally { clipped.dispose(); }
+    private KitView view(ViewSpec spec) {
+        var view = new KitView(kit, spec, this::event);
+        views.add(view);
+        return view;
     }
 
-    @Override public boolean contains(int x, int y) {
-        int arc = UIScale.scale(CORNER_ARC);
-        return new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), arc, arc).contains(x, y);
+    private int metric(DesignMetrics.Role role) { return kit.metrics().value(role); }
+    private int scaled(DesignMetrics.Role role) { return UIScale.scale(metric(role)); }
+    private Color color(SemanticColor role) { return kit.theme().semantic().color(role); }
+
+    // ---- Descriptors ------------------------------------------------------------------------------------------------
+
+    private ViewSpec chipSpec() {
+        return new ViewSpec(new Nodes.Chip(CHIP, ControlState.READY, chip == null ? "All" : chip, Nodes.Hue.BLUE));
     }
 
-    public JTextField queryField() { return query; }
-    JList<PaletteEntry> entryList() { return list; }
-    JPanel hintBar() { return hintBar; }
-    JLabel stepTitle() { return stepTitle; }
+    private ViewSpec querySpec() {
+        String name = chip == null ? "All" : chip;
+        return new ViewSpec(new Nodes.Field(QUERY, ControlState.READY, Nodes.FieldKind.SEARCH, query, placeholder,
+            "Search " + name.toLowerCase(Locale.ROOT), ""));
+    }
 
-    /** Shows {@code label}'s chip, or none for null; the field and list are named after it. */
-    void setChip(String label, Icon icon) {
-        chip.setText(label);
-        chip.setIcon(icon);
-        chip.setVisible(label != null);
-        chip.getAccessibleContext().setAccessibleName(label == null ? null : "Scope: " + label);
-        String name = label == null ? "All" : label;
-        query.getAccessibleContext().setAccessibleName("Search " + name.toLowerCase(Locale.ROOT));
-        list.getAccessibleContext().setAccessibleName(name);
+    private ViewSpec resultsSpec() {
+        var items = new ArrayList<ListItem>();
+        for (int i = 0; i < entries.size(); i++) items.add(item(i, entries.get(i)));
+        Set<String> selection = selected < 0 ? Set.of() : Set.of(id(selected));
+        return new ViewSpec(new Nodes.ItemList(RESULTS, ControlState.READY, Nodes.ListKind.RESULTS, items, selection, RUN, List.of(),
+            Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(visibleRows)));
+    }
+
+    private static String id(int index) { return "entry." + index; }
+
+    private static ListItem item(int index, PaletteEntry entry) {
+        String id = id(index);
+        return switch (entry) {
+            case PaletteEntry.Header header -> new ListItem(id, Optional.empty(),
+                List.of(text(id + ".title", header.label(), Nodes.TextRole.CAPTION)), List.of(), List.of(), true);
+            case PaletteEntry.Item item -> {
+                PaletteRow row = item.row();
+                // Plugin artwork arrives as raw icons until Task 11 names it; only host glyphs have a kit name.
+                Optional<Nodes.Node> icon = Optional.ofNullable(row.icon()).flatMap(AppIcons::kitName)
+                    .map(name -> new Nodes.Icon(id + ".icon", ControlState.READY, name, Nodes.Hue.NONE, Nodes.IconSize.RAIL, row.title()));
+                Nodes.TextRole role = !row.enabled() ? Nodes.TextRole.DESCRIPTION
+                    : item.scope().monospaceRows() ? Nodes.TextRole.MONO : Nodes.TextRole.BODY;
+                yield new ListItem(id, icon, List.of(text(id + ".title", row.title(), role)),
+                    row.detail() == null ? List.of() : List.of(text(id + ".detail", row.detail(), Nodes.TextRole.DESCRIPTION)),
+                    row.tag() == null ? List.of() : List.of(text(id + ".tag", row.tag(), Nodes.TextRole.CAPTION)));
+            }
+            case PaletteEntry.More more -> new ListItem(id, Optional.empty(),
+                List.of(text(id + ".title", "More in " + more.scope().label() + "…", Nodes.TextRole.DESCRIPTION)), List.of(), List.of());
+        };
+    }
+
+    private static Nodes.Text text(String id, String value, Nodes.TextRole role) {
+        return new Nodes.Text(id, ControlState.READY, value, role);
+    }
+
+    private ViewSpec emptySpec() {
+        return new ViewSpec(text(EMPTY, emptyText, Nodes.TextRole.DESCRIPTION));
+    }
+
+    /** The selected row's detail (or tag) and its scope's second and third verbs, as links. */
+    private ViewSpec hintSpec() {
+        var children = new ArrayList<Nodes.Node>();
+        children.add(text(HINT + ".text", hintText(), Nodes.TextRole.CAPTION));
+        if (selectedEntry() instanceof PaletteEntry.Item item) {
+            List<PaletteVerb> verbs = item.scope().verbs();
+            for (int verb = 1; verb < Math.min(3, verbs.size()); verb++)
+                children.add(new Nodes.Button(VERB + verb, ControlState.READY, verbs.get(verb).label() + " " + keys(verb), "",
+                    Nodes.ButtonKind.LINK, VERB + verb, ""));
+        }
+        return new ViewSpec(new Nodes.Stack(HINT, ControlState.READY, Nodes.LayoutRole.NAVIGATION, children));
+    }
+
+    private ViewSpec stepSpec() {
+        var children = new ArrayList<Nodes.Node>();
+        children.add(text(STEP + ".title", stepTitle == null ? "" : stepTitle, Nodes.TextRole.CAPTION));
+        for (int i = 0; i < stepFields.size(); i++) {
+            PaletteStep.Field field = stepFields.get(i);
+            String label = field.label().isBlank() ? field.name() : field.label();
+            children.add(new Nodes.FormRow(STEP + ".row." + i, ControlState.READY, label, "",
+                new Nodes.Field(STEP_FIELD + i, ControlState.READY, Nodes.FieldKind.TEXT, stepTexts.get(i), "", label, ""), Optional.empty()));
+        }
+        var shown = new ControlState(stepError != null, true, false, "");
+        children.add(new Nodes.Stack(STEP + ".error", shown, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.StatusDot(STEP + ".error.status", ControlState.READY, Nodes.StatusKind.DANGER),
+            text(STEP + ".error.text", stepError == null ? "" : stepError, Nodes.TextRole.BODY))));
+        return new ViewSpec(new Nodes.Stack(STEP, ControlState.READY, Nodes.LayoutRole.VERTICAL, children));
+    }
+
+    private void render(KitView view, ViewSpec spec) { if (!view.isClosed()) view.update(spec); }
+
+    // ---- Events -----------------------------------------------------------------------------------------------------
+
+    private void event(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Edited edited when edited.id().equals(QUERY) -> edited(edited.text());
+            case UiEvent.Edited edited when edited.id().startsWith(STEP_FIELD) -> {
+                int index = Integer.parseInt(edited.id().substring(STEP_FIELD.length()));
+                if (index < stepTexts.size()) stepTexts.set(index, edited.text());
+            }
+            case UiEvent.Selected chosen when chosen.id().equals(RESULTS) ->
+                chosen.ids().stream().findFirst().ifPresent(id -> select(Integer.parseInt(id.substring("entry.".length()))));
+            case UiEvent.Action action when action.id().equals(RUN) -> executeSelected(0);
+            case UiEvent.Action action when action.id().startsWith(VERB) -> executeSelected(Integer.parseInt(action.id().substring(VERB.length())));
+            default -> { }
+        }
+    }
+
+    /**
+     * The query changed, typed or set by the host. A scope prefix typed with no chip ("history > ls") leaves the query
+     * and becomes the chip, as the field's prefix filter did; deleting text never makes a chip.
+     */
+    private void edited(String text) {
+        String previous = query;
+        Optional<ScopePrefix> prefix = text.equals(previous) || removal(previous, text) ? Optional.empty() : prefixes.apply(text);
+        query = prefix.map(ScopePrefix::rest).orElse(text);
+        render(queryView, querySpec());
+        queryChanged.accept(query);
+        prefix.ifPresent(found -> chipTyped.accept(found.scope()));
+    }
+
+    /** Whether {@code next} is {@code previous} with one stretch of it deleted. */
+    static boolean removal(String previous, String next) {
+        if (next.length() >= previous.length()) return false;
+        int common = 0;
+        while (common < next.length() && previous.charAt(common) == next.charAt(common)) common++;
+        return previous.endsWith(next.substring(common));
+    }
+
+    // ---- Query and chip ---------------------------------------------------------------------------------------------
+
+    /** Moves keyboard focus to the query field. */
+    public void focusQuery() { if (!queryView.isClosed()) queryView.focus(QUERY); }
+
+    String queryText() { return query; }
+
+    /** The query view's mounted text input, the palette's one focus target. */
+    private Component queryInput() { return first(queryView, JTextComponent.class); }
+
+    private static <T extends Component> T first(Component component, Class<T> type) {
+        if (type.isInstance(component)) return type.cast(component);
+        if (component instanceof Container container) for (Component child : container.getComponents()) {
+            T found = first(child, type);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /** Replaces the query as if typed (a typed scope prefix still becomes the chip); the same text changes nothing. */
+    void setQueryText(String text) { if (!Objects.requireNonNull(text).equals(query)) edited(text); }
+
+    /** Shows {@code label}'s chip, or none for null; the field and list are named after it. The icon stays off the chip. */
+    void setChip(String label, Icon ignoredIcon) {
+        chip = label;
+        render(chipView, chipSpec());
+        chipView.setVisible(label != null);
+        chipView.getAccessibleContext().setAccessibleName(label == null ? null : "Scope: " + label);
+        render(queryView, querySpec());
+        resultsView.getAccessibleContext().setAccessibleName(label == null ? "All" : label);
         fieldRow.revalidate();
         fieldRow.repaint();
     }
 
     /** The chip's label; null while no chip is set. */
-    String chipText() { return chip.isVisible() ? chip.getText() : null; }
-    JLabel chip() { return chip; }
-    void setPlaceholder(String text) { query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, text); }
+    String chipText() { return chip; }
+    void setPlaceholder(String text) { placeholder = text == null ? "" : text; render(queryView, querySpec()); }
+    String placeholder() { return placeholder; }
+    boolean composing() { return !queryView.isClosed() && queryView.composing(QUERY); }
+
+    // ---- Results ----------------------------------------------------------------------------------------------------
 
     /** Replaces the list, selecting {@code selectionKey} when present and otherwise the first selectable entry. */
-    void setEntries(List<PaletteEntry> entries, String selectionKey, String emptyText) {
-        long rows = entries.stream().filter(entry -> entry instanceof PaletteEntry.Item).count();
+    void setEntries(List<PaletteEntry> next, String selectionKey, String empty) {
+        long rows = next.stream().filter(entry -> entry instanceof PaletteEntry.Item).count();
         if (rows > PaletteResults.MAX_ROWS) throw new IllegalArgumentException("Too many palette results");
-        int selected = -1, first = -1;
-        model.clear();
-        hover = -1;
-        for (int i = 0; i < entries.size(); i++) {
-            PaletteEntry entry = entries.get(i);
-            model.addElement(entry);
+        int chosen = -1, first = -1;
+        for (int i = 0; i < next.size(); i++) {
+            PaletteEntry entry = next.get(i);
             if (entry.selectable() && first < 0) first = i;
-            if (selectionKey != null && selectionKey.equals(entry.key())) selected = i;
+            if (selectionKey != null && selectionKey.equals(entry.key())) chosen = i;
         }
-        if (selected < 0) selected = first;
-        empty.setText(emptyText == null ? "" : emptyText);
-        if (selected < 0) list.clearSelection(); else list.setSelectedIndex(selected);
-        listCard = first < 0 ? "empty" : "results";
-        if (!stepShowing()) cardLayout.show(cards, listCard);
+        entries = List.copyOf(next);
+        selected = chosen >= 0 ? chosen : first;
+        emptyText = empty == null ? "" : empty;
         resultCount = rows;
+        revision++;
+        listCard = first < 0 ? EMPTY : RESULTS;
+        if (!stepShowing()) cardLayout.show(cards, listCard);
+        render(emptyView, emptySpec());
+        render(resultsView, resultsSpec());
         updateHint();
         revalidate();
-        if (selected >= 0) {
-            scroll.doLayout();
-            scroll.getViewport().doLayout();
-            reveal(selected);
-        }
         repaint();
     }
 
-    PaletteEntry selectedEntry() { return list.getSelectedValue(); }
+    PaletteEntry selectedEntry() { return selected < 0 || selected >= entries.size() ? null : entries.get(selected); }
 
     String selectedKey() {
-        PaletteEntry entry = list.getSelectedValue();
+        PaletteEntry entry = selectedEntry();
         return entry == null ? null : entry.key();
     }
 
     /** Selects the first row with {@code rowId}, whichever scope it came from. */
     void selectRow(String rowId) {
-        for (int i = 0; i < model.size(); i++)
-            if (model.get(i) instanceof PaletteEntry.Item item && item.row().id().equals(rowId)) {
-                list.setSelectedIndex(i);
-                reveal(i);
-                return;
-            }
+        for (int i = 0; i < entries.size(); i++)
+            if (entries.get(i) instanceof PaletteEntry.Item item && item.row().id().equals(rowId)) { select(i); return; }
     }
 
-    /** Moves {@code delta} selectable entries, skipping headers and stopping at either end. */
+    /** Moves {@code delta} selectable entries, skipping headings and stopping at either end. */
     void selectRelative(int delta) {
-        int index = list.getSelectedIndex();
-        if (index < 0 || delta == 0) return;
-        int direction = Integer.signum(delta), remaining = Math.abs(delta), target = index;
-        for (int i = index + direction; remaining > 0 && i >= 0 && i < model.size(); i += direction)
-            if (model.get(i).selectable()) { target = i; remaining--; }
-        list.setSelectedIndex(target);
-        reveal(target);
+        if (selected < 0 || delta == 0) return;
+        int direction = Integer.signum(delta), remaining = Math.abs(delta), target = selected;
+        for (int i = selected + direction; remaining > 0 && i >= 0 && i < entries.size(); i += direction)
+            if (entries.get(i).selectable()) { target = i; remaining--; }
+        select(target);
+    }
+
+    private void select(int index) {
+        if (index < 0 || index >= entries.size() || !entries.get(index).selectable()) return;
+        selected = index;
+        render(resultsView, resultsSpec());
+        updateHint();
     }
 
     void executeSelected() { executeSelected(0); }
 
     void executeSelected(int verb) {
-        PaletteEntry entry = list.getSelectedValue();
+        PaletteEntry entry = selectedEntry();
         if (entry != null) execute.accept(entry, verb);
     }
 
-    boolean composing() { return composing; }
-    int itemHeight() { return UIScale.scale(ROW_HEIGHT); }
-    String hintText() { return hint.getText(); }
+    int itemHeight() { return scaled(DesignMetrics.Role.RESULTS_ROW_HEIGHT); }
+
+    /** How many result rows the list shows before it scrolls; section headings among them add their own height. */
+    void setVisibleRows(int rows) { visibleRows = rows; render(resultsView, resultsSpec()); revalidate(); }
+    int visibleRows() { return visibleRows; }
+
+    String hintText() {
+        return switch (selectedEntry()) {
+            case PaletteEntry.Item item -> item.row().detail() != null ? item.row().detail() : item.row().tag() != null ? item.row().tag() : "";
+            case PaletteEntry.More more -> "Show every match in " + more.scope().label();
+            case null, default -> "";
+        };
+    }
 
     List<String> hintActionTexts() {
         var texts = new ArrayList<String>();
-        for (Component action : hintActions.getComponents()) texts.add(((JLabel) action).getText());
+        if (hintView.spec().root() instanceof Nodes.Stack stack)
+            for (Nodes.Node child : stack.children()) if (child instanceof Nodes.Button button) texts.add(button.label());
         return texts;
     }
 
     /** As a click on the {@code index}th hint action. */
-    void clickHintAction(int index) { executeSelected(hintVerbs.get(index)); }
-
-    /** Shows a form instead of the list; the chip and query stay and the hint bar hides. The first field takes focus. */
-    void showStep(String title, List<PaletteStep.Field> fields) {
-        stepPanel.removeAll(); stepFields.clear(); stepNames.clear(); stepLabels.clear();
-        stepTitle.setText(title);
-        stepPanel.add(row(stepTitle));
-        for (PaletteStep.Field field : fields) {
-            var label = new JLabel(field.label());
-            label.putClientProperty("html.disable", Boolean.TRUE);
-            label.setPreferredSize(new Dimension(UIScale.scale(140), 0));
-            var text = new JTextField(field.prefill());
-            text.getAccessibleContext().setAccessibleName(field.label());
-            var line = new FixedHeightPanel(STEP_ROW_HEIGHT);
-            line.setLayout(new BorderLayout(UIScale.scale(10), 0));
-            line.setOpaque(false);
-            line.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(4), UIScale.scale(12), UIScale.scale(4), UIScale.scale(12)));
-            line.add(label, BorderLayout.LINE_START);
-            line.add(text, BorderLayout.CENTER);
-            stepPanel.add(line);
-            stepFields.add(text); stepNames.add(field.name()); stepLabels.add(label);
-        }
-        stepError.setText("");
-        stepError.setVisible(false);
-        errorRow = row(stepError);
-        errorRow.setVisible(false);
-        stepPanel.add(errorRow);
-        applyStepColors();
-        cardLayout.show(cards, "step");
-        hintBar.setVisible(false);
-        stepFocus = 0;
-        stepFields.getFirst().requestFocusInWindow();
-        stepFields.getFirst().selectAll();
-        revalidate(); repaint();
-    }
-
-    void hideStep() {
-        stepPanel.removeAll(); stepFields.clear(); stepNames.clear(); stepLabels.clear();
-        errorRow = null;
-        stepFocus = -1;
-        hintBar.setVisible(true);
-        cardLayout.show(cards, listCard);
-        revalidate(); repaint();
-    }
-
-    boolean stepShowing() { return stepFocus >= 0; }
-    List<JTextField> stepFields() { return List.copyOf(stepFields); }
-    int stepFocusIndex() { return stepFocus; }
-    JLabel stepError() { return stepError; }
-
-    /** Moves focus to the next (or previous) field, wrapping. */
-    void focusStepField(int delta) {
-        if (stepFields.isEmpty()) return;
-        stepFocus = Math.floorMod(stepFocus + delta, stepFields.size());
-        JTextField field = stepFields.get(stepFocus);
-        field.requestFocusInWindow();
-        field.selectAll();
-    }
-
-    Map<String, String> stepValues() {
-        var values = new LinkedHashMap<String, String>();
-        for (int i = 0; i < stepFields.size(); i++) values.put(stepNames.get(i), stepFields.get(i).getText());
-        return values;
-    }
-
-    void setStepError(String message) {
-        stepError.setText(message == null ? "" : message);
-        stepError.setVisible(message != null);
-        if (errorRow != null) errorRow.setVisible(message != null);
-        revalidate(); repaint();
-    }
-
-    void refreshTheme() {
-        foreground = color("List.foreground", "Label.foreground");
-        infoForeground = color("SearchEverywhere.SearchField.infoForeground", "Label.disabledForeground");
-        separatorColor = color("SearchEverywhere.List.separatorColor", "Separator.foreground");
-        separatorForeground = color("SearchEverywhere.List.separatorForeground", "Label.disabledForeground");
-        Color listBackground = color("List.background", "Panel.background");
-        selectionBackground = UIManager.getColor("List.selectionBackground");
-        selectionForeground = UIManager.getColor("List.selectionForeground");
-        hoverBackground = UIManager.getColor("List.hoverBackground");
-        advertiserForeground = color("SearchEverywhere.Advertiser.foreground", "Label.disabledForeground");
-        linkColor = UIManager.getColor("Component.linkColor");
-        chipBackground = color("SearchEverywhere.Tab.selectedBackground", "List.selectionInactiveBackground");
-        chip.setForeground(linkColor);
-        Color border = color("Popup.borderColor", "PopupMenu.borderColor");
-        // One surface throughout, like VS Code's quick input: the field keeps only its border.
-        Color fieldBackground = listBackground;
-        Color fieldBorder = color("SearchEverywhere.SearchField.borderColor", "Component.borderColor");
-        font = UIManager.getFont("Label.font");
-        smallFont = font.deriveFont(Font.PLAIN, font.getSize2D() - UIScale.scale(1f));
-        monoFont = new Font(Font.MONOSPACED, Font.PLAIN, 13).deriveFont(font.getSize2D());
-
-        setBackground(listBackground);
-        setBorder(new FlatLineBorder(new Insets(1, 1, 1, 1), border, 1f, CORNER_ARC));
-        fieldRow.setBackground(fieldBackground);
-        fieldRow.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(8), UIScale.scale(6), UIScale.scale(8)));
-        query.putClientProperty(FlatClientProperties.STYLE, "background: " + hex(fieldBackground)
-            + "; borderColor: " + hex(fieldBorder) + "; placeholderForeground: " + hex(infoForeground));
-        query.setBackground(listBackground);
-        query.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_ICON, AppIcons.icon("search"));
-        query.setFont(font);
-        chip.setFont(font);
-        list.setBackground(listBackground);
-        list.setForeground(foreground);
-        list.setSelectionBackground(selectionBackground);
-        list.setSelectionForeground(selectionForeground);
-        list.setFont(font);
-        scroll.getViewport().setBackground(listBackground);
-        cards.setBackground(listBackground);
-        stepPanel.setBackground(listBackground);
-        empty.setForeground(infoForeground);
-        empty.setFont(font);
-        hintBar.setBackground(listBackground);
-        hintBar.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(UIScale.scale(1), 0, 0, 0, separatorColor),
-            BorderFactory.createEmptyBorder(0, UIScale.scale(12), 0, UIScale.scale(12))));
-        hint.setForeground(advertiserForeground);
-        hint.setFont(smallFont);
-        applyHintColors();
-        applyStepColors();
-        revalidate(); repaint();
-    }
-
-    @Override public Dimension getPreferredSize() {
-        Insets insets = getInsets();
-        int height = FIELD_HEIGHT + (stepShowing()
-            ? HEADER_HEIGHT + stepFields.size() * STEP_ROW_HEIGHT + (stepError.isVisible() ? HEADER_HEIGHT : 0)
-            : listHeight() + HINT_HEIGHT);
-        return new Dimension(UIScale.scale(WIDTH), UIScale.scale(height) + insets.top + insets.bottom);
-    }
-
-    /** How many result rows the list shows before it scrolls; section headers among them add their own height. */
-    void setVisibleRows(int rows) { visibleRows = rows; revalidate(); }
-    int visibleRows() { return visibleRows; }
-
-    /** Tall enough for the first {@link #visibleRows} rows and the headers above them; the rest scroll. */
-    private int listHeight() {
-        if ("empty".equals(listCard)) return ROW_HEIGHT;
-        int height = 0;
-        for (int i = 0, rows = 0; i < model.size() && rows < visibleRows; i++) {
-            boolean header = model.get(i) instanceof PaletteEntry.Header;
-            height += header ? HEADER_HEIGHT : ROW_HEIGHT;
-            if (!header) rows++;
-        }
-        return height;
-    }
-
-    private void reveal(int index) {
-        if (index > 0 && !model.get(index - 1).selectable()) list.ensureIndexIsVisible(index - 1);
-        list.ensureIndexIsVisible(index);
-    }
-
-    private int entryAt(Point point) {
-        int index = list.locationToIndex(point);
-        if (index < 0) return -1;
-        Rectangle bounds = list.getCellBounds(index, index);
-        return bounds != null && bounds.contains(point) && model.get(index).selectable() ? index : -1;
-    }
-
-    private void setHover(int index) {
-        if (index == hover) return;
-        hover = index;
-        list.repaint();
-    }
+    void clickHintAction(int index) { executeSelected(index + 1); }
 
     private void updateHint() {
-        hintActions.removeAll();
-        hintVerbs.clear();
-        String text = "";
         String verbsDescription = "";
-        PaletteEntry entry = list.getSelectedValue();
-        if (entry instanceof PaletteEntry.Item item) {
-            PaletteRow row = item.row();
-            text = row.detail() != null ? row.detail() : row.tag() != null ? row.tag() : "";
-            List<PaletteVerb> verbs = item.scope().verbs();
-            verbsDescription = verbsDescription(verbs);
-            for (int verb = 1; verb < Math.min(3, verbs.size()); verb++) {
-                int chosen = verb;
-                var action = new SizedLabel(verbs.get(verb).label() + " " + keys(verb), HINT_HEIGHT - 1);
-                action.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(14), 0, 0));
-                action.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                action.addMouseListener(new MouseAdapter() {
-                    @Override public void mousePressed(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) executeSelected(chosen); }
-                });
-                hintActions.add(action);
-                hintVerbs.add(verb);
-            }
-        } else if (entry instanceof PaletteEntry.More more) {
-            text = "Show every match in " + more.scope().label();
-            verbsDescription = keys(0) + " " + text;
-        }
-        hint.setText(text);
-        list.getAccessibleContext().setAccessibleDescription(
+        if (selectedEntry() instanceof PaletteEntry.Item item) verbsDescription = verbsDescription(item.scope().verbs());
+        else if (selectedEntry() instanceof PaletteEntry.More more) verbsDescription = keys(0) + " Show every match in " + more.scope().label();
+        resultsView.getAccessibleContext().setAccessibleDescription(
             resultCount + " results" + (verbsDescription.isEmpty() ? "" : "; " + verbsDescription));
-        applyHintColors();
-        hintActions.revalidate();
-        hintActions.repaint();
+        render(hintView, hintSpec());
+        hintBar.revalidate();
+        hintBar.repaint();
     }
 
     /** Every verb, primary through third, in the base card's format: {@code key label  key label}. */
@@ -504,219 +425,215 @@ public final class CommandPalette extends JPanel {
         return (macOs ? new String[]{"⏎", "⌘⏎", "⇧⏎"} : new String[]{"Enter", "Ctrl+Enter", "Shift+Enter"})[verb];
     }
 
-    private void applyHintColors() {
-        for (Component action : hintActions.getComponents()) {
-            action.setForeground(linkColor);
-            if (smallFont != null) action.setFont(smallFont);
-        }
+    // ---- Step -------------------------------------------------------------------------------------------------------
+
+    /** Shows a form instead of the list; the chip and query stay and the hint bar hides. The first field takes focus. */
+    void showStep(String title, List<PaletteStep.Field> fields) {
+        stepTitle = title;
+        stepFields = List.copyOf(fields);
+        stepTexts.clear();
+        for (PaletteStep.Field field : stepFields) stepTexts.add(field.prefill());
+        stepError = null;
+        render(stepView, stepSpec());
+        cardLayout.show(cards, STEP);
+        hintBar.setVisible(false);
+        stepFocus = -1;
+        focusStepField(1);
+        revalidate(); repaint();
     }
 
-    private void applyStepColors() {
-        if (foreground == null) return;
-        stepTitle.setForeground(separatorForeground);
-        stepTitle.setFont(smallFont);
-        for (JLabel label : stepLabels) { label.setForeground(infoForeground); label.setFont(smallFont); }
-        stepError.setForeground(UIManager.getColor("Actions.Red"));
-        stepError.setFont(smallFont);
+    void hideStep() {
+        stepTitle = null;
+        stepFields = List.of();
+        stepTexts.clear();
+        stepError = null;
+        stepFocus = -1;
+        render(stepView, stepSpec());
+        hintBar.setVisible(true);
+        cardLayout.show(cards, listCard);
+        revalidate(); repaint();
     }
 
-    private static JPanel row(JLabel label) {
-        var row = new FixedHeightPanel(HEADER_HEIGHT);
-        row.setLayout(new BorderLayout());
-        row.setOpaque(false);
-        row.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(12), 0, UIScale.scale(12)));
-        row.add(label, BorderLayout.CENTER);
-        return row;
+    boolean stepShowing() { return stepFocus >= 0; }
+    int stepFocusIndex() { return stepFocus; }
+    String stepTitleText() { return stepTitle; }
+    /** The step's error; null while none shows. */
+    String stepErrorText() { return stepError; }
+    int stepFieldCount() { return stepFields.size(); }
+
+    /** Moves focus to the next (or previous) field, wrapping, and selects its text for replacement. */
+    void focusStepField(int delta) {
+        if (stepFields.isEmpty()) return;
+        stepFocus = Math.floorMod(stepFocus + delta, stepFields.size());
+        if (stepView.isClosed()) return;
+        stepView.focus(STEP_FIELD + stepFocus);
+        var input = stepInput(stepFocus);
+        if (input != null) input.selectAll();
     }
 
-    private static Color color(String key, String fallbackKey) {
-        Color value = UIManager.getColor(key);
-        return value != null ? value : UIManager.getColor(fallbackKey);
+    /** The mounted kit input of the {@code index}th step field (kit components are named after their node). */
+    JTextComponent stepInput(int index) { return find(stepView, STEP_FIELD + index + ".input", JTextComponent.class); }
+
+    Map<String, String> stepValues() {
+        var values = new LinkedHashMap<String, String>();
+        for (int i = 0; i < stepFields.size(); i++) values.put(stepFields.get(i).name(), stepTexts.get(i));
+        return values;
     }
 
-    private static String hex(Color color) { return String.format("#%06x", color.getRGB() & 0xffffff); }
-
-    private static int uncommittedCharacters(InputMethodEvent event) {
-        AttributedCharacterIterator text = event.getText();
-        if (text == null) return 0;
-        int length = text.getEndIndex() - text.getBeginIndex();
-        return Math.max(0, length - event.getCommittedCharacterCount());
+    void setStepError(String message) {
+        stepError = message;
+        render(stepView, stepSpec());
+        revalidate(); repaint();
     }
 
-    private static class FixedHeightPanel extends JPanel {
-        private final int logicalHeight;
+    // ---- Shell ------------------------------------------------------------------------------------------------------
 
-        FixedHeightPanel(int logicalHeight) { this.logicalHeight = logicalHeight; }
-
-        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(logicalHeight)); }
-        @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(logicalHeight)); }
-        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, UIScale.scale(logicalHeight)); }
+    /** The kit views follow the theme themselves; the shell repaints its surface, outline and rule and re-measures. */
+    void refreshTheme() {
+        hintBar.setBorder(new EmptyBorder(scaled(DesignMetrics.Role.HAIRLINE), scaled(DesignMetrics.Role.PALETTE_HINT_SIDE_PADDING),
+            0, scaled(DesignMetrics.Role.PALETTE_HINT_SIDE_PADDING)));
+        int vertical = scaled(DesignMetrics.Role.PALETTE_FIELD_VERTICAL_PADDING), side = scaled(DesignMetrics.Role.PALETTE_FIELD_SIDE_PADDING);
+        fieldRow.setBorder(new EmptyBorder(vertical, side, vertical, side));
+        ((BorderLayout) fieldRow.getLayout()).setHgap(scaled(DesignMetrics.Role.PALETTE_CHIP_GAP));
+        int step = scaled(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING), stepRow = scaled(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING);
+        stepView.setBorder(new EmptyBorder(stepRow, step, stepRow, step));
+        revalidate();
+        repaint();
     }
 
-    /** A label whose height is fixed in logical pixels, so tabs and hints stay aligned under any font. */
-    private static class SizedLabel extends JLabel {
-        private final int logicalHeight;
+    // Repaint through this component so opaque header/footer children never square off its corners.
+    @Override protected boolean isPaintingOrigin() { return true; }
 
-        SizedLabel(String text, int logicalHeight) {
-            super(text);
-            this.logicalHeight = logicalHeight;
-            putClientProperty("html.disable", Boolean.TRUE);
-        }
-
-        @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(logicalHeight)); }
-    }
-
-    private static void paintHighlight(Graphics graphics, Color color, int width, int height) {
+    @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
-            g.setColor(color);
-            float radius = UIScale.scale(UIManager.getInt("List.selectionArc") / 2f);
-            com.formdev.flatlaf.ui.FlatUIUtils.paintSelection(g, 0, 0, width, height,
-                UIScale.scale(UIManager.getInsets("List.selectionInsets")), radius, radius, radius, radius, 0);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            int arc = scaled(DesignMetrics.Role.PALETTE_CORNER_ARC);
+            g.setColor(color(SemanticColor.SURFACE_CARD));
+            g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), arc, arc));
         } finally { g.dispose(); }
     }
 
-    private final class EntryRenderer extends JPanel implements ListCellRenderer<PaletteEntry> {
-        private final JLabel icon = new JLabel();
-        private final JLabel title = new JLabel();
-        private final JLabel detail = new JLabel();
-        private final JLabel tag = new JLabel();
-        private PaletteEntry entry;
-        private boolean selected, hovered, first;
+    @Override protected void paintChildren(Graphics graphics) {
+        var clipped = (Graphics2D) graphics.create();
+        try {
+            int inset = scaled(DesignMetrics.Role.HAIRLINE);
+            int arc = UIScale.scale(metric(DesignMetrics.Role.PALETTE_CORNER_ARC) - 2 * metric(DesignMetrics.Role.HAIRLINE));
+            clipped.clip(new RoundRectangle2D.Double(inset, inset,
+                Math.max(0, getWidth() - 2 * inset), Math.max(0, getHeight() - 2 * inset), arc, arc));
+            super.paintChildren(clipped);
+        } finally { clipped.dispose(); }
+    }
 
-        EntryRenderer() {
-            setLayout(null);
-            setOpaque(false);
-            for (JLabel label : List.of(icon, title, detail, tag)) {
-                label.setOpaque(false);
-                label.putClientProperty("html.disable", Boolean.TRUE);
-                add(label);
-            }
-            icon.setHorizontalAlignment(SwingConstants.CENTER);
+    @Override public boolean contains(int x, int y) {
+        int arc = scaled(DesignMetrics.Role.PALETTE_CORNER_ARC);
+        return new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), arc, arc).contains(x, y);
+    }
+
+    @Override public Dimension getPreferredSize() {
+        Insets insets = getInsets();
+        int height = metric(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + (stepShowing()
+            ? metric(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT) + stepFields.size() * metric(DesignMetrics.Role.PALETTE_STEP_ROW_HEIGHT)
+                + (stepError != null ? metric(DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT) : 0)
+            : listHeight() + metric(DesignMetrics.Role.PALETTE_HINT_HEIGHT));
+        return new Dimension(scaled(DesignMetrics.Role.PALETTE_WIDTH), UIScale.scale(height) + insets.top + insets.bottom);
+    }
+
+    /** Tall enough for the first {@link #visibleRows} rows and the headings above them; the rest scroll. */
+    private int listHeight() {
+        int row = metric(DesignMetrics.Role.RESULTS_ROW_HEIGHT), heading = metric(DesignMetrics.Role.RESULTS_HEADING_HEIGHT);
+        if (EMPTY.equals(listCard)) return row;
+        int height = 0;
+        for (int i = 0, rows = 0; i < entries.size() && rows < visibleRows; i++) {
+            boolean header = entries.get(i) instanceof PaletteEntry.Header;
+            height += header ? heading : row;
+            if (!header) rows++;
         }
+        return height;
+    }
 
-        @Override public Component getListCellRendererComponent(JList<? extends PaletteEntry> source, PaletteEntry value,
-                                                                 int index, boolean isSelected, boolean cellHasFocus) {
-            entry = value;
-            selected = isSelected && value.selectable();
-            hovered = index == hover && !selected && value.selectable();
-            first = index == 0;
-            icon.setIcon(null);
-            detail.setText("");
-            tag.setText("");
-            switch (value) {
-                case PaletteEntry.Header header -> {
-                    title.setText(header.label());
-                    title.setFont(smallFont);
-                    title.setForeground(separatorForeground);
-                }
-                case PaletteEntry.Item item -> {
-                    PaletteRow row = item.row();
-                    icon.setIcon(row.icon());
-                    title.setText(row.title());
-                    title.setFont(item.scope().monospaceRows() ? monoFont : font);
-                    title.setForeground(selected ? selectionForeground : row.enabled() ? foreground : infoForeground);
-                    detail.setText(row.detail() == null ? "" : row.detail());
-                    detail.setFont(font);
-                    detail.setForeground(selected ? selectionForeground : infoForeground);
-                    tag.setText(row.tag() == null ? "" : row.tag());
-                    tag.setFont(smallFont);
-                    tag.setForeground(selected ? selectionForeground : infoForeground);
-                }
-                case PaletteEntry.More more -> {
-                    title.setText("More in " + more.scope().label() + "…");
-                    title.setFont(font);
-                    title.setForeground(selected ? selectionForeground : infoForeground);
-                }
-            }
-            return this;
+    @Override public void close() {
+        if (closed) return;
+        closed = true;
+        try { themeSubscription.close(); } catch (Exception ignored) { /* closing a subscription has nothing to report */ }
+        views.forEach(KitView::close);
+    }
+
+    // ---- Package-private access for headless tests ------------------------------------------------------------------
+
+    KitView queryView() { return queryView; }
+    KitView chipView() { return chipView; }
+    KitView resultsView() { return resultsView; }
+    KitView hintView() { return hintView; }
+    KitView stepView() { return stepView; }
+    KitView emptyView() { return emptyView; }
+    JPanel fieldRow() { return fieldRow; }
+    JPanel hintBar() { return hintBar; }
+    List<PaletteEntry> entries() { return entries; }
+    int selectedIndex() { return selected; }
+    /** How many times the host replaced the list. */
+    long revision() { return revision; }
+    KitContext kit() { return kit; }
+
+    static <T extends Component> T find(Component component, String name, Class<T> type) {
+        if (type.isInstance(component) && name.equals(component.getName())) return type.cast(component);
+        if (component instanceof Container container) for (Component child : container.getComponents()) {
+            T found = find(child, name, type);
+            if (found != null) return found;
         }
+        return null;
+    }
 
+    /** A panel whose height is fixed in logical pixels, so the query row and hint bar stay put under any font. */
+    private final class FixedHeightPanel extends JPanel {
+        private final DesignMetrics.Role height;
+
+        FixedHeightPanel(DesignMetrics.Role height) { this.height = height; }
+
+        @Override public Dimension getMinimumSize() { return new Dimension(0, scaled(height)); }
+        @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, scaled(height)); }
+        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, scaled(height)); }
+    }
+
+    /** The hint bar: a hairline rule in {@code border.subtle} above the detail and verb links. */
+    private final class HintBar extends JPanel {
+        HintBar() { super(new BorderLayout()); setOpaque(false); }
+
+        @Override public Dimension getMinimumSize() { return new Dimension(0, scaled(DesignMetrics.Role.PALETTE_HINT_HEIGHT)); }
         @Override public Dimension getPreferredSize() {
-            return new Dimension(0, UIScale.scale(entry instanceof PaletteEntry.Header ? HEADER_HEIGHT : ROW_HEIGHT));
+            return new Dimension(super.getPreferredSize().width, scaled(DesignMetrics.Role.PALETTE_HINT_HEIGHT));
         }
-
-        @Override public void doLayout() {
-            int side = UIScale.scale(8), gap = UIScale.scale(8), iconSize = UIScale.scale(16), height = getHeight();
-            if (entry instanceof PaletteEntry.Header) {
-                title.setBounds(side, 0, Math.max(0, getWidth() - 2 * side), height);
-                for (JLabel unused : List.of(icon, detail, tag)) unused.setBounds(0, 0, 0, 0);
-                return;
-            }
-            icon.setBounds(side, (height - iconSize) / 2, iconSize, iconSize);
-            int start = side + iconSize + gap, end = getWidth() - side;
-            int titleWidth = title.getPreferredSize().width;
-            int tagWidth = tag.getText().isEmpty() ? 0 : tag.getPreferredSize().width;
-            int detailWidth = detail.getText().isEmpty() ? 0 : detail.getPreferredSize().width;
-            // When space runs out the tag goes first; then the detail, and finally the title, are cut
-            // short. The tag only shows when the title, the detail (if any) and the tag all fit together;
-            // otherwise the tag would claim room the detail needs and never get cut back for it.
-            int detailTerm = detailWidth > 0 ? gap + detailWidth : 0;
-            boolean showTag = tagWidth > 0 && start + titleWidth + detailTerm + gap + tagWidth <= end;
-            int textEnd = showTag ? end - tagWidth - gap : end;
-            tag.setBounds(showTag ? end - tagWidth : 0, 0, showTag ? tagWidth : 0, height);
-            int shownTitle = Math.max(0, Math.min(titleWidth, textEnd - start));
-            title.setBounds(start, 0, shownTitle, height);
-            int detailStart = start + shownTitle + gap;
-            detail.setBounds(detailStart, 0, Math.max(0, Math.min(detailWidth, textEnd - detailStart)), height);
-        }
-
+        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, scaled(DesignMetrics.Role.PALETTE_HINT_HEIGHT)); }
         @Override protected void paintComponent(Graphics graphics) {
-            // CellRendererPane assigns the bounds just before painting; lay the labels out at that width.
-            doLayout();
-            Color fill = selected ? selectionBackground : hovered ? hoverBackground : null;
-            if (fill != null) {
-                paintHighlight(graphics, fill, getWidth(), getHeight());
-            }
-            if (entry instanceof PaletteEntry.Header && !first) {
-                graphics.setColor(separatorColor);
-                graphics.fillRect(0, 0, getWidth(), UIScale.scale(1));
-            }
-            super.paintComponent(graphics);
+            graphics.setColor(color(SemanticColor.BORDER_SUBTLE));
+            graphics.fillRect(0, 0, getWidth(), scaled(DesignMetrics.Role.HAIRLINE));
         }
     }
 
-    /** Turns a typed scope prefix into a chip: the prefix leaves the field and {@code chipTyped} runs. */
-    private final class ChipFilter extends javax.swing.text.DocumentFilter {
-        @Override public void insertString(FilterBypass bypass, int offset, String text,
-                                           javax.swing.text.AttributeSet attributes) throws javax.swing.text.BadLocationException {
-            replace(bypass, offset, 0, text, attributes);
+    /** The card's rounded outline in the menu border role, one hairline wide. */
+    private final class CardOutline extends AbstractBorder {
+        @Override public Insets getBorderInsets(Component component) {
+            int line = scaled(DesignMetrics.Role.HAIRLINE);
+            return new Insets(line, line, line, line);
         }
-
-        @Override public void replace(FilterBypass bypass, int offset, int length, String text,
-                                      javax.swing.text.AttributeSet attributes) throws javax.swing.text.BadLocationException {
-            var document = bypass.getDocument();
-            String current = document.getText(0, document.getLength());
-            String inserted = text == null ? "" : text;
-            String next = current.substring(0, offset) + inserted + current.substring(offset + length);
-            var prefix = inserted.isEmpty() ? java.util.Optional.<ScopePrefix>empty() : prefixes.apply(next);
-            if (prefix.isEmpty()) { bypass.replace(offset, length, text, attributes); return; }
-            bypass.replace(0, document.getLength(), prefix.get().rest(), attributes);
-            chipTyped.accept(prefix.get().scope());
+        @Override public Insets getBorderInsets(Component component, Insets insets) {
+            int line = scaled(DesignMetrics.Role.HAIRLINE);
+            insets.set(line, line, line, line);
+            return insets;
         }
-    }
-
-    /** The active scope: its icon and label on a pill in the accent colour. */
-    private final class ChipLabel extends JLabel {
-        ChipLabel() {
-            setName("scopeChip");
-            putClientProperty("html.disable", Boolean.TRUE);
-            setIconTextGap(UIScale.scale(4));
-            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(8), 0, UIScale.scale(8)));
-            setVisible(false);
-        }
-
-        @Override protected void paintComponent(Graphics graphics) {
-            if (chipBackground != null) {
-                var g = (Graphics2D) graphics.create();
-                try {
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-                    int height = Math.min(getHeight(), UIScale.scale(CHIP_HEIGHT));
-                    g.setColor(chipBackground);
-                    g.fillRoundRect(0, (getHeight() - height) / 2, getWidth(), height, height, height);
-                } finally { g.dispose(); }
-            }
-            super.paintComponent(graphics);
+        @Override public void paintBorder(Component component, Graphics graphics, int x, int y, int width, int height) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int line = scaled(DesignMetrics.Role.HAIRLINE), arc = scaled(DesignMetrics.Role.PALETTE_CORNER_ARC);
+                var outer = new RoundRectangle2D.Double(x, y, width, height, arc, arc);
+                var inner = new RoundRectangle2D.Double(x + line, y + line, width - 2.0 * line, height - 2.0 * line,
+                    Math.max(0, arc - 2 * line), Math.max(0, arc - 2 * line));
+                var ring = new java.awt.geom.Area(outer);
+                ring.subtract(new java.awt.geom.Area(inner));
+                g.setColor(color(SemanticColor.BORDER_MENU));
+                g.fill(ring);
+            } finally { g.dispose(); }
         }
     }
 }

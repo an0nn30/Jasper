@@ -10,21 +10,24 @@ public final class ThemeMigrationPaletteCapture {
     private ThemeMigrationPaletteCapture() { }
     public static void capture(List<PaletteScope> scopes) throws Exception {
         ThemeMigrationCapture.themes(theme -> {
-            new dev.jasper.app.appearance.ThemeController().configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var themes = new dev.jasper.app.appearance.ThemeController();
+            themes.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var kit = themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
             for (String family : List.of("history", "snippets")) {
                 var scope = scopes.stream().filter(value -> value.id().startsWith("dev.jasper." + family)).findFirst().orElseThrow();
-                var palette = new CommandPalette(true, query -> { }, (entry, verb) -> { }, prefix -> Optional.empty(), selected -> { });
+                var palette = new CommandPalette(kit, true, query -> { }, (entry, verb) -> { }, prefix -> Optional.empty(), selected -> { });
                 palette.setChip(scope.label(), scope.icon()); palette.setPlaceholder(scope.placeholder());
                 var context = new PaletteContext(true, PaletteTarget.window(java.util.UUID.fromString("00000000-0000-0000-0000-000000000003")));
                 var results = scope.search("", context);
                 if (results.rows().isEmpty()) throw new AssertionError("Synthetic " + family + " data not loaded");
                 palette.setEntries(results.rows().stream().map(row -> (PaletteEntry) new PaletteEntry.Item(scope, row)).toList(), null, "No matches");
                 save(family + "-palette", theme, "populated", palette, 680, 360);
-                palette.queryField().setText("fixture-no-match");
+                dev.jasper.app.palette.PaletteTestSupport.query(palette).setText("fixture-no-match");
                 var empty = scope.search("fixture-no-match", context);
                 if (!empty.rows().isEmpty()) throw new AssertionError("Expected fixture-only filtered empty");
                 palette.setEntries(List.of(), null, "No matches");
                 save(family + "-palette", theme, "filtered-empty", palette, 680, 360);
+                palette.close();
             }
         });
     }

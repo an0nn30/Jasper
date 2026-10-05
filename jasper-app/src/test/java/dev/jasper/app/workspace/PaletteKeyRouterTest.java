@@ -47,7 +47,7 @@ class PaletteKeyRouterTest {
                 var root = install(owner); install(other); var router = router(owner, mac, root);
                 var count = new AtomicInteger();
                 owner.commands().register(command("fixture", count::incrementAndGet));
-                owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("fixture");
+                owner.commandPalette().toggle(); dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("fixture");
                 assertThat(router.dispatch(press(owner, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(count.get()).isEqualTo(1);
                 assertThat(owner.commandPalette().isOpen()).isFalse();
@@ -88,7 +88,7 @@ class PaletteKeyRouterTest {
                 assertThat(router.dispatch(press(owner, KeyEvent.VK_P, primary(true) | InputEvent.SHIFT_DOWN_MASK))).isFalse();
                 assertThat(router.dispatch(press(owner, KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isTrue();
                 router.dispatch(release(owner, KeyEvent.VK_P));
-                var field = owner.commandPalette().component().queryField();
+                var field = dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component());
                 for (int code : new int[]{KeyEvent.VK_C, KeyEvent.VK_V}) {
                     assertThat(router.dispatch(press(field, code, primary(true)))).isFalse();
                     assertThat(router.dispatch(release(field, code))).isFalse();
@@ -108,37 +108,37 @@ class PaletteKeyRouterTest {
                 var second = command("fixture.two", count::incrementAndGet);
                 var registration = owner.commands().register(first); owner.commands().register(second);
                 owner.commandPalette().toggle(); var card = owner.commandPalette().component();
-                card.queryField().setText("fixture");
-                for (int i = 0; i < 6; i++) assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_DOWN, 0))).isTrue();
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("fixture");
+                for (int i = 0; i < 6; i++) assertThat(router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_DOWN, 0))).isTrue();
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRowIndex(card)).isEqualTo(1);
-                for (int i = 0; i < 6; i++) router.dispatch(press(card.queryField(), KeyEvent.VK_UP, 0));
+                for (int i = 0; i < 6; i++) router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_UP, 0));
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRowIndex(card)).isZero();
-                assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_5, primary(false)))).isTrue();
-                assertThat(router.dispatch(typed(card.queryField(), '5'))).isTrue();
-                router.dispatch(release(card.queryField(), KeyEvent.VK_5));
+                assertThat(router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_5, primary(false)))).isTrue();
+                assertThat(router.dispatch(typed(dev.jasper.app.palette.PaletteTestSupport.query(card), '5'))).isTrue();
+                router.dispatch(release(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_5));
                 assertThat(count.get()).isZero(); assertThat(owner.commandPalette().isOpen()).isTrue();
-                assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_1, 0))).isFalse();
-                assertThat(router.dispatch(typed(card.queryField(), '1'))).isFalse();
-                var ime = new InputMethodEvent(card.queryField(), InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
+                assertThat(router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_1, 0))).isFalse();
+                assertThat(router.dispatch(typed(dev.jasper.app.palette.PaletteTestSupport.query(card), '1'))).isFalse();
+                var ime = new InputMethodEvent(dev.jasper.app.palette.PaletteTestSupport.query(card), InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
                     new AttributedString("pending").getIterator(), 0, null, null);
-                for (var listener : card.queryField().getInputMethodListeners()) listener.inputMethodTextChanged(ime);
+                for (var listener : dev.jasper.app.palette.PaletteTestSupport.query(card).getInputMethodListeners()) listener.inputMethodTextChanged(ime);
                 for (int code : new int[]{KeyEvent.VK_ENTER, KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_A})
-                    assertThat(router.dispatch(press(card.queryField(), code, 0))).isFalse();
+                    assertThat(router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), code, 0))).isFalse();
                 assertThat(count.get()).isZero();
-                assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ESCAPE, 0))).isTrue();
-                router.dispatch(release(card.queryField(), KeyEvent.VK_ESCAPE));
-                var committed = new InputMethodEvent(card.queryField(), InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
+                assertThat(router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_ESCAPE, 0))).isTrue();
+                router.dispatch(release(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_ESCAPE));
+                var committed = new InputMethodEvent(dev.jasper.app.palette.PaletteTestSupport.query(card), InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
                     null, 0, null, null);
-                for (var listener : card.queryField().getInputMethodListeners()) listener.inputMethodTextChanged(committed);
+                for (var listener : dev.jasper.app.palette.PaletteTestSupport.query(card).getInputMethodListeners()) listener.inputMethodTextChanged(committed);
                 owner.commandPalette().toggle(); registration.close();
                 PaletteTestSupport.setRows(card, owner.commandsScope(), PaletteTestSupport.rows(owner.commandsScope(), List.of(first)), null);
-                assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
-                assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
+                assertThat(router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_ENTER, 0))).isTrue();
+                assertThat(router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(count.get()).isZero();
-                router.dispatch(release(card.queryField(), KeyEvent.VK_ENTER));
+                router.dispatch(release(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_ENTER));
                 owner.commandPalette().toggle(); second.action().setEnabled(false);
                 PaletteTestSupport.setRows(card, owner.commandsScope(), PaletteTestSupport.rows(owner.commandsScope(), List.of(second)), null);
-                router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0));
+                router.dispatch(press(dev.jasper.app.palette.PaletteTestSupport.query(card), KeyEvent.VK_ENTER, 0));
                 assertThat(count.get()).isZero();
             }
         });

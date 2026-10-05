@@ -90,7 +90,7 @@ class PaletteScopesTest {
                 assertThat(PaletteTestSupport.hintBarTexts(card)).as("only the selected row's detail and other verbs")
                     .containsExactly("the alpha detail", "Two ⌘⏎", "Three ⇧⏎");
                 assertThat(fake.activations).isEqualTo(1);
-                card.queryField().setText("al");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("al");
                 assertThat(PaletteTestSupport.entries(card)).containsSubsequence("# Fake", "test.fake/alpha");
                 palette.toggle();
                 assertThat(palette.isOpen()).as("the shortcut closes it again").isFalse();
@@ -113,7 +113,7 @@ class PaletteScopesTest {
                 owner.scopes().register(quiet);
                 var palette = owner.commandPalette(); var card = palette.component();
                 for (String row : new String[] {"gamma", "gamma", "gamma", "beta", "alpha"}) {
-                    palette.open("test.fake"); card.queryField().setText("");
+                    palette.open("test.fake"); dev.jasper.app.palette.PaletteTestSupport.query(card).setText("");
                     PaletteTestSupport.selectRow(card, row); palette.enterPressed(0);
                 }
                 palette.open("test.quiet"); PaletteTestSupport.selectRow(card, "alpha"); palette.enterPressed(0);
@@ -141,21 +141,23 @@ class PaletteScopesTest {
                 owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                card.queryField().setText("fake > al");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("fake > al");
                 assertThat(palette.activeScopeId()).isEqualTo("test.fake");
                 assertThat(PaletteTestSupport.chipText(card)).isEqualTo("Fake");
-                assertThat(card.queryField().getText()).isEqualTo("al");
+                assertThat(PaletteTestSupport.queryText(card)).as("the prefix left the query").isEqualTo("al");
+                PaletteTestSupport.settle();
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).as("and the field once it settles").isEqualTo("al");
                 assertThat(PaletteTestSupport.entries(card)).containsExactly("test.fake/alpha");
-                card.queryField().setText("closes > right");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("closes > right");
                 assertThat(palette.activeScopeId()).as("with a chip, '>' is text").isEqualTo("test.fake");
                 assertThat(PaletteTestSupport.entries(card)).containsExactly("test.fake/gt");
                 assertThat(palette.backspacePressed()).as("the query is not empty").isFalse();
-                card.queryField().setText("");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("");
                 assertThat(palette.backspacePressed()).isTrue();
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
                 assertThat(PaletteTestSupport.chipText(card)).isNull();
                 assertThat(palette.backspacePressed()).as("no chip to remove").isFalse();
-                card.queryField().setText(">");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText(">");
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
                 assertThat(PaletteTestSupport.placeholder(card)).isEqualTo("Type a command");
             }
@@ -175,7 +177,7 @@ class PaletteScopesTest {
                 palette.setVisibleRows(2);
                 assertThat(palette.visibleRows()).isEqualTo(2);
                 palette.toggle();
-                card.queryField().setText("alp");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("alp");
                 var entries = PaletteTestSupport.entries(card);
                 int section = entries.indexOf("# Fake");
                 assertThat(entries.subList(section + 1, section + 13)).as("every match, in order")
@@ -196,7 +198,7 @@ class PaletteScopesTest {
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
                 assertThat(PaletteTestSupport.entries(card)).as("no unprompted rows").noneMatch(entry -> entry.startsWith("test.fake/"));
-                card.queryField().setText("al");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("al");
                 assertThat(PaletteTestSupport.entries(card)).doesNotContain("# Fake").noneMatch(entry -> entry.startsWith("test.fake/"));
                 assertThat(fake.activations).as("All does not activate it").isZero();
                 palette.open("test.fake");
@@ -217,7 +219,7 @@ class PaletteScopesTest {
                 owner.scopes().register(new FakeScope());
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                card.queryField().setText("alph");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("alph");
                 assertThat(palette.isOpen()).isTrue();
                 assertThat(PaletteTestSupport.entries(card)).contains("# Fake").doesNotContain("# Broken");
             }
@@ -231,11 +233,11 @@ class PaletteScopesTest {
                 owner.scopes().register(new FakeScope());
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.open("test.fake");
-                card.queryField().setText("be");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("be");
                 assertThat(palette.tabPressed(false)).isTrue();
                 assertThat(palette.tabPressed(true)).isTrue();
                 assertThat(palette.activeScopeId()).isEqualTo("test.fake");
-                assertThat(card.queryField().getText()).isEqualTo("be");
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).isEqualTo("be");
                 palette.dismiss();
                 assertThat(palette.tabPressed(false)).as("closed").isFalse();
             }
@@ -253,7 +255,7 @@ class PaletteScopesTest {
                 });
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                card.queryField().setText("alph");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("alph");
                 assertThat(PaletteTestSupport.entries(card)).containsExactly("# Fake", "test.fake/alpha", "# Other", "test.other/alpha");
                 assertThat(PaletteTestSupport.selectedRowIndex(card)).isZero();
                 palette.moveSelection(1);
@@ -286,7 +288,7 @@ class PaletteScopesTest {
                 palette.escape();
                 assertThat(PaletteTestSupport.hintBar(card).isVisible()).isTrue();
                 palette.open(PaletteScope.COMMANDS_ID);
-                card.queryField().setText("new tab");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("new tab");
                 assertThat(PaletteTestSupport.hint(card)).as("a command's shortcut").isEqualTo("⌘T");
                 assertThat(PaletteTestSupport.hintActions(card)).isEmpty();
             }
@@ -310,7 +312,7 @@ class PaletteScopesTest {
                 PaletteTestSupport.executeSelected(card);
                 assertThat(fake.executed).containsExactly("alpha:one", "alpha:two", "beta:one");
                 palette.toggle();
-                card.queryField().setText("new tab");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("new tab");
                 PaletteTestSupport.executeSelected(card, 1);
                 assertThat(palette.isOpen()).as("Commands has no second verb").isTrue();
                 assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
@@ -325,16 +327,16 @@ class PaletteScopesTest {
                 var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                card.queryField().setText("beta");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("beta");
                 PaletteTestSupport.selectRow(card, "beta");
                 PaletteTestSupport.executeSelected(card, 1);
                 assertThat(fake.executed).containsExactly("beta:two");
                 palette.toggle();
-                card.queryField().setText("beta");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("beta");
                 PaletteTestSupport.selectRow(card, "beta");
                 palette.enterPressed(2);
                 assertThat(palette.stepOpen()).as("the scope's own step").isTrue();
-                assertThat(PaletteTestSupport.stepTitle(card).getText()).isEqualTo("Fill Beta");
+                assertThat(PaletteTestSupport.stepTitle(card)).isEqualTo("Fill Beta");
                 palette.enterPressed(0);
                 assertThat(fake.completed).hasSize(1);
                 assertThat(palette.isOpen()).isFalse();
@@ -350,7 +352,7 @@ class PaletteScopesTest {
                 var registration = owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                card.queryField().setText("beta");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("beta");
                 PaletteTestSupport.selectRow(card, "beta");
                 palette.enterPressed(2);
                 assertThat(palette.stepOpen()).as("the step opened from All").isTrue();
@@ -390,7 +392,7 @@ class PaletteScopesTest {
                 palette.toggle();
                 var fake = new FakeScope();
                 var registration = owner.scopes().register(fake);
-                card.queryField().setText("gam");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("gam");
                 fake.rows = List.of(PaletteRow.of("gamma", "Gamma"));
                 List.copyOf(fake.listeners).forEach(Runnable::run);
                 assertThat(PaletteTestSupport.entries(card)).contains("# Fake", "test.fake/gamma");
@@ -421,7 +423,7 @@ class PaletteScopesTest {
                 }
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.toggle();
-                card.queryField().setText("row");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("row");
                 assertThat(palette.isOpen()).as("All opens without throwing").isTrue();
                 assertThat(PaletteTestSupport.rowCount(card)).as("at most PaletteResults.MAX_ROWS (200) item rows").isEqualTo(200);
                 var entries = PaletteTestSupport.entries(card);
@@ -436,7 +438,7 @@ class PaletteScopesTest {
                 assertThat(PaletteTestSupport.selectedRow(card)).as("the More row is selected").isNull();
                 palette.enterPressed(0);
                 assertThat(palette.activeScopeId()).isEqualTo("test.fake6");
-                assertThat(card.queryField().getText()).as("the query is kept").isEqualTo("row");
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).as("the query is kept").isEqualTo("row");
                 assertThat(PaletteTestSupport.rowCount(card)).isEqualTo(30);
             }
         });
@@ -483,15 +485,15 @@ class PaletteScopesTest {
                 var palette = owner.commandPalette(); var card = palette.component();
                 var router = PaletteKeyRouterTest.router(owner, true, root);
                 palette.open("test.fake");
-                card.queryField().setText("al");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("al");
                 assertThat(PaletteTestSupport.hintActions(card)).containsExactly("Two ⌘⏎", "Three ⇧⏎");
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_ENTER));
                 assertThat(palette.stepOpen()).isTrue();
-                assertThat(card.queryField().getText()).isEqualTo("al");
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).isEqualTo("al");
                 assertThat(PaletteTestSupport.stepFields(card)).hasSize(2);
                 assertThat(PaletteTestSupport.stepFields(card).getFirst().getText()).isEqualTo("pre");
-                assertThat(PaletteTestSupport.stepTitle(card).getText()).isEqualTo("Fill Alpha");
+                assertThat(PaletteTestSupport.stepTitle(card)).isEqualTo("Fill Alpha");
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_DOWN, 0))).isTrue();
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_2, primary(true)))).isTrue();
                 assertThat(fake.executed).isEmpty();
@@ -507,7 +509,7 @@ class PaletteScopesTest {
                 assertThat(fake.completed).hasSize(1);
                 assertThat(fake.completed.getFirst()).containsEntry("first", "pre").containsEntry("second", "two");
                 assertThat(palette.stepOpen()).isTrue();
-                assertThat(PaletteTestSupport.stepError(card).getText()).isEqualTo("Nope");
+                assertThat(PaletteTestSupport.stepError(card)).isEqualTo("Nope");
                 fake.stepResult = PaletteStep.Result.reopen(PaletteScope.COMMANDS_ID, "new_tab");
                 palette.enterPressed(1);
                 assertThat(fake.completed).hasSize(2);
@@ -515,7 +517,7 @@ class PaletteScopesTest {
                 assertThat(palette.stepOpen()).isFalse();
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
                 assertThat(PaletteTestSupport.selectedRow(card).id()).isEqualTo("new_tab");
-                assertThat(card.queryField().getText()).isEmpty();
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).isEmpty();
             } finally { new dev.jasper.app.appearance.ThemeController(); }
         });
     }
@@ -528,7 +530,7 @@ class PaletteScopesTest {
                 install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.open("test.fake");
-                card.queryField().setText("al");
+                dev.jasper.app.palette.PaletteTestSupport.query(card).setText("al");
                 palette.enterPressed(2);
                 assertThat(palette.stepOpen()).isTrue();
                 fake.rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("alpine", "Alpine"));
@@ -537,13 +539,13 @@ class PaletteScopesTest {
                 palette.escape();
                 assertThat(palette.stepOpen()).isFalse();
                 assertThat(palette.isOpen()).isTrue();
-                assertThat(card.queryField().getText()).isEqualTo("al");
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).isEqualTo("al");
                 assertThat(PaletteTestSupport.rowCount(card)).isEqualTo(2);
                 palette.enterPressed(2);
                 palette.open(PaletteScope.COMMANDS_ID);
                 assertThat(palette.stepOpen()).isFalse();
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
-                assertThat(card.queryField().getText()).isEqualTo("al");
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.query(card).getText()).isEqualTo("al");
                 palette.open("test.fake");
                 palette.enterPressed(2);
                 fake.stepResult = PaletteStep.Result.done();
@@ -612,7 +614,7 @@ class PaletteScopesTest {
                         var oldTab = content.currentTab();
                         content.newTab(DesktopTestSupport.HOME); content.closeTab(oldTab);
                     }
-                    palette.open(fake.id()); palette.component().queryField().setText("beta");
+                    palette.open(fake.id()); dev.jasper.app.palette.PaletteTestSupport.query(palette.component()).setText("beta");
                     palette.enterPressed(2); palette.enterPressed(0);
                     assertThat(fake.completed).hasSize(2);
                 });
@@ -622,7 +624,7 @@ class PaletteScopesTest {
                     assertThat(palette.isOpen()).as("transition %s", mode).isTrue();
                     assertThat(palette.stepOpen()).isTrue();
                     assertThat(palette.activeScopeId()).isEqualTo("test.fake");
-                    assertThat(palette.component().queryField().getText()).isEqualTo("beta");
+                    assertThat(dev.jasper.app.palette.PaletteTestSupport.query(palette.component()).getText()).isEqualTo("beta");
                     palette.enterPressed(0);
                     assertThat(fake.completed).hasSize(2);
                     assertThat(fake.executed).isEmpty();

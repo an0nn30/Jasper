@@ -39,14 +39,14 @@ public final class PaletteController implements AutoCloseable {
     private boolean open, closed, completing, dirty = true, rosterChanged;
     private long generation;
 
-    public PaletteController(ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
+    public PaletteController(dev.jasper.ui.swing.KitContext kit, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
                       Runnable layout, Runnable dismissed, BooleanSupplier batching, Runnable updateActions,
                       Consumer<String> reportError, Consumer<String> reopen) {
         this.scopes = scopes; this.history = java.util.Objects.requireNonNull(history); this.macOs = macOs; this.layout = layout; this.dismissed = dismissed;
         this.batching = batching; this.updateActions = updateActions;
         this.reportError = reportError; this.reopen = reopen;
         context = new PaletteContext(macOs, PaletteTarget.none());
-        palette = new CommandPalette(macOs, this::queryChanged, this::execute, this::prefix, scope -> selectTab(scope.id()));
+        palette = new CommandPalette(kit, macOs, this::queryChanged, this::execute, this::prefix, scope -> selectTab(scope.id()));
         scopesListener = scopes.onChanged(this::rosterChanged);
     }
 
@@ -75,12 +75,12 @@ public final class PaletteController implements AutoCloseable {
             generation++;
             originValid = valid;
             context = new PaletteContext(macOs, target);
-            palette.queryField().setText("");
+            palette.setQueryText("");
             open = true;
             palette.setVisible(true);
             activate(tabId);
         }
-        if (queryOrNull != null) palette.queryField().setText(queryOrNull);
+        if (queryOrNull != null) palette.setQueryText(queryOrNull);
         if (rowIdOrNull != null) palette.selectRow(rowIdOrNull);
         return true;
     }
@@ -160,7 +160,7 @@ public final class PaletteController implements AutoCloseable {
 
     /** Backspace in an empty query removes the chip; false leaves the key to the field. */
     public boolean backspacePressed() {
-        if (!open || step != null || active == null || !palette.queryField().getText().isEmpty()) return false;
+        if (!open || step != null || active == null || !palette.queryText().isEmpty()) return false;
         activate(PaletteScope.ALL_ID);
         return true;
     }
@@ -248,7 +248,7 @@ public final class PaletteController implements AutoCloseable {
         completing = false;
         palette.hideStep();
         rebuild(true);
-        palette.queryField().requestFocusInWindow();
+        palette.focusQuery();
     }
 
     private void completeStep() {
@@ -269,7 +269,7 @@ public final class PaletteController implements AutoCloseable {
                     restoreAndHide();
                     if (result.reopenScopeId() != null) {
                         reopen.accept(result.reopenScopeId());
-                        if (open && result.reopenQuery() != null) palette.queryField().setText(result.reopenQuery());
+                        if (open && result.reopenQuery() != null) palette.setQueryText(result.reopenQuery());
                         if (open && result.reopenRowId() != null) palette.selectRow(result.reopenRowId());
                     }
                 };
@@ -340,7 +340,7 @@ public final class PaletteController implements AutoCloseable {
         if (step != null) { dirty = true; return; }
         dirty = false;
         String keep = preserve ? palette.selectedKey() : null;
-        String query = palette.queryField().getText();
+        String query = palette.queryText();
         var entries = new ArrayList<PaletteEntry>();
         String initial = null;
         if (active != null) {
@@ -422,5 +422,6 @@ public final class PaletteController implements AutoCloseable {
         if (closed) return;
         dismiss(); closed = true; generation++;
         scopesListener.close();
+        palette.close();
     }
 }

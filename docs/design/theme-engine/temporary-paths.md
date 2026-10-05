@@ -254,6 +254,32 @@ Out-of-family integration: `windows/NativeShells` now passes the chrome context 
 `FileChooserPanel.installDefaultAction` instead of `setDefaultButton`; its `JOptionPane` replace and new-folder
 prompts are Task 6c. `workspace/WindowCommandPalette` (palette focus traversal) is untouched until 6b-2.
 
+## Task 6b-2 consumer removal (palette)
+
+Plan 2 Task 6b-2 moved the command palette card (`palette/CommandPalette`) to module kit views on the chrome
+`KitContext` (`ThemeController.appearance().context(ThemeRoute.CHROME)`, passed from `workspace/WindowContent` through
+`WindowCommandPalette` and `PaletteController`). The family no longer reads any `LegacyAppearanceDefaults` key or
+FlatLaf style: the former readers of `List.foreground`/`List.background`/`List.selectionBackground`/
+`List.selectionForeground`/`List.hoverBackground`/`List.selectionArc`/`List.selectionInsets`,
+`SearchEverywhere.SearchField.infoForeground`/`.borderColor`, `SearchEverywhere.List.separatorColor`/
+`.separatorForeground`, `SearchEverywhere.Advertiser.foreground`, `SearchEverywhere.Tab.selectedBackground`,
+`Component.linkColor`, `Component.borderColor`, `Popup.borderColor`, `PopupMenu.borderColor`, `Separator.foreground`,
+`Label.foreground`/`Label.disabledForeground`/`Label.font`, `Panel.background`, `Actions.Red`, the
+`FlatClientProperties` placeholder/style/leading-icon client properties, `FlatLineBorder` and `FlatUIUtils.paintSelection`
+(the JList renderer, the `JTextField` with its `DocumentFilter`, the chip, hint and step `JLabel`s) were rewritten as kit
+descriptors. Remaining raw Swing in the family is layout only: the card shell (rounded clip and hairline outline painted
+from `border.menu` over `surface.card`, `PALETTE_*`/`RESULTS_*` named metrics with the former values), the fixed-height
+query row and hint bar (a `border.subtle` rule), the CardLayout centre and the query-only focus traversal policy. The
+keys stay published for their other consumers (6c pluginmanager/notifications, Tasks 7–10 plugins) until Task 11.
+
+Task 11 dependency (ruling P5): SDK `PaletteRow.icon`/`ScopeSpec.icon` are still raw `Optional<Icon>`. The kit palette
+shows host glyphs by name (`AppIcons.kitName`) and omits plugin row icons on this branch; the scope chip has no icon
+(ruling P9). Task 11 must turn the SDK palette icons into named icons and show them again.
+
+Out-of-family integration: `workspace/WindowCommandPalette` passes the chrome context and focuses the query through
+`CommandPalette.focusQuery()`; the card owns its focus cycle (the old query-only policy), so nothing outside the
+family reaches the kit input. `workspace/WindowContent` passes `themes.appearance().context(CHROME)` (one line).
+
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 
 **Preserved native geometry (no visual change in Plan 2).** Native adapters keep their pre-migration values

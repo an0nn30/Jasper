@@ -233,7 +233,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         chrome = new WindowChrome(this);
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
-        commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs);
+        commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs,
+            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             this::ownsKeySource);
         addHierarchyListener(event -> {

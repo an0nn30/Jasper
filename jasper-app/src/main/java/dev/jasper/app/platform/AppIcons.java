@@ -63,6 +63,16 @@ public final class AppIcons {
             DesignMetrics.DEFAULT.value(DesignMetrics.Role.ICON_RAIL), false));
     }
 
+    /**
+     * The module glyph name behind a host icon, for kit descriptors: present for {@link #icon}, {@link #named} and
+     * {@link #semantic} icons, empty for authored catalog or plugin artwork.
+     */
+    public static java.util.Optional<String> kitName(Icon icon) {
+        if (icon instanceof SemanticIcon named) return java.util.Optional.of(named.name());
+        if (icon instanceof SurfaceIcon surface) return java.util.Optional.of(surface.icon().name());
+        return java.util.Optional.empty();
+    }
+
     /** The authored light SVG behind a semantic name, for a surface that renders it itself (the macOS menu bar glyph). */
     static java.net.URL artwork(String name) {
         return Objects.requireNonNull(AppIcons.class.getClassLoader().getResource(BASE + NamedIcons.id(name) + ".svg"), name);

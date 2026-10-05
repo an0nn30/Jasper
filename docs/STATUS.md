@@ -2,6 +2,22 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 6b-2 implemented (command palette); review pending** (2026-10-05). Carried preliminary
+  fix first: Settings' `okSettings` and the chooser's `chooser.approve` window Enter bindings are disabled while OK/the
+  primary is (spec §6), so Enter is then not consumed, like a disabled default button. Kit additions next (spec §6,
+  mirrored in SDK, host `KitValues`/`HostedKitView`, testkit fake and `KitContractTest`, SDK version unchanged):
+  `ListItem.heading`, `ListKind.RESULTS` (follows an external field: never focusable, press runs a row, fixed
+  `RESULTS_ROW_HEIGHT`/`RESULTS_HEADING_HEIGHT`, one-line rows whose tag drops first, selection and its heading kept in
+  view on host updates, scroll kept on theme changes), `ItemList.visibleRows`, `KitView`/`UiView.composing(fieldId)`
+  (fake `setComposing`); SEARCH fields no longer show a label (accessible name only), which also restores the
+  pre-Plan-2 look of the Settings and chooser search fields. The palette card is a layout-only shell on the chrome
+  context (`PALETTE_*` metrics, exact geometry tests kept) hosting kit views for the chip, query, results, empty line,
+  hint bar and step form; no UIManager/FlatLaf reads remain. Scopes, recents, verbs and keys, selection persistence,
+  IME suppression and focus are unchanged; a typed scope prefix becomes the chip through host normalization of
+  `Edited`. `WindowCommandPalette` passes the context and uses `focusQuery()`. Query, caret, selection and scroll
+  survive a theme switch (tested). Until Task 11: plugin palette row icons are omitted (raw SDK icons) and the chip has
+  no icon. GUI checks for the user: palette look, click-to-run, IME composition, Tab in steps.
+
 - **Theme engine Plan 2 Task 6b-1 implemented (files chooser, shortcuthelp/Keymap); review pending** (2026-10-05).
   Controller split 6b into 6b-1 and 6b-2 (palette). Kit additions first (`b5b5597b`, spec §6), mirrored in SDK, host
   `KitValues`, testkit fake and `KitContractTest`, SDK version unchanged (Task 11): `Column` weight/sort with

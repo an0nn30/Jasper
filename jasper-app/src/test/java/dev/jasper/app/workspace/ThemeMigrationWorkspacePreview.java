@@ -26,10 +26,10 @@ public final class ThemeMigrationWorkspacePreview {
                         owner.selectTheme(theme);
                         ThemeMigrationCapture.save("workspace", name, "launch-pending", root, 1000, 620);
                         owner.commandPalette().open(PaletteScope.ALL_ID);
-                        owner.commandPalette().component().queryField().setText("pane");
+                        dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("pane");
                         if (PaletteTestSupport.rowCount(owner.commandPalette().component()) == 0) throw new AssertionError("Actual pane commands missing");
                         ThemeMigrationCapture.save("palette-current", name, "pane-query", root, 1000, 620);
-                        owner.commandPalette().component().queryField().setText("fixture-no-match-command");
+                        dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText("fixture-no-match-command");
                         if (PaletteTestSupport.rowCount(owner.commandPalette().component()) != 0) throw new AssertionError("Unexpected fixture match");
                         ThemeMigrationCapture.save("palette-current", name, "no-match", root, 1000, 620);
                         owner.commandPalette().escape();

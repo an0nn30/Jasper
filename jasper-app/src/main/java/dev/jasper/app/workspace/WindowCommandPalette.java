@@ -33,22 +33,15 @@ final class WindowCommandPalette implements AutoCloseable {
 
     private final dev.jasper.app.commands.CommandHistory history;
 
+    /** {@code kit} is the chrome context the palette's kit views mount on; the palette owns its focus cycle. */
     WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history,
-                         String defaultScopeId, boolean macOs) {
+                         String defaultScopeId, boolean macOs, dev.jasper.ui.swing.KitContext kit) {
         this.history = history;
         this.owner = owner; this.defaultScopeId = defaultScopeId;
-        controller = new PaletteController(scopes, history, macOs, this::layoutOverlay, this::restoreAndHide,
+        controller = new PaletteController(kit, scopes, history, macOs, this::layoutOverlay, this::restoreAndHide,
             owner::updatingActions, owner::updateActions,
             message -> owner.onError.accept("Command failed", message), this::open);
         palette = controller.component();
-        palette.setFocusCycleRoot(true);
-        palette.setFocusTraversalPolicy(new FocusTraversalPolicy() {
-            @Override public Component getComponentAfter(Container root, Component current) { return palette.queryField(); }
-            @Override public Component getComponentBefore(Container root, Component current) { return palette.queryField(); }
-            @Override public Component getFirstComponent(Container root) { return palette.queryField(); }
-            @Override public Component getLastComponent(Container root) { return palette.queryField(); }
-            @Override public Component getDefaultComponent(Container root) { return palette.queryField(); }
-        });
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);
     }
 
@@ -81,7 +74,7 @@ final class WindowCommandPalette implements AutoCloseable {
             if (controller.open(id, originPane == null ? PaletteTarget.window(owner.id()) : target(originPane), this::validOrigin, queryOrNull, rowIdOrNull)) {
                 if (!wasOpen) overlay.swallowing = false;
                 overlay.setVisible(true); layoutOverlay();
-                palette.queryField().requestFocusInWindow();
+                palette.focusQuery();
             }
         }
 

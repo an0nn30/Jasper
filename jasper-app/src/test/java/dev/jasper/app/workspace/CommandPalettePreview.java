@@ -212,7 +212,7 @@ public final class CommandPalettePreview {
                 themes.configure(theme);
                 while (owner.commandPalette().stepOpen()) owner.commandPalette().escape();
                 if (!scenario.scope.equals(owner.commandPalette().activeScopeId())) owner.commandPalette().open(scenario.scope);
-                owner.commandPalette().component().queryField().setText(scenario.query);
+                dev.jasper.app.palette.PaletteTestSupport.query(owner.commandPalette().component()).setText(scenario.query);
             });
         }
 
@@ -244,7 +244,7 @@ public final class CommandPalettePreview {
                 int actualUnit = UIScale.scale(1);
                 var palette = owner.commandPalette().component();
                 Dimension preferred = palette.getPreferredSize();
-                int inputHeight = palette.queryField().getParent().getPreferredSize().height;
+                int inputHeight = dev.jasper.app.palette.PaletteTestSupport.fieldRow(palette).getPreferredSize().height;
                 int rowHeight = dev.jasper.app.palette.PaletteTestSupport.itemHeight(palette);
                 if (actualUnit != expectedScale) {
                     throw new AssertionError("Expected UIScale " + expectedScale + "x, got " + actualUnit + "x");
