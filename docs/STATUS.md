@@ -17,7 +17,7 @@
   package rebuild after license whitespace normalization passed; all four fonts and four notices in
   the image match source bytes. Changed-source hygiene and whitespace checks passed. A 2x headless
   12 pt style/symbol render was inspected (`jasper-app/build/font-preview/cousine-12pt-2x.png`).
-  No GUI, benchmark or AOT training. Awaiting the user's merge/push choice.
+  No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05; no push requested.
 
 - **Terminal Share Path** (2026-10-05; `codex/share-path`, isolated worktree
   `/Users/dustin/.codex/worktrees/share-path/moray`): implements the user-approved bounded design:
