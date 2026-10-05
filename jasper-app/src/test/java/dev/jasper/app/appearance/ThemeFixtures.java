@@ -1,4 +1,5 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,7 +25,7 @@ public final class ThemeFixtures {
         Path source = file.resolveSibling("." + file.getFileName() + ".jar");
         plugin(source, name, dark, background, console);
         try {
-            var converted = dev.jasper.app.themeimport.ThemeConverter.convert(source).getFirst();
+            var converted = dev.jasper.ui.themeimport.ThemeConverter.convert(source).getFirst();
             Files.writeString(file, ThemeTomlWriter.write(converted.document()));
             Files.delete(source); return file;
         } catch (IOException failure) { throw new UncheckedIOException(failure); }

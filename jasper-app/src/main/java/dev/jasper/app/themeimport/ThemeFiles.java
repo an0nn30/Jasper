@@ -1,10 +1,11 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeSources;
 
 import dev.jasper.app.appearance.ThemeCatalog;
-import dev.jasper.app.appearance.ThemeDocument;
-import dev.jasper.app.appearance.ThemeResolver;
-import dev.jasper.app.appearance.ThemeToml;
-import dev.jasper.app.appearance.ThemeTomlWriter;
+import dev.jasper.ui.theme.ThemeDocument;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;

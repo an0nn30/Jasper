@@ -1,8 +1,9 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ConversionResult;
 
 import dev.jasper.app.appearance.ThemeFixtures;
-import dev.jasper.app.appearance.ThemeToml;
-import dev.jasper.app.appearance.ThemeTomlWriter;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -14,6 +15,26 @@ import static org.assertj.core.api.Assertions.*;
 
 class ThemeImporterTest {
     @TempDir Path home;
+    @Test void nativeSemanticIntentAndDiscardDiagnosticsSurviveKeepBothWithoutTouchingSource() throws Exception {
+        new ThemeFiles(home).create(named("Authored"));
+        Path source = home.resolve("authored.toml");
+        Files.writeString(source, "name='Authored'\nextends='Jasper Dark'\n[semantic]\n'surface.card'='#12345680'\n[ui]\n'Button.arc'=99\n[workspace]\nopacity=0.7\n");
+        byte[] before = Files.readAllBytes(source);
+        var importer = new ThemeImporter(home);
+        var plan = importer.plan(source);
+        assertThat(plan.failures()).isEmpty();
+        var item = plan.items().getFirst();
+        assertThat(item.conversion().warnings().stream().filter(w -> w.contains("Button.arc"))).hasSize(1);
+        var report = importer.commit(plan, Map.of(item.id(), ThemeImporter.ConflictChoice.KEEP_BOTH));
+        assertThat(report.failures()).isEmpty();
+        var loaded = ThemeToml.parse(Files.readString(report.imported().getFirst().path()), "installed");
+        assertThat(loaded.name()).isEqualTo("Authored 2");
+        assertThat(loaded.semanticOverrides()).containsEntry(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD, new java.awt.Color(0x12,0x34,0x56,0x80));
+        assertThat(loaded.workspace().levels().opacity()).isEqualTo(.7);
+        assertThat(loaded.ui()).doesNotContainKey("Button.arc");
+        assertThat(Files.readAllBytes(source)).isEqualTo(before);
+    }
+
     private Path source(String name) throws Exception {
         Path file = home.resolve("source.toml"); Files.writeString(file, ThemeTomlWriter.write(named(name))); return file;
     }
@@ -102,7 +123,7 @@ class ThemeImporterTest {
             assertThat(item.path()).hasSameBinaryContentAs(target);
         });
         assertThat(ThemeToml.parse(Files.readString(target), "saved").seeds())
-            .containsEntry(dev.jasper.app.appearance.Seed.BACKGROUND, new java.awt.Color(0x123456));
+            .containsEntry(dev.jasper.ui.theme.Seed.BACKGROUND, new java.awt.Color(0x123456));
     }
 
     @Test void sameNamedProvidersCanBeChosenIndependently() {

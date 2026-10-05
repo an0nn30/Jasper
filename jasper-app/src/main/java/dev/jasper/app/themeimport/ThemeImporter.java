@@ -1,8 +1,11 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeSources;
+import dev.jasper.ui.themeimport.ThemeConverter;
+import dev.jasper.ui.themeimport.ConversionResult;
 
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeCatalog;
-import dev.jasper.app.appearance.ThemeDocument;
+import dev.jasper.ui.theme.ThemeDocument;
 import dev.jasper.app.appearance.ThemeManager;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -78,9 +81,7 @@ public final class ThemeImporter {
                         if (!ids.add(item.id())) throw new IOException("Duplicate import item identity");
                         ConflictChoice choice = selected.getOrDefault(item.id(), item.target().isPresent() ? ConflictChoice.SKIP : ConflictChoice.KEEP_BOTH);
                         if (choice == ConflictChoice.SKIP) continue;
-                        ThemeDocument original = item.conversion().document();
-                        ThemeDocument document = dev.jasper.app.appearance.ThemeToml.parse(
-                            dev.jasper.app.appearance.ThemeTomlWriter.write(original), original.origin());
+                        ThemeDocument document = item.conversion().document();
                         String name = document.name(); String normalized = key(name);
                         boolean replace = item.target().isPresent() && choice == ConflictChoice.REPLACE;
                         if (replace) {
@@ -141,7 +142,7 @@ public final class ThemeImporter {
     static String key(String name) { return name.strip().toLowerCase(Locale.ROOT); }
     static ThemeDocument rename(ThemeDocument base, String name) {
         return new ThemeDocument(base.origin(), name, base.dark(), base.parent(), base.parentLine(), base.uiComplete(), base.metadata(),
-            base.seeds(), base.ansi(), base.tokens(), base.syntax(), base.ui(), base.icons(), base.workspace());
+            base.seeds(), base.ansi(), base.tokens(), base.syntax(), base.ui(), base.icons(), base.workspace(), base.semanticOverrides());
     }
     private static void worker() { if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Theme import requires a worker thread"); }
     private static String message(Throwable failure) { return failure.getMessage() == null ? failure.toString() : failure.getMessage(); }

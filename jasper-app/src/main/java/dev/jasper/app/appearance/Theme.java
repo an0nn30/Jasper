@@ -1,4 +1,7 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.theme.ThemeGenerator;
+import dev.jasper.ui.theme.ThemeDocument;
+import dev.jasper.ui.theme.GeneratedTheme;
 
 import dev.jasper.terminal.config.Palette;
 import java.nio.file.Path;
@@ -17,7 +20,7 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     }
 
     /**
-     * A theme Jasper ships, from {@code file} under {@code dev/jasper/app/themes/}: a Jasper theme or a converted IntelliJ
+     * A theme Jasper ships, from {@code file} under {@code dev/jasper/ui/themeimport/native/}: a Jasper theme or a converted IntelliJ
      * one. Its document is read on first use, once: nearly all of a converted theme's bytes are [ui] and [icons] tables,
      * which only installing or previewing it needs. Bundled themes are equal by file, so comparing catalogs reads nothing.
      */
@@ -66,6 +69,6 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     /** The theme {@code source}'s document generates, under {@code id}. */
     public static Theme of(String id, Source source) {
         GeneratedTheme generated = ThemeGenerator.generate(source.document());
-        return new Theme(id, generated.name(), generated.dark(), generated.terminal(), source);
+        return new Theme(id, generated.name(), generated.dark(), TerminalPaletteAdapter.toTerminal(generated.terminal()), source);
     }
 }

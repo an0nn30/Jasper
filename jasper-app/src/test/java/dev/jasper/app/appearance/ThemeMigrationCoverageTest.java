@@ -24,7 +24,17 @@ class ThemeMigrationCoverageTest {
         for (var row : rows) {
             assertThat(row).as("CSV column count: %s", row).hasSize(8);
             assertThat(paths.add(row.get(0))).as("unique source: %s", row.get(0)).isTrue();
-            assertThat(Files.isRegularFile(ROOT.resolve(row.get(0)))).as("existing source: %s", row.get(0)).isTrue();
+            String disposition = row.get(7);
+            if (disposition.startsWith("Removed in Plan 2 Tasks 2-3; authority=")) {
+                assertThat(Files.exists(ROOT.resolve(row.get(0)))).as("removed source: %s", row.get(0)).isFalse();
+                String authority = disposition.substring(disposition.indexOf("authority=") + 10).split(";", 2)[0];
+                assertThat(Files.isRegularFile(ROOT.resolve(authority))).as("replacement authority: %s", authority).isTrue();
+            } else if (disposition.startsWith("Moved in Plan 2 Tasks 2-3 to ")) {
+                assertThat(Files.exists(ROOT.resolve(row.get(0)))).as("moved source: %s", row.get(0)).isFalse();
+                String destination = disposition.substring("Moved in Plan 2 Tasks 2-3 to ".length()).split(";", 2)[0];
+                assertThat(Files.isRegularFile(ROOT.resolve(destination))).as("moved destination: %s", destination).isTrue();
+                assertThat(rows).anySatisfy(moved -> assertThat(moved.get(0)).isEqualTo(destination));
+            } else assertThat(Files.isRegularFile(ROOT.resolve(row.get(0)))).as("existing source: %s", row.get(0)).isTrue();
             assertThat(CLASSIFICATIONS).contains(row.get(3));
             assertThat(row.get(1)).isNotBlank();
             assertThat(row.get(7)).isNotBlank();

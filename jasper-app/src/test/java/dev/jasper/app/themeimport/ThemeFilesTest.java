@@ -1,8 +1,8 @@
 package dev.jasper.app.themeimport;
 
 import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.appearance.ThemeDocument;
-import dev.jasper.app.appearance.ThemeToml;
+import dev.jasper.ui.theme.ThemeDocument;
+import dev.jasper.ui.themeio.ThemeToml;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;

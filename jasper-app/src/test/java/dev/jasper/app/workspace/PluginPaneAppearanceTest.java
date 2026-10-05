@@ -1,7 +1,10 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import dev.jasper.app.config.*;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.contributions.Contributions;
 import java.util.ArrayDeque;
 import javax.swing.*;
@@ -183,7 +186,7 @@ class PluginPaneAppearanceTest {
             ui.put("Panel.background", "#17232f");
             var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
                 base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons());
-            var chrome = new Theme("optional-pane", "Optional Pane", true, ThemeGenerator.generate(document).terminal(),
+            var chrome = new Theme("optional-pane", "Optional Pane", true, dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(ThemeGenerator.generate(document).terminal()),
                 new Theme.UserFile(java.nio.file.Path.of("optional-pane.toml"), document));
             var themes = new ThemeController(chrome);
             themes.configure(chrome, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());

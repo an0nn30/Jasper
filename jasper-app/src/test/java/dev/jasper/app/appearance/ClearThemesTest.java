@@ -1,4 +1,6 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.theme.GlassLevels;
+import dev.jasper.ui.theme.GeneratedTheme;
 
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.terminal.config.Palette;
@@ -21,7 +23,7 @@ class ClearThemesTest {
         GeneratedTheme theme = generated("Clear Dark");
         assertThat(theme.dark()).isTrue();
         assertThat(theme.glass()).isEqualTo(new GlassLevels(0.95, true));
-        Palette palette = theme.terminal();
+        var palette = theme.terminal();
         assertThat(hex(palette.background())).isEqualTo("#212734");
         assertThat(hex(palette.foreground())).isEqualTo("#e6e6e6");
         assertThat(hex(palette.selection())).isEqualTo("#334e5e");
@@ -35,7 +37,7 @@ class ClearThemesTest {
         GeneratedTheme theme = generated("Clear Light");
         assertThat(theme.dark()).isFalse();
         assertThat(theme.glass()).isEqualTo(new GlassLevels(0.93, true));
-        Palette palette = theme.terminal();
+        var palette = theme.terminal();
         assertThat(hex(palette.background())).isEqualTo("#ffffff");
         assertThat(hex(palette.foreground())).isEqualTo("#3a4851");
         assertThat(hex(palette.selection())).isEqualTo("#e5ecf1");

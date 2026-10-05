@@ -1,4 +1,6 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeSources;
+import dev.jasper.ui.themeimport.AlacrittyTheme;
 
 import dev.jasper.app.appearance.ThemeFixtures;
 
@@ -54,7 +56,7 @@ class AlacrittyThemeTest {
     @Test void aFullThemeMapsOntoThePalette() {
         var result = AlacrittyTheme.read(FULL);
         assertThat(result.problems()).isEmpty();
-        Palette palette = result.palette().orElseThrow();
+        var palette = result.palette().orElseThrow();
         assertThat(palette.background()).isEqualTo(new Color(0x282a36));
         assertThat(palette.foreground()).isEqualTo(new Color(0xf8f8f2));
         assertThat(palette.cursor()).isEqualTo(new Color(0xffb86c));
@@ -76,7 +78,7 @@ class AlacrittyThemeTest {
             red = '#ff0000'
             """);
         assertThat(result.problems()).isEmpty();
-        Palette palette = result.palette().orElseThrow();
+        var palette = result.palette().orElseThrow();
         assertThat(palette.cursor()).as("a keyword cursor is the foreground").isEqualTo(new Color(0xe0e0e0));
         assertThat(palette.selection()).as("30% foreground over background").isEqualTo(new Color(
             (int) Math.round(0xe0 * 0.3 + 0x10 * 0.7), (int) Math.round(0xe0 * 0.3 + 0x10 * 0.7), (int) Math.round(0xe0 * 0.3 + 0x10 * 0.7)));

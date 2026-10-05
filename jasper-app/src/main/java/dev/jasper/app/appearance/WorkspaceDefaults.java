@@ -1,4 +1,6 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.theme.Token;
+import dev.jasper.ui.theme.GeneratedTheme;
 
 import javax.swing.UIManager;
 

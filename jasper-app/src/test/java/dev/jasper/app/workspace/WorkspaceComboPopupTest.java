@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import java.awt.Color;
 import javax.swing.*;
 import javax.swing.plaf.basic.ComboPopup;

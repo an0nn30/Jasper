@@ -37,6 +37,12 @@ not claim fresh visual inspection of all 42 sheets or native acceptance.
 
 ## Known Minor and acceptance boundaries
 
+**Resolved in Plan 2 Tasks 2–3 (2026-10-05), independent review pending:** the three probes
+below now match pinned FlatLaf 3.7 in `AuthoredUiColorsTest`. Spin ignores relative hue scaling;
+percentage channels truncate and HSL channels use pinned float interpolation. The table is retained
+as historical failure evidence, not current output. Focused module gate: 128 tests, zero failures.
+Native visual acceptance and complete admitted-expression parity are not claimed.
+
 The final review's JBR 25 headless differential probe found these exact ARGB results against
 pinned FlatLaf 3.7:
 

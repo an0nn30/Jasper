@@ -1,4 +1,9 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.theme.ThemeGenerator;
+import dev.jasper.ui.theme.GeneratedTheme;
 
 /** The themes Jasper ships: Jasper Light/Dark, Nord and Clear Dark/Light. */
 final class BuiltInThemes {
@@ -12,7 +17,7 @@ final class BuiltInThemes {
      */
     static Theme toml(String id, String file) {
         GeneratedTheme summary = ThemeGenerator.generate(ThemeResolver.resolve(ThemeToml.parse(head(read(file)), file)));
-        return new Theme(id, summary.name(), summary.dark(), summary.terminal(),
+        return new Theme(id, summary.name(), summary.dark(), TerminalPaletteAdapter.toTerminal(summary.terminal()),
             new Theme.Bundled(file, () -> ThemeResolver.resolve(ThemeToml.parse(read(file), file))));
     }
 

@@ -71,8 +71,6 @@ final class HostedUi {
     private record Context(WindowHandle window, Optional<PaneHandle> pane) implements ActionContext { }
 
     private volatile dev.jasper.app.appearance.ResolvedTheme appearanceSnapshot;
-    private dev.jasper.app.appearance.ResolvedTheme kitSource;
-    private dev.jasper.ui.theme.ThemePair kitSnapshot;
     private final List<Consumer<Variant>> themeHandlers = new ArrayList<>();
     private final List<Consumer<Variant>> workspaceHandlers = new ArrayList<>();
 
@@ -306,10 +304,11 @@ final class HostedUi {
     }
 
     dev.jasper.ui.theme.ThemePair kitThemes() {
-        var source=appearanceSnapshot;
-        if(source==null)return KitThemeBridge.fallback(variant.get()==Variant.DARK);
-        if(kitSnapshot==null || source!=kitSource){kitSnapshot=KitThemeBridge.pair(source);kitSource=source;}
-        return kitSnapshot;
+        var source = appearanceSnapshot;
+        if (source != null) return source.pair();
+        var theme = dev.jasper.app.appearance.ThemeManager.generated(variant.get() == Variant.DARK
+            ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        return new dev.jasper.ui.theme.ThemePair(theme, theme);
     }
 
     Appearance appearance() {

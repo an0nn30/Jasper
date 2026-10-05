@@ -17,7 +17,12 @@ final class AuthoredUiColors {
         document.ui()
                 .forEach(
                         (key, raw) -> {
-                            if (!UiColorKeys.supports(key, raw)) return;
+                            if (!UiColorKeys.supports(key, raw)) {
+                                if (Arrays.stream(Token.values()).anyMatch(token -> UiTokenKeys.aliases(token).contains(key)) && raw instanceof String text
+                                        && (text.startsWith("#") || text.startsWith("$") || text.startsWith("@") || text.contains("(") || text.contains(" ")))
+                                    throw new IllegalArgumentException(document.origin() + ": invalid [ui] color " + key);
+                                return;
+                            }
                             Object value = branch(raw);
                             if (value == null) return;
                             if (key.startsWith("*."))
@@ -78,6 +83,10 @@ final class AuthoredUiColors {
                 }
             }
             if (source != null) {
+                // Old native exports can contain an unresolved vendor palette name. Only a
+                // top-level unprefixed bare name is optional; explicit/reference operands stay strict.
+                if (supplied instanceof String text && text.matches("[A-Za-z][A-Za-z0-9_.-]*")
+                        && !text.equals("null") && !values.containsKey(text) && !values.containsKey("ColorPalette." + text)) continue;
                 try {
                     Color color = color(supplied, new LinkedHashSet<>(), 0);
                     if (color != null) result.put(token, color);
@@ -232,7 +241,7 @@ final class AuthoredUiColors {
                         : hsl[index]
                                 + (subtract ? -1 : 1)
                                         * amount
-                                        * (options.contains("relative") ? hsl[index] : 1);
+                                        * (index != 0 && options.contains("relative") ? hsl[index] : 1);
         hsl[index] = index == 0 ? (result % 360 + 360) % 360 : Math.clamp(result, 0, 1);
         return fromHsl(hsl[0], hsl[1], hsl[2], hsl[3]);
     }
@@ -265,7 +274,7 @@ final class AuthoredUiColors {
 
     private static int channel(String value) {
         return value.endsWith("%")
-                ? (int) Math.round(255 * percent(value))
+                ? (int) (255 * percent(value))
                 : Integer.parseInt(value);
     }
 
@@ -304,17 +313,21 @@ final class AuthoredUiColors {
     }
 
     private static Color fromHsl(double h, double s, double l, double a) {
-        h = (h % 360 + 360) % 360;
-        double c = (1 - Math.abs(2 * l - 1)) * s,
-                x = c * (1 - Math.abs(h / 60 % 2 - 1)),
-                m = l - c / 2;
-        double r = h < 60 || h >= 300 ? c : h < 120 || h >= 240 ? x : 0,
-                g = h < 60 || h >= 180 && h < 240 ? x : h < 180 ? c : 0,
-                b = h < 120 ? 0 : h < 180 || h >= 300 ? x : c;
-        return new Color(
-                (int) Math.round((r + m) * 255),
-                (int) Math.round((g + m) * 255),
-                (int) Math.round((b + m) * 255),
-                (int) Math.round(a * 255));
+        // Float hue interpolation matches the pinned FlatLaf channel materialization.
+        float hue = (float) ((h % 360 + 360) % 360) / 360f;
+        float saturation = (float) s, lightness = (float) l;
+        float q = lightness < .5f ? lightness * (1 + saturation)
+            : lightness + saturation - saturation * lightness;
+        float p = 2 * lightness - q;
+        return new Color(hueChannel(p, q, hue + 1f / 3f), hueChannel(p, q, hue),
+            hueChannel(p, q, hue - 1f / 3f), (float) a);
+    }
+
+    private static float hueChannel(float p, float q, float hue) {
+        if (hue < 0) hue += 1;
+        if (hue > 1) hue -= 1;
+        float value = 6 * hue < 1 ? p + (q - p) * 6 * hue
+            : 2 * hue < 1 ? q : 3 * hue < 2 ? p + (q - p) * 6 * (2f / 3f - hue) : p;
+        return Math.clamp(value, 0f, 1f);
     }
 }

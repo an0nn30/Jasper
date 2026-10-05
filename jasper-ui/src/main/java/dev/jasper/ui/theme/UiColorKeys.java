@@ -24,11 +24,13 @@ public final class UiColorKeys {
     public static boolean supports(String key) {
         if (key.endsWith("UI")) return false;
         if (key.startsWith("ColorPalette.")) return NAME.matcher(key.substring("ColorPalette.".length())).matches();
+        if (Set.of("ScrollBar.trackHighlight", "TabbedPane.focus", "VersionControl.RefLabel.backgroundBase").contains(key)) return true;
         if (UiTemplate.JASPER.containsKey(key) || key.equals("Jasper.headerHighlight")) return true;
         String lower = key.toLowerCase(Locale.ROOT);
         // FlatLaf's border slots parse insets, line thickness and arcs, even without a class name.
         if (!key.startsWith("@") && lower.endsWith("border")) return false;
         return key.startsWith("@") || lower.endsWith("background") || lower.endsWith("foreground")
+            || lower.endsWith("disabledtext") || lower.endsWith("selectionbackgroundinactive") || lower.endsWith("selectionforegroundinactive")
             || lower.endsWith("color") || lower.endsWith("thumb") || lower.endsWith("track")
             || lower.endsWith("caret") || lower.startsWith("actions.") || lower.startsWith("objects.");
     }

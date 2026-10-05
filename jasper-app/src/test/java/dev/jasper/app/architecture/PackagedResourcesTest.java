@@ -53,27 +53,26 @@ class PackagedResourcesTest {
                 "dev/jasper/app/shell-integration/zsh/.zprofile",
                 "dev/jasper/app/shell-integration/zsh/.zshenv",
                 "dev/jasper/app/shell-integration/zsh/.zshrc",
-                "dev/jasper/app/themeimport/intellij/Light.theme.json",
-                "dev/jasper/app/themeimport/intellij/intellijlaf.theme.json",
-                "dev/jasper/app/themeimport/intellij/darcula.theme.json",
-                "dev/jasper/app/themeimport/intellij/DefaultColorSchemesManager.xml",
-                "dev/jasper/app/themeimport/intellij/expUI/expUI_dark.theme.json",
-                "dev/jasper/app/themeimport/intellij/islands/ManyIslandsDark.theme.json",
-                "dev/jasper/app/themeimport/intellij/islands/IslandSchemeDark.xml",
-                "dev/jasper/app/themeimport/intellij/LICENSE.txt",
-                "dev/jasper/app/themes/jasper-light.toml",
-                "dev/jasper/app/themes/nord-nord.toml",
-                "dev/jasper/app/themes/clear-dark.toml",
-                "dev/jasper/app/themes/clear-light.toml",
-                "dev/jasper/app/themes/jasper-dark.toml",
-                "dev/jasper/app/themes/THIRD-PARTY-THEMES.md"
+                "dev/jasper/app/themes/legacy-aliases.json"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")
                 || n.contains("TestSupport") || n.contains("Preview.class") || n.contains("ControlledSessionChild"));
             assertThat(jar.getJarEntry("dev/jasper/app/themes/FlatLaf.properties")).isNull();
-            String border = dev.jasper.app.appearance.ThemeManager.APP_DEFAULTS.get("SplitPaneDivider.border");
+            String border = "dev.jasper.app.workspace.SplitDividerBorder";
             assertThat(jar.getJarEntry(border.replace('.', '/') + ".class")).isNotNull();
+        }
+    }
+    @Test void sharedThemeResourcesBelongToTheUiJar() throws Exception {
+        try (var jar = new JarFile(dev.jasper.ui.theme.GeneratedTheme.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath())) {
+            for (String name : java.util.List.of("intellij/Light.theme.json", "intellij/darcula.theme.json", "intellij/LICENSE.txt",
+                    "native/jasper-light.toml", "native/jasper-dark.toml", "native/nord-nord.toml", "native/clear-dark.toml",
+                    "native/clear-light.toml", "native/index.txt", "native/THIRD-PARTY-THEMES.md", "native/licenses/nord/license"))
+                assertThat(jar.getJarEntry("dev/jasper/ui/themeimport/" + name)).as(name).isNotNull();
+        }
+        try (var jar = new JarFile(System.getProperty("jasper.appJar"))) {
+            assertThat(jar.stream().map(java.util.jar.JarEntry::getName).toList())
+                .noneMatch(name -> name.startsWith("dev/jasper/app/themeimport/intellij/") || name.endsWith("/themes/jasper-dark.toml"));
         }
     }
     @Test void libraryJarsDoNotContainApplicationClasses() throws Exception {

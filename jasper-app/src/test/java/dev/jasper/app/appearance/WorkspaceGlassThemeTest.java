@@ -1,4 +1,11 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.theme.WorkspaceGlass;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.theme.ThemeGenerator;
+import dev.jasper.ui.theme.ThemeFileException;
+import dev.jasper.ui.theme.GlassLevels;
 
 import java.util.List;
 import java.util.Optional;

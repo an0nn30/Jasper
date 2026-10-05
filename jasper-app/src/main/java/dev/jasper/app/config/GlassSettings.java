@@ -33,4 +33,8 @@ public record GlassSettings(float opacityPercent, WorkspaceBlur blurChoice) {
             case OFF -> Optional.of(false);
         };
     }
+    /** Saved app preferences override only the corresponding module theme levels. */
+    public dev.jasper.ui.theme.GlassLevels resolve(dev.jasper.ui.theme.GlassLevels theme) {
+        return new dev.jasper.ui.theme.GlassLevels(opacity().orElse(theme.opacity()), blur().orElse(theme.blur()));
+    }
 }

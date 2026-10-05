@@ -1,8 +1,8 @@
 package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.ui.FlatStylingSupport.StyleableUI;
-import dev.jasper.app.appearance.GeneratedTheme;
-import dev.jasper.app.appearance.Token;
+import dev.jasper.ui.theme.GeneratedTheme;
+import dev.jasper.ui.theme.Token;
 import java.awt.Color;
 import java.util.LinkedHashMap;
 import java.util.Map;

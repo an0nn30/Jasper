@@ -6,6 +6,18 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ImportedColorsTest {
+    @Test void provenLegacyColorSlotsSurviveWhileGeometryAndBooleansAreDiagnosedOnce() {
+        var keys = java.util.List.of("*.disabledText", "Button.disabledText", "*.selectionBackgroundInactive", "*.selectionForegroundInactive",
+            "ScrollBar.trackHighlight", "TabbedPane.focus", "VersionControl.RefLabel.backgroundBase");
+        var source = new LinkedHashMap<String,Object>();
+        keys.forEach(key -> source.put(key, "#12345680"));
+        source.put("Button.arc", "#123456"); source.put("TabbedPane.focusable", true);
+        var result = ImportedColors.filter(source);
+        keys.forEach(key -> assertThat(result.colors()).containsEntry(key,"#12345680"));
+        assertThat(result.warnings()).hasSize(2).containsExactly("discarded non-color override \"Button.arc\"", "discarded non-color override \"TabbedPane.focusable\"");
+        assertThat(ImportedColors.filter(Map.of("TabbedPane.focus", "true", "Button.disabledText", "com.example.Delegate")).colors()).isEmpty();
+    }
+
     @Test void geometryOverridesAreReportedAndDiscarded() {
         var result = ImportedColors.filter(Map.of("Button.arc", 50, "Button.background", "#123456"));
         assertThat(result.colors()).containsEntry("Button.background", "#123456").doesNotContainKey("Button.arc");

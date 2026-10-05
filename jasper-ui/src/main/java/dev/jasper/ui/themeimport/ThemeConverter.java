@@ -25,6 +25,18 @@ public final class ThemeConverter {
     public record Batch(List<ConversionResult> results, List<Failure> failures) {
         public Batch { results = List.copyOf(results); failures = List.copyOf(failures); }
     }
+    /** Maximum archive input size, in bytes (64 MiB). */
+    public static final long MAX_ARCHIVE = ThemeArchive.MAX_ARCHIVE;
+    /** Maximum individual archive entry or legacy source size, in bytes (4 MiB). */
+    public static final int MAX_FILE = ThemeArchive.MAX_FILE;
+    /** Maximum declared theme providers inspected per archive (64). */
+    public static final int MAX_PROVIDERS = ThemeArchive.MAX_PROVIDERS;
+    /** Maximum nested JAR files inspected per archive (16). */
+    public static final int MAX_NESTED_JARS = ThemeArchive.MAX_NESTED_JARS;
+    /** Authored legacy token keys, for bundle conversion without vendor heuristics. */
+    public static Map<Token, java.awt.Color> explicitTokens(Map<String, Object> ui) {
+        return WorkspaceTokenKeys.explicitTokens(ui);
+    }
     private static final int MAX_NATIVE_FILE = 256 * 1024;
     private ThemeConverter() {}
 
@@ -38,8 +50,9 @@ public final class ThemeConverter {
     /** Converts every supported local provider, retaining contextual failures and fallback warnings. */
     public static Batch convertAll(Path source) { return convertAll(source, false); }
 
-    // Legacy downloads are inspected before their .part suffix is replaced with .jar/.zip.
-    static Batch archive(Path source) { return convertAll(source, true); }
+    /** Converts an archive regardless of filename suffix, including staged {@code .part} downloads.
+     * Applies the same bounded validation and partial-failure behavior as {@link #convertAll(Path)}. */
+    public static Batch archive(Path source) { return convertAll(source, true); }
 
     private static Batch convertAll(Path source, boolean archive) {
         var results = new ArrayList<ConversionResult>();

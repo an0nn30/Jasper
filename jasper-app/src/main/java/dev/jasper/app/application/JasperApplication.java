@@ -1443,6 +1443,7 @@ public final class JasperApplication {
         notifications.close();
         if (activityNotifier != null) activityNotifier.close();
         buddyAppearance.close();
+        themes.close();
         buddy.close();
         incidentNotices.close();
         notificationViews.close();

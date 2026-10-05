@@ -1,4 +1,6 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.theme.Token;
+import dev.jasper.ui.theme.ThemeGenerator;
 
 import dev.jasper.terminal.config.Palette;
 import java.awt.Color;

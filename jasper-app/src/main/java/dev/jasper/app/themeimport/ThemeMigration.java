@@ -1,10 +1,13 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeSources;
+import dev.jasper.ui.themeimport.ThemeConverter;
+import dev.jasper.ui.themeimport.ConversionResult;
 
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeCatalog;
-import dev.jasper.app.appearance.ThemeDocument;
-import dev.jasper.app.appearance.ThemeResolver;
-import dev.jasper.app.appearance.ThemeToml;
+import dev.jasper.ui.theme.ThemeDocument;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.themeio.ThemeToml;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -418,7 +421,7 @@ public final class ThemeMigration {
     private static String sourceHash(Path path) throws IOException {
         if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Not a regular legacy source");
         String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
-        long limit = name.endsWith(".jar") || name.endsWith(".zip") ? ThemeArchive.MAX_ARCHIVE : ThemeArchive.MAX_FILE;
+        long limit = name.endsWith(".jar") || name.endsWith(".zip") ? ThemeConverter.MAX_ARCHIVE : ThemeConverter.MAX_FILE;
         String oversized = path.getFileName() + " is larger than " + limit + " bytes; use Import after reducing its size";
         if (Files.size(path) > limit) throw new IOException(oversized);
         try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {

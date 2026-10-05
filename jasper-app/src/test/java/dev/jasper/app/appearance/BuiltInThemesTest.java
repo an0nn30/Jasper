@@ -1,4 +1,7 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.theme.ThemeDocument;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;

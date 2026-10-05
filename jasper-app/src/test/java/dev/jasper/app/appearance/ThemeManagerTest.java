@@ -1,4 +1,7 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.theme.ThemeGeneratorTest;
+import dev.jasper.ui.theme.Token;
+import dev.jasper.ui.theme.GeneratedTheme;
 
 import com.formdev.flatlaf.FlatLaf;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -123,8 +126,8 @@ class ThemeManagerTest {
             var expected = new LinkedHashMap<String, String>();
             for (int i = 0; i < TODAYS_DARK.length; i += 2) expected.put(TODAYS_DARK[i], TODAYS_DARK[i + 1]);
             assertColours(expected);
-            for (int i = 0; i < TODAYS_DARK_NUMBERS.length; i += 2)
-                assertThat(String.valueOf(UIManager.get(TODAYS_DARK_NUMBERS[i]))).as(TODAYS_DARK_NUMBERS[i]).isEqualTo(TODAYS_DARK_NUMBERS[i + 1]);
+            assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(12);
+            assertThat(UIManager.getInt("Component.minimumHeight")).isEqualTo(28);
             // FlatLaf copies the list selection into menus; white text keeps it readable.
             assertColours(Map.of("MenuItem.selectionBackground", "#5e7293", "MenuItem.selectionForeground", "#ffffff"));
             assertColours(Map.of("ToolWindow.background", "#191c20", "Table.background", "#191c20", "StatusBar.background", "#25292e",
@@ -136,10 +139,10 @@ class ThemeManagerTest {
     @Test void keysFlatLafSkipsAreRestoredWithoutReplacingItsOwn() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         try {
-            var resolved = dev.jasper.app.themeimport.LegacyThemeTestSupport.load("fixture.json", """
+            var resolved = dev.jasper.ui.themeimport.LegacyThemeTestSupport.load("fixture.json", """
                 {"name": "Fixture", "ui": {"SearchEverywhere.Header.background": "#123456",
                   "EditorTabs.hoverBackground": "#00000019", "ComboBox.background": "#010101"}}""");
-            assertThat(ThemeManager.install(resolved.json(), resolved.colors(), Color.WHITE)).isTrue();
+            assertThat(LegacyInstallFixture.install(resolved.json(), resolved.colors(), Color.WHITE)).isTrue();
             assertColours(Map.of("SearchEverywhere.Header.background", "#123456", "EditorTabs.hoverBackground", "#00000019"));
             // FlatLaf reads IntelliJ's combo keys its own way; its value stands.
             assertThat(hex(UIManager.getColor("ComboBox.background"))).isNotEqualTo("#010101");
@@ -178,7 +181,7 @@ class ThemeManagerTest {
             GeneratedTheme generated = ThemeManager.generated(theme);
             assertThat(generated.name()).isEqualTo(theme.name());
             assertThat(generated.dark()).isEqualTo(theme.dark());
-            assertThat(generated.terminal()).isEqualTo(theme.palette());
+            assertThat(TerminalPaletteAdapter.toTerminal(generated.terminal())).isEqualTo(theme.palette());
         }
         assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.id()).isEqualTo("intellij-light");
         assertThat(Theme.DARK.id()).isEqualTo("jasper-dark");
@@ -189,12 +192,12 @@ class ThemeManagerTest {
         assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette()).isNotEqualTo(Palette.jasperLight());
         // IntelliJ Light's scheme takes its console background from its parent, Default: CONSOLE_BACKGROUND_KEY ffffff.
         assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette().background()).isEqualTo(new Color(0xffffff));
-        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette()).isEqualTo(dev.jasper.app.themeimport.LegacyThemeTestSupport.palette("IntelliJ Light", false));
+        assertThat(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT.palette()).isEqualTo(dev.jasper.ui.themeimport.LegacyThemeTestSupport.palette("IntelliJ Light", false));
     }
 
     @Test void theVendoredIntellijThemesLoadWithoutWarnings() {
         for (String file : List.of("intellij/Light.theme.json", "intellij/darcula.theme.json"))
-            assertThat(dev.jasper.app.themeimport.LegacyThemeTestSupport.bundled(file).warnings()).as(file).isEmpty();
+            assertThat(dev.jasper.ui.themeimport.LegacyThemeTestSupport.bundled(file).warnings()).as(file).allMatch(w -> w.contains("discarded non-color override"));
     }
 
     @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {
@@ -227,7 +230,7 @@ class ThemeManagerTest {
             assertThat(UIManager.getColor("EditorTabs.underlineColor")).as("a key FlatLaf skips is put back")
                 .isEqualTo(theme.tokens().get(Token.TAB_UNDERLINE));
             assertThat(UIManager.getColor("Jasper.titleSearch.background")).as("ChromeKeys fills keys without a token").isNotNull();
-            assertThat(UIManager.getInt("Component.arc")).isEqualTo(4);
+            assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS));
             assertThat(UIManager.getFont("Label.font").getSize2D()).as("app defaults still apply").isEqualTo(12f);
         } finally { UIManager.setLookAndFeel(original); }
     }

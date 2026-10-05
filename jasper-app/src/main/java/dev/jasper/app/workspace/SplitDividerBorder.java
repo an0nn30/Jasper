@@ -16,7 +16,7 @@ public final class SplitDividerBorder extends AbstractBorder implements UIResour
         int thickness = UIScale.scale(2);
         Graphics g = graphics.create();
         try {
-            g.setColor(WorkspaceTheme.color(component, dev.jasper.app.appearance.Token.DIVIDER, "Jasper.splitDivider"));
+            g.setColor(WorkspaceTheme.color(component, dev.jasper.ui.theme.Token.DIVIDER, "Jasper.splitDivider"));
             if (vertical) g.fillRect(x + (width - thickness) / 2, y, thickness, height);
             else g.fillRect(x, y + (height - thickness) / 2, width, thickness);
         } finally {

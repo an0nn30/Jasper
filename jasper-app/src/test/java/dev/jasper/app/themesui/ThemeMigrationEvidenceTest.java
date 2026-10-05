@@ -1,8 +1,8 @@
 package dev.jasper.app.themesui;
 
 import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.themeimport.ConversionResult;
-import dev.jasper.app.themeimport.ThemeConverter;
+import dev.jasper.ui.themeimport.ConversionResult;
+import dev.jasper.ui.themeimport.ThemeConverter;
 import dev.jasper.app.themeimport.ThemeImporter;
 import dev.jasper.sdk.contracts.ThemeMigrationCapture;
 import java.nio.file.Path;

@@ -43,7 +43,7 @@ class TerminalColorsTest {
             assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             var find = hidden.findBar();
             assertThat(find.queryField().getForeground()).as("the find bar follows workspace tokens")
-                .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TEXT));
+                .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.TEXT));
             assertThat(find.getBackground()).isNotEqualTo(Theme.DARK.palette().background());
             owner.newTab(HOME);
             assertThat(owner.currentPane().getBackground()).as("a tab opened after the switch")

@@ -1,6 +1,8 @@
 package dev.jasper.app.application;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import dev.jasper.app.config.ConfigService;
 import java.nio.file.*;
 import org.junit.jupiter.api.Test;

@@ -12,7 +12,7 @@ class ThemeStateTest {
         var value = ThemeState.defaults().resolve();
         assertThat(value.workspace()).isSameAs(value.chrome());
         assertThat(value.matching()).isTrue();
-        assertThat(value.palette()).isEqualTo(value.workspace().terminal());
+        assertThat(value.palette()).isEqualTo(TerminalPaletteAdapter.toTerminal(value.workspace().terminal()));
     }
 
     @Test void explicitWorkspaceSurvivesChromeChangesAndMissingResetsToMatch() {

@@ -177,7 +177,7 @@ class WindowTabsTest {
                 var strip = owner.windowTabs(); layout(strip, 800, 30);
                 var selected = named(strip, "select:second").getParent();
                 int middle = selected.getX() + selected.getWidth() / 2;
-                Color accent = owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.ACCENT);
+                Color accent = owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.ACCENT);
                 assertThat(pixel(strip, middle, 28)).as("active indicator uses the current workspace accent").isEqualTo(accent);
                 assertThat(pixel(strip, middle, 26)).as("indicator remains only two pixels tall").isEqualTo(owner.workspaceSurface());
                 assertThat(pixel(strip, middle, 29)).as("the folder still joins the terminal below the indicator").isEqualTo(owner.workspaceSurface());
@@ -265,7 +265,7 @@ class WindowTabsTest {
                         Color text = named(strip, "select:other").getForeground();
                         if (!owner.theme().matching())
                             assertThat(text).as("inactive title uses workspace TEXT_MUTED, active %s", active)
-                                .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.TEXT_MUTED));
+                                .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.TEXT_MUTED));
                         assertThat(contrast(text, strip.getBackground())).as("%s UI, %s terminal, active %s", chrome, colors, active)
                             .isGreaterThanOrEqualTo(3);
                     }

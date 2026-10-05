@@ -1,7 +1,7 @@
 package dev.jasper.app.plugins;
 
-import dev.jasper.app.appearance.GeneratedTheme;
-import dev.jasper.app.appearance.Token;
+import dev.jasper.ui.theme.GeneratedTheme;
+import dev.jasper.ui.theme.Token;
 import dev.jasper.sdk.ui.EditorPalette;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.sdk.ui.SyntaxPalette;

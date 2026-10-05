@@ -1,9 +1,12 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeSources;
+import dev.jasper.ui.themeimport.ThemeConverter;
+import dev.jasper.ui.themeimport.ConversionResult;
 
-import dev.jasper.app.appearance.ThemeDocument;
-import dev.jasper.app.appearance.ThemeResolver;
-import dev.jasper.app.appearance.ThemeToml;
-import dev.jasper.app.appearance.ThemeTomlWriter;
+import dev.jasper.ui.theme.ThemeDocument;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -37,7 +40,7 @@ public final class ConvertThemes {
         var generated = new TreeMap<String, byte[]>();
         var notice = new StringBuilder("# Bundled themes\n\nGenerated offline from tools/themes/sources.json. Original authors and licenses are retained.\n\n");
         for (String id : List.of("jasper-dark", "jasper-light", "clear-dark", "clear-light")) {
-            String resource = "/dev/jasper/app/themes/" + id + ".toml";
+            String resource = "/dev/jasper/ui/themeimport/native/" + id + ".toml";
             try (var input = ConvertThemes.class.getResourceAsStream(resource)) {
                 if (input == null) throw new IOException("Missing Jasper source " + resource);
                 generated.put(id + ".toml", input.readAllBytes());
@@ -64,12 +67,11 @@ public final class ConvertThemes {
                 var metadata = new LinkedHashMap<>(document.metadata());
                 if (metadata.getOrDefault("author", "").isBlank()) metadata.put("author", source.author());
                 metadata.put("license", source.license()); metadata.put("source", source.repository()); metadata.put("commit", source.commit());
-                var tokens = new java.util.EnumMap<dev.jasper.app.appearance.Token, java.awt.Color>(dev.jasper.app.appearance.Token.class);
+                var tokens = new java.util.EnumMap<dev.jasper.ui.theme.Token, java.awt.Color>(dev.jasper.ui.theme.Token.class);
                 tokens.putAll(document.tokens());
-                if (document.uiComplete().orElse(false)) tokens.keySet().retainAll(dev.jasper.app.appearance.WorkspaceTokenKeys
-                    .explicitTokens(document.ui(), variant.name(), metadata.get("author"), document.dark().orElse(true)).keySet());
+                if (document.uiComplete().orElse(false)) tokens.keySet().retainAll(ThemeConverter.explicitTokens(document.ui()).keySet());
                 document = new ThemeDocument(variant.id(), variant.name(), document.dark(), Optional.empty(), 0,
-                    document.uiComplete(), metadata, document.seeds(), document.ansi(), tokens, document.syntax(), document.ui(), document.icons());
+                    document.uiComplete(), metadata, document.seeds(), document.ansi(), tokens, document.syntax(), document.ui(), document.icons(), document.workspace(), document.semanticOverrides());
                 byte[] bytes = ThemeTomlWriter.write(document).getBytes(StandardCharsets.UTF_8);
                 ThemeResolver.resolve(ThemeToml.parse(new String(bytes, StandardCharsets.UTF_8), variant.id()));
                 generated.put(variant.id() + ".toml", bytes);
@@ -137,7 +139,7 @@ public final class ConvertThemes {
                             var json = new LinkedHashMap<String, Object>();
                             ((Map<?, ?>) parsed).forEach((key, value) -> json.put((String) key, value));
                             json.put("editorScheme", variant.get().scheme());
-                            bytes = dev.jasper.app.appearance.FlatLafThemeData.write(json).getBytes(StandardCharsets.UTF_8);
+                            bytes = dev.jasper.ui.themeimport.FlatLafThemeData.write(json).getBytes(StandardCharsets.UTF_8);
                         }
                         put(zip, entry, bytes);
                     }
@@ -162,7 +164,7 @@ public final class ConvertThemes {
             if (canonical == null) throw new IllegalArgumentException("Missing native replacement for legacy palette " + variant.name());
             legacy.put(key, canonical);
         }
-        return dev.jasper.app.appearance.FlatLafThemeData.write(legacy) + "\n";
+        return dev.jasper.ui.themeimport.FlatLafThemeData.write(legacy) + "\n";
     }
 
     private static void put(ZipOutputStream zip, String name, byte[] bytes) throws IOException {

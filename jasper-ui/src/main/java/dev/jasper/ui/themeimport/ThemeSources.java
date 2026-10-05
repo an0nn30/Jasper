@@ -117,7 +117,9 @@ public final class ThemeSources {
         if (!actual.equals(recorded)) throw invalid("Unrecorded/missing provider variants in " + source.id());
     }
 
-    static Path safe(Path root, String relative) {
+    /** Resolves a nonblank relative catalog path, rejecting absolute paths, dot segments,
+     * backslashes and symbolic links in the resolved path or its ancestors. */
+    public static Path safe(Path root, String relative) {
         Path path = Path.of(relative);
         if (relative.isBlank() || path.isAbsolute() || relative.contains("\\")) throw invalid("Unsafe path " + relative);
         for (Path part : path) if (part.toString().equals("..") || part.toString().equals(".")) throw invalid("Escaping path " + relative);
@@ -126,7 +128,8 @@ public final class ThemeSources {
             if (Files.isSymbolicLink(cursor)) throw invalid("Symlink in source path " + resolved);
         return resolved;
     }
-    static String hash(byte[] bytes) {
+    /** Returns the lowercase hexadecimal SHA-256 digest of the exact supplied source bytes. */
+    public static String hash(byte[] bytes) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
     }

@@ -11,6 +11,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class TerminalColorsThemeTest {
+    @Test void moduleTerminalAdapterPreservesEveryFieldAndAlpha() {
+        var ansi = java.util.stream.IntStream.range(0,16).mapToObj(i -> new java.awt.Color(i, i+20, i+40, i+100)).toList();
+        var source = new dev.jasper.ui.theme.TerminalColors(new java.awt.Color(1,2,3,4), new java.awt.Color(5,6,7,8),
+            new java.awt.Color(9,10,11,12), new java.awt.Color(13,14,15,16), ansi);
+        var actual = TerminalPaletteAdapter.toTerminal(source);
+        assertThat(new dev.jasper.ui.theme.TerminalColors(actual.background(), actual.foreground(), actual.cursor(), actual.selection(), actual.ansi())).isEqualTo(source);
+    }
+
     @Test void aTerminalOnlyChangeNotifiesOnceWithoutReinstallingTheLookAndFeel() {
         var installs = new ArrayList<Theme>();
         var themes = new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT, theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
@@ -50,7 +58,7 @@ class TerminalColorsThemeTest {
 
 
     @Test void themeOnlyAndFontOnlyChangesKeepANamedPalette() {
-        var named = ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA).terminal();
+        var named = TerminalPaletteAdapter.toTerminal(ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA).terminal());
         var themes = new ThemeController(Theme.DARK, ThemeTestSupport::install);
         try {
             themes.configure(Theme.DARK, new dev.jasper.app.config.WorkspaceThemeChoice("Darcula"), dev.jasper.app.appearance.ThemeFixtures.DARCULA, UiFontConfig.defaults());

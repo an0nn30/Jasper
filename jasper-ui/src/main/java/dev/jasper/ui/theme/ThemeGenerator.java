@@ -111,6 +111,12 @@ public final class ThemeGenerator {
 
         GeneratedTheme result() {
             for (Token token : Token.values()) token(token);
+            // Resolve authored expressions against one complete fallback snapshot, then rebuild
+            // dependent values from the final authored parents before deriving syntax.
+            var authored = new AuthoredUiColors(document, platform, uiKeys()).tokens();
+            tokens.clear();
+            tokens.putAll(authored);
+            for (Token token : Token.values()) token(token);
             var syntax = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
             for (SyntaxRole role : SyntaxRole.values()) syntax.put(role, syntax(role));
             return new GeneratedTheme(document.name(), dark, document.metadata().getOrDefault("author", "Jasper"), tokens, syntax,

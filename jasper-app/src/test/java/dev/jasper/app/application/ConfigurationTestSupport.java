@@ -3,6 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.*;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.workspace.WindowContent;
 import java.nio.file.Path;
 import java.util.function.Consumer;

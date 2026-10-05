@@ -471,3 +471,48 @@ FlatLaf theme-name/author-specific post-JSON heuristics. For example, Carbon's a
 new provenance mechanism. Existing importer exclusions/provenance and ancillary legacy UI behavior
 remain; this is not full vendor visual parity. Themes relying on those heuristics may need explicit
 semantic adjustment during Plan 2 visual acceptance. A concrete Carbon regression preserves this ruling.
+
+## Plan 2 Tasks 2–3 integration corrections (2026-10-05)
+
+The app `ThemeController` keeps selection, persisted names, configuration schema and file policy.
+It publishes module `ThemePair` through `AppearanceBindings.binding()`; `context(ThemeRoute)` supplies
+app-native views with controller-owned icons/metrics. Hosted kits consume the same module snapshots
+without conversion. `TerminalPaletteAdapter.toTerminal(TerminalColors)` maps all 20 colors by meaning,
+including alpha. App snapshots carry module GeneratedTheme values. Application shutdown closes bindings.
+
+`ThemeGenerator` resolves authored UI tokens before recomputing dependent tokens and syntax.
+Explicit document tokens win in this value graph; canonical semantic overrides are last. Raw legacy
+controls temporarily retain native `[ui]` last-word colors through the app adapter, independently of
+canonical kit roles. Generic native chrome aliases and named `ColorPalette.accentColor` are interpreted
+in the module, with no vendor-name heuristics. Native source files are never rewritten by reading them.
+Only unresolved, syntactically valid, top-level unprefixed bare names from old native exports may fall
+back. Required `@`/`$` references, cycles, malformed colors/functions and missing required operands
+remain errors. Known bare names continue resolving normally.
+
+Pinned FlatLaf parity: spin always rotates hue absolutely, including `relative`; RGB(A) percentage
+channels truncate like the pinned parser, while HSL uses float hue interpolation before Color channel
+materialization. This corrects the carried green-spin and 50%-alpha probes without a rounding-policy exception.
+
+Import publication uses these public module utility boundaries (no SDK projection):
+`ThemeSources.hash(byte[]): String` is SHA-256; `safe(Path,String): Path` retains existing containment
+validation. `ThemeConverter.archive(Path): Batch` explicitly reads staged archives regardless of suffix.
+`MAX_ARCHIVE=64 MiB`, `MAX_FILE=4 MiB`, `MAX_PROVIDERS=64`, `MAX_NESTED_JARS=16` expose existing limits
+for app journal/publication guards; ThemeArchive stays package-private. `explicitTokens(Map<String,Object>)`
+returns authored legacy token ownership without vendor-name inference. The app keeps locks, identities,
+fingerprints and atomic filesystem publication. Documents cross this boundary directly, preserving
+semantic overrides during rename; no serialization bridge is used.
+
+KitContext typography uses the raw developer defaultFont family and, when a raw developer Label.font
+also exists, that exact unscaled body size. It never reads an inherited/scaled LAF Label.font as an
+explicit body setting. KitView invalidates on both override changes/removal even when ThemePair is equal.
+This preserves existing app title/menu offsets and fractional user form/body settings with one scaling pass.
+
+Color-policy correction: `*.disabledText`, `*.selectionBackgroundInactive` and
+`*.selectionForegroundInactive` are color suffixes. Proven exact color keys
+`ScrollBar.trackHighlight`, `TabbedPane.focus`, and `VersionControl.RefLabel.backgroundBase`
+are admitted without broad `focus`/`backgroundBase` heuristics. Values still require the supported
+color grammar; booleans, Java delegates, border geometry and font/metric values remain rejected.
+The pinned FlatLaf 3.7 properties/UI readers and unchanged Nord source provide the concrete evidence.
+Conversion reports discarded geometry once per key and does not diagnose these restored color slots.
+The existing color-policy golden gains only four proven color lines; original upstream and legacy
+golden bytes remain untouched.

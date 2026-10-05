@@ -18,6 +18,25 @@ import static org.assertj.core.api.Assertions.*;
 class ImportParityTest {
     @TempDir Path home;
 
+    @Test void stagedArchivePublicRouteAndPublicationUtilitiesKeepBounds() throws Exception {
+        Path staged = ThemeFixtures.jar(home.resolve("download.part"), ThemeFixtures.entries(
+            "META-INF/plugin.xml", ThemeFixtures.pluginXml("Staged", "theme.json"),
+            "theme.json", "{\"name\":\"Staged\",\"dark\":true,\"ui\":{\"Panel.background\":\"#123456\"}}"));
+        byte[] before = Files.readAllBytes(staged);
+        var batch = ThemeConverter.archive(staged);
+        assertThat(batch.failures()).isEmpty();
+        assertThat(batch.results()).singleElement().satisfies(result -> assertThat(result.document().name()).isEqualTo("Staged"));
+        assertThat(Files.readAllBytes(staged)).isEqualTo(before);
+        assertThat(ThemeConverter.MAX_ARCHIVE).isEqualTo(64L << 20);
+        assertThat(ThemeConverter.MAX_FILE).isEqualTo(4 << 20);
+        assertThat(ThemeConverter.MAX_PROVIDERS).isEqualTo(64);
+        assertThat(ThemeConverter.MAX_NESTED_JARS).isEqualTo(16);
+        assertThat(ThemeSources.hash(new byte[0])).isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assertThatThrownBy(() -> ThemeSources.safe(home, "../escape")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(ThemeConverter.explicitTokens(Map.of("Panel.background", "#123456", "Button.arc", 99)))
+            .containsEntry(Token.SURFACE, new Color(0x123456));
+    }
+
     private Path file(String name, String text) throws Exception {
         Path path = home.resolve(name);
         Files.createDirectories(path.getParent()); Files.writeString(path, text); return path;

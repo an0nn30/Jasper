@@ -2,6 +2,7 @@ package dev.jasper.app.settingsui;
 
 import dev.jasper.app.appearance.ThemeManager;
 import dev.jasper.app.config.*;
+import dev.jasper.app.config.TerminalColors;
 import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;

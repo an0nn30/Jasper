@@ -1,10 +1,14 @@
 package dev.jasper.app.themesui;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import dev.jasper.app.config.*;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.settingsui.*;
 import dev.jasper.app.themeimport.*;
+import dev.jasper.ui.themeimport.*;
 import dev.jasper.app.windows.*;
 import java.awt.*;
 import java.nio.file.*;

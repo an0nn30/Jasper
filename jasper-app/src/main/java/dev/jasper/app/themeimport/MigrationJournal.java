@@ -1,4 +1,6 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeSources;
+import dev.jasper.ui.themeimport.ThemeConverter;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -73,7 +75,7 @@ final class MigrationJournal {
                 boolean convertible = bool(source, "convertible"), moved = bool(source, "moved"), blocked = bool(source, "blocked");
                 var outputs = new ArrayList<Output>(); var providers = new HashSet<String>();
                 var out = source.getArray("outputs");
-                if (out == null || out.size() > ThemeArchive.MAX_PROVIDERS * ThemeArchive.MAX_NESTED_JARS) throw new IOException("Missing/oversized output list");
+                if (out == null || out.size() > ThemeConverter.MAX_PROVIDERS * ThemeConverter.MAX_NESTED_JARS) throw new IOException("Missing/oversized output list");
                 for (int j = 0; j < out.size(); j++) {
                     var output = out.getTable(j); String target = required(output, "path"); outputPath(target);
                     if (!outputPaths.add(target.toLowerCase(java.util.Locale.ROOT))) throw new IOException("Duplicate journal output");
@@ -123,7 +125,7 @@ final class MigrationJournal {
                     String text = required(entry, "text"); byte[] content = text.getBytes(StandardCharsets.UTF_8);
                     if (content.length > dev.jasper.app.appearance.ThemeCatalog.MAX_THEME_FILE || !ThemeSources.hash(content).equals(desired))
                         throw new IOException("Invalid native edit content");
-                    dev.jasper.app.appearance.ThemeToml.parse(text, path);
+                    dev.jasper.ui.themeio.ThemeToml.parse(text, path);
                     if (sources.stream().flatMap(source -> source.outputs().stream()).noneMatch(output -> output.path().equals(parent) && output.hash().equals(parentHash)))
                         throw new IOException("Native edit has no planned parent");
                     edits.add(new NativeEdit(path, original, required(entry, "file_key"), desired, text, backup, parent, parentHash,

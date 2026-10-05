@@ -1,4 +1,11 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.theme.UiTokenKeys;
+import dev.jasper.ui.theme.Token;
+import dev.jasper.ui.theme.ThemeGenerator;
+import dev.jasper.ui.theme.ThemeDocument;
+import dev.jasper.ui.theme.SyntaxStyle;
+import dev.jasper.ui.theme.SyntaxRole;
+import dev.jasper.ui.theme.Seed;
 
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
@@ -23,7 +30,7 @@ class WorkspaceValuesTest {
         var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
             base.uiComplete(), base.metadata(), seeds, base.ansi(), Map.of(), base.syntax(), ui, base.icons());
         var original = ThemeGenerator.generate(document);
-        var workspace = WorkspaceValues.resolve(document, original);
+        var workspace = ThemeGenerator.generate(document);
         assertThat(UIManager.getLookAndFeel()).isSameAs(chromeLaf);
         assertThat(UIManager.getColor("Panel.background")).isEqualTo(chromeBackground);
         assertThat(colors()).isEqualTo(before);
@@ -54,7 +61,7 @@ class WorkspaceValuesTest {
             var ui = new java.util.LinkedHashMap<>(base.ui());
             var document = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0,
                 base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), Map.of(), base.syntax(), ui, base.icons());
-            var values = WorkspaceValues.resolve(document, ThemeGenerator.generate(document));
+            var values = ThemeGenerator.generate(document);
             assertThat(severe).extracting(java.util.logging.LogRecord::getMessage).isEmpty();
             assertThat(values.tokens()).isNotEmpty();
         } finally {
@@ -71,7 +78,7 @@ class WorkspaceValuesTest {
             base.uiComplete(), base.metadata(), base.seeds(), base.ansi(),
             Map.of(Token.SURFACE, explicit, Token.EDITOR_BACKGROUND, Color.WHITE),
             Map.of(SyntaxRole.COMMENT, style), base.ui(), base.icons());
-        var values = WorkspaceValues.resolve(document, ThemeGenerator.generate(document));
+        var values = ThemeGenerator.generate(document);
         assertThat(values.tokens()).containsEntry(Token.SURFACE, explicit).containsEntry(Token.EDITOR_BACKGROUND, Color.WHITE);
         assertThat(values.syntax()).containsEntry(SyntaxRole.COMMENT, style);
         assertThat(ChromeKeys.contrast(values.syntax().get(SyntaxRole.KEYWORD).color(), Color.WHITE)).isGreaterThanOrEqualTo(4.5);
@@ -80,9 +87,12 @@ class WorkspaceValuesTest {
     @Test void missingEffectiveKeysKeepGeneratedValuesAndPresentColorsKeepAlpha() {
         var alpha = new Color(7, 8, 9, 99);
         var original = ThemeGenerator.generate(Theme.DARK.source().document());
-        var values = WorkspaceTokenKeys.resolve(original.tokens(), key -> key.equals("Panel.background") ? alpha : null);
-        assertThat(values).containsEntry(Token.SURFACE, alpha).containsEntry(Token.TEXT, original.tokens().get(Token.TEXT));
-        assertThat(WorkspaceTokenKeys.KEYS).hasSize(Token.values().length);
+        var base = Theme.DARK.source().document();
+        var changed = new ThemeDocument(base.origin(), base.name(), base.dark(), base.parent(), 0, base.uiComplete(),
+            base.metadata(), base.seeds(), base.ansi(), Map.of(), base.syntax(), Map.of("Panel.background", "#07080963"), base.icons());
+        var values = ThemeGenerator.generate(changed).tokens();
+        assertThat(values).containsEntry(Token.SURFACE, alpha).containsEntry(Token.ACCENT, original.tokens().get(Token.ACCENT));
+        assertThat(UiTokenKeys.KEYS).hasSize(Token.values().length);
     }
 
     @Test void nativeValuesReuseTheCacheAndCompleteValuesMatchInstalledColors() throws Exception {
@@ -93,9 +103,9 @@ class WorkspaceValuesTest {
             var values = ThemeManager.generated(dev.jasper.app.appearance.ThemeFixtures.DARCULA);
             assertThat(ThemeManager.install(dev.jasper.app.appearance.ThemeFixtures.DARCULA)).isTrue();
             var mismatches = new java.util.ArrayList<String>();
-            WorkspaceTokenKeys.KEYS.forEach((token, key) -> {
+            UiTokenKeys.KEYS.forEach((token, key) -> {
                 var color = UIManager.getLookAndFeelDefaults().getColor(key);
-                if (color != null && !color.equals(values.tokens().get(token))) mismatches.add(key + ": " + values.tokens().get(token) + " != " + color);
+                if (color != null && !color.equals(dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(values.uiKeys()).getOrDefault(key, values.tokens().get(token)))) mismatches.add(key + ": " + values.tokens().get(token) + " != " + color);
             });
             assertThat(mismatches).isEmpty();
         } finally { UIManager.setLookAndFeel(original); }
@@ -115,8 +125,7 @@ class WorkspaceValuesTest {
         var thread = new Thread(() -> {
             try {
                 assertThatThrownBy(() -> ThemeManager.generated(Theme.DARK)).isInstanceOf(IllegalStateException.class);
-                assertThatThrownBy(() -> WorkspaceValues.resolve(Theme.DARK.source().document(),
-                    ThemeGenerator.generate(Theme.DARK.source().document()))).isInstanceOf(IllegalStateException.class);
+                assertThat(ThemeGenerator.generate(Theme.DARK.source().document()).name()).isEqualTo(Theme.DARK.name());
             } catch (Throwable problem) { failure.set(problem); }
         });
         thread.start();

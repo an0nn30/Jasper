@@ -143,6 +143,12 @@ passed. The focused 2x geometry/choice/secret/row run passed all 42 tests.
 
 ## Known Minor expression-parity gap
 
+**Resolved in Plan 2 Tasks 2–3 (2026-10-05), independent review pending:** the three probes
+below now match pinned FlatLaf 3.7 in `AuthoredUiColorsTest`. Spin ignores relative hue scaling;
+percentage channels truncate and HSL channels use pinned float interpolation. The table is retained
+as historical failure evidence, not current output. Focused module gate: 128 tests, zero failures.
+Native visual acceptance and complete admitted-expression parity are not claimed.
+
 Final scoped review of `a4e78995..771fd1a1` found a narrow admitted-expression mismatch with
 pinned FlatLaf 3.7. The reviewer ran a bounded JBR 25 headless source-launcher probe against
 compiled `jasper-ui` and the pinned jar (`java -Djava.awt.headless=true --class-path <ui classes>:<flatlaf 3.7 jar> --source 25 /dev/stdin`). Exact ARGB results:

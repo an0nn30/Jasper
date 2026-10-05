@@ -28,6 +28,27 @@ class AuthoredUiColorsTest {
                 platform);
     }
 
+    @Test void legacyUnresolvedBareNameFallsBackButRequiredReferencesStayStrict() {
+        var fallback = generate("", RuntimePlatform.MAC).tokens().get(Token.SURFACE);
+        assertThat(generate("\"Panel.background\"=\"panel\"", RuntimePlatform.MAC).tokens().get(Token.SURFACE)).isEqualTo(fallback);
+        assertThat(generate("\"ColorPalette.panel\"=\"#123456\"\n\"Panel.background\"=\"panel\"", RuntimePlatform.MAC).tokens().get(Token.SURFACE)).isEqualTo(new Color(0x123456));
+        for (var value : List.of("@missing", "$missing", "#oops", "bad text", "lighten(panel,10%)", "unknown(#123456)", "@broken"))
+            assertThatThrownBy(() -> generate("\"@broken\"=\"panel\"\n\"Panel.background\"=\"" + value + "\"", RuntimePlatform.MAC), value).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void authoredWorkspaceColorsReachTokensAndDependentSyntax() {
+        var theme = generate("\"Jasper.editorBackground\"=\"#ffffff\"\n\"Panel.background\"=\"#12345680\"", RuntimePlatform.MAC);
+        assertThat(theme.tokens().get(Token.SURFACE)).isEqualTo(new Color(0x12,0x34,0x56,0x80));
+        assertThat(theme.tokens().get(Token.EDITOR_BACKGROUND)).isEqualTo(Color.WHITE);
+        assertThat(theme.tokens().get(Token.EDITOR_GUTTER)).isEqualTo(Color.WHITE);
+        assertThat(theme.tokens().get(Token.EDITOR_CURRENT_LINE)).isEqualTo(ColorMath.mix(theme.tokens().get(Token.EDITOR_FOREGROUND), Color.WHITE, .05));
+        var document = ThemeToml.parse(ThemeGeneratorTest.SEEDS + "\n[tokens]\neditor_background='#010203'\n[ui]\n'Jasper.editorBackground'='#ffffff'\n[semantic]\n'surface.panel'='#abcdef'", "explicit");
+        var explicit = ThemeGenerator.generate(ThemeResolver.resolve(document));
+        assertThat(explicit.tokens().get(Token.EDITOR_BACKGROUND)).isEqualTo(new Color(0x010203));
+        assertThat(explicit.semantic().color(SemanticColor.SURFACE_PANEL)).isEqualTo(new Color(0xabcdef));
+        assertThat(ColorMath.contrast(theme.syntax().get(SyntaxRole.KEYWORD).color(), Color.WHITE)).isGreaterThanOrEqualTo(4.5);
+    }
+
     @Test
     void platformAliasWildcardReferenceAndCanonicalOrder() {
         var platform =
@@ -114,7 +135,7 @@ class AuthoredUiColorsTest {
         var examples =
                 Map.ofEntries(
                         Map.entry("rgb(1,2,3)", new Color(1, 2, 3)),
-                                Map.entry("rgba(#123456,50%)", new Color(0x12, 0x34, 0x56, 128)),
+                                Map.entry("rgba(#123456,50%)", new Color(0x12, 0x34, 0x56, 127)),
                         Map.entry("hsl(120,100%,50%)", Color.GREEN),
                                 Map.entry("hsla(240,100%,50%,50%)", new Color(0, 0, 255, 128)),
                         Map.entry("lighten(#000,20%)", new Color(51, 51, 51)),
@@ -153,6 +174,9 @@ class AuthoredUiColorsTest {
     void deterministicFunctionsMatchPinnedFlatLafMaterialization() {
         for (String expression :
                 List.of(
+                        "spin(#00ff00,30,relative)",
+                        "spin(#00ff00,30)",
+                        "rgba(#123456,50%)",
                         "contrast(#808080,#111,#eee)",
                         "contrast(#ff0000,#111,#eee,30%)",
                         "lighten(#999,10%,autoInverse)",

@@ -15,7 +15,9 @@ import java.util.function.Predicate;
 import javax.swing.*;
 
 /** Application-owned, EDT-confined theme selection and value subscriptions. */
-public final class ThemeController {
+public final class ThemeController implements AutoCloseable {
+    private AppearanceBindings appearance;
+    private boolean applying;
 
     public static final class InstallationFailure extends IllegalStateException {
         InstallationFailure(Theme theme, RuntimeException cause) {
@@ -43,11 +45,12 @@ public final class ThemeController {
         // Swing otherwise tries the component's plugin loader for third-party LAF delegates.
         // Only UI delegate lookup belongs to the app; plugin class visibility stays isolated.
         UIManager.put("ClassLoader", ThemeController.class.getClassLoader());
-        UIManager.put("defaultFont", null);
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
+        UIManager.put("defaultFont", null);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
         current = state.resolve();
-        installOrThrow(state.choice());
+        appearance = new AppearanceBindings(current.pair(), ThemeController::reportFailure, () -> true);
+        new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(state.choice()), ignored -> {}).apply(current.pair());
         WorkspaceDefaults.publish(current.workspace());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
@@ -89,19 +92,37 @@ public final class ThemeController {
         ResolvedTheme previous = current, next = candidate.resolve();
         boolean chromeChanged = state.choice() != candidate.choice() || !uiFont.equals(font);
         boolean choiceChanged = !state.workspaceChoice().equals(candidate.workspaceChoice());
-        if (chromeChanged) {
-            installFontDefaults(font);
-            try { installOrThrow(candidate.choice()); }
-            catch (RuntimeException failure) { installFontDefaults(uiFont); throw failure; }
-        }
-        uiFont = font;
-        UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
-        state = candidate;
-        if (chromeChanged || !previous.equals(next) || choiceChanged) {
-            current = next;
-            WorkspaceDefaults.publish(next.workspace());
-            for (var listener : List.copyOf(listeners)) listener.accept(next, chromeChanged);
-        }
+        if (applying) throw new IllegalStateException("Theme configuration cannot re-enter");
+        applying = true;
+        try {
+            new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> {
+                if (chromeChanged) {
+                    installFontDefaults(font);
+                    installOrThrow(candidate.choice());
+                }
+                UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
+                WorkspaceDefaults.publish(next.workspace());
+                uiFont = font;
+                state = candidate;
+                current = next;
+            }, ignored -> {}).apply(next.pair());
+            if (chromeChanged || !previous.equals(next) || choiceChanged) {
+                for (var listener : List.copyOf(listeners)) {
+                    if (listeners.contains(listener)) notifyListener(listener, next, chromeChanged);
+                }
+            }
+        } finally { applying = false; }
+    }
+
+    /** Shared module contexts for app-native views; lifetime is the controller's. */
+    public AppearanceBindings appearance() { requireEdt(); return appearance; }
+    @Override public void close() { requireEdt(); listeners.clear(); appearance.close(); }
+    private static void reportFailure(Throwable failure) {
+        java.util.logging.Logger.getLogger(ThemeController.class.getName()).log(java.util.logging.Level.WARNING,
+            "Theme subscriber failed", failure);
+    }
+    private static void notifyListener(BiConsumer<ResolvedTheme, Boolean> listener, ResolvedTheme value, boolean chrome) {
+        try { listener.accept(value, chrome); } catch (Throwable failure) { reportFailure(failure); }
     }
 
     private FontUIResource resolveFont(UiFontConfig choice) {
@@ -127,21 +148,14 @@ public final class ThemeController {
     public Subscription subscribe(BiConsumer<ResolvedTheme, Boolean> listener) {
         requireEdt(); Objects.requireNonNull(listener);
         if (!listeners.add(listener)) return new Subscription(() -> {});
-        try { listener.accept(current(), true); }
-        catch (RuntimeException | Error failure) { listeners.remove(listener); throw failure; }
+        notifyListener(listener, current(), true);
         return new Subscription(() -> { requireEdt(); listeners.remove(listener); });
     }
 
     private void installOrThrow(Theme theme) {
-        LookAndFeel previous = UIManager.getLookAndFeel();
         try {
             if (!installer.test(theme)) throw new IllegalStateException("Could not apply theme: " + theme.name());
         } catch (RuntimeException failure) {
-            // A failed setup may have installed a LAF before one of its initialization hooks failed.
-            if (UIManager.getLookAndFeel() != previous) {
-                try { UIManager.setLookAndFeel(previous); }
-                catch (UnsupportedLookAndFeelException | RuntimeException restoreFailure) { failure.addSuppressed(restoreFailure); }
-            }
             throw new InstallationFailure(theme, failure);
         }
     }

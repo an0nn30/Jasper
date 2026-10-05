@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.*;
@@ -372,7 +374,7 @@ class WorkspaceStylesTest {
             ui.remove("ToolWindow.background");
             var old = original.workspace();
             var complete = new GeneratedTheme(old.name(), old.dark(), old.author(), old.tokens(), old.syntax(),
-                old.terminal(), ui, old.icons());
+                old.terminal(), ui, old.icons(), old.glass(), old.semantic());
             var label = new JLabel("content");
             applyRecipe(label, WorkspaceStyles.recipe(label, complete));
             assertThat(label.getForeground()).isEqualTo(complete.tokens().get(Token.TEXT));

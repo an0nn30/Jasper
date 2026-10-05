@@ -1,4 +1,8 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.theme.ThemeGenerator;
 
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
@@ -17,8 +21,8 @@ import static dev.jasper.app.appearance.ThemeFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * A converted IntelliJ plugin theme installs exactly as the plugin's resolved {@code .theme.json} did before the theme
- * engine: every colour FlatLaf ends up with is the same, named colours ({@code ColorPalette.*}) and the accent included.
+ * A converted IntelliJ theme preserves every installed color across native publication/reload,
+ * including authored named colors, independent of vendor-name postprocessing.
  */
 @ExtendWith(EdtTestExtension.class)
 class PluginThemeParityTest {
@@ -55,13 +59,13 @@ class PluginThemeParityTest {
         try {
             jar(home.resolve("themes/vampire.jar"), entries(
                 "META-INF/plugin.xml", pluginXml("Vampire", "/" + ENTRY), ENTRY, json));
-            var converted = dev.jasper.app.themeimport.ThemeConverter.convert(home.resolve("themes/vampire.jar")).getFirst();
-            assertThat(converted.warnings()).singleElement().asString().contains("no console colours", "Jasper Dark");
+            var converted = dev.jasper.ui.themeimport.ThemeConverter.convert(home.resolve("themes/vampire.jar")).getFirst();
+            assertThat(converted.warnings().stream().filter(w -> !w.contains("discarded non-color override"))).singleElement().asString().contains("no console colours", "Jasper Dark");
             Theme theme = Theme.of("converted", new Theme.UserFile(home.resolve("vampire.toml"), converted.document()));
             String label = converted.sourceEntry();
 
-            var resolved = dev.jasper.app.themeimport.LegacyThemeTestSupport.load(label, json);
-            assertThat(ThemeManager.install(resolved.json(), resolved.colors(), theme.palette().background())).isTrue();
+            var resolved = dev.jasper.ui.themeimport.LegacyThemeTestSupport.load(label, json);
+            assertThat(ThemeManager.install(ThemeGenerator.generate(converted.document()))).isTrue();
             Map<String, String> before = colours();
             assertThat(ThemeManager.install(theme)).isTrue();
             Map<String, String> after = colours();
@@ -73,7 +77,7 @@ class PluginThemeParityTest {
             assertThat(ThemeManager.install(Theme.of("export", new Theme.UserFile(home.resolve("export.toml"), reloaded)))).isTrue();
             assertThat(differences(before, colours())).as("native disk round-trip install").isEmpty();
             var installed = UIManager.getLookAndFeel();
-            var workspace = WorkspaceValues.resolve(reloaded, ThemeGenerator.generate(reloaded));
+            var workspace = ThemeGenerator.generate(reloaded);
             assertThat(UIManager.getLookAndFeel()).isSameAs(installed);
             assertThat(workspace.icons()).isEqualTo(theme.source().document().icons());
         } finally { UIManager.setLookAndFeel(original); }

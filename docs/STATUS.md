@@ -2,6 +2,22 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Tasks 2–3 implemented, independent review pending** (2026-10-05).
+  App selection/catalog/import now consume the module engine directly; 27 duplicate pure types,
+  WorkspaceValues, KitThemeBridge and copied production resources are removed. App filesystem
+  locks/fingerprints/publication, names/config and terminal/syntax/workspace semantics remain owned
+  by their existing layers. Controller bindings publish after successful installation; tests cover
+  contained listeners and exact restoration of LAF defaults plus developer overrides. Carried pinned
+  FlatLaf spin/rgba parity is corrected. Approved integration corrections cover authored token
+  dependencies, strict legacy bare-name fallback, proven imported color slots and raw body-font
+  overrides with live invalidation. Temporary raw-Swing defaults have exact Task 5 removal owners;
+  Task 4 still owns live animation policy. Source assets and 408 before PNGs/572 checksums remain frozen.
+  Focused gate: module 128 tests, app 296 tests, zero failures/errors/skips; application/UI architecture
+  pass. Separate 2× font/transaction scope: 8 tests, zero failures/errors/skips. Full repository gate
+  remains Task 12; native acceptance remains user-run. See [contracts](superpowers/plans/2026-10-04-theme-engine-contracts.md)
+  and [removal ledger](design/theme-engine/temporary-paths.md). Tasks 2–3 are one approved integration
+  unit; no SDK shape changed and no geometry/source golden recapture was performed.
+
 - **Theme engine Plan 2 execution started** (2026-10-05), baseline `f16ae32f`. Task 1 records
   971 exact consumers (532 production / 439 test-fixture), existing behavior suites and task owners,
   with 408 immutable before renders across 22 families and checksum/source provenance. See
@@ -14,7 +30,7 @@
   palette preview assertion are documented; clean final captures use verified synthetic roots.
   Task 1 review round 1 corrected test-only zero-width titlebar context capture, added actual
   WindowTabs-region evidence and actual SSH-key empty/invalid/edit forms; 572 checksummed assets.
-  Task 2 still owns the color-expression evaluator parity gap. Independent Task 1 fix review follows.
+  Task 1 fix review is complete. The carried evaluator gap is corrected by Tasks 2–3 above.
 
 - **Theme engine/UI kit overhaul: Plan 1 implemented and reviewed** (2026-10-04), on
   `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.

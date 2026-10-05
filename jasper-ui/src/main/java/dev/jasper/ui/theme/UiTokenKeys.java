@@ -66,6 +66,14 @@ public final class UiTokenKeys {
                             if (value == token) keys.add(key);
                         });
         switch (token) {
+            case ERROR_BACKGROUND -> keys.add("SearchField.errorBackground");
+            case ACCENT -> keys.add("ColorPalette.accentColor");
+            case TITLE_BAR -> keys.addAll(List.of("MainToolbar.background", "TitlePane.background"));
+            case TAB_ACTIVE -> keys.addAll(List.of("EditorTabs.underlinedTabBackground", "EditorTabs.selectedBackground"));
+            case TAB_ACTIVE_TEXT -> keys.add("EditorTabs.foreground");
+            case TAB_HOVER -> keys.add("EditorTabs.hoverBackground");
+            case TAB_UNDERLINE -> keys.add("EditorTabs.underlineColor");
+            case TAB_UNDERLINE_INACTIVE -> keys.add("EditorTabs.inactiveUnderlineColor");
             case BUTTON_BACKGROUND -> keys.add("Button.startBackground");
             case BUTTON_DEFAULT -> keys.add("Button.default.startBackground");
             case BUTTON_BORDER -> keys.add("Button.startBorderColor");

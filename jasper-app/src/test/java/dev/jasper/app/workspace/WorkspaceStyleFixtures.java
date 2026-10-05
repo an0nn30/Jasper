@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
@@ -24,7 +26,7 @@ final class WorkspaceStyleFixtures {
         tokens.putAll(old.tokens());
         tokens.put(token, color);
         var changed = new GeneratedTheme(old.name(), old.dark(), old.author(), tokens, old.syntax(),
-            old.terminal(), old.uiKeys(), old.icons());
+            old.terminal(), old.uiKeys(), old.icons(), old.glass(), old.semantic());
         return new ResolvedTheme(original.chrome(), changed);
     }
 

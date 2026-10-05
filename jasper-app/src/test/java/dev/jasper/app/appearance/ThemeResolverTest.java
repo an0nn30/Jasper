@@ -1,4 +1,10 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.theme.Token;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.theme.ThemeFileException;
+import dev.jasper.ui.theme.ThemeDocument;
+import dev.jasper.ui.theme.Seed;
 
 import java.awt.Color;
 import java.util.List;

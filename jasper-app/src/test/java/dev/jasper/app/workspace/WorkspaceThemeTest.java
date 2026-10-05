@@ -1,7 +1,10 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import dev.jasper.app.config.*;
+import dev.jasper.app.config.TerminalColors;
 import java.util.ArrayDeque;
 import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;
@@ -25,7 +28,7 @@ class WorkspaceThemeTest {
                 base.uiComplete(), base.metadata(), base.seeds(), base.ansi(), base.tokens(), base.syntax(), ui, base.icons());
             var generated = ThemeGenerator.generate(document);
             var chrome = new Theme("optional-tool-window-" + authored, generated.name(), generated.dark(),
-                generated.terminal(), new Theme.UserFile(java.nio.file.Path.of("optional-tool-window.toml"), document));
+                dev.jasper.app.appearance.TerminalPaletteAdapter.toTerminal(generated.terminal()), new Theme.UserFile(java.nio.file.Path.of("optional-tool-window.toml"), document));
             var themes = new ThemeController(chrome);
             var background = new java.awt.Color(authored ? 0x314159 : 0x17232f);
             assertThat(UIManager.getColor("ToolWindow.background")).isEqualTo(authored ? background : null);

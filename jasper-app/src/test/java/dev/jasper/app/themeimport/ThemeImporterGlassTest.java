@@ -1,6 +1,6 @@
 package dev.jasper.app.themeimport;
 
-import dev.jasper.app.appearance.ThemeToml;
+import dev.jasper.ui.themeio.ThemeToml;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;

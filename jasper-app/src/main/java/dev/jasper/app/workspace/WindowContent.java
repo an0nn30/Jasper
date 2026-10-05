@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.GlassLevels;
+import dev.jasper.ui.theme.GlassLevels;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
@@ -1247,7 +1247,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         var workspace = themes.current().workspace();
-        glassRequests.accept(GlassLevels.resolve(configured == null ? GlassSettings.UNSET : configured.glass(), workspace.glass()),
+        glassRequests.accept((configured == null ? GlassSettings.UNSET : configured.glass()).resolve(workspace.glass()),
             workspace.dark());
     }
 

@@ -71,7 +71,7 @@ class ZoneIconsTest {
             var chromeKey = pixels(key, label);
             root.add(label);
             assertThat(pixels(key, label)).contains(themes.current().workspace().tokens()
-                .get(dev.jasper.app.appearance.Token.TEXT).getRGB());
+                .get(dev.jasper.ui.theme.Token.TEXT).getRGB());
             assertThat(pixels(plugin, label)).isEqualTo(original);
             assertThat(AppIcons.forBackground(plugin, Color.BLACK)).isSameAs(plugin);
             themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);

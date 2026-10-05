@@ -6,7 +6,7 @@ import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
 import java.util.function.LongSupplier;
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.appearance.Token;
+import dev.jasper.ui.theme.Token;
 import dev.jasper.app.platform.SystemFonts;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;

@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.appearance.Token;
+import dev.jasper.ui.theme.Token;
 import java.beans.PropertyChangeListener;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;

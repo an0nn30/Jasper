@@ -1,6 +1,7 @@
 package dev.jasper.app.themesui;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.themeimport.*;
+import dev.jasper.ui.themeimport.*;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.nio.file.Path;
 import java.util.*;

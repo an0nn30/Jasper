@@ -1,6 +1,9 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeConverter;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import java.awt.Color;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,7 +59,7 @@ class ThemeConverterTest {
         assertThat(saved.ansi().get(12)).isEqualTo(new Color(0x010203));
         assertThat(saved.syntax().get(SyntaxRole.KEYWORD)).isEqualTo(new SyntaxStyle(new Color(0xaabbcc), true, true));
         assertThat(saved.metadata()).containsEntry("author", "Fixture Author");
-        assertThat(saved.ui()).containsEntry("Button.arc", "7").containsEntry("Panel.background", "#223344");
+        assertThat(saved.ui()).doesNotContainKey("Button.arc").containsEntry("Panel.background", "#223344");
         assertThat(saved.icons()).containsKey("ColorPalette");
         assertThat(saved.tokens()).containsEntry(Token.SURFACE, new Color(0x223344));
     }
@@ -64,7 +67,7 @@ class ThemeConverterTest {
     @Test void serializedConversionMatchesTheCompleteGolden() throws Exception {
         Path source = Path.of(getClass().getResource("golden/child.theme.json").toURI());
         String actual = ThemeTomlWriter.write(ThemeConverter.convert(source).getFirst().document());
-        assertThat(actual).isEqualTo(Files.readString(source.resolveSibling("child.expected.toml")));
+        assertThat(actual).isEqualTo(Files.readString(Path.of(System.getProperty("jasper.repoRoot"), "jasper-ui/src/test/resources/dev/jasper/ui/themeimport/golden/child.colors.expected.toml")));
     }
 
     @Test void reportsEveryConsoleFallback() throws Exception {
@@ -87,14 +90,14 @@ class ThemeConverterTest {
         var ui = new LinkedHashMap<String, Object>();
         ui.put("*.background", "#111111"); ui.put("Panel.background", "#222222");
         ui.put("Button.startBackground", "#334455");
-        assertThat(WorkspaceTokenKeys.explicitTokens(ui)).containsEntry(Token.SURFACE, new Color(0x222222))
+        assertThat(dev.jasper.ui.themeimport.ThemeConverter.explicitTokens(ui)).containsEntry(Token.SURFACE, new Color(0x222222))
             .containsEntry(Token.BUTTON_BACKGROUND, new Color(0x334455)).doesNotContainKey(Token.ERROR);
         ui.remove("*.background"); ui.put("*.background", "#556677");
-        assertThat(WorkspaceTokenKeys.explicitTokens(ui)).containsEntry(Token.SURFACE, new Color(0x556677));
+        assertThat(dev.jasper.ui.themeimport.ThemeConverter.explicitTokens(ui)).containsEntry(Token.SURFACE, new Color(0x556677));
     }
 
     @Test void unrelatedControlColorsDoNotOverrideEffectiveDefaults() {
-        assertThat(WorkspaceTokenKeys.explicitTokens(Map.of(
+        assertThat(dev.jasper.ui.themeimport.ThemeConverter.explicitTokens(Map.of(
             "ToolTip.background", "#123456", "ProgressBar.foreground", "#234567",
             "ScrollPane.background", "#345678", "Button.toolbar.hoverBackground", "#456789")))
             .doesNotContainKeys(Token.SURFACE_RAISED, Token.ACCENT, Token.SCROLLBAR_TRACK, Token.HOVER);

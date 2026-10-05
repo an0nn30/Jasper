@@ -3,7 +3,7 @@ package dev.jasper.app.workspace;
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
-import dev.jasper.app.appearance.Token;
+import dev.jasper.ui.theme.Token;
 import dev.jasper.terminal.search.FindResult;
 import dev.jasper.terminal.search.SearchQuery;
 import dev.jasper.terminal.view.TerminalView;

@@ -1,8 +1,8 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.GeneratedTheme;
+import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.appearance.Token;
+import dev.jasper.ui.theme.Token;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Window;

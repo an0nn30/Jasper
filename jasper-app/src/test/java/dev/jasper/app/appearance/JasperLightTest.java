@@ -1,4 +1,7 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.theme.Token;
+import dev.jasper.ui.theme.ThemeGenerator;
+import dev.jasper.ui.theme.GeneratedTheme;
 
 import com.formdev.flatlaf.FlatLaf;
 import dev.jasper.app.testsupport.EdtTestExtension;

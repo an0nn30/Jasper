@@ -1,7 +1,10 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import dev.jasper.app.config.*;
+import dev.jasper.app.config.TerminalColors;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;

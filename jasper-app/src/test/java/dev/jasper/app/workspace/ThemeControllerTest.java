@@ -23,6 +23,51 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.*;
 
 class ThemeControllerTest {
+    @Test void realBindingsTrackSameDarkThemeIndependentWorkspaceAndFontsDespiteBadSubscriber() throws Exception {
+        edt(() -> {
+            try (var controller = new ThemeController()) {
+                var chrome = controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
+                var workspace = controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.WORKSPACE);
+                var changes = new ArrayList<ResolvedTheme>();
+                controller.subscribe((value, refresh) -> { throw new IllegalStateException("contained fixture"); });
+                controller.subscribe((value, refresh) -> changes.add(value));
+                var nord = ThemeTestSupport.named("Nord");
+                controller.configure(nord, new dev.jasper.app.config.UiFontConfig("Monospaced", 19));
+                assertThat(chrome.theme()).isSameAs(controller.current().chrome());
+                assertThat(chrome.theme().name()).isEqualTo("Nord");
+                assertThat(chrome.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(19);
+                controller.configureWorkspace(new dev.jasper.app.config.WorkspaceThemeChoice(Theme.DARK.name()), Theme.DARK);
+                assertThat(workspace.theme()).isSameAs(controller.current().workspace());
+                assertThat(workspace.theme().name()).isEqualTo(Theme.DARK.name());
+                assertThat(chrome.theme().name()).isEqualTo("Nord");
+                assertThat(changes).hasSize(3);
+            }
+        });
+    }
+
+    @Test void failedInstallerRestoresBothRawDefaultsLayers() throws Exception {
+        edt(() -> {
+            var controller = new ThemeController(theme -> {
+                if (theme == Theme.JASPER_LIGHT) {
+                    UIManager.put("migration.override", Color.RED);
+                    UIManager.getLookAndFeelDefaults().put("migration.laf", Color.BLUE);
+                    throw new IllegalStateException("partial install");
+                }
+                return ThemeTestSupport.install(theme);
+            });
+            UIManager.put("migration.override", Color.GREEN);
+            UIManager.getLookAndFeelDefaults().put("migration.laf", Color.YELLOW);
+            var old = controller.current();
+            assertThatThrownBy(() -> controller.configure(Theme.JASPER_LIGHT))
+                .isInstanceOf(ThemeController.InstallationFailure.class);
+            assertThat(controller.current()).isSameAs(old);
+            assertThat(UIManager.getColor("migration.override")).isEqualTo(Color.GREEN);
+            assertThat(UIManager.getLookAndFeelDefaults().getColor("migration.laf")).isEqualTo(Color.YELLOW);
+            UIManager.put("migration.override", null);
+            UIManager.getLookAndFeelDefaults().remove("migration.laf");
+        });
+    }
+
     @Test void sameDarknessWorkspacePublishesWithoutChromeInstallAndRepeatsAreQuiet() throws Exception {
         edt(() -> {
             var installs = new ArrayList<Theme>();
@@ -50,6 +95,9 @@ class ThemeControllerTest {
             var old = controller.current();
             var laf = UIManager.getLookAndFeel();
             var font = UIManager.getFont("Label.font");
+            var aliases = Map.of("Jasper.titleBackground", UIManager.getColor("Jasper.titleBackground"),
+                "Jasper.tabUnderline", UIManager.getColor("Jasper.tabUnderline"),
+                "Button.foreground", UIManager.getColor("Button.foreground"));
             var changes = new ArrayList<ResolvedTheme>();
             controller.subscribe((value, refresh) -> changes.add(value)); changes.clear();
             assertThatThrownBy(() -> controller.configure(Theme.JASPER_LIGHT,
@@ -61,6 +109,8 @@ class ThemeControllerTest {
             assertThat(controller.workspaceChoice()).isEqualTo(dev.jasper.app.config.WorkspaceThemeChoice.MATCH);
             assertThat(UIManager.getLookAndFeel()).isSameAs(laf);
             assertThat(UIManager.getFont("Label.font")).isEqualTo(font);
+            aliases.forEach((key, value) -> assertThat(UIManager.getColor(key)).as(key).isEqualTo(value));
+            assertThat(controller.appearance().binding().current()).isEqualTo(old.pair());
             assertThat(changes).isEmpty();
         });
     }

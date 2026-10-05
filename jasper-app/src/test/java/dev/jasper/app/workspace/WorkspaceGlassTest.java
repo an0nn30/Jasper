@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.GlassLevels;
+import dev.jasper.ui.theme.GlassLevels;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -189,7 +189,7 @@ class WorkspaceGlassTest {
             // Clear Dark's generated tab-bar colour differs from its terminal background, so the colour check bites.
             var clear = ThemeCatalog.builtIn().scan().find("Clear Dark").orElseThrow();
             themes.configureWorkspace(new WorkspaceThemeChoice("Clear Dark"), clear);
-            assertThat(themes.current().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_BAR))
+            assertThat(themes.current().workspace().tokens().get(dev.jasper.ui.theme.Token.TAB_BAR))
                 .isNotEqualTo(themes.current().palette().background());
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
             owner.setSize(900, 600);

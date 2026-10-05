@@ -1,6 +1,8 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.appearance.*;
+import dev.jasper.ui.theme.*;
+import dev.jasper.ui.themeio.*;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.ui.WorkspacePalette;
@@ -20,7 +22,7 @@ final class WorkspaceAppearanceFixture {
     void setVariant(Variant variant) {
         var old = current.chrome();
         var chrome = new GeneratedTheme(old.name(), variant == Variant.DARK, old.author(), old.tokens(), old.syntax(),
-            old.terminal(), old.uiKeys(), old.icons());
+            old.terminal(), old.uiKeys(), old.icons(), old.glass(), old.semantic());
         current = new ResolvedTheme(chrome, current.matching() ? chrome : current.workspace());
         for (var listener : List.copyOf(listeners)) listener.accept(current);
     }
@@ -51,7 +53,7 @@ final class WorkspaceAppearanceFixture {
         syntax.styles().forEach((role, style) -> styles.put(SyntaxRole.valueOf(role.name()),
             new SyntaxStyle(style.color(), style.bold(), style.italic())));
         var workspace = new GeneratedTheme("Contract", variant == Variant.DARK, "", tokens, styles,
-            previous.terminal(), previous.uiKeys(), previous.icons());
+            previous.terminal(), previous.uiKeys(), previous.icons(), previous.glass(), previous.semantic());
         current = new ResolvedTheme(current.chrome(), workspace);
         for (var listener : List.copyOf(listeners)) listener.accept(current);
     }

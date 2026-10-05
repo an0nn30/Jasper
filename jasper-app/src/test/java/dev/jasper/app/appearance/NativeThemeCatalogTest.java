@@ -1,4 +1,7 @@
 package dev.jasper.app.appearance;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.theme.ThemeResolver;
+import dev.jasper.ui.theme.Seed;
 
 import java.nio.file.*;
 import org.junit.jupiter.api.Test;
@@ -40,8 +43,8 @@ class NativeThemeCatalogTest {
         assertThat(snapshot.names()).containsExactly("Clear Dark", "Clear Light", "Jasper Dark", "Jasper Light", "Nord");
         assertThat(snapshot.find("Jasper Dark")).containsSame(Theme.DARK);
         assertThat(snapshot.find("Jasper Light")).containsSame(Theme.JASPER_LIGHT);
-        try (var jar = new java.util.jar.JarFile(System.getProperty("jasper.appJar"))) {
-            String root = "dev/jasper/app/themes/";
+        try (var jar = new java.util.jar.JarFile(dev.jasper.ui.theme.GeneratedTheme.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath())) {
+            String root = "dev/jasper/ui/themeimport/native/";
             assertThat(jar.stream().map(java.util.jar.JarEntry::getName)
                 .filter(name -> name.startsWith(root) && name.endsWith(".toml")).toList())
                 .containsExactlyInAnyOrder(root + "jasper-light.toml", root + "jasper-dark.toml",

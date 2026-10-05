@@ -106,10 +106,10 @@ class FindBarModernTest {
                     Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());
                 WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
                 var tokens = themes.current().workspace().tokens();
-                assertThat(query.getBackground()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.ERROR_BACKGROUND));
-                assertThat(query.getForeground()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.TEXT));
-                assertThat(query.getSelectionColor()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.TEXT_SELECTION));
-                assertThat(bar[0].getBackground()).isEqualTo(tokens.get(dev.jasper.app.appearance.Token.SURFACE));
+                assertThat(query.getBackground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.ERROR_BACKGROUND));
+                assertThat(query.getForeground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.TEXT));
+                assertThat(query.getSelectionColor()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.TEXT_SELECTION));
+                assertThat(bar[0].getBackground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.SURFACE));
                 assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
                 themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);
                 WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();

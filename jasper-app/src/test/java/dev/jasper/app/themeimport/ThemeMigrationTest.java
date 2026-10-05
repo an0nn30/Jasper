@@ -1,8 +1,10 @@
 package dev.jasper.app.themeimport;
+import dev.jasper.ui.themeimport.ThemeConverter;
+
 
 import dev.jasper.app.appearance.ThemeFixtures;
-import dev.jasper.app.appearance.ThemeToml;
-import dev.jasper.app.appearance.ThemeTomlWriter;
+import dev.jasper.ui.themeio.ThemeToml;
+import dev.jasper.ui.themeio.ThemeTomlWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -22,7 +24,7 @@ class ThemeMigrationTest {
         String text = "[colors.primary]\nbackground='#101010'\nforeground='#eeeeee'\n";
         for (String group : java.util.List.of("normal", "bright")) {
             text += "[colors." + group + "]\n";
-            for (String color : dev.jasper.app.appearance.ThemeDocument.ANSI_NAMES) text += color + "='#445566'\n";
+            for (String color : dev.jasper.ui.theme.ThemeDocument.ANSI_NAMES) text += color + "='#445566'\n";
         }
         return text;
     }
@@ -37,7 +39,7 @@ class ThemeMigrationTest {
         var migration = new ThemeMigration(home); var report = migration.run(); migration.complete(report);
         var theme = dev.jasper.app.appearance.ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Custom");
         assertThat(theme).isPresent();
-        assertThat(theme.orElseThrow().source().document().seeds()).containsEntry(dev.jasper.app.appearance.Seed.BACKGROUND, new java.awt.Color(0x010203));
+        assertThat(theme.orElseThrow().source().document().seeds()).containsEntry(dev.jasper.ui.theme.Seed.BACKGROUND, new java.awt.Color(0x010203));
         assertThat(Files.readString(nativeFile)).contains("# keep my override", "# my parent", "accent='#abcdef'");
         assertThat(ThemeToml.parse(Files.readString(nativeFile), "a.toml").parent()).contains("Custom 2");
         try (var saved = Files.list(home.resolve("themes/legacy"))) {
@@ -71,7 +73,7 @@ class ThemeMigrationTest {
         Path child = Files.writeString(home.resolve("themes/child.toml"), "name='Child'\nextends='Custom'\n");
         var migration = new ThemeMigration(home); var report = migration.run(); migration.complete(report);
         var theme = dev.jasper.app.appearance.ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Child").orElseThrow();
-        assertThat(theme.source().document().seeds()).containsEntry(dev.jasper.app.appearance.Seed.BACKGROUND, new java.awt.Color(0x010203));
+        assertThat(theme.source().document().seeds()).containsEntry(dev.jasper.ui.theme.Seed.BACKGROUND, new java.awt.Color(0x010203));
         assertThat(ThemeToml.parse(Files.readString(child), "child.toml").parent()).contains("Custom 2");
     }
 
@@ -79,7 +81,7 @@ class ThemeMigrationTest {
     void sourceFingerprintRejectsOversizedFilesAndKeepsWarningsBounded(String name) throws Exception {
         Path path = home.resolve(name.endsWith(".toml") ? "terminal-themes" : "themes").resolve(name);
         Files.createDirectories(path.getParent());
-        long limit = name.endsWith(".jar") ? ThemeArchive.MAX_ARCHIVE : ThemeArchive.MAX_FILE;
+        long limit = name.endsWith(".jar") ? ThemeConverter.MAX_ARCHIVE : ThemeConverter.MAX_FILE;
         try (var channel = java.nio.channels.FileChannel.open(path, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE)) {
             channel.position(limit); channel.write(java.nio.ByteBuffer.wrap(new byte[] {0}));
         }
@@ -172,7 +174,7 @@ class ThemeMigrationTest {
                 try { return ThemeToml.parse(Files.readString(path), path.toString()); }
                 catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
             }).filter(doc -> doc.name().equals("Example 2")).findFirst().orElseThrow();
-            assertThat(output.seeds()).containsEntry(dev.jasper.app.appearance.Seed.BACKGROUND, new java.awt.Color(0x010203));
+            assertThat(output.seeds()).containsEntry(dev.jasper.ui.theme.Seed.BACKGROUND, new java.awt.Color(0x010203));
         } else {
             assertThat(report.chromeRenames()).doesNotContainKey("example");
             assertThat(report.workspaceRenames()).doesNotContainKey("example");
@@ -222,7 +224,7 @@ class ThemeMigrationTest {
     @Test void oversizedConvertedOutputDoesNotAbortOtherSources() throws Exception {
         Files.createDirectories(home.resolve("themes"));
         Path bad = Files.writeString(home.resolve("themes/a.theme.json"),
-            "{\"name\":\"Huge\",\"dark\":true,\"ui\":{\"Some.value\":\"" + "x".repeat(270000) + "\"}}");
+            "{\"name\":\"" + "x".repeat(270000) + "\",\"dark\":true}");
         plugin("z.jar", "Good");
         var report = new ThemeMigration(home).run();
         assertThat(report.outputs()).hasSize(1); assertThat(bad).exists();
