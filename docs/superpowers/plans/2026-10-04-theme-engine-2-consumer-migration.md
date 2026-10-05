@@ -16,7 +16,7 @@ with the live `ui.animations.enabled` application setting before mounting migrat
 Test disabled motion and setting changes on an existing hosted view. This is also recorded in the
 [temporary-path ledger](../../design/theme-engine/temporary-paths.md).
 **Shared contracts:** [Exact paths and APIs](2026-10-04-theme-engine-contracts.md).
-**Status:** Execution started 2026-10-05 on `codex/theme-engine`; Plan 1 is complete. Task 1 inventory/before evidence implemented; independent task review follows. Checkboxes record executed work, not completion of consumer migration.
+**Status:** Execution started 2026-10-05 on `codex/theme-engine`; Plan 1 is complete. Task 1 inventory/before evidence implemented; review round 1 corrected test-only titlebar root/context and actual SSH-key-form evidence; independent fix review follows. Checkboxes record executed work, not completion of consumer migration.
 **Execution rulings/deviations:** Tasks 2–3 form one integrated engine/import implementation/review unit because of direct model dependencies. Task 12 provides the single final review (no duplicate). Task 1 adds pinned FlatLaf 3.7 only to plugin test runtime and uses test-only recursive layout of actual renderers. Buddy native-window visual evidence is unavailable headlessly and remains user acceptance; supported adapter behavioral evidence and app-owned notification/status captures are preserved. The inherited first preview's home-discovery outputs were discarded; final captures verify synthetic history/config roots. The unchanged stale standalone CommandPalettePreview is replaced only for evidence by a narrow real-owner fixture. See [inventory and frozen before evidence](../../design/theme-engine/migration-evidence.md).
 
 ## Global Constraints

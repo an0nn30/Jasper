@@ -5,7 +5,7 @@
   "flatlaf": "3.7; plugin testRuntimeOnly; app existing runtime",
   "mutableRenders": "build/theme-migration-evidence; normal checks never write this frozen directory",
   "syntheticInputs": "temporary directories, example.invalid, fixture history/snippet, fake domain services/icons; no networking/native window launch",
-  "inspection": "All 104 plugin dark/light images inspected in six contact sheets; app dark/light/system-font/18pt representatives in five sheets plus existing title-bar preview. Remaining app built-in themes are preserved as supplementary captures. Images are evidence, not golden acceptance assertions.",
+  "inspection": "All 104 plugin dark/light images inspected in six contact sheets; app dark/light/system-font/18pt representatives in five sheets plus existing title-bar preview. Remaining app built-in themes are preserved as supplementary captures. Images are evidence, not golden acceptance assertions. Review fix round 1: all 24 corrected titlebar/window-tab owner captures and all 6 actual SSH-key form captures inspected in two additional sheets; strip context and separate window-tab region now visibly represented.",
   "limitations": [
     "Buddy native-window visual baseline unavailable headlessly; user-run acceptance remains required. App BuddyIntegration/BuddyTestSupport behavior preserved; app-owned notification/status captures present.",
     "Native focus/traffic lights/glass/window placement not proven by peerless rendering. Native boundaries remain user acceptance.",
@@ -17,7 +17,7 @@
   "harnessSources": [
     {
       "path": "jasper-app/src/test/java/dev/jasper/app/appearance/ThemeMigrationCoverageTest.java",
-      "sha256": "6d1201a26d77e276ef6da1c22b319a8eca0181490ebfb535f12fd59e812e93e6"
+      "sha256": "ccab028edd5710e8d452363b5f78ce49c93c42089911075855bf910dd2c05ff9"
     },
     {
       "path": "jasper-app/src/test/java/dev/jasper/app/appearance/ThemeMigrationPreview.java",
@@ -65,7 +65,7 @@
     },
     {
       "path": "jasper-app/src/test/java/dev/jasper/app/workspace/TitleBarPreview.java",
-      "sha256": "fd909ad05b5eeeae6c0d82196930fa81192044f657459b0f6667f28871fe1d02"
+      "sha256": "3e2d8e210dbc68b8d6e96d3dc881a678d4587063c7ffc02d1da0feb2521acf13"
     },
     {
       "path": "jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/contracts/ThemeMigrationCapture.java",
@@ -105,7 +105,7 @@
     },
     {
       "path": "plugins/vault/src/test/java/dev/jasper/vault/ui/ThemeMigrationEvidenceTest.java",
-      "sha256": "6b8d33376c3b7577b660a15ef73da2542fa7f44657343f4750b8079789c7221d"
+      "sha256": "3f09a5f6b3aaa5cafb66c17165ae1e824b166f099dd866ca9e310703d3efbf0e"
     }
   ],
   "familyCounts": {
@@ -128,8 +128,8 @@
     "shortcut-help": 30,
     "snippets-palette": 4,
     "theme-import": 6,
-    "title-bar": 12,
-    "vault": 20,
+    "title-bar": 24,
+    "vault": 26,
     "workspace": 2
   },
   "captures": [
@@ -5488,7 +5488,12 @@
       "uiFont": "system platform size",
       "width": 900,
       "height": 60,
-      "sha256": "6e13d8ec8eb0fd90f6db2ba533e8b3a6a761d04bd8a37c9e9a0d59d31c2a6c08"
+      "sha256": "d420353763013e26f141a86af62ff1835cfa06d8bbed8f32aa3897e2e73639d4",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/intellij light-remote-narrow.png",
@@ -5499,7 +5504,12 @@
       "uiFont": "system platform size",
       "width": 900,
       "height": 60,
-      "sha256": "6e13d8ec8eb0fd90f6db2ba533e8b3a6a761d04bd8a37c9e9a0d59d31c2a6c08"
+      "sha256": "d420353763013e26f141a86af62ff1835cfa06d8bbed8f32aa3897e2e73639d4",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/intellij light-remote.png",
@@ -5510,7 +5520,12 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "339b14af6728e620e5da0e4c18534e1db8170dd4e8b2a530a23dfbd9432db890"
+      "sha256": "9aa70bd9b977001b11c8a7abb14651f25e91b76676f2a4d898532c75f33d1e0b",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/intellij light-shell-tabs.png",
@@ -5521,7 +5536,12 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "339b14af6728e620e5da0e4c18534e1db8170dd4e8b2a530a23dfbd9432db890"
+      "sha256": "68b9248e13d60d610ab8ceafc51fdc2560c1a4105e3ce4391e443a0c9297525b",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/intellij light-single.png",
@@ -5532,7 +5552,12 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "339b14af6728e620e5da0e4c18534e1db8170dd4e8b2a530a23dfbd9432db890"
+      "sha256": "68b9248e13d60d610ab8ceafc51fdc2560c1a4105e3ce4391e443a0c9297525b",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 1
     },
     {
       "path": "title-bar/intellij light-tmux-tabs.png",
@@ -5543,7 +5568,12 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "339b14af6728e620e5da0e4c18534e1db8170dd4e8b2a530a23dfbd9432db890"
+      "sha256": "805e0bbd4f3873a79cd7fcadcb3d9fc9c4f94585b6a6d3693384a9f1d1a835f2",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/jasper dark-narrow.png",
@@ -5554,7 +5584,12 @@
       "uiFont": "system platform size",
       "width": 900,
       "height": 60,
-      "sha256": "33fde2fed120e26eaae4786605c89427e4c42269431a6a97e8d44a9fc3bfc037"
+      "sha256": "c8b333e98a866bcd52705d55c2b56062e37c1e86abce186416a5b13f53fe71e5",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/jasper dark-remote-narrow.png",
@@ -5565,7 +5600,12 @@
       "uiFont": "system platform size",
       "width": 900,
       "height": 60,
-      "sha256": "33fde2fed120e26eaae4786605c89427e4c42269431a6a97e8d44a9fc3bfc037"
+      "sha256": "c8b333e98a866bcd52705d55c2b56062e37c1e86abce186416a5b13f53fe71e5",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/jasper dark-remote.png",
@@ -5576,7 +5616,12 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "e0e98e051746c36319b771e9ec93de2099ae4ce3c5243a24df11a23313fbf545"
+      "sha256": "c51777442ae8b0a87b99982e3fc8013e237e8116a6b8056993dc7deb40a43e5e",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/jasper dark-shell-tabs.png",
@@ -5587,7 +5632,12 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "e0e98e051746c36319b771e9ec93de2099ae4ce3c5243a24df11a23313fbf545"
+      "sha256": "84e234c54760764264194d18b930836288e0284db7e430f3ce482ac210619f41",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
     },
     {
       "path": "title-bar/jasper dark-single.png",
@@ -5598,7 +5648,12 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "e0e98e051746c36319b771e9ec93de2099ae4ce3c5243a24df11a23313fbf545"
+      "sha256": "84e234c54760764264194d18b930836288e0284db7e430f3ce482ac210619f41",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 1
     },
     {
       "path": "title-bar/jasper dark-tmux-tabs.png",
@@ -5609,7 +5664,308 @@
       "uiFont": "system platform size",
       "width": 1660,
       "height": 60,
-      "sha256": "e0e98e051746c36319b771e9ec93de2099ae4ce3c5243a24df11a23313fbf545"
+      "sha256": "727373886c4742339f387a6001c14864a04f8c1ec50ed30c598c27166e9790a5",
+      "region": "MacTitleBar actual strip with centered TitleSearchField (magnifier only when narrow)",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/intellij light-narrow-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/intellij light-narrow-window-tabs.png",
+      "theme": "intellij light",
+      "state": "intellij light-narrow-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 900,
+      "height": 60,
+      "sha256": "bf72e797fcc62d6b18c2e1ecbff1390ee59a7a32c21bf04b56cfba9ce15154ca",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/intellij light-remote-narrow-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/intellij light-remote-narrow-window-tabs.png",
+      "theme": "intellij light",
+      "state": "intellij light-remote-narrow-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 900,
+      "height": 60,
+      "sha256": "bf72e797fcc62d6b18c2e1ecbff1390ee59a7a32c21bf04b56cfba9ce15154ca",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/intellij light-remote-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/intellij light-remote-window-tabs.png",
+      "theme": "intellij light",
+      "state": "intellij light-remote-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "d46b4e6093f9262ddf97036abb92bddf1fcfc41c3a3454f2112a2d168d46aaa5",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/intellij light-shell-tabs-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/intellij light-shell-tabs-window-tabs.png",
+      "theme": "intellij light",
+      "state": "intellij light-shell-tabs-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "9e3c258df31d1bbce751963557ec4df928ac80ca23b88c662d3b08f51c16291c",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/intellij light-single-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/intellij light-single-window-tabs.png",
+      "theme": "intellij light",
+      "state": "intellij light-single-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "6f505af6e8c311613d8112d75fdee155eef6335a700d22a8636538cbe4ef78e0",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 1
+    },
+    {
+      "path": "title-bar/intellij light-tmux-tabs-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/intellij light-tmux-tabs-window-tabs.png",
+      "theme": "intellij light",
+      "state": "intellij light-tmux-tabs-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "d46b4e6093f9262ddf97036abb92bddf1fcfc41c3a3454f2112a2d168d46aaa5",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/jasper dark-narrow-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/jasper dark-narrow-window-tabs.png",
+      "theme": "jasper dark",
+      "state": "jasper dark-narrow-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 900,
+      "height": 60,
+      "sha256": "f0dc45d4cda0ac6cbab5176b1285e75916623b4f103a7c90993127510a88afe0",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/jasper dark-remote-narrow-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/jasper dark-remote-narrow-window-tabs.png",
+      "theme": "jasper dark",
+      "state": "jasper dark-remote-narrow-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 900,
+      "height": 60,
+      "sha256": "f0dc45d4cda0ac6cbab5176b1285e75916623b4f103a7c90993127510a88afe0",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 450,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/jasper dark-remote-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/jasper dark-remote-window-tabs.png",
+      "theme": "jasper dark",
+      "state": "jasper dark-remote-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "8ed45841faf15a47300fe596b889680ed1142d6c3c75353f94a3a6fa6a202dfe",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/jasper dark-shell-tabs-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/jasper dark-shell-tabs-window-tabs.png",
+      "theme": "jasper dark",
+      "state": "jasper dark-shell-tabs-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "e6d19fda79f877641426dbc5be53faf724c82d33a59388ec9020e0ce396b96ec",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "title-bar/jasper dark-single-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/jasper dark-single-window-tabs.png",
+      "theme": "jasper dark",
+      "state": "jasper dark-single-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "cf845cfc7833c41b4882ea01b4c5b805ed234b8def1457bec5f24febd660f6fa",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 1
+    },
+    {
+      "path": "title-bar/jasper dark-tmux-tabs-window-tabs.png",
+      "sourceOutput": "jasper-app/build/reports/title-bar/jasper dark-tmux-tabs-window-tabs.png",
+      "theme": "jasper dark",
+      "state": "jasper dark-tmux-tabs-window-tabs",
+      "pixelScale": 2,
+      "uiFont": "system platform size",
+      "width": 1660,
+      "height": 60,
+      "sha256": "8ed45841faf15a47300fe596b889680ed1142d6c3c75353f94a3a6fa6a202dfe",
+      "region": "WindowTabs actual owner region below titlebar",
+      "rootWidth": 830,
+      "rootHeight": 620,
+      "contextAssertion": "positive usable bounds; wide context expanded; narrow context collapsed; tmux/remote text asserted",
+      "tabCount": 2
+    },
+    {
+      "path": "vault/dark/ssh-key-edit.png",
+      "sourceOutput": "plugins/vault/build/theme-migration-evidence/vault/dark/ssh-key-edit.png",
+      "sha256": "ac6ab2a652aa245ad9d6886e44435984fb7c3324f0a04fc4f9ca26bfae58bb5a",
+      "owner": "dev.jasper.vault.ui.EntryEditor",
+      "theme": "dark",
+      "state": "ssh-key-edit",
+      "width": 700,
+      "height": 330,
+      "laf": "com.formdev.flatlaf.FlatDarkLaf",
+      "fontFamily": ".AppleSystemUIFont",
+      "fontSize": 13,
+      "headless": true,
+      "nativeWindow": false,
+      "icons": "fake SDK icons where used"
+    },
+    {
+      "path": "vault/dark/ssh-key-empty.png",
+      "sourceOutput": "plugins/vault/build/theme-migration-evidence/vault/dark/ssh-key-empty.png",
+      "sha256": "0e193e2708c37ca680d3c919a47b6308b3786e76543092f0c31dab666fd4006a",
+      "owner": "dev.jasper.vault.ui.EntryEditor",
+      "theme": "dark",
+      "state": "ssh-key-empty",
+      "width": 700,
+      "height": 330,
+      "laf": "com.formdev.flatlaf.FlatDarkLaf",
+      "fontFamily": ".AppleSystemUIFont",
+      "fontSize": 13,
+      "headless": true,
+      "nativeWindow": false,
+      "icons": "fake SDK icons where used"
+    },
+    {
+      "path": "vault/dark/ssh-key-invalid-path.png",
+      "sourceOutput": "plugins/vault/build/theme-migration-evidence/vault/dark/ssh-key-invalid-path.png",
+      "sha256": "fcf6fe7cfdbea99af6da3f0429b047cfe8f1dff47252e54b224a747a6595879f",
+      "owner": "dev.jasper.vault.ui.EntryEditor",
+      "theme": "dark",
+      "state": "ssh-key-invalid-path",
+      "width": 700,
+      "height": 330,
+      "laf": "com.formdev.flatlaf.FlatDarkLaf",
+      "fontFamily": ".AppleSystemUIFont",
+      "fontSize": 13,
+      "headless": true,
+      "nativeWindow": false,
+      "icons": "fake SDK icons where used"
+    },
+    {
+      "path": "vault/light/ssh-key-edit.png",
+      "sourceOutput": "plugins/vault/build/theme-migration-evidence/vault/light/ssh-key-edit.png",
+      "sha256": "d7b5f568e9396c90ed0ff626cbb571268a79b15f8fcd8121964df148ac4cef26",
+      "owner": "dev.jasper.vault.ui.EntryEditor",
+      "theme": "light",
+      "state": "ssh-key-edit",
+      "width": 700,
+      "height": 330,
+      "laf": "com.formdev.flatlaf.FlatLightLaf",
+      "fontFamily": ".AppleSystemUIFont",
+      "fontSize": 13,
+      "headless": true,
+      "nativeWindow": false,
+      "icons": "fake SDK icons where used"
+    },
+    {
+      "path": "vault/light/ssh-key-empty.png",
+      "sourceOutput": "plugins/vault/build/theme-migration-evidence/vault/light/ssh-key-empty.png",
+      "sha256": "3adfa0092a25288e93ace49ad0832a9955d5ecb143524e7b3472cb637ab6a6d6",
+      "owner": "dev.jasper.vault.ui.EntryEditor",
+      "theme": "light",
+      "state": "ssh-key-empty",
+      "width": 700,
+      "height": 330,
+      "laf": "com.formdev.flatlaf.FlatLightLaf",
+      "fontFamily": ".AppleSystemUIFont",
+      "fontSize": 13,
+      "headless": true,
+      "nativeWindow": false,
+      "icons": "fake SDK icons where used"
+    },
+    {
+      "path": "vault/light/ssh-key-invalid-path.png",
+      "sourceOutput": "plugins/vault/build/theme-migration-evidence/vault/light/ssh-key-invalid-path.png",
+      "sha256": "56e4ec06d501b0aae36ac7bf1738611c188a350277cfebc7184ed0d5faab1a68",
+      "owner": "dev.jasper.vault.ui.EntryEditor",
+      "theme": "light",
+      "state": "ssh-key-invalid-path",
+      "width": 700,
+      "height": 330,
+      "laf": "com.formdev.flatlaf.FlatLightLaf",
+      "fontFamily": ".AppleSystemUIFont",
+      "fontSize": 13,
+      "headless": true,
+      "nativeWindow": false,
+      "icons": "fake SDK icons where used"
+    }
+  ],
+  "corrections": [
+    {
+      "date": "2026-10-05",
+      "reviewBase": "84f7ff4a",
+      "finding": "P2 titlebar zero-width root and omitted actual EntryEditor.key",
+      "scope": "Authorized pre-migration evidence correction only: containing root layout/context assertions, separate WindowTabs owner images, SSH-key empty/invalid/edit images. Production baseline remains f16ae32f; no golden/production change."
     }
   ]
 }

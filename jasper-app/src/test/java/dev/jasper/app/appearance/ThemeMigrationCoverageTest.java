@@ -98,6 +98,22 @@ class ThemeMigrationCoverageTest {
                 .as("pre-migration family: %s", family).isTrue();
     }
 
+    @Test void frozenContextAndWindowTabStatesAreDistinctAndSshKeyFormIsPreserved() throws Exception {
+        Path before = ROOT.resolve("docs/design/theme-engine/before-f16ae32f");
+        for (String theme : List.of("jasper dark", "intellij light")) {
+            Path title = before.resolve("title-bar");
+            assertThat(Files.readAllBytes(title.resolve(theme + "-tmux-tabs.png")))
+                .as("wide context is visibly changed, not collapsed by a zero-width root")
+                .isNotEqualTo(Files.readAllBytes(title.resolve(theme + "-remote.png")));
+            assertThat(Files.readAllBytes(title.resolve(theme + "-single-window-tabs.png")))
+                .as("tabs have their own actual owner region, separately from the titlebar")
+                .isNotEqualTo(Files.readAllBytes(title.resolve(theme + "-shell-tabs-window-tabs.png")));
+        }
+        for (String theme : List.of("dark", "light"))
+            for (String state : List.of("ssh-key-empty", "ssh-key-invalid-path", "ssh-key-edit"))
+                assertThat(Files.isRegularFile(before.resolve("vault/" + theme + "/" + state + ".png"))).as("actual EntryEditor.key state").isTrue();
+    }
+
     private static List<List<String>> rows() throws IOException {
         List<String> lines = Files.readAllLines(ROOT.resolve("docs/design/theme-engine/migration.csv"));
         assertThat(lines.getFirst()).isEqualTo("path,owner,surface,classification,migration_task,composition_task,existing_test,disposition");

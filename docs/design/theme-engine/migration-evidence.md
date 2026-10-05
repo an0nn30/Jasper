@@ -25,15 +25,15 @@ never exempts the enclosing editor surface.
 
 [before-f16ae32f/manifest.json](before-f16ae32f/manifest.json) records production revision, capture
 runtime/theme/font/state/scale provenance, source-harness hashes, dimensions, checksums and
-limitations for **390 owner PNGs across 22 families**. [SHA256SUMS](before-f16ae32f/SHA256SUMS)
-covers every asset and metadata file plus the manifest and eleven inspected contact sheets.
+limitations for **408 owner PNGs across 22 families**. [SHA256SUMS](before-f16ae32f/SHA256SUMS)
+covers every asset and metadata file plus the manifest and thirteen inspected contact sheets.
 `ThemeMigrationCoverageTest` verifies byte integrity and required family presence. This directory
 is a frozen before snapshot: never regenerate it during migration. Normal tests and preview runs
 write only current `build/` outputs. Existing golden expectations were not changed.
 
 | Family | Before states |
 |---|---|
-| Vault | create, invalid create, unlock, manager empty/populated/filtered/locked, add menu, login password/key |
+| Vault | create, invalid create, unlock, manager empty/populated/filtered/locked, add menu, login password/key; actual SSH-key form empty/invalid-path/edit |
 | Remote | sessions empty/populated/filtered, add Vault/agent/invalid, connection busy/error, trust, import preview/busy/failed |
 | SFTP | disconnected, loading, connected, operation error |
 | Tunnels | empty, stopped, busy, failed |
@@ -44,12 +44,12 @@ write only current `build/` outputs. Existing golden expectations were not chang
 | Sample | standalone real settings owner using fake SDK host, plus actual application-hosted bundled settings |
 | Settings | appearance, window, font, shell/narrow, system, search, draft, keymap/search, plugin list/details and six actual bundled settings pages |
 | App dialogs | chooser, theme-import conflict/pending/failure, plugin removal/busy/consent, notification card and errors empty/incident/cleared |
-| App chrome | workspace pending launch, actual command palette query/no-match, dock shown/hidden, hosted content/status, titlebar single/tabs/tmux/remote/narrow, shortcuts sections/expanded/recording |
+| App chrome | workspace pending launch, actual command palette query/no-match, dock shown/hidden, hosted content/status, titlebar context single/tmux/remote/narrow plus separate actual WindowTabs owner region, shortcuts sections/expanded/recording |
 
 Plugin surfaces use real FlatLaf 3.7 dark/light and system font; the test-only helper records effective
 font and look-and-feel per image. App owner tests install existing application theme aliases; settings
 and shortcut previews preserve five built-in themes with system font size and explicit 18pt override.
-Representative dark/light app outputs and all 104 plugin images were inspected in contact sheets;
+Representative dark/light app outputs and all 110 plugin images were inspected in contact sheets;
 other app themes are supplementary evidence. Hosted-content and titlebar previews use 2x pixels.
 Composite Swing list renderer children require recursive layout in the peerless test harness; the
 helper lays out the actual renderer and restores it after capture. No production UI repair was made.
@@ -92,3 +92,14 @@ Use JBR 25 and the wrapper, headlessly:
 
 Later captures are current-state comparisons against the frozen snapshot, not a replacement of it.
 Task 2 owns the carried color-expression parity gap; Task 1 does not alter the evaluator.
+
+Review correction before migration (Task 1 round 1, base `84f7ff4a`): the inherited titlebar
+preview had sized only the bar, leaving the containing root width zero and collapsing the context.
+The test-only preview now lays out the actual root and asserts positive context bounds, wide/narrow
+collapse state and tmux/remote text. The strip has no tabs; separate `*-window-tabs.png` captures
+preserve the actual WindowTabs owner. All 24 strip/tab-region outputs were inspected. The actual
+`EntryEditor.key` now has six dark/light empty, missing-path-validation and populated-edit captures
+using synthetic paths with save/I/O forbidden. These authorized corrections replace the incomplete
+pre-migration titlebar assets and append key/tab images; manifest provenance and all 572 asset
+checksums are refreshed. Five coverage tests include a distinct-context/tab-state guard. Normal
+checks still never replace the frozen baseline.

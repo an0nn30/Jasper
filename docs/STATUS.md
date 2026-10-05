@@ -4,7 +4,7 @@
 
 - **Theme engine Plan 2 execution started** (2026-10-05), baseline `f16ae32f`. Task 1 records
   971 exact consumers (532 production / 439 test-fixture), existing behavior suites and task owners,
-  with 390 immutable before renders across 22 families and checksum/source provenance. See
+  with 408 immutable before renders across 22 families and checksum/source provenance. See
   [inventory and evidence](design/theme-engine/migration-evidence.md). No production styling or
   golden expectations changed. Execution rulings: Tasks 2–3 integrate engine/import migration;
   Task 12 is the single final review. Pinned FlatLaf 3.7 is test-runtime-only for plugin captures;
@@ -12,7 +12,9 @@
   user-run/unavailable headlessly; existing adapter behavior and app notification/status captures
   remain evidence. Discarded first-run inherited-home discovery and the preserved stale standalone
   palette preview assertion are documented; clean final captures use verified synthetic roots.
-  Task 2 still owns the color-expression evaluator parity gap. Independent Task 1 review follows.
+  Task 1 review round 1 corrected test-only zero-width titlebar context capture, added actual
+  WindowTabs-region evidence and actual SSH-key empty/invalid/edit forms; 572 checksummed assets.
+  Task 2 still owns the color-expression evaluator parity gap. Independent Task 1 fix review follows.
 
 - **Theme engine/UI kit overhaul: Plan 1 implemented and reviewed** (2026-10-04), on
   `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.

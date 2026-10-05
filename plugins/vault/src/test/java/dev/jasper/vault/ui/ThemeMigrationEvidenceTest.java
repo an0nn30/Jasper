@@ -38,6 +38,24 @@ class ThemeMigrationEvidenceTest {
                 login.auth.setSelectedIndex(2);
                 save("vault", theme, "login-key-and-password", login, 600, 430);
             } finally { login.close(); }
+            var key = EntryEditor.key(null, value -> { throw new AssertionError("Empty/invalid key must not save"); }, () -> { });
+            try {
+                save("vault", theme, "ssh-key-empty", key, 700, 330);
+                key.name.setText("Fixture SSH key"); key.save.doClick();
+                assertThat(key.error.getText()).isEqualTo("Choose a key file path");
+                assertThat(key.save.isEnabled()).isTrue();
+                save("vault", theme, "ssh-key-invalid-path", key, 700, 330);
+            } finally { key.close(); }
+            var existing = new dev.jasper.vault.model.SshKey(UUID.fromString("00000000-0000-0000-0000-000000000004"),
+                "Fixture SSH key", "ed25519", "SHA256:fixture", "Fixture comment",
+                java.nio.file.Path.of("/fixture/keys/id_ed25519"), java.nio.file.Path.of("/fixture/keys/id_ed25519.pub"), java.time.Instant.EPOCH);
+            var edit = EntryEditor.key(existing, value -> { throw new AssertionError("Edit capture must not save"); }, () -> { });
+            try {
+                assertThat(edit.privatePath.getText()).isEqualTo(existing.privatePath().toString());
+                assertThat(edit.publicPath.getText()).isEqualTo(existing.publicPath().toString());
+                assertThat(edit.comment.getText()).isEqualTo("Fixture comment");
+                save("vault", theme, "ssh-key-edit", edit, 700, 330);
+            } finally { edit.close(); }
         });
     }
 }
