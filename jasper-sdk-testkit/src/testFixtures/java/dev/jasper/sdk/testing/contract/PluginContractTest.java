@@ -131,6 +131,37 @@ public abstract class PluginContractTest {
         return context.get();
     }
 
+    @Test void ownedViewsMountReplaceAndMoveWithExistingGuards() throws Exception {
+        var context = new AtomicReference<PluginContext>();
+        var other = new AtomicReference<PluginContext>();
+        h.start(info("test.owned"),Set.of(),Set.of(),context::set);
+        h.start(info("test.foreign"),Set.of(),Set.of(),other::set);
+        javax.swing.SwingUtilities.invokeAndWait(() -> h.ui(() -> {
+            var ctx=context.get();var disposed=new AtomicInteger();
+            var descriptor=new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Custom("node",dev.jasper.sdk.ui.ControlState.READY,"document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"Document"));
+            var view=ctx.kit().create(descriptor,e -> {});
+            view.registerContent(new dev.jasper.sdk.ui.CustomContent("document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea("retain"),disposed::incrementAndGet));
+            var alien=other.get().kit().create(descriptor,e -> {});
+            var window=ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true));
+            assertThatThrownBy(() -> window.setContent(alien)).isInstanceOf(IllegalArgumentException.class);
+            window.setContent(view);window.setContent(view);
+            assertThat(ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true))).isSameAs(window);
+            var veto=window.onClosing(() -> false);
+            assertThat(h.requestClose("test.owned.window")).isFalse();assertThat(disposed.get()).isZero();
+            veto.close();window.close();window.close();assertThat(disposed.get()).isEqualTo(1);
+            var document=ctx.kit().create(descriptor,e -> {});
+            document.registerContent(new dev.jasper.sdk.ui.CustomContent("document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea("retained"),disposed::incrementAndGet));
+            assertThatThrownBy(() -> ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("foreign","Foreign"),null,alien)).isInstanceOf(IllegalArgumentException.class);
+            var tab=ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,document);
+            tab.move(true);assertThat(tab.isSeparate()).isTrue();tab.move(false);assertThat(tab.isSeparate()).isFalse();
+            var guard=ctx.windows().onTabsClosing((tabs,batch) -> CompletableFuture.completedFuture(false));
+            assertThat(tab.requestClose().join()).isFalse();assertThat(disposed.get()).isEqualTo(1);
+            guard.close();assertThat(tab.requestClose().join()).isTrue();assertThat(disposed.get()).isEqualTo(2);
+            assertThatThrownBy(document::spec).isInstanceOf(IllegalStateException.class);
+            alien.close();
+        }));
+    }
+
     @Test void pluginStopClosesOverlaysAndExplicitCloseReleasesTheirReservation() {
         var context = started("test.overlay", Set.of());
         UUID window = h.addTerminalWindow();

@@ -41,6 +41,16 @@ final class PluginPanelPage implements SettingsPage {
     private JComponent body;
     /** Whether the page applied successfully and nothing changed since, so there is nothing for the panel to drop. */
     private boolean applied;
+    private boolean disposed;
+    Runnable onDisposed = () -> {};
+    private HostedKit kit;
+    private HostedKitView view;
+    private final Host rowHost = new Host();
+    private final KitSettingRows kitRows = new KitSettingRows(rowHost, this::settingSpec);
+    private dev.jasper.sdk.settings.SettingSpec<?> settingSpec(dev.jasper.sdk.settings.Setting<?> setting){return declared.handle(setting).spec();}
+    void kit(HostedKit value) { kit=value; }
+    private void refreshRows(){if(view!=null && !disposed)view.update(view.spec());}
+
 
     PluginPanelPage(String pluginId, String title, DeclaredSettings declared, SettingsPanel panel, Containment containment,
                     PageContext context) {
@@ -50,6 +60,7 @@ final class PluginPanelPage implements SettingsPage {
         own = new PageContext(draft, context.navigate(), context.closeThen(), context.chooseFile(), context.changed(), context.surface());
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
+            refreshRows();
             PluginPageBody.showMessage(message, declared);
             context.changed().run();
         });
@@ -83,9 +94,15 @@ final class PluginPanelPage implements SettingsPage {
     }
 
     @Override public JComponent component() {
+        if(disposed)throw new IllegalStateException("Settings page is closed");
         if (body != null) return body;
         var made = new AtomicReference<JComponent>();
-        Throwable failure = containment.attempt(pluginId, "settings page", () -> { made.set(panel.create(new Host())); return null; });
+        Throwable failure = containment.attempt(pluginId, "settings page", () -> { var owned=panel instanceof SettingsPanel.View ? java.util.Objects.requireNonNull(((SettingsPanel.View)panel).createView(rowHost),"Settings view") : null;
+            if(owned!=null){
+                var next=kit.requireOwned(owned);next.mount(this);view=next;view.hostSpec=kitRows::refresh;
+                view.hostEvents=event -> {boolean handled=kitRows.event(event);if(handled)refreshRows();return handled;};
+                made.set(view.component());
+            }else made.set(panel.create(rowHost)); return null; });
         content = failure == null && made.get() != null ? made.get() : failed(failure);
         body = new PluginPageBody(message, content);
         PluginPageBody.showMessage(message, declared);
@@ -102,6 +119,7 @@ final class PluginPanelPage implements SettingsPage {
     }
 
     @Override public boolean modified() {
+        if(disposed)return false;
         if (draft.modified()) return true;
         boolean[] changed = {false};
         containment.attempt(pluginId, "settings page state", () -> { changed[0] = panel.modified(); return null; });
@@ -109,18 +127,23 @@ final class PluginPanelPage implements SettingsPage {
     }
 
     /** A rejected file holds up only this page's own edits to its declared settings, which could not be saved to it. */
-    @Override public boolean valid() { return !(declared.rejected() && draft.modified()) && rows.stream().allMatch(SchemaPage::valid); }
+    @Override public boolean valid() { return !disposed && !(declared.rejected() && draft.modified()) && kitRows.valid() && rows.stream().allMatch(SchemaPage::valid); }
 
     @Override public void reset() {
+        if(disposed)return;
+        kitRows.reset();
         rows.forEach(SchemaPage::reset);
         draft.reset(declared.handles().stream().<Setting<?>>map(DeclaredSetting::appSetting).toList());
         containment.run(pluginId, "settings page reset", panel::reset);
+        refreshRows();
     }
 
     /** Saves the declared settings, then lets the plugin save its own state. */
     @Override public CompletableFuture<Void> apply() {
+        if(disposed || !valid())return CompletableFuture.failedFuture(new IllegalStateException("Settings page unavailable or invalid"));
         CompletableFuture<Void> saved = draft.modified() ? declared.save(draft.edit()) : CompletableFuture.completedFuture(null);
         return saved.thenRun(() -> {
+            if(disposed)return;
             Throwable failure = containment.attempt(pluginId, "settings page apply", () -> { panel.apply(); return null; });
             if (failure != null) throw new CompletionException(failure);
             applied = true;
@@ -128,23 +151,30 @@ final class PluginPanelPage implements SettingsPage {
     }
 
     @Override public void highlight(String query) {
+        if(disposed)return;
         rows.forEach(row -> row.highlight(query));
         containment.run(pluginId, "settings page highlight", () -> panel.highlight(query));
     }
 
     /** Lets a page that was shown drop state of its own that was not applied, then releases it. */
     @Override public void dispose() {
+        if(disposed)return;disposed=true;
         stopListening.run();
         draftListening.close();
         rows.forEach(SchemaPage::dispose);
         if (body != null && !applied) containment.run(pluginId, "settings page reset", panel::reset);
+        if(view!=null)view.close();
         containment.run(pluginId, "settings page dispose", panel::dispose);
+        onDisposed.run();onDisposed=() -> {};
     }
 
     /** What the plugin's page may use: standard rows and the page's draft. */
     private final class Host implements SettingsPanelHost {
+        private void guard(){if(disposed)throw new IllegalStateException("Settings page is closed");}
+        @Override public dev.jasper.sdk.ui.Nodes.Node rowNode(dev.jasper.sdk.settings.Setting<?> setting){guard();return kitRows.row(setting);}
+
         @Override public JComponent row(dev.jasper.sdk.settings.Setting<?> setting) {
-            DeclaredSetting<?> handle = declared.handle(setting);
+            guard();DeclaredSetting<?> handle = declared.handle(setting);
             var spec = SchemaPage.page(id() + "." + handle.key(), title);
             PluginSettingsPage.row(spec, handle);
             SchemaPage page = spec.build(own);
@@ -154,22 +184,25 @@ final class PluginPanelPage implements SettingsPage {
 
         @SuppressWarnings("unchecked")
         @Override public <T> T pending(dev.jasper.sdk.settings.Setting<T> setting) {
-            DeclaredSetting<T> handle = declared.handle(setting);
+            guard();DeclaredSetting<T> handle = declared.handle(setting);
             return handle.sdkValue(draft.value((Setting<Object>) handle.appSetting()));
         }
 
         @SuppressWarnings("unchecked")
         @Override public <T> void stage(dev.jasper.sdk.settings.Setting<T> setting, T value) {
-            DeclaredSetting<T> handle = declared.handle(setting);
+            guard();DeclaredSetting<T> handle = declared.handle(setting);
             handle.spec().kind().check(value).ifPresent(problem -> { throw new IllegalArgumentException(problem); });
             var app = (Setting<Object>) handle.appSetting();
             Object staged = handle.toApp(value);
             boolean unsetDefault = staged.equals(app.defaultValue()) && draft.saved(app).isEmpty();
             applied = false;
+            kitRows.staged(setting);
             draft.stage(app, unsetDefault ? Optional.empty() : Optional.of(staged));
+            refreshRows();
         }
 
         @Override public void changed() {
+            guard();
             applied = false;
             context.changed().run();
         }

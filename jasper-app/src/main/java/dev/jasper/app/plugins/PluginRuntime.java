@@ -334,6 +334,12 @@ public final class PluginRuntime {
         appearanceSubscriber = Objects.requireNonNull(subscribe);
     }
 
+    private java.util.function.BooleanSupplier animations = () -> true;
+    /** Supplies the live application motion policy before plugin startup. */
+    public void animations(java.util.function.BooleanSupplier enabled) {
+        if(host!=null)throw new IllegalStateException("Plugins have already started");
+        animations = Objects.requireNonNull(enabled);
+    }
     private GlassSource glass = GlassSource.NONE;
 
     /** Supplies window opacity for plugins before they start. UI thread.
@@ -500,6 +506,7 @@ public final class PluginRuntime {
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
             dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
+        created.animations = animations;
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         connectionBridge = created.bus.subscribe(EventBus.APP, Activities.CONNECTIONS, this::forwardConnection);

@@ -58,6 +58,7 @@ final class HostedContext implements PluginContext {
     final DeclaredSettings declared;
     private final String id;
     private final List<Subscription> owned = new ArrayList<>();
+    void ownPage(PluginPanelPage page){Subscription cleanup=page::dispose;owned.add(cleanup);page.onDisposed=() -> owned.remove(cleanup);}
     private final ExecutorService executor;
     volatile State state = State.STARTING;
     private final HostedUi ui;
@@ -86,7 +87,8 @@ final class HostedContext implements PluginContext {
             handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
             host.environment.windows(), terminals, host.environment.appearance(), host.environment.appearanceSubscriber(),
             host.environment.glass());
-        this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment);
+        this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment, () -> host.animations.getAsBoolean());
+        ui.kit(kit);
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,

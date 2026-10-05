@@ -248,14 +248,31 @@ class ConfigurationControllerTest {
         });
     }
 
+    @Test void configurationReloadUpdatesExistingNativeKitMotionPolicy() throws Exception {
+        start("[ui.animations]\nenabled=false\n");
+        var context=new AtomicReference<dev.jasper.ui.swing.KitContext>();
+        edt(() -> {context.set(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));assertThat(context.get().animationsEnabled().getAsBoolean()).isFalse();});
+        reload("[ui.animations]\nenabled=true\n");
+        edt(() -> assertThat(context.get().animationsEnabled().getAsBoolean()).isTrue());
+        reload("[ui.animations]\nenabled=false\n");
+        edt(() -> assertThat(context.get().animationsEnabled().getAsBoolean()).isFalse());
+    }
+
     @Test void applicationCallbackFailuresAreNotReportedAsInstallationFailures() throws Exception {
         start("");
         edt(() -> {
             var owner = owner();
             owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
             var next = new ConfigService.State(new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults().withSize(16), Theme.JASPER_LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
-            assertThatThrownBy(() -> controller.accept(next)).isInstanceOf(IllegalStateException.class)
-                .hasMessage("application callback");
+            var published=new ArrayList<ResolvedTheme>();
+            var listening=themes.subscribe((value,changed) -> published.add(value));published.clear();
+            assertThatCode(() -> controller.accept(next)).doesNotThrowAnyException();
+            assertThat(themes.choice()).isEqualTo(Theme.JASPER_LIGHT);
+            assertThat(published).containsExactly(themes.current());
+            assertThat(controller.shown().snapshot()).isEqualTo(next.snapshot());
+            assertThat(controller.shown().diagnostics()).noneMatch(diagnostic -> diagnostic.message().contains("Could not apply theme"));
+            assertThat(owner.tabHeight()).isEqualTo(38);
+            listening.close();
         });
     }
 

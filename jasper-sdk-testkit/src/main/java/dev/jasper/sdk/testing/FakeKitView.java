@@ -10,7 +10,15 @@ public final class FakeKitView implements UiView {
  final FakeKit owner;
  private ViewSpec spec;
  private boolean updating;
+ private Object mount;
+ void unmount(Object target){if(mount==target)mount=null;}
+ final javax.swing.JPanel component = new javax.swing.JPanel();
+ void mount(Object target){guard();if(mount!=null && mount!=target)throw new IllegalArgumentException("View is already mounted");mount=target;}
+
  private Consumer<UiEvent> events;
+ java.util.function.Predicate<UiEvent> hostEvents = event -> false;
+ java.util.function.UnaryOperator<ViewSpec> hostSpec = value -> value;
+
  private final Map<String,char[]> secrets=new HashMap<>();
  private final Map<String,CustomContent> contents=new HashMap<>();
  private final AtomicBoolean closed=new AtomicBoolean();
@@ -18,7 +26,7 @@ public final class FakeKitView implements UiView {
  FakeKitView(FakeKit owner, ViewSpec spec, Consumer<UiEvent> events) {this.owner=owner;this.events=Objects.requireNonNull(events);update(spec);}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  @Override public ViewSpec spec(){guard();return spec;}
- @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{var nodes=index(next.root());
+ @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{next=hostSpec.apply(next);var nodes=index(next.root());
   secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret nextSecret && index(spec.root()).get(e.getKey()) instanceof Nodes.Secret oldSecret && nextSecret.kind()==oldSecret.kind())return false;Arrays.fill(e.getValue(),(char)0);return true;});
   for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && index(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
   spec=next;if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
@@ -35,7 +43,7 @@ public final class FakeKitView implements UiView {
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
  /** Deliver a typed event through containment. */
- public void emit(UiEvent event){guard();try{events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
+ public void emit(UiEvent event){guard();try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);
   if(index(spec.root()).values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id())&&c.kind()==content.kind()))throw new IllegalArgumentException("No matching Custom content");
   if(contents.containsKey(content.id()))throw new IllegalArgumentException("Content already registered");
@@ -44,7 +52,7 @@ public final class FakeKitView implements UiView {
  private void dispose(CustomContent content){
   // Claim removal before invoking plugin code; reentrant close may consume the remaining snapshot.
   if(contents.get(content.id())!=content)return;contents.remove(content.id());CONTENT_OWNERS.remove(content.component(),this);try{content.lifetime().close();}catch(Throwable failure){owner.failed();}}
- @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
+ @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var value:secrets.values())Arrays.fill(value,(char)0);secrets.clear();for(var content:List.copyOf(contents.values()))dispose(content);contents.clear();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
     static List<Nodes.Node> children(Nodes.Node node) {
         var result = new ArrayList<Nodes.Node>();
         switch (node) {

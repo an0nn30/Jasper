@@ -19,6 +19,9 @@ public interface WindowSurface extends Subscription {
      */
     void setContent(JComponent content);
 
+    /** Mounts an owned view. Replacement and final closure dispose it exactly once. */
+    void setContent(UiView content);
+
     /** Shows the surface; overlays return immediately. For a modal dialog this returns after the dialog has closed. */
     void show();
 

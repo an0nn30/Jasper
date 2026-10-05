@@ -10,6 +10,14 @@ import javax.swing.JComponent;
  * state of the plugin's own.
  */
 public interface SettingsPanel {
+    /** Transitional kit-only page; needs no legacy component factory. */
+    @FunctionalInterface
+    interface View extends SettingsPanel {
+        @Override default JComponent create(SettingsPanelHost host) { throw new UnsupportedOperationException("Owned view page"); }
+        /** Builds the owned page, once per Settings opening. */
+        dev.jasper.sdk.ui.UiView createView(SettingsPanelHost host);
+    }
+
     /**
      * Builds the page, once per opening of Settings, when the page is first shown.
      *

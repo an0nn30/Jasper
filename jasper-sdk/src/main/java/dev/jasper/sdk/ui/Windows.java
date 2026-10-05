@@ -12,6 +12,9 @@ import java.util.function.Supplier;
 
 /** Application-built windows and dialogs with consistent chrome. */
 public interface Windows {
+    /** Opens an owned view as content; moving retains it, final closure disposes it. */
+    ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content);
+
     /** Opens or selects plugin-scoped content in the main workspace.
      * @param spec stable identity and title
      * @param owner originating window, or null for the last main window; a closed origin uses fallback

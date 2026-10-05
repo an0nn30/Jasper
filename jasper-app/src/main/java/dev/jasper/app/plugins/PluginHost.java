@@ -95,6 +95,7 @@ final class PluginHost {
 
     record Outcome(PluginStatus.State state, String reason) { }
 
+    java.util.function.BooleanSupplier animations = () -> true;
     final Environment environment;
     /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
     final CleanupWorker cleanup = new CleanupWorker();
@@ -218,8 +219,10 @@ final class PluginHost {
             if (hosted.state != HostedContext.State.ACTIVE) continue;
             var info = hosted.hosted.info();
             var panel = hosted.declared.panel();
-            if (panel.isPresent())
-                pages.add(new PluginPanelPage(info.id(), info.name(), hosted.declared, panel.get(), containment, context));
+            if (panel.isPresent()) {
+                var page=new PluginPanelPage(info.id(), info.name(), hosted.declared, panel.get(), containment, context);
+                page.kit((HostedKit)hosted.kit());hosted.ownPage(page);pages.add(page);
+            }
             else if (hosted.declared.declaresAnything())
                 pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context));
         }

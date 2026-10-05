@@ -74,6 +74,8 @@ final class HostedUi {
     private final List<Consumer<Variant>> themeHandlers = new ArrayList<>();
     private final List<Consumer<Variant>> workspaceHandlers = new ArrayList<>();
 
+    private HostedKit kit;
+    void kit(HostedKit value) { kit = java.util.Objects.requireNonNull(value); }
     private final String pluginId;
     private final Contributions model;
     private final Containment containment;
@@ -376,7 +378,7 @@ final class HostedUi {
             requireNamespace(spec.id(), "A panel");
             spec.toggleActionId().ifPresent(HostedUi.this::requireOwn);
             // Anchor plus split is IntelliJ's anchor plus split: one of the six slots. The SDK's own Side is imported here.
-            var entry = model.addPanel(spec.id(), spec.title(), spec.icon(),
+            var entry = model.addPanel(spec.id(), spec.title(), spec.iconName() == null ? spec.icon() : kit.icon(spec.iconName()),
                 Slot.of(dev.jasper.app.dock.Side.valueOf(spec.defaultAnchor().name()), spec.split()),
                 spec.toggleActionId(), site -> {
                 JComponent[] built = {null};
@@ -384,6 +386,15 @@ final class HostedUi {
                 return built[0];
             });
             return tracked(entry::close);
+          }
+          @Override public Subscription registerView(dev.jasper.sdk.ui.PanelSpec spec, dev.jasper.sdk.ui.PanelFactory.View factory) {
+            java.util.Objects.requireNonNull(factory);
+            return register(spec, host -> {
+                var view = kit.requireOwned(factory.createView(host));
+                view.mount(host);
+                host.onClosed(view::close);
+                return view.component();
+            });
           }
           @Override public void toggle(String panelId, WindowHandle window) {
             guard("toggle");
@@ -424,8 +435,19 @@ final class HostedUi {
     /** One SDK view of an application surface; windows and dialogs differ only in their SDK type. */
     private class Surface implements WindowSurface {
         final AuxiliarySurface surface;
-        Surface(AuxiliarySurface surface) { this.surface = surface; }
-        @Override public void setContent(JComponent content) { requireUi("setContent"); surface.setContent(content); }
+        HostedKitView mounted;
+        Surface(AuxiliarySurface surface) { this.surface = surface; surface.onClosed(() -> { if(mounted!=null){mounted.close();mounted=null;} }); }
+        @Override public void setContent(JComponent content) { requireUi("setContent"); if(surface.closed())return; surface.setContent(content); if(mounted!=null){mounted.close();mounted=null;} }
+        @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
+            guard("setContent");
+            var next = kit.requireOwned(content);
+            if(surface.closed())throw new IllegalStateException("Surface is closed");
+            next.mount(surface);
+            if(mounted==next)return;
+            var previous=mounted;
+            surface.setContent(next.component());mounted=next;
+            if(previous!=null)previous.close();
+        }
         @Override public void show() { requireUi("show"); surface.show(); }
         @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
             guard("chooseFile");
@@ -560,6 +582,19 @@ final class HostedUi {
 
     Windows windows() {
         return new Windows() {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
+                guard("openTab");
+                var view = kit.requireOwned(content);
+                var existing = ownedContent.values().stream().filter(c -> c.entry.key().equals(spec.key())).findFirst();
+                if(existing.isPresent()) { existing.get().select(); return existing.get(); }
+                // Reserve before publishing: a view cannot be owned by two surface lifetimes.
+                view.mount(spec);
+                try {
+                    var tab = openTab(spec, owner, view.component());
+                    tab.onClosed(view::close);
+                    return tab;
+                } catch(RuntimeException | Error failure) {view.unmount(spec);throw failure;}
+            }
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 guard("openTab");
                 java.util.UUID window = null;

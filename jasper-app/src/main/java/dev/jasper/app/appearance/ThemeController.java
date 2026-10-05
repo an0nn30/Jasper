@@ -18,6 +18,9 @@ import javax.swing.*;
 public final class ThemeController implements AutoCloseable {
     private AppearanceBindings appearance;
     private boolean applying;
+    private boolean animationsEnabled = true;
+    public boolean animationsEnabled() { requireEdt(); return animationsEnabled; }
+    public void configureAnimations(boolean enabled) { requireEdt(); animationsEnabled = enabled; }
 
     public static final class InstallationFailure extends IllegalStateException {
         InstallationFailure(Theme theme, RuntimeException cause) {
@@ -49,7 +52,7 @@ public final class ThemeController implements AutoCloseable {
         UIManager.put("defaultFont", null);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
         current = state.resolve();
-        appearance = new AppearanceBindings(current.pair(), ThemeController::reportFailure, () -> true);
+        appearance = new AppearanceBindings(current.pair(), ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(state.choice()), ignored -> {}).apply(current.pair());
         WorkspaceDefaults.publish(current.workspace());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");

@@ -15,6 +15,14 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
     private final FakePluginSettings settings;
     final Map<String, Object> pending = new LinkedHashMap<>();
     int changes;
+    boolean closed, applied;
+    FakeKitView view;
+    javax.swing.JComponent component;
+    final KitSettingRows rows = new KitSettingRows(this, this::spec);
+    private dev.jasper.sdk.settings.SettingSpec<?> spec(Setting<?> setting){return settings.handle(setting).spec();}
+    private void guard(){if(closed)throw new IllegalStateException("Settings page is closed");}
+    @Override public dev.jasper.sdk.ui.Nodes.Node rowNode(Setting<?> setting){guard();return rows.row(setting);}
+
 
     FakeSettingsPanelHost(FakePluginSettings settings) { this.settings = settings; }
 
@@ -24,17 +32,17 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
 
     @SuppressWarnings("unchecked")
     @Override public <T> T pending(Setting<T> setting) {
-        settings.handle(setting);
+        guard();settings.handle(setting);
         return pending.containsKey(setting.key()) ? (T) pending.get(setting.key()) : setting.get();
     }
 
     @SuppressWarnings("unchecked")
     @Override public <T> void stage(Setting<T> setting, T value) {
-        var handle = (FakeSetting<T>) settings.handle(setting);
+        guard();applied=false;var handle = (FakeSetting<T>) settings.handle(setting);
         Optional<String> problem = handle.spec().kind().check(value);
         if (problem.isPresent()) throw new IllegalArgumentException(problem.get());
-        pending.put(setting.key(), value);
+        rows.staged(setting);pending.put(setting.key(), value);if(view!=null)view.update(view.spec());
     }
 
-    @Override public void changed() { changes++; }
+    @Override public void changed() { guard();applied=false;changes++; }
 }

@@ -258,14 +258,20 @@ final class FakeUi {
         final String id; final FakeWindow owner; String title; boolean shown; boolean closed; JComponent content;
         final List<BooleanSupplier> guards = new ArrayList<>(); final List<Runnable> closedHandlers = new ArrayList<>();
         FakeWindow(String id, String title, FakeWindow owner) { this.id = id; this.title = title; this.owner = owner; }
-        @Override public void setContent(JComponent content) { if (!closed) this.content = java.util.Objects.requireNonNull(content); }
+        FakeKitView mounted;
+        @Override public void setContent(JComponent content) { if (!closed) {this.content = java.util.Objects.requireNonNull(content);if(mounted!=null){mounted.close();mounted=null;}} }
+        @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
+            context.requireOpen();var next=context.kit().requireOwned(content);
+            if(closed)throw new IllegalStateException("Surface is closed");next.mount(this);
+            if(mounted==next)return;var old=mounted;this.content=next.component;mounted=next;if(old!=null)old.close();
+        }
         @Override public void show() { if (!closed) shown = true; }
         @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
             context.requireOpen();
             if (title == null || title.isBlank()) throw new IllegalArgumentException("A file chooser needs a title");
             java.util.Objects.requireNonNull(initialPath, "initialPath");
             if (!shown || closed) throw new IllegalStateException("File selection needs a shown, open window");
-            return host.takeFileSelection();
+            var result=host.takeFileSelection();return closed || context.state == FakePluginContext.State.CLOSED ? Optional.empty() : result;
         }
         @Override public void toFront() { }
         @Override public void setTitle(String value) {
@@ -305,6 +311,7 @@ final class FakeUi {
         @Override public void close() {
             if (closed) return;
             closed = true;
+            if(mounted!=null){mounted.close();mounted=null;}
             windows.remove(this);
             for (FakeWindow other : List.copyOf(windows)) if (other.owner == this) other.close();
             for (Runnable handler : List.copyOf(closedHandlers)) {
@@ -357,6 +364,10 @@ final class FakeUi {
             var panel = new Panel(spec, factory);
             panels.add(panel);
             return () -> { if (panels.remove(panel)) { panel.instances.values().forEach(PanelInstance::close); panel.instances.clear(); } };
+          }
+          @Override public Subscription registerView(PanelSpec spec, PanelFactory.View factory) {
+            java.util.Objects.requireNonNull(factory);
+            return register(spec, host -> {var view=context.kit().requireOwned(factory.createView(host));view.mount(host);host.onClosed(view::close);return view.component;});
           }
           @Override public void toggle(String panelId, WindowHandle window) {
             context.requireOpen();
@@ -417,6 +428,11 @@ final class FakeUi {
 
     Windows windows() {
         return new Windows() {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
+                context.requireOpen();var view=context.kit().requireOwned(content);
+                for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
+                view.mount(spec);try{var tab=openTab(spec,owner,view.component);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.unmount(spec);throw failure;}
+            }
             @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
                 context.requireOpen();
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}

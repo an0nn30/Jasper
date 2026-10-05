@@ -33,6 +33,6 @@ public final class FakeKit implements UiKit, AutoCloseable {
     /** Sanitized diagnostics never retain exceptions or input content. */
     public List<String> failures() { edt();return List.copyOf(failures); }
     /** Test mounting seam: foreign and disposed handles are rejected. */
-    public void requireOwned(UiView view) { guard();if(!(view instanceof FakeKitView fake) || fake.owner!=this)throw new IllegalArgumentException("Foreign view");fake.guard(); }
+    public FakeKitView requireOwned(UiView view) { guard();if(!(view instanceof FakeKitView fake) || fake.owner!=this)throw new IllegalArgumentException("Foreign view");fake.guard();return fake; }
     @Override public void close() { if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var view:List.copyOf(views))view.close();icons.clear();}; if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup); }
 }

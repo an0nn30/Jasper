@@ -2,6 +2,20 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 4 implemented; independent review pending** (2026-10-05).
+  Owned SDK views mount in panels, windows/dialogs/overlays, content tabs and custom settings pages.
+  Real/fake adapters retain guards, chooser pinning, draft Apply/Cancel and exactly-once disposal;
+  custom content keeps its document/caret and resamples opacity during reparenting. Semantic panel
+  icons retain placement/toggle identity. Existing native and hosted views read live animation policy;
+  active/future effects and configuration reload are tested. Transitional factory markers/rowNode and
+  old Swing overloads have exact Task 11 removal ownership in the [ledger](design/theme-engine/temporary-paths.md).
+  Actual custom settings owner is PluginPanelPage, a correction to the task brief; existing native
+  transport/lifetime owners needed no redundant API. The legacy configuration callback test now
+  verifies approved subscriber containment, continued publication and absence of install warnings.
+  Focused gate: app171 tests and testkit89 tests; zero failures/errors/skips; all four architecture
+  checks pass. Self-review evidence is recorded in the Task 4 implementation report;
+  full repository gate remains Task 12. Frozen before assets are unchanged; no GUI/AOT/push/merge.
+
 - **Theme engine Plan 2 Tasks 2–3 implemented; review round 1 fixes ready** (2026-10-05).
   App selection/catalog/import now consume the module engine directly; 27 duplicate pure types,
   WorkspaceValues, KitThemeBridge and copied production resources are removed. App filesystem

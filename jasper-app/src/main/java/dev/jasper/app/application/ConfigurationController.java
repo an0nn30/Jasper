@@ -286,6 +286,7 @@ final class ConfigurationController implements AutoCloseable {
         retained.add(theme);
         if (workspace != null) retained.add(workspace);
         dev.jasper.app.appearance.ThemeManager.retainGenerated(retained);
+        themes.configureAnimations(next.snapshot().animations().enabled());
         try {
             themes.configure(theme, choice, workspace, next.snapshot().uiFont());
             themeProblems = List.copyOf(problems);

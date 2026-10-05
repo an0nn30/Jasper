@@ -769,6 +769,7 @@ public final class JasperApplication {
             return new Subscription(() -> glassListeners.remove(listener));
         }) : dev.jasper.app.plugins.GlassSource.NONE);
         plugins.reportFailuresTo(failure -> incidentNotices.pluginFailure(failure.pluginId(), failure.operation(), failure.cause()));
+        plugins.animations(themes::animationsEnabled);
         plugins.appearance(themes::current, handler -> themes.subscribe((value, changed) -> handler.accept(value)));
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),

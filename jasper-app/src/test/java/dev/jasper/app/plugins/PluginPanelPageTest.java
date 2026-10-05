@@ -62,6 +62,55 @@ class PluginPanelPageTest {
         java.util.concurrent.CompletableFuture.allOf(pending.get().toArray(java.util.concurrent.CompletableFuture[]::new)).join();
     }
 
+    @Test void kitPageRowsStageValidateResetApplyCancelAndOwnerStop() throws Exception {
+        var view=new AtomicReference<HostedKitView>();
+        var pageHost=new AtomicReference<SettingsPanelHost>();
+        var setting=new AtomicReference<Setting<Integer>>();
+        var callbacks=new ArrayList<String>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> started -> {
+            setting.set(started.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
+            started.settings().page(new SettingsPanel.View(){
+                @Override public dev.jasper.sdk.ui.UiView createView(SettingsPanelHost rows){
+                    pageHost.set(rows);
+                    var result=(HostedKitView)started.kit().create(new dev.jasper.sdk.ui.ViewSpec(rows.rowNode(setting.get())),event -> callbacks.add(event.id()));
+                    view.set(result);return result;
+                }
+                @Override public void apply(){callbacks.add("apply");}
+                @Override public void reset(){callbacks.add("reset");}
+                @Override public void dispose(){callbacks.add("dispose");}
+            });
+        })));
+        var page=onEdtValue(() -> (PluginPanelPage)host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:size","99"));
+            assertThat(page.valid()).isFalse();assertThat(pageHost.get().pending(setting.get())).isEqualTo(4);
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:size","7"));
+            assertThat(page.valid()).isTrue();assertThat(page.modified()).isTrue();assertThat(setting.get().get()).isEqualTo(4);
+            assertThat(pageHost.get().pending(setting.get())).isEqualTo(7);
+            assertThat(callbacks).isEmpty();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("plugin-action"));assertThat(callbacks).containsExactly("plugin-action");
+        });
+        onEdtValue(page::apply).get(5,TimeUnit.SECONDS);
+        onEdt(() -> {
+            assertThat(setting.get().get()).isEqualTo(7);
+            // A programmatic stage must update an already mounted row, including clearing a previous edit buffer.
+            pageHost.get().stage(setting.get(),9);
+            var row=(dev.jasper.sdk.ui.Nodes.SettingRow)view.get().spec().root();
+            var field=(dev.jasper.sdk.ui.Nodes.Field)((dev.jasper.sdk.ui.Nodes.Stack)row.control()).children().getFirst();
+            assertThat(field.value()).isEqualTo("9");
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:size:reset"));
+            assertThat(pageHost.get().pending(setting.get())).isEqualTo(4);
+            page.dispose();page.dispose();
+            assertThat(setting.get().get()).isEqualTo(7);
+            assertThat(callbacks).containsExactly("plugin-action","apply","reset","dispose");
+            assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> pageHost.get().stage(setting.get(),8)).isInstanceOf(IllegalStateException.class);
+        });
+        var reopened=onEdtValue(() -> (PluginPanelPage)host.settingsPages(context).getFirst());
+        onEdt(() -> {reopened.component();host.stop();assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class);});
+    }
+
     private void start(Consumer<PluginSettings> declare) {
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
             PluginPanelPageTest.class.getClassLoader(), () -> started -> declare.accept(started.settings()))));

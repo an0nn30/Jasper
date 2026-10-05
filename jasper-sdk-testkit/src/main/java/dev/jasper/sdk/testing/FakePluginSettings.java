@@ -22,6 +22,7 @@ final class FakePluginSettings implements PluginSettings {
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private boolean open = true;
     private dev.jasper.sdk.settings.SettingsPanel panel;
+    Setting<?> handleByKey(String key){return declared.stream().filter(s -> s.key().equals(key)).findFirst().orElseThrow();}
 
     FakePluginSettings(FakePluginHost host, String pluginId, Path file) {
         this.host = host; this.pluginId = pluginId; this.file = file;

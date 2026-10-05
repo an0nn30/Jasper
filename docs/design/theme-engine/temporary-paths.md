@@ -115,11 +115,12 @@ preserved. License/provenance files travel with their assets. No resource is del
 
 ## Required host-policy wiring before production cutover
 
-`jasper-app/src/main/java/dev/jasper/app/plugins/HostedKit.java` temporarily passes `() -> true`
-as the kit animation supplier. **Plan 2 Task 4 owns replacing it with the live application
-`ui.animations.enabled` setting before any migrated production surface mounts.** Verify disabled
-motion and a setting change on an existing hosted view. The standalone kit's supplier/motion behavior
-is already implemented; this is remaining app integration, not permission to ship a hardcoded policy.
+Completed by Plan 2 Task 4: `ConfigurationController` updates `ThemeController` from
+`ui.animations.enabled`; existing app-native `AppearanceBindings` contexts read the live controller
+supplier. `JasperApplication` installs that supplier through `PluginRuntime.animations` before plugin
+startup; `PluginHost` passes it to `HostedKit`. Existing switch effects settle on their next frame,
+future effects stay disabled, and enabling resumes motion without view replacement. Owner-package
+headless probes cover native and hosted contexts; configuration reload is covered end to end.
 
 ## Integrated Tasks 2–3 adapter removal contract
 
@@ -144,3 +145,31 @@ is already implemented; this is remaining app integration, not permission to shi
 - `migration.csv` retains removed/moved historical rows and adds destinations/new boundaries. Integrity
   tests verify absence plus extant replacement authority/destination, and still enforce discovery and
   the unchanged 572-file before-capture checksum manifest.
+
+## Task 4 typed-mount transition — exact Task 11 removal owners
+
+All entries below are temporary source compatibility for bundled plugins migrating in Tasks 7–10.
+Task 11 removes every legacy member and bridge name together, updates both hosts and their contracts,
+and does not retain a legacy raw-Swing plugin entry point.
+
+| Exact SDK owner/member | Task 11 final action |
+|---|---|
+| `ui.PanelFactory.create(PanelHost): JComponent` | Replace return type with UiView. |
+| `ui.PanelFactory.View` and `View.createView(PanelHost)` | Remove nested bridge; move typed signature to PanelFactory.create. |
+| `ui.Panels.registerView(PanelSpec,PanelFactory.View)` | Fold into register(PanelSpec,PanelFactory), remove bridge name and legacy registration adapter. |
+| `ui.WindowSurface.setContent(JComponent)` | Remove; retain setContent(UiView). |
+| `ui.Windows.openTab(ContentSpec,WindowOwner,JComponent)` | Remove; retain UiView overload. |
+| `settings.SettingsPanel.create(SettingsPanelHost): JComponent` | Replace return type with UiView. |
+| `settings.SettingsPanel.View`, `View.createView`, `View.create` default throwing shim | Remove nested bridge and shim; typed create becomes final factory. The host selects by View marker, never by null fallback. |
+| `settings.SettingsPanelHost.row(Setting): JComponent` | Remove Swing path. |
+| `settings.SettingsPanelHost.rowNode(Setting): Nodes.Node` | Rename to row after removing Swing path. |
+| `ui.PanelSpec.icon(): Icon`, Icon constructors (4/5/6 arguments), dual-source canonical 7-argument constructor | Remove arbitrary Icon slot/constructors and dual-source compatibility; retain semantic iconName, identity/anchor/split/toggle behavior. |
+
+Mirrored implementation removal owners: `app.plugins.HostedUi` legacy register/setContent/openTab
+adapters; `PluginPanelPage` legacy `panel.create`, `Host.row`, `rows`, `own` and `KeepsHeight` Swing-row
+support; `sdk.testing.FakeUi` legacy factory/content adapters; `FakePluginHost.settingsPanel` legacy
+create branch; `FakeSettingsPanelHost.row` placeholder. `KitSettingRows`, owned handle lifetime checks,
+semantic icon resolution and live motion source are final behavior, not removal targets. App-native
+JComponent transport in contributions/windows/workspace remains an internal module boundary; it does
+not expose raw Swing through the final SDK. Existing auxiliary/panel/content lifetime owners require
+no duplicate new adapter outside app.plugins.

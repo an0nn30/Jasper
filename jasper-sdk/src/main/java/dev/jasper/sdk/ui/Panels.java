@@ -15,6 +15,9 @@ public interface Panels {
      * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
      */
     Subscription register(PanelSpec spec, PanelFactory factory);
+    /** Registers an owned kit view per window; closing the instance disposes its view. */
+    Subscription registerView(PanelSpec spec, PanelFactory.View factory);
+
     /**
      * Toggles this plugin's registered panel in a terminal window, creating it lazily.
      * Requests for a closed window have no effect.

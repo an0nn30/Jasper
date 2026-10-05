@@ -523,3 +523,33 @@ focus provenance; semantic construction must not reevaluate an expression agains
 Explicit document tokens and final semantic overrides retain their precedence. App native-file publication
 validates full generation of the serialized/resolved candidate before staging or replacement; import planning
 uses the same validator for actionable source failures, and commit independently revalidates frozen plans.
+
+
+## Plan 2 Task 4 mounted-view contracts and temporary names
+
+The coordinated final signatures remain PanelFactory.create → UiView, Panels.register with that factory,
+WindowSurface.setContent(UiView), Windows.openTab(ContentSpec,WindowOwner,UiView), SettingsPanel.create
+→ UiView and SettingsPanelHost.row → Nodes.Node. During bundled migration only, PanelFactory.View /
+Panels.registerView and SettingsPanel.View.createView / SettingsPanelHost.rowNode carry the typed path.
+A SettingsPanel.View implementer needs no dummy legacy create; hosts select that marker deterministically
+and reject null/foreign/disposed/already-mounted views. The legacy SettingsPanel remains functional until
+Task 11. PanelSpec accepts either a legacy Icon or semantic iconName, never both/neither, and preserves
+anchor, split and toggle-action identity. Exact member removal mapping is in the temporary-path ledger.
+
+Views have one surface lifetime. Re-setting the identical view is idempotent; replacing window content
+closes the old view; final window/panel/tab/settings closure closes its view once. Tab reparenting retains
+the same component/document and lifetime. Duplicate content keys select their existing entry without
+consuming the unused caller-owned view. Failed tab publication releases the attempted mount claim.
+Foreign views are rejected before ownership transfer. Existing chooser pinning and close/quit guards
+are retained; document owner closure discards chooser results. Custom-content hierarchy changes resample
+workspace opacity while retaining editor document, caret and the separate editor palette route.
+
+Standard settings row descriptors use host-owned settings:<key> ids, receive draft stage/reset/validation,
+and intercept their events before the plugin callback. Unrelated events reach the plugin once. Apply
+persists declared values through the existing settings-file owner; Cancel discards the draft; disposal
+and plugin shutdown stop row callbacks and release the view. The actual custom-page owner is
+PluginPanelPage (the plan brief named PluginSettingsPage, which owns generated legacy pages).
+
+Motion integration is live: ConfigurationController feeds ThemeController independently of theme-install
+success; AppearanceBindings reads its supplier and PluginRuntime passes the same source to HostedKit
+before startup. Existing effects poll and settle on their next frame; no global UI default controls motion.

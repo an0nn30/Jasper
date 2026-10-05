@@ -39,6 +39,24 @@ class HostedChooserTest {
     private final HostedUi ui = new HostedUi("dev.x.tool", contributions, new Containment(() -> true),
         Runnable::run, () -> true, open::get, getClass().getClassLoader(), () -> Variant.DARK, h -> () -> {}, windows, terminals);
 
+    @Test void ownedDocumentPinsAcrossChooserAndOwnerClosureDiscardsResult() {
+        var containment=new Containment(() -> true);
+        var kit=new HostedKit("dev.x.tool",open::get,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
+        contributions.content().setFactory(separate -> {
+            UUID id=fixture.addWindow();contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(id,separate,e -> {},e -> {},e -> {},() -> {}));return id;
+        });
+        var disposed=new java.util.concurrent.atomic.AtomicInteger();
+        var view=kit.create(HostedKitTest.custom(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"doc"),e -> {});
+        view.registerContent(new dev.jasper.sdk.ui.CustomContent("doc",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),disposed::incrementAndGet));
+        var tab=ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,view);
+        during.set(() -> {tab.move(true);assertThat(tab.isSeparate()).isFalse();assertThat(tab.requestClose().join()).isFalse();});
+        assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).hasSize(2);
+        tab.move(true);assertThat(tab.isSeparate()).isTrue();
+        during.set(tab::close);
+        assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).isEmpty();
+        assertThat(disposed.get()).isEqualTo(1);kit.close();ui.closeAll();
+    }
+
     @Test void terminalOwnerSelectsMultipleFilesOrOneDirectory() {
         var owner = terminals.windowHandle(fixture.addWindow());
         assertThat(ui.windows().chooseFiles(owner, "Upload", Optional.empty())).containsExactly(Path.of("/one").toAbsolutePath(),Path.of("/two").toAbsolutePath());

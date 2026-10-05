@@ -330,19 +330,41 @@ public final class FakePluginHost implements AutoCloseable {
     public java.util.Optional<javax.swing.JComponent> settingsPanel(String pluginId) {
         FakePluginContext context = contexts.get(pluginId);
         if (context == null) return java.util.Optional.empty();
+        var existing=panelHosts.get(pluginId);
+        if(existing!=null)return java.util.Optional.ofNullable(existing.component);
         return context.settings.panel().map(panel -> {
             var rows = new FakeSettingsPanelHost(context.settings);
             panelHosts.put(pluginId, rows);
-            return panel.create(rows);
+            try {
+            var owned=panel instanceof dev.jasper.sdk.settings.SettingsPanel.View ? java.util.Objects.requireNonNull(((dev.jasper.sdk.settings.SettingsPanel.View)panel).createView(rows),"Settings view") : null;
+            if(owned==null){rows.component=panel.create(rows);return rows.component;}
+            var view=context.kit().requireOwned(owned);view.mount(rows);rows.view=view;view.hostSpec=rows.rows::refresh;
+            view.hostEvents=event -> {boolean handled=rows.rows.event(event);if(handled)view.update(view.spec());return handled;};
+            rows.component=view.component;return rows.component;
+            }catch(Throwable failure){recordFailure("Settings callback failed");rows.component=new javax.swing.JLabel("This page could not be shown.");return rows.component;}
         });
     }
 
-    /**
-     * The values a plugin's own settings page staged since {@link #settingsPanel} built it.
-     *
-     * @param pluginId the plugin
-     * @return the values by dotted key
-     */
+    /** Applies the open settings draft; invalid rows reject Apply. */
+    @SuppressWarnings({"unchecked","rawtypes"})
+    public void applySettingsPanel(String pluginId) {
+        var rows=panelHosts.get(pluginId);var context=contexts.get(pluginId);
+        if(rows==null || rows.closed || !rows.rows.valid())throw new IllegalStateException("Settings page unavailable or invalid");
+        for(var entry:rows.pending.entrySet())((dev.jasper.sdk.settings.Setting)context.settings.handleByKey(entry.getKey())).set(entry.getValue()).join();
+        try{context.settings.panel().orElseThrow().apply();}
+        catch(Throwable failure){recordFailure("Settings callback failed");throw new IllegalStateException("Settings callback failed");}
+        rows.pending.clear();rows.applied=true;
+    }
+    /** Cancels unapplied changes and releases the open page exactly once. */
+    public void closeSettingsPanel(String pluginId) {
+        var rows=panelHosts.remove(pluginId);if(rows==null || rows.closed)return;rows.closed=true;
+        var context=contexts.get(pluginId);if(context!=null)context.settings.panel().ifPresent(panel -> {
+            try{if(!rows.applied)panel.reset();}catch(Throwable failure){recordFailure("Settings callback failed");}
+            try{panel.dispose();}catch(Throwable failure){recordFailure("Settings callback failed");}
+        });
+        if(rows.view!=null)rows.view.close();rows.pending.clear();
+    }
+    /** Values staged since settingsPanel built the page. */
     public Map<String, Object> pendingSettings(String pluginId) {
         FakeSettingsPanelHost rows = panelHosts.get(pluginId);
         return rows == null ? Map.of() : Map.copyOf(rows.pending);
@@ -553,6 +575,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     private void teardown(FakePluginContext context, String reason) {
+        closeSettingsPanel(context.plugin().id());
         context.state = FakePluginContext.State.CLOSED;
         workspace.sessions.stopping(context);
         context.closeOwned();

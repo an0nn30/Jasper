@@ -15,6 +15,9 @@ public interface SettingsPanelHost {
      */
     JComponent row(Setting<?> setting);
 
+    /** Descriptor for a standard row, automatically bound to this page's draft by the host. */
+    dev.jasper.sdk.ui.Nodes.Node rowNode(Setting<?> setting);
+
     /**
      * The page's unsaved value of a declared setting, or its saved value when nothing is pending.
      *
