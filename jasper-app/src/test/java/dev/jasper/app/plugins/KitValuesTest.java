@@ -82,4 +82,18 @@ class KitValuesTest {
   assertThat(Arrays.stream(ScrollPolicy.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ScrollPolicy.values()).map(Enum::name).toArray(String[]::new));
   assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.Sorted("files","size"))).isEqualTo(new UiEvent.Sorted("files","size"));
  }
+ /** Plan 2 Task 6b-2: RESULTS lists, headings and visible rows cross the projection unchanged. */
+ @Test void resultListsProjectWithoutLoss(){
+  var heading=new ListItem("h",Optional.empty(),List.of(new Text("h.title",READY,"Commands",TextRole.CAPTION)),List.of(),List.of(),true);
+  var row=new ListItem("r",Optional.of(new Icon("r.icon",READY,"play",Hue.NONE,IconSize.RAIL,"Command")),List.of(new Text("r.title",READY,"New Tab",TextRole.BODY)),
+   List.of(new Text("r.detail",READY,"a detail",TextRole.DESCRIPTION)),List.of(new Text("r.tag",READY,"Cmd+T",TextRole.CAPTION)));
+  var list=new ItemList("results",READY,ListKind.RESULTS,List.of(heading,row),Set.of("r"),"run",List.of(),SelectionMode.SINGLE,Optional.empty(),OptionalInt.of(5));
+  var spec=new ViewSpec(list);
+  assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  var module=(dev.jasper.ui.model.Nodes.ItemList)KitValues.toModule(spec).root();
+  assertThat(module.items().getFirst().heading()).isTrue();
+  assertThat(module.visibleRows()).hasValue(5);
+  assertThat(module.kind()).isEqualTo(dev.jasper.ui.model.Nodes.ListKind.RESULTS);
+  assertThat(Arrays.stream(ListKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ListKind.values()).map(Enum::name).toArray(String[]::new));
+ }
 }

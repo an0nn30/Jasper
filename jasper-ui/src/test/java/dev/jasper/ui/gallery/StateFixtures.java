@@ -62,6 +62,19 @@ public final class StateFixtures {
         browser.add(new Table("browser-standard", READY, List.of(new Column("name", "Name", TextRole.BODY, false)),
             List.of(new TableRow("one", Map.of("name", "Standard scroll"), Optional.empty())), Set.of(), "", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD));
         result.add(sheet("browser", new Stack("browser", READY, LayoutRole.VERTICAL, browser), 640, 560));
+        // A command palette: a search field over a RESULTS list with headings, one-line rows and five visible rows.
+        var results = new ArrayList<ListItem>();
+        results.add(new ListItem("results-commands", Optional.empty(), List.of(text("results-commands-title", "Commands", TextRole.CAPTION)), List.of(), List.of(), true));
+        for (String name : List.of("New Tab", "Split Right", "Close Pane")) {
+            String id = "results-" + name.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
+            results.add(new ListItem(id, Optional.of(new Icon(id + "-icon", READY, "play", Hue.NONE, IconSize.RAIL, "Command")),
+                List.of(text(id + "-title", name, TextRole.BODY)), List.of(text(id + "-detail", "Panes", TextRole.DESCRIPTION)), List.of(text(id + "-tag", "Cmd+T", TextRole.CAPTION))));
+        }
+        results.add(new ListItem("results-history", Optional.empty(), List.of(text("results-history-title", "History", TextRole.CAPTION)), List.of(), List.of(), true));
+        results.add(new ListItem("results-ls", Optional.empty(), List.of(text("results-ls-title", "ls -la", TextRole.MONO)), List.of(), List.of()));
+        result.add(sheet("results", new Stack("results", READY, LayoutRole.VERTICAL, List.of(
+            new Field("results-query", READY, FieldKind.SEARCH, "", "Search everything", "Search all", ""),
+            new ItemList("results-list", READY, ListKind.RESULTS, results, Set.of("results-new-tab"), "run", List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(5)))), 680, 240));
         for (SplitKind kind : SplitKind.values()) result.add(sheet("split-" + kind, new Split("split", READY, kind, List.of(text("left", "Sidebar", TextRole.BODY), text("right", "Detail", TextRole.BODY))), 600, 100));
         for (FormKind kind : FormKind.values()) result.add(sheet("form-" + kind, new Form("form", READY, kind, kind.name(), Optional.empty(), List.of(row("row", "Label", field("input", "", "Value", FieldKind.TEXT))), Optional.empty(), List.of(button("save", "Save", ButtonKind.PRIMARY)), "cancel"), 480, 200));
         for (CustomKind kind : CustomKind.values()) result.add(sheet("custom-" + kind, new Custom("custom", READY, "preview", kind, kind.name()), 480, 180));

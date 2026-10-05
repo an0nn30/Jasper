@@ -45,6 +45,12 @@ public final class FakeKitView implements UiView {
  /** The node last scrolled into view; reveal never moves logical focus.
  * @return node id */
  public Optional<String> revealed(){guard();return Optional.ofNullable(revealed);}
+ private final Set<String> composing=new HashSet<>();
+ @Override public boolean composing(String fieldId){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");return composing.contains(fieldId);}
+ /** Simulate an input method composing (or committing) text in a field.
+ * @param fieldId field node
+ * @param value whether uncommitted text is pending */
+ public void setComposing(String fieldId,boolean value){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field))throw new IllegalArgumentException("Not a field node");if(value)composing.add(fieldId);else composing.remove(fieldId);}
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
  /** Deliver a typed event through containment. */

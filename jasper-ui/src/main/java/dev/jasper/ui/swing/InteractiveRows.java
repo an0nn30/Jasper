@@ -36,6 +36,8 @@ final class InteractiveRows {
         String pendingReveal;
         String typed = "";
         long typedAt = Long.MIN_VALUE;
+        /** Row tops when rows differ in height (item-list headings in RESULTS lists); null while every row is rowHeight tall. */
+        int[] tops;
 
         RowsControl(KitView view, Nodes.Node node) {
             this(view, node, new JScrollPane());
@@ -124,6 +126,89 @@ final class InteractiveRows {
             return 1;
         }
 
+        /** Whether the item can be selected, activated, hovered or given a menu; item-list headings cannot. */
+        boolean selectable(int index) {
+            return true;
+        }
+
+        /** Whether every row is {@link #rowHeight} tall; otherwise {@link #rowHeightAt} sizes each row. */
+        boolean uniformRows() {
+            return true;
+        }
+
+        int rowHeightAt(int index) {
+            return rowHeight;
+        }
+
+        /** How many selectable rows the viewport shows before it scrolls; absent keeps the default of eight rows. */
+        OptionalInt visibleRows() {
+            return OptionalInt.empty();
+        }
+
+        /** Whether the rows follow an external field: they never take focus, and a left press activates a row. */
+        boolean externallyDriven() {
+            return false;
+        }
+
+        /** One-line result rows: a fixed icon column, the title and detail inline, and a trailing tag that drops first. */
+        boolean resultsLayout() {
+            return false;
+        }
+
+        void measureRows() {
+            if (uniformRows()) { tops = null; return; }
+            int n = size();
+            tops = new int[n + 1];
+            for (int i = 0; i < n; i++) tops[i + 1] = tops[i] + rowHeightAt(i);
+        }
+
+        int top(int index) {
+            return tops == null ? index * rowHeight : tops[Math.max(0, Math.min(index, tops.length - 1))];
+        }
+
+        int heightAt(int index) {
+            return tops == null ? rowHeight : tops[index + 1] - tops[index];
+        }
+
+        int rowsHeight() {
+            return top(size());
+        }
+
+        /** The row under {@code y} (clamped to {@code 0..size}). */
+        int indexAt(int y) {
+            if (tops == null) return rowHeight <= 0 ? 0 : Math.max(0, y) / rowHeight;
+            int low = 0, high = size();
+            while (low < high) {
+                int middle = (low + high + 1) >>> 1;
+                if (tops[middle] <= y) low = middle; else high = middle - 1;
+            }
+            return low;
+        }
+
+        /** The viewport's preferred height: {@link #visibleRows} selectable rows and the headings among them. */
+        int viewportRowsHeight() {
+            var visible = visibleRows();
+            if (visible.isEmpty()) return top(Math.min(8, size()));
+            int height = 0;
+            for (int i = 0, rows = 0; i < size() && rows < visible.getAsInt(); i++) {
+                height += heightAt(i);
+                if (selectable(i)) rows++;
+            }
+            return height;
+        }
+
+        /** The row a key step lands on: the next selectable row that way, or the first one when none has focus yet. */
+        int step(int delta) {
+            int current = focusItem == null ? -1 : indexOf(focusItem);
+            return current < 0 ? nextSelectable(-1, 1) : nextSelectable(current, Integer.signum(delta));
+        }
+
+        /** The next selectable index from {@code from} in {@code direction}, or {@code from} when there is none. */
+        int nextSelectable(int from, int direction) {
+            for (int i = from + direction; i >= 0 && i < size(); i += direction) if (selectable(i)) return i;
+            return from;
+        }
+
         int indexOf(String id) {
             for (int i = 0; i < size(); i++) if (itemId(i).equals(id)) return i;
             return -1;
@@ -167,6 +252,8 @@ final class InteractiveRows {
                             line * lines()
                                     + ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
+            measureRows();
+            canvas.setFocusable(!externallyDriven());
             canvas.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_APP));
             scroll.getVerticalScrollBar().setUnitIncrement(rowHeight);
             canvas.revalidate();
@@ -196,9 +283,14 @@ final class InteractiveRows {
             try {
                 int extent = scroll.getViewport().getExtentSize().height;
                 int y = scroll.getViewport().getViewPosition().y;
-                int first = Math.max(0, Math.min(size(), y / rowHeight) - 2);
-                int last =
-                        Math.min(size(), (y + Math.max(1, extent) + rowHeight - 1) / rowHeight + 2);
+                int first, last;
+                if (tops == null) {
+                    first = Math.max(0, Math.min(size(), y / rowHeight) - 2);
+                    last = Math.min(size(), (y + Math.max(1, extent) + rowHeight - 1) / rowHeight + 2);
+                } else {
+                    first = Math.max(0, indexAt(y) - 2);
+                    last = Math.min(size(), indexAt(y + Math.max(1, extent) - 1) + 1 + 2);
+                }
                 var wanted = new LinkedHashSet<String>();
                 for (int i = first; i < last; i++) wanted.add(itemId(i));
                 var spare = new ArrayDeque<Row>();
@@ -223,12 +315,12 @@ final class InteractiveRows {
                     row.index = i;
                     populate(row, i);
                     row.finish();
-                    row.setBounds(0, i * rowHeight, Math.max(0, width), rowHeight);
+                    row.setBounds(0, top(i), Math.max(0, width), heightAt(i));
                     row.doLayout();
                 }
                 for (var row : spare) canvas.remove(row);
                 if (footer != null)
-                    footer.setBounds(0, size() * rowHeight, Math.max(0, width), footerHeight());
+                    footer.setBounds(0, rowsHeight(), Math.max(0, width), footerHeight());
                 canvas.repaint();
             } finally {
                 syncing = false;
@@ -240,7 +332,7 @@ final class InteractiveRows {
         }
 
         void select(String id, boolean toggle) {
-            if (!interactive() || indexOf(id) < 0) return;
+            if (!interactive() || indexOf(id) < 0 || !selectable(indexOf(id))) return;
             focusItem = id;
             focusControl = null;
             anchor = id;
@@ -273,6 +365,8 @@ final class InteractiveRows {
         void pressed(Row row, MouseEvent e) {
             row.contextPress = e.isPopupTrigger();
             if (row.contextPress) context(row.id, (JComponent) e.getComponent(), e.getX(), e.getY());
+            // A list that follows an external field runs a row on a single left press, keeping the field's focus.
+            else if (externallyDriven() && SwingUtilities.isLeftMouseButton(e)) activate(row.id);
         }
 
         void released(Row row, MouseEvent e) {
@@ -284,6 +378,7 @@ final class InteractiveRows {
         void clicked(Row row, MouseEvent e) {
             boolean context = row.contextPress;
             row.contextPress = false;
+            if (externallyDriven()) return;
             // macOS Ctrl+click is the popup trigger on press yet arrives as a BUTTON1 click: never a selection.
             if (context || !SwingUtilities.isLeftMouseButton(e)) return;
             int modifiers = InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK
@@ -300,7 +395,7 @@ final class InteractiveRows {
             if (!interactive() || indexOf(id) < 0) return;
             int from = indexOf(anchor), to = indexOf(id);
             selected.clear();
-            for (int i = Math.min(from, to); i <= Math.max(from, to); i++) selected.add(itemId(i));
+            for (int i = Math.min(from, to); i <= Math.max(from, to); i++) if (selectable(i)) selected.add(itemId(i));
             focusItem = id;
             focusControl = null;
             sync();
@@ -311,7 +406,8 @@ final class InteractiveRows {
         void extend(int delta) {
             if (!multiple()) { move(delta); return; }
             if (size() == 0 || !interactive()) return;
-            int i = Math.max(0, Math.min(size() - 1, (focusItem == null ? -1 : indexOf(focusItem)) + delta));
+            int i = step(delta);
+            if (i < 0) return;
             if (anchor == null) anchor = itemId(i);
             range(itemId(i));
             ensure(i);
@@ -326,7 +422,7 @@ final class InteractiveRows {
             typedAt = when;
             String prefix = typed.toLowerCase(Locale.ROOT);
             for (int i = 0; i < size(); i++)
-                if (itemText(i).toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                if (selectable(i) && itemText(i).toLowerCase(Locale.ROOT).startsWith(prefix)) {
                     select(itemId(i), false);
                     ensure(i);
                     return;
@@ -334,6 +430,7 @@ final class InteractiveRows {
         }
 
         void activate(String id) {
+            if (indexOf(id) < 0 || !selectable(indexOf(id))) return;
             String action = activation();
             select(id, false);
             if (!action.isBlank() && stillCurrent(id) && action.equals(activation()))
@@ -342,12 +439,8 @@ final class InteractiveRows {
 
         void move(int delta) {
             if (size() == 0 || !interactive()) return;
-            int i =
-                    Math.max(
-                            0,
-                            Math.min(
-                                    size() - 1,
-                                    (focusItem == null ? -1 : indexOf(focusItem)) + delta));
+            int i = step(delta);
+            if (i < 0) return;
             String id = itemId(i);
             select(id, false);
             ensure(i);
@@ -360,13 +453,13 @@ final class InteractiveRows {
         }
 
         void position(int index) {
-            int y = index * rowHeight,
+            int y = top(index), height = heightAt(index),
                     top = scroll.getViewport().getViewPosition().y,
                     h = scroll.getViewport().getExtentSize().height;
-            if (y < top || y + rowHeight > top + h)
+            if (y < top || y + height > top + h)
                 scroll.getViewport()
                         .setViewPosition(
-                                new Point(0, Math.max(0, y - Math.max(0, h - rowHeight) / 2)));
+                                new Point(0, Math.max(0, y - Math.max(0, h - height) / 2)));
         }
 
         ControlRegistry.Control inline(String id) {
@@ -385,7 +478,7 @@ final class InteractiveRows {
         void context(String id, JComponent invoker, int x, int y) {
             if (!interactive()) return;
             clearPopup();
-            if (!stillCurrent(id) || !selected.contains(id) && !ownsContextActions(id)) return;
+            if (!stillCurrent(id) || !selectable(indexOf(id)) || !selected.contains(id) && !ownsContextActions(id)) return;
             var actions = contextActions(id);
             for (var item : actions) {
                 if (item.separator()) {
@@ -505,13 +598,12 @@ final class InteractiveRows {
         }
         @Override
         public Dimension getPreferredSize() {
-            return new Dimension(360, owner.size() * owner.rowHeight + owner.footerHeight());
+            return new Dimension(360, owner.rowsHeight() + owner.footerHeight());
         }
 
         @Override
         public Dimension getPreferredScrollableViewportSize() {
-            return new Dimension(
-                    360, Math.min(8, owner.size()) * owner.rowHeight + owner.footerHeight());
+            return new Dimension(360, owner.viewportRowsHeight() + owner.footerHeight());
         }
 
         @Override
@@ -704,7 +796,7 @@ final class InteractiveRows {
                     it.remove();
                 }
             }
-            check.setVisible(owner.multiple());
+            check.setVisible(owner.multiple() && owner.selectable(index));
             check.setEnabled(owner.interactive());
             check.setSelected(owner.selected.contains(id));
             check.getAccessibleContext().setAccessibleName("Select " + id);
@@ -743,6 +835,8 @@ final class InteractiveRows {
 
         @Override
         public void doLayout() {
+            if (!owner.selectable(index)) { headingLayout(); return; }
+            if (owner.resultsLayout()) { resultLayout(); return; }
             int pad = ThemePainting.metric(owner.context(), DesignMetrics.Role.ICON_GAP),
                     x = pad + indent,
                     width = Math.max(0, getWidth() - pad),
@@ -780,8 +874,72 @@ final class InteractiveRows {
             trailing.doLayout();
         }
 
+        /** A heading shows only its title, inset like the rows below it. */
+        void headingLayout() {
+            int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : DesignMetrics.Role.ICON_GAP);
+            check.setBounds(0, 0, 0, 0);
+            leading.setBounds(0, 0, 0, 0);
+            subtitle.setBounds(0, 0, 0, 0);
+            trailing.setBounds(0, 0, 0, 0);
+            title.setBounds(pad, 0, Math.max(0, getWidth() - 2 * pad), getHeight());
+            title.doLayout();
+        }
+
+        /**
+         * One line: the icon column, the title, the detail after it and the tag at the end. When space runs out the tag
+         * goes first, then the detail and finally the title are cut short. The tag shows only when the title, the detail
+         * (if any) and the tag all fit, so it never claims room the detail needs.
+         */
+        void resultLayout() {
+            var context = owner.context();
+            int side = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_PADDING),
+                    gap = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_GAP),
+                    icon = ThemePainting.metric(context, DesignMetrics.Role.ICON_RAIL), h = getHeight();
+            check.setBounds(0, 0, 0, 0);
+            leading.setBounds(side, 0, icon, h);
+            int start = side + icon + gap, end = getWidth() - side;
+            int titleWidth = title.getPreferredSize().width;
+            int tagWidth = trailing.getComponentCount() == 0 ? 0 : trailing.getPreferredSize().width;
+            int detailWidth = subtitle.getComponentCount() == 0 ? 0 : subtitle.getPreferredSize().width;
+            int detailTerm = detailWidth > 0 ? gap + detailWidth : 0;
+            boolean showTag = tagWidth > 0 && start + titleWidth + detailTerm + gap + tagWidth <= end;
+            int textEnd = showTag ? end - tagWidth - gap : end;
+            trailing.setBounds(showTag ? end - tagWidth : 0, 0, showTag ? tagWidth : 0, h);
+            int shownTitle = Math.max(0, Math.min(titleWidth, textEnd - start));
+            title.setBounds(start, 0, shownTitle, h);
+            int detailStart = start + shownTitle + gap;
+            subtitle.setBounds(detailStart, 0, Math.max(0, Math.min(detailWidth, textEnd - detailStart)), h);
+            leading.doLayout();
+            title.doLayout();
+            subtitle.doLayout();
+            trailing.doLayout();
+        }
+
         @Override
         protected void paintComponent(Graphics g) {
+            if (!owner.selectable(index)) {
+                // A heading after other rows opens its section with a hairline rule.
+                if (index > 0) {
+                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_SUBTLE));
+                    g.fillRect(0, 0, getWidth(), ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE));
+                }
+                return;
+            }
+            if (owner.resultsLayout()) {
+                Color fill = owner.selected.contains(id) ? ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG)
+                        : hover ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
+                if (fill != null) {
+                    var rounded = (Graphics2D) g.create();
+                    try {
+                        ThemePainting.antialias(rounded);
+                        int inset = ThemePainting.metric(owner.context(), DesignMetrics.Role.RESULTS_SELECTION_INSET),
+                                arc = ThemePainting.metric(owner.context(), DesignMetrics.Role.RESULTS_SELECTION_ARC);
+                        rounded.setColor(fill);
+                        rounded.fillRoundRect(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight(), arc, arc);
+                    } finally { rounded.dispose(); }
+                }
+                return;
+            }
             if (owner.selected.contains(id)) {
                 g.setColor(ThemePainting.color(owner.context(), SemanticColor.SELECTION_BG));
                 g.fillRect(0, 0, getWidth(), getHeight());

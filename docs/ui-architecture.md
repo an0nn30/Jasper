@@ -133,6 +133,14 @@ on to the host when a row collection has no activate action; a context press nev
 menu items report only their action (a shared menu opens only on a selected row); ACTIONS stacks wrap instead of squeezing their buttons; trailing tree columns keep minimum
 widths; single-line fields never clip an enlarged font.
 
+Palette capabilities (Plan 2 Task 6b-2): `ListItem.heading` is a title-only section row (never selected, activated,
+hovered or given a menu; a hairline opens every heading after the first); `ListKind.RESULTS` is the one-line result
+list that follows an external field: it never takes focus, a left press runs a row, rows and headings keep fixed heights
+(`RESULTS_ROW_HEIGHT`/`RESULTS_HEADING_HEIGHT`), the trailing tag drops first, and every host update keeps the
+selection and the heading above it in view while a theme change keeps the scroll; `ItemList.visibleRows` sizes the
+viewport in selectable rows; `KitView.composing(fieldId)` reports uncommitted input-method text; and a SEARCH field's
+label is its accessible name only (the glyph and hint label it visually).
+
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).
 

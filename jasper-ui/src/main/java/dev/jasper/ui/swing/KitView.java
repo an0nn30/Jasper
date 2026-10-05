@@ -84,6 +84,15 @@ public final class KitView extends JPanel implements AutoCloseable {
         var component = reconciler.control(Objects.requireNonNull(id)).component;
         component.scrollRectToVisible(new Rectangle(0, 0, component.getWidth(), component.getHeight()));
     }
+    /**
+     * Whether an input method is composing text in a field (uncommitted text an IME has not yet committed). A host that
+     * routes keys around the field leaves them to the input method while this is true.
+     */
+    public boolean composing(String fieldId) {
+        requireOpen();
+        if (reconciler.control(Objects.requireNonNull(fieldId)) instanceof TextFields.FieldControl field) return field.composing;
+        throw new IllegalArgumentException("Node is not a field: " + fieldId);
+    }
     /** Register by Custom.contentId (not node id); ordinary Swing trees cannot enter through this method. */
     public void registerContent(String id, JComponent component, AutoCloseable lifetime) { requireOpen(); reconciler.registerContent(id, Objects.requireNonNull(component), Objects.requireNonNull(lifetime)); }
     /** Borrow the mounted kit header; ownership remains with the view. */

@@ -59,6 +59,29 @@ public abstract class KitContractTest {
             new UiEvent.Edited("path","/tmp"),new UiEvent.Action("go"),new UiEvent.Selected("places",Set.of("box")),new UiEvent.Clicked("places","box"));
         stop(kit);
     }); }
+    /** A palette: a search field driving a RESULTS list with headings and a visible row count (Plan 2 Task 6b-2). */
+    static ViewSpec results(String selected, int visibleRows) {
+        var heading=new ListItem("commands",Optional.empty(),List.of(new Nodes.Text("commands.title",ControlState.READY,"Commands",Nodes.TextRole.CAPTION)),List.of(),List.of(),true);
+        var items=new ArrayList<ListItem>(List.of(heading));
+        for(String id:List.of("new","close"))items.add(new ListItem(id,Optional.of(new Nodes.Icon(id+".icon",ControlState.READY,"play",Nodes.Hue.NONE,Nodes.IconSize.RAIL,"Command")),
+            List.of(new Nodes.Text(id+".title",ControlState.READY,id+" tab",Nodes.TextRole.BODY)),List.of(new Nodes.Text(id+".detail",ControlState.READY,"Tabs",Nodes.TextRole.DESCRIPTION)),
+            List.of(new Nodes.Text(id+".tag",ControlState.READY,"Cmd+T",Nodes.TextRole.CAPTION))));
+        return new ViewSpec(new Nodes.Stack("palette",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Field("query",ControlState.READY,Nodes.FieldKind.SEARCH,"tab","Search everything","Search all",""),
+            new Nodes.ItemList("results",ControlState.READY,Nodes.ListKind.RESULTS,items,Set.of(selected),"run",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty(),OptionalInt.of(visibleRows)))));
+    }
+    @Test void resultListsMountUpdateAndReportPressesAndComposition() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var view=kit.create(results("new",5),events::add);
+        assertThat(view.spec()).isEqualTo(results("new",5));
+        view.update(results("close",8));assertThat(view.spec()).isEqualTo(results("close",8));
+        assertThat(view.composing("query")).as("no input method is composing").isFalse();
+        assertThatThrownBy(() -> view.composing("results")).isInstanceOf(IllegalArgumentException.class);
+        emit(view,new UiEvent.Edited("query","tabs"));emit(view,new UiEvent.Selected("results",Set.of("new")));emit(view,new UiEvent.Action("run"));
+        assertThat(events).containsExactly(new UiEvent.Edited("query","tabs"),new UiEvent.Selected("results",Set.of("new")),new UiEvent.Action("run"));
+        assertThatThrownBy(() -> new Nodes.ItemList("bad",ControlState.READY,Nodes.ListKind.RESULTS,((Nodes.ItemList)((Nodes.Stack)results("new",1).root()).children().get(1)).items(),
+            Set.of("commands"),"run",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty(),OptionalInt.of(1))).as("a heading is never selected").isInstanceOf(IllegalArgumentException.class);
+        stop(kit);assertThatThrownBy(() -> view.composing("query")).isInstanceOf(IllegalStateException.class);
+    }); }
     @Test void disposalCannotReenterUpdate() throws Exception { edt(() -> {
         var kit=kit("owner"); var before=new ViewSpec(new Nodes.Custom("custom",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));
         var view=kit.create(before,e -> {}); var calls=new java.util.concurrent.atomic.AtomicInteger(); var rejected=new java.util.concurrent.atomic.AtomicBoolean();

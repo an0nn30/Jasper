@@ -8,6 +8,14 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   assertThat(kit.views()).containsExactly(view); view.close(); assertThat(kit.views()).isEmpty(); kit.close();
  });
 }
+ @Test void plugInTestsSimulateAnInputMethodComposingInAField() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
+  var kit=new FakeKit("sample");var view=(FakeKitView)kit.create(KitContractTest.results("new",5),e -> {});
+  assertThat(view.composing("query")).isFalse();
+  view.setComposing("query",true);assertThat(view.composing("query")).isTrue();
+  view.setComposing("query",false);assertThat(view.composing("query")).isFalse();
+  assertThatIllegalArgumentException().isThrownBy(() -> view.setComposing("results",true));
+  kit.close();
+ });}
  @Test void contextFailedStartAndStopOwnKitAndSemanticRefresh() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
   try(var host=new FakePluginHost()) {
    var info=new dev.jasper.sdk.PluginInfo("owner","Owner","1.0.0",java.util.Set.of());var retained=new java.util.ArrayList<FakeKit>();

@@ -32,6 +32,7 @@ final class HostedKitView implements UiView {
  @Override public void replaceSecret(String id,char[] value){guard();view.replaceSecret(id,value);}
  @Override public void focus(String id){guard();view.focus(id);}
  @Override public void reveal(String id){guard();view.reveal(id);}
+ @Override public boolean composing(String fieldId){guard();return view.composing(fieldId);}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);KitDiagnostics.validate(content);
   var expected=KitContent.find(spec.root(),content.id());if(expected==null||expected.kind()!=content.kind())throw new IllegalArgumentException("No matching Custom content id/kind");
   var owned=new KitContent(owner,content);try{view.registerContent(content.id(),content.component(),owned);}catch(Throwable failure){owned.abort();throw failure;}

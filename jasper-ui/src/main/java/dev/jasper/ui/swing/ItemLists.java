@@ -66,6 +66,73 @@ final class ItemLists {
             return value().kind() == Nodes.ListKind.DOUBLE ? 2 : 1;
         }
 
+        boolean results() {
+            return value().kind() == Nodes.ListKind.RESULTS;
+        }
+
+        @Override
+        boolean selectable(int index) {
+            return index < 0 || index >= size() || !value().items().get(index).heading();
+        }
+
+        /** RESULTS rows and headings keep fixed heights; headings elsewhere are as tall as the rows. */
+        @Override
+        boolean uniformRows() {
+            return !results();
+        }
+
+        @Override
+        int rowHeightAt(int index) {
+            return ThemePainting.metric(context(), value().items().get(index).heading()
+                    ? DesignMetrics.Role.RESULTS_HEADING_HEIGHT : DesignMetrics.Role.RESULTS_ROW_HEIGHT);
+        }
+
+        @Override
+        OptionalInt visibleRows() {
+            return value().visibleRows();
+        }
+
+        @Override
+        boolean externallyDriven() {
+            return results();
+        }
+
+        @Override
+        boolean resultsLayout() {
+            return results();
+        }
+
+        /**
+         * A RESULTS list follows its host: whenever the host updates the list, the selected row (with the heading directly
+         * above it) is scrolled into view; a theme or font refresh keeps the scroll position.
+         */
+        @Override
+        void update(Nodes.Node next) {
+            boolean changed = next != node;
+            super.update(next);
+            if (changed && results() && !closed) {
+                String first = selected.stream().min(Comparator.comparingInt(this::indexOf)).orElse(null);
+                if (first != null) { pendingReveal = first; sync(); }
+            }
+        }
+
+        /** RESULTS scroll as little as possible, first to the heading above the row and then to the row itself. */
+        @Override
+        void position(int index) {
+            if (!results()) { super.position(index); return; }
+            var viewport = scroll.getViewport();
+            int y = viewport.getViewPosition().y, h = viewport.getExtentSize().height;
+            if (index > 0 && !selectable(index - 1)) y = visible(y, h, top(index - 1), heightAt(index - 1));
+            y = visible(y, h, top(index), heightAt(index));
+            if (y != viewport.getViewPosition().y) viewport.setViewPosition(new java.awt.Point(0, y));
+        }
+
+        static int visible(int y, int extent, int top, int height) {
+            if (top < y) return top;
+            if (top + height > y + extent) return Math.max(0, top + height - extent);
+            return y;
+        }
+
         /** Descriptor-only measurement keeps offscreen choices from allocating Swing widgets. */
         @Override
         int minimumRowHeight() {

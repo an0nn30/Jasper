@@ -24,6 +24,8 @@ final class TextFields {
         boolean embedded;
         boolean applying;
         boolean notifying;
+        /** An input method holds uncommitted (composed) text in the field. */
+        boolean composing;
         long valueRevision;
         FieldControl(KitView view, Nodes.Field node) {
             super(view, node, new JPanel(new BorderLayout())); container = (JPanel)component;
@@ -62,6 +64,11 @@ final class TextFields {
                 }
             };
             input.getDocument().addDocumentListener(listener); own(() -> input.getDocument().removeDocumentListener(listener));
+            java.awt.event.InputMethodListener composition = new java.awt.event.InputMethodListener() {
+                @Override public void inputMethodTextChanged(java.awt.event.InputMethodEvent event) { composing = uncommitted(event) > 0; }
+                @Override public void caretPositionChanged(java.awt.event.InputMethodEvent event) {}
+            };
+            input.addInputMethodListener(composition); own(() -> input.removeInputMethodListener(composition));
             setValue(node.value());
             refresh();
         }
@@ -117,11 +124,18 @@ final class TextFields {
             applying = true;
             try { input.setText(value); } finally { applying = false; }
         }
-        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value && !surface.hero); }
-        @Override void hero(boolean value) { surface.hero=value; label.setVisible(!embedded && !value); }
+        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(labelShown()); }
+        @Override void hero(boolean value) { surface.hero=value; label.setVisible(labelShown()); }
+        /** A search field is labelled by its glyph and hint; its label stays its accessible name only. */
+        boolean labelShown() { return !embedded && !surface.hero && ((Nodes.Field)node).kind() != Nodes.FieldKind.SEARCH; }
+        static int uncommitted(java.awt.event.InputMethodEvent event) {
+            var text = event.getText();
+            if (text == null) return 0;
+            return Math.max(0, text.getEndIndex() - text.getBeginIndex() - event.getCommittedCharacterCount());
+        }
         @Override JComponent focusTarget() { return input; }
         @Override void refresh() {
-            var field = (Nodes.Field)node; state(); label.setVisible(!embedded && !surface.hero); input.setEnabled(component.isEnabled());
+            var field = (Nodes.Field)node; state(); label.setVisible(labelShown()); input.setEnabled(component.isEnabled());
             input.setEditable(component.isEnabled()); surface.setEnabled(component.isEnabled());
             input.setCursor(Cursor.getPredefinedCursor(component.isEnabled() ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (scroll != null) {

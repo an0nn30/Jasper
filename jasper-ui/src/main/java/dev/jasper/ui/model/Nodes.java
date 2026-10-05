@@ -22,7 +22,11 @@ public final class Nodes {
     public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED, SEARCHABLE }
     public enum CardKind { FORM, SETTINGS, MIXED }
     public enum SelectionMode { SINGLE, MULTIPLE }
-    public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED }
+    /**
+     * RESULTS is a one-line result list driven by an external field (a command palette): it never takes focus, the host
+     * moves its selection, a left press activates a row, and fixed row and heading heights keep it steady.
+     */
+    public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
     public enum FormKind { HERO, SHEET, FULL, SETTINGS }
     public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION }
     public enum SplitKind { SIDEBAR_DETAIL, THREE_COLUMN, DOCUMENT }
@@ -252,8 +256,12 @@ public final class Nodes {
         }
     }
 
-    /** Virtual row collection. MULTIPLE shows checkboxes; addAction is a footer, never a data item. */
-    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction) implements Node {
+    /**
+     * Virtual row collection. MULTIPLE shows checkboxes; addAction is a footer, never a data item. A present
+     * {@code visibleRows} is how many selectable rows the viewport shows before it scrolls (headings above them add their
+     * own height); absent keeps the kit default. Headings are never selected and ORDERED lists have none.
+     */
+    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows) implements Node {
         public ItemList {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -261,10 +269,18 @@ public final class Nodes {
             selectedIds = Set.copyOf(selectedIds);
             Objects.requireNonNull(activateAction);
             contextActions = List.copyOf(contextActions);
-            Objects.requireNonNull(selectionMode); Objects.requireNonNull(addAction);
+            Objects.requireNonNull(selectionMode); Objects.requireNonNull(addAction); Objects.requireNonNull(visibleRows);
             if (selectionMode == SelectionMode.SINGLE && selectedIds.size() > 1) throw new IllegalArgumentException("Single selection accepts at most one item");
+            if (visibleRows.isPresent() && visibleRows.getAsInt() < 1) throw new IllegalArgumentException("Visible rows must be positive");
             ModelChecks.unique(items, ListItem::id);
             ModelChecks.unique(contextActions, MenuItem::id);
+            for (var item : items) if (item.heading()) {
+                if (kind == ListKind.ORDERED) throw new IllegalArgumentException("Ordered lists have no headings");
+                if (selectedIds.contains(item.id())) throw new IllegalArgumentException("A heading is never selected");
+            }
+        }
+        public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction) {
+            this(id, state, kind, items, selectedIds, activateAction, contextActions, selectionMode, addAction, OptionalInt.empty());
         }
         public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions) {
             this(id, state, kind, items, selectedIds, activateAction, contextActions, SelectionMode.SINGLE, Optional.empty());

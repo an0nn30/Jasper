@@ -183,7 +183,7 @@ unique within their owning control; references resolve only in that control. Do 
 | Card | `CardKind kind, List<Node> children` |
 | Section | `String title, Node body` |
 | Empty | `Node icon, String title, String description, List<Node> actions` |
-| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction` |
+| ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows` |
 | Header | `String title, OptionalInt count, Optional<Node> context, Optional<Node> primary, List<MenuItem> overflow` |
 | Panel | `Header header, Optional<Node> searchOrNavigation, Node body, Optional<Node> footer` |
 | Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction` |
@@ -195,7 +195,7 @@ unique within their owning control; references resolve only in that control. Do 
 
 Support records, each in its own model file: `Option(String id,String label,Optional<Hue> hue)`,
 `MenuItem(String id,String label,String icon,String action,boolean enabled,boolean separator,Nodes.Hue hue)`,
-`ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing)`,
+`ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing,boolean heading)`,
 `Column(String id,String title,TextRole role,boolean numeric,double weight,Optional<Boolean> sorted)`,
 `TableRow(String id,Map<String,String> cells,Optional<String> icon,boolean muted,Optional<List<MenuItem>> contextActions)`,
 `TreeItem(String id,String title,Optional<String> icon,boolean leaf,List<TreeItem> children,OptionalInt count,boolean emphasized,String tooltip,Optional<StatusKind> status,List<String> trailing,Optional<List<MenuItem>> contextActions)`,
@@ -209,7 +209,7 @@ BLUE/GREEN/AMBER/PURPLE/NEUTRAL/NONE; IconSize is CAPTION/CONTROL/RAIL/EMPTY/HER
 ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK;
 StatusKind is SUCCESS/WARNING/DANGER/IDLE;
 FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
-CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED; SelectionMode is SINGLE/MULTIPLE;
+CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED/RESULTS; SelectionMode is SINGLE/MULTIPLE;
 FormKind is HERO/SHEET/FULL/SETTINGS; LayoutRole is VERTICAL/INLINE/ACTIONS/HERO/DETAIL/FOOTER/NAVIGATION;
 SplitKind is SIDEBAR_DETAIL/THREE_COLUMN/DOCUMENT; CustomKind is EDITOR/TERMINAL/CHART/PREVIEW; ScrollPolicy is STANDARD/OVERLAY.
 Header primary nodes are restricted to Button or MenuButton. MenuButton's `action` is blank for a
@@ -305,6 +305,29 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   While `editing` it shows a MONO text field holding `value` (selected for replacement when editing starts), reports
   typing as `Edited`, Enter as `submitAction`, Escape or leaving the field as `cancelAction`; `focus(id)` focuses the
   field while editing.
+
+Plan 2 Task 6b-2 palette additions (command palette; same mirroring and SDK version rule). Prior constructors remain
+and default to the old meaning (not a heading, no visible-row count):
+- `ListItem.heading` is a section row holding its title only (no leading, subtitle or trailing; at least one title node).
+  It is never selected (a descriptor selecting one is rejected), activated, hovered, stepped onto by the arrow keys or
+  type-ahead, given a checkbox or offered a menu; every heading after the first row opens with a `border.subtle`
+  hairline. ORDERED lists reject headings. Elsewhere a heading is as tall as the rows.
+- `ListKind.RESULTS` is a one-line result list that follows an external field (a palette query): its canvas is never
+  focusable, so the field keeps focus and the host moves the selection; a left press (not a popup trigger) on a row
+  reports `Selected` then the activate `Action` (the click that follows reports nothing); rows are
+  `RESULTS_ROW_HEIGHT` (24) and headings `RESULTS_HEADING_HEIGHT` (22) tall whatever the font; a row lays out its
+  leading node in a fixed `ICON_RAIL` column at `RESULTS_ROW_PADDING`, then the title, the subtitle (detail) after it
+  on the same line and the trailing tag right-aligned, `RESULTS_ROW_GAP` apart; when space runs out the tag is dropped
+  first (it shows only when title, detail and tag all fit), then the detail and finally the title are cut. Selection
+  and hover paint `selection.bg` and the 5 % `hover.overlay` as rounded rectangles (`RESULTS_SELECTION_ARC`) inset by
+  `RESULTS_SELECTION_INSET`. Every host update (a new descriptor) scrolls the selected row, and the heading directly
+  above it, into view with the least movement; a theme or font refresh keeps the scroll position.
+- `ItemList.visibleRows` (positive when present) is how many selectable rows the viewport's preferred height shows;
+  headings among them add their own height. Absent keeps the default (eight rows).
+- `KitView.composing(fieldId)` and SDK `UiView.composing(fieldId)` report whether an input method holds uncommitted
+  text in a field (a non-field id is rejected); the testkit fake simulates it with `FakeKitView.setComposing`.
+- A SEARCH field never shows its label (kit behaviour, no API): the label stays its accessible name and `labelFor`,
+  and the search glyph and hint label it visually. Other field kinds are unchanged.
 
 `ViewSpec(Node root)` validates the tree and references. `UiEvent` is sealed with nested records
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,
