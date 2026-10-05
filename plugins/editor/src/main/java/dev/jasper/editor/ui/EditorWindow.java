@@ -670,7 +670,7 @@ public final class EditorWindow {
         numbers.put(session, nextNumber++);
         var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab);
         hosted.put(tab, handle); ownerRef.set(handle);
-        handle.setFocusTarget(tab.area()::requestFocusInWindow);
+        handle.setFocusTarget(tab::focusText);
         handle.onActive(active -> { if (active) activate(tab); });
         handle.onClosed(() -> remove(tab));
         var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
