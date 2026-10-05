@@ -136,9 +136,20 @@ final class Panels {
 
         int contentHeight(int width) {
             if (control == null || !control.component.isVisible()) return 0;
-            return control instanceof InteractiveRows.RowsControl rows
-                    ? rows.rowHeight
-                    : Composition.height(control.component, width);
+            if (control instanceof InteractiveRows.RowsControl rows) {
+                Insets insets = rows.scroll.getInsets();
+                int height = rows.rowHeight + insets.top + insets.bottom;
+                var header = rows.scroll.getColumnHeader();
+                if (header != null && header.isVisible())
+                    height += header.getPreferredSize().height;
+                var border = rows.scroll.getViewportBorder();
+                if (border != null) {
+                    Insets viewport = border.getBorderInsets(rows.scroll);
+                    height += viewport.top + viewport.bottom;
+                }
+                return height;
+            }
+            return Composition.height(control.component, width);
         }
 
         @Override

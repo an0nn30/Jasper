@@ -55,21 +55,26 @@ public final class PanelFixtures {
         }
 
         public boolean pending() {
-            return state.pending;
+            return !state.pendingServers.isEmpty();
         }
 
         /**
          * Deterministic completion seam for gallery/tests; false demonstrates confirmed-state
-         * failure.
+         * failure. Completes the oldest pending row intent; other rows keep their own pending
+         * state.
          */
         public void completePending(boolean success) {
             if (closed) throw new IllegalStateException("Closed fixture");
-            if (!state.pending) throw new IllegalStateException("No pending toggle");
-            state.pending = false;
+            if (state.pendingServers.isEmpty())
+                throw new IllegalStateException("No pending toggle");
+            var server = state.servers.get(state.pendingServers.removeFirst());
+            server.pending = false;
             if (success) {
-                state.serverOn = state.requested;
-                state.error = "";
-            } else state.error = "Could not start file server";
+                server.confirmed = server.requested;
+                server.error = "";
+            } else
+                server.error =
+                        "Could not " + (server.requested ? "start" : "stop") + " file server";
             refresh();
         }
 
@@ -78,10 +83,13 @@ public final class PanelFixtures {
                 state.query = edit.text();
             else if (e instanceof UiEvent.Toggled toggle) {
                 if (toggle.id().equals("sftp-follow")) state.follow = toggle.checked();
-                else if (toggle.id().equals("server-toggle")) {
-                    state.pending = true;
-                    state.requested = toggle.checked();
-                    state.error = "";
+                else {
+                    var server = state.servers.get(toggle.id());
+                    if (server == null || server.pending) return;
+                    server.pending = true;
+                    server.requested = toggle.checked();
+                    server.error = "";
+                    state.pendingServers.addLast(toggle.id());
                 }
             } else if (e instanceof UiEvent.Selected selected
                     && selected.id().equals("sessions-body")) {
@@ -98,7 +106,10 @@ public final class PanelFixtures {
                     case "choose-amp" -> state.sftpSession = "amp";
                     case "choose-pve" -> state.sftpSession = "pve";
                     case "sftp-disconnect" -> state.sftpSession = "";
-                    case "fileservers-add" -> state.servers++;
+                    case "fileservers-add" ->
+                            state.servers.put(
+                                    "server-" + state.servers.size() + "-toggle",
+                                    new ServerState());
                     case "session-connect" -> state.connected = !state.connected;
                     default -> {
                         return;
@@ -123,6 +134,11 @@ public final class PanelFixtures {
 
     private record Session(String id, String title, String address) {}
 
+    private static final class ServerState {
+        boolean confirmed, pending, requested;
+        String error = "";
+    }
+
     private static final class State {
         final String name;
         final List<Session> sessions =
@@ -134,14 +150,17 @@ public final class PanelFixtures {
                                 new Session("minecraft", "minecraft-local", "192.168.1.124"),
                                 new Session("pve", "pve", "100.73.226.91"),
                                 new Session("pve-root", "pve-root", "100.73.226.91")));
-        String query = "", selected = "amp", sftpSession = "", error = "";
-        int tunnels, servers = 1;
-        boolean follow = true, serverOn, pending, requested, collapsed, connected;
+        String query = "", selected = "amp", sftpSession = "";
+        int tunnels;
+        final Map<String, ServerState> servers = new LinkedHashMap<>();
+        final Deque<String> pendingServers = new ArrayDeque<>();
+        boolean follow = true, collapsed, connected;
 
         State(String name) {
             if (!Set.of("sessions", "tunnels", "sftp", "fileservers").contains(name))
                 throw new IllegalArgumentException("Unknown panel fixture: " + name);
             this.name = name;
+            servers.put("server-toggle", new ServerState());
         }
 
         ControlState bodyState() {
@@ -464,9 +483,11 @@ public final class PanelFixtures {
 
         ViewSpec fileServers() {
             var rows = new ArrayList<ListItem>();
-            for (int i = 0; i < servers; i++) {
+            int i = 0;
+            for (var entry : servers.entrySet()) {
                 String prefix = i == 0 ? "server" : "server-" + i;
-                var toggleState = new ControlState(true, true, pending, error);
+                var server = entry.getValue();
+                var toggleState = new ControlState(true, true, server.pending, server.error);
                 rows.add(
                         new ListItem(
                                 prefix,
@@ -491,21 +512,24 @@ public final class PanelFixtures {
                                                 TextRole.MONO_SMALL),
                                         text(
                                                 prefix + "-state",
-                                                pending
-                                                        ? "Starting..."
-                                                        : error.isEmpty() ? "" : "Failed",
+                                                server.pending
+                                                        ? server.requested
+                                                                ? "Starting..."
+                                                                : "Stopping..."
+                                                        : server.error.isEmpty() ? "" : "Failed",
                                                 TextRole.CAPTION)),
                                 List.of(
                                         new Toggle(
                                                 prefix + "-toggle",
-                                                i == 0 ? toggleState : READY,
+                                                toggleState,
                                                 "Enable file server",
-                                                i == 0 && serverOn,
+                                                server.confirmed,
                                                 "toggle-server",
                                                 true))));
+                i++;
             }
             return panel(
-                    header("File Servers", OptionalInt.of(servers), true),
+                    header("File Servers", OptionalInt.of(servers.size()), true),
                     Optional.empty(),
                     new ItemList(
                             "fileservers-body",

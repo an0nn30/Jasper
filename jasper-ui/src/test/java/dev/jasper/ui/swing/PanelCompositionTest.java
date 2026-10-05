@@ -706,4 +706,127 @@ class PanelCompositionTest {
                     }
                 });
     }
+
+    @Test
+    void connectedShortSftpReservesColumnHeaderAndOneReachableDataRowAtEnlargedFont() {
+        Edt.run(
+                () -> {
+                    var ctx = KitFixtures.context();
+                    var old = UIManager.get("defaultFont");
+                    try (var demo = dev.jasper.ui.gallery.PanelFixtures.mount("sftp", ctx)) {
+                        UIManager.put("defaultFont", new Font(Font.DIALOG, Font.PLAIN, 24));
+                        var view = demo.view();
+                        var menu = (Menus.MenuControl) view.control("sftp-choose");
+                        menu.main.doClick(0);
+                        ((JMenuItem) menu.popup.getComponent(0)).doClick(0);
+                        KitFixtures.render(view, s(240), s(180), 1);
+                        var table = (Tables.TableControl) view.control("sftp-body");
+                        assertThat(table.scroll.getViewport().getExtentSize().height)
+                                .isGreaterThanOrEqualTo(table.rowHeight);
+                        assertThat(table.scroll.getHeight())
+                                .isGreaterThanOrEqualTo(
+                                        table.header.getPreferredSize().height + table.rowHeight);
+                        var panel = (Panels.PanelControl) view.control("sftp");
+                        panel.scroll
+                                .getVerticalScrollBar()
+                                .setValue(panel.scroll.getVerticalScrollBar().getMaximum());
+                        KitFixtures.render(view, s(240), s(180), 1);
+                        var reachable =
+                                SwingUtilities.convertRectangle(
+                                        table.scroll.getViewport(),
+                                        new Rectangle(
+                                                0,
+                                                0,
+                                                table.scroll.getViewport().getWidth(),
+                                                table.rowHeight),
+                                        panel.scroll.getViewport());
+                        assertThat(reachable.y).isGreaterThanOrEqualTo(0);
+                        assertThat(reachable.y + reachable.height)
+                                .isLessThanOrEqualTo(panel.scroll.getViewport().getHeight());
+                        assertThat(table.mounted).isNotEmpty();
+                    } finally {
+                        if (old == null) UIManager.getDefaults().remove("defaultFont");
+                        else UIManager.put("defaultFont", old);
+                        release(ctx);
+                    }
+                });
+    }
+
+    @Test
+    void addedFileServerSwitchHasIndependentPendingFailureAndConfirmedState() {
+        Edt.run(
+                () -> {
+                    var ctx = KitFixtures.context();
+                    try (var demo = dev.jasper.ui.gallery.PanelFixtures.mount("fileservers", ctx)) {
+                        var view = demo.view();
+                        KitFixtures.render(view, s(320), s(480), 1);
+                        find(view, "fileservers-add", JButton.class).doClick(0);
+                        KitFixtures.render(view, s(320), s(480), 1);
+                        var original = (Switches.ToggleControl) view.control("server-toggle");
+                        var added = (Switches.ToggleControl) view.control("server-1-toggle");
+                        added.button.doClick(0);
+                        assertThat(demo.pending()).isTrue();
+                        assertThat(view.control("server-1-toggle").node.state().busy()).isTrue();
+                        assertThat(original.node.state().busy()).isFalse();
+                        demo.completePending(false);
+                        assertThat(((Toggle) view.control("server-1-toggle").node).checked())
+                                .isFalse();
+                        assertThat(view.control("server-1-toggle").node.state().error())
+                                .isNotBlank();
+                        assertThat(original.node.state().error()).isEmpty();
+                        ((Switches.ToggleControl) view.control("server-1-toggle"))
+                                .button.doClick(0);
+                        demo.completePending(true);
+                        assertThat(((Toggle) view.control("server-1-toggle").node).checked())
+                                .isTrue();
+                        assertThat(((Toggle) view.control("server-toggle").node).checked())
+                                .isFalse();
+                        ((Switches.ToggleControl) view.control("server-1-toggle"))
+                                .button.doClick(0);
+                        demo.completePending(false);
+                        assertThat(((Toggle) view.control("server-1-toggle").node).checked())
+                                .isTrue();
+                        ((Switches.ToggleControl) view.control("server-1-toggle"))
+                                .button.doClick(0);
+                        demo.completePending(true);
+                        assertThat(((Toggle) view.control("server-1-toggle").node).checked())
+                                .isFalse();
+                        assertThat(((Toggle) view.control("server-toggle").node).checked())
+                                .isFalse();
+                        original.button.doClick(0);
+                        ((Switches.ToggleControl) view.control("server-1-toggle"))
+                                .button.doClick(0);
+                        assertThat(view.control("server-toggle").node.state().busy()).isTrue();
+                        assertThat(view.control("server-1-toggle").node.state().busy()).isTrue();
+                        demo.completePending(true);
+                        assertThat(((Toggle) view.control("server-toggle").node).checked())
+                                .isTrue();
+                        assertThat(view.control("server-toggle").node.state().busy()).isFalse();
+                        assertThat(view.control("server-1-toggle").node.state().busy()).isTrue();
+                        demo.completePending(false);
+                        assertThat(((Toggle) view.control("server-1-toggle").node).checked())
+                                .isFalse();
+                        assertThat(view.control("server-1-toggle").node.state().error())
+                                .isNotBlank();
+                        assertThat(view.control("server-toggle").node.state().error()).isEmpty();
+                        ((Switches.ToggleControl) view.control("server-1-toggle"))
+                                .button.doClick(0);
+                        original.button.doClick(0);
+                        demo.completePending(true);
+                        assertThat(((Toggle) view.control("server-1-toggle").node).checked())
+                                .isTrue();
+                        assertThat(((Toggle) view.control("server-toggle").node).checked())
+                                .isTrue();
+                        assertThat(view.control("server-toggle").node.state().busy()).isTrue();
+                        demo.completePending(true);
+                        assertThat(((Toggle) view.control("server-toggle").node).checked())
+                                .isFalse();
+                        assertThat(((Toggle) view.control("server-1-toggle").node).checked())
+                                .isTrue();
+                        assertThat(demo.pending()).isFalse();
+                    } finally {
+                        release(ctx);
+                    }
+                });
+    }
 }

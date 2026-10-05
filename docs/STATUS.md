@@ -155,6 +155,12 @@
   reachable. Final default/2x focused: **13 tests each**; module check/architecture: **234 tests,
   0 failures/errors/skips**. Original panel screenshot remains unchanged; full gallery calibration and
   native focus checks remain Task 13/user-run. No GUI, benchmark, AOT, push or merge.
+  Task 10 independent review fix round adds data-owner chrome to the bounded panel minimum, so
+  connected SFTP retains its column header and a usable full row at 240×180 with enlarged fonts.
+  Added File Server switches now retain independent confirmed/pending/failure state; deterministic
+  completions follow request order without changing other rows. Both P2 regressions reproduced;
+  final affected default/2x: **15 tests each, 0 failures/errors/skips**. Earlier 234-module result is
+  pre-fix evidence; this bounded review wave ran only affected tests as requested.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`
