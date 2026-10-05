@@ -21,7 +21,7 @@ public final class Typography {
     }
     private final String family;
     private final float bodySize;
-    public Typography() { this(platformFamily(), 13); }
+    public Typography() { this(PlatformFamily.NAME, 13); }
     public Typography(String family, float bodySize) {
         Objects.requireNonNull(family);
         if (family.isBlank() || !Float.isFinite(bodySize) || bodySize < 6 || bodySize > 96)
@@ -40,7 +40,12 @@ public final class Typography {
             TextAttribute.SIZE, role.size * bodySize / 13f,
             TextAttribute.WEIGHT, weight == 600 ? TextAttribute.WEIGHT_SEMIBOLD : weight == 500 ? TextAttribute.WEIGHT_MEDIUM : TextAttribute.WEIGHT_REGULAR));
     }
+    static int platformLookups() { return LOOKUPS.get(); }
+    private static final java.util.concurrent.atomic.AtomicInteger LOOKUPS = new java.util.concurrent.atomic.AtomicInteger();
+    /** Installed families are a process constant; each lookup creates native font objects macOS never releases. */
+    private static final class PlatformFamily { static final String NAME = platformFamily(); }
     private static String platformFamily() {
+        LOOKUPS.incrementAndGet();
         Set<String> installed = Set.of(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames(Locale.ROOT));
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         List<String> families = os.contains("mac") ? List.of("Helvetica Neue", "Helvetica", "Noto Sans", "DejaVu Sans")

@@ -339,6 +339,17 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
+    /** The installed LAF is FlatLaf's IntelliJ theme LAF carrying the saved theme's module snapshot; its identity. */
+    private static String installedLightLaf() {
+        var laf = javax.swing.UIManager.getLookAndFeel();
+        assertThat(laf).isInstanceOf(com.formdev.flatlaf.IntelliJTheme.ThemeLaf.class);
+        var light = dev.jasper.app.appearance.ThemeManager.generated(dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+        assertThat(dev.jasper.ui.swing.FlatLafInstaller.installedTheme()).isSameAs(light);
+        assertThat(laf.getDefaults().get("Jasper.installedTheme")).as("the snapshot travels with the LAF itself").isSameAs(light);
+        assertThat(laf.getName()).isEqualTo(light.name());
+        return laf.getClass().getName() + "\n" + System.identityHashCode(laf) + "\n" + laf.getName();
+    }
+
     private static final String APPEARANCE_FIXTURE = """
         package fix.look;
         import dev.jasper.sdk.plugin.Plugin;
@@ -351,6 +362,8 @@ class JasperApplicationPluginsTest {
                 Files.writeString(context.dataDirectory().resolve("appearance"),
                     context.appearance().variant().name() + "\\n" +
                     UIManager.getLookAndFeel().getClass().getName() + "\\n" +
+                    System.identityHashCode(UIManager.getLookAndFeel()) + "\\n" +
+                    UIManager.getLookAndFeel().getName() + "\\n" +
                     new JButton().getUI().getClass().getName());
             }
         }
@@ -365,6 +378,7 @@ class JasperApplicationPluginsTest {
         var service = new dev.jasper.app.config.ConfigService(dirs.configFile(), false);
         var terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
+        String[] installed = new String[1];
         try {
             edt(() -> {
                 application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(),
@@ -372,9 +386,10 @@ class JasperApplicationPluginsTest {
                 application[0].startPlugins(null, dev, false, dirs);
                 assertThat(application[0].terminals().windows()).isEmpty();
                 assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).isFalse();
+                installed[0] = installedLightLaf();
             });
-            assertThat(dirs.plugins().resolve("dev.example.look/data/appearance")).hasContent(
-                "LIGHT\ncom.formdev.flatlaf.IntelliJTheme$ThemeLaf\ncom.formdev.flatlaf.ui.FlatButtonUI");
+            assertThat(dirs.plugins().resolve("dev.example.look/data/appearance")).as("the plugin started under that same LAF")
+                .hasContent("LIGHT\n" + installed[0] + "\ncom.formdev.flatlaf.ui.FlatButtonUI");
         } finally {
             if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
             service.close();
