@@ -328,6 +328,9 @@ rule; prior constructors remain and default to the old meaning):
 - Host-only (not projected into the SDK): `KitView(context, spec, events, pointerOnly)`. A pointer-only view's controls
   never take keyboard focus, including controls mounted later and after theme changes, while they stay operable by
   pointer and keep their accessible names and actions (notification cards over a terminal keep the shell's focus).
+- The app no longer publishes `Jasper.notification.{background,borderColor,foreground,mutedForeground,linkForeground}`;
+  notifications read module roles. An authored `[ui]` key of that name is an unsupported override with no consumer, which
+  the Task 11 unsupported-override diagnostic must report.
 
 Plan 2 Task 6b-2 palette additions (command palette; same mirroring and SDK version rule). Prior constructors remain
 and default to the old meaning (not a heading, no visible-row count):

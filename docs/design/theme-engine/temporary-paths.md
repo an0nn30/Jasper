@@ -281,6 +281,40 @@ Out-of-family integration: `workspace/WindowCommandPalette` passes the chrome co
 `CommandPalette.focusQuery()`; the card owns its focus cycle (the old query-only policy), so nothing outside the
 family reaches the kit input. `workspace/WindowContent` passes `themes.appearance().context(CHROME)` (one line).
 
+## Task 6c consumer removal (pluginmanager, notificationui, Buddy, chooser prompts)
+
+Plan 2 Task 6c moved the Plugins page and its consent/removal sheets (`pluginmanager`), the notification cards, card
+layer, history panel and Errors window (`notificationui`), and the file chooser's replace/new-folder prompts
+(`windows/ChooserPrompts` in place of `JOptionPane`) to module kit views on the chrome `KitContext` (the Plugins page
+from `PageContext.kit`; notifications and the Errors window from `ThemeController.appearance().context(CHROME)`
+supplied by `JasperApplication`; the prompts from `NativeShells`). These families no longer read any
+`LegacyAppearanceDefaults` key or FlatLaf style: the former readers of `Label.font`, `Label.foreground`,
+`Label.disabledForeground`, `Actions.Red`, `Component.accentColor`, `Component.linkColor`, `List.background`,
+`List.selectionBackground`/`List.selectionInactiveBackground`, `Separator.foreground`, `Jasper.mutedForeground`,
+`Popup.dropShadowColor` (plus `FlatLaf.isLafDark()`), the `FlatClientProperties` placeholder/button-type client
+properties and `FlatSVGIcon` gear artwork were rewritten as kit descriptors (`PluginCard`, `PluginCardList`,
+`PluginDetails`, `PluginManagerPanel`, `ConfirmView`, `ConsentView`, `NotificationCard`, `CardLayer`, `HistoryPanel`,
+`HistoryRow`, `ErrorsView`, `NotificationStyle`, `TextBlock`; `WrappedText` deleted). Remaining raw Swing is layout
+only: the Plugins page and Errors window shells with unpainted split gutters (`PLUGIN_*`/`ERRORS_*` metrics, former
+0.4/0.35 resize shares), the notification card's absolute layout and painted fill/hairline (`NOTIFICATION_*`), the
+history row shells and width-following row column (`HISTORY_*`), the plugin details' read-only text and the Errors
+message/trace as Custom EDITOR content, and the manifest icon canvas as Custom PREVIEW content (`PluginIcons`).
+
+Notification aliases (ruling G8): `LegacyAppearanceDefaults` no longer publishes
+`Jasper.notification.{background,borderColor,foreground,mutedForeground,linkForeground}`, and nothing reads them. A
+theme that authors one of these keys in `[ui]` still has it copied as a raw native last-word value for that install
+only; it is an unsupported override with no consumer, and the Task 11 unsupported-override diagnostic must name it.
+
+Task 11 dependencies: SDK notification `icon` (raw `Optional<Icon>` posted through `HostedNotifications`) is omitted on
+this branch (rulings P5/G7) and the severity glyph shows instead; Task 11 makes the SDK icon named and shows it again.
+The plugin list shows the kit `plugin` tile; manifest icons show in the details header only (ruling G2; a Plan 3
+visual item). The other `LegacyAppearanceDefaults` keys stay published for their Tasks 7–10 plugin consumers until
+Task 11 removes the adapter. `WorkspaceDefaults` is unchanged (SDK palette readers, Tasks 7–11).
+
+Remaining `JOptionPane` owners outside Task 6 families: `workspace/WindowContent` (configuration diagnostics message)
+and `workspace/WorkspaceActions` (tab rename input) are Task 5 family items, recorded in `migration.csv` for the
+Task 12 audit sweep. `workspace/WindowCommandPalette` has none.
+
 ## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
 
 **Preserved native geometry (no visual change in Plan 2).** Native adapters keep their pre-migration values

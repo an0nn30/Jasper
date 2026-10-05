@@ -2,6 +2,26 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 6c implemented (pluginmanager, notificationui, Buddy adapter, chooser prompts); Task 6
+  complete pending its review** (2026-10-05). Kit first (`8dfccd78`, rulings G1/G4/G5/G7, mirrored in SDK, host
+  `KitValues`, testkit fake and `KitContractTest`, SDK version unchanged): `ListItem.contextActions` (row-owned menus,
+  offered on any row without selecting it), Shift+F10 beside the menu key, Space operating a row's only switch,
+  `Toggle.tooltip`, `Icon.severity` (INFO/WARNING/DANGER tints) with `error` and `plugin` glyphs, flowing body text in
+  vertical containers (`TEXT_FLOW_COLUMNS` 44; fixes the 6a message sheet growing to the whole message) and a host-only
+  pointer-only `KitView`; later a host-set selection becomes the keyboard row. Plugins page (`d155155b`): kit rows with
+  group headings, switch, badges and per-row menus; details with manifest icon, homepage, primary, More actions and an
+  Overview | Details segmented choice over read-only text; consent/removal kit sheets (Enter/Escape, busy ignores
+  Enter). Notifications (`1642c5d4`): card and history shells of pointer-only kit views from module roles
+  (`NOTIFICATION_*`/`HISTORY_*`), shadow from the module scrim, Errors window as a kit list with read-only message and
+  trace; the five `Jasper.notification.*` aliases are no longer published (an authored one is an unsupported override,
+  Task 11 diagnostic); Buddy facade-only assertion. Chooser replace/new-folder prompts are kit sheets (`ec7b8c2b`).
+  Behaviour preserved (install/uninstall/enable, drop-in zips, consent, restart conversation, actions once,
+  deduplication, hover/countdown); theme switches keep manager search/selection/choice/text selection/scroll and open
+  cards. Visual-only until Plan 3: list plugin tile, switch for checkbox, kit link padding (fewer wide links beside
+  More), kit stack gaps in history rows. Until Task 11: poster notification icons omitted. GUI checks for the user:
+  Plugins page look and row menus, card hover/close and link clicks keeping terminal focus, history wrapping, Errors
+  window, chooser sheets. Gate: module 355, SDK 63, testkit 122, app 2600 (1 pre-existing skip), four architecture
+  checks green.
 - **Theme engine Plan 2 Task 6b-2 implemented (command palette); review fix round 1 done, re-review pending** (2026-10-05). Carried preliminary
   fix first: Settings' `okSettings` and the chooser's `chooser.approve` window Enter bindings are disabled while OK/the
   primary is (spec §6), so Enter is then not consumed, like a disabled default button. Kit additions next (spec §6,
