@@ -178,6 +178,51 @@ class ShortcutSectionsTest {
                 var texts = new ArrayList<String>();
                 collect((Container) row, texts);
                 assertThat(texts).contains("Clear Scrollback", "Terminal", ShortcutText.format(KeyStroke.getKeyStroke("meta K")));
+                var where = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/trailing/0", JLabel.class);
+                var binding = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/action/clear_scrollback/trailing/1", JLabel.class);
+                assertThat(where.getWidth()).as("the Where column keeps its 88 px minimum").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(88));
+                assertThat(binding.getWidth()).as("the binding column keeps its 96 px minimum").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.UIScale.scale(96));
+            } finally { panel.close(); }
+        });
+    }
+
+    @Test void aRightClickOnARowSelectsItButNeverEditsOrToggles() throws Exception {
+        edt(() -> {
+            var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
+            try {
+                panel.setRows(List.of(new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "", true, "cmd+c")));
+                button(panel, "expand").doClick(0);
+                layout(panel);
+                int rows = panel.tree.rowCount();
+                for (String item : List.of("action/copy", "group/Clipboard")) {
+                    var title = KitTestSupport.require(panel, "@tree/" + ShortcutTree.ID + "/" + item + "/title", JLabel.class);
+                    var press = new java.awt.event.MouseEvent(title, java.awt.event.MouseEvent.MOUSE_PRESSED, 0,
+                        java.awt.event.InputEvent.BUTTON3_DOWN_MASK, 3, 3, 1, true, java.awt.event.MouseEvent.BUTTON3);
+                    post(press);
+                    var release = new java.awt.event.MouseEvent(title, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 3, 3, 1, false, java.awt.event.MouseEvent.BUTTON3);
+                    post(release);
+                    assertThat(panel.tree.selected()).as("a right click may select %s", item).isEqualTo(item);
+                    assertThat(panel.editor.isVisible()).as("a right click never edits").isFalse();
+                    assertThat(panel.tree.rowCount()).as("nor toggles a section").isEqualTo(rows);
+                    layout(panel);
+                }
+            } finally { panel.close(); }
+        });
+    }
+
+    @Test void theKeymapKeepsItsAccessibleNames() throws Exception {
+        edt(() -> {
+            var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
+            try {
+                panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
+                assertThat(search(panel).getAccessibleContext().getAccessibleName()).isEqualTo("Search keyboard shortcuts");
+                var tree = KitTestSupport.require(panel, ShortcutTree.ID, JScrollPane.class);
+                var treeView = (JComponent) SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.KitView.class, tree);
+                assertThat(treeView.getAccessibleContext().getAccessibleName()).isEqualTo("Keyboard shortcuts grouped by section or plugin");
+                var status = KitTestSupport.require(panel, "status", JLabel.class);
+                var statusView = (JComponent) SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.KitView.class, status);
+                assertThat(statusView.getAccessibleContext().getAccessibleName()).isEqualTo("Shortcut search status");
+                assertThat(status.getText()).contains("shortcuts");
             } finally { panel.close(); }
         });
     }

@@ -266,14 +266,26 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   A left click on any header reports `Sorted(tableId,columnId)`; the host owns the order.
 - `TableRow.muted` paints every cell in `text.placeholder` (the theme's disabled text). A present
   `TableRow.contextActions`/`TreeItem.contextActions` is that row's context menu, replacing the table's; an empty
-  list means none. Trees gain context menus this way. A menu item reports `Selected` for the row, then `Action`.
+  list means none. Trees gain context menus this way. A right click may select the row (reporting `Selected` when it
+  changes), but a context menu item of any row collection reports only its `Action` (6b-1 fix round 1): it never
+  re-reports the selection, so it cannot open, edit or navigate to the row. Hosts name the row in the item's action.
+  The mounted component carries the kit-owned menu under `KitOwnership.CONTEXT_MENU` (also on `Breadcrumbs`).
 - `TreeItem.tooltip` is the row's literal tooltip (no HTML) and accessible description; `status` adds a status dot
   after the icon; `trailing` texts are CAPTION columns at the row end, right-aligned, each as wide as its widest
-  value across the tree, before any count.
+  value across the tree and at least `TREE_DETAIL_COLUMN` (88) wide, the last column (the value) at least
+  `TREE_VALUE_COLUMN` (96), before any count.
 - Every row collection (no API): typing selects the first row whose first cell/title starts with the case-insensitive
   text typed within 1 s (`TYPE_AHEAD_MILLIS`); with MULTIPLE selection Shift-click and Shift+Up/Down select the range
   from the last row chosen without Shift; a selection the host sets (not the echo of the user's own) is scrolled into
   view once the viewport has a size. A theme change keeps selection and scroll position.
+- Tables and trees report a plain left single click on a row as `Clicked(id,itemId)` after its `Selected`; keys, right
+  clicks, right-button clicks and the second click of a double click never report it (Enter and double clicks report
+  the owner's activate action). Hosts that open or edit on a single click use `Clicked`, never the event being
+  dispatched. Item lists keep their contract (no `Clicked`).
+- Kit `ACTIONS` stacks too wide for one row wrap onto further rows at their natural widths instead of squeezing their
+  buttons (Form footers, Empty-state actions and app action rows); at normal widths they stay one row as before.
+- A single-line field never clips its text: when the designed height leaves less than the input's preferred height
+  (an enlarged font), the vertical padding shrinks around the centered input; the field keeps its designed height.
 - `ScrollPolicy.OVERLAY` (opt-in per table; a policy change remounts the control) draws a transient
   `text.tertiary` thumb over the rows only while they scroll, taking no width; a held drag stays visible, and the thumb
   hides after `OVERLAY_SCROLLBAR_IDLE_MILLIS` and when the table leaves the screen.
@@ -289,7 +301,7 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,
 `Toggled(String id,boolean checked)`, `Expanded(String id,String itemId,boolean expanded)`,
 `Reordered(String id,String itemId,int destination)`, `Removed(String id,String itemId)`, `SecretChanged(String id)`,
-`Sorted(String id,String columnId)`.
+`Sorted(String id,String columnId)`, `Clicked(String id,String itemId)`.
 Event identifier mapping (approved Task 7 ruling): `Action.id` is the configured action key
 (Button/MenuButton/menu item, Browse, or Choice PICKER opening). Every payload-bearing event
 (`Edited`, `Selected`, `Toggled`, `Expanded`, `Reordered`, `Removed`, `SecretChanged`) identifies its owning

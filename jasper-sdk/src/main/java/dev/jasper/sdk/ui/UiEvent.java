@@ -26,6 +26,12 @@ public sealed interface UiEvent {
         public Reordered { ModelChecks.id(id); ModelChecks.id(itemId); if (destination < 0) throw new IllegalArgumentException("Negative destination"); }
     }
     record SecretChanged(String id) implements UiEvent { public SecretChanged { ModelChecks.id(id); } }
+    /**
+     * A plain left single click on a table or tree row, reported after its {@link Selected}: id is the owner, itemId
+     * the row. Keys, right clicks and the second click of a double click never report it; Enter and double clicks
+     * report the owner's activate action instead.
+     */
+    record Clicked(String id, String itemId) implements UiEvent { public Clicked { ModelChecks.id(id); ModelChecks.id(itemId); } }
     /** Sort intent: id is the table owner, columnId the clicked column header; the host owns the order. */
     record Sorted(String id, String columnId) implements UiEvent { public Sorted { ModelChecks.id(id); ModelChecks.id(columnId); } }
 }

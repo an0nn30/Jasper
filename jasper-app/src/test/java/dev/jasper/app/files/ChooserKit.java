@@ -95,4 +95,21 @@ final class ChooserKit {
     static JComponent crumbs(FileChooserPanel panel) { return KitTestSupport.require(panel, "@crumbs/" + FileChooserPanel.PATH + "/crumbs", JComponent.class); }
 
     static <T extends Component> T kit(FileChooserPanel panel, String name, Class<T> type) { return KitTestSupport.require(panel, name, type); }
+
+    /**
+     * Right-clicks {@code target} as a popup trigger and presses the item labelled {@code label} in the kit context menu
+     * it built. Headless, the menu is built but never shown; its items are the real kit items.
+     */
+    static void chooseFromMenu(JComponent target, String label) {
+        var press = new MouseEvent(target, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), java.awt.event.InputEvent.BUTTON3_DOWN_MASK,
+            2, 2, 1, true, MouseEvent.BUTTON3);
+        for (var listener : target.getMouseListeners()) listener.mousePressed(press);
+        javax.swing.JPopupMenu menu = null;
+        for (java.awt.Container c = target; c != null && menu == null; c = c.getParent())
+            if (c instanceof JComponent owner && owner.getClientProperty(dev.jasper.ui.swing.KitOwnership.CONTEXT_MENU) instanceof javax.swing.JPopupMenu found) menu = found;
+        if (menu == null) throw new AssertionError("no kit context menu above " + target.getName());
+        for (var item : menu.getComponents())
+            if (item instanceof javax.swing.JMenuItem entry && entry.getText().equals(label)) { entry.doClick(0); return; }
+        throw new AssertionError("no menu item " + label);
+    }
 }

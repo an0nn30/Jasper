@@ -101,7 +101,7 @@ class BrowserKitTest {
                 assertThat(((JMenuItem) owner.popup.getComponent(0)).getText()).as("the row's own menu").isEqualTo("Pin");
                 events.clear();
                 ((JMenuItem) owner.popup.getComponent(0)).doClick(0);
-                assertThat(events).containsExactly(new UiEvent.Selected("files", Set.of("r2")), new UiEvent.Action("pin"));
+                assertThat(events).as("a row's menu reports only its action").containsExactly(new UiEvent.Action("pin"));
                 owner.context("r3", owner.canvas, 0, 0);
                 assertThat(owner.popup.getComponentCount()).as("an empty list means no menu").isZero();
             } finally { release(context); }
@@ -116,7 +116,7 @@ class BrowserKitTest {
                 assertThat(treeEvents).as("the right-clicked row is selected first").containsExactly(new UiEvent.Selected("places", Set.of("home")));
                 treeEvents.clear();
                 ((JMenuItem) owner.popup.getComponent(0)).doClick(0);
-                assertThat(treeEvents).containsExactly(new UiEvent.Selected("places", Set.of("home")), new UiEvent.Action("unpin"));
+                assertThat(treeEvents).as("never re-reports the row, so it cannot open it").containsExactly(new UiEvent.Action("unpin"));
             } finally { release(other); }
         });
     }
@@ -215,7 +215,8 @@ class BrowserKitTest {
                 assertThat(events.getLast()).isEqualTo(new UiEvent.Selected("files", Set.of("r2", "r3", "r4")));
                 var single = owner.mounted.get("r8");
                 for (var listener : single.getMouseListeners()) listener.mouseClicked(click(single, 0));
-                assertThat(events.getLast()).as("a plain click starts over").isEqualTo(new UiEvent.Selected("files", Set.of("r8")));
+                assertThat(events.subList(events.size() - 2, events.size())).as("a plain click starts over")
+                    .containsExactly(new UiEvent.Selected("files", Set.of("r8")), new UiEvent.Clicked("files", "r8"));
             } finally { release(context); }
             var singleContext = KitFixtures.context(); var singleEvents = new ArrayList<UiEvent>();
             try (var view = new KitView(singleContext, new ViewSpec(files(10, Set.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.empty())), singleEvents::add)) {
@@ -435,6 +436,115 @@ class BrowserKitTest {
                 assertThat(Composition.height(row, natural * 2 / 3)).as("the stack grows to show both rows")
                     .isGreaterThanOrEqualTo(restore.getY() + restore.getHeight());
             } finally { release(context); }
+        });
+    }
+
+    @Test void aLeftSingleClickReportsClickedWhileKeysRightClicksAndDoubleClicksDoNot() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(keymap(false)), events::add)) {
+                view.setSize(500, 300); InteractiveRowsTest.layout(view);
+                var owner = (Trees.TreeControl) view.control("keys");
+                var title = find(view, "@tree/keys/new/title", JLabel.class);
+                for (var listener : title.getMouseListeners()) listener.mouseClicked(click(title, 0));
+                assertThat(events).containsExactly(new UiEvent.Selected("keys", Set.of("new")), new UiEvent.Clicked("keys", "new"));
+                events.clear();
+                var right = new MouseEvent(title, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK, 2, 2, 1, true, MouseEvent.BUTTON3);
+                var other = find(view, "@tree/keys/scrollback/title", JLabel.class);
+                var rightOther = new MouseEvent(other, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK, 2, 2, 1, true, MouseEvent.BUTTON3);
+                for (var listener : other.getMouseListeners()) listener.mousePressed(rightOther);
+                assertThat(events).as("a right click may select but never clicks").containsExactly(new UiEvent.Selected("keys", Set.of("scrollback")));
+                for (var listener : other.getMouseListeners())
+                    listener.mouseClicked(new MouseEvent(other, MouseEvent.MOUSE_CLICKED, 0, 0, 2, 2, 1, false, MouseEvent.BUTTON3));
+                assertThat(events).as("nor does a right-button click").hasSize(1);
+                events.clear();
+                owner.canvas.getActionMap().get("DOWN").actionPerformed(null);
+                owner.canvas.getActionMap().get("ENTER").actionPerformed(null);
+                assertThat(events).as("keys select and Enter activates; no click").noneMatch(event -> event instanceof UiEvent.Clicked)
+                    .contains(new UiEvent.Action("edit"));
+                events.clear();
+                var twice = new MouseEvent(title, MouseEvent.MOUSE_CLICKED, 0, 0, 2, 2, 2, false, MouseEvent.BUTTON1);
+                for (var listener : title.getMouseListeners()) listener.mouseClicked(twice);
+                assertThat(events).as("the second click of a double click activates").containsExactly(
+                    new UiEvent.Selected("keys", Set.of("new")), new UiEvent.Action("edit"));
+                assertThat(right.isPopupTrigger()).isTrue();
+            } finally { release(context); }
+            var tables = KitFixtures.context(); var tableEvents = new ArrayList<UiEvent>();
+            try (var view = new KitView(tables, new ViewSpec(files(5, Set.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.empty())), tableEvents::add)) {
+                view.setSize(600, 300); InteractiveRowsTest.layout(view);
+                var row = ((Tables.TableControl) view.control("files")).mounted.get("r1");
+                for (var listener : row.getMouseListeners()) listener.mouseClicked(click(row, 0));
+                assertThat(tableEvents).containsExactly(new UiEvent.Selected("files", Set.of("r1")), new UiEvent.Clicked("files", "r1"));
+            } finally { release(tables); }
+            var lists = KitFixtures.context(); var listEvents = new ArrayList<UiEvent>();
+            try (var view = new KitView(lists, new ViewSpec(InteractiveRowsTest.list(List.of(InteractiveRowsTest.item(0)), Set.of())), listEvents::add)) {
+                view.setSize(400, 200); InteractiveRowsTest.layout(view);
+                var row = ((ItemLists.ListControl) view.control("servers")).mounted.get("item0");
+                for (var listener : row.getMouseListeners()) listener.mouseClicked(click(row, 0));
+                assertThat(listEvents).as("item lists keep their contract").containsExactly(new UiEvent.Selected("servers", Set.of("item0")));
+            } finally { release(lists); }
+        });
+    }
+
+    @Test void trailingTreeColumnsKeepTheirMinimumWidths() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var narrow = new Tree("keys", READY, List.of(new TreeItem("a", "Action", Optional.empty(), true, List.of(), OptionalInt.empty(), false,
+                "", Optional.empty(), List.of("G", "K"), Optional.empty())), Set.of(), Set.of(), "");
+            try (var view = new KitView(context, new ViewSpec(narrow), e -> {})) {
+                view.setSize(500, 200); InteractiveRowsTest.layout(view);
+                var detail = find(view, "@tree/keys/a/trailing/0", JLabel.class);
+                var value = find(view, "@tree/keys/a/trailing/1", JLabel.class);
+                assertThat(detail.getWidth()).as("detail column minimum").isGreaterThanOrEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.TREE_DETAIL_COLUMN));
+                assertThat(value.getWidth()).as("value column minimum").isGreaterThanOrEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.TREE_VALUE_COLUMN));
+                assertThat(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.TREE_DETAIL_COLUMN)).isEqualTo(88);
+                assertThat(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.TREE_VALUE_COLUMN)).isEqualTo(96);
+            } finally { release(context); }
+        });
+    }
+
+    @Test void formFootersAndEmptyStateActionsStillLayOutInOneRowAtNormalWidths() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var save = new Nodes.Button("save", READY, "Save", "", ButtonKind.PRIMARY, "save", "");
+            var cancel = new Nodes.Button("cancel", READY, "Cancel", "", ButtonKind.SECONDARY, "cancel", "");
+            var form = new Form("form", READY, FormKind.SHEET, "Sheet", Optional.empty(),
+                List.of(new Text("body", READY, "Body", TextRole.BODY)), Optional.empty(), List.of(cancel, save), "cancel");
+            try (var view = new KitView(context, new ViewSpec(form), e -> {})) {
+                view.setSize(480, 300); InteractiveRowsTest.layout(view);
+                var a = find(view, "save", JButton.class); var b = find(view, "cancel", JButton.class);
+                assertThat(a.getY()).as("one footer row").isEqualTo(b.getY());
+                assertThat(a.getWidth()).isPositive(); assertThat(b.getWidth()).isPositive();
+            } finally { release(context); }
+            var other = KitFixtures.context();
+            var empty = new Empty("empty", READY, new Nodes.Icon("i", READY, "folder", Hue.NONE, IconSize.EMPTY, "Empty"), "Nothing", "",
+                List.of(new Nodes.Button("one", READY, "Retry", "", ButtonKind.PRIMARY, "one", ""), new Nodes.Button("two", READY, "Cancel connection", "", ButtonKind.SECONDARY, "two", "")));
+            try (var view = new KitView(other, new ViewSpec(empty), e -> {})) {
+                view.setSize(480, 300); InteractiveRowsTest.layout(view);
+                var a = find(view, "one", JButton.class); var b = find(view, "two", JButton.class);
+                assertThat(a.getY()).as("one action row").isEqualTo(b.getY());
+                assertThat(a.getWidth()).isEqualTo(a.getPreferredSize().width);
+                assertThat(b.getWidth()).isEqualTo(b.getPreferredSize().width);
+            } finally { release(other); }
+        });
+    }
+
+    @Test void aSingleLineFieldNeverClipsAnEnlargedFont() {
+        Edt.run(() -> {
+            Object old = UIManager.get("defaultFont");
+            var context = KitFixtures.context();
+            try {
+                for (int size : new int[] {13, 18, 28}) {
+                    UIManager.put("defaultFont", new Font("Dialog", Font.PLAIN, size));
+                    try (var view = new KitView(context, KitViewTest.stack(KitViewTest.field("search", FieldKind.SEARCH, "Query")), e -> {})) {
+                        view.setSize(400, view.getPreferredSize().height); InteractiveRowsTest.layout(view);
+                        var input = editor(view, "search");
+                        assertThat(input.getHeight()).as("input at %s pt gets its preferred height", size).isGreaterThanOrEqualTo(input.getPreferredSize().height);
+                        if (size == 13) assertThat(input.getParent().getHeight()).as("normal fonts keep the designed field height")
+                            .isEqualTo(ThemePainting.height(context, dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT, dev.jasper.ui.metrics.Typography.Role.BODY));
+                    }
+                }
+            } finally { UIManager.put("defaultFont", old); release(context); }
         });
     }
 

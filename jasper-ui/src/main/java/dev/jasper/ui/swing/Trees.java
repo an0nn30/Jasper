@@ -41,6 +41,11 @@ final class Trees {
         }
 
         @Override
+        boolean reportsClicks() {
+            return true;
+        }
+
+        @Override
         Set<String> specifiedSelection() {
             return value().selectedIds();
         }
@@ -80,6 +85,11 @@ final class Trees {
             var metrics = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.CAPTION));
             int columns = items.values().stream().mapToInt(item -> item.trailing().size()).max().orElse(0);
             trailingWidths = new int[columns];
+            // Detail columns are at least TREE_DETAIL_COLUMN wide and the last (the value) at least TREE_VALUE_COLUMN.
+            for (int i = 0; i < columns; i++)
+                trailingWidths[i] = ThemePainting.metric(context(), i == columns - 1
+                        ? dev.jasper.ui.metrics.DesignMetrics.Role.TREE_VALUE_COLUMN
+                        : dev.jasper.ui.metrics.DesignMetrics.Role.TREE_DETAIL_COLUMN);
             for (var item : items.values())
                 for (int i = 0; i < item.trailing().size(); i++)
                     trailingWidths[i] = Math.max(trailingWidths[i], metrics.stringWidth(item.trailing().get(i)));

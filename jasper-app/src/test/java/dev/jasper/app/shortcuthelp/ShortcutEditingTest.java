@@ -186,6 +186,25 @@ class ShortcutEditingTest {
         });
     }
 
+    @Test void clickingTheValueStartsRecordingAgain() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var saved = new ArrayList<Map<String, Optional<String>>>();
+            var panel = panel(true, changes -> { saved.add(changes); return new CompletableFuture<>(); });
+            panel.setRows(ShortcutCatalog.rows(KeyBindings.withOverrides(true, Map.of("copy", "none")), List.of(), Map.of(), true));
+            search(panel).setText("Copy"); clickShortcut(panel);
+            button(panel, "editor.record").doClick(0);
+            assertThat(panel.capture(KeyStroke.getKeyStroke("ctrl H"))).as("recording stopped").isFalse();
+            assertThat(message(panel)).contains("Apply or OK");
+            button(panel, "editor.value").doClick(0);
+            assertThat(message(panel)).as("clicking the value records").contains("Press the new shortcut");
+            assertThat(panel.capture(KeyStroke.getKeyStroke("ctrl H"))).isTrue();
+            assertThat(button(panel, "editor.value").getText()).isEqualTo(ShortcutText.format(KeyStroke.getKeyStroke("ctrl H")));
+            button(panel, "editor.set").doClick(0);
+            assertThat(saved).containsExactly(Map.of("copy", Optional.of("ctrl+h")));
+            panel.close();
+        });
+    }
+
     /** Lays out every container, hidden ones included, as Container.validateTree does. */
     private static void layoutAll(java.awt.Container container) {
         container.doLayout();

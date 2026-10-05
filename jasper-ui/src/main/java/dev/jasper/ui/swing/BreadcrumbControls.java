@@ -57,6 +57,7 @@ final class BreadcrumbControls {
             surface.add(cards, BorderLayout.CENTER);
             component.add(surface, BorderLayout.CENTER);
             popup = new Menus.Popup(context());
+            component.putClientProperty(KitOwnership.CONTEXT_MENU, popup);
             own(() -> { popup.setVisible(false); clearPopup(); });
             own(() -> { crumbCleanup.forEach(Runnable::run); crumbCleanup.clear(); });
 

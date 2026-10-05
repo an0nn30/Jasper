@@ -20,7 +20,6 @@ import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.EventQueue;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
@@ -29,7 +28,6 @@ import java.awt.Shape;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseEvent;
 import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
 import java.nio.file.Files;
@@ -111,6 +109,7 @@ public final class FileChooserPanel extends JPanel {
     private final Map<String, Location> crumbTargets = new LinkedHashMap<>();
     private final List<String> crumbLabels = new ArrayList<>();
     private String placeSelection;
+    private String placeFocus;
     private String name = "";
     private String status = "";
     private boolean editingPath;
@@ -239,8 +238,6 @@ public final class FileChooserPanel extends JPanel {
     String previewText() { return previewText.getText(); }
     String pathText() { return String.join(" › ", crumbLabels); }
     List<RoundedPane> roundedPanes() { return List.copyOf(panes); }
-    /** Delivers a menu item's action as the kit reports it; context menus cannot open headlessly. */
-    void act(String actionId) { event(new UiEvent.Action(actionId)); }
     JSplitPane split() { return split; }
 
     private JComponent toolbar() {
@@ -381,11 +378,13 @@ public final class FileChooserPanel extends JPanel {
             case UiEvent.Selected selected -> {
                 switch (selected.id()) {
                     case FILES -> { if (!updating) selectionChanged(selected.ids()); }
-                    case PLACES -> placeSelected(selected.ids().stream().findFirst().orElse(null));
+                    // Keys and right clicks only move the places highlight; a left click or Enter opens the place.
+                    case PLACES -> placeFocus = selected.ids().stream().findFirst().orElse(null);
                     case PATH -> selected.ids().stream().findFirst().map(crumbTargets::get).ifPresent(model::navigate);
                     default -> { }
                 }
             }
+            case UiEvent.Clicked clicked when clicked.id().equals(PLACES) -> openPlace(clicked.itemId());
             case UiEvent.Sorted sorted -> {
                 switch (sorted.columnId()) {
                     case "name" -> model.sortBy(ChooserModel.Column.NAME);
@@ -410,6 +409,7 @@ public final class FileChooserPanel extends JPanel {
             case "refresh" -> model.refresh();
             case "newFolder" -> newFolder();
             case "open" -> activateSelection();
+            case "place.open" -> openPlace(placeFocus);
             case "approve" -> approve();
             case "cancel" -> cancel();
             case "center" -> centerAction.run();
@@ -428,12 +428,14 @@ public final class FileChooserPanel extends JPanel {
         return Optional.empty();
     }
 
-    private void placeSelected(String id) {
-        // The kit selects a row before showing its menu; a right click names the place without going there.
-        boolean menu = EventQueue.getCurrentEvent() instanceof MouseEvent mouse && mouse.isPopupTrigger();
+    /** Shows a place; the place already shown is not listed again (a double click reports its click, then Enter's action). */
+    private void openPlace(String id) {
         Places.Place place = placeIds.get(id);
-        if (place != null && !menu && !updating) model.navigate(place.location());
-        else syncNavigationSelection();
+        if (place == null || place.location().equals(model.location())) {
+            syncNavigationSelection();
+            return;
+        }
+        model.navigate(place.location());
     }
 
     // ---- Model to views ---------------------------------------------------------------------------------------------
@@ -599,7 +601,7 @@ public final class FileChooserPanel extends JPanel {
         }
         if (children != null) roots.add(branch(headingId, heading, children));
         return new ViewSpec(new Nodes.Tree(PLACES, ControlState.READY, roots, open,
-            placeSelection == null ? Set.of() : Set.of(placeSelection), ""));
+            placeSelection == null ? Set.of() : Set.of(placeSelection), "place.open"));
     }
 
     private static TreeItem branch(String id, String heading, List<TreeItem> children) {

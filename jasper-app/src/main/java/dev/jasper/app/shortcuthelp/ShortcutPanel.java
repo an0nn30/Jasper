@@ -11,11 +11,9 @@ import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.EventQueue;
 import java.awt.KeyEventDispatcher;
 import java.awt.KeyboardFocusManager;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseEvent;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +63,8 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         tools = new KitView(context, toolsSpec(), this::event);
         list = new KitView(context, new ViewSpec(tree.descriptor()), this::event);
         footer = new KitView(context, statusSpec(), this::event);
+        list.getAccessibleContext().setAccessibleName("Keyboard shortcuts grouped by section or plugin");
+        footer.getAccessibleContext().setAccessibleName("Shortcut search status");
         add(top, BorderLayout.NORTH);
         var sections = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP)));
         sections.setOpaque(false);
@@ -106,19 +106,17 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
                     case "clear" -> { captured = null; query = ""; filter(); top.focus(SEARCH); }
                     case "expand" -> { tree.expandSections(true); render(); }
                     case "collapse" -> { tree.expandSections(false); render(); }
-                    case "edit" -> { if (!(EventQueue.getCurrentEvent() instanceof MouseEvent)) activate(tree.selected()); }
+                    case "edit" -> activate(tree.selected());
                     default -> { }
                 }
             }
+            // Keys and right clicks only select; a left click, Enter or a double click edits a shortcut or opens or
+            // closes a section, as the old tree did.
             case UiEvent.Selected selected when selected.id().equals(ShortcutTree.ID) -> {
-                String id = selected.ids().stream().findFirst().orElse(null);
-                tree.select(id);
-                // A single click edits a shortcut or opens or closes a section, as the old tree did; arrow keys,
-                // type-ahead and the second click of a double click only select. The kit reports Selected while it
-                // dispatches the click, so the event being dispatched tells a click from a key.
-                if (EventQueue.getCurrentEvent() instanceof MouseEvent mouse && mouse.getClickCount() == 1) activate(id);
-                else render();
+                tree.select(selected.ids().stream().findFirst().orElse(null));
+                render();
             }
+            case UiEvent.Clicked clicked when clicked.id().equals(ShortcutTree.ID) -> activate(clicked.itemId());
             case UiEvent.Expanded expanded when expanded.id().equals(ShortcutTree.ID) -> { tree.expanded(expanded.itemId(), expanded.expanded()); render(); }
             default -> { }
         }
@@ -161,7 +159,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
 
     private ViewSpec topSpec() {
         var field = new Nodes.Field(SEARCH, new ControlState(true, !recording, false, ""), Nodes.FieldKind.SEARCH, query,
-            "Search actions, plugins, or Cmd+Shift+H", "Find a shortcut", "");
+            "Search actions, plugins, or Cmd+Shift+H", "Search keyboard shortcuts", "");
         var buttons = new Nodes.Stack("search.actions", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
             new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record shortcut", "", Nodes.ButtonKind.SECONDARY, "record", ""),
             new Nodes.Button("clear", ControlState.READY, "Clear", "", Nodes.ButtonKind.SECONDARY, "clear", "")));

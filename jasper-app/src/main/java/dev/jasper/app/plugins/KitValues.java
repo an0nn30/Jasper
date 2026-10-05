@@ -67,5 +67,6 @@ final class KitValues {
  case dev.jasper.ui.model.UiEvent.Reordered n -> new dev.jasper.sdk.ui.UiEvent.Reordered(n.id(), n.itemId(), n.destination());
  case dev.jasper.ui.model.UiEvent.SecretChanged n -> new dev.jasper.sdk.ui.UiEvent.SecretChanged(n.id());
  case dev.jasper.ui.model.UiEvent.Sorted n -> new dev.jasper.sdk.ui.UiEvent.Sorted(n.id(), n.columnId());
+ case dev.jasper.ui.model.UiEvent.Clicked n -> new dev.jasper.sdk.ui.UiEvent.Clicked(n.id(), n.itemId());
  }; }
 }

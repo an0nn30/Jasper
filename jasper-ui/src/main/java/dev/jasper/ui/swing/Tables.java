@@ -57,6 +57,11 @@ final class Tables {
         }
 
         @Override
+        boolean reportsClicks() {
+            return true;
+        }
+
+        @Override
         Set<String> specifiedSelection() {
             return value().selectedIds();
         }

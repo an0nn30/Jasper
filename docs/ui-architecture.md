@@ -128,7 +128,9 @@ header clicks as `Sorted`; rows can be muted and carry their own context menu; t
 dot and aligned trailing columns; every row collection has type-ahead, Shift ranges for multiple selection and
 scrolls a host-set selection into view; tables can opt into the OVERLAY scroll policy; and `Breadcrumbs` is the kit
 path control with tail overflow and a typed-path mode. The named glyph vocabulary gains `home`, `desktop` and
-`preview`.
+`preview`. Tables and trees report a left single click as `Clicked`; context menu items report only their action
+(never the selection); ACTIONS stacks wrap instead of squeezing their buttons; trailing tree columns keep minimum
+widths; single-line fields never clip an enlarged font.
 
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).

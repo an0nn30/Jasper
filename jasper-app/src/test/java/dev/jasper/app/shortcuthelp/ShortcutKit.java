@@ -73,6 +73,15 @@ final class ShortcutKit {
         if (!loop.enter()) throw new AssertionError("could not wait for the click");
     }
 
+    /** Delivers any mouse event through the system event queue and waits for it, as a real one is delivered. */
+    static void post(MouseEvent event) {
+        var queue = Toolkit.getDefaultToolkit().getSystemEventQueue();
+        var loop = queue.createSecondaryLoop();
+        queue.postEvent(event);
+        EventQueue.invokeLater(loop::exit);
+        if (!loop.enter()) throw new AssertionError("could not wait for the event");
+    }
+
     static void layout(Component root) {
         if (root.getWidth() == 0) root.setSize(900, 600);
         KitTestSupport.layout(root);

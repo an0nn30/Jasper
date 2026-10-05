@@ -231,6 +231,22 @@ final class TextFields {
             int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, role);
             return new Dimension(size.width, multiline ? Math.max(size.height, height) : height);
         }
+        /**
+         * A single-line input never clips its text: when the designed height leaves less than the input's preferred
+         * height, the vertical padding shrinks (the input stays centered) instead of the input.
+         */
+        @Override public Insets getInsets() { return fitted(super.getInsets()); }
+        @Override public Insets getInsets(Insets reuse) {
+            Insets fitted = fitted(super.getInsets(reuse));
+            if (reuse == null) return fitted;
+            reuse.set(fitted.top, fitted.left, fitted.bottom, fitted.right);
+            return reuse;
+        }
+        private Insets fitted(Insets base) {
+            if (multiline || input == null || getHeight() <= 0) return base;
+            int room = Math.max(0, (getHeight() - input.getPreferredSize().height) / 2);
+            return new Insets(Math.min(base.top, room), base.left, Math.min(base.bottom, room), base.right);
+        }
         @Override public void paint(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); }

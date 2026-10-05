@@ -272,10 +272,10 @@ class InteractiveRowsTest {
                         events.clear();
                         owner.context("item1", owner.canvas, 0, 0);
                         ((JMenuItem) owner.popup.getComponent(0)).doClick(0);
+                        // The menu acts on the current selection without re-reporting it.
                         assertThat(events)
-                                .containsExactly(
-                                        new UiEvent.Selected("servers", Set.of("item0", "item1")),
-                                        new UiEvent.Action("delete-selected"));
+                                .containsExactly(new UiEvent.Action("delete-selected"));
+                        assertThat(owner.selected).containsExactlyInAnyOrder("item0", "item1");
                         owner.select("item0", false);
                         assertThat(owner.mounted.get("item1").check.isSelected()).isFalse();
                     } finally {
@@ -677,10 +677,8 @@ class InteractiveRowsTest {
                         events.clear();
                         owner.context("item0", owner.canvas, 0, 0);
                         ((JMenuItem) owner.popup.getComponent(0)).doClick(0);
-                        assertThat(events)
-                                .containsExactly(
-                                        new UiEvent.Selected("servers", Set.of("item0")),
-                                        new UiEvent.Action("edit-action"));
+                        // The row is already selected, so the menu reports only its action.
+                        assertThat(events).containsExactly(new UiEvent.Action("edit-action"));
                         events.clear();
                         rebind[0] = true;
                         owner.activate("item0");

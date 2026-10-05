@@ -137,5 +137,7 @@ class KitValuesTest {
         assertThatThrownBy(() -> new Breadcrumbs("path", ControlState.READY, List.of(crumb), "Location", true, "/", "edit", "go", "")).isInstanceOf(IllegalArgumentException.class);
         assertThat(new Table("t", ControlState.READY, List.of(), List.of(), Set.of(), "", List.of()).scroll()).isEqualTo(ScrollPolicy.STANDARD);
         assertThatThrownBy(() -> new UiEvent.Sorted("files", " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new UiEvent.Clicked("tree", " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(new UiEvent.Clicked("tree", "leaf").itemId()).isEqualTo("leaf");
     }
 }

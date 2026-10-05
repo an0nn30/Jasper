@@ -14,6 +14,13 @@
   on the value to record, Save-mode dimming, crumb pin menus, free-area/Cmd+L typed path, Enter as the default action
   (`FileChooserPanel.installDefaultAction`, wired in `NativeShells`). Visual-only until Plan 3: multi-select
   checkboxes, preview switch, field labels above search fields. `NativeShells`' `JOptionPane` prompts go to 6c.
+  Fix round 1 (controller rulings): tables/trees report a left single click as the new `UiEvent.Clicked` (mirrored in
+  SDK, host and fake) and every row context menu reports only its action, so app code no longer inspects the dispatched
+  event; a right click never opens a place or edits a shortcut, and pinning never navigates. Keymap trailing columns
+  keep their 88/96 minima (`TREE_DETAIL_COLUMN`/`TREE_VALUE_COLUMN`); single-line kit fields no longer squeeze their
+  input; ACTIONS wrapping is documented; Keymap accessible names restored; the chooser's `act` test hook is gone
+  (tests press the real kit menu items via `KitOwnership.CONTEXT_MENU`). Places open on a left click or Enter; arrow
+  keys only move the highlight.
 - **Theme engine Plan 2 Task 6a implemented (settingsui, restart, themesui); review pending** (2026-10-05).
   Controller ruling (spec §6: extend the kit for missing standard controls) added module kit capabilities first
   (`0008eb49`): `TreeItem` count/emphasized, `SettingRow`/`FormRow` `highlighted` with `KitView.reveal` (no focus move),

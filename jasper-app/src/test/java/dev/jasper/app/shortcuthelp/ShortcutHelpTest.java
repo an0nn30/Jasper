@@ -155,8 +155,7 @@ class ShortcutHelpTest {
                 assertThat(search(panel).getWidth()).isGreaterThan(200);
                 var record = button(panel, "record");
                 assertThat(record.getWidth()).isGreaterThanOrEqualTo(record.getPreferredSize().width);
-                var field = dev.jasper.app.testsupport.KitTestSupport.require(panel, ShortcutPanel.SEARCH, javax.swing.JComponent.class);
-                assertThat(field.getHeight()).as("the search field gets its full height").isGreaterThanOrEqualTo(field.getPreferredSize().height);
+                assertThat(search(panel).getHeight()).as("the search text is never squeezed").isGreaterThanOrEqualTo(search(panel).getPreferredSize().height);
             } finally {
                 panel.close();
                 themes.configure(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.config.UiFontConfig.defaults());

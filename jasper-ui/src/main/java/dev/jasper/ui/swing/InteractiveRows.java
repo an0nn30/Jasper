@@ -52,6 +52,7 @@ final class InteractiveRows {
             scroll.getViewport().setOpaque(false);
             scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
             popup = new Menus.Popup(context());
+            scroll.putClientProperty(KitOwnership.CONTEXT_MENU, popup);
             javax.swing.event.ChangeListener listener = e -> sync();
             scroll.getViewport().addChangeListener(listener);
             own(() -> scroll.getViewport().removeChangeListener(listener));
@@ -253,6 +254,17 @@ final class InteractiveRows {
             emit(new UiEvent.Selected(node.id(), selected));
         }
 
+        /** Whether a plain left single click also reports {@link UiEvent.Clicked} (tables and trees). */
+        boolean reportsClicks() {
+            return false;
+        }
+
+        /** A plain left single click: selects the row, then, for tables and trees, reports the click. */
+        void click(String id, boolean toggle) {
+            select(id, toggle);
+            if (reportsClicks() && stillCurrent(id)) emit(new UiEvent.Clicked(node.id(), id));
+        }
+
         /** Shift-click: with multiple selection, every row from the anchor through {@code id}; otherwise a plain select. */
         void range(String id) {
             if (!multiple() || anchor == null || indexOf(anchor) < 0) { select(id, false); return; }
@@ -366,7 +378,8 @@ final class InteractiveRows {
                                                 false));
                 ActionListener listener =
                         e -> {
-                            emit(new UiEvent.Selected(node.id(), selected));
+                            // A row's menu acts on that row (its action names it); it never re-reports the
+                            // selection, so choosing an item cannot also open or navigate to the row.
                             if (stillCurrent(id) && contextActions(id).contains(item))
                                 emit(new UiEvent.Action(item.action()));
                         };
@@ -545,7 +558,7 @@ final class InteractiveRows {
                             if (!SwingUtilities.isLeftMouseButton(e)) return;
                             if (e.getClickCount() == 2) owner.activate(id);
                             else if (e.isShiftDown()) owner.range(id);
-                            else owner.select(id, e.isControlDown() || e.isMetaDown());
+                            else owner.click(id, e.isControlDown() || e.isMetaDown());
                             owner.canvas.requestFocusInWindow();
                         }
                     };
@@ -615,7 +628,7 @@ final class InteractiveRows {
                                     if (SwingUtilities.isLeftMouseButton(e)) {
                                         if (e.getClickCount() == 2) owner.activate(id);
                                         else if (e.isShiftDown()) owner.range(id);
-                                        else owner.select(id, e.isControlDown() || e.isMetaDown());
+                                        else owner.click(id, e.isControlDown() || e.isMetaDown());
                                         owner.canvas.requestFocusInWindow();
                                     }
                                 }

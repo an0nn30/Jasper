@@ -7,7 +7,6 @@ import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.KitTestSupport;
 import dev.jasper.ui.model.Nodes;
-import dev.jasper.ui.model.TreeItem;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.ThemeRoute;
@@ -19,7 +18,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Stream;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -193,27 +191,42 @@ class FileChooserPanelTest {
         assertThat(panel.pathText()).endsWith("docs");
     }
 
-    @Test void pinMenusNameTheirFolderAndPinWithoutNavigating() {
+    @Test void pinMenusPinTheirFolderWithoutNavigating() {
         var panel = panel(OPEN, Optional.empty());
-        var docs = table(panel).rows().get(rows(panel).indexOf("docs"));
         assertThat(table(panel).rows().get(rows(panel).indexOf("notes.txt")).contextActions()).as("files have no pin menu").contains(List.of());
-        var pin = docs.contextActions().orElseThrow().getFirst();
-        assertThat(pin.label()).isEqualTo("Pin");
         String shown = panel.pathText();
-        panel.act(pin.action());
+        var docsCell = kit(panel, "@table/files/" + table(panel).rows().get(rows(panel).indexOf("docs")).id() + "/name", JLabel.class);
+        chooseFromMenu(docsCell, "Pin");
         assertThat(prefs.pinned()).containsExactly(here("docs"));
-        assertThat(panel.pathText()).as("pinning does not navigate").isEqualTo(shown);
-        assertThat(table(panel).rows().get(rows(panel).indexOf("docs")).contextActions().orElseThrow().getFirst().label()).isEqualTo("Unpin");
-        var tree = (Nodes.Tree) view(panel, FileChooserPanel.PLACES).spec().root();
-        TreeItem pinned = tree.roots().stream().flatMap(root -> Stream.concat(Stream.of(root), root.children().stream()))
-            .filter(item -> item.id().equals(panel.placeId(place(panel, "docs")))).findFirst().orElseThrow();
-        assertThat(pinned.tooltip()).isEqualTo(dir.resolve("docs").toString());
-        panel.act(pinned.contextActions().orElseThrow().getFirst().action());
-        assertThat(prefs.pinned()).isEmpty();
-        var crumbs = ((Nodes.Breadcrumbs) view(panel, FileChooserPanel.PATH).spec().root()).crumbs();
-        panel.act(crumbs.getLast().contextActions().getFirst().action());
+        assertThat(panel.pathText()).as("pinning a row does not open it").isEqualTo(shown);
+        assertThat(rows(panel)).contains("notes.txt");
+        layout(panel);
+        var docsPlace = place(panel, "docs");
+        var placeTitle = kit(panel, "@tree/places/" + panel.placeId(docsPlace) + "/title", JLabel.class);
+        assertThat(placeTitle.getToolTipText()).isEqualTo(dir.resolve("docs").toString());
+        chooseFromMenu(placeTitle, "Unpin");
+        assertThat(prefs.pinned()).as("unpinned from the places menu").isEmpty();
+        assertThat(panel.pathText()).as("the place's menu does not navigate to it").isEqualTo(shown);
+        assertThat(rows(panel)).containsExactly("docs", "notes.txt", "todo.md");
+        layout(panel);
+        var crumbButtons = java.util.Arrays.stream(crumbs(panel).getComponents()).filter(c -> c instanceof JButton).map(JButton.class::cast).toList();
+        chooseFromMenu(crumbButtons.getLast(), "Pin");
         assertThat(prefs.pinned()).as("a crumb's menu pins the folder it names").containsExactly(Location.local(dir));
         assertThat(panel.pathText()).isEqualTo(shown);
+    }
+
+    @Test void aRightClickOnAPlaceNeverOpensItButALeftClickOrEnterDoes() {
+        var panel = panel(OPEN, Optional.empty());
+        panel.togglePin(here("docs"));
+        layout(panel);
+        String shown = panel.pathText();
+        var title = kit(panel, "@tree/places/" + panel.placeId(place(panel, "docs")) + "/title", JLabel.class);
+        var press = new java.awt.event.MouseEvent(title, java.awt.event.MouseEvent.MOUSE_PRESSED, 0, java.awt.event.InputEvent.BUTTON3_DOWN_MASK, 2, 2, 1, true, java.awt.event.MouseEvent.BUTTON3);
+        for (var listener : title.getMouseListeners()) listener.mousePressed(press);
+        assertThat(panel.pathText()).as("right click").isEqualTo(shown);
+        var canvas = (JComponent) kit(panel, FileChooserPanel.PLACES, javax.swing.JScrollPane.class).getViewport().getView();
+        canvas.getActionMap().get(canvas.getInputMap().get(KeyStroke.getKeyStroke("ENTER"))).actionPerformed(null);
+        assertThat(panel.pathText()).as("Enter opens the highlighted place").endsWith("docs");
     }
 
     @Test void theHiddenFilesToggleIsRememberedAndTypingSelects() throws IOException {
