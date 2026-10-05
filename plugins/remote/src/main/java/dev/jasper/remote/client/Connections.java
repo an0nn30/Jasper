@@ -247,6 +247,35 @@ public final class Connections {
         return shared != null && shared.session != null && shared.session.isOpen() && shared.session.isAuthenticated();
     }
 
+    /**
+     * UI-only: borrow any authenticated session to a saved host (a shared one first, else a dedicated shell's) without
+     * opening connections or prompting. Background work uses it, so it never asks the user to sign in.
+     */
+    public Optional<SessionLease> existingLease(UUID hostId) {
+        if (closed) return Optional.empty();
+        Shared found = null;
+        for (Shared shared : sessions.values()) {
+            if (!borrowable(shared, hostId)) continue;
+            if (!shared.dedicated()) { found = shared; break; }
+            if (found == null) found = shared;
+        }
+        if (found == null) return Optional.empty();
+        Shared lent = found;
+        lent.refs++;
+        if (lent.cancelLinger != null) { lent.cancelLinger.run(); lent.cancelLinger = null; }
+        return Optional.of(new SessionLease(lent.identity, lent.session, () -> ui.execute(() -> release(lent))));
+    }
+
+    /** UI-only: whether any authenticated session to a saved host is open, so background work can use it. */
+    public boolean authenticated(UUID hostId) {
+        return !closed && sessions.values().stream().anyMatch(shared -> borrowable(shared, hostId));
+    }
+
+    private static boolean borrowable(Shared shared, UUID hostId) {
+        return shared.host.id().equals(hostId) && !shared.evicted && shared.session != null && shared.session.isOpen()
+            && shared.session.isAuthenticated();
+    }
+
     public CompletableFuture<SessionLease> lease(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status) {
         return lease(identity, owner, status, false);
     }
