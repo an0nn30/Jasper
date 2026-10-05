@@ -161,6 +161,20 @@
   completions follow request order without changing other rows. Both P2 regressions reproduced;
   final affected default/2x: **15 tests each, 0 failures/errors/skips**. Earlier 234-module result is
   pre-fix evidence; this bounded review wave ran only affected tests as requested.
+  Tasks 11–12 integrated implementation/self-review complete (joint independent review pending):
+  full 26-node SDK projection at SDK 0.14.1, eight shared host/fake kit contracts, real owned FakeKit,
+  lazy host adapters, explicit old-app theme value bridge, same-variant semantic publication and
+  specialized content slots. Cross-owner view/widget reuse and ordinary control trees are rejected;
+  custom contentId uniqueness is now validated in both vocabularies. Editor semantic/syntax/opacity
+  refresh preserves document/caret through the existing Appearance APIs. Actual fail-start/stop/restart
+  ownership and sanitized throwing callbacks are covered. Reentrant content disposal now publishes
+  replacement control ownership before callbacks, so callback-triggered close cleans the new controls.
+  Approved additions are bounded KitThemeBridge/SDK IconPaths helpers and generic specialized-root
+  validation; no plugin-id allowlist, widget reflection, SDK version bump or consumer migration.
+  Final checks: SDK **59**, testkit **105**, selected app suites **101**, full UI **238** tests,
+  all zero failures/errors/skips; SDK JavaDoc and UI/SDK/app/plugin architecture gates pass.
+  The shared Appearance contract now expects onChanged for workspace-only theme changes; opacity-only
+  notifications remain workspace-specific. Full repository check and gallery remain Tasks 14/13.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

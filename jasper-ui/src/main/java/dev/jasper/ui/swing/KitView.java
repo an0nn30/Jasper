@@ -12,7 +12,7 @@ import javax.swing.*;
 
 /**
  * EDT-confined descriptor view. The view owns controls and subscriptions; the host owns its context.
- * Specialized families are added by their assigned kit tasks and currently fail explicitly.
+ * Ordinary controls and explicitly registered specialized content share the same owned lifetime.
  */
 public final class KitView extends JPanel implements AutoCloseable {
     private final KitContext context;
@@ -66,8 +66,8 @@ public final class KitView extends JPanel implements AutoCloseable {
     void revealSecrets(SecretFields.SecretControl source, boolean revealed) { reconciler.revealSecrets(source, revealed); }
     /** Focus a control; an offscreen inline row control is first scrolled into view and mounted. */
     public void focus(String id) { requireOpen(); reconciler.control(Objects.requireNonNull(id)).focusTarget().requestFocusInWindow(); }
-    /** Register only explicit Custom content; ordinary Swing trees cannot enter through this method. */
-    public void registerContent(String id, JComponent component, AutoCloseable lifetime) { requireOpen(); throw new UnsupportedOperationException("Custom content is not implemented yet"); }
+    /** Register by Custom.contentId (not node id); ordinary Swing trees cannot enter through this method. */
+    public void registerContent(String id, JComponent component, AutoCloseable lifetime) { requireOpen(); reconciler.registerContent(id, Objects.requireNonNull(component), Objects.requireNonNull(lifetime)); }
     /** Borrow the mounted kit header; ownership remains with the view. */
     public JComponent panelHeader(String panelId) { requireOpen(); return panel(panelId).header.component; }
     /** Host integration slot, separate from the descriptor event callback. */

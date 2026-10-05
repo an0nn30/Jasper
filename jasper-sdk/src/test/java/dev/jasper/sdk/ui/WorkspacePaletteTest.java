@@ -69,6 +69,7 @@ class WorkspacePaletteTest {
 
     @Test void legacyCustomHostInheritsCompleteDefaults() {
         Appearance legacy = new Appearance() {
+            public java.awt.Color color(SemanticColor role) { return java.awt.Color.BLACK; }
             public Variant variant() { return Variant.LIGHT; }
             public Subscription onChanged(java.util.function.Consumer<Variant> handler) { return () -> {}; }
             public Icon icon(String path) { return new ImageIcon(); }

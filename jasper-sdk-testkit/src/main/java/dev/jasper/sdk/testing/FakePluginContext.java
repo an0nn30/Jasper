@@ -52,6 +52,8 @@ public final class FakePluginContext implements PluginContext {
     volatile State state = State.STARTING;
     final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
     private final List<Subscription> owned = new ArrayList<>();
+    private final FakeKit kit;
+    @Override public FakeKit kit() { return kit; }
     final FakeTerminals terminals;
     final FakeUi ui;
     final FakePalette palette;
@@ -60,6 +62,7 @@ public final class FakePluginContext implements PluginContext {
     final dev.jasper.sdk.notifications.Notifications notifications;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
+        this.kit = new FakeKit(info.id());
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
         this.terminals = new FakeTerminals(this, host.workspace);
         this.ui = new FakeUi(host, this);
@@ -74,6 +77,7 @@ public final class FakePluginContext implements PluginContext {
     }
 
     void closeOwned() {
+        kit.close();
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
@@ -196,6 +200,7 @@ public final class FakePluginContext implements PluginContext {
     /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
     @Override public Appearance appearance() {
         return new Appearance() {
+            @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { host.requireAppearanceThread(); return host.semanticColor(role); }
             @Override public Variant variant() { return ui.variant(); }
             @Override public Variant workspaceVariant() { return host.workspaceAppearance().variant(); }
             @Override public dev.jasper.sdk.ui.WorkspacePalette workspacePalette() {
@@ -217,7 +222,7 @@ public final class FakePluginContext implements PluginContext {
                 var subscription = host.subscribeWorkspace(info.id(), handler); own(subscription); return subscription;
             }
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
-                return events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant()));
+                requireOpen();var subscription=host.subscribeAppearance(info.id(),handler);own(subscription);return subscription;
             }
             @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.IconName name) {
                 return new FakeNamedIcon(java.util.Objects.requireNonNull(name, "name"));

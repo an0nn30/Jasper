@@ -6,10 +6,12 @@ import java.util.function.Consumer;
 import javax.swing.Icon;
 
 /**
- * The application's look. Plugins build ordinary Swing components and the global look and feel applies
- * to them; this is for the few things that must follow the theme by hand.
+ * Host-owned appearance values. Declarative views follow these automatically; specialized content
+ * subscribes to refresh its domain palettes.
  */
 public interface Appearance {
+    /** Read a canonical semantic color on the UI thread. @param role canonical role @return current color */
+    java.awt.Color color(SemanticColor role);
     /**
      * The current variant; safe from any thread.
      *
@@ -65,7 +67,8 @@ public interface Appearance {
     }
 
     /**
-     * Runs the handler on the UI thread after each change of variant.
+     * Runs the handler on the UI thread after every chrome or workspace theme change, including
+     * color changes within the same variant. Workspace opacity changes use onWorkspaceChanged.
      *
      * @param handler receives the new variant
      * @return the registration

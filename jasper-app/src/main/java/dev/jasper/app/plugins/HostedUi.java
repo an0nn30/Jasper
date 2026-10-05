@@ -71,6 +71,9 @@ final class HostedUi {
     private record Context(WindowHandle window, Optional<PaneHandle> pane) implements ActionContext { }
 
     private volatile dev.jasper.app.appearance.ResolvedTheme appearanceSnapshot;
+    private dev.jasper.app.appearance.ResolvedTheme kitSource;
+    private dev.jasper.ui.theme.ThemePair kitSnapshot;
+    private final List<Consumer<Variant>> themeHandlers = new ArrayList<>();
     private final List<Consumer<Variant>> workspaceHandlers = new ArrayList<>();
 
     private final String pluginId;
@@ -119,6 +122,7 @@ final class HostedUi {
             var registration = subscribe.apply(next -> {
                 var previous = appearanceSnapshot;
                 appearanceSnapshot = next;
+                if (!previous.equals(next)) for(var handler:List.copyOf(themeHandlers)) if(themeHandlers.contains(handler) && open.getAsBoolean()) containment.run(pluginId,"appearance",() -> handler.accept(next.chrome().dark()?Variant.DARK:Variant.LIGHT));
                 if (!previous.workspace().equals(next.workspace())) announceWorkspace();
             });
             closers.add(registration::close);
@@ -301,8 +305,16 @@ final class HostedUi {
         };
     }
 
+    dev.jasper.ui.theme.ThemePair kitThemes() {
+        var source=appearanceSnapshot;
+        if(source==null)return KitThemeBridge.fallback(variant.get()==Variant.DARK);
+        if(kitSnapshot==null || source!=kitSource){kitSnapshot=KitThemeBridge.pair(source);kitSource=source;}
+        return kitSnapshot;
+    }
+
     Appearance appearance() {
         return new Appearance() {
+            @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { requireUi("color"); return kitThemes().chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.valueOf(java.util.Objects.requireNonNull(role).name())); }
             @Override public Variant variant() {
                 var snapshot = appearanceSnapshot;
                 return snapshot == null ? variant.get() : snapshot.chrome().dark() ? Variant.DARK : Variant.LIGHT;
@@ -339,7 +351,10 @@ final class HostedUi {
             }
             @Override public Subscription onChanged(Consumer<Variant> handler) {
                 guard("onChanged");
-                return themeSubscriber.apply(java.util.Objects.requireNonNull(handler, "handler"));
+                java.util.Objects.requireNonNull(handler,"handler");
+                if(appearanceSnapshot==null)return themeSubscriber.apply(handler);
+                var closed=new AtomicBoolean();Consumer<Variant> guarded=v -> {if(!closed.get())handler.accept(v);};themeHandlers.add(guarded);
+                var removal=tracked(() -> {closed.set(true);themeHandlers.remove(guarded);});return () -> {closed.set(true);removal.close();};
             }
             @Override public Icon icon(dev.jasper.sdk.ui.IconName name) {
                 return AppIcons.named(java.util.Objects.requireNonNull(name, "name").name());

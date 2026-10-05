@@ -298,7 +298,9 @@ Secret arrays passed to `withSecret` are temporary copies zeroed in `finally`, i
 throw. The Vault explicitly clones/transfers a needed value to its existing async operation owner.
 `update` diffs stable ids/kinds; reused controls preserve documents/caret/scroll/focus. Removing an id
 disposes it and erases its secret. Changing a kind replaces just that control. Registering content
-requires a matching Custom node; ordinary component trees cannot use this API.
+uses `Custom.contentId`, not its node id, and requires a matching Custom node. Content ids are unique
+within the view. Stable node id/kind/contentId retains registration; replacing any identity closes it.
+Ordinary component trees cannot use this API.
 All methods require EDT except idempotent close may enqueue disposal from another thread.
 `setAvailableHeight` is module/app integration only and is not projected into UiView or descriptors.
 The app supplies a positive logical content height excluding native chrome; the latest supplied
@@ -341,6 +343,24 @@ values as host-provided custom-content values without static UIManager lookup.
 New SDK custom content is explicit `CustomContent(String id,CustomKind kind,JComponent component,
 AutoCloseable lifetime)` and receives semantic appearance/opacity refreshes. Only approved custom
 content code may construct the specialized Swing widget; other plugin UI uses descriptors.
+Task 11–12 execution ruling: this is a generic capability, without plugin-id restrictions. Runtime
+validation accepts a multiline text/editor root (or its scroll wrapper) for EDITOR, and a purpose-built
+JComponent canvas/preview root for TERMINAL/CHART/PREVIEW. Ordinary JPanel form trees, buttons,
+labels, fields and data/choice controls are rejected as specialized roots. Necessary implementation
+children under an accepted specialized root are allowed; this is API discipline, not a sandbox.
+Host registration ownership is recorded independently of widget class names, with cross-view/component
+reuse rejected; kit-owned roots cannot be re-registered. Plan 2 supplies the source-owner inventory.
+The host refreshes registered root semantic foreground/background and workspace opacity. Domain code
+uses the existing Appearance editor/syntax/workspace subscription APIs to refresh specialized styling;
+the host never reaches into editor vendor internals or replaces its document/caret. `onChanged` covers
+both chrome and workspace theme changes including same-variant updates; opacity-only changes remain
+`onWorkspaceChanged`. The Plan 1 KitThemeBridge copies explicit old app values into independent module
+values; existing application theme ownership and consumer APIs stay in place until Plan 2.
+Kit factories initialize EDT resources lazily: legacy contexts may be created off EDT, but actual
+create/update/read/input/icon/content operations retain strict EDT confinement. Off-EDT close requests
+immediately revoke handles and enqueue owned teardown. Event and content-lifetime failures have fixed
+sanitized diagnostics, never throwable messages or causes that could retain plugin secret text.
+
 
 ## Test support and verification conventions
 

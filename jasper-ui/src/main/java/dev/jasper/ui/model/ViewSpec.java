@@ -10,7 +10,7 @@ import static dev.jasper.ui.model.Nodes.*;
 public record ViewSpec(Node root) {
     public ViewSpec {
         Objects.requireNonNull(root);
-        validate(root, new HashSet<>(), 0, new int[]{0});
+        validate(root, new HashSet<>(), new HashSet<>(), 0, new int[]{0});
     }
     private static void references(Set<String> selected, Set<String> ids) {
         if (!ids.containsAll(selected)) throw new IllegalArgumentException("Unknown item reference");
@@ -21,9 +21,10 @@ public record ViewSpec(Node root) {
         if (!item.leaf()) branches.add(item.id());
         for (var child : item.children()) tree(child, ids, branches, depth + 1);
     }
-    private static void validate(Node node, Set<String> ids, int depth, int[] count) {
+    private static void validate(Node node, Set<String> ids, Set<String> contentIds, int depth, int[] count) {
         if (depth > 128 || ++count[0] > 100_000) throw new IllegalArgumentException("View too deep or large");
         if (!ids.add(node.id())) throw new IllegalArgumentException("Duplicate node: " + node.id());
+        if (node instanceof Custom custom && !contentIds.add(custom.contentId())) throw new IllegalArgumentException("Duplicate custom content id");
         var children = new ArrayList<Node>();
         switch (node) {
             case Stack n -> children.addAll(n.children());
@@ -56,6 +57,6 @@ public record ViewSpec(Node root) {
             }
             case Text _, Icon _, Button _, MenuButton _, StatusDot _, Field _, Secret _, Toggle _, Chip _, Progress _, Strength _, Custom _ -> { }
         }
-        for (var child : children) validate(child, ids, depth + 1, count);
+        for (var child : children) validate(child, ids, contentIds, depth + 1, count);
     }
 }

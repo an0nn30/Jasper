@@ -78,4 +78,10 @@ class ViewSpecTest {
         assertThat(event.ids()).containsExactly("a");
         assertThatThrownBy(() -> new UiEvent.Reordered("list", "a", -1)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void customContentIdsAreUniqueEvenWhenNodeIdsDiffer() {
+        assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root",ControlState.READY,LayoutRole.VERTICAL,List.of(
+            new Custom("one",ControlState.READY,"document",CustomKind.EDITOR,"Editor"),
+            new Custom("two",ControlState.READY,"document",CustomKind.EDITOR,"Editor")))))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
 }

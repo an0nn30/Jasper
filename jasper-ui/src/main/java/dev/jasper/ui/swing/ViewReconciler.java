@@ -40,8 +40,10 @@ final class ViewReconciler implements AutoCloseable {
         for (var node : nodes.values()) next.get(node.id()).children(ControlRegistry.children(node).stream().map(child -> next.get(child.id())).toList());
         JComponent root = next.get(spec.root().id()).component;
         if (root.getParent() != view) { view.removeAll(); view.add(root, java.awt.BorderLayout.CENTER); }
-        for (var old : mounted.values()) if (next.get(old.node.id()) != old) old.close();
-        mounted = next; view.revalidate(); view.repaint();
+        // Publish ownership before invoking disposal callbacks: a callback may close this view.
+        var previous = mounted; mounted = next;
+        for (var old : previous.values()) if (next.get(old.node.id()) != old) old.close();
+        view.revalidate(); view.repaint();
     }
     private void detachMoves(Nodes.Node root, Map<String, Nodes.Node> nodes, Map<String, ControlRegistry.Control> next) {
         var parents = new LinkedHashMap<JComponent, java.awt.Container>();
@@ -69,6 +71,10 @@ final class ViewReconciler implements AutoCloseable {
     }
     private void collect(Nodes.Node node, Map<String, Nodes.Node> nodes) {
         nodes.put(node.id(), node); ControlRegistry.children(node).forEach(child -> collect(child, nodes));
+    }
+    void registerContent(String id, JComponent component, AutoCloseable lifetime) {
+        for(var control:mounted.values()) if(control instanceof CustomContents.CustomControl custom && ((Nodes.Custom)custom.node).contentId().equals(id)) {custom.register(component,lifetime);return;}
+        throw new IllegalArgumentException("No matching Custom content");
     }
     boolean dismissPopup() {
         boolean dismissed = false;

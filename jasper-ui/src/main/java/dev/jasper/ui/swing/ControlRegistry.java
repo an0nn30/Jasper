@@ -12,7 +12,7 @@ final class ControlRegistry {
     private ControlRegistry() {}
     static void validate(Nodes.Node node) {
         switch (node) {
-            case Nodes.Text ignored -> {} case Nodes.Icon ignored -> {} case Nodes.Button ignored -> {} case Nodes.Field ignored -> {}
+            case Nodes.Custom ignored -> {} case Nodes.Text ignored -> {} case Nodes.Icon ignored -> {} case Nodes.Button ignored -> {} case Nodes.Field ignored -> {}
             case Nodes.Secret ignored -> {} case Nodes.Choice ignored -> {} case Nodes.Toggle ignored -> {}
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
             case Nodes.MenuButton ignored -> {}
@@ -24,6 +24,7 @@ final class ControlRegistry {
     }
     static Control create(KitView view, Nodes.Node node) {
         return switch (node) {
+            case Nodes.Custom custom -> new CustomContents.CustomControl(view, custom);
             case Nodes.Panel panel -> new Panels.PanelControl(view, panel);
             case Nodes.Header header -> new PanelHeaders.HeaderControl(view, header);
             case Nodes.Text text -> new Labels.TextControl(view, text);
@@ -72,6 +73,7 @@ final class ControlRegistry {
     }
     static Object kind(Nodes.Node node) {
         return switch (node) {
+            case Nodes.Custom custom -> java.util.List.of(custom.kind(),custom.contentId());
             case Nodes.Field field -> field.kind();
             case Nodes.Button button -> button.kind();
             case Nodes.Choice choice -> choice.kind();

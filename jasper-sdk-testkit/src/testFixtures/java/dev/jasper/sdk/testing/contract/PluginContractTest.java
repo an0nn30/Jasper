@@ -553,7 +553,7 @@ public abstract class PluginContractTest {
             var closed = a.onWorkspaceChanged(value -> disposed.incrementAndGet()); closed.close();
         });
         h.setWorkspace(Variant.DARK, next, editor, syntax); h.flush();
-        assertThat(seen).hasValue(1); assertThat(chrome).hasValue(0); assertThat(disposed).hasValue(0);
+        assertThat(seen).hasValue(1); assertThat(chrome).hasValue(1); assertThat(disposed).hasValue(0);
         h.setWorkspace(Variant.DARK, next, editor, syntax); h.flush();
         assertThat(seen).hasValue(1);
         assertThat(java.util.concurrent.CompletableFuture.supplyAsync(a::workspaceVariant).join()).isEqualTo(Variant.DARK);

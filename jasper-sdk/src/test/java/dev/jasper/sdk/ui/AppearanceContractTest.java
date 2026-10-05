@@ -26,6 +26,7 @@ class AppearanceContractTest {
     @Test void olderImplementationsInheritANamedIconDefaultThatRefusesEveryName() {
         Icon original = new ImageIcon();
         Appearance legacy = new Appearance() {
+            public java.awt.Color color(SemanticColor role) { return java.awt.Color.BLACK; }
             public Variant variant() { return Variant.LIGHT; }
             public Subscription onChanged(Consumer<Variant> handler) { return () -> {}; }
             public Icon icon(String path) { return original; }

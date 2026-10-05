@@ -28,6 +28,8 @@ import dev.jasper.sdk.ui.Platform;
  * handles already issued do nothing. {@link #log()} keeps working.
  */
 public interface PluginContext {
+    /** Plugin-owned declarative view factory. @return the kit */
+    dev.jasper.sdk.ui.UiKit kit();
     /**
      * This plugin's verified identity.
      *

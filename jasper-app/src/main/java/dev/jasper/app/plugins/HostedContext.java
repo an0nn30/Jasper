@@ -61,6 +61,7 @@ final class HostedContext implements PluginContext {
     private final ExecutorService executor;
     volatile State state = State.STARTING;
     private final HostedUi ui;
+    private final HostedKit kit;
     final CapabilityGate gate;
     final HostedTerminals terminals;
     final HostedPalette palette;
@@ -85,6 +86,7 @@ final class HostedContext implements PluginContext {
             handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
             host.environment.windows(), terminals, host.environment.appearance(), host.environment.appearanceSubscriber(),
             host.environment.glass());
+        this.kit = new HostedKit(id, () -> state != State.CLOSED, ui::kitThemes, ui.appearance(), host.containment);
         this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.fileSources = new HostedFileSources(id, gate, host.environment.contributions(), host.containment, ui, terminals);
         this.notifications = new HostedNotifications(id, hosted.info().name(), host.environment.notifications(), host.containment,
@@ -103,6 +105,7 @@ final class HostedContext implements PluginContext {
     /** Closes everything the context handed out. Interrupting is for a failed start; shutdown drains first. */
     void teardown(boolean interrupt, String reason) {
         state = State.CLOSED;
+        kit.close();
         ui.closeAll();
         terminals.closeAll();
         notifications.close();
@@ -147,6 +150,7 @@ final class HostedContext implements PluginContext {
     @Override public Toolbar toolbar() { return ui.toolbar(); }
     @Override public Menus menus() { return ui.menus(); }
     @Override public StatusBar statusBar() { return ui.statusBar(); }
+    @Override public dev.jasper.sdk.ui.UiKit kit() { return kit; }
     @Override public Appearance appearance() { return ui.appearance(); }
     @Override public Panels panels() { return ui.panels(); }
     @Override public Rail rail() { return ui.rail(); }

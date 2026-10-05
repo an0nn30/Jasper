@@ -129,15 +129,20 @@ class KitViewTest {
             } finally { release(context); }
         });
     }
-    @Test void unsupportedUpdateFailsBeforeRemovingExistingTree() {
+    @Test void customSlotsRejectOrdinaryControlsAndOwnSpecializedLifetime() {
         Edt.run(() -> {
-            var context = KitFixtures.context();
-            try (var view = new KitView(context, stack(field("a", FieldKind.TEXT, "value")), e -> {})) {
-                var a = editor(view, "a"); var spec = view.spec();
-                assertThatThrownBy(() -> view.update(new ViewSpec(new Custom("custom", ControlState.READY, "content", CustomKind.EDITOR, "Editor"))))
-                    .isInstanceOf(UnsupportedOperationException.class);
-                assertThat(view.spec()).isSameAs(spec); assertThat(editor(view, "a")).isSameAs(a);
+            var context = KitFixtures.context(); var closed = new java.util.concurrent.atomic.AtomicInteger();
+            var spec = new ViewSpec(new Custom("custom", ControlState.READY, "content", CustomKind.EDITOR, "Editor"));
+            try (var view = new KitView(context, spec, e -> {})) {
+                var ordinary = new JPanel(); ordinary.add(new JButton("Wrong"));
+                assertThatThrownBy(() -> view.registerContent("content", ordinary, () -> {})).isInstanceOf(IllegalArgumentException.class);
+                var editor = new JTextArea("document"); editor.setCaretPosition(3);
+                view.registerContent("content", editor, closed::incrementAndGet);
+                view.update(spec); assertThat(editor.getCaretPosition()).isEqualTo(3);
+                assertThatThrownBy(() -> view.registerContent("content",new JTextArea(),() -> {})).isInstanceOf(IllegalArgumentException.class);
+                view.update(stack(field("a", FieldKind.TEXT, "value"))); assertThat(closed.get()).isEqualTo(1);
             } finally { release(context); }
+            assertThat(closed.get()).isEqualTo(1);
         });
     }
     @Test void callbacksAreContainedAndDoNotPreventFurtherEditsOrActions() {
@@ -212,6 +217,17 @@ class KitViewTest {
             try (var view = new KitView(context, stack(), e -> {})) {
                 view.close(); assertThatThrownBy(() -> view.update(stack())).isInstanceOf(IllegalStateException.class);
             } finally { release(context); }
+        });
+    }
+    @Test void disposalCallbackClosingViewDisposesTheNewlyMountedControls() {
+        Edt.run(() -> {
+            var context=KitFixtures.context();var button=new JButton[1];var holder=new KitView[1];
+            try {
+                holder[0]=new KitView(context,new ViewSpec(new Custom("custom",ControlState.READY,"content",CustomKind.EDITOR,"Editor")),e -> {});
+                holder[0].registerContent("content",new JTextArea(),() -> {button[0]=find(holder[0],"run",JButton.class);holder[0].close();});
+                holder[0].update(new ViewSpec(new Nodes.Button("run",ControlState.READY,"Run","",ButtonKind.PRIMARY,"run","")));
+                assertThat(button[0].getActionListeners()).isEmpty();
+            } finally {if(holder[0]!=null)holder[0].close();release(context);}
         });
     }
 }
