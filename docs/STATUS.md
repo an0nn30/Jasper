@@ -16,7 +16,7 @@
   91 tasks: **8,782 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and
   documentation gates. Changed-source hygiene and whitespace checks passed. The existing bounded
   port search/bind-race failure handling is retained. No GUI, benchmark or AOT training; native menu
-  acceptance remains user-run. Awaiting the user's merge/push choice.
+  acceptance remains user-run. User approved local main integration on 2026-10-05; no push requested.
 
 - **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
   `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
