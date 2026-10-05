@@ -10,7 +10,9 @@ import dev.jasper.fileserver.share.ReadOnlyShareException;
 import dev.jasper.fileserver.share.ShareRoot;
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.BufferedOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
@@ -19,6 +21,7 @@ import java.net.SocketTimeoutException;
 import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AccessDeniedException;
+import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -69,7 +72,7 @@ final class TftpTransfer {
             String path;
             try { path = ClientPaths.absolute("/", request.filename()); }
             catch (PathRefusedException refused) { refuse(refused, request.filename()); return; }
-            if (request.write()) refuse(new ReadOnlyShareException(), path); // writes arrive in Task 3
+            if (request.write()) write(path, netascii);
             else read(path, netascii);
         } catch (IOException failure) {
             if (!socket.isClosed()) events.error(remote, "TFTP transfer failed: " + failure.getMessage());
@@ -106,6 +109,87 @@ final class TftpTransfer {
                 transfer.finish(complete);
             }
         }
+    }
+
+    private void write(String path, boolean netascii) throws IOException {
+        if (share.readOnly()) {
+            refuse(new ReadOnlyShareException(), path);
+            return;
+        }
+        long announced = announcedSize();
+        if (announced > usableSpace()) {
+            send(DISK_FULL);
+            events.error(remote, DISK_FULL.message() + ": " + path);
+            return;
+        }
+        ShareRoot.Upload upload;
+        try { upload = share.upload(ClientPaths.relative(path)); }
+        catch (IOException refused) { refuse(refused, path); return; }
+        Map<String, String> accepted = negotiate(netascii ? -1 : announced);
+        var transfer = events.transfer(remote, ServerEvent.Direction.UPLOAD, path, announced, socket::close);
+        boolean complete = false;
+        try (upload) {
+            OutputStream out = netascii ? NetAscii.decoding(new BufferedOutputStream(upload.stream())) : upload.stream();
+            byte[] lastSent = (accepted.isEmpty() ? new TftpPacket.Ack(0) : new TftpPacket.OptionAck(accepted)).encode();
+            int block = 1;
+            for (TftpPacket.Data data = awaitData(lastSent, block); data != null; data = awaitData(lastSent, block)) {
+                try { out.write(data.bytes()); }
+                catch (IOException failed) { send(error(failed)); return; }
+                transfer.add(data.bytes().length);
+                lastSent = new TftpPacket.Ack(block).encode();
+                if (data.bytes().length < blockSize) {
+                    try {
+                        out.close();
+                        upload.commit();
+                    } catch (IOException failed) {
+                        send(error(failed));
+                        return;
+                    }
+                    complete = true;
+                    send(lastSent);
+                    dally(lastSent, block);
+                    return;
+                }
+                block = (block + 1) & 0xFFFF;
+            }
+        } finally {
+            transfer.finish(complete);
+        }
+    }
+
+    /** Sends {@code lastSent} until block {@code expected} arrives; a repeat of the previous block is answered at once. Null when it gives up. */
+    private TftpPacket.Data awaitData(byte[] lastSent, int expected) throws IOException {
+        int previous = (expected - 1) & 0xFFFF;
+        for (int attempt = 0; attempt <= retries; attempt++) {
+            send(lastSent);
+            long deadline = System.nanoTime() + timeout.toNanos();
+            for (TftpPacket reply = receive(deadline); reply != null; reply = receive(deadline)) {
+                if (reply instanceof TftpPacket.Data data && data.block() == expected) return data;
+                if (reply instanceof TftpPacket.Data data && data.block() == previous) send(lastSent);
+                if (reply instanceof TftpPacket.Error) return null;
+            }
+        }
+        return null;
+    }
+
+    /** After the final ACK, answers a repeated final block for one timeout, for a client whose ACK was lost. */
+    private void dally(byte[] finalAck, int block) throws IOException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        for (TftpPacket reply = receive(deadline); reply != null; reply = receive(deadline))
+            if (reply instanceof TftpPacket.Data data && data.block() == block) send(finalAck);
+    }
+
+    /** The client's tsize for a write, or -1 when it sent none or an unusable one. */
+    private long announcedSize() {
+        String tsize = request.options().get("tsize");
+        if (tsize == null) return -1;
+        try { return Math.max(-1, Long.parseLong(tsize.strip())); }
+        catch (NumberFormatException unusable) { return -1; }
+    }
+
+    private long usableSpace() {
+        try { return Files.getFileStore(share.root()).getUsableSpace(); }
+        catch (IOException unknown) { return Long.MAX_VALUE; }
     }
 
     /**
