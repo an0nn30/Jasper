@@ -101,8 +101,8 @@ on_exit = "keep_open"
 shell_integration = "auto"
 
 [terminal.font]
-family = "JetBrains Mono"
-size = 16.0
+family = "Cousine Nerd Font Mono"
+size = 12.0
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 ligatures = true
 line_height = 1.0
@@ -152,8 +152,8 @@ workspace = "match"
 | `palette.visible_rows` | `5` | Integer 1–20; the old `palette.max_results` key is still read | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
 | `ui.font.size` | Platform default (omit key) | Finite number 8–32 points | Live, app and plugins |
-| `terminal.font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
-| `terminal.font.size` | `16.0` | Finite number 6–72 points | Live |
+| `terminal.font.family` | `"Cousine Nerd Font Mono"` | Nonblank string without NUL | Live |
+| `terminal.font.size` | `12.0` | Finite number 6–72 points | Live |
 | `terminal.font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
 | `terminal.font.ligatures` | `true` | Boolean | Live |
 | `terminal.font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
@@ -421,7 +421,7 @@ Live changes reach existing windows and terminals, including hidden tabs, zoomed
 
 View menu choices save: Toolbar and Status Bar write `window.toolbar` and `window.status_bar` to `config.toml`, and every window follows. Choose themes in Settings › Appearance and tab, rail, toolbar and status bar sizes in Settings › Window. The command palette’s Window Settings… command opens the Window page. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and the command palette’s Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
-Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
+Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses bundled Cousine Nerd Font Mono at 12 points by default. The app ships regular, bold, italic and bold-italic faces, including Nerd Font symbols, and registers them for its own process; no system font installation is needed. Explicitly saved font family and size settings take precedence.
 
 On macOS, `option_as_meta` controls which Option key sends Meta input; `"none"` leaves Option character entry available. Application shortcuts retain priority over terminal encoding. Cursor settings supply the fallback: a program's cursor shape/blink escape sequence takes precedence until the program resets that choice. Configured pane dimming persists through focus and theme changes. Copy-on-select copies a completed local selection to the clipboard.
 

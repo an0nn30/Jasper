@@ -55,10 +55,10 @@ system = true
 visible_rows = 5
 
 [terminal.font]
-# Live across existing and new panes. Missing fonts use JBR/system fallback.
-family = "JetBrains Mono"
+# Live across existing and new panes. Cousine Nerd Font Mono is bundled; other missing fonts use JBR/system fallback.
+family = "Cousine Nerd Font Mono"
 # Range: 6-72 points. A saved size change is live; new panes and Font reset use this value.
-size = 16.0
+size = 12.0
 # Ordered live fallbacks; names must be nonblank. An empty list is allowed.
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 # Live across existing and new panes.

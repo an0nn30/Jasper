@@ -214,6 +214,7 @@ public final class JasperApplication {
     }
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir, List<ThemeCatalog.Problem> startupThemeProblems) {
+        dev.jasper.app.platform.BundledFonts.register();
         migrationProblems = List.copyOf(startupThemeProblems);
         if (service != null) startupConfigProblems = startupThemeProblems.stream().filter(problem -> problem.file().equals(service.initialState().file())).toList();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();

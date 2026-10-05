@@ -213,7 +213,7 @@ class ExpandedConfigTest {
         var snapshot = parse("").snapshot();
         assertThat(snapshot.columns()).isEqualTo(100);
         assertThat(snapshot.lines()).isEqualTo(35);
-        assertThat(snapshot.font()).isEqualTo(new FontConfig("JetBrains Mono", 16f,
+        assertThat(snapshot.font()).isEqualTo(new FontConfig("Cousine Nerd Font Mono", 12f,
             List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1f));
         assertThat(snapshot.terminal()).isEqualTo(new TerminalConfig(new TerminalConfig.Shell("", List.of()),
             Map.of(), 10000, OptionAsMeta.LEFT, CursorStyle.BLOCK, true, .3f, false, BellMode.VISUAL));
