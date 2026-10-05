@@ -13,6 +13,9 @@ dependencies {
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
     testImplementation(project(":jasper-sdk"))
     testImplementation(project(":jasper-sdk-testkit"))
+    // Headless baseline evidence only; never shipped with the plugin.
+    testImplementation(testFixtures(project(":jasper-sdk-testkit")))
+    testRuntimeOnly("com.formdev:flatlaf:3.7")
     testImplementation(project(":jasper-plugin-vault"))
     testImplementation("commons-net:commons-net:3.13.0")
 }

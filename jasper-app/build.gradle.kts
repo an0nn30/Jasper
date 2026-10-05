@@ -81,6 +81,8 @@ tasks.test {
     systemProperty("jasper.terminalJar", project(":jasper-terminal").layout.buildDirectory.file("libs/jasper-terminal.jar").get().asFile.absolutePath)
     val configExample = rootProject.layout.projectDirectory.file("config.example.toml")
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(rootProject.file("docs/design/theme-engine/migration.csv")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(rootProject.fileTree("docs/design/theme-engine/before-f16ae32f")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(rootProject.layout.projectDirectory.file("docs/configuration.md")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(rootProject.file("packaging/icons/Jasper.icns"), rootProject.file("packaging/icons/Jasper.ico"),
         rootProject.file("packaging/icons/Jasper.png"), rootProject.fileTree("packaging/icons/linux") { include("**/*.png") })
@@ -198,4 +200,20 @@ tasks.register<JavaExec>("convertThemes") {
         "--sources", rootProject.file("third_party/themes"),
         "--output", file("src/main/resources/dev/jasper/app/themes"),
         "--notices", rootProject.file("THIRD-PARTY-THEMES.md"))
+}
+
+// Pre-migration evidence uses current build outputs; immutable before captures are checked in separately.
+tasks.register<JavaExec>("themeMigrationPreview") {
+    group = "verification"
+    description = "Captures real existing app families headlessly without replacing golden expectations."
+    dependsOn(tasks.testClasses, stagePlugins)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.appearance.ThemeMigrationPreview"
+    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+    val captureHome = layout.buildDirectory.dir("theme-migration-home").get().asFile.absolutePath
+    systemProperty("user.home", captureHome)
+    environment("HISTFILE", "$captureHome/.zsh_history")
+    environment("XDG_CONFIG_HOME", "$captureHome/.config")
+    environment("APPDATA", "$captureHome/AppData/Roaming")
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
 }

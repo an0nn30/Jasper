@@ -43,6 +43,7 @@ public final class SettingsDialogPreview {
 
     public static void main(String[] args) throws Exception {
         Path output = Path.of(args[0]);
+        boolean migration = args.length > 1 && args[1].equals("--migration");
         Files.createDirectories(output);
         Path file = Path.of("/Users/me/.config/jasper/config.toml");
         var parsed = ConfigLoader.parse(file, "[window]\ntab_height = 34\n[terminal.font]\nsize = 15\n", true);
@@ -64,12 +65,18 @@ public final class SettingsDialogPreview {
             Map.of(), List.of());
         Files.writeString(home.resolve("plugins.toml"), "version = 1\n\n[plugins.\"dev.example.tidy\"]\nenabled = true\nconsented = []\n\n"
             + "[plugins.\"dev.example.broken\"]\nenabled = true\nconsented = []\n");
+        if (migration) {
+            Path snippets = home.resolve("plugins/dev.jasper.snippets/data/snippets.toml");
+            Files.createDirectories(snippets.getParent());
+            Files.writeString(snippets, "[[snippet]]\nname = \"Fixture snippet\"\ncommand = \"printf fixture\"\n");
+        }
         var holder = new JComponent[1];
         var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> {
             holder[0] = surface.holder();
             return new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1000, 700),
                 (title, initial) -> Optional.empty());
         });
+        var contributions = new Contributions();
         var themes = new ThemeController[1];
         var runtime = new PluginRuntime[1];
         var manager = new PluginManager[1];
@@ -78,7 +85,7 @@ public final class SettingsDialogPreview {
             themes[0] = new ThemeController();
             runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                 home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
-                PluginRuntime.SettingsReports.IGNORED, new Contributions(), windows, new TerminalRegistry());
+                PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
             runtime[0].start(Map.of(), true);
             var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run,
                 Duration.ofMillis(20), Duration.ofMillis(1));
@@ -93,7 +100,11 @@ public final class SettingsDialogPreview {
                 var keymap = new KeymapPage[1];
                 var dialog = new SettingsDialog(windows, CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark", "IntelliJ Light")),
                     new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
-                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context), previewPlugins[0].pages()),
+                    context -> keymap[0] = new KeymapPage(keymapHooks, context), context -> manager[0].page(context), context -> {
+                        var pages = new java.util.ArrayList<>(previewPlugins[0].pages().apply(context));
+                        if (migration) pages.addAll(runtime[0].settingsPages(context));
+                        return List.copyOf(pages);
+                    }),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,
                         listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true));
                 SwingUtilities.invokeAndWait(() -> {
@@ -136,9 +147,16 @@ public final class SettingsDialogPreview {
                     render(holder[0], output.resolve("plugin-editor-" + suffix));
                     dialog.select("plugin.dev.example.sample");
                     render(holder[0], output.resolve("plugin-sample-" + suffix));
+                    if (migration) for (String id : List.of("history", "sample", "editor", "vault", "remote", "fileserver")) {
+                        String page = "plugin.dev.jasper." + id;
+                        if (dialog.pages().stream().noneMatch(value -> value.id().equals(page))) throw new AssertionError("Missing real plugin settings " + page);
+                        dialog.select(page);
+                        render(holder[0], output.resolve("bundled-plugin-" + id + "-" + suffix));
+                    }
                     dialog.cancel();
                 });
             }
+            if (migration) dev.jasper.app.palette.ThemeMigrationPaletteCapture.capture(contributions.scopes());
         } finally {
             if (previewPlugins[0] != null) previewPlugins[0].close();
             var stopping = new CompletableFuture<List<CompletableFuture<?>>>();

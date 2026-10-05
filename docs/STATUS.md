@@ -1,6 +1,18 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-04
+## Current state — 2026-10-05
+
+- **Theme engine Plan 2 execution started** (2026-10-05), baseline `f16ae32f`. Task 1 records
+  971 exact consumers (532 production / 439 test-fixture), existing behavior suites and task owners,
+  with 390 immutable before renders across 22 families and checksum/source provenance. See
+  [inventory and evidence](design/theme-engine/migration-evidence.md). No production styling or
+  golden expectations changed. Execution rulings: Tasks 2–3 integrate engine/import migration;
+  Task 12 is the single final review. Pinned FlatLaf 3.7 is test-runtime-only for plugin captures;
+  peerless renderer layout stays in test fixtures. Buddy native-window visual acceptance remains
+  user-run/unavailable headlessly; existing adapter behavior and app notification/status captures
+  remain evidence. Discarded first-run inherited-home discovery and the preserved stale standalone
+  palette preview assertion are documented; clean final captures use verified synthetic roots.
+  Task 2 still owns the color-expression evaluator parity gap. Independent Task 1 review follows.
 
 - **Theme engine/UI kit overhaul: Plan 1 implemented and reviewed** (2026-10-04), on
   `codex/theme-engine` in `/Users/dustin/.codex/worktrees/theme-engine/moray`, based on `192443b3`.
@@ -22,7 +34,7 @@
   [shared API contracts](superpowers/plans/2026-10-04-theme-engine-contracts.md). The plans cover 14/12/11
   task groups, preserve the per-task implementer/reviewer workflow, and propose the coordinated SDK
   0.15.0 boundary. Planning self-review checked source paths, cross-plan signatures, spec coverage,
-  and panel capability gaps (including status dots and menu buttons). The user requested “execute plan 1”. Plan 1 Task 14 is complete with one known Minor expression-parity gap assigned to Plan 2 Task 2. Native/user acceptance is pending; Plans 2–3 remain unexecuted. See the [final handoff and decisions](design/theme-engine/verification.md).
+  and panel capability gaps (including status dots and menu buttons). The user requested “execute plan 1”. Plan 1 Task 14 is complete with one known Minor expression-parity gap assigned to Plan 2 Task 2. Native/user acceptance is pending; Plan 2 execution started 2026-10-05 and Plan 3 remains unexecuted. See the [final handoff and decisions](design/theme-engine/verification.md).
   Sequencing adjustments: Tasks 4–5 (context/icons/metrics) and 11–12 (SDK/host) are each integrated
   implementation/review units to keep commits runnable; Task 14 supplies the single final branch review.
   Task 1 pulls forward base ThemeToml parsing into `themeio` so the resolver tests retain real TOML
@@ -5019,4 +5031,4 @@ gallery runs contain 49 fixtures each / 636 files total; details and exact per-m
 [UI maintenance](ui-maintenance.md) and [calibration](design/theme-engine/calibration.md).
 Task 14 verification and independent review are complete; one known Minor expression-parity gap
 is assigned to Plan 2 Task 2 before imported-theme visual acceptance. User/native acceptance remains
-pending; Plans 2–3 remain unexecuted. See the [review handoff](design/theme-engine/verification.md).
+pending; Plan 2 execution started 2026-10-05 and Plan 3 remains unexecuted. See the [review handoff](design/theme-engine/verification.md).

@@ -16,6 +16,9 @@ dependencies {
     implementation("org.tomlj:tomlj:1.1.1")
     testImplementation(project(":jasper-sdk"))
     testImplementation(project(":jasper-sdk-testkit"))
+    // Headless baseline evidence only; never shipped with the plugin.
+    testImplementation(testFixtures(project(":jasper-sdk-testkit")))
+    testRuntimeOnly("com.formdev:flatlaf:3.7")
     testImplementation(project(":jasper-plugin-vault"))
     testImplementation(project(":jasper-plugin-editor"))
 }

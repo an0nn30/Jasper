@@ -16,7 +16,8 @@ with the live `ui.animations.enabled` application setting before mounting migrat
 Test disabled motion and setting changes on an existing hosted view. This is also recorded in the
 [temporary-path ledger](../../design/theme-engine/temporary-paths.md).
 **Shared contracts:** [Exact paths and APIs](2026-10-04-theme-engine-contracts.md).
-**Status:** Written for review; not executed. No deviations. Do not interpret task checkboxes or expected outcomes as completed verification.
+**Status:** Execution started 2026-10-05 on `codex/theme-engine`; Plan 1 is complete. Task 1 inventory/before evidence implemented; independent task review follows. Checkboxes record executed work, not completion of consumer migration.
+**Execution rulings/deviations:** Tasks 2–3 form one integrated engine/import implementation/review unit because of direct model dependencies. Task 12 provides the single final review (no duplicate). Task 1 adds pinned FlatLaf 3.7 only to plugin test runtime and uses test-only recursive layout of actual renderers. Buddy native-window visual evidence is unavailable headlessly and remains user acceptance; supported adapter behavioral evidence and app-owned notification/status captures are preserved. The inherited first preview's home-discovery outputs were discarded; final captures verify synthetic history/config roots. The unchanged stale standalone CommandPalettePreview is replaced only for evidence by a narrow real-owner fixture. See [inventory and frozen before evidence](../../design/theme-engine/migration-evidence.md).
 
 ## Global Constraints
 
@@ -81,11 +82,11 @@ commits as a compatibility-supporting SDK.
 **Interfaces:** CSV columns: `path,owner,surface,classification,migration_task,composition_task,existing_test,disposition`.
 Classification is `standard-ui`, `custom-content`, `native-platform`, or `nonvisual-helper`.
 
-- [ ] Inventory Java sources importing Swing/AWT/FlatLaf, referencing UIManager/appearance, constructing controls, or overriding paint in app and every plugin. Include SDK signatures and fake implementations. Compare with `rg --files`; classify helper false positives rather than dropping them invisibly.
-- [ ] Add a coverage test that checks each inventoried path exists, every standard-ui row has a migration/composition task, and all bundled plugin ids occur. Assert History/Snippets are palette/settings consumers rather than inventing nonexistent manager windows.
-- [ ] Run `./gradlew :jasper-app:test --tests '*ThemeMigrationCoverageTest'`; verify the test initially exposes deliberately omitted fixture ownership, then complete the ledger. This checks inventory integrity, not proof that migration is finished.
-- [ ] Record existing behavioral tests next to each owner and the allowed custom-content classes for Editor. Capture pre-migration headless renders for each family and view states without updating golden expectations.
-- [ ] Review completeness against spec §8 and commit `Inventory all appearance consumers and preserve migration evidence`.
+- [x] Inventory Java sources importing Swing/AWT/FlatLaf, referencing UIManager/appearance, constructing controls, or overriding paint in app and every plugin. Include SDK signatures and fake implementations. Compare with `rg --files`; classify helper false positives rather than dropping them invisibly.
+- [x] Add a coverage test that checks each inventoried path exists, every standard-ui row has a migration/composition task, and all bundled plugin ids occur. Assert History/Snippets are palette/settings consumers rather than inventing nonexistent manager windows.
+- [x] Run `./gradlew :jasper-app:test --tests '*ThemeMigrationCoverageTest'`; verify the test initially exposes deliberately omitted fixture ownership, then complete the ledger. This checks inventory integrity, not proof that migration is finished.
+- [x] Record existing behavioral tests next to each owner and the allowed custom-content classes for Editor. Capture pre-migration headless renders for each family and view states without updating golden expectations.
+- [x] Review completeness against spec §8 and commit `Inventory all appearance consumers and preserve migration evidence`.
 
 ## Task 2 — Replace app resolution with the module engine
 
