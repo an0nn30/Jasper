@@ -23,6 +23,7 @@ import dev.jasper.fileserver.ui.ServerRows;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -33,6 +34,7 @@ import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
+import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
@@ -158,6 +160,11 @@ public final class FileServerPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SERVE_FTP, "Serve Current Folder over FTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "ftp", "folder")),
             invoked -> serve(invoked, Protocol.FTP));
+        var shareMenu = context.menus().terminalContext().submenu("Share Path");
+        registerShareAction(shareMenu, Protocol.HTTP, false);
+        registerShareAction(shareMenu, Protocol.HTTP, true);
+        registerShareAction(shareMenu, Protocol.FTP, false);
+        registerShareAction(shareMenu, Protocol.FTP, true);
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
@@ -267,10 +274,36 @@ public final class FileServerPlugin implements Plugin {
         dialog.show();
     }
 
+    private void registerShareAction(PluginMenu menu, Protocol protocol, boolean tls) {
+        if (!Engines.AVAILABLE.contains(protocol)) return;
+        String type = protocol.label() + (tls ? "S" : "");
+        String id = ID + ".share-" + type.toLowerCase(Locale.ROOT);
+        context.actions().register(ActionSpec.of(id, type).withIcon(context.appearance().icon(IconName.SERVER))
+                .withKeywords(List.of("file server", "share path", "folder", type.toLowerCase(Locale.ROOT))),
+            invoked -> sharePath(invoked, protocol, tls));
+        menu.add(id);
+    }
+
+    /** A context-menu share must use this pane's local directory, never a substitute. */
+    private void sharePath(ActionContext invoked, Protocol protocol, boolean tls) {
+        Optional<Path> folder = invoked.pane().map(pane -> pane.info())
+            .filter(info -> info.kind() == SessionKind.LOCAL && info.remoteDirectory().isEmpty())
+            .flatMap(info -> info.workingDirectory()).filter(Path::isAbsolute).filter(Files::isDirectory);
+        if (folder.isEmpty()) {
+            context.notifications().group().error("Could not share path", "This terminal has no available local folder to share.");
+            return;
+        }
+        serve(invoked.window(), folder.get(), protocol, tls);
+    }
+
     /** Shares the folder the shell is in, read-only and on this computer only, until stopped. */
     void serve(ActionContext invoked, Protocol protocol) {
         Path folder = invoked.pane().or(() -> context.terminals().activePane())
             .flatMap(pane -> pane.info().workingDirectory()).filter(Files::isDirectory).orElse(environment.home());
+        serve(invoked.window(), folder, protocol, false);
+    }
+
+    private void serve(WindowHandle window, Path folder, Protocol protocol, boolean tls) {
         Set<Integer> used = registry.servers().stream().filter(view -> !view.state().phase().startable())
             .map(view -> view.definition().port()).collect(Collectors.toSet());
         int port = protocol.defaultPort();
@@ -278,11 +311,12 @@ public final class FileServerPlugin implements Plugin {
         Path leaf = folder.getFileName();
         String folderName = leaf == null ? folder.toString() : leaf.toString();
         if (folderName.length() > 60) folderName = folderName.substring(0, 60) + "…";
-        var created = ServerDefinition.create(uniqueName(folderName + " (" + protocol.label() + ")"), protocol, folder);
+        String type = protocol.label() + (tls ? "S" : "");
+        var created = ServerDefinition.create(uniqueName(folderName + " (" + type + ")"), protocol, folder);
         var definition = new ServerDefinition(created.id(), created.name(), protocol, folder, Bind.LOOPBACK, port, Optional.empty(), false,
-            created.login(), List.of(), false, false, false);
-        registry.startTemporary(definition, invoked.window());
-        showPanel(invoked.window(), definition.id());
+            created.login(), List.of(), tls, tls && protocol == Protocol.FTP, false);
+        registry.startTemporary(definition, window);
+        showPanel(window, definition.id());
     }
 
     private void showPanel(WindowHandle window, UUID id) {
