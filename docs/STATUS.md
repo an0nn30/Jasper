@@ -25,6 +25,9 @@
   Fix round 2: only a plain left click reports `Clicked` (never after a popup-trigger press such as macOS Ctrl+click,
   never for toggle clicks); Enter passes on when a row collection has no activate action, so the Keymap tree (no
   activate action, Enter bound by the panel) acts exactly once on a double click.
+  Fix round 3: the pass-on rule matches Swing's JTree/JList (no Enter binding), so Enter on the Settings page tree or a
+  Settings ordered list presses OK, and Enter on the chooser's places presses its default action, exactly as at the
+  pre-Plan-2 baseline; tests lock each.
 - **Theme engine Plan 2 Task 6a implemented (settingsui, restart, themesui); review pending** (2026-10-05).
   Controller ruling (spec §6: extend the kit for missing standard controls) added module kit capabilities first
   (`0008eb49`): `TreeItem` count/emphasized, `SettingRow`/`FormRow` `highlighted` with `KitView.reveal` (no focus move),

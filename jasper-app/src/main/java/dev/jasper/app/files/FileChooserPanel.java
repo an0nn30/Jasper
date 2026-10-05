@@ -109,7 +109,6 @@ public final class FileChooserPanel extends JPanel {
     private final Map<String, Location> crumbTargets = new LinkedHashMap<>();
     private final List<String> crumbLabels = new ArrayList<>();
     private String placeSelection;
-    private String placeFocus;
     private String name = "";
     private String status = "";
     private boolean editingPath;
@@ -381,8 +380,7 @@ public final class FileChooserPanel extends JPanel {
                     // Moving the highlight (a left click or the arrow keys) opens the place, as before. A right click
                     // never changes the selection, so it never reaches here.
                     case PLACES -> {
-                        placeFocus = selected.ids().stream().findFirst().orElse(null);
-                        if (!updating) openPlace(placeFocus);
+                        if (!updating) openPlace(selected.ids().stream().findFirst().orElse(null));
                     }
                     case PATH -> selected.ids().stream().findFirst().map(crumbTargets::get).ifPresent(model::navigate);
                     default -> { }
@@ -412,7 +410,6 @@ public final class FileChooserPanel extends JPanel {
             case "refresh" -> model.refresh();
             case "newFolder" -> newFolder();
             case "open" -> activateSelection();
-            case "place.open" -> openPlace(placeFocus);
             case "approve" -> approve();
             case "cancel" -> cancel();
             case "center" -> centerAction.run();
@@ -431,7 +428,7 @@ public final class FileChooserPanel extends JPanel {
         return Optional.empty();
     }
 
-    /** Shows a place; the place already shown is not listed again (a double click reports its click, then Enter's action). */
+    /** Shows a place; the place already shown is not listed again. */
     private void openPlace(String id) {
         Places.Place place = placeIds.get(id);
         if (place == null || place.location().equals(model.location())) {
@@ -604,7 +601,8 @@ public final class FileChooserPanel extends JPanel {
         }
         if (children != null) roots.add(branch(headingId, heading, children));
         return new ViewSpec(new Nodes.Tree(PLACES, ControlState.READY, roots, open,
-            placeSelection == null ? Set.of() : Set.of(placeSelection), "place.open"));
+            // No activate action: as the old JList, Enter on the places is the dialog's (its default action).
+            placeSelection == null ? Set.of() : Set.of(placeSelection), ""));
     }
 
     private static TreeItem branch(String id, String heading, List<TreeItem> children) {

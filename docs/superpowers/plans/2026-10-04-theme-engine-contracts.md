@@ -285,7 +285,10 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   non-left buttons, any click whose press or release was the popup trigger (macOS Ctrl+click, which then neither
   selects nor clicks) and the second click of a double click never report it; that second click reports the owner's
   activate action when it has one, otherwise only `Selected`. Enter activates the focused row when the control has an
-  activate action; without one Enter is not the rows' key and passes on to the host. So a host that acts on a single
+  activate action; without one Enter is not the rows' key and passes on to the host. This matches Swing's JTree and
+  JList, which bind no Enter key: in the app, Enter on the Settings page tree or a Settings ordered list presses OK and
+  Enter on the chooser's places presses its default action, as the pre-Plan-2 JTree/JList with a default button did
+  (evidence in the Task 6b-1 report, fix round 3); the Keymap binds Enter itself and the chooser's files keep `open`. So a host that acts on a single
   click leaves the activate action blank, uses `Clicked`, and binds Enter itself: a double click then acts exactly
   once. Hosts never inspect the event being dispatched. Item lists keep their contract (no `Clicked`).
 - Kit `ACTIONS` stacks too wide for one row wrap onto further rows at their natural widths instead of squeezing their

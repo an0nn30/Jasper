@@ -396,6 +396,33 @@ class SettingsDialogTest {
         throw new AssertionError("No tree item " + id);
     }
 
+    /**
+     * Before Plan 2 the page tree was a JTree, which binds no Enter key, and OK was the root pane's default button:
+     * Enter on the tree pressed OK. The kit tree has no activate action, so its Enter passes on to the same OK.
+     */
+    @Test void enterOnThePageTreePressesOkAsTheOldDefaultButtonDid() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            var view = dialog.view();
+            var root = new javax.swing.JRootPane();
+            root.getContentPane().add(view);
+            view.addNotify();
+            view.navigation.setSize(260, 600);
+            KitTestSupport.layout(view.navigation);
+            var canvas = (javax.swing.JComponent) KitTestSupport.require(view.navigation, "pages", javax.swing.JScrollPane.class).getViewport().getView();
+            javax.swing.SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(canvas, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_DOWN, java.awt.event.KeyEvent.CHAR_UNDEFINED));
+            assertThat(dialog.isOpen()).isTrue();
+            var enter = new java.awt.event.KeyEvent(canvas, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n');
+            assertThat(javax.swing.SwingUtilities.processKeyBindings(enter)).as("neither the tree nor the dialog's panels take Enter").isFalse();
+            // Swing then offers the key to the window's bindings, where OK sits as the default button did.
+            var name = root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0));
+            assertThat(name).isEqualTo("okSettings");
+            root.getActionMap().get(name).actionPerformed(new java.awt.event.ActionEvent(root, 0, ""));
+        });
+        until(() -> !dialog.isOpen());
+    }
+
     @Test void theTreeNavigatesAndRemembersClosedGroupsThroughKitEvents() throws Exception {
         var dialog = dialog();
         edt(() -> {

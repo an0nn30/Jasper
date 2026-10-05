@@ -261,6 +261,15 @@ class SchemaPageTest {
         assertThat(kit(page, "terminal.shell.args:new.input", JTextField.class).getText()).as("ready for the next").isEmpty();
     }
 
+    /** Before Plan 2 the list was a JList, which binds no Enter key, so Enter on it pressed the dialog's OK. */
+    @Test void enterOnAnOrderedListPassesToTheDialogAsTheOldListDid() {
+        var page = SchemaPage.page("shell", "Shell").row(CoreSettings.TERMINAL_SHELL_ARGS, Editors.textList()).build(context);
+        var list = KitTestSupport.require(page.component(), "terminal.shell.args", javax.swing.JScrollPane.class);
+        var canvas = (javax.swing.JComponent) list.getViewport().getView();
+        var enter = new java.awt.event.KeyEvent(canvas, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n');
+        assertThat(javax.swing.SwingUtilities.processKeyBindings(enter)).as("the list does not take Enter; OK does").isFalse();
+    }
+
     @Test void enterInAFontListsEntryAddsTheHighlightedFamily() {
         var page = SchemaPage.page("font", "Font").row(CoreSettings.TERMINAL_FONT_FALLBACK, Editors.fontList(false)).build(context);
         var before = draft.value(CoreSettings.TERMINAL_FONT_FALLBACK);

@@ -232,6 +232,27 @@ class FileChooserPanelTest {
         assertThat(panel.pathText()).as("Enter after the right click stays on the place shown").isEqualTo(shown);
     }
 
+    /** Before Plan 2 the places were a JList, which binds no Enter key, so Enter there pressed the default button. */
+    @Test void enterOnThePlacesPassesToTheDialogsDefaultActionAsTheOldListDid() {
+        var panel = panel(OPEN, Optional.empty());
+        var root = new javax.swing.JRootPane();
+        root.getContentPane().add(panel);
+        panel.installDefaultAction(root);
+        panel.togglePin(here("docs"));
+        layout(panel);
+        String shown = panel.pathText();
+        var canvas = (JComponent) kit(panel, FileChooserPanel.PLACES, javax.swing.JScrollPane.class).getViewport().getView();
+        var enter = new java.awt.event.KeyEvent(canvas, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, '\n');
+        assertThat(javax.swing.SwingUtilities.processKeyBindings(enter)).as("the places do not take Enter").isFalse();
+        assertThat(panel.pathText()).isEqualTo(shown);
+        var name = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(KeyStroke.getKeyStroke("ENTER"));
+        root.getActionMap().get(name).actionPerformed(null);
+        assertThat(panel.statusText()).as("the default action approves, as the default button did").isEqualTo("Select a file.");
+        var files = (JComponent) scroll(panel).getViewport().getView();
+        assertThat(javax.swing.SwingUtilities.processKeyBindings(new java.awt.event.KeyEvent(files, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0,
+            java.awt.event.KeyEvent.VK_ENTER, '\n'))).as("the file listing keeps its own Enter, as the JTable did").isTrue();
+    }
+
     @Test void arrowKeysInThePlacesOpenEachPlaceAsBeforeAndALeftClickOpensOne() {
         var panel = panel(OPEN, Optional.empty());
         panel.togglePin(here("docs"));
