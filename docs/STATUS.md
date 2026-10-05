@@ -2,6 +2,34 @@
 
 ## Current state — 2026-10-05
 
+- **File Server FS-3: SFTP** (2026-10-05; branch `claude/file-server-fs3`, plan `docs/superpowers/plans/2026-10-01-file-server-fs3.md`):
+  File Server 0.3.0 serves SFTP on Apache MINA sshd 2.19.0 with a persistent Ed25519 host key (`data/hostkey`,
+  fingerprint on the server card and in Show Fingerprints…), password, authorized-key and keys-only logins (through
+  `LoginThrottle`; unauthorized keys don't count), and only the SFTP subsystem (no shell, exec, forwarding or
+  keyboard-interactive). The jail is `engine.sftp.ShareAccessor`: every path through `ClientPaths` and
+  `ShareRoot.locate`, every operation through `ShareRoot`, links refused, only harmless extensions. Uploads commit on
+  a normal CLOSE. Editor: authorized keys (Add from File…, Paste, Remove) and "Keys only". Serve Current Folder over
+  SFTP. Decisions: see the plan header. Full `./gradlew check` passed: **8,812 tests, 0 failures, 0 errors, 6
+  existing skips** (File Server: 206, up from 165); source hygiene clean. No GUI, benchmark or AOT training; not
+  pushed.
+  Deviations from the plan text (details in the plan's banner): amended for main as of 2026-10-05 (SDK range kept at
+  `>=0.14.2, <0.15`; `context.notifications().group()` instead of `notices()`; Task 7's panel edits applied to the
+  redesigned panel); `ShareRoot.openWriteChannel` converts the plain IOException the JDK throws for NOFOLLOW_LINKS on
+  a final symlink into a FileSystemException; Task 4 hardening from auditing sshd's direct file calls
+  (`UnsupportedAttributePolicy.ThrowException`, a `resolveFileAccessLinkOptions` gate, `readFileAttributes` mapping
+  only READDIR's root `..`, rewriting the host folder name in v3 REALPATH long names, generic error text); security
+  review fixes (`ShareRoot.resolve` refuses a missing folder behind an outward link, which also protects HTTP and
+  FTP; owner and group lookups refuse without looking the name up).
+  Deferred: FSTAT/FSETSTAT on an upload handle act on the target, not the temporary file (OpenSSH `put -p` may warn,
+  and times may be lost); LSTAT of an outward link shows the link's own metadata (listings hide such links); sshd
+  still advertises extensions that File Server refuses; the `org.apache.sshd` log level is JVM-wide, so it also
+  quiets Remote's sshd INFO lines; a path through an outward link that lands back inside the share is accepted (a
+  client can confirm the share's absolute host path when such a link exists); a key file read for "Add from File…"
+  runs on the UI thread with no size cap; sshd replaces an unreadable host key silently, and there is no
+  "regenerate host key". GUI checks pending: OpenSSH `sftp`/`scp`, FileZilla and Cyberduck with a password and with a
+  key; the first-connection host key prompt matching the card; refused shell (`ssh -p 2222 host`); the editor's key
+  list.
+
 - **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
   `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
   [flat-tab design](design/flat-tabs.md). One workspace-colored strip, persistent icons, muted inactive

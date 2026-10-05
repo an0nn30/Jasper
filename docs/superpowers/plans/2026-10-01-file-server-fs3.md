@@ -1,5 +1,13 @@
 # File Server FS-3: SFTP — Implementation Plan
 
+**Status:** executed on `claude/file-server-fs3` (2026-10-05), `./gradlew check` green (8,812 tests, 0 failures, 6 existing skips; File Server 206).
+
+**Deviations from the plan text:**
+1. *Amendments for main as of 2026-10-05* (commit 64ff15d5): the `sdk` range stays `>=0.14.2, <0.15`; `PluginContext.notices()` is gone, so plugin reports use `context.notifications().group()`; Task 7's panel edits were applied to the redesigned panel (`PanelStyle`, `ProtocolChip`, `RowArtwork`). Reason: `main` gained about 400 commits after the plan was written.
+2. *Task 1* (39b5fcca): `ShareRoot.openWriteChannel` converts the plain IOException the JDK throws for NOFOLLOW_LINKS on a final symlink (on every Unix JDK) into a FileSystemException, so callers see one failure type.
+3. *Task 4 hardening beyond the plan* (e86d2f13), found by auditing sshd 2.19.0's direct file calls; each item has tests: `UnsupportedAttributePolicy.ThrowException`, so sshd never reads attributes through an outward link itself; a `resolveFileAccessLinkOptions` gate, because v6 REALPATH extra parts skip `resolveLocalFilePath`; `readFileAttributes` maps only READDIR's root `..`; `putRemoteFileName` rewrites the host folder name in v3 REALPATH long names; error text is generic.
+4. *Task 4 security-review fixes* (d6b3f31c): `ShareRoot.resolve` refuses a missing folder behind an outward link through `refuseIfOutside`, so "no such file" comes only from folders inside the share (before this, a client could learn which host paths exist behind an outward link; HTTP and FTP are protected too); `ShareAccessor.resolveFileOwner` and `resolveGroupOwner` refuse without looking the name up (before this, an SFTP v4+ client could probe which host user and group names exist).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add SFTP to the File Server plugin on Apache MINA sshd 2.19.0. This covers a persistent Ed25519 host key, password and authorized-key logins through the shared login throttle, a jail that routes every file operation through `ShareRoot`, authorized keys in the editor, the host key's fingerprint in the panel, and Serve Current Folder over SFTP.

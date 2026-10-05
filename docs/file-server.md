@@ -1,7 +1,7 @@
 # File Server: share a folder with other computers
 
 File Server is bundled with Jasper. It shares a folder on this computer with other programs and computers, the way
-MobaXterm's Servers window does. This version serves **HTTP, HTTPS, FTP and FTPS**; SFTP and TFTP follow.
+MobaXterm's Servers window does. This version serves **HTTP, HTTPS, FTP, FTPS and SFTP**; TFTP follows.
 
 ## The File Servers panel
 
@@ -21,7 +21,7 @@ the panel.
 - **This computer only.** *Reachable from* chooses *All networks* or one network interface; the panel then lists
   the addresses others can use. macOS and Windows ask once whether Jasper may accept connections; on macOS, Jasper
   also needs Privacy & Security › Local Network.
-- **Unprivileged ports.** HTTP starts at 8080 and FTP at 2121. On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
+- **Unprivileged ports.** HTTP starts at 8080, FTP at 2121 and SFTP at 2222. On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
   editor suggests one 8000 higher.
 - **Jailed.** Clients cannot leave the folder, through `..` or through a link that points outside it.
 - **Warnings.** The panel and the editor warn about plain HTTP or plain FTP with a password ("Plain FTP sends the
@@ -46,6 +46,9 @@ keeps it.
 
 **Serve Current Folder over FTP** does the same with a temporary read-only FTP server on this computer only. It uses a
 session password; copy it with **Copy Password** in the server's menu.
+
+**Serve Current Folder over SFTP** does the same with a temporary read-only SFTP server on this computer only, with
+a session password.
 
 ## FTP and FTPS
 
@@ -75,6 +78,28 @@ certificate; compare the fingerprint before you accept it. The server card shows
 fingerprint. **Show Fingerprints…** in a server's menu shows it too, and offers **Regenerate Certificate…**. A new
 certificate makes clients that trusted the old one warn again; running servers keep the old one until they restart.
 
+## SFTP
+
+An SFTP server shares the folder with any SFTP client (`sftp`, `scp` from OpenSSH 9 on, FileZilla, Cyberduck,
+WinSCP). It serves file transfer only: no shell, no commands and no port forwarding.
+
+- **Logins.** A Vault account or a session password, and/or **authorized keys**: OpenSSH public key lines added in
+  the editor with Add from File… (for example `~/.ssh/id_ed25519.pub`) or Paste. A server with a password login
+  accepts keys only for that user name. **Keys only (no password)** accepts any user name with an authorized key.
+  Key lines with options (`command=`, `from=`, `restrict`) are refused. Wrong passwords are throttled as for FTP; an
+  offered key that isn't authorized doesn't count.
+- **Host key.** File Server creates an Ed25519 host key the first time an SFTP server starts and keeps it in
+  `data/hostkey` (owner-only). Clients ask you to trust it on first connection; compare the fingerprint with the
+  server card's "SSH host key SHA256:…" or Show Fingerprints…. If the key file becomes unreadable, a new key replaces
+  it and clients warn about the change.
+- **The shared folder is a jail.** `..` stops at the top; links that lead outside are invisible and cannot be
+  followed, and links can't be created or read. A link inside the shared folder that leads outside is refused
+  ("permission denied"), however deep the path behind it. Server-side copy, checksum and disk-space requests are not
+  supported.
+- **Uploads** replace a file only when the client closes it normally; a dropped connection leaves the old file.
+  Resuming, appending and writing part of a file happen in place.
+- On a writable server, a client may change a file's times and permissions. SFTP clients can't set owners or groups.
+
 ## Quitting
 
 Servers run inside Jasper and stop when it quits. While any runs, quitting or restarting asks first; turn that off
@@ -87,7 +112,8 @@ only closes the windows and keeps Jasper in the background: servers keep running
 Saved servers live in `plugins/dev.jasper.fileserver/data/servers.toml` under Jasper's home; the file never holds a
 password. Settings (`confirm_quit`, `activity_entries`, `passive_ports`) live in
 `plugins/dev.jasper.fileserver/dev.jasper.fileserver.toml`. The certificate lives in
-`plugins/dev.jasper.fileserver/data/tls/server.p12`, with its generated password in `data/tls/password`.
+`plugins/dev.jasper.fileserver/data/tls/server.p12`, with its generated password in `data/tls/password`. The SFTP host key lives in
+`plugins/dev.jasper.fileserver/data/hostkey`.
 
 ## For other programs
 
