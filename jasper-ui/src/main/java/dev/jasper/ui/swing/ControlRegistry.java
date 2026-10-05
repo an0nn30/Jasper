@@ -3,6 +3,8 @@ package dev.jasper.ui.swing;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
 import java.util.ArrayList;
+import java.util.List;
+import java.awt.Container;
 import javax.swing.JComponent;
 
 /** Typed renderer dispatch. Each mounted control owns precisely its own registrations. */
@@ -13,7 +15,8 @@ final class ControlRegistry {
             case Nodes.Text ignored -> {} case Nodes.Icon ignored -> {} case Nodes.Button ignored -> {} case Nodes.Field ignored -> {}
             case Nodes.Secret ignored -> {} case Nodes.Choice ignored -> {} case Nodes.Toggle ignored -> {}
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
-            case Nodes.Stack stack -> stack.children().forEach(ControlRegistry::validate);
+            case Nodes.MenuButton ignored -> {}
+            case Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _ -> children(node).forEach(ControlRegistry::validate);
             default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         }
     }
@@ -31,8 +34,31 @@ final class ControlRegistry {
             case Nodes.Progress progress -> new Indicators.ProgressControl(view, progress);
             case Nodes.Strength strength -> new Indicators.StrengthControl(view, strength);
             case Nodes.Stack stack -> new Stacks.StackControl(view, stack);
+            case Nodes.FormRow row -> new FormRows.RowControl(view, row);
+            case Nodes.SettingRow row -> new SettingRows.RowControl(view, row);
+            case Nodes.Card card -> new Cards.CardControl(view, card);
+            case Nodes.Section section -> new Cards.SectionControl(view, section);
+            case Nodes.Empty empty -> new EmptyStates.EmptyControl(view, empty);
+            case Nodes.Form form -> new Forms.FormControl(view, form);
+            case Nodes.Split split -> new SplitViews.SplitControl(view, split);
+            case Nodes.MenuButton menu -> new Menus.MenuControl(view, menu);
             default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         };
+    }
+    static List<Nodes.Node> children(Nodes.Node node) {
+        var result = new ArrayList<Nodes.Node>();
+        switch (node) {
+            case Nodes.Stack n -> result.addAll(n.children());
+            case Nodes.Card n -> result.addAll(n.children());
+            case Nodes.Split n -> result.addAll(n.children());
+            case Nodes.FormRow n -> { result.add(n.control()); n.trailing().ifPresent(result::add); }
+            case Nodes.SettingRow n -> result.add(n.control());
+            case Nodes.Section n -> result.add(n.body());
+            case Nodes.Empty n -> { result.add(n.icon()); result.addAll(n.actions()); }
+            case Nodes.Form n -> { n.hero().ifPresent(result::add); result.addAll(n.sections()); n.preview().ifPresent(result::add); result.addAll(n.actions()); }
+            default -> {}
+        }
+        return result;
     }
     static Object kind(Nodes.Node node) {
         return switch (node) {
@@ -56,6 +82,10 @@ final class ControlRegistry {
         final KitContext context() { return view.context(); }
         void update(Nodes.Node next) { node = next; refresh(); }
         abstract void refresh();
+        Container childParent(Nodes.Node child) { return component; }
+        void children(List<Control> controls) {}
+        void embeddedLabel(boolean embedded) {}
+        void hero(boolean hero) {}
         JComponent focusTarget() { return component; }
         final boolean interactive() { return !closed && parentEnabled && node.state().enabled() && !node.state().busy() && node.state().visible(); }
         final void emit(UiEvent event) { if (interactive()) view.dispatch(event); }

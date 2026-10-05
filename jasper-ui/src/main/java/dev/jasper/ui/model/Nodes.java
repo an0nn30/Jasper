@@ -148,7 +148,7 @@ public final class Nodes {
     public record FormRow(String id, ControlState state, String label, String caption, Node control, Optional<Node> trailing) implements Node {
         public FormRow {
             ModelChecks.id(id); Objects.requireNonNull(state);
-            ModelChecks.label(label, "label");
+            Objects.requireNonNull(label);
             Objects.requireNonNull(caption);
             Objects.requireNonNull(control);
             Objects.requireNonNull(trailing);
@@ -227,7 +227,8 @@ public final class Nodes {
         }
     }
 
-    public record Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions) implements Node {
+    /** Form content only; cancellation uses an explicit action key, blank means none. */
+    public record Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction) implements Node {
         public Form {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -236,6 +237,13 @@ public final class Nodes {
             sections = List.copyOf(sections);
             Objects.requireNonNull(preview);
             actions = List.copyOf(actions);
+            Objects.requireNonNull(cancelAction);
+            if (actions.stream().filter(button -> button.kind() == ButtonKind.PRIMARY).count() > 1)
+                throw new IllegalArgumentException("Form supports at most one primary action");
+        }
+        public Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero,
+                    List<Node> sections, Optional<Node> preview, List<Button> actions) {
+            this(id, state, kind, title, hero, sections, preview, actions, "");
         }
     }
 

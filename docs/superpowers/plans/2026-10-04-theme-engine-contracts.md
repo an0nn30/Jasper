@@ -183,7 +183,7 @@ unique within their owning control; references resolve only in that control. Do 
 | ItemList | `ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions` |
 | Header | `String title, OptionalInt count, Optional<Node> context, Optional<Node> primary, List<MenuItem> overflow` |
 | Panel | `Header header, Optional<Node> searchOrNavigation, Node body, Optional<Node> footer` |
-| Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions` |
+| Form | `FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction` |
 | Split | `SplitKind kind, List<Node> children` (semantic manager/sidebar/document divisions) |
 | Table | `List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions` |
 | Tree | `List<TreeItem> roots, Set<String> expandedIds, Set<String> selectedIds, String activateAction` |
@@ -209,6 +209,20 @@ Header primary nodes are restricted to Button or MenuButton. MenuButton's `actio
 menu-only button; nonblank gives the main side of a split button. Its arrow opens the listed menu
 without firing the main action; item actions dispatch their own ids. StatusDot uses status tokens,
 never category hues. A field's browse action uses the app/SDK file chooser service; a picker action opens its domain picker.
+Form permits at most one PRIMARY in its action list. `cancelAction` is an explicit semantic action
+key; blank means no cancellation. The prior constructor without this final argument delegates to
+blank for existing callers. Cancellation is never inferred from a localized label. Enter submits the
+primary only when visible/enabled validation state is valid and no applicable operation is busy;
+textarea newlines and open-menu confirmation keep their own bindings. Escape dismisses a popup
+first, then delegates a subsequent Escape to the containing form's cancel action, including when
+focus stays on a menu button. Cancellation cleanup remains the domain owner's responsibility.
+
+FormRow permits a nonnull blank label for helper rows: this reserves the same fixed label cell and
+places the helper node in the control column. Actual input descriptors still require their labels
+for accessibility. Embedded inputs suppress duplicate displayed labels while retaining their
+accessible names; moving back to standalone composition restores their labels. SettingRow's
+`dependent` flag is domain presentation information; it never resets the child value automatically.
+
 Widths/gaps come from these semantic roles; plugins cannot pass dimensions or UI delegates.
 
 `ViewSpec(Node root)` validates the tree and references. `UiEvent` is sealed with nested records
@@ -233,6 +247,7 @@ public ViewSpec spec();
 public void withSecret(String fieldId, Consumer<char[]> use);
 public void clearSecret(String fieldId);
 public void focus(String id);
+public void setAvailableHeight(int logicalPixels);
 public void registerContent(String id, JComponent component, AutoCloseable lifetime);
 public JComponent panelHeader(String panelId);
 public void setPanelHostActions(String panelId, List<Nodes.Button> actions, Consumer<UiEvent> events);
@@ -245,6 +260,13 @@ throw. The Vault explicitly clones/transfers a needed value to its existing asyn
 disposes it and erases its secret. Changing a kind replaces just that control. Registering content
 requires a matching Custom node; ordinary component trees cannot use this API.
 All methods require EDT except idempotent close may enqueue disposal from another thread.
+`setAvailableHeight` is module/app integration only and is not projected into UiView or descriptors.
+The app supplies a positive logical content height excluding native chrome; the latest supplied
+value lasts for this view's lifetime and is scaled exactly once through Swing user scaling. The
+initial value is unconstrained. Forms cap their preferred height at 85% of the supplied height and
+scroll the body independently of the reachable action/preview footer. Native screen queries and
+plugin-provided geometry are forbidden. Native title bars/windows/scrims stay app-owned; sheet
+content has an in-content title and bottom-only rounded corners.
 The two panel-header methods are module/app integration only and are not projected into UiView.
 `panelHeader` returns the existing kit-owned header so the host can attach drag/focus handling; it
 does not transfer ownership. Host actions occupy reserved header slots and use their separate callback.

@@ -24,6 +24,7 @@ final class Buttons {
             ActionListener listener = event -> emit(new UiEvent.Action(((Nodes.Button)this.node).action()));
             button.addActionListener(listener); own(() -> button.removeActionListener(listener)); refresh();
         }
+        @Override void hero(boolean value) { button.hero=value; }
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind();
             button.setText(value.label()); button.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
@@ -45,6 +46,7 @@ final class Buttons {
     static class KitButton extends JButton {
         private final KitContext context;
         Nodes.ButtonKind kind;
+        boolean hero;
         ThemePainting.Focus focus;
         KitButton(KitContext context) { this.context = context; }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
@@ -58,7 +60,7 @@ final class Buttons {
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
-            int height = ThemePainting.height(context, DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
+            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
         /** Shared painter permits a real specialized owner to select its semantic surface. */
@@ -71,6 +73,7 @@ final class Buttons {
                 case LINK -> hover ? ColorMath.opacity(ThemePainting.color(context, SemanticColor.ACCENT), .08) : null;
             };
         }
+        Color border() { return kind == Nodes.ButtonKind.SECONDARY ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : null; }
         @Override protected void paintComponent(Graphics graphics) {
             if (kind == null) return;
             var g = (Graphics2D)graphics.create();
@@ -82,7 +85,7 @@ final class Buttons {
                     Color darkened = ColorMath.mix(ThemePainting.color(context, SemanticColor.SURFACE_APP), fill, .08);
                     fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
                 }
-                Color border = kind == Nodes.ButtonKind.SECONDARY ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : null;
+                Color border = border();
                 ThemePainting.rounded(g, this, context, fill, border, focus != null && focus.visible(), false);
                 g.setFont(getFont()); g.setColor(ThemePainting.color(context, textRole(hover)));
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();

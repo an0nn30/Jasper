@@ -96,6 +96,19 @@
   `surface.control.hover` treatment while ordinary secondary buttons retain their own colors.
   Contrasting-role regression reproduced the mismatch; **10 focused choice/button tests pass**,
   zero failures/errors/skips. The minor segment-label medium-weight finding stays with final review.
+  Task 8 composition implementation/self-review complete (independent review pending): real form/settings
+  rows, padded/mixed cards, section labels, centered hero/empty states, split columns, menu/split buttons
+  and content-only forms/sheets. Stable nested updates retain ordinary/secret documents and restore
+  standalone labels; heroes propagate larger field/button roles. Approved corrections append explicit
+  Form.cancelAction, allow blank helper labels and add app-only positive logical available-content-height
+  integration. Forms cap height at 85% and scroll body separately from the reachable preview/action footer.
+  Popup Escape/outside dismissal and subsequent containing-form cancellation are owned and headless.
+  Full unlock Form fixture replaces the temporary Stack. Scoped RED failures reproduced/fixed hero anatomy,
+  menu chevron, negative narrow Browse bounds, mixed settings padding, empty tile painting, focused-menu
+  Escape delegation, sheet title, menu tile and actual invalid-primary availability. Final focused normal/2x: **22 tests**; module
+  check/architecture: **197 tests, 0 failures/errors/skips**. Source hygiene/diff checks clean.
+  Package-private Composition.java supplies width-aware layout and literal wrapping; screenshot calibration
+  and native desktop focus remain later/user-run. No GUI, screen queries, AOT, push or merge.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

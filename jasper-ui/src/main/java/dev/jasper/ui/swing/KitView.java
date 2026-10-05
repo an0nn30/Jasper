@@ -21,6 +21,7 @@ public final class KitView extends JPanel implements AutoCloseable {
     private final MotionPolicy motion;
     private final AtomicBoolean closeRequested = new AtomicBoolean();
     private ViewSpec spec;
+    private int availableHeight = Integer.MAX_VALUE;
     private AutoCloseable appearance;
     private final UIDefaults defaults;
     private final PropertyChangeListener fontChanges;
@@ -71,6 +72,15 @@ public final class KitView extends JPanel implements AutoCloseable {
     public JComponent panelHeader(String panelId) { requireOpen(); throw new UnsupportedOperationException("Panels are not implemented yet"); }
     /** Host integration slot, separate from the descriptor event callback. */
     public void setPanelHostActions(String panelId, List<Nodes.Button> actions, Consumer<UiEvent> events) { requireOpen(); throw new UnsupportedOperationException("Panels are not implemented yet"); }
+    /** App-only available content height excluding native chrome, in logical pixels; EDT confined. */
+    public void setAvailableHeight(int logicalPixels) {
+        requireOpen(); if (logicalPixels <= 0) throw new IllegalArgumentException("Available height must be positive");
+        availableHeight = logicalPixels; refresh();
+    }
+    int availableHeight() { return availableHeight == Integer.MAX_VALUE ? Integer.MAX_VALUE : com.formdev.flatlaf.util.UIScale.scale(availableHeight); }
+    boolean dismissPopup() { return reconciler.dismissPopup(); }
+    boolean popupOpen() { return reconciler.popupOpen(); }
+    ControlRegistry.Control control(String id) { return reconciler.control(id); }
     KitContext context() { return context; }
     MotionPolicy motion() { return motion; }
     void dispatch(UiEvent event) {

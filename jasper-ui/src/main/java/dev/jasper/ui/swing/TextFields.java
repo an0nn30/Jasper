@@ -17,10 +17,11 @@ final class TextFields {
         final JTextComponent input;
         final JLabel label = Labels.literal(), error = Labels.literal(), leading = Labels.literal();
         final FieldSurface surface;
-        final JPanel line = new JPanel(new BorderLayout()), container;
+        final JPanel line = new JPanel(new TrailingFieldLayout()), container;
         final Buttons.ButtonControl browse;
         final JScrollPane scroll;
         final DocumentListener listener;
+        boolean embedded;
         boolean applying;
         boolean notifying;
         long valueRevision;
@@ -84,9 +85,11 @@ final class TextFields {
             applying = true;
             try { input.setText(value); } finally { applying = false; }
         }
+        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
+        @Override void hero(boolean value) { surface.hero=value; }
         @Override JComponent focusTarget() { return input; }
         @Override void refresh() {
-            var field = (Nodes.Field)node; state(); input.setEnabled(component.isEnabled());
+            var field = (Nodes.Field)node; state(); label.setVisible(!embedded); input.setEnabled(component.isEnabled());
             input.setEditable(component.isEnabled()); surface.setEnabled(component.isEnabled());
             input.setCursor(Cursor.getPredefinedCursor(component.isEnabled() ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (scroll != null) {
@@ -125,6 +128,15 @@ final class TextFields {
             container.revalidate(); container.repaint();
         }
     }
+    static final class TrailingFieldLayout extends BorderLayout {
+        @Override public void layoutContainer(Container parent) {
+            Component trailing=getLayoutComponent(EAST),control=getLayoutComponent(CENTER);
+            if(trailing==null||!trailing.isVisible()||control==null){super.layoutContainer(parent);return;}
+            Insets i=parent.getInsets();int width=Math.max(0,parent.getWidth()-i.left-i.right),height=Math.max(0,parent.getHeight()-i.top-i.bottom);
+            int gap=Math.min(getHgap(),width),tw=Math.min(trailing.getPreferredSize().width,Math.max(0,(width-gap)/2));
+            control.setBounds(i.left,i.top,Math.max(0,width-gap-tw),height);trailing.setBounds(parent.getWidth()-i.right-tw,i.top,tw,height);
+        }
+    }
     static final class NumericFilter extends DocumentFilter {
         @Override public void insertString(FilterBypass bypass, int offset, String text, AttributeSet attributes) throws BadLocationException {
             replace(bypass, offset, 0, text, attributes);
@@ -134,6 +146,7 @@ final class TextFields {
         }
     }
     static final class FieldSurface extends JPanel {
+        boolean hero;
         final KitContext context; final JTextComponent input; final boolean multiline;
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
         ThemePainting.Focus focus;
@@ -142,7 +155,7 @@ final class TextFields {
         }
         @Override public Dimension getPreferredSize() {
             var size = super.getPreferredSize();
-            return new Dimension(size.width, Math.max(size.height, ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, role)));
+            return new Dimension(size.width, Math.max(size.height, ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, role)));
         }
         @Override public void paint(Graphics graphics) {
             var g = (Graphics2D)graphics.create();

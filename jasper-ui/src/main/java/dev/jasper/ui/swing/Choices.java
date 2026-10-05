@@ -20,6 +20,8 @@ final class Choices {
         final JComponent input;
         final ArrayList<AutoCloseable> optionLifetimes = new ArrayList<>();
         List<Option> options = List.of();
+        boolean embedded;
+        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
         boolean applying;
         ChoiceControl(KitView view, Nodes.Choice node) {
             super(view, node, new JPanel(new BorderLayout()));
@@ -107,7 +109,7 @@ final class Choices {
                         button.setBorder(new EmptyBorder(0, pad, 0, pad));
                     }
                 }
-                label.setText(choice.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(input.isEnabled());
+                label.setVisible(!embedded);label.setText(choice.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(input.isEnabled());
                 error.setText(choice.state().error()); error.setVisible(!choice.state().error().isEmpty()); error.setEnabled(input.isEnabled());
                 error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
                 ((BorderLayout)component.getLayout()).setVgap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));

@@ -28,16 +28,16 @@ final class ViewReconciler implements AutoCloseable {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
+        next.values().forEach(control -> { control.embeddedLabel(false); control.hero(false); });
         inherit(spec.root(), next, true);
         for (var node : nodes.values()) next.get(node.id()).update(node);
+        applyHero(spec.root(), next, false);
         for (var control : next.values()) if (control instanceof SecretFields.SecretControl secret) {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) secret.reveal(revealGroups.getOrDefault(group, false));
         }
         detachMoves(spec.root(), nodes, next);
-        for (var node : nodes.values()) if (node instanceof Nodes.Stack stack) {
-            ((Stacks.StackControl)next.get(node.id())).children(stack.children().stream().map(child -> next.get(child.id()).component).toList());
-        }
+        for (var node : nodes.values()) next.get(node.id()).children(ControlRegistry.children(node).stream().map(child -> next.get(child.id())).toList());
         JComponent root = next.get(spec.root().id()).component;
         if (root.getParent() != view) { view.removeAll(); view.add(root, java.awt.BorderLayout.CENTER); }
         for (var old : mounted.values()) if (next.get(old.node.id()) != old) old.close();
@@ -46,9 +46,9 @@ final class ViewReconciler implements AutoCloseable {
     private void detachMoves(Nodes.Node root, Map<String, Nodes.Node> nodes, Map<String, ControlRegistry.Control> next) {
         var parents = new LinkedHashMap<JComponent, java.awt.Container>();
         parents.put(next.get(root.id()).component, view);
-        for (var node : nodes.values()) if (node instanceof Nodes.Stack stack) {
-            var parent = next.get(stack.id()).component;
-            for (var child : stack.children()) parents.put(next.get(child.id()).component, parent);
+        for (var node : nodes.values()) {
+            var owner = next.get(node.id());
+            for (var child : ControlRegistry.children(node)) parents.put(next.get(child.id()).component, owner.childParent(child));
         }
         // Detach every move before attaching any new edge: a valid new tree may invert old ancestry.
         // Children staying under the same parent are untouched, preserving unaffected sibling component identity.
@@ -59,13 +59,26 @@ final class ViewReconciler implements AutoCloseable {
     }
     private void inherit(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean enabled) {
         next.get(node.id()).parentEnabled = enabled;
-        if (node instanceof Nodes.Stack stack) {
-            boolean childrenEnabled = enabled && node.state().enabled() && !node.state().busy() && node.state().visible();
-            stack.children().forEach(child -> inherit(child, next, childrenEnabled));
-        }
+        boolean childrenEnabled = enabled && node.state().enabled() && !node.state().busy() && node.state().visible();
+        ControlRegistry.children(node).forEach(child -> inherit(child, next, childrenEnabled));
+    }
+    private void applyHero(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
+        boolean hero = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.HERO : inherited;
+        next.get(node.id()).hero(hero);
+        ControlRegistry.children(node).forEach(child -> applyHero(child, next, hero));
     }
     private void collect(Nodes.Node node, Map<String, Nodes.Node> nodes) {
-        nodes.put(node.id(), node); if (node instanceof Nodes.Stack stack) stack.children().forEach(child -> collect(child, nodes));
+        nodes.put(node.id(), node); ControlRegistry.children(node).forEach(child -> collect(child, nodes));
+    }
+    boolean dismissPopup() {
+        boolean dismissed = false;
+        for (var owner : mounted.values()) if (owner instanceof Menus.MenuControl menu) dismissed |= menu.dismiss();
+        for (var owner : mounted.values()) if (owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible()) { combo.hidePopup(); dismissed = true; }
+        return dismissed;
+    }
+    boolean popupOpen() {
+        return mounted.values().stream().anyMatch(owner -> owner instanceof Menus.MenuControl menu && menu.popup.isVisible()
+            || owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible());
     }
     ControlRegistry.Control control(String id) {
         var control = mounted.get(id); if (control == null) throw new IllegalArgumentException("Unknown node: " + id); return control;
