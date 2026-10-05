@@ -82,6 +82,27 @@ public abstract class KitContractTest {
             Set.of("commands"),"run",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty(),OptionalInt.of(1))).as("a heading is never selected").isInstanceOf(IllegalArgumentException.class);
         stop(kit);assertThatThrownBy(() -> view.composing("query")).isInstanceOf(IllegalStateException.class);
     }); }
+    /** Plugin-manager style rows: a row-owned menu, a compact switch with a tooltip, and severity-tinted glyphs. */
+    static ViewSpec manager(boolean on, String tooltip) {
+        var menu=List.of(new MenuItem("settings","Open Settings","","a:settings",true,false),new MenuItem("sep","","","",false,true),new MenuItem("remove","Remove…","","a:remove",true,false));
+        return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Icon("severity",ControlState.READY,"error",Nodes.Hue.NONE,Nodes.IconSize.RAIL,"Error",Optional.of(Nodes.Severity.DANGER)),
+            new Nodes.Text("body",ControlState.READY,"A plugin is unrestricted code.\nAllow only plugins you trust.",Nodes.TextRole.BODY),
+            new Nodes.ItemList("plugins",ControlState.READY,Nodes.ListKind.DOUBLE,List.of(
+                new ListItem("group",Optional.empty(),List.of(new Nodes.Text("group.title",ControlState.READY,"Bundled",Nodes.TextRole.CAPTION)),List.of(),List.of(),true),
+                new ListItem("a",Optional.of(new Nodes.Icon("a.icon",ControlState.READY,"plugin",Nodes.Hue.NEUTRAL,Nodes.IconSize.RAIL,"Plugin")),
+                    List.of(new Nodes.Text("a.name",ControlState.READY,"A",Nodes.TextRole.BODY_STRONG)),List.of(),
+                    List.of(new Nodes.Toggle("a.on",ControlState.READY,"Enable A",on,"a:toggle",true,tooltip)),false,Optional.of(menu))),
+                Set.of("a"),"",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty()))));
+    }
+    @Test void managerRowsMountUpdateAndReportSwitchesAndRowMenuActions() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var view=kit.create(manager(true,""),events::add);
+        assertThat(view.spec()).isEqualTo(manager(true,""));
+        view.update(manager(false,"Restart to apply"));assertThat(view.spec()).isEqualTo(manager(false,"Restart to apply"));
+        emit(view,new UiEvent.Toggled("a.on",true));emit(view,new UiEvent.Action("a:remove"));
+        assertThat(events).containsExactly(new UiEvent.Toggled("a.on",true),new UiEvent.Action("a:remove"));
+        stop(kit);
+    }); }
     @Test void disposalCannotReenterUpdate() throws Exception { edt(() -> {
         var kit=kit("owner"); var before=new ViewSpec(new Nodes.Custom("custom",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));
         var view=kit.create(before,e -> {}); var calls=new java.util.concurrent.atomic.AtomicInteger(); var rejected=new java.util.concurrent.atomic.AtomicBoolean();

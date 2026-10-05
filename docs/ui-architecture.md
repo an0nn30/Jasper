@@ -142,6 +142,14 @@ viewport in selectable rows; `KitView.composing(fieldId)` reports uncommitted in
 label is its accessible name only (the glyph and hint label it visually). `Field.presentation` lets a host composition
 supply a field's visible label (EMBEDDED) and, on a surface that backs the field, drop the input fill (TRANSPARENT).
 
+Manager and notification capabilities (Plan 2 Task 6c): item-list rows can carry their own context menu (offered on
+any row, never selecting it; the menu key and Shift+F10 open the focused row's menu); Space on a row whose trailing slot
+holds exactly one switch operates that switch, keeping a list of switch rows one focus stop; switches take a literal
+tooltip; glyphs can carry a severity (INFO, WARNING, DANGER) that tints them with the accent or status colour, and the
+vocabulary gains `error` and `plugin`; body, strong, description and caption text flows (wraps, keeping line breaks,
+no wider than `TEXT_FLOW_COLUMNS`) in vertical stacks, form bodies, cards and sections; and an app host can mount a
+pointer-only `KitView` whose controls never take keyboard focus (not part of the plugin SDK).
+
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).
 

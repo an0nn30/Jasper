@@ -82,6 +82,20 @@ class KitValuesTest {
   assertThat(Arrays.stream(ScrollPolicy.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ScrollPolicy.values()).map(Enum::name).toArray(String[]::new));
   assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.Sorted("files","size"))).isEqualTo(new UiEvent.Sorted("files","size"));
  }
+ /** Plan 2 Task 6c: row-owned list menus, switch tooltips and severity-tinted glyphs cross the projection unchanged. */
+ @Test void managerAndNoticeCapabilitiesProjectWithoutLoss(){
+  var menu=List.of(new MenuItem("settings","Open Settings","","a:settings",true,false),new MenuItem("sep","","","",false,true));
+  var row=new ListItem("a",Optional.of(new Icon("a.icon",READY,"plugin",Hue.NEUTRAL,IconSize.RAIL,"Plugin")),List.of(new Text("a.name",READY,"A",TextRole.BODY_STRONG)),List.of(),
+   List.of(new Toggle("a.on",READY,"Enable A",true,"a:toggle",true,"Restart to apply")),false,Optional.of(menu));
+  var none=new ListItem("b",Optional.empty(),List.of(new Text("b.name",READY,"B",TextRole.BODY)),List.of(),List.of(),false,Optional.of(List.of()));
+  List<Node> nodes=List.of(new ItemList("plugins",READY,ListKind.DOUBLE,List.of(row,none),Set.of("a"),"",List.of(),SelectionMode.SINGLE,Optional.empty()),
+   new Icon("e",READY,"error",Hue.NONE,IconSize.RAIL,"Error",Optional.of(Severity.DANGER)),new Toggle("t",READY,"T",false,"t",false,"Why"));
+  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  var module=(dev.jasper.ui.model.Nodes.ItemList)KitValues.toModule(new ViewSpec(nodes.getFirst())).root();
+  assertThat(module.items().getFirst().contextActions()).hasValueSatisfying(items -> assertThat(items).hasSize(2));
+  assertThat(module.items().get(1).contextActions()).hasValue(List.of());
+  assertThat(Arrays.stream(Severity.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.Severity.values()).map(Enum::name).toArray(String[]::new));
+ }
  /** Plan 2 Task 6b-2: RESULTS lists, headings and visible rows cross the projection unchanged. */
  @Test void resultListsProjectWithoutLoss(){
   var heading=new ListItem("h",Optional.empty(),List.of(new Text("h.title",READY,"Commands",TextRole.CAPTION)),List.of(),List.of(),true);

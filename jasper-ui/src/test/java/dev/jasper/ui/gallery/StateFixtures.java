@@ -77,6 +77,21 @@ public final class StateFixtures {
         result.add(sheet("results", new Stack("results", READY, LayoutRole.VERTICAL, List.of(
             new Field("results-query", READY, FieldKind.SEARCH, "", "Search everything", "Search all", ""),
             new ItemList("results-list", READY, ListKind.RESULTS, results, Set.of("results-new-tab"), "run", List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(5)))), 680, 240));
+        // Plan 2 Task 6c: plugin rows with their own menus and switch tooltips, severity glyphs and flowing body text.
+        var notices = new ArrayList<Node>();
+        for (Severity severity : Severity.values())
+            notices.add(new Icon("notice-" + severity, READY, switch (severity) { case INFO -> "info"; case WARNING -> "warning"; case DANGER -> "error"; },
+                Hue.NONE, IconSize.RAIL, severity.name(), Optional.of(severity)));
+        notices.add(text("notice-body", "Fixture plugin 1.0\nFrom Fixture vendor\n\nA plugin is unrestricted code running inside Jasper, "
+            + "with everything your account can reach. Allow only plugins you trust.", TextRole.BODY));
+        var menu = List.of(new MenuItem("plugin-settings", "Open Settings", "", "settings", true, false), new MenuItem("plugin-remove", "Remove…", "", "remove", true, false));
+        notices.add(new ItemList("notice-plugins", READY, ListKind.DOUBLE, List.of(
+            new ListItem("notice-bundled", Optional.empty(), List.of(text("notice-bundled-title", "Bundled (1 of 1 enabled)", TextRole.CAPTION)), List.of(), List.of(), true),
+            new ListItem("notice-plugin", Optional.of(new Icon("notice-plugin-icon", READY, "plugin", Hue.NEUTRAL, IconSize.RAIL, "Plugin")),
+                List.of(text("notice-plugin-name", "Fixture plugin", TextRole.BODY_STRONG)), List.of(text("notice-plugin-meta", "1.0  Fixture vendor", TextRole.CAPTION)),
+                List.of(new Toggle("notice-plugin-enabled", READY, "Enable Fixture plugin", true, "toggle", true, "Restart to apply")), false, Optional.of(menu))),
+            Set.of("notice-plugin"), "", List.of(), SelectionMode.SINGLE, Optional.empty()));
+        result.add(sheet("notices", new Stack("notices", READY, LayoutRole.VERTICAL, notices), 420, 320));
         for (SplitKind kind : SplitKind.values()) result.add(sheet("split-" + kind, new Split("split", READY, kind, List.of(text("left", "Sidebar", TextRole.BODY), text("right", "Detail", TextRole.BODY))), 600, 100));
         for (FormKind kind : FormKind.values()) result.add(sheet("form-" + kind, new Form("form", READY, kind, kind.name(), Optional.empty(), List.of(row("row", "Label", field("input", "", "Value", FieldKind.TEXT))), Optional.empty(), List.of(button("save", "Save", ButtonKind.PRIMARY)), "cancel"), 480, 200));
         for (CustomKind kind : CustomKind.values()) result.add(sheet("custom-" + kind, new Custom("custom", READY, "preview", kind, kind.name()), 480, 180));

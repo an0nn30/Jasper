@@ -28,8 +28,9 @@ final class ViewReconciler implements AutoCloseable {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
-        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button)button.button.panel=false; if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) text.wrap = false; control.embeddedLabel(false); control.hero(false); });
+        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button)button.button.panel=false; if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) { text.wrap = false; text.flow = false; } control.embeddedLabel(false); control.hero(false); });
         inherit(spec.root(), next, true);
+        applyFlow(spec.root(), next);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
         applyTiles(spec.root(), next, 0);
@@ -77,6 +78,24 @@ final class ViewReconciler implements AutoCloseable {
                 ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_DETAIL_TILE) : inherited;
         if (size > 0 && node instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO && next.get(icon.id()) instanceof Labels.IconControl control) control.tile(size, false);
         ControlRegistry.children(node).forEach(child -> applyTiles(child, next, size));
+    }
+    /**
+     * Body text flows (wraps, keeping its line breaks) where its parent stacks content vertically: VERTICAL and DETAIL
+     * stacks, form bodies, cards and sections. Inline stacks and list rows keep one truncated line.
+     */
+    private void applyFlow(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
+        boolean vertical = node instanceof Nodes.Form || node instanceof Nodes.Card || node instanceof Nodes.Section
+                || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL);
+        for (var child : ControlRegistry.children(node)) {
+            if (vertical && child instanceof Nodes.Text text && switch (text.role()) {
+                        case BODY, BODY_STRONG, DESCRIPTION, CAPTION -> true;
+                        default -> false;
+                    } && next.get(child.id()).component instanceof Labels.LiteralLabel label) {
+                label.flow = true;
+                label.flowColumns = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.TEXT_FLOW_COLUMNS);
+            }
+            applyFlow(child, next);
+        }
     }
     private void collect(Nodes.Node node, Map<String, Nodes.Node> nodes) {
         nodes.put(node.id(), node); ControlRegistry.children(node).forEach(child -> collect(child, nodes));

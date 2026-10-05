@@ -86,17 +86,24 @@ final class InteractiveRows {
                     canvas,
                     "SPACE",
                     () -> {
-                        if (focusItem != null) select(focusItem, multiple());
+                        if (focusItem != null) space(focusItem);
                     });
-            bind(
-                    canvas,
-                    "CONTEXT_MENU",
-                    () -> {
-                        if (focusItem != null) context(focusItem, canvas, 0, 0);
-                    });
+            // The menu key and Shift+F10 both open the focused row's menu, as platform lists do.
+            for (String stroke : List.of("CONTEXT_MENU", "shift F10"))
+                bind(
+                        canvas,
+                        stroke,
+                        () -> {
+                            if (focusItem != null) context(focusItem, canvas, 0, 0);
+                        });
         }
 
         abstract int size();
+
+        /** Space on the focused row: it selects the row unless a collection gives the key another meaning. */
+        void space(String id) {
+            select(id, multiple());
+        }
 
         abstract String itemId(int index);
 

@@ -166,14 +166,14 @@ unique within their owning control; references resolve only in that control. Do 
 | Record | Additional fields |
 |---|---|
 | Text | `String text, TextRole role` |
-| Icon | `String name, Hue hue, IconSize size, String accessibleName` |
+| Icon | `String name, Hue hue, IconSize size, String accessibleName, Optional<Severity> severity` |
 | Button | `String label, String icon, ButtonKind kind, String action, String tooltip` |
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip` |
 | StatusDot | `StatusKind kind` |
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation` (numeric present exactly for NUMBER) |
 | Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value) |
 | Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search` (present exactly for SEARCHABLE) |
-| Toggle | `String label, boolean checked, String action, boolean compact` |
+| Toggle | `String label, boolean checked, String action, boolean compact, String tooltip` |
 | Chip | `String label, Hue hue` |
 | Progress | `double fraction, String label` (-1 means indeterminate) |
 | Strength | `int filled, String label` (0–4) |
@@ -195,7 +195,7 @@ unique within their owning control; references resolve only in that control. Do 
 
 Support records, each in its own model file: `Option(String id,String label,Optional<Hue> hue)`,
 `MenuItem(String id,String label,String icon,String action,boolean enabled,boolean separator,Nodes.Hue hue)`,
-`ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing,boolean heading)`,
+`ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing,boolean heading,Optional<List<MenuItem>> contextActions)`,
 `Column(String id,String title,TextRole role,boolean numeric,double weight,Optional<Boolean> sorted)`,
 `TableRow(String id,Map<String,String> cells,Optional<String> icon,boolean muted,Optional<List<MenuItem>> contextActions)`,
 `TreeItem(String id,String title,Optional<String> icon,boolean leaf,List<TreeItem> children,OptionalInt count,boolean emphasized,String tooltip,Optional<StatusKind> status,List<String> trailing,Optional<List<MenuItem>> contextActions)`,
@@ -207,7 +207,7 @@ Enums are nested in `Nodes`: TextRole is HERO_TITLE/DETAIL_TITLE/WINDOW_TITLE/PA
 BODY_STRONG/LABEL/DESCRIPTION/CAPTION/SECTION_LABEL/COUNT/CHIP/MONO/MONO_SMALL; Hue is
 BLUE/GREEN/AMBER/PURPLE/NEUTRAL/NONE; IconSize is CAPTION/CONTROL/RAIL/EMPTY/HERO;
 ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK;
-StatusKind is SUCCESS/WARNING/DANGER/IDLE;
+StatusKind is SUCCESS/WARNING/DANGER/IDLE; Severity is INFO/WARNING/DANGER;
 FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; FieldPresentation is STANDARD/EMBEDDED/TRANSPARENT; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
 CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED/RESULTS; SelectionMode is SINGLE/MULTIPLE;
 FormKind is HERO/SHEET/FULL/SETTINGS; LayoutRole is VERTICAL/INLINE/ACTIONS/HERO/DETAIL/FOOTER/NAVIGATION;
@@ -305,6 +305,27 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   While `editing` it shows a MONO text field holding `value` (selected for replacement when editing starts), reports
   typing as `Edited`, Enter as `submitAction`, Escape or leaving the field as `cancelAction`; `focus(id)` focuses the
   field while editing.
+
+Plan 2 Task 6c manager and notification additions (plugin manager, notifications; same mirroring and SDK version
+rule; prior constructors remain and default to the old meaning):
+- `ListItem.contextActions` (present = the row's own menu, empty list = none; a heading rejects one) is offered on that
+  row whether or not it is selected, as on TableRow/TreeItem rows: a context press never selects, and a chosen item
+  reports only its `Action`. The list's shared `contextActions` still act on the selection and open only on a selected
+  row. Every row collection opens the focused row's menu with the menu key and with Shift+F10.
+- Space on a focused item-list row whose trailing slot holds exactly one `Toggle` operates that switch: it reports
+  `Toggled(toggleId, !checked)` once and neither selects nor activates the row, so a list of switch rows stays one
+  focus stop; a disabled or busy switch makes Space do nothing. Rows without exactly one switch select as before.
+- `Toggle.tooltip` is the switch's literal tooltip and accessible description (blank shows the label); a validation
+  error still takes precedence.
+- `Icon.severity` (INFO, WARNING, DANGER) tints the glyph with `accent`, `status.warning` or `status.danger` instead of
+  its hue. New named glyphs `error` and `plugin`.
+- BODY, BODY_STRONG, DESCRIPTION and CAPTION text whose parent stacks content vertically (VERTICAL and DETAIL stacks,
+  form bodies, cards and sections) flows: it wraps to the width it is given, keeps explicit line breaks, and asks for no
+  more than `TEXT_FLOW_COLUMNS` (44) widths of 'm', the former text areas' column rule. INLINE stacks, list rows and
+  FormRow controls keep one truncated line; FormRow helper text keeps its own wrapping (no API).
+- Host-only (not projected into the SDK): `KitView(context, spec, events, pointerOnly)`. A pointer-only view's controls
+  never take keyboard focus, including controls mounted later and after theme changes, while they stay operable by
+  pointer and keep their accessible names and actions (notification cards over a terminal keep the shell's focus).
 
 Plan 2 Task 6b-2 palette additions (command palette; same mirroring and SDK version rule). Prior constructors remain
 and default to the old meaning (not a heading, no visible-row count):

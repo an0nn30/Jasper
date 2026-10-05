@@ -42,13 +42,21 @@ public final class Nodes {
         }
     }
 
-    public record Icon(String id, ControlState state, String name, Hue hue, IconSize size, String accessibleName) implements Node {
+    /** Message severity a glyph can carry: INFO in the accent colour, WARNING and DANGER in the status colours. */
+    public enum Severity { INFO, WARNING, DANGER }
+
+    /** A present {@code severity} tints the glyph with its colour instead of the hue. */
+    public record Icon(String id, ControlState state, String name, Hue hue, IconSize size, String accessibleName, Optional<Severity> severity) implements Node {
         public Icon {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.label(name, "name");
             Objects.requireNonNull(hue);
             Objects.requireNonNull(size);
             ModelChecks.label(accessibleName, "accessibleName");
+            Objects.requireNonNull(severity);
+        }
+        public Icon(String id, ControlState state, String name, Hue hue, IconSize size, String accessibleName) {
+            this(id, state, name, hue, size, accessibleName, Optional.empty());
         }
     }
 
@@ -174,11 +182,16 @@ public final class Nodes {
         }
     }
 
-    public record Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact) implements Node {
+    /** {@code tooltip} is the switch's literal tooltip (blank shows the label); a validation error still takes precedence. */
+    public record Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact, String tooltip) implements Node {
         public Toggle {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.label(label, "label");
             ModelChecks.label(action, "action");
+            Objects.requireNonNull(tooltip);
+        }
+        public Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact) {
+            this(id, state, label, checked, action, compact, "");
         }
     }
 

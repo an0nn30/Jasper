@@ -62,6 +62,39 @@ final class ItemLists {
         }
 
         @Override
+        List<MenuItem> contextActions(String id) {
+            var item = item(id);
+            return item == null ? List.of() : item.contextActions().orElse(value().contextActions());
+        }
+
+        @Override
+        boolean ownsContextActions(String id) {
+            var item = item(id);
+            return item != null && item.contextActions().isPresent();
+        }
+
+        ListItem item(String id) {
+            for (var item : value().items()) if (item.id().equals(id)) return item;
+            return null;
+        }
+
+        /**
+         * Space on a row whose trailing slot holds exactly one switch operates that switch (it reports {@code Toggled},
+         * once, without selecting or activating the row), so a list of switch rows stays one focus stop; a disabled
+         * switch makes Space do nothing. Other rows select as usual.
+         */
+        @Override
+        void space(String id) {
+            var item = item(id);
+            var toggles = item == null ? List.<Nodes.Toggle>of() : item.trailing().stream()
+                    .filter(Nodes.Toggle.class::isInstance).map(Nodes.Toggle.class::cast).toList();
+            if (toggles.size() != 1) { super.space(id); return; }
+            var toggle = toggles.getFirst();
+            if (toggle.state().visible() && toggle.state().enabled() && !toggle.state().busy())
+                emit(new UiEvent.Toggled(toggle.id(), !toggle.checked()));
+        }
+
+        @Override
         int lines() {
             return value().kind() == Nodes.ListKind.DOUBLE ? 2 : 1;
         }

@@ -27,9 +27,21 @@ public final class KitView extends JPanel implements AutoCloseable {
     private final UIDefaults defaults;
     private final PropertyChangeListener fontChanges;
 
+    private final boolean pointerOnly;
+    private final java.awt.event.ContainerListener pointerOnlyMounts = new java.awt.event.ContainerAdapter() {
+        @Override public void componentAdded(java.awt.event.ContainerEvent event) { unfocusable(event.getChild()); }
+    };
+
     /** Mount a validated descriptor tree; every operation except close requires EDT. */
-    public KitView(KitContext context, ViewSpec spec, Consumer<UiEvent> events) {
-        requireEdt(); this.context = Objects.requireNonNull(context); this.events = Objects.requireNonNull(events);
+    public KitView(KitContext context, ViewSpec spec, Consumer<UiEvent> events) { this(context, spec, events, false); }
+
+    /**
+     * Mount a descriptor tree whose controls never take keyboard focus when {@code pointerOnly}: a host overlay (for
+     * example notification cards over a terminal) keeps the focus where it is while its controls stay operable by pointer
+     * and keep their accessible names and actions. App-only; not part of the plugin SDK.
+     */
+    public KitView(KitContext context, ViewSpec spec, Consumer<UiEvent> events, boolean pointerOnly) {
+        requireEdt(); this.pointerOnly = pointerOnly; this.context = Objects.requireNonNull(context); this.events = Objects.requireNonNull(events);
         this.reconciler = new ViewReconciler(this); this.motion = context.motionPolicy();
         setLayout(new BorderLayout()); setOpaque(false); KitOwnership.mark(this, "view");
         defaults = UIManager.getDefaults();
@@ -38,6 +50,7 @@ public final class KitView extends JPanel implements AutoCloseable {
             if (EventQueue.isDispatchThread()) refresh(); else EventQueue.invokeLater(this::refresh);
         };
         try {
+            if (pointerOnly) unfocusable(this);
             update(spec); defaults.addPropertyChangeListener(fontChanges);
             appearance = context.binding().subscribe(pair -> refresh());
         } catch (Throwable failure) {
@@ -49,6 +62,7 @@ public final class KitView extends JPanel implements AutoCloseable {
         if (updating) throw new IllegalStateException("Reentrant view update");
         ViewSpec previous = this.spec;
         updating = true; try { reconciler.update(spec); this.spec = spec; } finally { updating = false; }
+        if (pointerOnly) unfocusable(this);
         // Native panel hosts reborrow a replacement header after reconciliation, never during it.
         try { firePropertyChange("viewSpec", previous, spec); } catch (Throwable failure) { report(failure); }
     }
@@ -130,7 +144,20 @@ public final class KitView extends JPanel implements AutoCloseable {
     }
     private void refresh() {
         if (closeRequested.get()) return;
-        try { motion.enabled(); reconciler.refresh(); } catch (Throwable failure) { report(failure); }
+        try { motion.enabled(); reconciler.refresh(); if (pointerOnly) unfocusable(this); } catch (Throwable failure) { report(failure); }
+    }
+    /** Whether this view's controls never take keyboard focus. */
+    public boolean pointerOnly() { return pointerOnly; }
+    /** Makes a mounted subtree unfocusable, and anything later mounted into it (lazily mounted rows included). */
+    private void unfocusable(Component component) {
+        component.setFocusable(false);
+        if (component instanceof Container container) {
+            if (container instanceof JComponent owned && owned.getClientProperty(pointerOnlyMounts) == null) {
+                owned.putClientProperty(pointerOnlyMounts, Boolean.TRUE);
+                container.addContainerListener(pointerOnlyMounts);
+            }
+            for (Component child : container.getComponents()) unfocusable(child);
+        }
     }
     private static void requireEdt() { if (!EventQueue.isDispatchThread()) throw new IllegalStateException("KitView requires EDT"); }
     private void requireOpen() { requireEdt(); if (closeRequested.get()) throw new IllegalStateException("KitView is closed"); }

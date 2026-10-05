@@ -46,6 +46,31 @@ class ThemeImportTest {
     void click(String label) throws Exception { edt(() -> { var buttons = buttons(windows.open().getLast().holder()); buttons.stream().filter(b -> b.getText().equals(label)).findFirst().orElseThrow().doClick(); }); }
     static List<JButton> buttons(Container root){var out=new ArrayList<JButton>();for(var c:root.getComponents()){if(c instanceof JButton b)out.add(b);if(c instanceof Container nested)out.addAll(buttons(nested));}return out;}
     static List<String> texts(Container root){return dev.jasper.app.testsupport.KitTestSupport.texts(root);}
+    /** Plan 2 Task 6c ruling G4: a long message flows over several lines instead of widening the sheet past 44 columns. */
+    @Test void aLongMessageWrapsInsideItsSheetAndKeepsItsCloseButton() throws Exception {
+        String line = "The theme archive could not be read because one of its files is not a valid theme document.";
+        String text = line + "\n\n" + line + " " + line;
+        edt(() -> {
+            var dialogs = new ThemeDialogs(windows, () -> owner, dev.jasper.app.testsupport.KitTestSupport::context);
+            dialogs.message("Import failed", text);
+            var surface = windows.open().getLast(); var sheet = surface.holder();
+            var label = dev.jasper.app.testsupport.KitTestSupport.require(sheet, "message-text", JLabel.class);
+            var metrics = label.getFontMetrics(label.getFont());
+            int columns = metrics.charWidth('m') * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.TEXT_FLOW_COLUMNS);
+            assertThat(label.getPreferredSize().width).isLessThanOrEqualTo(columns);
+            sheet.setSize(sheet.getPreferredSize()); dev.jasper.app.testsupport.KitTestSupport.layout(sheet);
+            assertThat(label.getWidth()).isLessThanOrEqualTo(sheet.getWidth());
+            int lines = label.getHeight() / metrics.getHeight();
+            assertThat(lines).as("both paragraphs, their break and the wrapped tail").isGreaterThanOrEqualTo(4);
+            assertThat(label.getHeight() % metrics.getHeight()).isZero();
+            var close = buttons(sheet).stream().filter(b -> b.getText().equals("Close")).findFirst().orElseThrow();
+            assertThat(close.getWidth()).as("the action row is laid out").isPositive();
+            assertThat(close.getY() + close.getHeight()).isLessThanOrEqualTo(sheet.getHeight());
+            close.doClick();
+            assertThat(surface.closed()).as("Close still closes the sheet").isTrue();
+            dialogs.close();
+        });
+    }
     @Test void importUsesFrozenPlanAndBusyGatesDoubleClickWithoutConfigWrite() throws Exception {
         chosen=source("Example"); Files.writeString(home.resolve("config.toml"), "# untouched\n");
         edt(() -> { imports.importThemes(report::set); imports.importThemes(report::set); }); assertThat(worker.jobs).hasSize(1);

@@ -6,15 +6,24 @@ import java.util.Objects;
 
 /**
  * Immutable listitem descriptor. A {@code heading} is a kit-styled section row (its title only, with a separator above
- * it unless it is the first row): it is never selected, activated, hovered or offered a menu.
+ * it unless it is the first row): it is never selected, activated, hovered or offered a menu. A present
+ * {@code contextActions} is the row's own context menu, offered on that row whether or not it is selected (the list's
+ * shared menu acts on the selection); an empty list means the row has none.
  */
-public record ListItem(String id, Optional<Nodes.Node> leading, List<Nodes.Node> title, List<Nodes.Node> subtitle, List<Nodes.Node> trailing, boolean heading) {
+public record ListItem(String id, Optional<Nodes.Node> leading, List<Nodes.Node> title, List<Nodes.Node> subtitle, List<Nodes.Node> trailing, boolean heading,
+                       Optional<List<MenuItem>> contextActions) {
     public ListItem {
         ModelChecks.id(id);
         Objects.requireNonNull(leading); title = List.copyOf(title); subtitle = List.copyOf(subtitle); trailing = List.copyOf(trailing);
         leading.ifPresent(ListItem::inline); title.forEach(ListItem::inline); subtitle.forEach(ListItem::inline); trailing.forEach(ListItem::inline);
         if (heading && (leading.isPresent() || !subtitle.isEmpty() || !trailing.isEmpty() || title.isEmpty()))
             throw new IllegalArgumentException("A heading has a title only");
+        Objects.requireNonNull(contextActions); contextActions = contextActions.map(List::copyOf); contextActions.ifPresent(items -> ModelChecks.unique(items, MenuItem::id));
+        if (heading && contextActions.isPresent()) throw new IllegalArgumentException("A heading has no menu");
+    }
+    /** An item without a menu of its own. */
+    public ListItem(String id, Optional<Nodes.Node> leading, List<Nodes.Node> title, List<Nodes.Node> subtitle, List<Nodes.Node> trailing, boolean heading) {
+        this(id, leading, title, subtitle, trailing, heading, Optional.empty());
     }
     /** An ordinary, selectable item. */
     public ListItem(String id, Optional<Nodes.Node> leading, List<Nodes.Node> title, List<Nodes.Node> subtitle, List<Nodes.Node> trailing) {

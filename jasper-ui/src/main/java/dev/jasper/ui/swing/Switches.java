@@ -41,8 +41,8 @@ final class Switches {
         @Override void refresh() {
             var toggle = (Nodes.Toggle)node; state(); button.compact = toggle.compact(); button.error = !toggle.state().error().isEmpty();
             button.setSelected(toggle.checked()); button.getAccessibleContext().setAccessibleName(toggle.label());
-            button.getAccessibleContext().setAccessibleDescription(toggle.state().error());
-            button.setToolTipText(toggle.state().error().isEmpty() ? toggle.label() : toggle.state().error());
+            button.getAccessibleContext().setAccessibleDescription(toggle.state().error().isEmpty() ? toggle.tooltip() : toggle.state().error());
+            button.setToolTipText(!toggle.state().error().isEmpty() ? toggle.state().error() : toggle.tooltip().isBlank() ? toggle.label() : toggle.tooltip());
             double next = toggle.checked() ? 1 : 0;
             if (next != target) {
                 from = button.position; target = next;

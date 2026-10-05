@@ -47,6 +47,22 @@ class KitValuesTest {
         assertThatThrownBy(() -> new ViewSpec(new Panel("panel", ControlState.READY, header, Optional.empty(), text("same"), Optional.empty())))
             .isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void rowMenusSwitchTooltipsAndSeveritiesAreValidated() {
+        var title = List.<Node>of(text("t"));
+        var items = new ArrayList<MenuItem>(List.of(new MenuItem("m", "Open", "", "open", true, false)));
+        var row = new ListItem("r", Optional.empty(), title, List.of(), List.of(), false, Optional.of(items)); items.clear();
+        assertThat(row.contextActions()).hasValueSatisfying(menu -> assertThat(menu).hasSize(1));
+        assertThat(new ListItem("plain", Optional.empty(), title, List.of(), List.of()).contextActions()).isEmpty();
+        assertThatThrownBy(() -> new ListItem("h", Optional.empty(), title, List.of(), List.of(), true, Optional.of(List.of())))
+            .isInstanceOf(IllegalArgumentException.class);
+        var twice = List.of(new MenuItem("m", "Open", "", "open", true, false), new MenuItem("m", "Again", "", "again", true, false));
+        assertThatThrownBy(() -> new ListItem("r", Optional.empty(), title, List.of(), List.of(), false, Optional.of(twice)))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new Toggle("t", ControlState.READY, "On", true, "on", true).tooltip()).isEmpty();
+        assertThatThrownBy(() -> new Toggle("t", ControlState.READY, "On", true, "on", true, null)).isInstanceOf(NullPointerException.class);
+        assertThat(new Icon("i", ControlState.READY, "info", Hue.NONE, IconSize.RAIL, "Info").severity()).isEmpty();
+        assertThatThrownBy(() -> new Icon("i", ControlState.READY, "info", Hue.NONE, IconSize.RAIL, "Info", null)).isInstanceOf(NullPointerException.class);
+    }
     @Test void nestedCollectionsAreImmutableSnapshots() {
         var children = new ArrayList<Node>(); children.add(text("text"));
         var root = new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, children);

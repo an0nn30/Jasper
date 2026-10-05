@@ -256,13 +256,19 @@ class KitViewTest {
                 KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(260), com.formdev.flatlaf.util.UIScale.scale(150), 1);
                 assertThat(view.control("text").component).isSameAs(label);
                 assertThat(label.wrap).as("standalone BODY must not inherit old helper wrapping").isFalse();
-                assertThat(label.getHeight()).isEqualTo(label.getPreferredSize().height);
+                // Plan 2 Task 6c ruling G4: BODY text directly in a vertical stack flows at its own width instead.
+                assertThat(label.flow).isTrue();
+                assertThat(label.getHeight()).isEqualTo(label.wrappedHeight(label.getWidth()));
+                assertThat(label.getHeight()).as("the 260 px column needs two lines").isEqualTo(2 * label.getFontMetrics(label.getFont()).getHeight());
                 view.update(stack(new FormRow("row", ControlState.READY, "Label", "", caption, java.util.Optional.empty())));
                 KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(260), com.formdev.flatlaf.util.UIScale.scale(150), 1);
                 assertThat(label.wrap).isTrue();
+                assertThat(label.flow).as("a FormRow helper wraps by its own rule, not by flowing").isFalse();
                 view.update(stack(new FormRow("row", ControlState.READY, "Label", "", new Text("text", ControlState.READY, content, TextRole.BODY), java.util.Optional.empty())));
                 KitFixtures.render(view, com.formdev.flatlaf.util.UIScale.scale(260), com.formdev.flatlaf.util.UIScale.scale(150), 1);
                 assertThat(label.wrap).isFalse();
+                assertThat(label.flow).as("BODY as a FormRow control keeps one line").isFalse();
+                assertThat(label.getHeight()).isEqualTo(label.getPreferredSize().height);
             } finally { context.icons().close(); context.binding().close(); }
         });
     }

@@ -11,18 +11,38 @@ final class Labels {
     private Labels() {}
     static JLabel literal() { var label = new LiteralLabel(); label.putClientProperty("html.disable", true); return label; }
     static class LiteralLabel extends JLabel {
+        /** Wraps to the width a FormRow gives it. */
         boolean wrap;
+        /**
+         * Flows in a vertical container: wraps to the width it is given, keeps explicit line breaks, and asks for no
+         * more than {@code flowColumns} widths of 'm' (the former text areas' column rule).
+         */
+        boolean flow;
+        int flowColumns;
         final Composition.WrappedText wrapped = new Composition.WrappedText();
         int wrappedHeight(int width) {
-            wrapped.text = getText(); wrapped.setFont(getFont());
+            wrapped.text = getText() == null ? "" : getText(); wrapped.setFont(getFont());
             return wrapped.height(width);
+        }
+        boolean wraps() { return wrap || flow; }
+        @Override public Dimension getPreferredSize() {
+            if (!flow || isPreferredSizeSet()) return super.getPreferredSize();
+            var metrics = getFontMetrics(getFont()); Insets insets = getInsets();
+            int widest = 0;
+            for (String line : (getText() == null ? "" : getText()).split("\n", -1)) widest = Math.max(widest, metrics.stringWidth(line));
+            int width = Math.min(widest, flowColumns * metrics.charWidth('m'));
+            return new Dimension(width + insets.left + insets.right, wrappedHeight(Math.max(1, width)) + insets.top + insets.bottom);
+        }
+        @Override public Dimension getMinimumSize() {
+            if (!flow || isMinimumSizeSet()) return super.getMinimumSize();
+            return new Dimension(0, getPreferredSize().height);
         }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {
                 ThemePainting.antialias(g); g.setFont(getFont()); g.setColor(getForeground());
-                if (wrap) {
+                if (wraps()) {
                     wrappedHeight(getWidth()); wrapped.setForeground(getForeground()); wrapped.setEnabled(isEnabled());
                     wrapped.setSize(getSize()); wrapped.paintComponent(g); return;
                 }
@@ -51,13 +71,24 @@ final class Labels {
             }));
         }
     }
+    /** The colour a severity tints a glyph with: information in the accent, warnings and dangers in their status colours. */
+    static SemanticColor tint(Nodes.Severity severity) {
+        return switch (severity) {
+            case INFO -> SemanticColor.ACCENT;
+            case WARNING -> SemanticColor.STATUS_WARNING;
+            case DANGER -> SemanticColor.STATUS_DANGER;
+        };
+    }
     static final class IconControl extends ControlRegistry.Control {
         int tileSize; boolean selected;
         void tile(int logicalSize, boolean value) { tileSize = logicalSize; selected = value; refresh(); }
         IconControl(KitView view, Nodes.Icon node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
-            label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), selected) : context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()))));
+            int size = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()));
+            label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), selected)
+                : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme().semantic(), tint(icon.severity().get()), size)
+                : context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), size));
             label.getAccessibleContext().setAccessibleName(icon.accessibleName());
             label.setToolTipText(icon.accessibleName());
         }
