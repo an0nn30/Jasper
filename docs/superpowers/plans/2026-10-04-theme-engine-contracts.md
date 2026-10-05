@@ -53,7 +53,7 @@ Its enum identifiers are the uppercase semantic names with dots replaced by unde
 The complete standard color set is:
 
 ```text
-surface.app surface.panel surface.panel.raised surface.dialog surface.card surface.sidebar
+surface.app surface.status surface.panel surface.panel.raised surface.dialog surface.card surface.sidebar
 surface.input surface.control surface.control.hover surface.menu surface.terminal surface.scrim
 border.window border.subtle border.input border.control border.menu border.focus border.error
 text.primary text.secondary text.tertiary text.placeholder text.onAccent text.onAccent.secondary
@@ -79,7 +79,7 @@ canonical values derive from the resolved old generator as follows; the right si
 
 | Canonical roles | Base |
 |---|---|
-| app; panel; panel.raised; dialog; card; sidebar | TITLE_BAR; SURFACE; SURFACE_RAISED; SURFACE; SURFACE_SUNKEN; SIDEBAR |
+| app; status; panel; panel.raised; dialog; card; sidebar | TITLE_BAR; STATUS_BAR; SURFACE; SURFACE_RAISED; SURFACE; SURFACE_SUNKEN; SIDEBAR |
 | input; control; control.hover; menu; terminal | INPUT_BACKGROUND; BUTTON_BACKGROUND; HOVER; SURFACE_RAISED; terminal background |
 | window; subtle; input; control; menu borders | BORDER; SEPARATOR; BORDER; BUTTON_BORDER; BORDER |
 | primary; secondary; tertiary; placeholder text | TEXT; TEXT_MUTED; TEXT_MUTED; TEXT_DISABLED |
@@ -614,7 +614,16 @@ is the single vendor-key → canonical-role table (`ToolWindow.background`, `Tex
 ledger. Borrowed kit headers resync the dock only when `panelHeader` identity changes (or the view closes); the
 Options host action opens under its button. `ThemeController.startup(saved, fallingBack)` owns the Jasper Dark
 start-up fallback and installs a snapshot before any reader runs. Open: the status-bar surface/indicator floors
-(ledger, Task 5 fix round 1).
+(ledger, Task 5 fix round 1) — resolved by the controller ruling below.
+
+Fix round 1 controller ruling (2026-10-05): canonical role `surface.status` (enum `SURFACE_STATUS`, 48 roles)
+is added to the module `theme.SemanticColor`, the SDK projection `sdk.ui.SemanticColor` (same name and position;
+the host maps by name, the testkit fake enumerates all values) and `[semantic]` TOML. Its base is the legacy
+`status_bar` token; `StatusBar.background` joins `UiColorKeys.semanticRoles()`; explicit `[semantic]` wins. The
+native status bar paints on it. `theme.SurfaceContrast` is the single readability rule (`readable`,
+`blackOrWhite`, `on(palette, role, surface, minimum)`, `TEXT` 4.5, `INDICATOR` 3): the generator's derived tokens,
+surface-tinted icons, status text and the running dot on `surface.status` (4.5) and rail badges on `surface.app`
+(3) use it. `on` applies a floor only where a role is painted; resolved shared roles are never changed.
 
 Temporary raw defaults and plugin styling retain only the exact consumers/removal owners in
 [temporary-paths](../../design/theme-engine/temporary-paths.md). Dynamic SDK current() readers require

@@ -241,8 +241,8 @@ kind; before Task 5 both notice commands were identical default `JButton`s, so t
 restore). Any visual change to these belongs to **Plan 3 Task 10**.
 
 **Vendor keys with a canonical role.** One module table, `UiColorKeys.semanticRoles()`, translates
-`ToolWindow.background` → `surface.sidebar`, `TextField.background` → `surface.input` and
-`Separator.foreground` → `border.subtle`: an authored value wins over the legacy token for that role (as the raw
+`ToolWindow.background` → `surface.sidebar`, `TextField.background` → `surface.input`,
+`Separator.foreground` → `border.subtle` and `StatusBar.background` → `surface.status`: an authored value wins over the legacy token for that role (as the raw
 key did for the native consumer) and an explicit `[semantic]` value wins over both. `MainToolbar.background` and
 `TitlePane.background` keep their existing translation as `title_bar` aliases into `surface.app` (token
 precedence, as the old `Jasper.titleBackground` publication had).
@@ -254,7 +254,6 @@ non-color data are unchanged); Task 11 owns the diagnostic when raw publication 
 
 | Key(s) | Native consumer now | Canonical route |
 |---|---|---|
-| `StatusBar.background` | status bar surface | `surface.app` (see open item below) |
 | `TitlePane.foreground`, `TitlePane.inactiveForeground`, `MainToolbar.foreground` | title/toolbar text | `text.secondary`/`text.tertiary`/`text.primary` |
 | `MainToolbar.borderColor`, `Borders.color` | title separator | `border.subtle` |
 | `MainToolbar.searchField.*`, `SearchEverywhere.SearchField.*` | title search field | `surface.input`, `surface.control.hover`, `border.input`, `text.primary`, `text.placeholder` |
@@ -262,17 +261,15 @@ non-color data are unchanged); Task 11 owns the diagnostic when raw publication 
 | `Button.toolbar.{hover,pressed,selected}Background` | native toolbar commands | `hover.overlay` at 8 %, `surface.control.hover`, `segment.selected.bg` |
 | `Popup.dropShadowColor` | command palette shadow | `surface.scrim` |
 | `DragAndDrop.areaBackground`, `DragAndDrop.borderColor` | dock drop guides | `accent` at the named 25 %/60 % alphas |
-| `Label.infoForeground`, `Actions.{Green,Yellow,Red}`, `TabbedPane.underlineColor` | muted/status/badge colors | `text.secondary`, `status.*`, `accent` |
+| `Label.infoForeground`, `Actions.{Green,Yellow,Red}`, `TabbedPane.underlineColor` | muted/status/badge colors | `text.secondary`, `status.*` (floored on `surface.status`), `accent` (floored on the rail) |
 
-**Open (controller decision needed): status-bar surface and chrome indicator contrast floors.** Task 5 paints the
-status bar on `surface.app` (the title bar), but the module derives `status.*` readable against the
-`status_bar` token, and the deleted ChromeKeys floors measured status text against `StatusBar.background` and
-rail badges against the title bar. There is no canonical status-bar surface role. Holding the shared canonical
-`status.*`/`text.link` roles to a floor on `surface.app` was tried and rejected: in a light theme with a dark
-title bar (for example IntelliJ New UI Light: `MainToolbar.background` Gray2, `StatusBar.background` Gray13)
-it moves the status colors toward white, unreadable on light panels where kit status chips use the same roles.
-Options are recorded in the Task 5 report (fix round 1, F5). Until decided, derived status colors keep their
-4.5:1 floor against the `status_bar` token (module generator) and no floor is guaranteed against `surface.app`.
+**Status-bar surface and indicator floors (controller ruling, fix round 1).** Canonical `surface.status` (base
+`status_bar`; vendor `StatusBar.background`; explicit `[semantic]` wins) is the native status bar's surface, so
+light themes with a dark title bar (IntelliJ New UI Light: `MainToolbar.background` Gray2, `StatusBar.background`
+Gray13) keep their light status bar. Status text and the running dot are held to 4.5:1 on `surface.status`, and
+rail badges to 3:1 on `surface.app`, by `theme.SurfaceContrast.on` where painted; the shared `status.*`/`accent`
+roles are not changed. Rejected alternative: flooring the shared canonical roles against `surface.app` (it made
+status colors unreadable on light panels).
 
 ## Task 4 typed-mount transition — exact Task 11 removal owners
 

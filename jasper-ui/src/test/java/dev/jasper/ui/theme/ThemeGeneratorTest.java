@@ -52,7 +52,22 @@ class ThemeGeneratorTest {
         assertThat(generate(SEEDS + tokens).semantic().color(SemanticColor.SURFACE_SIDEBAR)).isEqualTo(new Color(0x3c3f41));
         var explicit = generate(SEEDS + tokens + ui + "\n[semantic]\n\"surface.sidebar\"=\"#010203\"\n").semantic();
         assertThat(explicit.color(SemanticColor.SURFACE_SIDEBAR)).isEqualTo(new Color(0x010203));
-        assertThat(UiColorKeys.semanticRoles()).containsOnlyKeys("ToolWindow.background", "TextField.background", "Separator.foreground");
+        assertThat(UiColorKeys.semanticRoles()).containsOnlyKeys("ToolWindow.background", "TextField.background", "Separator.foreground",
+            "StatusBar.background");
+    }
+
+    /** The status bar's own surface: the status_bar token, an authored StatusBar.background, or an explicit value. */
+    @Test void statusSurfaceComesFromTheStatusBarTokenItsVendorKeyOrAnExplicitValue() {
+        String light = SEEDS.replace("#1e1e2e", "#fafafa").replace("#cdd6f4", "#383a42");
+        var derived = generate(light + "\n[tokens]\ntitle_bar=\"#1c1c1c\"\n");
+        assertThat(derived.semantic().color(SemanticColor.SURFACE_STATUS)).isEqualTo(derived.tokens().get(Token.STATUS_BAR))
+            .isNotEqualTo(derived.semantic().color(SemanticColor.SURFACE_APP));
+        String tokens = light + "\n[tokens]\nstatus_bar=\"#e0e0e0\"\n";
+        assertThat(generate(tokens).semantic().color(SemanticColor.SURFACE_STATUS)).isEqualTo(new Color(0xe0e0e0));
+        String vendor = tokens + "\n[ui]\n\"StatusBar.background\" = \"#f7f8fa\"\n";
+        assertThat(generate(vendor).semantic().color(SemanticColor.SURFACE_STATUS)).isEqualTo(new Color(0xf7f8fa));
+        assertThat(generate(vendor + "\n[semantic]\n\"surface.status\"=\"#102030\"\n").semantic().color(SemanticColor.SURFACE_STATUS))
+            .isEqualTo(new Color(0x102030));
     }
 
     @Test void seedsAloneMakeACompleteTheme() {

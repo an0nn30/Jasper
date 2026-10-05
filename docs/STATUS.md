@@ -2,7 +2,14 @@
 
 ## Current state — 2026-10-05
 
-- **Theme engine Plan 2 Task 5 review fix round 1: F1–F4, F6–F8 fixed; F5 partly fixed, one item needs a
+- **Theme engine Plan 2 Task 5 review fix round 1 complete; fix review pending** (2026-10-05). Controller
+  ruling applied: canonical `surface.status` (module, SDK projection, `[semantic]` TOML; base `status_bar`, vendor
+  `StatusBar.background`) is the native status bar's surface; `theme.SurfaceContrast` holds painted status text
+  (4.5:1 on the status surface) and rail badges (3:1 on the rail) without changing shared roles. Task 5's per-paint
+  platform font-family lookup leaked macOS CFonts and exhausted the single-JVM test heap (no OOM at e8ffc7f8);
+  the family is now resolved once. JasperApplicationPluginsTest asserts the snapshot LAF identity. Earlier round-1
+  note follows.
+- **Task 5 fix round 1, first pass: F1–F4, F6–F8 fixed; F5 partly fixed, one item needed a
   controller decision** (2026-10-05). Named icons on terminal-palette folder tabs are tinted for that surface;
   native recipes keep pre-migration geometry and button kinds (borderless find query, rail arc 10, toolbar hover
   arc 6, disabled 38 %, framed notice/Migrate Config, look-and-feel margins) under their own named metrics;

@@ -12,7 +12,9 @@ class PanelAndWindowValuesTest {
         assertThat(spec.defaultAnchor()).isEqualTo(Anchor.LEFT);
         assertThatIllegalArgumentException().isThrownBy(() -> new PanelSpec("nodot", "Hosts", new ImageIcon(), Anchor.LEFT));
         assertThatIllegalArgumentException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", " ", new ImageIcon(), Anchor.LEFT));
-        assertThatNullPointerException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", "Hosts", null, Anchor.LEFT));
+        assertThatIllegalArgumentException().as("Task 4 dual-source rule: exactly one icon source")
+            .isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", "Hosts", (javax.swing.Icon) null, Anchor.LEFT))
+            .withMessage("Exactly one icon source is required");
         assertThatNullPointerException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", "Hosts", new ImageIcon(), null));
         assertThat(spec.toggleActionId()).as("the application registers <id>.toggle").isEmpty();
         var named = spec.withToggleActionId("dev.x.tool.show");

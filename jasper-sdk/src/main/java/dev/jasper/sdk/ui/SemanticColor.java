@@ -5,6 +5,7 @@ import java.util.Optional;
 /** Stable canonical theme roles. Paint opacity and geometry belong to the kit. */
 public enum SemanticColor {
     SURFACE_APP("surface.app"),
+    SURFACE_STATUS("surface.status"),
     SURFACE_PANEL("surface.panel"),
     SURFACE_PANEL_RAISED("surface.panel.raised"),
     SURFACE_DIALOG("surface.dialog"),

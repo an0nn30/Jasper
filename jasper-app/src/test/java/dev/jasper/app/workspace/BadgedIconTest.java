@@ -30,9 +30,18 @@ class BadgedIconTest {
                 var g = image.createGraphics();
                 try { icon.paintIcon(new JLabel(), g, 0, 0); } finally { g.dispose(); }
                 int dot = UIScale.scale(6);
-                Color expected = dev.jasper.app.platform.ThemeZone.color(null, tone == PanelBadge.Tone.ERROR ? dev.jasper.ui.theme.SemanticColor.STATUS_DANGER : dev.jasper.ui.theme.SemanticColor.ACCENT);
-                assertThat(new Color(image.getRGB(icon.getIconWidth() - dot / 2 - 1, dot / 2), true)).as("%s %s", theme, tone)
-                    .isEqualTo(new Color(expected.getRGB()));
+                // The tone's role as painted on the rail, held to the 3:1 indicator floor there (IntelliJ Light's pale
+                // accent is lifted; Jasper Dark's roles already read and are painted as resolved).
+                var palette = dev.jasper.app.platform.ThemeZone.theme(null).semantic();
+                Color expected = dev.jasper.ui.theme.SurfaceContrast.on(palette, tone == PanelBadge.Tone.ERROR
+                    ? dev.jasper.ui.theme.SemanticColor.STATUS_DANGER : dev.jasper.ui.theme.SemanticColor.ACCENT,
+                    dev.jasper.ui.theme.SemanticColor.SURFACE_APP, dev.jasper.ui.theme.SurfaceContrast.INDICATOR);
+                Color painted = new Color(image.getRGB(icon.getIconWidth() - dot / 2 - 1, dot / 2), true);
+                assertThat(painted).as("%s %s", theme, tone).isEqualTo(new Color(expected.getRGB()));
+                assertThat(dev.jasper.ui.theme.ColorMath.contrast(painted, palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)))
+                    .as("%s %s on the rail", theme, tone).isGreaterThanOrEqualTo(3);
+                if (theme == Theme.DARK) assertThat(expected).isEqualTo(palette.color(tone == PanelBadge.Tone.ERROR
+                    ? dev.jasper.ui.theme.SemanticColor.STATUS_DANGER : dev.jasper.ui.theme.SemanticColor.ACCENT));
             }
         }
     }

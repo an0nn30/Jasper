@@ -40,6 +40,11 @@ class AppearanceContractTest {
         assertThatNullPointerException().isThrownBy(() -> legacy.workspaceOpacity(null));
     }
 
+    @Test void semanticColorsIncludeTheStatusBarSurface() {
+        assertThat(SemanticColor.values()).hasSize(48);
+        assertThat(SemanticColor.of("surface.status")).contains(SemanticColor.SURFACE_STATUS);
+    }
+
     @Test void theCatalogHoldsFortySevenMeaningsIncludingTheChromeNames() {
         assertThat(IconName.values()).hasSize(47)
             .contains(IconName.SPLIT, IconName.ZOOM, IconName.TERMINAL, IconName.SERVER);

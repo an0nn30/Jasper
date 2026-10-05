@@ -20,6 +20,7 @@ class SemanticTomlTest {
             accent = "#ff000040"
             [semantic]
             "surface.card" = "#aabbcc80"
+            "surface.status" = "#f7f8fa"
             accent = "#00ff0070"
             [syntax]
             keyword = { color = "#12345678", bold = true, italic = true }
@@ -34,7 +35,9 @@ class SemanticTomlTest {
         var second = ThemeToml.parse(output, first.origin());
         assertThat(second).isEqualTo(first);
         assertThat(output).contains("[semantic]", "\"surface.card\" = \"#aabbcc80\"");
-        assertThat(second.semanticOverrides()).containsEntry(SemanticColor.ACCENT, new Color(0, 255, 0, 112));
+        assertThat(second.semanticOverrides()).containsEntry(SemanticColor.ACCENT, new Color(0, 255, 0, 112))
+            .containsEntry(SemanticColor.SURFACE_STATUS, new Color(0xf7f8fa));
+        assertThat(output).contains("\"surface.status\" = \"#f7f8fa\"");
         assertThat(second.metadata()).containsEntry("provenance", "community");
         assertThat(ThemeTomlWriter.write(ThemeToml.parse("name='Legacy'", "legacy.toml"))).doesNotContain("[semantic]");
     }

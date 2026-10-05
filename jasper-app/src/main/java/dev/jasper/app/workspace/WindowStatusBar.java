@@ -193,10 +193,14 @@ final class WindowStatusBar extends JPanel {
         return ThemeZone.font(Typography.Role.CAPTION);
     }
 
+    /** A status color as painted on the status surface: held to the text floor there, shared role untouched. */
+    private static Color onStatus(SemanticColor role) {
+        return dev.jasper.ui.theme.SurfaceContrast.on(ThemeZone.theme(null).semantic(), role, SemanticColor.SURFACE_STATUS,
+            dev.jasper.ui.theme.SurfaceContrast.TEXT);
+    }
     private Color muted() { return ThemeZone.color(null, SemanticColor.TEXT_SECONDARY); }
     private static Color surface() {
-        Color colour = ThemeZone.color(null, SemanticColor.SURFACE_APP);
-        return colour != null ? colour : ThemeZone.color(null, SemanticColor.SURFACE_PANEL);
+        return ThemeZone.color(null, SemanticColor.SURFACE_STATUS);
     }
     void refreshTheme() {
         setBackground(surface());
@@ -206,7 +210,7 @@ final class WindowStatusBar extends JPanel {
                 item.setForeground(muted());
                 item.setFont(statusFont());
             } else if (child instanceof StatusProgressView progress) progress.refreshTheme();
-        configButton.setForeground(ThemeZone.color(null, configColor));
+        configButton.setForeground(onStatus(configColor));
     }
 
     private final class Segment extends JPanel {
@@ -275,7 +279,7 @@ final class WindowStatusBar extends JPanel {
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         if (showingContent) return;
-        g.setColor(running ? ThemeZone.color(null, SemanticColor.STATUS_SUCCESS) : muted());
+        g.setColor(running ? onStatus(SemanticColor.STATUS_SUCCESS) : muted());
         var copy = (Graphics2D) g.create();
         try {
             copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

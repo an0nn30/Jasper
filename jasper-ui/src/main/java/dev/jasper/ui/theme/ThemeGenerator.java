@@ -205,14 +205,10 @@ public final class ThemeGenerator {
 
         /** Prefer the theme's foreground, but fall back when it cannot meet the floor on this fill. */
         private static Color readable(Color color, Color fill, double minimum, Color toward) {
-            Color adjusted = ColorMath.readable(color, fill, minimum, toward);
-            return contrast(adjusted, fill) >= minimum ? adjusted
-                : ColorMath.readable(color, fill, minimum, blackOrWhite(fill));
+            return SurfaceContrast.readable(color, fill, minimum, toward);
         }
 
-        private static Color blackOrWhite(Color fill) {
-            return contrast(Color.WHITE, fill) >= contrast(Color.BLACK, fill) ? Color.WHITE : Color.BLACK;
-        }
+        private static Color blackOrWhite(Color fill) { return SurfaceContrast.blackOrWhite(fill); }
 
         private SyntaxStyle syntax(SyntaxRole role) {
             SyntaxStyle explicit = document.syntax().get(role);

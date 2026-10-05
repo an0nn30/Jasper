@@ -41,11 +41,10 @@ public final class IconRegistry implements AutoCloseable {
     /** The tint {@link #icon(String, Color, Color, int)} paints; one module rule for surface-tinted artwork. */
     public static Color surfaceTint(Color surface, Color foreground) {
         Objects.requireNonNull(surface); Objects.requireNonNull(foreground);
-        Color extreme = ColorMath.contrast(Color.WHITE, surface) >= ColorMath.contrast(Color.BLACK, surface) ? Color.WHITE : Color.BLACK;
         Color opaque = new Color(foreground.getRGB() & 0xffffff);
-        return ColorMath.contrast(opaque, surface) >= SURFACE_FLOOR ? opaque : ColorMath.readable(opaque, surface, SURFACE_FLOOR, extreme);
+        return ColorMath.contrast(opaque, surface) >= SurfaceContrast.INDICATOR ? opaque
+            : SurfaceContrast.readable(opaque, surface, SurfaceContrast.INDICATOR, SurfaceContrast.blackOrWhite(surface));
     }
-    private static final double SURFACE_FLOOR = 3;
     /** Category tile. Selected treatment is shared across list/menu renderers, applied to base alpha exactly once. */
     public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize, boolean selected) {
         Color foreground = selected ? palette.color(SemanticColor.TEXT_ONACCENT) : tint(palette, hue);

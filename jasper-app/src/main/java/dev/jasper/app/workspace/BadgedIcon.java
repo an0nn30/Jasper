@@ -47,8 +47,10 @@ final class BadgedIcon implements Icon {
                 g.setColor(rail);
                 g.fillOval(left - ring, y - ring, dot + 2 * ring, dot + 2 * ring);
             }
-            Color color = ThemeZone.color(null, tone == PanelBadge.Tone.ERROR ? SemanticColor.STATUS_DANGER : SemanticColor.ACCENT);
-            g.setColor(color != null ? color : Color.RED);
+            // Badges sit on the rail (surface.app); the module holds them to the indicator floor there.
+            g.setColor(dev.jasper.ui.theme.SurfaceContrast.on(ThemeZone.theme(null).semantic(),
+                tone == PanelBadge.Tone.ERROR ? SemanticColor.STATUS_DANGER : SemanticColor.ACCENT, SemanticColor.SURFACE_APP,
+                dev.jasper.ui.theme.SurfaceContrast.INDICATOR));
             g.fillOval(left, y, dot, dot);
         } finally { g.dispose(); }
     }

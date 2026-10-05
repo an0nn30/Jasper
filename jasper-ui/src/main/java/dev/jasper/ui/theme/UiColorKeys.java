@@ -31,7 +31,8 @@ public final class UiColorKeys {
     private static final Map<String, SemanticColor> SEMANTIC_ROLES = Map.of(
         "ToolWindow.background", SemanticColor.SURFACE_SIDEBAR,
         "TextField.background", SemanticColor.SURFACE_INPUT,
-        "Separator.foreground", SemanticColor.BORDER_SUBTLE);
+        "Separator.foreground", SemanticColor.BORDER_SUBTLE,
+        "StatusBar.background", SemanticColor.SURFACE_STATUS);
 
     /** Whether a legacy UI key describes a color or a referenced color variable. */
     public static boolean supports(String key) {

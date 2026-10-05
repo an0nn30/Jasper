@@ -17,6 +17,9 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
    var colors=new java.util.EnumMap<dev.jasper.sdk.ui.SemanticColor,java.awt.Color>(dev.jasper.sdk.ui.SemanticColor.class);for(var role:dev.jasper.sdk.ui.SemanticColor.values())colors.put(role,java.awt.Color.MAGENTA);
    var seen=new java.util.ArrayList<java.awt.Color>();context.appearance().onChanged(v -> seen.add(context.appearance().color(dev.jasper.sdk.ui.SemanticColor.ACCENT)));
    host.setSemanticColors(colors);host.flush();assertThat(seen).containsExactly(java.awt.Color.MAGENTA);
+   assertThat(context.appearance().color(dev.jasper.sdk.ui.SemanticColor.SURFACE_STATUS)).isEqualTo(java.awt.Color.MAGENTA);
+   var incomplete=new java.util.EnumMap<>(colors);incomplete.remove(dev.jasper.sdk.ui.SemanticColor.SURFACE_STATUS);
+   assertThatIllegalArgumentException().isThrownBy(() -> host.setSemanticColors(incomplete));
    host.stopAll();assertThat(context.kit().views()).isEmpty();assertThat(context.kit().icons()).isEmpty();
    host.setSemanticColors(colors);host.flush();assertThat(seen).hasSize(1);
   }

@@ -44,6 +44,7 @@ public final class SemanticDefaults {
     private static Color base(SemanticColor role, Map<Token, Color> legacy, TerminalColors terminal) {
         return switch (role) {
             case SURFACE_APP -> legacy.get(Token.TITLE_BAR);
+            case SURFACE_STATUS -> legacy.get(Token.STATUS_BAR);
             case SURFACE_PANEL, SURFACE_DIALOG -> legacy.get(Token.SURFACE);
             case SURFACE_PANEL_RAISED, SURFACE_MENU -> legacy.get(Token.SURFACE_RAISED);
             case SURFACE_CARD -> legacy.get(Token.SURFACE_SUNKEN);
