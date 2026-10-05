@@ -20,6 +20,57 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class ToolWindowHeaderTest {
+    @Test void connectedHeaderDotMatchesTheDarkReferenceAndLightSuccessPalette() {
+        Object oldBackground = javax.swing.UIManager.get("Panel.background");
+        Object oldSuccess = javax.swing.UIManager.get("Jasper.configSuccessForeground");
+        try {
+            for (boolean dark : List.of(true, false)) {
+                javax.swing.UIManager.put("Panel.background", new java.awt.Color(dark ? 0x20252b : 0xffffff));
+                javax.swing.UIManager.put("Jasper.configSuccessForeground", new java.awt.Color(0x248943));
+                var header = new ToolWindowHeader("SFTP", JPopupMenu::new, () -> {});
+                header.presentation(new dev.jasper.app.contributions.PanelHeaderState("prod", true, List.of()));
+                var detail = descendants(header).stream().filter(c -> c instanceof javax.swing.JLabel label && "prod".equals(label.getText()))
+                    .map(c -> (javax.swing.JLabel) c).findFirst().orElseThrow();
+                var image = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics();
+                try { detail.getIcon().paintIcon(detail, graphics, 0, 0); } finally { graphics.dispose(); }
+                assertThat(new java.awt.Color(image.getRGB(3, 3), true)).isEqualTo(new java.awt.Color(dark ? 0x38ba54 : 0x248943));
+            }
+        } finally {
+            javax.swing.UIManager.put("Panel.background", oldBackground);
+            javax.swing.UIManager.put("Jasper.configSuccessForeground", oldSuccess);
+        }
+    }
+
+    @Test void contributedActionsLiveInTheHeaderAndSurviveMetadataRefresh() {
+        var header = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { });
+        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        header.presentation(new dev.jasper.app.contributions.PanelHeaderState("5", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Import sessions", icon, () -> events.add("import")))));
+        var actions = descendants(header).stream().filter(c -> c instanceof javax.swing.JButton button
+            && "Import sessions".equals(button.getAccessibleContext().getAccessibleName())).toList();
+        assertThat(actions).hasSize(1);
+        var action = (javax.swing.JButton) actions.getFirst();
+        assertThat(action.getText()).isNullOrEmpty();
+        assertThat(action.isFocusable()).isTrue();
+        action.doClick();
+        header.presentation(new dev.jasper.app.contributions.PanelHeaderState("6", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Import sessions", icon, () -> events.add("updated")))));
+        assertThat(descendants(header)).contains(action);
+        action.doClick();
+        assertThat(events).containsExactly("import", "updated");
+        assertThat(descendants(header).stream().filter(c -> c instanceof javax.swing.JLabel label && "6".equals(label.getText()))).hasSize(1);
+    }
+
+    private static List<java.awt.Component> descendants(java.awt.Container parent) {
+        var result = new ArrayList<java.awt.Component>();
+        for (var child : parent.getComponents()) {
+            result.add(child);
+            if (child instanceof java.awt.Container container) result.addAll(descendants(container));
+        }
+        return result;
+    }
+
     private final List<String> events = new ArrayList<>();
 
     private JPopupMenu menu(Slot current, boolean visible) {

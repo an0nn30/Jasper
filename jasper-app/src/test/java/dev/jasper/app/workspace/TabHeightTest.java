@@ -22,6 +22,7 @@ class TabHeightTest {
         edt(() -> {
             var owner = owners[0]; var pane = owner.currentPane(); var tab = owner.currentTab();
             var session = pane.session(); pane.view().setFontSize(19);
+            owner.newTab(HOME); owner.selectTab(tab);
             var root = new JRootPane(); owner.installRootBindings(root);
             try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(958, 958); LayoutTestSupport.layoutTree(root);
@@ -50,7 +51,7 @@ class TabHeightTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>())); var root = new JRootPane();
             WindowContent.installTitleBar(root, owner, false, title -> {}); root.setSize(958, 958);
-            assertThat(owner.windowTabs().isVisible()).isTrue();
+            assertThat(owner.windowTabs().isVisible()).isFalse();
             owner.newTab(HOME);
             for (int height : new int[]{20, 72, 30}) {
                 owner.setTabHeight(height); LayoutTestSupport.layoutTree(root);

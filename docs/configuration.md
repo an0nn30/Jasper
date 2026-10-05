@@ -835,7 +835,9 @@ Settings → Appearance → Animations controls motion throughout the app. **Ena
 turning it off and clicking Apply finishes running transitions immediately in open windows. Future app animations
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 
-Tab motion uses fixed timings: opening takes 80 ms, closing 100 ms, and selection 130 ms.
+Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): first reveal takes 490 ms,
+subsequent opening 475 ms and closing 425 ms. Selection and hiding the last remaining tab
+bar are immediate. A single workspace tab has no visible tab bar.
 The temporary **Open tab duration**, **Close tab duration**, and **Switch tab duration** tuning fields have been removed.
 Existing `ui.animations.tab_open_ms`, `ui.animations.tab_close_ms`, and `ui.animations.tab_switch_ms` values are
 ignored silently and left in the configuration file; they no longer affect motion. Other unknown animation keys

@@ -768,6 +768,20 @@ public final class FakePluginHost implements AutoCloseable {
         return lines;
     }
 
+    /** Returns the currently published header of an open panel instance.
+     * @param panelId panel identifier
+     * @param windowId owning window
+     * @return header metadata, or an empty header if no instance exists
+     */
+    public dev.jasper.sdk.ui.PanelHeader panelHeader(String panelId, UUID windowId) {
+        for (var context : contexts.values()) for (var panel : context.ui.panels) {
+            if (!panel.spec.id().equals(panelId)) continue;
+            var instance = panel.instances.get(windowId);
+            if (instance != null) return instance.header;
+        }
+        return dev.jasper.sdk.ui.PanelHeader.EMPTY;
+    }
+
     /**
      * Invokes a panel's factory as a window showing it would. A factory failure is recorded.
      *

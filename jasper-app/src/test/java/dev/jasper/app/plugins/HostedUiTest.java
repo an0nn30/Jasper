@@ -403,6 +403,40 @@ class HostedUiTest {
         assertThat(model.railActions()).isEmpty();
     }
 
+    @Test void panelHeadersAreWindowOwnedContainFailuresAndBecomeInertWhenDiscarded() {
+        var hosts = new ArrayList<dev.jasper.sdk.ui.PanelHost>();
+        var calls = new ArrayList<String>();
+        ui.panels().register(new PanelSpec("dev.x.tool.header", "Header", new javax.swing.ImageIcon(), Anchor.LEFT),
+            host -> { hosts.add(host); return new javax.swing.JLabel(); });
+        var first = new ArrayList<dev.jasper.app.contributions.PanelHeaderState>();
+        var second = new ArrayList<dev.jasper.app.contributions.PanelHeaderState>();
+        var firstSite = new dev.jasper.app.contributions.PanelSite(UUID.randomUUID(), () -> {}, () -> {}, () -> true, first::add);
+        var secondSite = new dev.jasper.app.contributions.PanelSite(UUID.randomUUID(), () -> {}, () -> {}, () -> true, second::add);
+        var factory = model.panels().getFirst().factory();
+        factory.apply(firstSite); factory.apply(secondSite);
+        var icon = new javax.swing.ImageIcon();
+        hosts.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("5", false, List.of(
+            new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("first")),
+            new dev.jasper.sdk.ui.PanelHeader.Action("Failure", icon, () -> { throw new IllegalStateException("header failed"); }),
+            new dev.jasper.sdk.ui.PanelHeader.Action("Linkage failure", icon, () -> { throw new NoClassDefFoundError("header dependency"); }))));
+        hosts.getLast().setHeader(new dev.jasper.sdk.ui.PanelHeader("amp", true, List.of(
+            new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("second")))));
+        assertThat(first.getLast().detail()).isEqualTo("5");
+        assertThat(second.getLast().detail()).isEqualTo("amp");
+        var stale = first.getLast();
+        stale.actions().forEach(action -> action.invoke().run());
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
+        firstSite.notifyClosed();
+        assertThat(first.getLast()).isEqualTo(dev.jasper.app.contributions.PanelHeaderState.EMPTY);
+        hosts.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("late", false, List.of()));
+        stale.actions().forEach(action -> action.invoke().run());
+        second.getLast().actions().getFirst().invoke().run();
+        assertThat(first).hasSize(2);
+        assertThat(second).hasSize(1);
+        assertThat(calls).containsExactly("first", "second");
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(2);
+    }
+
     @Test void everyAnchorAndSplitCombinationMapsToItsOwnSlot() {
         record Case(String id, Anchor anchor, boolean split, Slot slot) { }
         var cases = List.of(

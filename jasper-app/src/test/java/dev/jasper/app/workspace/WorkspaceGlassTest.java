@@ -183,7 +183,7 @@ class WorkspaceGlassTest {
         });
     }
 
-    @Test void theSelectedFolderIsTheWorkspaceSurfaceWhetherOpaqueOrGlass() throws Exception {
+    @Test void tabSurfacesRetainWorkspaceAlphaWhetherOpaqueOrGlass() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
             // Clear Dark's generated tab-bar colour differs from its terminal background, so the colour check bites.
@@ -192,46 +192,48 @@ class WorkspaceGlassTest {
             assertThat(themes.current().workspace().tokens().get(dev.jasper.app.appearance.Token.TAB_BAR))
                 .isNotEqualTo(themes.current().palette().background());
             WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
+            owner.newTab(DesktopTestSupport.HOME);
             owner.setSize(900, 600);
             LayoutTestSupport.layoutTree(owner);
             LayoutTestSupport.layoutTree(owner);
             var strip = owner.windowTabs();
             assertThat(strip.getHeight()).as("the tab strip is laid out").isPositive();
-            Color workspace = owner.currentPane().getBackground();
+
             var entry = WindowTabsTest.named(strip, "select:" + owner.currentTab().title()).getParent();
-            // Sample below the accent pill: the joined folder surface keeps its glass alpha.
-            int x = entry.getX() + entry.getWidth() / 2, y = strip.getHeight() - 1;
+            // Sample above text: the tab strip keeps the workspace glass alpha.
+            int x = entry.getX() + entry.getWidth() / 2, y = 4;
             Point at = SwingUtilities.convertPoint(strip, x, y, owner);
 
             Color opaque = new Color(render(owner).getRGB(at.x, at.y), true);
             assertThat(opaque.getAlpha()).as("opaque strip").isEqualTo(255);
-            assertThat(opaque.getRGB() & 0xffffff).as("the strip shows the workspace background, not the theme's tab bar")
-                .isEqualTo(workspace.getRGB() & 0xffffff);
+
 
             owner.applyBackgroundOpacity(0.5);
             Color glass = new Color(render(owner).getRGB(at.x, at.y), true);
             assertThat(glass.getAlpha()).as("glass strip").isEqualTo(128);
-            assertThat(glass.getRGB() & 0xffffff).isEqualTo(workspace.getRGB() & 0xffffff);
+            assertThat(Math.abs(glass.getRed() - opaque.getRed())).isLessThanOrEqualTo(1);
+            assertThat(Math.abs(glass.getGreen() - opaque.getGreen())).isLessThanOrEqualTo(1);
+            assertThat(Math.abs(glass.getBlue() - opaque.getBlue())).isLessThanOrEqualTo(1);
         });
     }
 
-    @Test void folderGlassAndOverflowRemainStableAcrossClippedChildRepaints() throws Exception {
+    @Test void tabGlassRemainsStableAcrossClippedChildRepaints() throws Exception {
         edt(() -> {
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
             for (int i = 0; i < 8; i++) {
                 if (i > 0) owner.newTab(DesktopTestSupport.HOME);
-                owner.currentTab().rename("wide folder tab " + i);
+                owner.currentTab().rename("wide terminal tab " + i);
             }
             owner.update(); owner.applyBackgroundOpacity(.5);
             var strip = owner.windowTabs(); WindowTabsTest.layout(strip, 400, 30);
-            var entry = WindowTabsTest.named(strip, "select:wide folder tab 7").getParent();
+            var entry = WindowTabsTest.named(strip, "select:wide terminal tab 7").getParent();
             var image = render(strip);
-            // Sample below the accent pill: the joined folder surface keeps its glass alpha.
-            int x = entry.getX() + entry.getWidth() / 2, y = strip.getHeight() - 1;
-            assertThat(new Color(image.getRGB(x, y), true).getAlpha()).as("folder retains one workspace fill").isEqualTo(128);
-            assertThat(new Color(image.getRGB(390, y), true).getAlpha()).as("fixed controls sit on a solid recess").isEqualTo(255);
+            // Sample above text: the tab strip keeps the workspace glass alpha.
+            int x = entry.getX() + entry.getWidth() / 2, y = 4;
+            assertThat(new Color(image.getRGB(x, y), true).getAlpha()).as("strip retains one workspace fill").isEqualTo(128);
+            assertThat(new Color(image.getRGB(390, y), true).getAlpha()).as("selected cell shares the glass alpha").isEqualTo(128);
             // Repaint the dirty region a close-button hover produces, through its strip painting origin.
-            var close = WindowTabsTest.named(strip, "close:wide folder tab 7");
+            var close = WindowTabsTest.named(strip, "close:wide terminal tab 7");
             var clip = SwingUtilities.convertRectangle(close.getParent(), close.getBounds(), strip);
             clip.add(new java.awt.Rectangle(x, 0, strip.getWidth() - x, strip.getHeight()));
             var expected = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
@@ -239,7 +241,7 @@ class WorkspaceGlassTest {
                 var g = image.createGraphics();
                 try { g.setClip(clip); strip.paint(g); } finally { g.dispose(); }
                 assertThat(image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth()))
-                    .as("clipped repaint %s reconstructs folder alpha and overflow", pass).containsExactly(expected);
+                    .as("clipped repaint %s reconstructs strip alpha and cell surfaces", pass).containsExactly(expected);
             }
         });
     }

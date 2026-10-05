@@ -96,6 +96,68 @@ class SftpControllerTest {
             } finally { SwingUtilities.invokeAndWait(()->holder[0].close()); }
         }
     }
+    @Test @DisabledOnOs(OS.WINDOWS) void successfulNavigationBuildsHistoryAndNewNavigationTruncatesForwardHistory() throws Exception {
+        root=root.toRealPath();Path home=Files.createDirectory(root.resolve("home"));
+        Path child=Files.createDirectory(home.resolve("child"));Files.writeString(child.resolve("child-file"),"x");
+        Path other=Files.createDirectory(home.resolve("other"));Files.writeString(other.resolve("other-file"),"x");
+        var holder=new SftpController[1];var panel=new SftpPanel[1];
+        try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {
+            SwingUtilities.invokeAndWait(()-> {
+                panel[0]=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);
+                holder[0]=new SftpController(root.resolve("cache"),workers,SwingUtilities::invokeLater,id->CompletableFuture.completedFuture(new LocalEndpoint()),panel[0]);
+                holder[0].open(UUID.randomUUID(),host("A"),home.toString(),true);
+            });
+            try {
+                awaitRows(panel[0],"child","other");
+                SwingUtilities.invokeAndWait(()->holder[0].manual("child"));awaitRows(panel[0],"child-file");
+                SwingUtilities.invokeAndWait(()-> { assertThat(SftpPanelTest.named(panel[0],"Back").isEnabled()).isTrue();holder[0].back(); });
+                awaitRows(panel[0],"child","other");
+                SwingUtilities.invokeAndWait(()-> { assertThat(panel[0].following()).isFalse();assertThat(SftpPanelTest.named(panel[0],"Forward").isEnabled()).isTrue();holder[0].forward(); });
+                awaitRows(panel[0],"child-file");
+                SwingUtilities.invokeAndWait(holder[0]::back);awaitRows(panel[0],"child","other");
+                SwingUtilities.invokeAndWait(()->holder[0].manual("missing"));awaitMessage(panel[0],"missing");
+                SwingUtilities.invokeAndWait(()-> { assertThat(SftpPanelTest.named(panel[0],"Forward").isEnabled()).as("failed navigation preserves forward history").isTrue();holder[0].manual("other"); });
+                awaitRows(panel[0],"other-file");
+                SwingUtilities.invokeAndWait(()-> { assertThat(SftpPanelTest.named(panel[0],"Forward").isEnabled()).isFalse();holder[0].back(); });
+                awaitRows(panel[0],"child","other");
+            } finally { SwingUtilities.invokeAndWait(holder[0]::close);holder[0].stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS) void switchingConnectionsClearsStaleRowsAndNeverReusesAnotherHostsHistory() throws Exception {
+        root=root.toRealPath();Path a=Files.createDirectory(root.resolve("a"));Path child=Files.createDirectory(a.resolve("child"));Files.writeString(child.resolve("a-file"),"x");
+        Path b=Files.createDirectory(root.resolve("b"));Files.writeString(b.resolve("b-file"),"x");
+        var identityA=host("A");var identityB=host("B");var paneA=UUID.randomUUID();var paneB=UUID.randomUUID();
+        var pending=new CompletableFuture<FileEndpoint>();var firstB=new java.util.concurrent.atomic.AtomicBoolean(true);var holder=new SftpController[1];var panel=new SftpPanel[1];
+        try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {
+            SwingUtilities.invokeAndWait(()-> {
+                panel[0]=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);
+                holder[0]=new SftpController(root.resolve("cache"),workers,SwingUtilities::invokeLater,id->id.equals(identityB) && firstB.getAndSet(false)?pending:CompletableFuture.completedFuture(new LocalEndpoint()),panel[0]);
+                holder[0].open(paneA,identityA,a.toString(),true);
+            });
+            try {
+                awaitRows(panel[0],"child");SwingUtilities.invokeAndWait(()->holder[0].manual("child"));awaitRows(panel[0],"a-file");
+                SwingUtilities.invokeAndWait(()-> {
+                    holder[0].open(paneB,identityB,b.toString(),true);
+                    assertThat(holder[0].capture()).isEmpty();assertThat(panel[0].table().getRowCount()).isZero();
+                    assertThat(SftpPanelTest.named(panel[0],"Back").isEnabled()).isFalse();holder[0].back();
+                });
+                pending.complete(new LocalEndpoint());awaitRows(panel[0],"b-file");
+                SwingUtilities.invokeAndWait(()-> { assertThat(SftpPanelTest.named(panel[0],"Back").isEnabled()).isFalse();holder[0].open(paneA,identityA,a.toString(),true); });
+                awaitRows(panel[0],"a-file");SwingUtilities.invokeAndWait(holder[0]::back);awaitRows(panel[0],"child");
+                SwingUtilities.invokeAndWait(()->holder[0].open(paneA,identityB,b.toString(),true));awaitRows(panel[0],"b-file");
+                SwingUtilities.invokeAndWait(()->assertThat(SftpPanelTest.named(panel[0],"Back").isEnabled()).isFalse());
+            } finally { SwingUtilities.invokeAndWait(holder[0]::close);holder[0].stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
+    private static void awaitMessage(SftpPanel panel,String part) throws Exception {
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+        while(System.nanoTime()<deadline) {
+            var message=new String[1];SwingUtilities.invokeAndWait(()->message[0]=panel.messageText());
+            if(message[0].contains(part)) return;Thread.sleep(10);
+        }
+        throw new AssertionError("Expected status containing "+part);
+    }
     static void awaitRows(SftpPanel panel,String... names) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
         while(System.nanoTime()<deadline) { var rows=new ArrayList<String>();SwingUtilities.invokeAndWait(()-> { for(int i=0;i<panel.table().getRowCount();i++) rows.add(panel.table().getValueAt(i,0).toString()); });if(rows.equals(List.of(names))) return;Thread.sleep(10); }

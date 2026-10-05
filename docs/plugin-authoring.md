@@ -176,6 +176,13 @@ Your `PanelHost.onVisibility` hears a drop only when it shows your hidden panel,
 your panel to make room in the target slot; a drop that leaves your panel shown or hidden as it was
 tells it nothing.
 
+Since SDK 0.14.2, call `host.setHeader(new PanelHeader(detail, active, actions))` inside the panel
+factory or when its model changes. `detail` is a count or connection name; `active` adds a status dot.
+Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button with an accessible name
+and tooltip. Keep callbacks scoped to that factory's window. Header state survives hiding and moving
+the panel, and callbacks become inert when the instance closes. Use `PanelHeader.EMPTY` to clear it;
+do not add a duplicate action row inside the panel. Declare `sdk = ">=0.14.2, <0.15"` when using it.
+
 A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
 is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
 its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so

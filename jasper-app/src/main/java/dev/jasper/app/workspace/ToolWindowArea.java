@@ -207,6 +207,7 @@ final class ToolWindowArea extends JPanel {
         @Override public Dimension getMinimumSize() { return getPreferredSize(); }
     };
     private final EnumMap<Slot, Host> hosts = new EnumMap<>(Slot.class);
+    private final Map<String, dev.jasper.app.contributions.PanelHeaderState> headers = new HashMap<>();
     private final Map<String, Content> contents = new HashMap<>();
     private final EnumMap<DockGeometry.Handle, DividerHandle> dividers = new EnumMap<>(DockGeometry.Handle.class);
     /** A divider drag in progress lays out this copy of the state. */
@@ -249,7 +250,17 @@ final class ToolWindowArea extends JPanel {
         contents.put(Objects.requireNonNull(id), new Content(Objects.requireNonNull(title), Objects.requireNonNull(component)));
     }
 
-    void removeContent(String id) { contents.remove(id); }
+    void setHeader(String id, dev.jasper.app.contributions.PanelHeaderState header) {
+        headers.put(id, Objects.requireNonNull(header));
+        for (Slot slot : Slot.values()) {
+            if (state.active(slot).filter(id::equals).isPresent()) {
+                ToolWindowHeader shown = headerOf(slot);
+                if (shown != null) shown.presentation(header);
+            }
+        }
+    }
+
+    void removeContent(String id) { contents.remove(id); headers.remove(id); }
 
     /** The content showing in the slot, or null. */
     JComponent content(Slot slot) {
@@ -286,8 +297,7 @@ final class ToolWindowArea extends JPanel {
                 host.content = wanted.component();
                 ToolWindowHeader header = header(id, wanted.title());
                 host.add(header, BorderLayout.NORTH);
-                dragSource.accept(header, id);
-                dragSource.accept(header.titleLabel(), id);
+                for (JComponent surface : header.dragSurfaces()) dragSource.accept(surface, id);
                 host.add(wanted.component(), BorderLayout.CENTER);
                 ToolWindowSurface.apply(host);
                 hosts.put(slot, host);
@@ -311,10 +321,12 @@ final class ToolWindowArea extends JPanel {
     private DockState layoutState() { return toolsSuppressed ? emptyLayout : preview != null ? preview : state; }
 
     private ToolWindowHeader header(String id, String title) {
-        return new ToolWindowHeader(title,
+        var header = new ToolWindowHeader(title,
             () -> ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
                 slot -> onMove.accept(id, slot), () -> onHide.accept(id)),
             () -> onHide.accept(id));
+        header.presentation(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
+        return header;
     }
 
     /** The terminal palette background of the whole center, including the tab strip and any lower arc. */

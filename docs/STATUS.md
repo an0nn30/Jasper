@@ -1,6 +1,127 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-04
+## Current state — 2026-10-05
+
+- **Alacritty-style workspace tabs** (2026-10-05; `codex/alacritty-tabs`, isolated worktree
+  `/Users/dustin/.codex/worktrees/alacritty-tabs/moray`): implements the user-approved
+  [equal-width layout and measured motion](design/alacritty-tabs.md), superseding the flat-tab pass.
+  A single tab hides the rail and reclaims its height. Multiple centered text tabs divide the full
+  terminal column, with theme-derived selected/inactive surfaces, separators and hover-only close.
+  New-tab remains in the toolbar/palette/shortcuts. First reveal is 490 ms, additions 475 ms,
+  removals 425 ms; selection and hiding the rail are immediate. Curves interpolate boundaries from
+  the third supplied recording using ffmpeg frames and their actual timestamps; no source easing
+  constants are claimed. Closed tabs release resources immediately. This bounded follow-up uses
+  regression-first native inline implementation and independent final review, not historical plans.
+  Initial behavior regressions failed before implementation; a real hidden-parent reveal regression
+  also reproduced before its fix. Workspace/config checks and dark/light/glass headless previews pass.
+  Independent review found narrow cells reserving all title space for a hidden close affordance; a
+  16-tab/800px regression reproduced it, and narrow cells now reclaim those gutters. Follow-up review
+  has no remaining findings. Final `./gradlew -I tools/previews/alacritty-tabs.gradle
+  :jasper-app:alacrittyTabsPreview :jasper-app:alacrittyTabMotionPreview check --continue` passed:
+  **8,753 tests, 0 failures, 0 errors, 6 existing skips**, including architecture, docs and native
+  headless gates. The explicit 2× scale check, source hygiene and whitespace checks passed. Replaced
+  superseded underline/scroll/natural-width tests with equal-width/visibility/measured-motion coverage.
+  Previews remain in `jasper-app/build/alacritty-tabs-preview/`, including `tab-motion.mp4`.
+  No GUI, benchmark or AOT training. Native GUI acceptance remains user-run.
+  User approved merging to main and pushing on 2026-10-05. Combined `./gradlew check --continue`
+  passed **8,764 tests, 0 failures, 0 errors, 6 existing skips**, preserving the Share Path integration.
+  Preview files are preserved in the main checkout at `jasper-app/build/alacritty-tabs-preview/`;
+  recording analyses are in `build/alacritty-tabs-reference/` for managed-worktree archival after integration.
+
+- **Terminal Share Path** (2026-10-05; `codex/share-path`, isolated worktree
+  `/Users/dustin/.codex/worktrees/share-path/moray`): implements the user-approved bounded design:
+  terminal context menu **Share Path → HTTP / HTTPS / FTP / FTPS** starts a temporary server for the
+  invoked pane's current local folder, without a dialog, and reveals it in File Servers. Names and ports
+  are automatic; shares retain read-only/loopback defaults, FTP session passwords, and TLS is required
+  for FTPS. Missing, invalid and remote paths are rejected without substituting home or another pane.
+  Existing Serve Current Folder palette commands retain their documented behavior. Uses the existing
+  SDK menu contribution and server registry; no SDK/app changes. Native inline implementation with an
+  independent final review, without a new historical-plan execution. Eleven new cases failed before
+  implementation; focused plugin integration tests now pass, including real starts for all four types.
+  Independent final review found no actionable issues. Final `./gradlew check --continue` passed all
+  91 tasks: **8,782 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and
+  documentation gates. Changed-source hygiene and whitespace checks passed. The existing bounded
+  port search/bind-race failure handling is retained. No GUI, benchmark or AOT training; native menu
+  acceptance remains user-run. User approved local main integration on 2026-10-05; no push requested.
+
+- **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
+  `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
+  [flat-tab design](design/flat-tabs.md). One workspace-colored strip, persistent icons, muted inactive
+  labels, full-width animated accent underline, subtle separator, and a live-session dot after terminal
+  titles replace the folder silhouette. Existing close/list/add controls, sizing and interaction paths
+  remain. Status space is reserved; pending/exited sessions and documents have no live dot. The full
+  strip shares workspace glass opacity. This bounded change uses native inline implementation and one
+  independent final review, without re-executing historical plans. Initial visual/lifecycle regressions
+  failed before implementation; the 650-test workspace suite passes, and dark/light/glass/overflow
+  headless renders were inspected. The 2× geometry check passed. Independent review found missing fallback
+  artwork for hosted tabs; a regression reproduced it, and a generic document icon now covers absent/cleared
+  artwork while preserving supplied icons. The full check exposed a lifecycle-test fixture trying to paint
+  a zero-width animated opening; that test now disables motion, retaining the separate animation suite.
+  Focused tab tests and independent follow-up review passed with no remaining findings. Final
+  `./gradlew check --continue` passed: **8,771 tests, 0 failures, 0 errors, 6 existing skips**,
+  including architecture, documentation and native headless gates. Source hygiene and whitespace checks
+  passed. Reproduce previews with `./gradlew -I tools/previews/flat-tabs.gradle :jasper-app:flatTabsPreview`.
+  No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05;
+  the unrelated inherited Markdown-preview design stays on its own branch. Integrated as `e27dba15`;
+  `./gradlew check --continue` on main passed **8,771 tests, 0 failures, 0 errors, 6 existing skips**.
+  Previews are preserved in the main checkout under `jasper-app/build/flat-tabs-preview/`.
+  The managed worktree is archived after verification. No push performed.
+
+- **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
+  second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
+  Sessions has header-only Add/Import icons and count, flat alphabetical ungrouped hosts, a pencil-only edit action,
+  and a blue Open Shell action for connected hosts. SFTP places its connection in the header, uses compact
+  back/forward/path/refresh/upload controls and Name/Size rows, and preserves operation menus and destination picking.
+  Successful navigation history is scoped to each pane and connection identity. Tunnel/server rows use explicit
+  on/off switches; server rows add protocol chips, address/copy controls and an optional details view.
+  Supported chips are HTTP/SFTP/FTP/TFTP; the mock's RSYNC sample does not add an unsupported transport.
+  SDK **0.14.2** adds per-window `PanelHeader` via `PanelHost.setHeader`; the app translates it at the plugin boundary,
+  retains metadata while hidden/moved, contains action failures, and invalidates callbacks on close. Remote and
+  File Server now require that patch version. The screenshot-directed scope continues the bounded parallel
+  implementation/independent-review workflow rather than re-running historical feature plans. This follow-up
+  intentionally supersedes the earlier pass's default Other group/favorites-first order and app-only title bars.
+  Independent review approved after fixing header drag registration for the new label/detail surfaces. Regression
+  tests cover header action isolation/containment/disposal, hidden/moved headers, navigation history and row actions.
+  Final `./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview check --continue` passed:
+  **8,709 tests, 0 failures, 0 errors, 6 existing skips**; architecture, documentation and native headless gates passed.
+  Changed-source hygiene and whitespace checks passed. Refreshed empty/populated dark/light previews at 220/300px
+  and 18pt UI-font layouts were inspected, including narrow size-column and switch-contrast corrections.
+  Previews remain under `jasper-app/build/plugin-panel-preview/` (populated variants end in `-populated.png`).
+  Native desktop acceptance remains user-run. No GUI, benchmark or AOT training has been run.
+  User approved merge to main and push. Integrated main `192443b3`, preserving its tab-width correction and
+  OS-notification changes; only status notes conflicted and both entries were retained. Combined
+  `./gradlew check --continue` passed: **8,771 tests, 0 failures, 0 errors, 6 skipped**.
+  Preview images are preserved in the main checkout under `jasper-app/build/plugin-panel-preview/`.
+
+- **Plugin panel visual refresh** (2026-10-04; `codex/plugin-panel-redesign`, isolated worktree
+  `/Users/dustin/.codex/worktrees/plugin-panel-redesign/moray`): implements the user's supplied mock as the direction
+  for Remote's Sessions panel and disconnected SFTP / empty Tunnels and File Servers. Sessions shows addresses beside
+  names, leading status dots, trailing favorites, rounded selection and an icon-led selected-host footer with a local
+  accent Connect action. SFTP shows a centered folder prompt and a window-owned Choose Session action, plus a separated
+  Follow terminal folder switch. Empty tunnel/server views use centered icon/title/help/action stacks, retaining visible
+  parse errors and existing creation flows. Existing host grouping, favorites-first ordering and app-owned title bars
+  are retained; populated SFTP/tunnel/server layouts await the user's next reference. No SDK or connection architecture
+  changes. Helpers stay inside each plugin's boundary and read the active component-zone palette.
+  This bounded screenshot-directed follow-up used independent SFTP and empty-panel implementers and a whole-change
+  review, without re-executing historical plans. Meaningful state/action regressions were observed failing before
+  implementation. Review found narrow-row wrapping, live font refresh and missing keyboard focus on the custom
+  primary button; all are corrected. Font and focus regressions were observed failing before their fixes, and
+  independent follow-up review approved with no remaining findings. Final `./gradlew check --continue` passed:
+  **8,689 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and documentation gates.
+  Changed-source hygiene and whitespace checks passed. Dark/light, 220/300px rails and 18pt UI-font previews were
+  inspected; native desktop acceptance remains user-run. Headless previews are reproducible with
+  `./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview` and written under
+  `jasper-app/build/plugin-panel-preview/`. No native GUI, benchmark or AOT training launched.
+
+- **Tab width correction** (2026-10-04): clarified that only the starting size should double. Tabs now
+  have a 160-pixel minimum, normal measured title growth, and the original 240-pixel maximum. Removed the
+  content-width multiplier; the 64 × 2 accent pill and hidden-rail corners are unchanged. The regression
+  reproduced the SSH title consuming 390 pixels before correction and now covers short, SSH and long titles,
+  including shrinking back to the starting size. Full `./gradlew check --continue` passed: **8,682 tests,
+  0 failures, 0 errors, 6 skipped**. Headless previews refreshed; no native GUI launched.
+  Integrated remote main's OS notification work (`0734c5c5`); only status notes conflicted, and both entries
+  were retained. Final combined `./gradlew check --continue`: **8,743 tests, 0 failures, 0 errors, 6 skipped**.
+  Changed-source hygiene and whitespace checks passed.
 
 - **Notifications plan 6: Settings, reviewed on branch `claude/notifications-6`; awaiting the user's GUI checks and
   merge decision** (plan `docs/superpowers/plans/2026-10-04-notifications-6-settings.md`,

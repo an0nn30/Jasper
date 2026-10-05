@@ -23,6 +23,32 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class TunnelsPanelTest {
+    @Test void populatedRowsFitTwoLinesAndTheSwitchTogglesOncePerGesture() {
+        show();
+        panel.list.setSize(260, 300);
+        var row = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(1), 1, false, false);
+        assertThat(row.getPreferredSize().height).isLessThanOrEqualTo(50);
+        var cell = panel.list.getCellBounds(1, 1);
+        for (int count : List.of(1, 2)) {
+            var event = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0,
+                cell.width - 12, cell.y + cell.height / 2, count, false, java.awt.event.MouseEvent.BUTTON1);
+            for (var listener : panel.list.getMouseListeners()) listener.mouseClicked(event);
+        }
+        assertThat(events).containsExactly("start db");
+    }
+
+    @Test void windowHeaderCountsAllTunnelsAndOwnsTheAddAction() {
+        var headers = new ArrayList<dev.jasper.sdk.ui.PanelHeader>();
+        panel.onHeaderChanged(headers::add);
+        assertThat(headers.getLast().detail()).isEmpty();
+        show();
+        assertThat(headers.getLast().detail()).isEqualTo("3");
+        panel.filter.setText("5432");
+        assertThat(headers.getLast().detail()).isEqualTo("3");
+        headers.getLast().actions().getFirst().invoke().run();
+        assertThat(events).containsExactly("add");
+    }
+
     @Test void repeatedNotePaintsPreserveTheHostCompositeStyle() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             try (var colors = new ZoneColors()) {
@@ -39,7 +65,9 @@ class TunnelsPanelTest {
                     parent.add(panel);
                     var p = WorkspacePalette.current(panel.list);
                     var values = List.of(up(1234), new TunnelState.Starting("connecting"), new TunnelState.Failed("broken"), TunnelState.STOPPED);
-                    var expected = List.of(p.success(), p.warning(), p.error(), p.textMuted());
+                    var bg = p.background();
+                    boolean dark = bg.getRed() * .299 + bg.getGreen() * .587 + bg.getBlue() * .114 < 128;
+                    var expected = List.of(new java.awt.Color(dark ? 0x38ba54 : 0x248943), p.warning(), p.error(), new java.awt.Color(dark ? 0x49515c : 0x858d97));
                     for (int i = 0; i < values.size(); i++) {
                         states.put(db.id(), values.get(i)); show();
                         var item = new TunnelsPanel.Item(db);
@@ -47,10 +75,10 @@ class TunnelsPanelTest {
                         var dot = (JLabel) ((java.awt.BorderLayout) row.getLayout()).getLayoutComponent(java.awt.BorderLayout.WEST);
                         assertThat(dot.getForeground()).isEqualTo(expected.get(i));
                         var lines = (javax.swing.JPanel) ((java.awt.BorderLayout) row.getLayout()).getLayoutComponent(java.awt.BorderLayout.CENTER);
-                        assertThat(lines.getComponent(2).getForeground()).isEqualTo(i == 2 ? p.error() : p.textMuted());
+                        assertThat(lines.getComponent(i == 1 || i == 2 ? 2 : 1).getForeground()).isEqualTo(i == 2 ? p.error() : p.textMuted());
                         var selected = (javax.swing.JPanel) panel.list.getCellRenderer().getListCellRendererComponent(panel.list, item, 0, true, false);
                         var selectedLines = (javax.swing.JPanel) ((java.awt.BorderLayout) selected.getLayout()).getLayoutComponent(java.awt.BorderLayout.CENTER);
-                        for (var line : selectedLines.getComponents()) assertThat(line.getForeground()).isEqualTo(panel.list.getSelectionForeground());
+                        assertThat(selectedLines.getComponent(1).getForeground()).isEqualTo(panel.list.getSelectionForeground());
                     }
                     var problem = new TunnelsPanel.Problem("broken");
                     assertThat(panel.list.getCellRenderer().getListCellRendererComponent(panel.list, problem, 0, false, false).getForeground()).isEqualTo(p.error());
@@ -71,7 +99,7 @@ class TunnelsPanelTest {
     final Tunnel quick = Tunnel.create("", PROD, TunnelKind.LOCAL, Tunnel.LOCALHOST, 3000, "localhost", 3000);
     final TunnelsPanel panel = new TunnelsPanel(new TunnelsPanel.Actions(t -> note("start", t), t -> note("stop", t), t -> note("edit", t),
         t -> note("duplicate", t), t -> note("delete", t), t -> note("save", t), t -> note("browse", t), t -> note("copy", t),
-        () -> events.add("add")), icon -> null);
+        () -> events.add("add")), icon -> new javax.swing.ImageIcon(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB)));
 
     void note(String what, Tunnel tunnel) { events.add(what + " " + (tunnel.quick() ? "quick" : tunnel.name())); }
 
@@ -103,6 +131,38 @@ class TunnelsPanelTest {
         return lines;
     }
 
+
+    @Test void emptyPanelOffersNewTunnelAndHidesTheListAndFilter() {
+        panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
+        assertThat(panel.list.isVisible()).isFalse();
+        assertThat(panel.filter.isVisible()).isFalse();
+        var buttons = new ArrayList<javax.swing.JButton>();
+        buttons(panel, buttons);
+        buttons.stream().filter(button -> "New Tunnel".equals(button.getText())).findFirst().orElseThrow().doClick();
+        assertThat(events).containsExactly("add");
+        show();
+        assertThat(panel.list.isVisible()).isTrue();
+        assertThat(panel.filter.isVisible()).isTrue();
+        panel.setTunnels(List.of(), List.of(), Optional.of("line 2"), id -> TunnelState.STOPPED, id -> Optional.empty());
+        assertThat(panel.list.isVisible()).isFalse();
+        var notes = new ArrayList<javax.swing.JTextArea>();
+        notes(panel, notes);
+        assertThat(notes).anySatisfy(note -> {
+            assertThat(note.getText()).contains("tunnels.toml has errors: line 2");
+            assertThat(note.isVisible()).isTrue();
+        });
+    }
+
+    static void buttons(Component component, List<javax.swing.JButton> found) {
+        if (component instanceof javax.swing.JButton button) found.add(button);
+        if (component instanceof Container parent) for (var child : parent.getComponents()) buttons(child, found);
+    }
+
+    static void notes(Component component, List<javax.swing.JTextArea> found) {
+        if (component instanceof javax.swing.JTextArea note) found.add(note);
+        if (component instanceof Container parent) for (var child : parent.getComponents()) notes(child, found);
+    }
+
     @Test void savedTunnelsByNameThenQuickForwardsUnderTheirHeading() {
         show();
         assertThat(rows()).containsExactly("API", "db", "heading Quick forwards", "localhost:3000");
@@ -123,8 +183,8 @@ class TunnelsPanelTest {
 
     @Test void anEmptyPanelSaysHowToStartAndABrokenFileShowsOneRow() {
         panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
-        assertThat(panel.empty.getText()).isEqualTo("No tunnels yet — add one with +, or use Forward a Port… from an SSH pane");
-        assertThat(panel.empty.isVisible()).isTrue();
+        assertThat(texts(panel)).contains("No Tunnels");
+        assertThat(panel.emptyState.isVisible()).isTrue();
         panel.setTunnels(List.of(db), List.of(), Optional.of("line 2"), id -> TunnelState.STOPPED, id -> Optional.of("prod"));
         assertThat(rows()).containsExactly("problem tunnels.toml has errors: line 2", "db");
         assertThat(panel.menuFor(0)).isNull();
@@ -135,17 +195,19 @@ class TunnelsPanelTest {
         panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
         panel.setSize(260, 400);
         layOut(panel);
-        int line = panel.empty.getFontMetrics(panel.empty.getFont()).getHeight();
-        int padding = panel.empty.getInsets().top + panel.empty.getInsets().bottom;
-        assertThat(panel.empty.getWidth()).as("it takes the panel's width, not the text's").isLessThanOrEqualTo(260);
-        assertThat(panel.empty.getPreferredSize().width).as("and asks for no more").isLessThanOrEqualTo(260);
-        assertThat(panel.empty.getHeight() - padding).as("the text runs over several lines").isGreaterThanOrEqualTo(2 * line);
+        var labels = new ArrayList<JLabel>();
+        collect(panel.emptyState, labels);
+        var description = labels.stream().filter(label -> label.getText() != null && label.getText().startsWith("<html>")).findFirst().orElseThrow();
+        int line = description.getFontMetrics(description.getFont()).getHeight();
+        assertThat(description.getWidth()).as("it takes the panel's width, not the text's").isLessThanOrEqualTo(260);
+        assertThat(description.getHeight()).as("the text runs over several lines").isGreaterThanOrEqualTo(2 * line);
         panel.setTunnels(List.of(db), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
         layOut(panel);
         panel.setTunnels(List.of(), List.of(), Optional.empty(), id -> TunnelState.STOPPED, id -> Optional.empty());
         layOut(panel);
-        assertThat(panel.empty.getHeight() - padding).as("hidden at 0x0 in between, it still measures at the panel's width")
+        assertThat(description.getHeight()).as("hidden at 0x0 in between, it still measures at the panel's width")
             .isBetween(2 * line, 8 * line);
+        assertThat(panel.emptyAction.getY() + panel.emptyAction.getHeight()).isLessThanOrEqualTo(panel.emptyState.getHeight());
     }
 
     /** Container.validateTree lays out hidden children too, as the real window does; revalidate needs a showing window, so run what it would. */

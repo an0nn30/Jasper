@@ -5,6 +5,7 @@ import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.ui.BundledIcon;
+import dev.jasper.sdk.ui.PanelHeader;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Font;
@@ -45,11 +46,30 @@ public final class HostsPanel extends JPanel {
     public record Actions(Consumer<RemoteHost> connect, Consumer<RemoteHost> connectSplit, Consumer<Optional<RemoteHost>> edit, Consumer<RemoteHost> duplicate,
                           Consumer<RemoteHost> delete, BiConsumer<RemoteHost, Boolean> favorite, Runnable importConfig) { }
 
-    final JTextField search = new JTextField();
+    final JTextField search = new JTextField() {
+        @Override public java.awt.Color getBackground() { return WorkspacePalette.current(this).surfaceSunken(); }
+        @Override public java.awt.Dimension getPreferredSize() {
+            var size = super.getPreferredSize();
+            return new java.awt.Dimension(size.width, Math.max(PanelStyle.scale(this, 28), getFontMetrics(getFont()).getHeight() + 8));
+        }
+    };
     final JList<HostRows.Row> list;
-    final JPanel card = new JPanel();
-    final JLabel cardName = heading(""), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel(), cardInfo = new JLabel();
-    final JButton connect = new JButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
+    final JPanel card = new JPanel(new BorderLayout(0, 8)) {
+        @Override public java.awt.Color getBackground() { return WorkspacePalette.current(this).surfaceRaised(); }
+        @Override protected void paintComponent(java.awt.Graphics graphics) {
+            super.paintComponent(graphics);
+            graphics.setColor(WorkspacePalette.current(this).border());
+            graphics.drawLine(0, 0, getWidth(), 0);
+        }
+    };
+    final JLabel cardName = heading(""), cardAddress = muted(true), cardJump = muted(false), cardInfo = muted(false);
+    final JLabel cardCredential = new JLabel() {
+        @Override public java.awt.Color getForeground() {
+            var palette = WorkspacePalette.current(this);
+            return "Connected".equals(getText()) ? connectionColor(this, true) : palette.textMuted();
+        }
+    };
+    final JButton connect = PanelStyle.primaryButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
     final JLabel empty = new JLabel("No hosts yet \u2014 Add or Import from ~/.ssh/config");
     private final Actions actions;
     private final Function<BundledIcon, javax.swing.Icon> icons;
@@ -72,12 +92,27 @@ public final class HostsPanel extends JPanel {
     private ToIntFunction<ShellProfileInfo> distroSessions = profile -> 0;
     private Consumer<ShellProfileInfo> openDistro = profile -> { };
     private Consumer<ShellProfileInfo> splitDistro = profile -> { };
+    private Consumer<PanelHeader> headerChanged;
+    private int headerCount = -1;
+    private int hovered = -1;
 
     private static JLabel heading(String text) {
         return new JLabel(text) {
             @Override public void updateUI() {
                 super.updateUI();
                 setFont(javax.swing.UIManager.getFont("Label.font").deriveFont(Font.BOLD));
+            }
+        };
+    }
+
+    private static JLabel muted(boolean monospace) {
+        return new JLabel() {
+            @Override public java.awt.Color getForeground() { return WorkspacePalette.current(this).textMuted(); }
+            @Override public void updateUI() {
+                super.updateUI();
+                Font uiFont = javax.swing.UIManager.getFont("Label.font");
+                if (monospace && uiFont != null) setFont(new Font(Font.MONOSPACED, Font.PLAIN, 1).deriveFont(uiFont.getSize2D()));
+                putClientProperty("html.disable", true);
             }
         };
     }
@@ -90,22 +125,28 @@ public final class HostsPanel extends JPanel {
         super(new BorderLayout(0, 6));
         this.icons = java.util.Objects.requireNonNull(icons);
         this.actions = actions; this.activate = actions.connect();
-        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-        var header = new JPanel();
-        header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        // The tool window header carries the title.
-        header.add(Box.createHorizontalGlue()); header.add(importButton); header.add(Box.createHorizontalStrut(4)); header.add(add);
-        var north = new JPanel(new BorderLayout(0, 6));
-        north.add(header, BorderLayout.NORTH);
-        search.putClientProperty("JTextField.placeholderText", "Search sessions\u2026");
-        north.add(search, BorderLayout.SOUTH);
+        setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+        importButton.putClientProperty("JButton.buttonType", "toolBarButton");
+        add.putClientProperty("JButton.buttonType", "toolBarButton");
+        add.setToolTipText("New session"); add.getAccessibleContext().setAccessibleName("New session");
+        var north = new JPanel(new BorderLayout());
+        north.setOpaque(false);
+        north.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(this, 7), PanelStyle.scale(this, 10), 2, PanelStyle.scale(this, 10)));
+        search.putClientProperty("JTextField.placeholderText", "Search sessions");
+        search.putClientProperty("JTextField.leadingIcon", icons.apply(BundledIcon.GENERAL_SEARCH));
+        search.putClientProperty("FlatLaf.style", "arc: 10");
+        search.putClientProperty(javax.accessibility.AccessibleContext.ACCESSIBLE_NAME_PROPERTY, "Search sessions");
+        north.add(search, BorderLayout.CENTER);
         add(north, BorderLayout.NORTH);
         list = new JList<>(model) {
             @Override public boolean getScrollableTracksViewportWidth() { return true; }
+            @Override public java.awt.Color getBackground() { return HostsPanel.this.getBackground(); }
         };
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setCellRenderer(new Renderer());
         var center = new JPanel(new BorderLayout());
+        center.setOpaque(false);
+        center.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 6));
         var scroll = new JScrollPane(list);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -113,17 +154,32 @@ public final class HostsPanel extends JPanel {
         empty.setBorder(BorderFactory.createEmptyBorder(12, 4, 12, 4));
         center.add(empty, BorderLayout.SOUTH);
         add(center, BorderLayout.CENTER);
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        for (JLabel detail : List.of(cardName, cardAddress, cardInfo, cardCredential, cardJump))
+        card.setBorder(BorderFactory.createEmptyBorder(12, 12, 10, 12));
+        card.setOpaque(true);
+        var identity = new JPanel(new BorderLayout(10, 0)); identity.setOpaque(false);
+        identity.add(PanelStyle.iconTile(icons.apply(BundledIcon.TOOLWINDOWS_WEB_SERVER), 30), BorderLayout.WEST);
+        var details = new JPanel(); details.setOpaque(false);
+        details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
+        for (JLabel detail : List.of(cardName, cardAddress, cardInfo, cardJump)) {
             detail.setAlignmentX(Component.LEFT_ALIGNMENT);
-        cardInfo.putClientProperty("html.disable", true);
-        card.add(cardName); card.add(cardAddress); card.add(cardInfo); card.add(cardCredential); card.add(cardJump);
-        var buttons = new JPanel();
+            detail.putClientProperty("html.disable", true);
+            details.add(detail);
+        }
+        identity.add(details, BorderLayout.CENTER);
+        card.add(identity, BorderLayout.CENTER);
+        var footer = new JPanel(new BorderLayout(6, 0)); footer.setOpaque(false);
+        cardCredential.putClientProperty("html.disable", true);
+        footer.add(cardCredential, BorderLayout.CENTER);
+        var buttons = new JPanel(); buttons.setOpaque(false);
         buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.setAlignmentX(Component.LEFT_ALIGNMENT);
-        buttons.add(edit); buttons.add(Box.createHorizontalGlue()); buttons.add(connect);
-        card.add(Box.createVerticalStrut(6)); card.add(buttons);
+        PanelStyle.button(edit); PanelStyle.button(connect);
+        edit.setText(""); edit.setIcon(icons.apply(BundledIcon.GENERAL_EDIT));
+        edit.setToolTipText("Edit session"); edit.getAccessibleContext().setAccessibleName("Edit session");
+        edit.setMargin(new java.awt.Insets(4, 4, 4, 4));
+        edit.putClientProperty("JButton.buttonType", "toolBarButton");
+        buttons.add(edit); buttons.add(Box.createHorizontalStrut(8)); buttons.add(connect);
+        footer.add(buttons, BorderLayout.EAST);
+        card.add(footer, BorderLayout.SOUTH);
         card.setVisible(false);
         add(card, BorderLayout.SOUTH);
 
@@ -134,15 +190,23 @@ public final class HostsPanel extends JPanel {
         });
         list.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) selectionChanged(); });
         list.addMouseListener(new MouseAdapter() {
+            @Override public void mouseExited(MouseEvent event) { hovered = -1; list.repaint(); }
             @Override public void mouseClicked(MouseEvent event) {
                 int index = list.locationToIndex(event.getPoint());
                 if (index < 0 || !list.getCellBounds(index, index).contains(event.getPoint())) return;
                 if (SwingUtilities.isRightMouseButton(event)) { list.setSelectedIndex(index); JPopupMenu menu = menuFor(index); if (menu != null) menu.show(list, event.getX(), event.getY()); }
-                else if (event.getX() < 14 + favoriteWidth(list) && model.get(index) instanceof HostRows.Host row) {
+                else if (event.getX() >= list.getWidth() - PanelStyle.scale(list, 10) - favoriteWidth(list) && model.get(index) instanceof HostRows.Host row) {
                     if (event.getClickCount() == 1) actions.favorite().accept(row.host(), !row.host().favorite());
                 }
                 else if (event.getClickCount() == 2) activate(index);
                 else if (model.get(index) instanceof HostRows.Group) toggle(index);
+            }
+        });
+        list.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            @Override public void mouseMoved(MouseEvent event) {
+                int index = list.locationToIndex(event.getPoint());
+                int next = index >= 0 && list.getCellBounds(index, index).contains(event.getPoint()) ? index : -1;
+                if (next != hovered) { hovered = next; list.repaint(); }
             }
         });
         list.getInputMap().put(javax.swing.KeyStroke.getKeyStroke("ENTER"), "activateHost");
@@ -154,7 +218,10 @@ public final class HostsPanel extends JPanel {
         connect.addActionListener(event -> {
             Optional<ShellProfileInfo> distro = selectedDistro();
             if (distro.isPresent()) openDistro.accept(distro.get());
-            else selectedHost().ifPresent(actions.connect());
+            else selectedHost().ifPresent(host -> {
+                if (sessionCount.applyAsInt(host) > 0) activate.accept(host);
+                else actions.connect().accept(host);
+            });
         });
         edit.addActionListener(event -> selectedHost().ifPresent(host -> actions.edit().accept(Optional.of(host))));
         addHierarchyListener(event -> {
@@ -175,6 +242,10 @@ public final class HostsPanel extends JPanel {
     public void onRenameDefaultGroup(Runnable rename) { renameDefaultGroup = rename; }
     public void onBrowseFiles(Consumer<RemoteHost> action) { browseFiles=action; }
     public void onActivate(Consumer<RemoteHost> action) { activate = action; }
+    /** Supplies this window's app-owned header immediately and whenever the saved-session count changes. */
+    public void onHeaderChanged(Consumer<PanelHeader> listener) {
+        headerChanged = java.util.Objects.requireNonNull(listener); headerCount = -1; refreshHeader();
+    }
     public void setHostDetails(Function<RemoteHost, String> details, ToIntFunction<RemoteHost> sessions) {
         metadata = details; sessionCount = sessions; rebuild();
     }
@@ -266,6 +337,8 @@ public final class HostsPanel extends JPanel {
         menu.add(item("Duplicate", () -> actions.duplicate().accept(host)));
         menu.add(item("Delete\u2026", () -> actions.delete().accept(host)));
         menu.add(item(host.favorite() ? "Remove from favorites" : "Add to favorites", () -> actions.favorite().accept(host, !host.favorite())));
+        if (host.group().isEmpty() && defaultGroup.equals(HostRows.OTHER) && hosts.stream().allMatch(h -> h.group().isEmpty()))
+            menu.add(item("Rename group\u2026", renameDefaultGroup));
         return menu;
     }
 
@@ -275,6 +348,7 @@ public final class HostsPanel extends JPanel {
         UUID keep = selected;
         String keepDistro = selectedDistro;
         HostRows.Row previous = list.getSelectedValue();
+        hovered = -1;
         model.clear();
         error.ifPresent(message -> model.addElement(new HostRows.Error(message)));
         String query = search.getText().strip().toLowerCase(java.util.Locale.ROOT);
@@ -300,6 +374,17 @@ public final class HostsPanel extends JPanel {
         }
         if (list.isSelectionEmpty()) selectFirstHost();
         selectionChanged();
+        refreshHeader();
+    }
+
+    private void refreshHeader() {
+        if (headerChanged == null) return;
+        int count = hosts.size() + distros.size();
+        if (count == headerCount) return;
+        headerCount = count;
+        headerChanged.accept(new PanelHeader(String.valueOf(count), false, List.of(
+            new PanelHeader.Action("New session", icons.apply(BundledIcon.GENERAL_ADD), add::doClick),
+            new PanelHeader.Action("Import sessions", icons.apply(BundledIcon.GENERAL_IMPORT), importButton::doClick))));
     }
 
     private void selectionChanged() {
@@ -314,17 +399,56 @@ public final class HostsPanel extends JPanel {
         if (distro.isPresent()) { distroCard(distro.get()); return; }
         Optional<RemoteHost> host = selectedHost();
         card.setVisible(host.isPresent());
-        connect.setText("Connect"); edit.setVisible(true); cardCredential.setVisible(true);
+        edit.setVisible(true); cardCredential.setVisible(true);
         host.ifPresent(h -> {
+            boolean connected = sessionCount.applyAsInt(h) > 0;
+            connect.setText(connected ? "Open Shell" : "Connect");
+            connect.setIcon(connected ? terminalGlyph() : null);
             cardName.setText(h.name());
             cardAddress.setText(h.label());
-            cardCredential.setText(credentialLabels.apply(h));
+            cardCredential.setText(connected ? "Connected" : credentialLabels.apply(h));
+            cardCredential.setIcon(connected ? connectedDot() : cardCredential.getText().equals("Vault locked") ? icons.apply(BundledIcon.GENERAL_LOCKED) : null);
+            cardCredential.setToolTipText(cardCredential.getText());
             String facts = metadata.apply(h);
-            cardInfo.setText(facts); cardInfo.setVisible(!facts.isBlank());
+            cardInfo.setText(facts); cardInfo.setVisible(false);
             String via = h.jump().flatMap(id -> hosts.stream().filter(other -> other.id().equals(id)).findFirst()).map(RemoteHost::name).orElse(null);
-            cardJump.setVisible(via != null);
+            cardJump.setVisible(false);
             cardJump.setText(via == null ? "" : "via " + via);
+            cardAddress.setToolTipText(h.label() + (facts.isBlank() ? "" : ", " + facts) + (via == null ? "" : ", via " + via));
         });
+    }
+
+    private javax.swing.Icon connectedDot() {
+        return new javax.swing.Icon() {
+            @Override public int getIconWidth() { return PanelStyle.scale(cardCredential, 8); }
+            @Override public int getIconHeight() { return PanelStyle.scale(cardCredential, 8); }
+            @Override public void paintIcon(Component component, java.awt.Graphics graphics, int x, int y) {
+                var g = (java.awt.Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.setColor(connectionColor(component, true));
+                    g.fillOval(x, y, getIconWidth(), getIconHeight());
+                } finally { g.dispose(); }
+            }
+        };
+    }
+
+    private javax.swing.Icon terminalGlyph() {
+        return new javax.swing.Icon() {
+            @Override public int getIconWidth() { return PanelStyle.scale(connect, 14); }
+            @Override public int getIconHeight() { return PanelStyle.scale(connect, 14); }
+            @Override public void paintIcon(Component component, java.awt.Graphics graphics, int x, int y) {
+                var g = (java.awt.Graphics2D) graphics.create();
+                try {
+                    g.translate(x, y);
+                    double scale = getIconWidth() / 14d; g.scale(scale, scale);
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.setColor(component.getForeground());
+                    g.setStroke(new java.awt.BasicStroke(1.4f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+                    g.drawLine(2, 4, 5, 7); g.drawLine(5, 7, 2, 10); g.drawLine(8, 10, 12, 10);
+                } finally { g.dispose(); }
+            }
+        };
     }
 
     /** A distribution's card: its name, WSL version and the command Jasper runs; nothing to edit. */
@@ -332,16 +456,18 @@ public final class HostsPanel extends JPanel {
         card.setVisible(true);
         cardName.setText(profile.name());
         cardAddress.setText(profile.detail().orElse(HostRows.WSL));
+        cardAddress.setToolTipText(cardAddress.getText());
         cardInfo.setText("wsl.exe -d " + profile.name()); cardInfo.setVisible(true);
-        cardCredential.setText(""); cardCredential.setVisible(false);
+        cardCredential.setText(""); cardCredential.setIcon(null); cardCredential.setVisible(false);
         cardJump.setText(""); cardJump.setVisible(false);
         edit.setVisible(false);
         connect.setText("Open");
+        connect.setIcon(terminalGlyph());
     }
 
     private final class Renderer implements javax.swing.ListCellRenderer<HostRows.Row> {
         @Override public Component getListCellRendererComponent(JList<? extends HostRows.Row> owner, HostRows.Row value, int index, boolean selected, boolean focused) {
-            if (value instanceof HostRows.Host row) return hostRow(owner, row.host(), selected);
+            if (value instanceof HostRows.Host row) return hostRow(owner, row.host(), selected, focused || index == hovered || selected && owner.hasFocus());
             if (value instanceof HostRows.Distro row) return distroRow(owner, row, selected);
             JLabel label = new JLabel(); label.putClientProperty("html.disable", true);
             label.setOpaque(selected);
@@ -365,26 +491,51 @@ public final class HostsPanel extends JPanel {
         return Math.max(16, Math.max(metrics.stringWidth("\u2605"), metrics.stringWidth("\u2606")) + 2);
     }
 
-    private Component hostRow(JList<?> owner, RemoteHost host, boolean selected) {
-        var row = new JPanel(new BorderLayout(6, 0));
-        row.setOpaque(true);
-        row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-        row.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 8));
+    private Component hostRow(JList<?> owner, RemoteHost host, boolean selected, boolean showFavorite) {
+        var row = new JPanel(new BorderLayout(8, 0)) {
+            @Override protected void paintComponent(java.awt.Graphics graphics) {
+                var g = (java.awt.Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.setColor(getBackground());
+                    int arc = PanelStyle.scale(this, 10);
+                    g.fillRoundRect(0, 1, getWidth(), getHeight() - 2, arc, arc);
+                } finally { g.dispose(); }
+            }
+        };
+        row.setOpaque(false);
+        row.setBackground(selected ? dark(owner) ? new java.awt.Color(0x304e77) : owner.getSelectionBackground() : owner.getBackground());
+        row.setBorder(BorderFactory.createEmptyBorder(PanelStyle.scale(owner, 5), PanelStyle.scale(owner, 8),
+            PanelStyle.scale(owner, 5), PanelStyle.scale(owner, 10)));
+        var palette = WorkspacePalette.current(owner);
         java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-        Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 1);
-        var favorite = text(host.favorite() ? "\u2605" : "\u2606", foreground, font);
-        favorite.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), favorite.getPreferredSize().height));
-        row.add(favorite, BorderLayout.WEST);
-        row.add(text(host.name(), foreground, font), BorderLayout.CENTER);
+        Font font = owner.getFont();
         int sessions = sessionCount.applyAsInt(host);
-        if (sessions > 0) {
-            var status = new JPanel(new BorderLayout(4, 0)); status.setOpaque(false);
-            java.awt.Color active = WorkspacePalette.current(owner).success();
-            var dot = text("\u25CF", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f)));
-            status.add(dot, BorderLayout.WEST);
-            if (sessions > 1) status.add(text(String.valueOf(sessions), foreground, owner.getFont()), BorderLayout.CENTER);
-            row.add(status, BorderLayout.EAST);
-        }
+        var dot = text("\u25CF", connectionColor(owner, sessions > 0),
+            font.deriveFont(Math.max(8f, font.getSize2D() - 3f)));
+        row.add(dot, BorderLayout.WEST);
+        var identity = new JPanel(null) {
+            @Override public java.awt.Dimension getPreferredSize() {
+                var nameSize = getComponent(0).getPreferredSize(); var addressSize = getComponent(1).getPreferredSize();
+                return new java.awt.Dimension(nameSize.width + PanelStyle.scale(this, 10) + addressSize.width, Math.max(nameSize.height, addressSize.height));
+            }
+            @Override public void doLayout() {
+                int gap = PanelStyle.scale(this, 10);
+                int nameWidth = Math.min(getComponent(0).getPreferredSize().width, Math.max(0, (getWidth() - gap) * 3 / 5));
+                getComponent(0).setBounds(0, 0, nameWidth, getHeight());
+                getComponent(1).setBounds(nameWidth + gap, 0, Math.max(0, getWidth() - nameWidth - gap), getHeight());
+            }
+        };
+        identity.setOpaque(false);
+        identity.add(text(host.name(), foreground, font));
+        identity.add(text(host.hostname(), selected ? mix(foreground, row.getBackground(), .7f) : palette.textMuted(), font));
+        row.add(identity, BorderLayout.CENTER);
+        var trailing = new JPanel(new BorderLayout(4, 0)); trailing.setOpaque(false);
+        var favorite = text(host.favorite() ? "\u2605" : showFavorite ? "\u2606" : "", host.favorite() ? palette.warning() : palette.textMuted(), font);
+        favorite.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), favorite.getPreferredSize().height));
+        trailing.add(favorite, BorderLayout.EAST);
+        row.add(trailing, BorderLayout.EAST);
+        row.setPreferredSize(new java.awt.Dimension(row.getPreferredSize().width, PanelStyle.scale(owner, 30)));
         String facts = metadata.apply(host);
         String description = host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts)
             + ", " + sessions + (sessions == 1 ? " session" : " sessions");
@@ -426,6 +577,23 @@ public final class HostsPanel extends JPanel {
         row.setToolTipText(description);
         row.getAccessibleContext().setAccessibleName(description);
         return row;
+    }
+
+    private static java.awt.Color mix(java.awt.Color foreground, java.awt.Color background, float weight) {
+        return new java.awt.Color(Math.round(foreground.getRed() * weight + background.getRed() * (1 - weight)),
+            Math.round(foreground.getGreen() * weight + background.getGreen() * (1 - weight)),
+            Math.round(foreground.getBlue() * weight + background.getBlue() * (1 - weight)));
+    }
+
+    private static boolean dark(Component component) {
+        java.awt.Color background = WorkspacePalette.current(component).background();
+        return background.getRed() * .299 + background.getGreen() * .587 + background.getBlue() * .114 < 128;
+    }
+
+    private static java.awt.Color connectionColor(Component component, boolean active) {
+        var palette = WorkspacePalette.current(component);
+        if (dark(component)) return new java.awt.Color(active ? 0x38ba54 : 0x49515c);
+        return active ? palette.success() : palette.textMuted();
     }
 
     private static JLabel text(String value, java.awt.Color foreground, Font font) {
