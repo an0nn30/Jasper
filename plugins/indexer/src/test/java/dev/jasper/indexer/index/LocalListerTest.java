@@ -117,6 +117,34 @@ class LocalListerTest {
         assertThat(listing.files()).containsExactly("odd\nname.txt");
     }
 
+    @Test void anUnreadableRootFailsInsteadOfListingNothing() throws IOException {
+        assumeTrue(!System.getProperty("os.name").startsWith("Windows") && !"root".equals(System.getProperty("user.name")));
+        Path root = Files.createDirectories(home.resolve("app"));
+        write(root.resolve("a.txt"));
+        Files.setPosixFilePermissions(root, PosixFilePermissions.fromString("---------"));
+        try {
+            var lister = new LocalLister(List.of(home.resolve("no-such-git").toString()), home);
+            assertThatThrownBy(() -> lister.list(root, EXCLUDES, 1_000, () -> false)).isInstanceOf(IOException.class)
+                .isNotInstanceOf(NoSuchFileException.class);
+        } finally {
+            Files.setPosixFilePermissions(root, PosixFilePermissions.fromString("rwx------"));
+        }
+    }
+
+    @Test void aRootThatIsALinkListsTheFolderItNames() throws IOException {
+        assumeTrue(!System.getProperty("os.name").startsWith("Windows"));
+        Path real = Files.createDirectories(home.resolve("real"));
+        write(real.resolve("a.txt"));
+        write(real.resolve("sub/b.txt"));
+        Path elsewhere = Files.createDirectories(home.resolve("elsewhere"));
+        write(elsewhere.resolve("c.txt"));
+        Files.createSymbolicLink(real.resolve("out"), elsewhere);
+        Path link = Files.createSymbolicLink(home.resolve("app"), real);
+        var listing = new LocalLister(List.of(home.resolve("no-such-git").toString()), home).list(link, EXCLUDES, 1_000, () -> false);
+        assertThat(listing.strategy()).isEqualTo(Strategy.WALK);
+        assertThat(listing.files()).as("links inside the project are still not followed").containsExactly("a.txt", "sub/b.txt");
+    }
+
     @Test void aMissingRootAndCancellationAreReported() throws IOException {
         var lister = new LocalLister(List.of(home.resolve("no-such-git").toString()), home);
         assertThatThrownBy(() -> lister.list(home.resolve("gone"), EXCLUDES, 1_000, () -> false)).isInstanceOf(NoSuchFileException.class);

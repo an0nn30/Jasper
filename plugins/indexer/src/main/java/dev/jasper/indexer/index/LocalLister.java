@@ -50,7 +50,7 @@ public final class LocalLister {
      * @param cancelled polled while listing
      * @return the files, relative to the root and {@code /}-separated
      * @throws NoSuchFileException when the root is not a folder
-     * @throws IOException when the walk fails
+     * @throws IOException when the walk fails, including when the root cannot be read
      * @throws CancellationException when {@code cancelled} turned true
      */
     public Listing list(Path root, Collection<String> excludes, int maxFiles, BooleanSupplier cancelled) throws IOException {
@@ -138,7 +138,12 @@ public final class LocalLister {
         }
     }
 
-    private static Listing walk(Path root, Set<String> skip, int maxFiles, BooleanSupplier cancelled) throws IOException {
+    /**
+     * Walks the root's real folder, so a root that is a link lists what it names; links inside it are never followed.
+     * A root that cannot be read fails the walk rather than listing nothing.
+     */
+    private static Listing walk(Path link, Set<String> skip, int maxFiles, BooleanSupplier cancelled) throws IOException {
+        Path root = link.toRealPath();
         var files = new ArrayList<String>();
         var truncated = new boolean[1];
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
@@ -157,7 +162,10 @@ public final class LocalLister {
                 return FileVisitResult.CONTINUE;
             }
 
-            @Override public FileVisitResult visitFileFailed(Path file, IOException failure) { return FileVisitResult.CONTINUE; }
+            @Override public FileVisitResult visitFileFailed(Path file, IOException failure) throws IOException {
+                if (file.equals(root)) throw failure;
+                return FileVisitResult.CONTINUE;
+            }
         });
         Collections.sort(files);
         return new Listing(files, Strategy.WALK, truncated[0]);
