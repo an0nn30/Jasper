@@ -14,7 +14,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import javax.swing.JOptionPane;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.persistence.UiState;
@@ -244,11 +243,10 @@ public final class NativeShells {
         var prefs = new ChooserPrefs(state);
         var model = new ChooserModel(request, sources, worker, SwingUtilities::invokeLater, prefs.showHidden());
         var result = new AtomicReference<List<Location>>(List.of());
+        // The replace and new-folder questions are kit sheets over the chooser (Plan 2 Task 6c), not option panes.
+        var prompts = new ChooserPrompts(() -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), title -> sheet(dialog, title));
         var panel = new FileChooserPanel(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), model, prefs, local.homePath(), chosen -> { result.set(chosen); dialog.dispose(); },
-            file -> JOptionPane.showConfirmDialog(dialog, model.name(file) + " already exists. Do you want to replace it?",
-                "Confirm Save As", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION,
-            () -> Optional.ofNullable(JOptionPane.showInputDialog(dialog, "Folder name:", "New Folder", JOptionPane.PLAIN_MESSAGE))
-                .map(String::strip).filter(name -> !name.isEmpty()));
+            file -> prompts.confirmReplace(model.name(file)), prompts::askFolderName);
         // Jasper's own title bar, as on the application's other dialogs, so the chooser matches the theme.
         MacTitleBar bar = MacTitleBar.install(dialog.getRootPane(), panel, () -> { }, MacTitleBar.isSupported());
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
@@ -288,6 +286,32 @@ public final class NativeShells {
             dialog.dispose();
             worker.shutdown();
         }
+    }
+
+    /**
+     * A document-modal window over {@code owner} holding one kit sheet; closing it by its title bar cancels. When it
+     * closes, the owner gets the focus back.
+     */
+    private static ChooserPrompts.Modal sheet(Window owner, String title) {
+        var window = new JDialog(owner, title, Dialog.ModalityType.DOCUMENT_MODAL);
+        window.setIconImages(ApplicationIcon.images());
+        window.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        return new ChooserPrompts.Modal() {
+            @Override public void setContent(javax.swing.JComponent content) { window.getContentPane().add(content); }
+            @Override public void show(Runnable shown) {
+                window.addWindowListener(new WindowAdapter() {
+                    @Override public void windowOpened(WindowEvent event) { shown.run(); }
+                });
+                window.pack();
+                window.setLocationRelativeTo(owner);
+                window.setVisible(true);
+            }
+            @Override public void close() {
+                if (!window.isDisplayable()) return;
+                window.dispose();
+                owner.toFront();
+            }
+        };
     }
 
     /** A minimal menu bar: macOS otherwise shows only the application menu while this window has focus. */
