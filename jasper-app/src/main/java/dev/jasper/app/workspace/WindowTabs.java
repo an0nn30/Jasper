@@ -17,8 +17,8 @@ import java.util.List;
 import javax.swing.*;
 
 /**
- * Folder tabs over WindowContent's retained Swing selection model. The selected folder joins the workspace
- * surface; the recessed strip and fixed controls frame it independently of the surrounding chrome.
+ * Flat tabs over WindowContent's retained Swing selection model. An animated underline marks selection;
+ * icons and live-session dots identify content without changing its ownership or lifetime.
  */
 final class WindowTabs extends JPanel implements AutoCloseable {
     private static final int MIN_TAB = 160, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6;
@@ -27,7 +27,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     private final WindowContent owner;
     private final LongSupplier clock;
     private final List<Slot> slots = new ArrayList<>();
-    private final Value folderX = new Value(0), folderWidth = new Value(0), folderAlpha = new Value(0);
+    private final Value indicatorX = new Value(0), indicatorWidth = new Value(0), indicatorAlpha = new Value(0);
     private AnimationSettings animations = AnimationSettings.defaults();
     private Timer timer;
     private int layoutHeight = -1;
@@ -118,11 +118,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         }
         boolean switched = selected != owner.selectedComponent();
         if (switched) { selected = owner.selectedComponent(); revealSelection = true; }
-        Color background = owner.theme().palette().background();
-        // A small workspace-derived recess works with independently light or dark terminal palettes.
-        float shade = owner.theme().workspace().dark() ? .78f : .94f;
-        setBackground(new Color(Math.round(background.getRed() * shade), Math.round(background.getGreen() * shade),
-            Math.round(background.getBlue() * shade)));
+        setBackground(owner.theme().palette().background());
         list.setIcon(AppIcons.forBackground(AppIcons.named("DROPDOWN"), getBackground()));
         add.setIcon(AppIcons.forBackground(AppIcons.named("ADD"), getBackground()));
         boolean retitled = false;
@@ -143,9 +139,9 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         int remaining = slots.stream().mapToInt(slot -> slot.width.remainingMillis(now)).max().orElse(0);
         // Shell/plugin metadata can arrive during a switch after all slot widths have settled.
         // Preserve that transition's remaining time instead of snapping it or restarting its deadline.
-        remaining = Math.max(remaining, Math.max(folderX.remainingMillis(now),
-            Math.max(folderWidth.remainingMillis(now), folderAlpha.remainingMillis(now))));
-        if (changed || switched || retitled) retargetFolder(now,
+        remaining = Math.max(remaining, Math.max(indicatorX.remainingMillis(now),
+            Math.max(indicatorWidth.remainingMillis(now), indicatorAlpha.remainingMillis(now))));
+        if (changed || switched || retitled) retargetIndicator(now,
             changed ? duration : switched ? animations.tabSwitchMillis() : remaining);
         if (layoutWidth >= 0 && (changed || retitled)) doLayout();
         syncTimer();
@@ -221,72 +217,35 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         add.setBounds(width - addWidth, 0, addWidth, height);
     }
 
-    // Hover/close repaints reconstruct the strip before its children, including shoulders outside the entry.
+    // Child hover/close repaints reconstruct the translucent surface and animated underline together.
     @Override protected boolean isPaintingOrigin() { return true; }
 
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
-            // Replace the parent's glass once with the same workspace alpha. Paint only opaque negative space
-            // over it: translucent antialiased Src shapes cause expensive Metal readbacks on macOS.
+            // Replace glass exactly once, including on partial repaints.
             g.setComposite(AlphaComposite.Src);
             g.setColor(owner.workspaceSurface());
             g.fillRect(0, 0, getWidth(), getHeight());
-            var recess = new java.awt.geom.Area(new Rectangle(0, 0, getWidth(), getHeight()));
-            if (folderWidth.current > 0 && folderAlpha.current > 0) {
-                var folder = new java.awt.geom.Area(folder(folderX.current - scrollOffset, folderWidth.current));
-                folder.intersect(new java.awt.geom.Area(viewport.getBounds()));
-                recess.subtract(folder);
-            }
             g.setComposite(AlphaComposite.SrcOver);
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(getBackground());
-            g.fill(recess);
-            // Fade through opaque recess over the already replaced glass surface; repeated painting is idempotent.
-            if (folderAlpha.current < 1 && folderWidth.current > 0) {
-                g.setComposite(AlphaComposite.SrcOver.derive((float) (1 - folderAlpha.current)));
-                var fading = new java.awt.geom.Area(folder(folderX.current - scrollOffset, folderWidth.current));
-                fading.intersect(new java.awt.geom.Area(viewport.getBounds()));
-                g.fill(fading);
-            }
-            // A slim accent pill travels with the folder, staying inside the scrolling tab viewport.
-            double indicatorWidth = Math.min(UIScale.scale(64), Math.max(0, folderWidth.current - UIScale.scale(16)));
-            if (indicatorWidth > 0 && folderAlpha.current > 0) {
+            g.setColor(owner.theme().workspace().tokens().get(Token.BORDER));
+            int line = UIScale.scale(1);
+            g.fillRect(0, getHeight() - line, getWidth(), line);
+            if (indicatorWidth.current > 0 && indicatorAlpha.current > 0) {
                 g.clip(viewport.getBounds());
-                g.setComposite(AlphaComposite.SrcOver.derive((float) folderAlpha.current));
+                g.setComposite(AlphaComposite.SrcOver.derive((float) indicatorAlpha.current));
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setColor(owner.theme().workspace().tokens().get(Token.ACCENT));
                 double thickness = UIScale.scale(2f);
+                // Extending the rounded shape below the clip leaves square bottom corners at the content edge.
                 g.fill(new java.awt.geom.RoundRectangle2D.Double(
-                    folderX.current - scrollOffset + (folderWidth.current - indicatorWidth) / 2,
-                    getHeight() - UIScale.scale(3), indicatorWidth, thickness, thickness, thickness));
+                    indicatorX.current - scrollOffset, getHeight() - thickness,
+                    indicatorWidth.current, thickness * 2, thickness * 2, thickness * 2));
             }
         } finally { g.dispose(); }
     }
 
-    /** Soft top corners with quarter-circle cutouts forming broad outward bottom shoulders. */
-    private java.awt.Shape folder(double x, double w) {
-        double h = getHeight();
-        double r = Math.min(UIScale.scale(10f), Math.max(0, h / 2));
-        double upper = Math.min(Math.min(UIScale.scale(ToolWindowArea.SURFACE_ARC) / 2.0, w / 2), Math.max(0, h / 2));
-        double k = r * .5522847498;
-        double upperK = upper * .5522847498;
-        // Hidden rails remove the workspace frame, so a folder at its left edge joins it squarely.
-        double leftUpper = !owner.leftStripe().isVisible() && x <= 0 ? 0 : upper;
-        double leftUpperK = leftUpper * .5522847498;
-        var shape = new java.awt.geom.Path2D.Double();
-        shape.moveTo(x - r, h);
-        shape.curveTo(x - r + k, h, x, h - r + k, x, h - r);
-        shape.lineTo(x, leftUpper);
-        shape.curveTo(x, leftUpper - leftUpperK, x + leftUpper - leftUpperK, 0, x + leftUpper, 0);
-        shape.lineTo(x + w - upper, 0);
-        shape.curveTo(x + w - upper + upperK, 0, x + w, upper - upperK, x + w, upper);
-        shape.lineTo(x + w, h - r);
-        shape.curveTo(x + w, h - r + k, x + w + r - k, h, x + w + r, h);
-        shape.closePath();
-        return shape;
-    }
-
-    /** Fade clipped tabs into the recessed strip; the tab-list button stays outside the viewport. */
+    /** Fade clipped tabs into the tab surface; the tab-list button stays outside the viewport. */
     private void paintOverflow(Graphics2D graphics) {
         int width = viewport.getWidth(), height = viewport.getHeight();
         int fade = Math.min(UIScale.scale(16), width / 2);
@@ -322,19 +281,19 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
     private int duration(int millis) { return animations.enabled() && layoutWidth >= 0 ? millis : 0; }
 
-    private void retargetFolder(long now, int millis) {
+    private void retargetIndicator(long now, int millis) {
         double x = 0;
         for (Slot slot : slots) {
             if (slot.entry != null && slot.entry.tab == selected) {
-                folderX.target(x, now, duration(millis));
-                folderWidth.target(slot.width.to, now, duration(millis));
-                folderAlpha.target(1, now, duration(millis));
+                indicatorX.target(x, now, duration(millis));
+                indicatorWidth.target(slot.width.to, now, duration(millis));
+                indicatorAlpha.target(1, now, duration(millis));
                 return;
             }
             x += slot.width.to;
         }
-        folderWidth.target(0, now, duration(millis));
-        folderAlpha.target(0, now, duration(millis));
+        indicatorWidth.target(0, now, duration(millis));
+        indicatorAlpha.target(0, now, duration(millis));
     }
 
     /** One elapsed-time frame, also callable with an injected monotonic clock in headless tests. */
@@ -345,23 +304,23 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
     private void sample(long now) {
         for (Slot slot : slots) { slot.width.sample(now); slot.alpha.sample(now); }
-        folderX.sample(now); folderWidth.sample(now); folderAlpha.sample(now);
+        indicatorX.sample(now); indicatorWidth.sample(now); indicatorAlpha.sample(now);
         slots.removeIf(slot -> slot.entry == null && !slot.width.running);
     }
 
     private void settle() {
         for (Slot slot : slots) { slot.width.finish(); slot.alpha.finish(); }
         slots.removeIf(slot -> slot.entry == null);
-        folderX.finish(); folderWidth.finish(); folderAlpha.finish();
-        retargetFolder(clock.getAsLong(), 0);
+        indicatorX.finish(); indicatorWidth.finish(); indicatorAlpha.finish();
+        retargetIndicator(clock.getAsLong(), 0);
         syncTimer();
     }
 
     boolean motionRunning() { return timer != null && timer.isRunning(); }
-    Rectangle2D folderBounds() { return new Rectangle2D.Double(folderX.current - scrollOffset, 0, folderWidth.current, getHeight()); }
+    Rectangle2D indicatorBounds() { return new Rectangle2D.Double(indicatorX.current - scrollOffset, 0, indicatorWidth.current, getHeight()); }
 
     private void syncTimer() {
-        boolean moving = folderX.running || folderWidth.running || folderAlpha.running
+        boolean moving = indicatorX.running || indicatorWidth.running || indicatorAlpha.running
             || slots.stream().anyMatch(slot -> slot.width.running || slot.alpha.running);
         if (moving && !disposed && timer == null) {
             timer = new Timer(16, event -> animate(clock.getAsLong()));
@@ -445,7 +404,29 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         private final Component tab;
         private final Slot slot;
         private final JButton close = new JButton();
+        private boolean running;
         private final JButton select = new JButton() {
+            @Override protected void paintComponent(Graphics graphics) {
+                super.paintComponent(graphics);
+                if (!running) return;
+                Insets insets = getInsets();
+                var view = new Rectangle(insets.left, insets.top,
+                    Math.max(0, getWidth() - insets.left - insets.right),
+                    Math.max(0, getHeight() - insets.top - insets.bottom));
+                var icon = new Rectangle(); var text = new Rectangle();
+                SwingUtilities.layoutCompoundLabel(this, getFontMetrics(getFont()), getText(), getIcon(),
+                    getVerticalAlignment(), getHorizontalAlignment(), getVerticalTextPosition(), getHorizontalTextPosition(),
+                    view, icon, text, getIconTextGap());
+                var g = (Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.setColor(owner.theme().workspace().tokens().get(Token.SUCCESS));
+                    int size = UIScale.scale(6);
+                    g.fillOval(Math.max(icon.x + icon.width, text.x + text.width) + UIScale.scale(GAP),
+                        (getHeight() - size) / 2, size, size);
+                } finally { g.dispose(); }
+            }
+
             // Swing creates a fresh tip that does not inherit html.disable from its component.
             @Override public JToolTip createToolTip() {
                 var tip = new JToolTip();
@@ -463,6 +444,8 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             slot = new Slot(this);
             setOpaque(false);
             flat(select); flat(close);
+            // Reserve status space through launch/exit so lifecycle updates never shift the title or close target.
+            select.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, statusWidth()));
             select.setHorizontalAlignment(SwingConstants.LEADING);
             select.setIconTextGap(UIScale.scale(GAP));
             select.addActionListener(event -> { if (!disposed) owner.selectTab(tab); });
@@ -515,9 +498,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             repaint();
         }
 
+        private int statusWidth() { return tab instanceof TerminalTab ? UIScale.scale(GAP + 8) : 0; }
+
         int tabWidth() {
             FontMetrics metrics = select.getFontMetrics(select.getFont());
-            int content = UIScale.scale(EDGE + 16 + GAP) + metrics.stringWidth(owner.tabTitle(tab)) + UIScale.scale(GAP + 16 + EDGE);
+            int content = UIScale.scale(EDGE + 16 + GAP) + metrics.stringWidth(owner.tabTitle(tab)) + UIScale.scale(GAP + 16 + EDGE) + statusWidth();
             return Math.max(UIScale.scale(MIN_TAB), Math.min(UIScale.scale(MAX_TAB), content));
         }
 
@@ -532,8 +517,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             String shortcut = owner.tabShortcut(order.indexOf(tab));
             String tip = capped(owner.tabTooltip(tab));
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
-            Color surface = tab == selected ? owner.theme().palette().background() : WindowTabs.this.getBackground();
-            select.setIcon(tab == selected ? AppIcons.forBackground(owner.tabIcon(tab), surface) : null);
+            running = tab instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running();
+            select.getAccessibleContext().setAccessibleDescription(running ? "Session running" : null);
+            Color surface = WindowTabs.this.getBackground();
+            Icon icon = owner.tabIcon(tab);
+            select.setIcon(AppIcons.forBackground(icon == null ? AppIcons.named("FILE") : icon, surface));
             close.setIcon(AppIcons.forBackground(AppIcons.named("CLOSE"), surface));
             close.setRolloverIcon(AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface));
             select.setSelected(tab == selected);
@@ -558,8 +546,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             int edge = UIScale.scale(EDGE), closeWidth = Math.min(UIScale.scale(16), getWidth());
             int closeX = Math.max(0, getWidth() - edge - closeWidth);
             close.setBounds(closeX, 0, closeWidth, getHeight());
-            // Reserve the icon's space even on plain inactive labels, so selecting never changes the tab width.
-            int leading = edge + (tab == selected ? 0 : UIScale.scale(16 + GAP));
+            int leading = edge;
             select.setBounds(Math.min(leading, getWidth()), 0,
                 Math.max(0, closeX - UIScale.scale(GAP) - leading), getHeight());
         }

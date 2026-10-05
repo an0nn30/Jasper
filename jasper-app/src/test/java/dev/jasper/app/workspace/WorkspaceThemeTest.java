@@ -59,11 +59,11 @@ class WorkspaceThemeTest {
                 if (control instanceof AbstractButton button && button.isSelected()) entry = candidate;
         }
         assertThat(entry).as("one real selected tab").isNotNull();
-        assertThat(new java.awt.Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 29)))
-            .as("active folder follows the actual workspace palette").isEqualTo(owner.theme().palette().background());
+        assertThat(new java.awt.Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 4)))
+            .as("flat strip follows the actual workspace palette").isEqualTo(owner.theme().palette().background());
         assertThat(new java.awt.Color(image.getRGB(500, 15)))
-            .as("negative space follows the workspace-derived recess").isEqualTo(strip.getBackground())
-            .isNotEqualTo(owner.theme().palette().background());
+            .as("unused strip shares the workspace surface").isEqualTo(strip.getBackground())
+            .isEqualTo(owner.theme().palette().background());
     }
 
     @Test void independentWorkspaceMarksNewTabsAndPaintsStripWithoutChangingChrome() throws Exception {

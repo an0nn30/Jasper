@@ -1,6 +1,27 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-10-04
+## Current state — 2026-10-05
+
+- **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
+  `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
+  [flat-tab design](design/flat-tabs.md). One workspace-colored strip, persistent icons, muted inactive
+  labels, full-width animated accent underline, subtle separator, and a live-session dot after terminal
+  titles replace the folder silhouette. Existing close/list/add controls, sizing and interaction paths
+  remain. Status space is reserved; pending/exited sessions and documents have no live dot. The full
+  strip shares workspace glass opacity. This bounded change uses native inline implementation and one
+  independent final review, without re-executing historical plans. Initial visual/lifecycle regressions
+  failed before implementation; the 650-test workspace suite passes, and dark/light/glass/overflow
+  headless renders were inspected. The 2× geometry check passed. Independent review found missing fallback
+  artwork for hosted tabs; a regression reproduced it, and a generic document icon now covers absent/cleared
+  artwork while preserving supplied icons. The full check exposed a lifecycle-test fixture trying to paint
+  a zero-width animated opening; that test now disables motion, retaining the separate animation suite.
+  Focused tab tests and independent follow-up review passed with no remaining findings. Final
+  `./gradlew check --continue` passed: **8,771 tests, 0 failures, 0 errors, 6 existing skips**,
+  including architecture, documentation and native headless gates. Source hygiene and whitespace checks
+  passed. Reproduce previews with `./gradlew -I tools/previews/flat-tabs.gradle :jasper-app:flatTabsPreview`.
+  No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05;
+  the unrelated inherited Markdown-preview design stays on its own branch. Merge verification is pending.
+  No push is authorized.
 
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.

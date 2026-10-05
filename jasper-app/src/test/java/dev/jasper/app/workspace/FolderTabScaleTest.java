@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FolderTabScaleTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void scaledFoldersKeepTheirShouldersFlushAndFixedControlsReachable() throws Exception {
+    @Test void scaledUnderlineSpansTheTabAndFixedControlsStayReachable() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
@@ -32,15 +32,15 @@ class FolderTabScaleTest {
                     .as("the thin accent indicator follows UI scale and configured height")
                     .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.ACCENT));
                 assertThat(new Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 0)))
-                    .as("folder reaches the top of the rail without a dark gap").isEqualTo(surface);
+                    .as("flat surface reaches the top of the rail without a gap").isEqualTo(surface);
                 for (int cornerX : new int[]{entry.getX() + UIScale.scale(5),
                         entry.getX() + entry.getWidth() - UIScale.scale(5) - 1}) {
                     assertThat(new Color(image.getRGB(cornerX, UIScale.scale(1))))
-                        .as("upper corner follows the rail's eight-pixel radius at height %s", height).isEqualTo(surface);
+                        .as("tab body remains flat at height %s", height).isEqualTo(surface);
                 }
-                int x = entry.getX() - UIScale.scale(4), y = strip.getHeight() - 1;
-                assertThat(new Color(image.getRGB(x, y))).as("scaled shoulder joins the terminal at height %s", height)
-                    .isEqualTo(owner.theme().palette().background());
+                int x = entry.getX() + UIScale.scale(4), y = strip.getHeight() - 1;
+                assertThat(new Color(image.getRGB(x, y))).as("scaled underline spans the tab at height %s", height)
+                    .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.app.appearance.Token.ACCENT));
                 var add = WindowTabsTest.named(strip, "newTab");
                 assertThat(add.getBounds()).isEqualTo(new Rectangle(UIScale.scale(776), 0,
                     UIScale.scale(24), UIScale.scale(height)));

@@ -1253,8 +1253,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * The opacity actually in effect for this window, 1 being opaque. The terminal surface and each pane paint the
-     * terminal background at that opacity, each replacing what lies beneath. The selected folder follows it; chrome,
-     * the recessed strip and dividers stay solid.
+     * terminal background at that opacity, each replacing what lies beneath. The flat tab strip follows it; chrome
+     * and dividers stay solid.
      */
     void applyBackgroundOpacity(double opacity) {
         if (closed || opacity == backgroundOpacity) return;
@@ -1270,8 +1270,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The selected
-     * folder shares it, so the active tab, terminals and hosted content read as one space.
+     * The workspace surface's colour: the terminal background, at the window's opacity while translucent. The flat
+     * tab strip shares it, so tabs, terminals and hosted content read as one space.
      */
     java.awt.Color workspaceSurface() {
         java.awt.Color background = themes.current().palette().background();

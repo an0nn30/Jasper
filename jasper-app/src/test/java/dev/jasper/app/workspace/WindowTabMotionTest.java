@@ -62,22 +62,22 @@ class WindowTabMotionTest {
         });
     }
 
-    @Test void switchingGlidesTheFolderAndRepeatedSwitchesRetargetWithoutAJump() throws Exception {
+    @Test void switchingGlidesTheUnderlineAndRepeatedSwitchesRetargetWithoutAJump() throws Exception {
         edt(() -> {
             var fixture = fixture();
             fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second"); fixture.strip.refresh(); fixture.advance(150);
             var second = fixture.owner.currentTab(); var first = fixture.owner.tabStrip().getComponentAt(0);
-            double start = fixture.strip.folderBounds().getX();
+            double start = fixture.strip.indicatorBounds().getX();
             fixture.owner.selectTab(first); fixture.strip.refresh();
             assertThat(fixture.owner.selectedComponent()).isSameAs(first);
-            assertThat(fixture.strip.folderBounds().getX()).isEqualTo(start);
+            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(start);
             fixture.advance(65);
-            double middle = fixture.strip.folderBounds().getX();
+            double middle = fixture.strip.indicatorBounds().getX();
             assertThat(middle).isBetween(1.0, start - 1);
             fixture.owner.selectTab(second); fixture.strip.refresh();
-            assertThat(fixture.strip.folderBounds().getX()).isEqualTo(middle);
+            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(middle);
             fixture.advance(130);
-            assertThat(fixture.strip.folderBounds().getX()).isEqualTo(start);
+            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(start);
         });
     }
 
@@ -89,14 +89,14 @@ class WindowTabMotionTest {
             var second = fixture.owner.currentTab();
             fixture.owner.selectTab(fixture.owner.tabStrip().getComponentAt(0)); fixture.strip.refresh();
             fixture.advance(65);
-            var before = fixture.strip.folderBounds();
+            var before = fixture.strip.indicatorBounds();
             assertThat(before.getX()).isGreaterThan(0);
             second.rename("third"); fixture.strip.refresh();
-            assertThat(fixture.strip.folderBounds()).as("metadata must not snap the selected folder").isEqualTo(before);
+            assertThat(fixture.strip.indicatorBounds()).as("metadata must not snap the selected underline").isEqualTo(before);
             fixture.advance(64);
             assertThat(fixture.strip.motionRunning()).isTrue();
             fixture.advance(1);
-            assertThat(fixture.strip.folderBounds().getX()).isZero();
+            assertThat(fixture.strip.indicatorBounds().getX()).isZero();
             assertThat(fixture.strip.motionRunning()).as("metadata must not extend the switch deadline").isFalse();
         });
     }
@@ -108,27 +108,27 @@ class WindowTabMotionTest {
             fixture.strip.refresh(); fixture.advance(150);
             var first = fixture.owner.terminalTabs().get(0);
             fixture.owner.selectTab(first); fixture.strip.refresh(); fixture.advance(65);
-            var before = fixture.strip.folderBounds();
+            var before = fixture.strip.indicatorBounds();
             first.rename("a shell title with enough characters to use the maximum tab width"); fixture.strip.refresh();
-            assertThat(fixture.strip.folderBounds()).isEqualTo(before);
+            assertThat(fixture.strip.indicatorBounds()).isEqualTo(before);
             fixture.advance(65);
-            assertThat(fixture.strip.folderBounds().getX()).isZero();
-            assertThat(fixture.strip.folderBounds().getWidth()).isEqualTo(240);
+            assertThat(fixture.strip.indicatorBounds().getX()).isZero();
+            assertThat(fixture.strip.indicatorBounds().getWidth()).isEqualTo(240);
             assertThat(fixture.strip.motionRunning()).isFalse();
         });
     }
 
-    @Test void rapidMouseClicksRetargetTheMovingFolderWithoutSnapping() throws Exception {
+    @Test void rapidMouseClicksRetargetTheMovingUnderlineWithoutSnapping() throws Exception {
         edt(() -> {
             var fixture = fixture(); fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second");
             fixture.strip.refresh(); fixture.advance(150);
             click(named(fixture.strip, "select:first")); fixture.strip.refresh(); fixture.advance(65);
-            var before = fixture.strip.folderBounds();
+            var before = fixture.strip.indicatorBounds();
             click(named(fixture.strip, "select:second")); fixture.strip.refresh();
             assertThat(fixture.owner.currentTab().title()).isEqualTo("second");
-            assertThat(fixture.strip.folderBounds()).isEqualTo(before);
+            assertThat(fixture.strip.indicatorBounds()).isEqualTo(before);
             fixture.advance(130);
-            assertThat(fixture.strip.folderBounds().getX()).isGreaterThan(before.getX());
+            assertThat(fixture.strip.indicatorBounds().getX()).isGreaterThan(before.getX());
         });
     }
 
@@ -178,39 +178,39 @@ class WindowTabMotionTest {
             var g = image.createGraphics(); fixture.strip.paint(g); int before = image.getRGB(100, 29);
             g.setClip(90, 20, 30, 10);
             fixture.strip.paint(g); assertThat(image.getRGB(100, 29)).isEqualTo(before); g.dispose();
-            assertThat(fixture.strip.folderBounds().getWidth()).isBetween(0.0, 240.0);
+            assertThat(fixture.strip.indicatorBounds().getWidth()).isBetween(0.0, 240.0);
         });
     }
 
-    @Test void operationDurationsKeepTheFolderWithOpeningAndClosingMotion() throws Exception {
+    @Test void operationDurationsKeepTheUnderlineWithOpeningAndClosingMotion() throws Exception {
         edt(() -> {
             var fixture = fixture(); fixture.strip.setAnimations(new AnimationSettings(true, 1000, 800, 0));
-            double initial = fixture.strip.folderBounds().getX();
+            double initial = fixture.strip.indicatorBounds().getX();
             fixture.owner.newTab(HOME); fixture.strip.refresh();
-            assertThat(fixture.strip.folderBounds().getX()).isEqualTo(initial);
+            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(initial);
             fixture.advance(500);
-            double middle = fixture.strip.folderBounds().getX();
+            double middle = fixture.strip.indicatorBounds().getX();
             assertThat(middle).isBetween(1.0, 159.0);
             fixture.advance(500);
-            double beforeClose = fixture.strip.folderBounds().getX();
+            double beforeClose = fixture.strip.indicatorBounds().getX();
             fixture.owner.closeTab(fixture.owner.currentTab()); fixture.strip.refresh();
-            assertThat(fixture.strip.folderBounds().getX()).isEqualTo(beforeClose);
+            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(beforeClose);
             fixture.advance(400);
-            assertThat(fixture.strip.folderBounds().getX()).isBetween(1.0, beforeClose - 1);
+            assertThat(fixture.strip.indicatorBounds().getX()).isBetween(1.0, beforeClose - 1);
             fixture.advance(400);
-            assertThat(fixture.strip.folderBounds().getX()).isZero();
+            assertThat(fixture.strip.indicatorBounds().getX()).isZero();
         });
     }
 
-    @Test void aTitleArrivingMidOpenRetargetsWidthWithoutJumpingTheFolder() throws Exception {
+    @Test void aTitleArrivingMidOpenRetargetsWidthWithoutJumpingTheUnderline() throws Exception {
         edt(() -> {
             var fixture = fixture(); fixture.strip.setAnimations(new AnimationSettings(true, 1000, 800, 0));
             fixture.owner.newTab(HOME); fixture.strip.refresh(); fixture.advance(500);
-            var before = fixture.strip.folderBounds();
+            var before = fixture.strip.indicatorBounds();
             fixture.owner.currentTab().rename("a shell title with enough characters to use the maximum tab width"); fixture.strip.refresh();
-            assertThat(fixture.strip.folderBounds()).isEqualTo(before);
+            assertThat(fixture.strip.indicatorBounds()).isEqualTo(before);
             fixture.advance(500);
-            assertThat(fixture.strip.folderBounds().getWidth()).isEqualTo(240);
+            assertThat(fixture.strip.indicatorBounds().getWidth()).isEqualTo(240);
             assertThat(fixture.strip.motionRunning()).isFalse();
         });
     }

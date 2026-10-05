@@ -1,5 +1,8 @@
 # Folder tabs
 
+> Superseded visually by the approved [flat tabs](flat-tabs.md) follow-up on 2026-10-04.
+> The motion timings and interaction model below remain in use.
+
 The user approved this visual follow-up on 2026-10-04 after reviewing an interactive mock over the application screenshot. The supplied reference below is the visual authority for the silhouette. This supersedes the inset rounded selection with a blue outline; the earlier Inset rail proposal remains a design alternative, not an application setting.
 
 ![Approved folder-tab reference](folder-tabs-reference.png)
