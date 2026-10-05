@@ -39,7 +39,7 @@ class ErrorsViewTest {
     private int logFolders;
 
     private ErrorsView view() {
-        return new ErrorsView(incidents, new ErrorsView.Hooks(id -> id.equals("dev.jasper.remote") ? "Remote" : id,
+        return new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> id.equals("dev.jasper.remote") ? "Remote" : id,
             id -> id.equals("dev.jasper.remote") ? "2.1.0" : "", HERE, copied::add, disabled::add, () -> logFolders++),
             ZoneOffset.UTC);
     }
@@ -137,7 +137,7 @@ class ErrorsViewTest {
     }
 
     @Test void textIsNeverMarkup() {
-        var view = new ErrorsView(incidents, new ErrorsView.Hooks(id -> "<html><b>Evil</b>", id -> "", HERE, copied::add,
+        var view = new ErrorsView(dev.jasper.app.testsupport.KitTestSupport.context(), incidents, new ErrorsView.Hooks(id -> "<html><b>Evil</b>", id -> "", HERE, copied::add,
             disabled::add, () -> { }), ZoneOffset.UTC);
         record("dev.example.evil", "<html><i>op</i>", new IllegalStateException("<html><u>message</u>"));
         assertThat(view.headerText()).isEqualTo("<html><b>Evil</b> · <html><i>op</i>");
@@ -145,6 +145,32 @@ class ErrorsViewTest {
             assertThat(label.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
             assertThat(label.getClientProperty(BasicHTML.propertyKey)).isNull();
         }
+    }
+
+    /** The list is a kit list whose rows carry the danger glyph; the message and trace stay selectable read-only text. */
+    @Test void theListIsAKitListAndTheTextsStaySelectableAcrossAThemeSwitch() {
+        var bindings = dev.jasper.app.testsupport.KitTestSupport.bindings(true);
+        try {
+            var kit = bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME);
+            var view = new ErrorsView(kit, incidents, new ErrorsView.Hooks(id -> id, id -> "", HERE, copied::add, disabled::add, () -> { }), ZoneOffset.UTC);
+            Incident first = record("jasper", "a", new IllegalStateException("first"));
+            Incident second = record("jasper", "b", new IllegalStateException("second"));
+            view.select(first.id());
+            var list = (dev.jasper.ui.model.Nodes.ItemList) view.listView().spec().root();
+            assertThat(list.selectedIds()).containsExactly(first.id().toString());
+            var icon = (dev.jasper.ui.model.Nodes.Icon) list.items().getFirst().leading().orElseThrow();
+            assertThat(icon.name()).isEqualTo("error");
+            assertThat(icon.severity()).contains(dev.jasper.ui.model.Nodes.Severity.DANGER);
+            assertThat(view.traceArea().isEditable()).isFalse();
+            view.traceArea().select(0, 5);
+            bindings.binding().publish(dev.jasper.app.appearance.ThemeTestSupport.pair(false));
+            assertThat(view.selected()).map(Incident::id).contains(first.id());
+            assertThat(view.traceArea().getSelectionStart()).isZero();
+            assertThat(view.traceArea().getSelectionEnd()).isEqualTo(5);
+            assertThat(view.traceArea().getForeground()).isEqualTo(kit.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+            assertThat(second.id()).isNotEqualTo(first.id());
+            view.close();
+        } finally { bindings.close(); }
     }
 
     @Test void closingStopsListening() {

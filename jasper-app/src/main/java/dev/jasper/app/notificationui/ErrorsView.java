@@ -1,47 +1,49 @@
 package dev.jasper.app.notificationui;
 
-import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.Incident;
 import dev.jasper.app.notifications.IncidentReport;
 import dev.jasper.app.notifications.Incidents;
-import dev.jasper.app.platform.AppIcons;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.ListItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Graphics;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
-import javax.swing.ListCellRenderer;
-import javax.swing.ListSelectionModel;
-import javax.swing.ScrollPaneConstants;
-import javax.swing.SwingConstants;
-import javax.swing.UIManager;
+import javax.swing.plaf.basic.BasicSplitPaneDivider;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
 
 /**
  * The Errors window's content (spec section 5): this session's incidents, most recently seen first, beside the
  * selected one's source and operation, sightings, message and stack trace, with Copy, Disable Plugin (a plugin's
- * incidents only), Open Log Folder and Clear. Every text is plain. EDT only; {@link #close} stops it listening.
+ * incidents only), Open Log Folder and Clear. A layout-only shell (split, detail cards, button row; former geometry as
+ * named metrics) of chrome kit views: a kit list, kit text, kit buttons and read-only Custom EDITOR message and trace
+ * (ruling G4, so they stay selectable and scrollable). Every text is literal. EDT only; {@link #close} stops it listening.
  */
 public final class ErrorsView extends JPanel {
     /**
@@ -67,104 +69,133 @@ public final class ErrorsView extends JPanel {
         }
     }
 
-    private static final String EMPTY = "empty";
-    private static final String DETAIL = "detail";
+    static final String LIST = "errors", HEADER = "header", SIGHTINGS = "sightings";
+    static final String COPY = "copy", DISABLE = "disable", LOG_FOLDER = "log-folder", CLEAR = "clear";
+    private static final String EMPTY = "empty", DETAIL = "detail", MESSAGE = "errors.message", TRACE = "errors.trace";
+    /** The list's share of extra width when the window grows, as before. */
+    private static final double LIST_SHARE = 0.35;
+    private final KitContext kit;
     private final Incidents incidents;
     private final Hooks hooks;
     private final DateTimeFormatter time;
-    private final DefaultListModel<Incident> model = new DefaultListModel<>();
-    private final JList<Incident> list = new JList<>(model) {
-        // Rows take the list's width, so a long summary ends in an ellipsis instead of widening the list.
-        @Override public boolean getScrollableTracksViewportWidth() { return true; }
-    };
+    private final KitView listView, headingView, traceView, emptyView, leadingButtons, trailingButtons;
     private final CardLayout cards = new CardLayout();
-    private final JPanel detail = new JPanel(cards);
-    private final JLabel header = plain();
-    private final JLabel sightings = plain();
-    private final ReadOnlyText message = new ReadOnlyText(false);
-    private final ReadOnlyText trace = new ReadOnlyText(true);
-    private final JButton copy = new JButton("Copy");
-    private final JButton disable = new JButton("Disable Plugin");
-    private final JButton logFolder = new JButton("Open Log Folder");
-    private final JButton clear = new JButton("Clear");
+    private final JPanel detail = new JPanel(cards), details = new JPanel(new BorderLayout()), buttons = new JPanel(new BorderLayout());
+    private final JSplitPane split;
+    private final JTextArea message = new JTextArea(), trace = new JTextArea();
     private final Subscription listening;
-    private UUID shown;
-    private boolean refreshing;
-    private boolean closed;
+    private final AutoCloseable theme;
+    private List<Incident> listed = List.of();
+    private UUID selectedId, shown;
+    private boolean closed, showingEmpty = true;
 
     /**
+     * @param kit the chrome kit context
      * @param incidents the store it lists and clears
      * @param hooks what it asks of the application
      * @param zone the zone sightings are shown in
      */
-    public ErrorsView(Incidents incidents, Hooks hooks, ZoneId zone) {
+    public ErrorsView(KitContext kit, Incidents incidents, Hooks hooks, ZoneId zone) {
         super(new BorderLayout());
+        this.kit = Objects.requireNonNull(kit, "kit");
         this.incidents = Objects.requireNonNull(incidents, "incidents");
         this.hooks = Objects.requireNonNull(hooks, "hooks");
         time = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(zone);
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setCellRenderer(new Row());
-        list.getAccessibleContext().setAccessibleName("Errors");
-        list.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) showSelected(); });
-        var listScroll = new JScrollPane(list, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
-            ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-
-        header.setFont(header.getFont().deriveFont(Font.BOLD));
-        header.setAlignmentX(LEFT_ALIGNMENT);
-        sightings.setForeground(NotificationStyle.color("Jasper.mutedForeground", Color.GRAY));
-        sightings.setAlignmentX(LEFT_ALIGNMENT);
+        listView = new KitView(kit, listSpec(), this::event);
+        listView.getAccessibleContext().setAccessibleName("Errors");
+        message.setRows(kit.metrics().value(DesignMetrics.Role.ERRORS_MESSAGE_ROWS));
         message.setLineWrap(true);
         message.setWrapStyleWord(true);
-        message.setRows(3);
         message.getAccessibleContext().setAccessibleName("Message");
         trace.getAccessibleContext().setAccessibleName("Stack trace");
-        var messageScroll = new JScrollPane(message, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
-            ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        messageScroll.setAlignmentX(LEFT_ALIGNMENT);
-        var heading = new JPanel();
-        heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
-        heading.setOpaque(false);
-        heading.add(header);
-        heading.add(Box.createVerticalStrut(UIScale.scale(2)));
-        heading.add(sightings);
-        heading.add(Box.createVerticalStrut(UIScale.scale(8)));
-        heading.add(messageScroll);
-        var details = new JPanel(new BorderLayout(0, UIScale.scale(8)));
-        details.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-        details.add(heading, BorderLayout.NORTH);
-        details.add(new JScrollPane(trace), BorderLayout.CENTER);
-        JLabel empty = plain();
-        empty.setText("No errors");
-        empty.setHorizontalAlignment(SwingConstants.CENTER);
-        empty.setForeground(NotificationStyle.color("Jasper.mutedForeground", Color.GRAY));
-        detail.add(empty, EMPTY);
+        for (var area : List.of(message, trace)) { area.setEditable(false); area.setOpaque(false); }
+        headingView = new KitView(kit, headingSpec(null), this::event);
+        headingView.registerContent(MESSAGE, scroll(message), () -> { });
+        traceView = new KitView(kit, new ViewSpec(new Nodes.Custom("trace", ControlState.READY, TRACE, Nodes.CustomKind.EDITOR, "Stack trace")), this::event);
+        traceView.registerContent(TRACE, scroll(trace), () -> { });
+        emptyView = new KitView(kit, new ViewSpec(new Nodes.Empty("no-errors", ControlState.READY,
+            new Nodes.Icon("no-errors-icon", ControlState.READY, "check", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "No errors"), "No errors", "", List.of())), this::event);
+        leadingButtons = new KitView(kit, leadingSpec(null), this::event);
+        trailingButtons = new KitView(kit, trailingSpec(false), this::event);
+
+        details.setOpaque(false);
+        details.add(headingView, BorderLayout.NORTH);
+        details.add(traceView, BorderLayout.CENTER);
+        detail.setOpaque(false);
+        detail.add(emptyView, EMPTY);
         detail.add(details, DETAIL);
-
-        var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listScroll, detail);
-        split.setResizeWeight(0.35);
-        split.setDividerLocation(UIScale.scale(320));
+        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listView, detail) {
+            @Override public void updateUI() {
+                // An unpainted resize gutter, as in the chooser; Swing keeps its keyboard and drag handling.
+                setUI(new BasicSplitPaneUI() {
+                    @Override public BasicSplitPaneDivider createDefaultDivider() {
+                        return new BasicSplitPaneDivider(this) { @Override public void paint(Graphics graphics) { } };
+                    }
+                });
+                setOpaque(false);
+            }
+        };
+        split.setResizeWeight(LIST_SHARE);
         split.setBorder(BorderFactory.createEmptyBorder());
+        split.setContinuousLayout(true);
+        split.setDividerLocation(metric(DesignMetrics.Role.ERRORS_LIST_WIDTH));
         add(split, BorderLayout.CENTER);
-
-        var leading = new JPanel(new FlowLayout(FlowLayout.LEADING, UIScale.scale(6), 0));
-        leading.add(copy);
-        leading.add(disable);
-        var trailing = new JPanel(new FlowLayout(FlowLayout.TRAILING, UIScale.scale(6), 0));
-        trailing.add(logFolder);
-        trailing.add(clear);
-        var buttons = new JPanel(new BorderLayout());
-        buttons.setBorder(BorderFactory.createEmptyBorder(8, 6, 8, 6));
-        buttons.add(leading, BorderLayout.WEST);
-        buttons.add(trailing, BorderLayout.EAST);
+        buttons.setOpaque(false);
+        buttons.add(leadingButtons, BorderLayout.WEST);
+        buttons.add(trailingButtons, BorderLayout.EAST);
         add(buttons, BorderLayout.SOUTH);
-
-        copy.addActionListener(event -> selected().ifPresent(incident -> hooks.copy().accept(report(incident))));
-        disable.addActionListener(event -> selected().filter(Incident::fromPlugin)
-            .ifPresent(incident -> hooks.disablePlugin().accept(incident.source())));
-        logFolder.addActionListener(event -> hooks.openLogFolder().run());
-        clear.addActionListener(event -> incidents.clear());
+        theme = kit.binding().subscribe(pair -> restyle());
+        restyle();
         listening = incidents.onChange(change -> refresh());
         refresh();
+    }
+
+    private static JScrollPane scroll(JTextArea area) {
+        var scroll = new JScrollPane(area, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        return scroll;
+    }
+
+    private int metric(DesignMetrics.Role role) { return NotificationStyle.metric(kit, role); }
+
+    /** The former paddings and gaps from named metrics; the read-only texts take the module's body and mono roles. */
+    private void restyle() {
+        int vertical = metric(DesignMetrics.Role.ERRORS_DETAIL_VERTICAL_PADDING), side = metric(DesignMetrics.Role.ERRORS_DETAIL_SIDE_PADDING);
+        details.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        ((BorderLayout) details.getLayout()).setVgap(metric(DesignMetrics.Role.ERRORS_DETAIL_GAP));
+        int buttonsVertical = metric(DesignMetrics.Role.ERRORS_BUTTONS_VERTICAL_PADDING), buttonsSide = metric(DesignMetrics.Role.ERRORS_BUTTONS_SIDE_PADDING);
+        buttons.setBorder(BorderFactory.createEmptyBorder(buttonsVertical, buttonsSide, buttonsVertical, buttonsSide));
+        split.setDividerSize(metric(DesignMetrics.Role.WORKSPACE_GUTTER));
+        message.setFont(NotificationStyle.font(kit, Typography.Role.BODY));
+        trace.setFont(NotificationStyle.font(kit, Typography.Role.MONO));
+        for (var area : List.of(message, trace)) {
+            area.setForeground(NotificationStyle.color(kit, SemanticColor.TEXT_PRIMARY));
+            area.setCaretColor(area.getForeground());
+            area.setSelectionColor(NotificationStyle.color(kit, SemanticColor.SELECTION_BG));
+            area.setSelectedTextColor(NotificationStyle.color(kit, SemanticColor.TEXT_PRIMARY));
+        }
+        revalidate();
+        repaint();
+    }
+
+    private void event(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Selected chosen when chosen.id().equals(LIST) -> chosen.ids().stream().findFirst().map(UUID::fromString)
+                .ifPresent(id -> { selectedId = id; showSelected(); });
+            case UiEvent.Action action -> {
+                switch (action.id()) {
+                    case COPY -> selected().ifPresent(incident -> hooks.copy().accept(report(incident)));
+                    case DISABLE -> selected().filter(Incident::fromPlugin).ifPresent(incident -> hooks.disablePlugin().accept(incident.source()));
+                    case LOG_FOLDER -> hooks.openLogFolder().run();
+                    case CLEAR -> incidents.clear();
+                    default -> { }
+                }
+            }
+            default -> { }
+        }
     }
 
     /**
@@ -173,64 +204,59 @@ public final class ErrorsView extends JPanel {
      * @param id the incident
      */
     public void select(UUID id) {
-        int index = indexOf(id);
-        if (index < 0) return;
-        list.setSelectedIndex(index);
-        list.ensureIndexIsVisible(index);
+        if (closed || indexOf(id) < 0) return;
+        selectedId = id;
+        listView.update(listSpec());
+        showSelected();
     }
 
     /** Scrolls the selected row into view again; the window calls this once it has been laid out. */
     public void revealSelection() {
-        int index = list.getSelectedIndex();
-        if (index >= 0) list.ensureIndexIsVisible(index);
+        if (closed || selectedId == null || indexOf(selectedId) < 0) return;
+        listView.reveal(summaryId(selectedId));
     }
 
-    /** Stops listening; the window calls this when it closes. Idempotent. */
+    /** Stops listening and closes the kit views; the window calls this when it closes. Idempotent. */
     public void close() {
         if (closed) return;
         closed = true;
         listening.close();
+        try { theme.close(); } catch (Exception ignored) { /* the binding outlives the view */ }
+        for (var view : List.of(listView, headingView, traceView, emptyView, leadingButtons, trailingButtons)) view.close();
     }
 
-    Optional<Incident> selected() { return Optional.ofNullable(list.getSelectedValue()); }
+    Optional<Incident> selected() {
+        int index = indexOf(selectedId);
+        return index < 0 ? Optional.empty() : Optional.of(listed.get(index));
+    }
 
     /** Rebuilds the list, keeping the user's selection, else selecting the newest. */
     private void refresh() {
-        UUID chosen = selected().map(Incident::id).orElse(null);
-        List<Incident> now = incidents.list();
-        refreshing = true;
-        try {
-            model.clear();
-            now.forEach(model::addElement);
-            int index = indexOf(chosen);
-            if (index < 0 && !now.isEmpty()) index = 0;
-            if (index >= 0) list.setSelectedIndex(index);
-        } finally {
-            refreshing = false;
-        }
-        clear.setEnabled(!now.isEmpty());
+        if (closed) return;
+        listed = List.copyOf(incidents.list());
+        if (indexOf(selectedId) < 0) selectedId = listed.isEmpty() ? null : listed.getFirst().id();
+        listView.update(listSpec());
         showSelected();
     }
 
     private int indexOf(UUID id) {
         if (id == null) return -1;
-        for (int i = 0; i < model.size(); i++) if (model.get(i).id().equals(id)) return i;
+        for (int i = 0; i < listed.size(); i++) if (listed.get(i).id().equals(id)) return i;
         return -1;
     }
 
     private void showSelected() {
-        if (refreshing) return;
         Optional<Incident> chosen = selected();
-        copy.setEnabled(chosen.isPresent());
-        disable.setVisible(chosen.map(Incident::fromPlugin).orElse(false));
+        leadingButtons.update(leadingSpec(chosen.orElse(null)));
+        trailingButtons.update(trailingSpec(!listed.isEmpty()));
         if (chosen.isEmpty()) {
             shown = null;
+            showingEmpty = true;
             cards.show(detail, EMPTY);
             return;
         }
         Incident incident = chosen.get();
-        header.setText(sourceName(incident) + " · " + incident.operation());
-        sightings.setText(sightingsOf(incident));
+        headingView.update(headingSpec(incident));
         if (!incident.id().equals(shown)) {
             // The first sighting's text never changes, so a long trace is set once per selection.
             message.setText(incident.message().isEmpty() ? "No message" : incident.message());
@@ -239,7 +265,42 @@ public final class ErrorsView extends JPanel {
             trace.setCaretPosition(0);
             shown = incident.id();
         }
+        showingEmpty = false;
         cards.show(detail, DETAIL);
+    }
+
+    private static String summaryId(UUID id) { return "summary:" + id; }
+
+    private ViewSpec listSpec() {
+        var items = new ArrayList<ListItem>();
+        for (Incident incident : listed) {
+            String id = incident.id().toString();
+            items.add(new ListItem(id, Optional.of(new Nodes.Icon("icon:" + id, ControlState.READY, "error", Nodes.Hue.NONE, Nodes.IconSize.RAIL, "Error",
+                Optional.of(Nodes.Severity.DANGER))), List.of(new Nodes.Text(summaryId(incident.id()), ControlState.READY, incident.summary(), Nodes.TextRole.BODY)),
+                List.of(new Nodes.Text("detail:" + id, ControlState.READY, detailLine(incident), Nodes.TextRole.CAPTION)), List.of()));
+        }
+        return new ViewSpec(new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.DOUBLE, items,
+            selectedId == null ? Set.of() : Set.of(selectedId.toString()), "", List.of()));
+    }
+
+    private ViewSpec headingSpec(Incident incident) {
+        return new ViewSpec(new Nodes.Stack("heading", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text(HEADER, ControlState.READY, incident == null ? " " : sourceName(incident) + " · " + incident.operation(), Nodes.TextRole.BODY_STRONG),
+            new Nodes.Text(SIGHTINGS, ControlState.READY, incident == null ? " " : sightingsOf(incident), Nodes.TextRole.DESCRIPTION),
+            new Nodes.Custom("message", ControlState.READY, MESSAGE, Nodes.CustomKind.EDITOR, "Message"))));
+    }
+
+    private ViewSpec leadingSpec(Incident incident) {
+        boolean plugin = incident != null && incident.fromPlugin();
+        return new ViewSpec(new Nodes.Stack("leading-buttons", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+            new Nodes.Button(COPY, new ControlState(true, incident != null, false, ""), "Copy", "", Nodes.ButtonKind.SECONDARY, COPY, ""),
+            new Nodes.Button(DISABLE, new ControlState(plugin, true, false, ""), "Disable Plugin", "", Nodes.ButtonKind.SECONDARY, DISABLE, ""))));
+    }
+
+    private ViewSpec trailingSpec(boolean any) {
+        return new ViewSpec(new Nodes.Stack("trailing-buttons", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+            new Nodes.Button(LOG_FOLDER, ControlState.READY, "Open Log Folder", "", Nodes.ButtonKind.SECONDARY, LOG_FOLDER, ""),
+            new Nodes.Button(CLEAR, new ControlState(true, any, false, ""), "Clear", "", Nodes.ButtonKind.SECONDARY, CLEAR, ""))));
     }
 
     private String sourceName(Incident incident) {
@@ -262,87 +323,40 @@ public final class ErrorsView extends JPanel {
         return IncidentReport.text(incident, version == null ? "" : version, hooks.environment());
     }
 
-    /** A label that never renders markup: the property goes in before any text is set. */
-    private static JLabel plain() {
-        var label = new JLabel();
-        label.putClientProperty("html.disable", Boolean.TRUE);
-        return label;
-    }
-
-    List<Incident> listed() { return Collections.list(model.elements()); }
-    String headerText() { return header.getText(); }
-    JLabel headerLabel() { return header; }
-    String sightingsText() { return sightings.getText(); }
+    List<Incident> listed() { return listed; }
+    String headerText() { return showingEmpty ? "" : headingText(0); }
+    JLabel headerLabel() { return (JLabel) NotificationCard.find(headingView, HEADER); }
+    String sightingsText() { return showingEmpty ? "" : headingText(1); }
     String messageText() { return message.getText(); }
     String traceText() { return trace.getText(); }
     Font traceFont() { return trace.getFont(); }
-    boolean showingEmpty() { return detail.getComponent(0).isVisible(); }
-    JButton copyButton() { return copy; }
-    JButton disableButton() { return disable; }
-    JButton logFolderButton() { return logFolder; }
-    JButton clearButton() { return clear; }
-    String rowSummary(int index) { return rendered(index).summaryLabel.getText(); }
-    String rowDetail(int index) { return rendered(index).detailLabel.getText(); }
+    boolean showingEmpty() { return showingEmpty; }
+    AbstractButton copyButton() { return (AbstractButton) NotificationCard.find(leadingButtons, COPY); }
+    AbstractButton disableButton() { return (AbstractButton) NotificationCard.find(leadingButtons, DISABLE); }
+    AbstractButton logFolderButton() { return (AbstractButton) NotificationCard.find(trailingButtons, LOG_FOLDER); }
+    AbstractButton clearButton() { return (AbstractButton) NotificationCard.find(trailingButtons, CLEAR); }
+    KitView listView() { return listView; }
+    JTextArea messageArea() { return message; }
+    JTextArea traceArea() { return trace; }
+
+    private String headingText(int index) {
+        return ((Nodes.Text) ((Nodes.Stack) headingView.spec().root()).children().get(index)).text();
+    }
+
+    private ListItem item(int index) { return ((Nodes.ItemList) listView.spec().root()).items().get(index); }
+    String rowSummary(int index) { return ((Nodes.Text) item(index).title().getFirst()).text(); }
+    String rowDetail(int index) { return ((Nodes.Text) item(index).subtitle().getFirst()).text(); }
+
+    /** The row's mounted summary and detail labels (the list is laid out first, so the row is mounted). */
     List<JLabel> rowLabels(int index) {
-        Row row = rendered(index);
-        return List.of(row.summaryLabel, row.detailLabel);
+        if (listView.getWidth() == 0) listView.setSize(metric(DesignMetrics.Role.ERRORS_LIST_WIDTH), metric(DesignMetrics.Role.ERRORS_LIST_WIDTH));
+        layoutTree(listView);
+        var item = item(index);
+        return List.of((JLabel) NotificationCard.find(listView, item.title().getFirst().id()), (JLabel) NotificationCard.find(listView, item.subtitle().getFirst().id()));
     }
 
-    private Row rendered(int index) {
-        return (Row) list.getCellRenderer().getListCellRendererComponent(list, model.get(index), index, false, false);
-    }
-
-    /** One list row: the error icon and summary, then the source, count and last sighting. */
-    private final class Row extends JPanel implements ListCellRenderer<Incident> {
-        private final JLabel summaryLabel = plain();
-        private final JLabel detailLabel = plain();
-
-        Row() {
-            super(new BorderLayout(0, UIScale.scale(2)));
-            setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-            summaryLabel.setIcon(AppIcons.bundled("status/error"));
-            detailLabel.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(20), 0, 0));
-            add(summaryLabel, BorderLayout.NORTH);
-            add(detailLabel, BorderLayout.SOUTH);
-        }
-
-        @Override public Component getListCellRendererComponent(JList<? extends Incident> owner, Incident incident, int index,
-                                                                boolean selected, boolean focused) {
-            summaryLabel.setText(incident.summary());
-            detailLabel.setText(detailLine(incident));
-            Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-            setOpaque(true);
-            setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-            summaryLabel.setFont(owner.getFont());
-            detailLabel.setFont(owner.getFont());
-            summaryLabel.setForeground(foreground);
-            detailLabel.setForeground(selected ? foreground : NotificationStyle.color("Jasper.mutedForeground", Color.GRAY));
-            getAccessibleContext().setAccessibleName(incident.summary() + ", " + detailLine(incident));
-            return this;
-        }
-    }
-
-    /** Read-only text in the label font, or a monospaced one, kept through a look-and-feel change. */
-    private static final class ReadOnlyText extends JTextArea {
-        private final boolean monospaced;
-
-        ReadOnlyText(boolean monospaced) {
-            this.monospaced = monospaced;
-            setEditable(false);
-            restyle();
-        }
-
-        @Override public void updateUI() {
-            super.updateUI();
-            // JTextArea's constructor calls this before the field is set; the constructor restyles again.
-            restyle();
-        }
-
-        private void restyle() {
-            Font label = UIManager.getFont("Label.font");
-            int size = label == null ? 12 : label.getSize();
-            if (monospaced) setFont(new Font(Font.MONOSPACED, Font.PLAIN, size));
-            else if (label != null) setFont(label.deriveFont(Font.PLAIN));
-        }
+    private static void layoutTree(java.awt.Component component) {
+        component.doLayout();
+        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) layoutTree(child);
     }
 }

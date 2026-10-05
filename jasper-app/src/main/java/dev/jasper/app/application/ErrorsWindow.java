@@ -27,10 +27,13 @@ final class ErrorsWindow {
     private final Incidents incidents;
     private final ErrorsView.Hooks hooks;
     private final ZoneId zone;
+    private final java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit;
     private AuxiliarySurface surface;
     private ErrorsView view;
 
-    ErrorsWindow(Contributions contributions, AuxiliaryWindows windows, Incidents incidents, ErrorsView.Hooks hooks, ZoneId zone) {
+    ErrorsWindow(Contributions contributions, AuxiliaryWindows windows, Incidents incidents, ErrorsView.Hooks hooks, ZoneId zone,
+                 java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
+        this.kit = java.util.Objects.requireNonNull(kit, "kit");
         this.windows = windows;
         this.incidents = incidents;
         this.hooks = hooks;
@@ -47,7 +50,7 @@ final class ErrorsWindow {
     void show(Optional<UUID> incident) {
         if (surface == null || surface.closed()) {
             surface = windows.window(ID, "Errors", SIZE, true);
-            ErrorsView opened = new ErrorsView(incidents, hooks, zone);
+            ErrorsView opened = new ErrorsView(kit.get(), incidents, hooks, zone);
             surface.setContent(opened);
             surface.onClosed(opened::close);
             view = opened;

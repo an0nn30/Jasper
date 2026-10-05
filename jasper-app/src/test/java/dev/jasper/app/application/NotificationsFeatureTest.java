@@ -39,7 +39,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void registersTheGroupsThePanelAndItsActions() {
-        new NotificationsFeature(center, contributions);
+        new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         assertThat(center.groups()).extracting(NotificationGroup::id).containsExactly("jasper.general", "jasper.config");
         assertThat(center.mode("jasper.config")).isEqualTo(DisplayMode.STICKY);
         assertThat(panel().defaultSlot()).isEqualTo(Slot.RIGHT_TOP);
@@ -56,7 +56,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void theBadgeCountsUnreadAndTurnsRedForErrors() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         assertThat(panel().badge()).isEmpty();
         feature.info("Migrate Config", "Nothing to migrate");
         assertThat(panel().badge()).contains(new PanelBadge(1, PanelBadge.Tone.ACCENT, "1 unread notification"));
@@ -67,7 +67,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void cardsGoToTheirTargetOrTheWindowUsedLast() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var first = window();
         var second = window();
         feature.attach(first);
@@ -81,7 +81,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void aWindowsOwnMessagesShowInThatWindowEvenWhenAnotherWasUsedLast() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var first = window();
         var second = window();
         feature.attach(first);
@@ -96,7 +96,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void aRepeatFromAnotherWindowMovesItsCardThere() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var first = window();
         var second = window();
         feature.attach(first);
@@ -110,7 +110,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void aClosedWindowsCardsGoAndLaterOnesFindAnotherWindow() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var first = window();
         var second = window();
         feature.attach(first);
@@ -129,7 +129,7 @@ class NotificationsFeatureTest {
 
     @Test void notificationsFromBeforeTheFirstWindowShowWhenItIsFocused() {
         presence = Delivery.Presence.NO_WINDOW;
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         feature.error("Startup problem", "details");
         center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING, "config.toml has warnings"));
         presence = Delivery.Presence.FOCUSED;
@@ -143,7 +143,7 @@ class NotificationsFeatureTest {
     @Test void aCardPostedWhileAWindowOpensWaitsForItsFirstActivation() {
         // The window is attached but the native activation event has not arrived yet: the application reports NO_WINDOW.
         presence = Delivery.Presence.NO_WINDOW;
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var window = window();
         feature.attach(window);
         feature.error("Could not start /bin/zsh", "No such file");
@@ -156,7 +156,7 @@ class NotificationsFeatureTest {
 
     @Test void anErrorPostedWhileResidentAndIdleIsHistoryOnlyButAConfigProblemWaitsForTheNextWindow() {
         presence = Delivery.Presence.IDLE;
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         feature.error("Background plugin failed", "details");
         UUID configProblem = center.post(NotificationRequest.of(NotificationsFeature.CONFIG.id(), Severity.WARNING,
             "config.toml has warnings")).orElseThrow();
@@ -172,7 +172,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void dismissCardsClosesTheInvokingWindowsCardsAndReadsThem() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var window = window();
         feature.attach(window);
         feature.info("One", "");
@@ -184,7 +184,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void errorsWithoutDetailsStillPost() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         feature.error("Could not open config.toml", null);
         assertThat(center.history()).singleElement().satisfies(entry -> {
             assertThat(entry.request().title()).isEqualTo("Could not open config.toml");
@@ -194,7 +194,7 @@ class NotificationsFeatureTest {
     }
 
     @Test void showHistoryShowsThePanelInAnAttachedWindowOnly() {
-        var feature = new NotificationsFeature(center, contributions);
+        var feature = new NotificationsFeature(center, contributions, dev.jasper.app.testsupport.KitTestSupport::context);
         var requests = new ArrayList<Contributions.PanelRequest>();
         contributions.onPanelRequest(requests::add);
         var window = window();

@@ -25,18 +25,8 @@ final class LegacyAppearanceDefaults {
             defaults.put(key, new ColorUIResource(color));
             extra.put(key, ColorMath.hex(color));
         });
-        // Exact residual notification keys: Task 6 removes these readers. Editor keys already come from module uiKeys.
-        java.util.Map.of(
-            "Jasper.notification.background", SemanticColor.SURFACE_CARD,
-            "Jasper.notification.borderColor", SemanticColor.BORDER_SUBTLE,
-            "Jasper.notification.foreground", SemanticColor.TEXT_PRIMARY,
-            "Jasper.notification.mutedForeground", SemanticColor.TEXT_SECONDARY,
-            "Jasper.notification.linkForeground", SemanticColor.TEXT_LINK).forEach((key, role) -> {
-                var color = dev.jasper.ui.themeimport.FlatLafThemeData.explicitColors(theme.uiKeys()).get(key);
-                if (color == null) color = theme.semantic().color(role);
-                defaults.put(key, new ColorUIResource(color));
-                extra.put(key, ColorMath.hex(color));
-            });
+        // Plan 2 Task 6c: notifications read module roles from the chrome KitContext; the five former
+        // Jasper.notification.* aliases are no longer published (an authored one is an unsupported override, Task 11).
         // Persist module-installed colors, including semantic values, through reinstallation.
         defaults.forEach((key, value) -> { if (value instanceof java.awt.Color color) extra.put(key.toString(), ColorMath.hex(color)); });
         defaults.put("ListUI", "dev.jasper.app.appearance.AppListUI");

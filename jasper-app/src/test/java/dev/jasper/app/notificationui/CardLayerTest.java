@@ -19,7 +19,10 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import javax.swing.UIManager;
+import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.KitContext;
+import javax.swing.AbstractButton;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,10 +39,14 @@ class CardLayerTest {
     private final List<String> opened = new ArrayList<>();
     private long now;
 
-    private CardLayer layer(boolean focused) {
+    private CardLayer layer(boolean focused) { return layer(KitTestSupport.context(), focused); }
+
+    private static int margin() { return UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN)); }
+
+    private CardLayer layer(KitContext kit, boolean focused) {
         center.register(CARDS);
         center.register(STICKY);
-        return new CardLayer(center, focused, () -> opened.add("history"), (delay, task) -> {
+        return new CardLayer(kit, center, focused, () -> opened.add("history"), (delay, task) -> {
             boolean[] cancelled = {false};
             scheduled.add(new Scheduled(delay, task, cancelled));
             return () -> cancelled[0] = true;
@@ -60,8 +67,11 @@ class CardLayerTest {
         assertThat(layer.isVisible()).isTrue();
         assertThat(layer.getMouseListeners()).as("clicks beside a card reach the terminal").isEmpty();
         assertThat(layer.isFocusable()).isFalse();
-        int margin = UIScale.scale(CardLayer.MARGIN);
-        assertThat(layer.getPreferredSize().width).isEqualTo(UIScale.scale(NotificationCard.WIDTH) + 2 * margin);
+        int margin = margin();
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN)).as("the former margin, named").isEqualTo(12);
+        assertThat(DesignMetrics.DEFAULT.value(DesignMetrics.Role.NOTIFICATION_STACK_GAP)).isEqualTo(8);
+        assertThat(layer.getPreferredSize().width).isEqualTo(UIScale.scale(360) + 2 * margin);
+        assertThat(NotificationCardTest.focusable(layer)).as("nothing in the layer takes the keyboard").isEmpty();
         assertThat(layer.getPreferredSize().height).isEqualTo(layer.card(a.id()).getPreferredSize().height + 2 * margin);
     }
 
@@ -74,7 +84,7 @@ class CardLayerTest {
         layer.setSize(layer.getPreferredSize());
         layer.doLayout();
         assertThat(layer.card(b.id()).getY()).isGreaterThan(layer.card(a.id()).getY());
-        assertThat(layer.card(b.id()).getY() + layer.card(b.id()).getHeight()).isEqualTo(layer.getHeight() - UIScale.scale(CardLayer.MARGIN));
+        assertThat(layer.card(b.id()).getY() + layer.card(b.id()).getHeight()).isEqualTo(layer.getHeight() - margin());
     }
 
     @Test void aFourthCardPushesOutTheOldestAutoHidingOne() {
@@ -97,13 +107,16 @@ class CardLayerTest {
         for (var entry : List.of(s1, s2, s3, s4)) layer.show(entry);
         assertThat(layer.showing()).containsExactly(s1.id(), s2.id(), s3.id());
         assertThat(layer.waitingIds()).containsExactly(s4.id());
-        assertThat(layer.moreButton().isVisible()).isTrue();
-        assertThat(layer.moreButton().getText()).isEqualTo("+1 more");
-        layer.moreButton().doClick();
-        assertThat(opened).containsExactly("history");
+        assertThat(layer.moreView().isVisible()).isTrue();
+        assertThat(layer.moreText()).isEqualTo("+1 more");
+        var chip = KitTestSupport.require(layer.moreView(), CardLayer.MORE, AbstractButton.class);
+        assertThat(chip.getText()).isEqualTo("+1 more");
+        assertThat(chip.isFocusable()).as("the chip keeps the terminal's focus").isFalse();
+        chip.doClick(0);
+        assertThat(opened).as("the chip opens the history once").containsExactly("history");
         center.markRead(s1.id());
         assertThat(layer.showing()).containsExactly(s2.id(), s3.id(), s4.id());
-        assertThat(layer.moreButton().isVisible()).isFalse();
+        assertThat(layer.moreView().isVisible()).isFalse();
     }
 
     @Test void autoHideCountsTenFocusedSeconds() {
@@ -210,8 +223,10 @@ class CardLayerTest {
     private static int alpha(BufferedImage image, int x, int y) { return image.getRGB(x, y) >>> 24; }
 
     /** A layer larger than its stack, so there is room beyond the shadow's margin; the first card is the one returned. */
-    private CardLayer showingTwo(UUID[] ids) {
-        var layer = layer(true);
+    private CardLayer showingTwo(UUID[] ids) { return showingTwo(KitTestSupport.context(), ids); }
+
+    private CardLayer showingTwo(KitContext kit, UUID[] ids) {
+        var layer = layer(kit, true);
         var a = post(CARDS, "a");
         var b = post(CARDS, "b");
         layer.show(a);
@@ -235,8 +250,10 @@ class CardLayerTest {
     }
 
     @Test void aShadowIsRenderedAgainWhenItsCardChangesSizeOrItsColourOrTheScaleChanges() {
+        var bindings = KitTestSupport.bindings(true);
+        try {
         var ids = new UUID[2];
-        var layer = showingTwo(ids);
+        var layer = showingTwo(bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME), ids);
         paint(layer, 1);
         assertThat(layer.shadowRenders()).isEqualTo(2);
         var card = layer.card(ids[1]);
@@ -249,18 +266,45 @@ class CardLayerTest {
         assertThat(layer.shadowRenders()).as("a crisp image for the new device scale, for both cards").isEqualTo(5);
         paint(layer, 2);
         assertThat(layer.shadowRenders()).isEqualTo(5);
-        Color before = UIManager.getColor("Popup.dropShadowColor");
+        // A theme switch changes the module scrim colour and the dark/light alpha: both cards render again, once.
+        bindings.binding().publish(dev.jasper.app.appearance.ThemeTestSupport.pair(false));
+        layer.setSize(layer.getPreferredSize().width + UIScale.scale(60), layer.getPreferredSize().height + UIScale.scale(60));
+        layer.doLayout();
+        paint(layer, 2);
+        assertThat(layer.shadowRenders()).as("the shadow colour is part of the key").isEqualTo(7);
+        paint(layer, 2);
+        assertThat(layer.shadowRenders()).isEqualTo(7);
+        layer.close();
+        } finally { bindings.close(); }
+    }
+
+    /** An open card survives a theme switch: same card, its hover (and so its paused countdown) and its waiting chip. */
+    @Test void aThemeSwitchKeepsTheOpenCardsTheirHoverAndTheCountdown() {
+        var bindings = KitTestSupport.bindings(true);
         try {
-            UIManager.put("Popup.dropShadowColor", new Color(0x203040));
-            paint(layer, 2);
-            assertThat(layer.shadowRenders()).as("the shadow colour is part of the key").isEqualTo(7);
-        } finally { UIManager.put("Popup.dropShadowColor", before); }
+            var layer = layer(bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME), true);
+            var a = post(CARDS, "a");
+            layer.show(a);
+            var card = layer.card(a.id());
+            now += Duration.ofSeconds(3).toNanos();
+            card.setHovered(true);
+            assertThat(live()).isEmpty();
+            bindings.binding().publish(dev.jasper.app.appearance.ThemeTestSupport.pair(false));
+            assertThat(layer.card(a.id())).isSameAs(card);
+            assertThat(layer.showing()).containsExactly(a.id());
+            assertThat(card.closeShown()).isTrue();
+            assertThat(live()).as("still paused while hovered").isEmpty();
+            card.setHovered(false);
+            assertThat(live()).singleElement().satisfies(item -> assertThat(item.delay()).isEqualTo(Duration.ofSeconds(7)));
+            layer.close();
+            assertThat(card.closed()).as("cards close with their layer").isTrue();
+        } finally { bindings.close(); }
     }
 
     @Test void theShadowSurroundsACardAndStopsAtTheMargin() {
         var ids = new UUID[2];
         var layer = showingTwo(ids);
-        int margin = UIScale.scale(CardLayer.MARGIN);
+        int margin = margin();
         var top = layer.card(ids[0]);
         int middle = top.getY() + top.getHeight() / 2;
         for (double scale : new double[] {1, 2}) {

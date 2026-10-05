@@ -1,11 +1,18 @@
 package dev.jasper.app.notificationui;
 
-import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.DisplayMode;
 import dev.jasper.app.notifications.Notification;
 import dev.jasper.app.notifications.NotificationCenter;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -21,24 +28,22 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.LongSupplier;
-import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.UIManager;
 
 /**
  * One window's stack of notification cards for its content area's bottom-right corner (spec section 3): newest at the
  * bottom, at most {@value #VISIBLE}; a fourth pushes out the oldest auto-hiding card, and when every visible card is
  * sticky the rest wait behind a "+N more" chip that opens the history. An auto-hiding card counts ten seconds of
  * focused, unhovered time. The layer has no mouse listeners and is never focusable, so every click beside a card
- * reaches the terminal and the shell keeps the keyboard. No animation. EDT only; close it when its window closes.
+ * reaches the terminal and the shell keeps the keyboard; the cards and the chip are pointer-only kit views on the chrome
+ * KitContext. No animation. EDT only; close it when its window closes.
  */
 public final class CardLayer extends JComponent implements AutoCloseable {
     public static final int VISIBLE = 3;
     public static final Duration AUTO_HIDE = Duration.ofSeconds(10);
-    /** Room around the stack: the cards' inset from the content corner, and their shadow. */
-    static final int MARGIN = 12;
-    static final int GAP = 8;
+    static final String MORE = "more";
 
+    private final KitContext kit;
     private final NotificationCenter center;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final LongSupplier nanoTime;
@@ -46,8 +51,9 @@ public final class CardLayer extends JComponent implements AutoCloseable {
     private final List<Slot> slots = new ArrayList<>();
     /** Waiting for room, oldest first. */
     private final List<UUID> waiting = new ArrayList<>();
-    private final JButton more;
+    private final KitView more;
     private final Subscription subscription;
+    private final AutoCloseable theme;
     private final Runnable stopTracking;
     private boolean focused;
     private boolean closed;
@@ -69,12 +75,19 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         UUID id() { return card.notification().id(); }
     }
 
-    public CardLayer(NotificationCenter center, boolean focused, Runnable openHistory) {
-        this(center, focused, openHistory, CardLayer::swingTimer, System::nanoTime);
+    /**
+     * @param kit the chrome kit context the cards and the chip are built with
+     * @param center the notification store
+     * @param focused whether the window is active
+     * @param openHistory shows the Notifications panel, for the "+N more" chip
+     */
+    public CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory) {
+        this(kit, center, focused, openHistory, CardLayer::swingTimer, System::nanoTime);
     }
 
-    CardLayer(NotificationCenter center, boolean focused, Runnable openHistory,
+    CardLayer(KitContext kit, NotificationCenter center, boolean focused, Runnable openHistory,
               BiFunction<Duration, Runnable, Runnable> schedule, LongSupplier nanoTime) {
+        this.kit = Objects.requireNonNull(kit, "kit");
         this.center = Objects.requireNonNull(center, "center");
         this.schedule = Objects.requireNonNull(schedule, "schedule");
         this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
@@ -83,9 +96,13 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         setLayout(null);
         setOpaque(false);
         setFocusable(false);
-        more = NotificationStyle.link("", openHistory);
+        more = new KitView(kit, moreSpec(), event -> {
+            if (!closed && event instanceof UiEvent.Action action && action.id().equals(MORE)) openHistory.run();
+        }, true);
         more.setVisible(false);
         add(more);
+        // A theme change repaints the shadows (the cache follows the colour) and re-lays the restyled cards.
+        theme = kit.binding().subscribe(pair -> refresh());
         subscription = center.onChange(this::changed);
         stopTracking = WindowFocus.track(this, this::windowFocusChanged);
         refresh();
@@ -142,7 +159,10 @@ public final class CardLayer extends JComponent implements AutoCloseable {
 
     List<UUID> waitingIds() { return List.copyOf(waiting); }
 
-    JButton moreButton() { return more; }
+    KitView moreView() { return more; }
+
+    /** The chip's text, or empty while it is hidden. */
+    String moreText() { return more.isVisible() ? ((Nodes.Button) more.spec().root()).label() : ""; }
 
     /** How many card shadows this layer has rendered (cached ones are drawn, not rendered again). */
     int shadowRenders() { return shadowRenders; }
@@ -163,19 +183,22 @@ public final class CardLayer extends JComponent implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
-        closed = true;
         subscription.close();
         stopTracking.run();
         for (Slot slot : List.copyOf(slots)) discard(slot);
         waiting.clear();
         refresh();
+        closed = true;
+        try { theme.close(); } catch (Exception ignored) { /* the binding outlives the layer */ }
+        more.close();
     }
 
-    @Override public void updateUI() {
-        super.updateUI();
-        // The chip's link colour is a plain colour, so a theme change has to set it again.
-        if (more != null) more.setForeground(NotificationStyle.color("Jasper.notification.linkForeground", Color.BLUE));
+    private ViewSpec moreSpec() {
+        return new ViewSpec(new Nodes.Button(MORE, ControlState.READY, "+" + waiting.size() + " more", "", Nodes.ButtonKind.LINK, MORE,
+            "Show the notifications waiting behind these cards"));
     }
+
+    private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
 
     private Slot slot(UUID id) {
         for (Slot slot : slots) if (slot.id().equals(id)) return slot;
@@ -184,7 +207,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
 
     private void place(Notification notification) {
         boolean sticky = center.mode(notification.request().group()) == DisplayMode.STICKY;
-        var slot = new Slot(new NotificationCard(center, notification, sticky));
+        var slot = new Slot(new NotificationCard(kit, center, notification, sticky));
         slot.card.onHover = hovered -> {
             slot.hovered = hovered;
             if (hovered) pause(slot);
@@ -199,6 +222,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         pause(slot);
         slots.remove(slot);
         remove(slot.card);
+        slot.card.close();
     }
 
     private void promote() {
@@ -226,6 +250,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         slot.cancel = null;
         if (!slots.remove(slot)) return;
         remove(slot.card);
+        slot.card.close();
         promote();
         refresh();
     }
@@ -262,7 +287,8 @@ public final class CardLayer extends JComponent implements AutoCloseable {
 
     /** Re-lays the stack and publishes its size; the window keeps the layer in its corner from that. */
     private void refresh() {
-        more.setText("+" + waiting.size() + " more");
+        if (closed) return;
+        more.update(moreSpec());
         more.setVisible(!waiting.isEmpty());
         setPreferredSize(stackSize());
         setVisible(!slots.isEmpty() || !waiting.isEmpty());
@@ -272,15 +298,16 @@ public final class CardLayer extends JComponent implements AutoCloseable {
 
     private Dimension stackSize() {
         if (slots.isEmpty() && waiting.isEmpty()) return new Dimension(0, 0);
-        int margin = UIScale.scale(MARGIN), gap = UIScale.scale(GAP);
+        int margin = metric(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN), gap = metric(DesignMetrics.Role.NOTIFICATION_STACK_GAP);
         int height = margin * 2;
         if (more.isVisible()) height += more.getPreferredSize().height + (slots.isEmpty() ? 0 : gap);
         for (int i = 0; i < slots.size(); i++) height += slots.get(i).card.getPreferredSize().height + (i > 0 ? gap : 0);
-        return new Dimension(UIScale.scale(NotificationCard.WIDTH) + margin * 2, height);
+        return new Dimension(metric(DesignMetrics.Role.NOTIFICATION_WIDTH) + margin * 2, height);
     }
 
     @Override public void doLayout() {
-        int margin = UIScale.scale(MARGIN), gap = UIScale.scale(GAP), width = UIScale.scale(NotificationCard.WIDTH);
+        int margin = metric(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN), gap = metric(DesignMetrics.Role.NOTIFICATION_STACK_GAP);
+        int width = metric(DesignMetrics.Role.NOTIFICATION_WIDTH);
         // Bottom-aligned, so a clipped layer still shows the newest card.
         int y = getHeight() - margin;
         for (int i = slots.size() - 1; i >= 0; i--) {
@@ -307,17 +334,19 @@ public final class CardLayer extends JComponent implements AutoCloseable {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            Color shadow = UIManager.getColor("Popup.dropShadowColor");
-            if (shadow == null) shadow = Color.BLACK;
-            int argb = new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), FlatLaf.isLafDark() ? 4 : 2).getRGB();
+            // The shadow is the module's scrim colour at the former per-ring alphas, stronger on a dark theme.
+            Color shadow = kit.theme().semantic().color(SemanticColor.SURFACE_SCRIM);
+            int alpha = kit.metrics().value(kit.theme().dark() ? DesignMetrics.Role.NOTIFICATION_SHADOW_ALPHA_DARK : DesignMetrics.Role.NOTIFICATION_SHADOW_ALPHA_LIGHT);
+            int argb = new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), alpha).getRGB();
             AffineTransform device = g.getTransform();
             double deviceX = device.getScaleX() > 0 ? device.getScaleX() : 1, deviceY = device.getScaleY() > 0 ? device.getScaleY() : 1;
-            int arc = UIScale.scale(NotificationCard.ARC), margin = UIScale.scale(MARGIN);
+            int arc = metric(DesignMetrics.Role.NOTIFICATION_ARC), margin = metric(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN);
+            int rings = kit.metrics().value(DesignMetrics.Role.NOTIFICATION_STACK_MARGIN);
             for (Slot slot : slots) {
                 Rectangle card = slot.card.getBounds();
                 var key = new ShadowKey(card.width, card.height, arc, margin, UIScale.getUserScaleFactor(), argb, deviceX, deviceY);
                 if (!key.equals(slot.shadowKey)) {
-                    slot.shadow = renderShadow(key);
+                    slot.shadow = renderShadow(key, rings);
                     slot.shadowKey = key;
                     shadowRenders++;
                 }
@@ -327,7 +356,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
     }
 
     /** The rings around a card of the key's size, in an image {@code margin} larger on every side, at the key's device scale. */
-    private static BufferedImage renderShadow(ShadowKey key) {
+    private static BufferedImage renderShadow(ShadowKey key, int rings) {
         int width = key.width() + key.margin() * 2, height = key.height() + key.margin() * 2;
         var image = new BufferedImage(Math.max(1, (int) Math.ceil(width * key.deviceX())),
             Math.max(1, (int) Math.ceil(height * key.deviceY())), BufferedImage.TYPE_INT_ARGB_PRE);
@@ -336,7 +365,7 @@ public final class CardLayer extends JComponent implements AutoCloseable {
             g.scale(key.deviceX(), key.deviceY());
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setColor(new Color(key.argb(), true));
-            for (int i = MARGIN; i >= 1; i--) {
+            for (int i = rings; i >= 1; i--) {
                 int grow = UIScale.scale(i);
                 g.fillRoundRect(key.margin() - grow, key.margin() - grow, key.width() + grow * 2, key.height() + grow * 2,
                     key.arc() + grow, key.arc() + grow);

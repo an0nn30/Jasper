@@ -40,12 +40,15 @@ final class NotificationsFeature implements AutoCloseable {
     private final PanelEntry panel;
     private final Map<UUID, Attached> windows = new LinkedHashMap<>();
     private final Subscription listening;
+    private final java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit;
     private UUID lastActive;
     private boolean closed;
 
-    NotificationsFeature(NotificationCenter center, Contributions contributions) {
+    /** {@code kit} supplies the chrome kit context the cards and the Notifications panel are built with. */
+    NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
         this.center = center;
         this.contributions = contributions;
+        this.kit = java.util.Objects.requireNonNull(kit, "kit");
         center.register(GENERAL);
         center.register(CONFIG);
         var icon = AppIcons.bundled("toolwindows/notifications");
@@ -59,7 +62,7 @@ final class NotificationsFeature implements AutoCloseable {
                 if (attached != null) attached.layer().dismissAll();
             });
         panel = contributions.addPanel(PANEL_ID, "Notifications", icon, Slot.RIGHT_TOP, Optional.of(SHOW_HISTORY),
-            site -> new HistoryPanel(center, site, focused(site.windowId())));
+            site -> new HistoryPanel(kit.get(), center, site, focused(site.windowId())));
         listening = center.onChange(this::changed);
         updateBadge();
     }
@@ -68,7 +71,7 @@ final class NotificationsFeature implements AutoCloseable {
     void attach(WindowContent content) {
         if (closed || windows.containsKey(content.id())) return;
         UUID id = content.id();
-        var layer = new CardLayer(center, content.isActiveAndOpen(), () -> contributions.requestPanel(
+        var layer = new CardLayer(kit.get(), center, content.isActiveAndOpen(), () -> contributions.requestPanel(
             new Contributions.PanelRequest(id, PANEL_ID, Contributions.PanelRequest.Op.SHOW)));
         content.mountCornerLayer(layer);
         windows.put(id, new Attached(content, layer));

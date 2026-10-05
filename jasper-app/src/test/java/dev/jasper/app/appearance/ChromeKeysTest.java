@@ -3,28 +3,36 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.ui.theme.*;
 import java.awt.Color;
-import java.util.Map;
+import java.util.List;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Transitional alias publication, not a second color derivation engine. Task 6 removes notification aliases. */
+/**
+ * Transitional alias publication, not a second color derivation engine. Plan 2 Task 6c migrated the notification
+ * surfaces to module roles (ruling G8): the five former notification aliases are no longer published.
+ */
 @ExtendWith(EdtTestExtension.class)
 class ChromeKeysTest {
-    @Test void residualNotificationAliasesComeFromTheInstalledModuleSnapshotAndNeverStayStale() {
-        for (var theme : java.util.List.of(Theme.DARK, Theme.JASPER_LIGHT, Theme.DARK)) {
+    private static final List<String> NOTIFICATION_ALIASES = List.of("Jasper.notification.background", "Jasper.notification.borderColor",
+        "Jasper.notification.foreground", "Jasper.notification.mutedForeground", "Jasper.notification.linkForeground");
+
+    @Test void notificationAliasesAreNoLongerPublishedByAnyInstall() {
+        for (var theme : List.of(Theme.DARK, Theme.JASPER_LIGHT, Theme.DARK)) {
             ThemeManager.install(theme);
-            var palette = ThemeManager.generated(theme).semantic();
-            Map.of("Jasper.notification.background", SemanticColor.SURFACE_CARD,
-                "Jasper.notification.borderColor", SemanticColor.BORDER_SUBTLE,
-                "Jasper.notification.foreground", SemanticColor.TEXT_PRIMARY,
-                "Jasper.notification.mutedForeground", SemanticColor.TEXT_SECONDARY,
-                "Jasper.notification.linkForeground", SemanticColor.TEXT_LINK).forEach((key, role) ->
-                    assertThat(UIManager.getColor(key)).as(key).isEqualTo(palette.color(role)));
+            for (String key : NOTIFICATION_ALIASES) {
+                assertThat(UIManager.getColor(key)).as(key).isNull();
+                assertThat(((com.formdev.flatlaf.FlatLaf) UIManager.getLookAndFeel()).getExtraDefaults()).as(key).doesNotContainKey(key);
+            }
         }
     }
-    @Test void explicitNativeResidualAliasWinsOnlyOnItsOwnInstall() {
+
+    /**
+     * An authored notification key is now an unsupported raw override (Task 11 owns its diagnostic): the native [ui]
+     * last word still copies it for that install only, nothing reads it, and the next install does not keep it.
+     */
+    @Test void anAuthoredNotificationKeyIsARawOverrideForItsOwnInstallOnly() {
         var base = Theme.DARK.source().document();
         var ui = new java.util.LinkedHashMap<>(base.ui());
         ui.put("Jasper.notification.background", "#123456");
@@ -33,7 +41,7 @@ class ChromeKeysTest {
         ThemeManager.install(ThemeGenerator.generate(document));
         assertThat(UIManager.getColor("Jasper.notification.background")).isEqualTo(new Color(0x123456));
         ThemeManager.install(Theme.JASPER_LIGHT);
-        assertThat(UIManager.getColor("Jasper.notification.background"))
-            .isEqualTo(ThemeManager.generated(Theme.JASPER_LIGHT).semantic().color(SemanticColor.SURFACE_CARD));
+        assertThat(UIManager.getColor("Jasper.notification.background")).as("not stale after the next install").isNull();
+        for (String key : NOTIFICATION_ALIASES.subList(1, NOTIFICATION_ALIASES.size())) assertThat(UIManager.getColor(key)).as(key).isNull();
     }
 }

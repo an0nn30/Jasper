@@ -226,7 +226,8 @@ public final class JasperApplication {
         themes = ThemeController.startup(saved,
             failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Jasper Dark: " + failure.getMessage(), failure));
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
-        notificationViews = new NotificationsFeature(notificationCenter, contributions);
+        notificationViews = new NotificationsFeature(notificationCenter, contributions,
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
             new SystemNotices.Windows(this::raiseFor, notificationViews::showHistory, this::showErrors));
         incidents = new Incidents(notificationCenter.clock());
@@ -748,7 +749,8 @@ public final class JasperApplication {
         logFolder = dirs.logs();
         errorsWindow = new ErrorsWindow(contributions, auxiliary, incidents, new ErrorsView.Hooks(this::pluginName,
             id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),
-            this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone());
+            this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone(),
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
             new PluginRuntime.SettingsReports(

@@ -3,77 +3,58 @@ package dev.jasper.app.notificationui;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.notifications.Notification;
 import dev.jasper.app.notifications.Severity;
-import dev.jasper.app.platform.AppIcons;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Cursor;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Insets;
-import java.awt.RenderingHints;
-import javax.swing.BorderFactory;
-import javax.swing.Icon;
-import javax.swing.JButton;
-import javax.swing.UIManager;
+import java.awt.Font;
+import java.util.Optional;
 
-/** What cards and history rows share: severity icons, theme colours and link-style action buttons. EDT only. */
+/**
+ * What cards, history rows and the Errors window share: the severity glyph and module values read from the chrome
+ * KitContext (colours, fonts and the former geometry as named metrics). Nothing here reads UIManager. A poster's own
+ * icon is not shown on this branch (ruling P5/G7): the SDK still carries it as a raw icon until Task 11 makes it named.
+ * EDT only.
+ */
 final class NotificationStyle {
     private NotificationStyle() {}
 
-    /** The poster's icon, or the bundled one for the severity. */
-    static Icon icon(Notification notification) {
-        return notification.request().icon().map(NotificationStyle::fitted).orElseGet(() -> AppIcons.bundled(switch (notification.request().severity()) {
-            case INFO -> "status/info";
-            case WARNING -> "status/warning";
-            case ERROR -> "status/error";
-        }));
-    }
-
-    /** A poster's icon drawn within the 16 px box: a larger one is scaled down, a smaller one centred. */
-    static Icon fitted(Icon icon) {
-        int box = UIScale.scale(16);
-        if (icon.getIconWidth() == box && icon.getIconHeight() == box) return icon;
-        return new Icon() {
-            @Override public void paintIcon(Component c, Graphics g, int x, int y) {
-                int width = Math.max(1, icon.getIconWidth()), height = Math.max(1, icon.getIconHeight());
-                double scale = Math.min(1.0, Math.min((double) box / width, (double) box / height));
-                Graphics2D g2 = (Graphics2D) g.create();
-                try {
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g2.translate(x + (box - width * scale) / 2.0, y + (box - height * scale) / 2.0);
-                    g2.scale(scale, scale);
-                    icon.paintIcon(c, g2, 0, 0);
-                } finally {
-                    g2.dispose();
-                }
-            }
-            @Override public int getIconWidth() { return box; }
-            @Override public int getIconHeight() { return box; }
+    /** The kit glyph for a severity: information, warning and error. */
+    static String glyph(Severity severity) {
+        return switch (severity) {
+            case INFO -> "info";
+            case WARNING -> "warning";
+            case ERROR -> "error";
         };
     }
 
-    /** A theme colour as a plain {@link Color}, so a component keeps it through {@code updateUI} until restyled. */
-    static Color color(String key, Color fallback) {
-        Color color = UIManager.getColor(key);
-        return color == null ? fallback : new Color(color.getRGB(), true);
+    /** The kit severity tint: the accent for information, the status colours for warnings and errors. */
+    static Nodes.Severity tone(Severity severity) {
+        return switch (severity) {
+            case INFO -> Nodes.Severity.INFO;
+            case WARNING -> Nodes.Severity.WARNING;
+            case ERROR -> Nodes.Severity.DANGER;
+        };
     }
 
-    /** A borderless, link-coloured button that never takes focus and never renders markup. */
-    static JButton link(String label, Runnable run) {
-        var button = new JButton();
-        // The property is read when the text is set, so it goes in first: JButton(String) would parse markup before it exists.
-        button.putClientProperty("html.disable", Boolean.TRUE);
-        button.setText(label);
-        button.putClientProperty("JButton.buttonType", "borderless");
-        button.setFocusable(false);
-        button.setContentAreaFilled(false);
-        button.setMargin(new Insets(0, 0, 0, 0));
-        button.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setForeground(color("Jasper.notification.linkForeground", Color.BLUE));
-        button.addActionListener(event -> run.run());
-        return button;
+    /** The notification's severity glyph, tinted by its severity. */
+    static Nodes.Icon icon(String id, Notification notification) {
+        Severity severity = notification.request().severity();
+        return new Nodes.Icon(id, ControlState.READY, glyph(severity), Nodes.Hue.NONE, Nodes.IconSize.RAIL, severityName(severity),
+            Optional.of(tone(severity)));
     }
+
+    static Color color(KitContext kit, SemanticColor role) { return kit.theme().semantic().color(role); }
+
+    static Font font(KitContext kit, Typography.Role role) {
+        Font font = kit.typography().font(role);
+        return font.deriveFont(UIScale.scale(font.getSize2D()));
+    }
+
+    static int metric(KitContext kit, DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
 
     static String severityName(Severity severity) {
         return switch (severity) {

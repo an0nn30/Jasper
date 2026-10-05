@@ -42,6 +42,34 @@ class BuddyIntegrationTest {
         assertThat(registrations).hasValue(1); assertThat(removals).hasValue(1);
         assertThat(fixture.notices()).isEmpty();
     }
+    /**
+     * Plan 2 Task 6c: the Buddy adapter adapts appearance only through the supported facade values. It imports only the
+     * supported top-level config, notice and view types (never Buddy internals), and a theme change replaces exactly the
+     * primary font and the dark flag, keeping every other option (position, callbacks) as composed.
+     */
+    @Test void appearanceAdaptationUsesOnlySupportedFacadeValues() throws Exception {
+        var source = java.nio.file.Files.readString(java.nio.file.Path.of(System.getProperty("jasper.repoRoot"),
+            "jasper-app/src/main/java/dev/jasper/app/application/BuddyIntegration.java"));
+        var imports = source.lines().filter(line -> line.startsWith("import dev.jasper.buddy.")).toList();
+        assertThat(imports).isNotEmpty().allSatisfy(line -> assertThat(line)
+            .matches("import dev\\.jasper\\.buddy\\.(config|notice|view)\\.[A-Z]\\w*;"));
+        assertThat(source).doesNotContain("buddy.internal");
+        var fixture = new BuddyTestSupport();
+        Runnable activate = () -> {}, toggle = () -> {};
+        var original = BuddyOptions.builder(font).dark(true).activateHost(activate).toggleRequested(toggle)
+            .initialPosition(new BuddyPosition(5, 6)).build();
+        var integration = new BuddyIntegration(original, fixture.companion(), new BuddyVisibility(), () -> true, s -> true, l -> () -> {});
+        var larger = font.deriveFont(18f);
+        integration.appearance(larger, false);
+        var applied = integration.options();
+        assertThat(applied.primaryFont()).isEqualTo(larger);
+        assertThat(applied.dark()).isFalse();
+        assertThat(applied.activateHost()).isSameAs(original.activateHost());
+        assertThat(applied.toggleRequested()).isSameAs(original.toggleRequested());
+        assertThat(applied.positionChanged()).isSameAs(original.positionChanged());
+        assertThat(applied.initialPosition()).isEqualTo(original.initialPosition());
+        integration.close();
+    }
     @Test void savedPositionIsReadOnceAndOnlyDragCallbackWritesIt() throws Exception {
         Path state = temp.resolve("buddy.toml"); BuddyStateFile.write(state, new java.awt.Point(-70, 30));
         var options = BuddyIntegration.options(state, font, true, () -> {}, () -> {});
