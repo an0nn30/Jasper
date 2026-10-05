@@ -60,7 +60,7 @@ public final class SftpEngine implements ServerEngine {
         var sftp = new SftpSubsystemFactory.Builder().withFileSystemAccessor(new ShareAccessor(share))
             .withUnsupportedAttributePolicy(UnsupportedAttributePolicy.ThrowException) // a refused stat fails instead of sshd reading it itself
             .build();
-        sftp.addSftpEventListener(new SftpActivity());
+        sftp.addSftpEventListener(new SftpActivity(share, events));
 
         SshServer created = SshServer.setUpDefaultServer();
         created.setHost(address.isAnyLocalAddress() ? null : address.getHostAddress());

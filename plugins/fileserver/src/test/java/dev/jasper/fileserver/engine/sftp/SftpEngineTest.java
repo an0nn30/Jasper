@@ -398,4 +398,52 @@ class SftpEngineTest {
         engine(DUSTIN, false, List.of("ssh-ed25519 AAAAnotakey"));
         assertThatThrownBy(engine::start).isInstanceOf(EngineFailure.class).hasMessageStartingWith("Authorized key 1 can't be used");
     }
+
+    List<ServerEvent.Transferred> transferred() {
+        return events.stream().filter(e -> e instanceof ServerEvent.Transferred).map(e -> (ServerEvent.Transferred) e).toList();
+    }
+
+    @Test void transfersAndLoginsAreReported() throws Exception {
+        var sftp = start(true);
+        assertThat(read(sftp, "/docs/a.txt")).isEqualTo("hello");
+        write(sftp, "/docs/new.txt", "abc");
+        await(() -> transferred().size() == 2, "both transfers end");
+        assertThat(transferred()).extracting(ServerEvent.Transferred::path, ServerEvent.Transferred::direction,
+                ServerEvent.Transferred::bytes, ServerEvent.Transferred::complete)
+            .containsExactly(org.assertj.core.groups.Tuple.tuple("/docs/a.txt", ServerEvent.Direction.DOWNLOAD, 5L, true),
+                org.assertj.core.groups.Tuple.tuple("/docs/new.txt", ServerEvent.Direction.UPLOAD, 3L, true));
+        assertThat(events).anyMatch(e -> e instanceof ServerEvent.Connected c && c.remote().equals("127.0.0.1"));
+        assertThat(events).filteredOn(e -> e instanceof ServerEvent.LoginSucceeded).singleElement()
+            .satisfies(e -> assertThat(((ServerEvent.LoginSucceeded) e).user()).isEqualTo("dustin"));
+        var started = (ServerEvent.TransferStarted) events.stream().filter(e -> e instanceof ServerEvent.TransferStarted).findFirst().orElseThrow();
+        assertThat(started.total()).as("a download knows its size").isEqualTo(5);
+    }
+
+    @Test void aPartialReadOrADroppedUploadIsIncomplete() throws Exception {
+        engine(DUSTIN, true, List.of()).start();
+        ClientSession session = clients.password(port, "dustin", "pw");
+        var sftp = Clients.sftp(session);
+        try (var handle = sftp.open("/docs/a.txt", OpenMode.Read)) { sftp.read(handle, 0, new byte[2]); }
+        await(() -> transferred().size() == 1, "the partial read ends");
+        assertThat(transferred().getFirst().complete()).isFalse();
+        var upload = sftp.open("/docs/b.txt", OpenMode.Write, OpenMode.Create, OpenMode.Truncate);
+        sftp.write(upload, 0, "xy".getBytes(StandardCharsets.UTF_8));
+        session.close(true);
+        await(() -> transferred().size() == 2, "the dropped upload ends");
+        assertThat(transferred().get(1).direction()).isEqualTo(ServerEvent.Direction.UPLOAD);
+        assertThat(transferred().get(1).complete()).isFalse();
+        assertThat(shared.resolve("docs/b.txt")).doesNotExist();
+    }
+
+    @Test void changesAreReportedAndRefusalsAreNot() throws Exception {
+        var sftp = start(true);
+        sftp.mkdir("/docs/sub");
+        sftp.rename("/docs/a.txt", "/docs/sub/a.txt");
+        sftp.remove("/docs/sub/a.txt");
+        sftp.rmdir("/docs/sub");
+        assertThatThrownBy(() -> sftp.rmdir("/docs/missing")).isInstanceOf(IOException.class);
+        await(() -> events.stream().filter(e -> e instanceof ServerEvent.Changed).count() == 4, "four changes");
+        assertThat(events).filteredOn(e -> e instanceof ServerEvent.Changed).extracting(e -> ((ServerEvent.Changed) e).description())
+            .containsExactly("created /docs/sub", "renamed /docs/a.txt to /docs/sub/a.txt", "deleted /docs/sub/a.txt", "deleted /docs/sub");
+    }
 }
