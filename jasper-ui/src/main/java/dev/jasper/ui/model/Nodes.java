@@ -94,7 +94,7 @@ public final class Nodes {
         }
     }
 
-    public record Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action) implements Node {
+    public record Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon) implements Node {
         public Choice {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -102,7 +102,13 @@ public final class Nodes {
             Objects.requireNonNull(selectedId);
             ModelChecks.label(label, "label");
             Objects.requireNonNull(action);
+            Objects.requireNonNull(icon);
+            if (kind != ChoiceKind.PICKER && !icon.isEmpty()) throw new IllegalArgumentException("Icon cue requires PICKER");
             ModelChecks.unique(options, Option::id);
+        }
+        /** Existing pickers retain the key cue; use the full constructor for an explicit cue or none. */
+        public Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action) {
+            this(id, state, kind, options, selectedId, label, action, kind == ChoiceKind.PICKER ? "key" : "");
         }
     }
 

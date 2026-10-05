@@ -34,5 +34,16 @@ The kit foundation now provides immutable `Nodes`/`ViewSpec`/`UiEvent` values, f
 `ThemeBinding` publishes complete chrome/workspace pairs on EDT; subscriptions replay and
 close independently. `AppearanceTransaction` installs real FlatLaf global defaults before
 publication and restores the old LAF, LAF defaults and developer overrides on failure.
-`KitContext` selects each view's theme route and supplies host-owned values. Renderer and
-form/panel fixtures are supplied in subsequent implementation tasks.
+`KitContext` selects each view's theme route and supplies host-owned values. All 26 node renderers and four working panel controllers are implemented. The headless gallery
+now exercises the eight initial mock compositions, panel transitions and state variants; final
+whole-branch review remains Plan 1 Task 14. Existing consumers migrate in Plans 2/3.
+
+Public usage, package/lifetime boundaries and compiled examples are in
+[UI architecture](../docs/ui-architecture.md). [Maintenance](../docs/ui-maintenance.md)
+documents gallery/distribution checks; [calibration](../docs/design/theme-engine/calibration.md)
+records original crop/scale anchors and the inspected capture matrix.
+
+```sh
+./gradlew :jasper-ui:gallery -Pjasper.galleryScale=2 -Pjasper.galleryTheme=calibration
+./gradlew :jasper-ui:verifyUiDistribution
+```

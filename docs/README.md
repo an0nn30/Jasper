@@ -1,7 +1,7 @@
 # Jasper documentation
 
 Use these guides for the code currently in the repository. Jasper's application composes
-two independent libraries and hosts plugins written against `jasper-sdk`. Public Java
+three independent libraries and hosts plugins written against `jasper-sdk`. Public Java
 visibility inside the app does not constitute a plugin API; the SDK does.
 
 ## Contributor routes
@@ -9,6 +9,7 @@ visibility inside the app does not constitute a plugin API; the SDK does.
 | Module | Start here | Architecture | Maintenance and extensions |
 | --- | --- | --- | --- |
 | `jasper-terminal` | [Onboarding and embedding](../jasper-terminal/README.md) | [Owners, API and threading](terminal-architecture.md) | [Keys, protocols, options and lifecycle](terminal-maintenance.md) |
+| `jasper-ui` | [Engine and kit](../jasper-ui/README.md) | [Packages, API and ownership](ui-architecture.md) | [Gallery, extensions and distribution](ui-maintenance.md) |
 | `jasper-app` | [Onboarding](../jasper-app/README.md) | [Composition and feature ownership](app-architecture.md) | [Commands, scopes, settings, providers and platform hooks](app-maintenance.md) |
 | `jasper-buddy` | [Embedding](../jasper-buddy/README.md) | [Facade, model and presentation](buddy-architecture.md) | [Notices, options, animation and assets](buddy-maintenance.md) |
 | `jasper-sdk` and plugins | [SDK packages](../jasper-sdk/README.md) | [Loading, threading and lifetimes](sdk-architecture.md) | [Writing and testing a plugin](plugin-authoring.md) |

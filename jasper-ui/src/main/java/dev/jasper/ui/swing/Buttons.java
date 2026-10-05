@@ -96,7 +96,7 @@ final class Buttons {
                 ThemePainting.rounded(g, this, context, fill, border, focus != null && focus.visible(), false);
                 g.setFont(getFont()); g.setColor(ThemePainting.color(context, textRole(hover)));
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
-                String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, CENTER, CENTER, RIGHT,
+                String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), getText(), getIcon(), CENTER, getHorizontalAlignment(), CENTER, RIGHT,
                     new Rectangle(insets.left, insets.top, getWidth() - insets.left - insets.right, getHeight() - insets.top - insets.bottom), icon, text, getIconTextGap());
                 if (getIcon() != null) {
                     // Re-tint the same named icon for hover without altering component identity.

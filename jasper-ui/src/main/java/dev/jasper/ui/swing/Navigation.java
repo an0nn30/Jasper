@@ -53,13 +53,15 @@ final class Navigation {
                 if (flexible(c)) flexible += c.getPreferredSize().width;
                 else fixed += c.getPreferredSize().width;
             }
-            int budget = Math.max(0, width - fixed), x = 0;
+            int budget = Math.max(0, width - fixed), x = 0, consumed = 0;
+            boolean anchor = !children.isEmpty() && children.getLast() instanceof AbstractButton;
             for (var c : children) {
                 int natural = c.getPreferredSize().width;
-                int w =
-                        flexible(c) && flexible > budget
-                                ? (int) ((long) natural * budget / Math.max(1, flexible))
-                                : natural;
+                int w = natural;
+                if (flexible(c) && (flexible > budget || anchor) && flexible > 0) {
+                    w = (int)((long)(consumed + natural) * budget / flexible - (long)consumed * budget / flexible);
+                    consumed += natural;
+                }
                 w = Math.max(0, Math.min(w, parent.getWidth() - x));
                 int h = Math.min(parent.getHeight(), c.getPreferredSize().height);
                 c.setBounds(x, (parent.getHeight() - h) / 2, w, h);

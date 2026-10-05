@@ -30,7 +30,7 @@ final class Indicators {
             try {
                 ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 int radius = ThemePainting.metric(context, DesignMetrics.Role.CHIP_RADIUS);
-                g.setColor(ColorMath.opacity(getForeground(), .16)); g.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+                g.setColor(ColorMath.opacity(getForeground(), .16)); g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
             } finally { g.dispose(); }
             super.paintComponent(graphics);
         }
@@ -120,7 +120,7 @@ final class Indicators {
                 ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 int gap = ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_GAP), height = ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_HEIGHT);
                 int radius = ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_RADIUS); double width = Math.max(0, (getWidth()-3.0*gap)/4);
-                for (int i=0; i<4; i++) { g.setColor(i<filled ? getForeground() : ThemePainting.color(context, SemanticColor.SURFACE_CONTROL)); int x=(int)Math.round(i*(width+gap)); int end=(int)Math.round(i*(width+gap)+width); g.fillRoundRect(x, 0, end-x, height, radius, radius); }
+                for (int i=0; i<4; i++) { g.setColor(i<filled ? getForeground() : ThemePainting.color(context, SemanticColor.SURFACE_CONTROL)); int x=(int)Math.round(i*(width+gap)); int end=(int)Math.round(i*(width+gap)+width); g.fillRoundRect(x, 0, end-x, height, radius * 2, radius * 2); }
                 g.setFont(getFont()); g.setColor(getForeground());
                 Rectangle text = new Rectangle(); String clipped = SwingUtilities.layoutCompoundLabel(this, g.getFontMetrics(), label, null, CENTER, RIGHT, CENTER, RIGHT,
                     new Rectangle(0, height, getWidth(), Math.max(0, getHeight()-height)), new Rectangle(), text, 0);

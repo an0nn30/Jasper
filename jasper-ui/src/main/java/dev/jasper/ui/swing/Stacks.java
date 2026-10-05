@@ -31,6 +31,8 @@ final class Stacks {
         void refresh() {
             state();
             var stack = (Nodes.Stack) node;
+            int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_PADDING) : 0;
+            component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, detailPadding, detailPadding));
             component.setLayout(
                     stack.role() == Nodes.LayoutRole.HERO
                             ? new HeroLayout(this)
@@ -98,7 +100,7 @@ final class Stacks {
                 ThemePainting.antialias(g);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL));
                 int radius = ThemePainting.metric(context, DesignMetrics.Role.HERO_TILE_RADIUS);
-                g.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+                g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
             } finally {
                 g.dispose();
             }

@@ -39,7 +39,7 @@ final class SplitViews {
         }
 
         int gap() {
-            return ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
+            return ((Nodes.Split)owner.node).kind() == Nodes.SplitKind.THREE_COLUMN ? 0 : ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
         }
 
         @Override
@@ -71,7 +71,13 @@ final class SplitViews {
             if (n == 0) return;
             int available = Math.max(0, p.getWidth() - (n - 1) * gap()), x = 0;
             for (int i = 0; i < n; i++) {
-                int w = available / n + (i < available % n ? 1 : 0);
+                int w;
+                if (((Nodes.Split)owner.node).kind() == Nodes.SplitKind.THREE_COLUMN && n == 3) {
+                    int sidebar = ThemePainting.metric(owner.context(), DesignMetrics.Role.MANAGER_SIDEBAR_WIDTH), list = ThemePainting.metric(owner.context(), DesignMetrics.Role.MANAGER_LIST_WIDTH);
+                    double fit = Math.min(1.0, available / (double)(sidebar + list + sidebar));
+                    int first = (int)Math.floor(sidebar * fit), second = (int)Math.floor(list * fit);
+                    w = i == 0 ? first : i == 1 ? second : available - first - second;
+                } else w = available / n + (i < available % n ? 1 : 0);
                 visible.get(i).setBounds(x, 0, w, p.getHeight());
                 x += w + gap();
             }

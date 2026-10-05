@@ -78,6 +78,12 @@ public final class PanelFixtures {
             refresh();
         }
 
+        /** Dispatch a local fixture intent; used to record deterministic gallery transitions. */
+        public void dispatch(UiEvent e) {
+            if (closed) throw new IllegalStateException("Closed fixture");
+            event(e);
+        }
+
         private void event(UiEvent e) {
             if (e instanceof UiEvent.Edited edit && edit.id().equals("sessions-query"))
                 state.query = edit.text();

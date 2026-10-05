@@ -45,7 +45,13 @@ final class FormRows {
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
-            for (var c : controls) Composition.label(c, true);
+            for (var c : controls) {
+                Composition.label(c, true);
+                if (c instanceof Labels.TextControl && c.component instanceof Labels.LiteralLabel label
+                        && c.node instanceof Nodes.Text text) {
+                    label.wrap = text.role() == Nodes.TextRole.CAPTION || text.role() == Nodes.TextRole.DESCRIPTION;
+                }
+            }
             Stacks.mount(
                     component,
                     java.util.stream.Stream.concat(

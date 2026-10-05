@@ -205,7 +205,7 @@ final class Panels {
         public int height(Container p, int width) {
             return owner.header == null
                     ? 0
-                    : Composition.height(owner.header.component, width)
+                    : (owner.header.component.isVisible() ? Composition.height(owner.header.component, width) : 0)
                             + owner.body.navigationHeight(width)
                             + owner.body.contentHeight(width)
                             + (owner.footer.isVisible() ? owner.footer.height(width) : 0);
@@ -224,7 +224,7 @@ final class Panels {
             if (owner.header == null) return;
             int w = p.getWidth(), h = p.getHeight();
             int fh = owner.footer.isVisible() ? Math.min(h, owner.footer.height(w)) : 0;
-            int hh = Math.min(Math.max(0, h - fh), Composition.height(owner.header.component, w));
+            int hh = Math.min(Math.max(0, h - fh), (owner.header.component.isVisible() ? Composition.height(owner.header.component, w) : 0));
             owner.header.component.setBounds(0, 0, w, hh);
             owner.scroll.setBounds(0, hh, w, Math.max(0, h - fh - hh));
             owner.footer.setBounds(0, h - fh, w, fh);

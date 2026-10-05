@@ -92,7 +92,8 @@ class TextFieldsTest {
                     var input = editor(view, kind.name());
                     assertThat(input.getAccessibleContext().getAccessibleName()).isEqualTo("Name");
                     assertThat(find(view, kind.name() + ".label", JLabel.class).getLabelFor()).isSameAs(input);
-                    assertThat(input.getClientProperty("JTextField.placeholderText")).isEqualTo("Example");
+                    assertThat(input.getAccessibleContext().getAccessibleDescription()).isEqualTo("Example");
+                    assertThat(input.getClientProperty("JTextField.placeholderText")).as("kit owns hint paint").isNull();
                 }
                 assertThat(editor(view, "TEXTAREA")).isInstanceOf(JTextArea.class);
                 assertThat(editor(view, "PATH").getFont().getFamily()).isEqualTo(Font.MONOSPACED);

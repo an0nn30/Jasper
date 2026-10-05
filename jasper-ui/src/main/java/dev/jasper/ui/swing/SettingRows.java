@@ -69,7 +69,7 @@ final class SettingRows {
         int trailing(Container p, int width) {
             return p.getComponentCount() > 2
                     ? Math.min(
-                            p.getComponent(2).getPreferredSize().width,
+                            Math.max(p.getComponent(2).getPreferredSize().width, ((Nodes.SettingRow)owner.node).control() instanceof Nodes.Choice ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_CHOICE_WIDTH) : 0),
                             Math.max(
                                     0,
                                     (width - p.getInsets().left - p.getInsets().right - gap()) / 2))

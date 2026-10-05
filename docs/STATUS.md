@@ -15,7 +15,7 @@
   protocol chips and interactive switches, persistent detail/settings footers, and full-body empty
   states with centered button/dropdown actions are required kit and SDK capabilities. Plan 1 must prove
   all four panel compositions in its gallery; Plan 3 matches the depicted panel areas. The user approved
-  the written spec with “alrighty, lets get started”. Three plans are now written for review:
+  the written spec with “alrighty, lets get started”. Three delivery plans are written; Plan 1 is executing:
   [1: engine and kit](superpowers/plans/2026-10-04-theme-engine-1-engine-and-kit.md),
   [2: consumer/SDK migration](superpowers/plans/2026-10-04-theme-engine-2-consumer-migration.md),
   [3: surface composition](superpowers/plans/2026-10-04-theme-engine-3-surface-refactor.md), with
@@ -33,7 +33,7 @@
   unknown tables/non-string fields remain invalid. Additional pure color mapping helpers omit theme
   geometry/delegates from generated UI data, and generated snapshots reuse the document's bounded
   deep-freeze logic. Headless `:jasper-ui:test verifyUiArchitecture`: **40 tests, 0 failures/errors/skips**.
-  Task 3 import extraction is implemented and self-reviewed (independent review pending):
+  Task 3 import extraction is implemented and self-reviewed (independent review complete):
   bounded native/IntelliJ/Alacritty conversion, bundled parents, provenance/license assets, archive/XML/path
   protections and color-reference/wildcard precedence now also live in the independent module.
   Color-only filtering follows named-color resolution, retains alpha/platform colors and diagnoses
@@ -52,7 +52,7 @@
   values are discarded in scalar/platform/nested color positions, while boolean conditions and
   resolved named-color references survive. Static color golden corrected; **79 focused import/generator
   tests, 0 failures/errors/skips**, and architecture passed after observed regression failures.
-  Tasks 4–5 integrated implementation and self-review complete (joint independent review pending):
+  Tasks 4–5 integrated implementation and self-review complete (joint independent review complete):
   fixed logical metrics, user font role resolution, EDT appearance pairs/bindings, real FlatLaf install
   and two-layer global rollback, all typed immutable descriptors/events, and 29 original monochrome
   named icons with scoped registrations. Same-variant updates and listener containment are covered.
@@ -64,7 +64,7 @@
   in the shared contracts; form/panel/render test fixtures arrive with the real renderer tasks.
   Headless focused tests: **22 at default and 2x scale**, zero failures/errors/skips; module check and
   architecture: **129 tests, 0 failures/errors/skips**. Source hygiene and diff checks are clean.
-  Task 6 renderer implementation and self-review complete (independent review pending): stable id/kind
+  Task 6 renderer implementation and self-review complete (independent review complete): stable id/kind
   reconciliation, five basic button and field kinds, literal labels/tooltips, inline validation/adornments,
   callback containment and owned listener teardown. Descriptor value comparison preserves pending edits;
   textarea documents/viewports and sibling components survive unrelated updates. Approved sequencing
@@ -80,7 +80,7 @@
   Hierarchy moves now detach changed parents before attaching new edges, allowing valid ancestor inversion
   while retaining input documents and unaffected sibling parent identity. All **28 affected focused tests
   pass**, zero failures/errors/skips, following reproduced edit/normalization/hierarchy regressions.
-  Task 7 implementation/self-review complete (independent review pending): real secure fields, dropdowns,
+  Task 7 implementation/self-review complete (independent review complete): real secure fields, dropdowns,
   domain pickers, keyboard segments, confirmed-state switches and semantic chip/status/progress/strength
   owners. Secret documents wipe replaced/removed storage and close safely from SecretChanged callbacks;
   copies are erased even on consumer failure. Shared reveal groups include added fields and survive removal.
@@ -96,7 +96,7 @@
   `surface.control.hover` treatment while ordinary secondary buttons retain their own colors.
   Contrasting-role regression reproduced the mismatch; **10 focused choice/button tests pass**,
   zero failures/errors/skips. The minor segment-label medium-weight finding stays with final review.
-  Task 8 composition implementation/self-review complete (independent review pending): real form/settings
+  Task 8 composition implementation/self-review complete (independent review complete): real form/settings
   rows, padded/mixed cards, section labels, centered hero/empty states, split columns, menu/split buttons
   and content-only forms/sheets. Stable nested updates retain ordinary/secret documents and restore
   standalone labels; heroes propagate larger field/button roles. Approved corrections append explicit
@@ -115,7 +115,7 @@
   pre-fix evidence; no broad rerun or GUI was needed for these bounded repairs.
   Package-private Composition.java supplies width-aware layout and literal wrapping; screenshot calibration
   and native desktop focus remain later/user-run. No GUI, screen queries, AOT, push or merge.
-  Task 9 interactive data implementation/self-review complete (independent review pending): viewport
+  Task 9 interactive data implementation/self-review complete (independent review complete): viewport
   row shells and bounded live inline controls for lists/tables/trees, owner-scoped selection/context/
   expansion/reorder/removal events, ordered add footer, numeric columns and semantic navigation.
   Approved schema corrections add explicit SelectionMode to lists/tables, itemId to Expanded,
@@ -141,7 +141,7 @@
   landed on its doubled border. Per controller ruling, that fixture now scales logical bounds and
   sample coordinates consistently; exact expected colors remain unchanged. Earlier module counts
   are pre-fix evidence; no broad repository/module rerun was requested for this bounded fix.
-  Task 10 panel implementation/self-review complete (independent review pending): a single inline
+  Task 10 panel implementation/self-review complete (independent review complete): a single inline
   title/count/context/primary/overflow/header with app-only borrowed-header and owned host-action slots,
   separate host/descriptor callbacks, persistent footer and scrollable navigation/body. ItemList data
   remains viewport-owned; 10,000-row/offscreen-focus/popup tests retain bounded live controls.
@@ -161,7 +161,7 @@
   completions follow request order without changing other rows. Both P2 regressions reproduced;
   final affected default/2x: **15 tests each, 0 failures/errors/skips**. Earlier 234-module result is
   pre-fix evidence; this bounded review wave ran only affected tests as requested.
-  Tasks 11–12 integrated implementation/self-review complete (joint independent review pending):
+  Tasks 11–12 integrated implementation/self-review complete (joint independent review complete):
   full 26-node SDK projection at SDK 0.14.1, eight shared host/fake kit contracts, real owned FakeKit,
   lazy host adapters, explicit old-app theme value bridge, same-variant semantic publication and
   specialized content slots. Cross-owner view/widget reuse and ordinary control trees are rejected;
@@ -174,12 +174,26 @@
   Final checks: SDK **59**, testkit **105**, selected app suites **101**, full UI **238** tests,
   all zero failures/errors/skips; SDK JavaDoc and UI/SDK/app/plugin architecture gates pass.
   The shared Appearance contract now expects onChanged for workspace-only theme changes; opacity-only
-  notifications remain workspace-specific. Full repository check and gallery remain Tasks 14/13.
+  notifications remain workspace-specific. Full repository check and final whole-branch review remain Task 14.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`
   passed all 91 tasks: **8,743 tests, 0 failures, 0 errors, 6 skipped**. Documentation link and
   placeholder checks passed; source attachments are preserved unchanged. No GUI or AOT training.
+
+  Task 13 calibration/gallery/documentation/distribution implementation is complete: 46 fixtures in
+  dark1x/2x, light1x, custom1x and calibration1x/2x, all 36 sheets inspected under actual FlatLaf.
+  Nine unchanged originals have crop/scale anchors recorded in [calibration](design/theme-engine/calibration.md).
+  RED/GREEN source corrections preserve full nominal control fill/border bounds and external focus/error
+  halos, fix radius diameter mapping/duplicate placeholders, embedded labels, category tiles, bounded
+  ordered rows, manager hidden header/columns/footer/24-pixel detail padding and wrapped helper text.
+  Approved capability additions append Choice.icon and MenuItem.hue with compatibility constructors,
+  mirrored UI/SDK/host projection. [UI architecture](ui-architecture.md) and [maintenance](ui-maintenance.md)
+  include compile-checked public examples. UI **258**, SDK **59**, testkit **106**, KitValues **4** pass,
+  zero failures/errors/skips, with UI/SDK doclint and four architecture gates. Headless installDist and
+  verifyUiDistribution confirm the application engine jar and isolate all seven plugin runtimes.
+  Task 14 still supplies full repository verification and the single final whole-branch review;
+  Plans 2–3 consumer/surface migration and native acceptance remain unexecuted. No GUI/AOT/push/merge.
 
 - **Tab width correction** (2026-10-04): clarified that only the starting size should double. Tabs now
   have a 160-pixel minimum, normal measured title growth, and the original 240-pixel maximum. Removed the

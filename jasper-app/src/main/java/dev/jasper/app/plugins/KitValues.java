@@ -12,7 +12,7 @@ final class KitValues {
  case dev.jasper.sdk.ui.Nodes.StatusDot n -> new dev.jasper.ui.model.Nodes.StatusDot(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.StatusKind.valueOf(n.kind().name()));
  case dev.jasper.sdk.ui.Nodes.Field n -> new dev.jasper.ui.model.Nodes.Field(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.FieldKind.valueOf(n.kind().name()), n.value(), n.hint(), n.label(), n.trailingAction());
  case dev.jasper.sdk.ui.Nodes.Secret n -> new dev.jasper.ui.model.Nodes.Secret(n.id(), toModule(n.state()), n.hint(), n.label(), n.revealGroup());
- case dev.jasper.sdk.ui.Nodes.Choice n -> new dev.jasper.ui.model.Nodes.Choice(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.ChoiceKind.valueOf(n.kind().name()), n.options().stream().map(KitValues::toModule).toList(), n.selectedId(), n.label(), n.action());
+ case dev.jasper.sdk.ui.Nodes.Choice n -> new dev.jasper.ui.model.Nodes.Choice(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.ChoiceKind.valueOf(n.kind().name()), n.options().stream().map(KitValues::toModule).toList(), n.selectedId(), n.label(), n.action(), n.icon());
  case dev.jasper.sdk.ui.Nodes.Toggle n -> new dev.jasper.ui.model.Nodes.Toggle(n.id(), toModule(n.state()), n.label(), n.checked(), n.action(), n.compact());
  case dev.jasper.sdk.ui.Nodes.Chip n -> new dev.jasper.ui.model.Nodes.Chip(n.id(), toModule(n.state()), n.label(), dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()));
  case dev.jasper.sdk.ui.Nodes.Progress n -> new dev.jasper.ui.model.Nodes.Progress(n.id(), toModule(n.state()), n.fraction(), n.label());
@@ -34,7 +34,7 @@ final class KitValues {
  }; }
  static dev.jasper.ui.model.ControlState toModule(dev.jasper.sdk.ui.ControlState n) { return new dev.jasper.ui.model.ControlState(n.visible(), n.enabled(), n.busy(), n.error()); }
  static dev.jasper.ui.model.Option toModule(dev.jasper.sdk.ui.Option n) { return new dev.jasper.ui.model.Option(n.id(), n.label(), n.hue().map(KitValues::toModule)); }
- static dev.jasper.ui.model.MenuItem toModule(dev.jasper.sdk.ui.MenuItem n) { return new dev.jasper.ui.model.MenuItem(n.id(), n.label(), n.icon(), n.action(), n.enabled(), n.separator()); }
+ static dev.jasper.ui.model.MenuItem toModule(dev.jasper.sdk.ui.MenuItem n) { return new dev.jasper.ui.model.MenuItem(n.id(), n.label(), n.icon(), n.action(), n.enabled(), n.separator(), dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name())); }
  static dev.jasper.ui.model.ListItem toModule(dev.jasper.sdk.ui.ListItem n) { return new dev.jasper.ui.model.ListItem(n.id(), n.leading().map(KitValues::toModule), n.title().stream().map(KitValues::toModule).toList(), n.subtitle().stream().map(KitValues::toModule).toList(), n.trailing().stream().map(KitValues::toModule).toList()); }
  static dev.jasper.ui.model.Column toModule(dev.jasper.sdk.ui.Column n) { return new dev.jasper.ui.model.Column(n.id(), n.title(), toModule(n.role()), n.numeric()); }
  static dev.jasper.ui.model.TableRow toModule(dev.jasper.sdk.ui.TableRow n) { return new dev.jasper.ui.model.TableRow(n.id(), n.cells(), n.icon()); }

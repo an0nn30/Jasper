@@ -97,6 +97,10 @@ public final class KitView extends JPanel implements AutoCloseable {
         try { thread.getUncaughtExceptionHandler().uncaughtException(thread, failure); }
         catch (Throwable ignored) { /* diagnostics must not break view ownership or EDT event delivery */ }
     }
+    @Override protected void paintChildren(Graphics graphics) {
+        super.paintChildren(graphics);
+        ThemePainting.halos(this, graphics);
+    }
     private void refresh() {
         if (closeRequested.get()) return;
         try { motion.enabled(); reconciler.refresh(); } catch (Throwable failure) { report(failure); }

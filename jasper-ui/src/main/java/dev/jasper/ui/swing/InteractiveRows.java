@@ -347,6 +347,21 @@ final class InteractiveRows {
             setFocusable(true);
         }
 
+        @Override protected void paintComponent(Graphics graphics) {
+            if (owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) {
+                var g = (Graphics2D)graphics.create();
+                try {
+                    ThemePainting.antialias(g);
+                    int radius = ThemePainting.metric(owner.context(), DesignMetrics.Role.ORDERED_RADIUS);
+                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.SURFACE_INPUT));
+                    g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
+                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_INPUT));
+                    g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius * 2, radius * 2);
+                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_SUBTLE));
+                    for (int i = 1; i <= owner.size(); i++) g.drawLine(1, i * owner.rowHeight, getWidth() - 2, i * owner.rowHeight);
+                } finally { g.dispose(); }
+            }
+        }
         @Override
         public Dimension getPreferredSize() {
             return new Dimension(360, owner.size() * owner.rowHeight + owner.footerHeight());

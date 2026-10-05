@@ -1,0 +1,196 @@
+package dev.jasper.ui.swing;
+
+import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.ui.model.*;
+import dev.jasper.ui.model.Nodes.*;
+import dev.jasper.ui.testsupport.*;
+import dev.jasper.ui.theme.SemanticColor;
+import java.awt.*;
+import java.awt.event.FocusEvent;
+import java.util.List;
+import java.util.Optional;
+import javax.swing.*;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+
+/** Calibration is against visible source geometry under the actual shipped LAF. */
+class KitCalibrationTest {
+    @Test void kitIsTheOnlyPlaceholderPainterUnderRealFlatLaf() {
+        Edt.run(() -> {
+            var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var context = KitFixtures.context();
+            try {
+                FlatLafInstaller.install(context.theme());
+                try (var view = new KitView(context, new ViewSpec(new Field("field", ControlState.READY, FieldKind.TEXT, "", "Placeholder calibration", "Label", "")), e -> {})) {
+                    var control = (TextFields.FieldControl)view.control("field");
+                    var before = KitFixtures.render(view, UIScale.scale(400), UIScale.scale(70), 1);
+                    control.input.putClientProperty("JTextField.placeholderText", null);
+                    var after = KitFixtures.render(view, UIScale.scale(400), UIScale.scale(70), 1);
+                    assertThat(java.util.Arrays.equals(before.getRGB(0, 0, before.getWidth(), before.getHeight(), null, 0, before.getWidth()), after.getRGB(0, 0, after.getWidth(), after.getHeight(), null, 0, after.getWidth()))).as("clearing vendor placeholder must not change kit pixels").isTrue();
+                }
+            } finally { context.binding().close(); context.icons().close(); restore(old); UIManager.put("defaultFont", font); }
+        });
+    }
+    @Test void nominalButtonHeightIsTheVisibleFillAndRadiusIsSixLogicalPixels() {
+        Edt.run(() -> {
+            var old = UIManager.getLookAndFeel(); Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var context = KitFixtures.context();
+            try {
+                FlatLafInstaller.install(context.theme());
+                try (var view = new KitView(context, new ViewSpec(new Nodes.Button("button", ControlState.READY, "Continue", "", ButtonKind.PRIMARY, "continue", "")), e -> {})) {
+                    var button = view.control("button").component;
+                    int width = UIScale.scale(120), height = UIScale.scale(28);
+                    button.setSize(width, height);
+                    var image = ButtonsTest.paint(button);
+                    int fill = context.theme().semantic().color(SemanticColor.ACCENT).getRGB();
+                    assertThat(button.getPreferredSize().height).isEqualTo(height);
+                    assertThat(image.getRGB(width / 2, 0)).as("visible top at nominal bounds").isEqualTo(fill);
+                    assertThat(image.getRGB(width / 2, height - 1)).as("visible bottom at nominal bounds").isEqualTo(fill);
+                    assertThat(image.getRGB(UIScale.scale(1), UIScale.scale(1))).as("6px radius corner is outside fill").isNotEqualTo(fill);
+                }
+            } finally { context.binding().close(); context.icons().close(); restore(old); UIManager.put("defaultFont", font); }
+        });
+    }
+    @Test void realFormFocusHaloIsExternalVisibleAndDoesNotChangeControlBounds() {
+        Edt.run(() -> {
+            var old = UIManager.getLookAndFeel(); var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            Object font = UIManager.get("defaultFont"); UIManager.put("defaultFont", new Font(new dev.jasper.ui.metrics.Typography().family(), Font.PLAIN, 13)); var manager = new FocusManager(); var context = KitFixtures.context();
+            try {
+                FlatLafInstaller.install(context.theme()); KeyboardFocusManager.setCurrentKeyboardFocusManager(manager);
+                var field = new Field("field", ControlState.READY, FieldKind.TEXT, "", "Value", "Label", "");
+                var form = new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(new FormRow("row", ControlState.READY, "Label", "", field, Optional.empty())), Optional.empty(), List.of(), "cancel");
+                try (var view = new KitView(context, new ViewSpec(form), e -> {})) {
+                    var before = KitFixtures.render(view, UIScale.scale(540), UIScale.scale(180), 1);
+                    var control = (TextFields.FieldControl)view.control("field");
+                    var bounds = SwingUtilities.convertRectangle(control.surface.getParent(), control.surface.getBounds(), view);
+                    assertThat(bounds.height).as("font=%s, typography=%s, line=%s, input=%s, surface=%s", control.input.getFont(), context.typography().family(), context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getLineMetrics("Ag", new java.awt.font.FontRenderContext(null,true,true)).getHeight(), control.input.getPreferredSize(), control.surface.getPreferredSize()).isEqualTo(UIScale.scale(28));
+                    manager.target = control.input;
+                    var event = new FocusEvent(control.input, FocusEvent.FOCUS_GAINED, false, null, FocusEvent.Cause.TRAVERSAL_FORWARD);
+                    for (var listener : control.input.getFocusListeners()) listener.focusGained(event);
+                    var after = KitFixtures.render(view, UIScale.scale(540), UIScale.scale(180), 1);
+                    assertThat(SwingUtilities.convertRectangle(control.surface.getParent(), control.surface.getBounds(), view)).isEqualTo(bounds);
+                    int x = bounds.x + bounds.width / 2, y = bounds.y - UIScale.scale(2);
+                    assertThat(after.getRGB(x, y)).as("outer halo survives form/viewport clipping").isNotEqualTo(before.getRGB(x, y));
+                    assertThat(after.getRGB(x, bounds.y + UIScale.scale(2))).as("focused fill keeps nominal bounds").isEqualTo(before.getRGB(x, bounds.y + UIScale.scale(2)));
+                }
+            } finally { KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus); context.binding().close(); context.icons().close(); restore(old); UIManager.put("defaultFont", font); }
+        });
+    }
+    @Test void heroAndCardSegmentsHaveOneVisibleLabelAndSettingsChoicesFitTheirSourceRole() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("unlock-vault"), e -> {})) {
+                var password = (SecretFields.SecretControl)view.control("password");
+                assertThat(password.label.isVisible()).as("hero hint is the visible label").isFalse();
+                assertThat(password.lock.isVisible()).as("hero source has no leading lock").isFalse();
+                assertThat(password.input.getAccessibleContext().getAccessibleName()).isEqualTo("Master password");
+            } finally { context.binding().close(); context.icons().close(); }
+            var hostContext = KitFixtures.context();
+            try (var view = new KitView(hostContext, dev.jasper.ui.gallery.FormFixtures.create("add-host"), e -> {})) {
+                KitFixtures.render(view, UIScale.scale(540), UIScale.scale(760), 1);
+                assertThat(((Choices.ChoiceControl)view.control("authentication-mode")).label.isVisible()).as("full-width card segments").isFalse();
+                assertThat(view.control("group").component.getWidth()).as("settings dropdown trailing width").isEqualTo(UIScale.scale(160));
+            } finally { hostContext.binding().close(); hostContext.icons().close(); }
+        });
+    }
+    @Test void referenceCategoryTilesOrderedSurfaceAndPickerAlignmentAreRealRenderedOwners() {
+        Edt.run(() -> {
+            var base = KitFixtures.context();
+            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("add-host"), e -> {})) {
+                var image = KitFixtures.render(view, UIScale.scale(540), UIScale.scale(760), 1);
+                var keys = (ItemLists.ListControl)view.control("keys");
+                var bounds = SwingUtilities.convertRectangle(keys.component.getParent(), keys.component.getBounds(), view);
+                assertThat(image.getRGB(bounds.x + bounds.width / 2, bounds.y + UIScale.scale(2))).as("ordered bounded input surface").isEqualTo(context.theme().semantic().color(SemanticColor.SURFACE_INPUT).getRGB());
+                var picker = (Choices.PickerButton)((Choices.ChoiceControl)view.control("credential")).input;
+                var before = ButtonsTest.paint(picker); picker.setIcon(null); var after = ButtonsTest.paint(picker);
+                boolean changed = false;
+                for (int x = UIScale.scale(10); x < UIScale.scale(28); x++) for (int y = 0; y < before.getHeight(); y++) changed |= before.getRGB(x, y) != after.getRGB(x, y);
+                assertThat(changed).as("picker glyph actually paints at leading edge").isTrue();
+            } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
+            var b = KitFixtures.context();
+            var c = new KitContext(b.binding(), b.route(), b.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            try (var sheet = new KitView(c, dev.jasper.ui.gallery.FormFixtures.create("add-login-sheet"), e -> {});
+                 var vault = new KitView(c, dev.jasper.ui.gallery.FormFixtures.create("credential-vault"), e -> {})) {
+                KitFixtures.render(sheet, UIScale.scale(480), UIScale.scale(365), 1);
+                KitFixtures.render(vault, UIScale.scale(900), UIScale.scale(555), 1);
+                assertThat(((JLabel)sheet.control("sheet-icon").component).getIcon().getIconWidth()).as("sheet category tile").isEqualTo(UIScale.scale(32));
+                assertThat(((JLabel)vault.control("type-icon").component).getIcon().getIconWidth()).as("detail category tile").isEqualTo(UIScale.scale(44));
+                assertThat(((JLabel)vault.control("proxmox-icon").component).getIcon().getIconWidth()).as("selected two-line category tile").isEqualTo(UIScale.scale(28));
+            } finally { c.icons().close(); b.icons().close(); b.binding().close(); }
+        });
+    }
+    @Test void managerUsesThreeSemanticColumnsHiddenChromeAndPinnedTrailingAction() {
+        Edt.run(() -> {
+            var base = KitFixtures.context();
+            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("credential-vault"), e -> {})) {
+                KitFixtures.render(view, UIScale.scale(900), UIScale.scale(555), 1);
+                assertThat(view.control("manager-header").component.getHeight()).as("hidden native-chrome replacement").isZero();
+                assertThat(view.control("categories").component.getWidth()).isEqualTo(UIScale.scale(192));
+                assertThat(view.control("list-column").component.getWidth()).isEqualTo(UIScale.scale(272));
+                var done = view.control("done").component;
+                var bounds = SwingUtilities.convertRectangle(done.getParent(), done.getBounds(), view);
+                assertThat(bounds.y).isGreaterThan(UIScale.scale(500));
+                assertThat(bounds.x + bounds.width).isEqualTo(UIScale.scale(890));
+            } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
+            var c = KitFixtures.context();
+            try (var view = new KitView(c, dev.jasper.ui.gallery.PanelFixtures.create("fileservers"), e -> {})) {
+                KitFixtures.render(view, UIScale.scale(264), UIScale.scale(424), 1);
+                assertThat(((JLabel)view.control("server-icon").component).getIcon().getIconWidth()).as("compact folder remains a plain control glyph").isEqualTo(UIScale.scale(14));
+            } finally { c.icons().close(); c.binding().close(); }
+        });
+    }
+    @Test void cardRadiusUsesNineLogicalPixelsRatherThanNinePixelArcDiameter() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, new ViewSpec(new Card("card", ControlState.READY, CardKind.FORM, List.of())), e -> {})) {
+                var card = view.control("card").component; card.setSize(UIScale.scale(180), UIScale.scale(80));
+                var image = ButtonsTest.paint(card);
+                assertThat((image.getRGB(0, UIScale.scale(5)) >>> 24) & 255).as("9px radius corner remains outside the full fill").isLessThan(200);
+            } finally { context.icons().close(); context.binding().close(); }
+        });
+    }
+    private static final class FocusManager extends DefaultKeyboardFocusManager { Component target; @Override public Component getFocusOwner() { return target; } }
+    @Test void formRowHelperWrapsAndDetailHasSourceInsets() {
+        Edt.run(() -> {
+            var base = KitFixtures.context();
+            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            try (var server = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("new-file-server"), e -> {});
+                 var vault = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("credential-vault"), e -> {})) {
+                KitFixtures.render(server, UIScale.scale(540), UIScale.scale(730), 1);
+                var helper = server.control("account-help").component;
+                assertThat(helper.getHeight()).as("caption must wrap in its real assigned control column").isGreaterThan(helper.getFontMetrics(helper.getFont()).getHeight());
+                KitFixtures.render(vault, UIScale.scale(900), UIScale.scale(555), 1);
+                var identity = vault.control("identity").component;
+                var bounds = SwingUtilities.convertRectangle(identity.getParent(), identity.getBounds(), vault);
+                assertThat(bounds.x).as("192 sidebar + 272 list + 24 detail inset").isEqualTo(UIScale.scale(488));
+                assertThat(bounds.y).isEqualTo(UIScale.scale(24));
+                assertThat(bounds.width).isEqualTo(UIScale.scale(900 - 488 - 24));
+            } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
+        });
+    }
+    @Test void menuCategoryHuesAreExplicitAndLegacyDefaultsRemainNeutral() {
+        Edt.run(() -> {
+            var base = KitFixtures.context();
+            var context = new KitContext(base.binding(), base.route(), base.metrics(), dev.jasper.ui.gallery.KitGallery.icons(), () -> false);
+            try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("vault-add-menu"), e -> {})) {
+                var descriptors = ((Nodes.MenuButton)view.control("add-menu").node).items();
+                assertThat(descriptors.stream().filter(i -> !i.separator()).map(dev.jasper.ui.model.MenuItem::hue)).containsExactly(Nodes.Hue.BLUE, Nodes.Hue.GREEN, Nodes.Hue.AMBER, Nodes.Hue.PURPLE);
+                var popup = view.control("add-menu").component.getComponentPopupMenu();
+                int index = 0;
+                for (var item : descriptors) {
+                    var component = popup.getComponent(index++);
+                    if (component instanceof JMenuItem menu) {
+                        var actual = new java.awt.image.BufferedImage(UIScale.scale(18), UIScale.scale(18), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var expected = new java.awt.image.BufferedImage(UIScale.scale(18), UIScale.scale(18), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var a = actual.createGraphics(); var b = expected.createGraphics();
+                        try { menu.getIcon().paintIcon(menu, a, 0, 0); context.icons().tile(item.icon(), context.theme().semantic(), item.hue(), UIScale.scale(18), false).paintIcon(menu, b, 0, 0); }
+                        finally { a.dispose(); b.dispose(); }
+                        assertThat(actual.getRGB(0,0,actual.getWidth(),actual.getHeight(),null,0,actual.getWidth())).isEqualTo(expected.getRGB(0,0,expected.getWidth(),expected.getHeight(),null,0,expected.getWidth()));
+                    }
+                }
+                assertThat(new dev.jasper.ui.model.MenuItem("old", "Old", "key", "old", true, false).hue()).isEqualTo(Nodes.Hue.NEUTRAL);
+            } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
+        });
+    }
+    private static void restore(LookAndFeel laf) { try { UIManager.setLookAndFeel(laf); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); } }
+}

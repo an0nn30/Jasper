@@ -274,7 +274,7 @@ final class Menus {
                                             .tile(
                                                     descriptor.icon(),
                                                     context().theme().semantic(),
-                                                    Nodes.Hue.NEUTRAL,
+                                                    descriptor.hue(),
                                                     ThemePainting.metric(
                                                             context(),
                                                             DesignMetrics.Role.MENU_TILE),

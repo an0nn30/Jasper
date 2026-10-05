@@ -32,6 +32,23 @@ class KitValuesTest {
   assertThat(nodes.stream().map(Object::getClass).distinct()).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
  }
+ @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){
+  for(String icon:List.of("lock","")){
+   var choice=new Choice("picker",READY,ChoiceKind.PICKER,List.of(),"","Credential","choose",icon);
+   var projected=(dev.jasper.ui.model.Nodes.Choice)KitValues.toModule(new ViewSpec(choice)).root();
+   assertThat(projected.icon()).isEqualTo(icon);
+  }
+  assertThat(new Choice("picker",READY,ChoiceKind.PICKER,List.of(),"","Picker","choose").icon()).isEqualTo("key");
+  assertThatThrownBy(()->new Choice("dropdown",READY,ChoiceKind.DROPDOWN,List.of(),"","Choice","select","lock")).isInstanceOf(IllegalArgumentException.class);
+  assertThatThrownBy(()->new dev.jasper.ui.model.Nodes.Choice("dropdown",dev.jasper.ui.model.ControlState.READY,dev.jasper.ui.model.Nodes.ChoiceKind.DROPDOWN,List.of(),"","Choice","select","lock")).isInstanceOf(IllegalArgumentException.class);
+ }
+ @Test void everyMenuHueProjectsAndLegacyRemainsNeutral(){
+  for(var hue:Hue.values()){
+   var item=new MenuItem("item","Item","key","open",true,false,hue);
+   assertThat(KitValues.toModule(item).hue().name()).isEqualTo(hue.name());
+  }
+  assertThat(new MenuItem("old","Old","key","open",true,false).hue()).isEqualTo(Hue.NEUTRAL);
+ }
  @Test void everyEventProjectsItsOwnerItemAndPayload(){
   List<dev.jasper.ui.model.UiEvent> events=List.of(new dev.jasper.ui.model.UiEvent.Action("act"),new dev.jasper.ui.model.UiEvent.Edited("field","text"),new dev.jasper.ui.model.UiEvent.Selected("list",Set.of("a")),new dev.jasper.ui.model.UiEvent.Toggled("toggle",true),new dev.jasper.ui.model.UiEvent.Expanded("tree","branch",true),new dev.jasper.ui.model.UiEvent.Reordered("list","a",2),new dev.jasper.ui.model.UiEvent.Removed("list","a"),new dev.jasper.ui.model.UiEvent.SecretChanged("secret"));
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());

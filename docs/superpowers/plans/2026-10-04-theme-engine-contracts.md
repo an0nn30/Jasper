@@ -1,6 +1,7 @@
 # Shared contracts for the three theme-engine plans
 
-Status: implementation-planning decisions for review; no production code exists yet.
+Status: Plan 1 engine/kit and SDK 0.14.1 projection are implemented through Task 13;
+Task 14 final whole-branch verification/review remains pending. Plans 2–3 consumers remain unexecuted.
 Authority: [approved spec](../specs/2026-10-04-jasper-theme-engine-design.md).
 This is a shared contract appendix, not a fourth implementation plan.
 
@@ -169,7 +170,7 @@ unique within their owning control; references resolve only in that control. Do 
 | StatusDot | `StatusKind kind` |
 | Field | `FieldKind kind, String value, String hint, String label, String trailingAction` |
 | Secret | `String hint, String label, String revealGroup` (no string value) |
-| Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action` |
+| Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon` |
 | Toggle | `String label, boolean checked, String action, boolean compact` |
 | Chip | `String label, Hue hue` |
 | Progress | `double fraction, String label` (-1 means indeterminate) |
@@ -190,7 +191,7 @@ unique within their owning control; references resolve only in that control. Do 
 | Custom | `String contentId, CustomKind kind, String accessibleName` |
 
 Support records, each in its own model file: `Option(String id,String label,Optional<Hue> hue)`,
-`MenuItem(String id,String label,String icon,String action,boolean enabled,boolean separator)`,
+`MenuItem(String id,String label,String icon,String action,boolean enabled,boolean separator,Nodes.Hue hue)`,
 `ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing)`,
 `Column(String id,String title,TextRole role,boolean numeric)`,
 `TableRow(String id,Map<String,String> cells,Optional<String> icon)`,
@@ -384,4 +385,25 @@ No GUI, benchmarks, AOT training, packageDist, or `-Pjasper.aot=true`.
 
 For each plan finish, record real command results and XML counts in the plan banner and STATUS;
 perform independent whole-branch review, resolve findings, and repeat only affected verification.
-Tests or goldens described here are future implementation work, not claims that they already pass.
+Plan 1 tests and gallery now have recorded task evidence; remaining consumer/surface tests are
+future Plans 2–3 work. The final whole-branch gate and independent review remain Task 14.
+
+
+### Task 13 calibration clarifications
+
+Nominal control bounds are their full visible fill/border geometry (28 default/32 hero), with external
+3-pixel focus/error halos owned by the view and clipped by real viewports. Named rounded-rectangle
+radii map to twice-radius Java arc diameters. The kit owns placeholder paint once. HERO and embedded
+card labels do not duplicate visible labels. Source-derived gaps/heights remain unchanged.
+
+`Choice.icon` names PICKER artwork; empty means no cue. Nonempty cues on other kinds are rejected.
+The original seven-argument constructor delegates to key for PICKER and empty otherwise. `MenuItem.hue`
+explicitly controls named category artwork; the original six-argument constructor delegates NEUTRAL.
+Both changes mirror through UI/SDK and host projection, without domain inference from ids/text.
+
+Named manager roles supply 192/272 sidebar/list widths plus remaining detail, with 24 detail padding;
+hidden panel headers consume zero height. Category tile roles use 20 single/rail, 28 double-list,
+32 sheet and 44 detail pixels, determined by explicit parents, IconSize and ListKind. Ordinary
+CONTROL icons remain glyphs. Ordered rows use bounded input chrome, separators and leading add;
+settings choices use the 160 trailing-width role. FormRow helper CAPTION/DESCRIPTION text wraps.
+Gallery evidence and scale/crop anchors are in [calibration](../../design/theme-engine/calibration.md).

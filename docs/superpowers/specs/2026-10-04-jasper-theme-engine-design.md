@@ -2,7 +2,8 @@
 
 Status: **Approved for implementation planning on 2026-10-04.** The user approved the written
 specification, including the additional plugin-panel reference, with “alrighty, lets get started”.
-The three implementation plans are written and awaiting review; product implementation has not started.
+Plan 1 engine/kit Tasks 1–13 are implemented, with headless gallery and distribution evidence;
+Task 14 final whole-branch verification/review remains pending. Plans 2–3 are written and unexecuted.
 
 Branch: `codex/theme-engine`, based on `192443b3`.
 

@@ -59,7 +59,7 @@ public final class IconRegistry implements AutoCloseable {
                 try {
                     g.translate(x, y); g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     if (tile) {
-                        g.setColor(background); double radius = size * .25;
+                        g.setColor(background); double radius = size * .25 * 2; // RoundRectangle2D accepts an arc diameter
                         g.fill(new RoundRectangle2D.Double(0, 0, size, size, radius, radius));
                         double inset = size * .2; g.translate(inset, inset); g.scale(size * .6 / 16, size * .6 / 16);
                     } else g.scale(size / 16.0, size / 16.0);

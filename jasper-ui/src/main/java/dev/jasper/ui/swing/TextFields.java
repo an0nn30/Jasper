@@ -85,11 +85,11 @@ final class TextFields {
             applying = true;
             try { input.setText(value); } finally { applying = false; }
         }
-        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
-        @Override void hero(boolean value) { surface.hero=value; }
+        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value && !surface.hero); }
+        @Override void hero(boolean value) { surface.hero=value; label.setVisible(!embedded && !value); }
         @Override JComponent focusTarget() { return input; }
         @Override void refresh() {
-            var field = (Nodes.Field)node; state(); label.setVisible(!embedded); input.setEnabled(component.isEnabled());
+            var field = (Nodes.Field)node; state(); label.setVisible(!embedded && !surface.hero); input.setEnabled(component.isEnabled());
             input.setEditable(component.isEnabled()); surface.setEnabled(component.isEnabled());
             input.setCursor(Cursor.getPredefinedCursor(component.isEnabled() ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (scroll != null) {
@@ -104,7 +104,8 @@ final class TextFields {
             input.setDisabledTextColor(input.getForeground()); input.setCaretColor(input.getForeground());
             input.setSelectionColor(ThemePainting.color(context(), SemanticColor.SELECTION_BG));
             input.setSelectedTextColor(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
-            input.putClientProperty("JTextField.placeholderText", field.hint()); surface.hint = field.hint(); surface.role = role;
+            // The kit surface owns placeholder painting; FlatLaf must not paint a second copy.
+            input.putClientProperty("JTextField.placeholderText", null); surface.hint = field.hint(); surface.role = role;
             input.getAccessibleContext().setAccessibleName(field.label());
             input.getAccessibleContext().setAccessibleDescription(field.state().error().isEmpty() ? field.hint() : field.state().error());
             label.setText(field.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
@@ -155,7 +156,8 @@ final class TextFields {
         }
         @Override public Dimension getPreferredSize() {
             var size = super.getPreferredSize();
-            return new Dimension(size.width, Math.max(size.height, ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, role)));
+            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, role);
+            return new Dimension(size.width, multiline ? Math.max(size.height, height) : height);
         }
         @Override public void paint(Graphics graphics) {
             var g = (Graphics2D)graphics.create();

@@ -41,6 +41,7 @@ final class Cards {
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
+            controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.SEGMENTED).forEach(c -> Composition.label(c, true));
             ((CardSurface) component).settings =
                     controls.stream()
                             .filter(c -> c.node instanceof Nodes.SettingRow)
@@ -122,9 +123,9 @@ final class Cards {
                 ThemePainting.antialias(g);
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
-                g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), r, r));
+                g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), r * 2, r * 2));
                 g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
-                g.draw(new RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, r, r));
+                g.draw(new RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, r * 2, r * 2));
                 Component[] children = getComponents();
                 for (int i = 1; i < children.length; i++)
                     if (children[i].isVisible()

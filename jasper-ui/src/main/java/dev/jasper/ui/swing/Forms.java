@@ -294,7 +294,7 @@ final class Forms {
                 ThemePainting.antialias(g);
                 int r = ThemePainting.metric(view.context(), DesignMetrics.Role.WINDOW_RADIUS);
                 g.setColor(ThemePainting.color(view.context(), SemanticColor.SURFACE_DIALOG));
-                if (!sheet) g.fillRoundRect(0, 0, getWidth(), getHeight(), r, r);
+                if (!sheet) g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
                 else {
                     double half = r / 2.0;
                     var path = new Path2D.Double();

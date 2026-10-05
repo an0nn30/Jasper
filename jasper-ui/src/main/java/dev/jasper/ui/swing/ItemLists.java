@@ -82,7 +82,7 @@ final class ItemLists {
                                 slotHeight(item.trailing()));
                 height = Math.max(height, Math.max(middle, side));
             }
-            return height;
+            return value().kind() == Nodes.ListKind.ORDERED ? Math.max(height, ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_ROW_HEIGHT)) : height;
         }
 
         int slotHeight(List<Nodes.Node> nodes) {
@@ -195,6 +195,7 @@ final class ItemLists {
             JComponent next = controls.isEmpty() ? null : controls.getFirst().component;
             if (footer != next && footer != null) canvas.remove(footer);
             footer = next;
+            if (footer instanceof Buttons.KitButton button && value().kind() == Nodes.ListKind.ORDERED) button.setHorizontalAlignment(SwingConstants.LEADING);
             if (footer != null && footer.getParent() != canvas) canvas.add(footer);
             canvas.revalidate();
             sync();
@@ -219,6 +220,9 @@ final class ItemLists {
                 trailing.add(commandNode(row, "remove", "close", "Remove", true));
             }
             row.slot(row.leading, leading);
+            if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.HERO) && icon.hue() != Nodes.Hue.NONE) {
+                ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), selected.contains(item.id()));
+            }
             row.slot(row.title, item.title());
             row.slot(row.subtitle, item.subtitle());
             row.slot(row.trailing, trailing);

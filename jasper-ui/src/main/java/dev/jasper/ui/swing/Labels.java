@@ -11,11 +11,21 @@ final class Labels {
     private Labels() {}
     static JLabel literal() { var label = new LiteralLabel(); label.putClientProperty("html.disable", true); return label; }
     static class LiteralLabel extends JLabel {
+        boolean wrap;
+        final Composition.WrappedText wrapped = new Composition.WrappedText();
+        int wrappedHeight(int width) {
+            wrapped.text = getText(); wrapped.setFont(getFont());
+            return wrapped.height(width);
+        }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {
                 ThemePainting.antialias(g); g.setFont(getFont()); g.setColor(getForeground());
+                if (wrap) {
+                    wrappedHeight(getWidth()); wrapped.setForeground(getForeground()); wrapped.setEnabled(isEnabled());
+                    wrapped.setSize(getSize()); wrapped.paintComponent(g); return;
+                }
                 Insets insets = getInsets(); Rectangle icon = new Rectangle(), text = new Rectangle();
                 Rectangle bounds = new Rectangle(insets.left, insets.top, getWidth() - insets.left - insets.right, getHeight() - insets.top - insets.bottom);
                 String display=getText();
@@ -42,10 +52,12 @@ final class Labels {
         }
     }
     static final class IconControl extends ControlRegistry.Control {
+        int tileSize; boolean selected;
+        void tile(int logicalSize, boolean value) { tileSize = logicalSize; selected = value; refresh(); }
         IconControl(KitView view, Nodes.Icon node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
-            label.setIcon(context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()))));
+            label.setIcon(tileSize > 0 ? context().icons().tile(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), selected) : context().icons().icon(icon.name(), context().theme().semantic(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()))));
             label.getAccessibleContext().setAccessibleName(icon.accessibleName());
             label.setToolTipText(icon.accessibleName());
         }

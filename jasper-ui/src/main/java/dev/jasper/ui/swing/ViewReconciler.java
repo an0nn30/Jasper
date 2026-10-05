@@ -28,10 +28,11 @@ final class ViewReconciler implements AutoCloseable {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) revealGroups.put(group, secret.revealed);
         }
-        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button)button.button.panel=false; if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} control.embeddedLabel(false); control.hero(false); });
+        next.values().forEach(control -> { if(control instanceof SettingRows.RowControl row)row.panelFooter=false; if(control instanceof Buttons.ButtonControl button)button.button.panel=false; if(control instanceof Menus.MenuControl menu){menu.main.panel=false;menu.arrow.panel=false;} if (control instanceof Labels.IconControl icon) icon.tile(0, false); control.embeddedLabel(false); control.hero(false); });
         inherit(spec.root(), next, true);
         for (var node : nodes.values()) next.get(node.id()).update(node);
         applyHero(spec.root(), next, false);
+        applyTiles(spec.root(), next, 0);
         for (var control : next.values()) if (control instanceof SecretFields.SecretControl secret) {
             String group = ((Nodes.Secret)secret.node).revealGroup();
             if (!group.isEmpty()) secret.reveal(revealGroups.getOrDefault(group, false));
@@ -68,6 +69,14 @@ final class ViewReconciler implements AutoCloseable {
         boolean hero = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.HERO : inherited;
         next.get(node.id()).hero(hero);
         ControlRegistry.children(node).forEach(child -> applyHero(child, next, hero));
+    }
+    private void applyTiles(Nodes.Node node, Map<String, ControlRegistry.Control> next, int inherited) {
+        int size = node instanceof Nodes.Form form && form.kind() == Nodes.FormKind.SHEET
+                ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_SHEET_TILE)
+                : node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL
+                ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_DETAIL_TILE) : inherited;
+        if (size > 0 && node instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO && next.get(icon.id()) instanceof Labels.IconControl control) control.tile(size, false);
+        ControlRegistry.children(node).forEach(child -> applyTiles(child, next, size));
     }
     private void collect(Nodes.Node node, Map<String, Nodes.Node> nodes) {
         nodes.put(node.id(), node); ControlRegistry.children(node).forEach(child -> collect(child, nodes));

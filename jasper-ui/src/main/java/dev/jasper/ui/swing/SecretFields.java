@@ -61,8 +61,8 @@ final class SecretFields {
             super.update(next);
         }
         boolean embedded;
-        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
-        @Override void hero(boolean value) { surface.hero=value; }
+        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value && !surface.hero); lock.setVisible(!value && !surface.hero); }
+        @Override void hero(boolean value) { surface.hero=value; label.setVisible(!embedded && !value); lock.setVisible(!embedded && !value); }
         @Override JComponent focusTarget() { return input; }
         @Override void refresh() {
             var secret = (Nodes.Secret)node; state(); boolean enabled = component.isEnabled();
@@ -74,7 +74,7 @@ final class SecretFields {
             input.getAccessibleContext().setAccessibleDescription(secret.state().error().isEmpty() ? secret.hint() : secret.state().error());
             label.setText(secret.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(enabled);
-            label.setVisible(!embedded);
+            label.setVisible(!embedded && !surface.hero);
             error.setText(secret.state().error()); error.setVisible(!secret.state().error().isEmpty()); error.setEnabled(enabled);
             error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
             surface.hint = secret.hint(); surface.error = !secret.state().error().isEmpty();

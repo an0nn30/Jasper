@@ -79,7 +79,7 @@ final class Choices {
                     picker.empty = option == null;
                     picker.setText(option == null ? "Choose…" : option.label());
                     picker.setForeground(ThemePainting.color(context(), picker.textRole(false)));
-                    picker.setIcon(context().icons().icon("key", context().theme().semantic(), SemanticColor.TEXT_SECONDARY,
+                    picker.setIcon(choice.icon().isEmpty() ? null : context().icons().icon(choice.icon(), context().theme().semantic(), SemanticColor.TEXT_SECONDARY,
                         com.formdev.flatlaf.util.UIScale.scale(context().icons().size(Nodes.IconSize.CONTROL))));
                     picker.setDisabledIcon(picker.getIcon()); picker.setHorizontalAlignment(SwingConstants.LEADING);
                     int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING), pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
@@ -190,7 +190,7 @@ final class Choices {
         final KitContext context;
         SegmentTrack(KitContext context) { this.context = context; setOpaque(false); int pad = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_PADDING); setBorder(new EmptyBorder(pad, pad, pad, pad)); }
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D)graphics.create(); try { ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_INPUT)); int r = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_TRACK_RADIUS); g.fillRoundRect(0, 0, getWidth(), getHeight(), r, r); g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE)); g.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, r, r); } finally { g.dispose(); }
+            var g = (Graphics2D)graphics.create(); try { ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_INPUT)); int r = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_TRACK_RADIUS); g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2); g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE)); g.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, r * 2, r * 2); } finally { g.dispose(); }
         }
     }
     static final class SegmentButton extends Buttons.KitButton {
@@ -201,7 +201,7 @@ final class Choices {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {
-                if (isSelected()) { ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); g.setColor(ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG)); int r = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_ITEM_RADIUS); g.fillRoundRect(0, 0, getWidth(), getHeight(), r, r); }
+                if (isSelected()) { ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); g.setColor(ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG)); int r = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_ITEM_RADIUS); g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2); }
                 super.paintComponent(graphics);
             } finally { g.dispose(); }
         }
