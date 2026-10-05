@@ -831,7 +831,7 @@ list.setCellRenderer((owner, value, index, selected, focused) -> {
 });
 ```
 
-The bundled audit covers all seven plugins. Semantic status dots remain colored independently of selected row
+The bundled audit covers all eight plugins. Semantic status dots remain colored independently of selected row
 text/background; normal card text uses ordinary control colors. The audit used
 `rg -n 'UIManager.getColor|new Color\(|Color\.' plugins/*/src/main/java` plus setter/renderer/paint searches.
 
@@ -848,7 +848,7 @@ text/background; normal card text uses ordinary control colors. The audit used
 | Editor `VimBar`: fixed error, output text, panel background/bell | Changed: mounted palette, plugin-owned style maps, first-paint palette comparison; 150 ms bell and 12-row limit retained |
 | Editor `EditorTheme`: fixed Color copies and blending | Domain-owned syntax/document surfaces; unchanged, exempt from generic styles |
 | Editor `vim/HighlightedYank`: configured RGBA color | Domain-owned user setting; unchanged |
-| History, Snippets, Sample | No custom color/painter occurrences; inherited standard controls (or palette contributions rendered by the host) |
+| History, Snippets, Sample, Project Index | No custom color/painter occurrences; inherited standard controls (or palette contributions rendered by the host) |
 
 FlatLaf 3.7 supports per-control progress track/fill colors but not progress text colors. Text on an external
 plugin's string-painted progress bar remains delegate-owned and can retain chrome colors. The audited bundled

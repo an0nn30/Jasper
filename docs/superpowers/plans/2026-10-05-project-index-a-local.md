@@ -1,5 +1,21 @@
 # Project Index, Plan A (local projects) Implementation Plan
 
+**Status:** executed on `claude/file-indexer` (2026-10-05); see docs/STATUS.md.
+
+Deviations from the plan text during execution:
+
+- Task 7 fix round hardened Indexer: lister Error/null no longer wedges a lane; project-list saves wait for load(); load() survives RuntimeException; persist chain and finish() follow-up survive failures (6 extra IndexerTest cases).
+- Task 12: the Step 2 instruction to find the File Server line by its link text is reworded in this file, because the documentation test resolves any link outside a fenced block, including one inside inline code.
+
+Deviations from the design spec, also recorded in docs/STATUS.md:
+
+- `data/projects.toml` instead of `projects.json` (no JSON library is bundled).
+- User guide `docs/project-index.md` instead of a plugin README.
+- Go to File off macOS is Ctrl+Alt+Shift+P (Ctrl+Shift+P is the Command Palette; plain Ctrl+P is readline's).
+- The truncation card names the Settings page instead of linking to it (no SDK call opens Settings).
+- Git listing is skipped when the work tree's top level is the home folder.
+- The settings template lists the default markers and excludes in comments, not as live values.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A new bundled plugin, Project Index (`plugins/indexer`, `dev.jasper.indexer` 0.1.0), that offers to index the
@@ -4862,7 +4878,7 @@ and their state) and holds the markers, excluded folders, ignored paths and limi
 
 - [ ] **Step 2: Link it and update the plugin audit**
 
-In `docs/README.md`, after the line beginning `- [File Server](file-server.md):`, add:
+In `docs/README.md`, after the File Server line (the one starting `- [File Server]`), add:
 
 ```markdown
 - [Project Index](project-index.md): offers to index the project a terminal enters and finds its files from the palette's Files tab.

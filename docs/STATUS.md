@@ -2,6 +2,28 @@
 
 ## Current state — 2026-10-05
 
+- **Project Index, plan A (local)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`): new bundled
+  plugin Project Index (`plugins/indexer`, `dev.jasper.indexer` 0.1.0) per the
+  [design](superpowers/specs/2026-10-05-jasper-project-index-design.md) and
+  [plan A](superpowers/plans/2026-10-05-project-index-a-local.md). A terminal entering a local project (configurable
+  strong/weak markers) gets an "Index project?" card (Yes / No for the session / Ignore this path); indexes come from
+  `git ls-files` (with `core.fsmonitor=false`, never in a home-folder work tree) or a folder walk skipping excluded
+  names, capped at 200,000 files, saved under the plugin's data directory and refreshed when a pane re-enters the
+  project or a command finishes there (5-minute throttle, 3 s debounce). The palette's **Files** scope (Go to File,
+  ⌘P / Ctrl+Alt+Shift+P) ranks exact, prefix, initials, substring and path matches with the current project first and
+  opens files in the Editor, copies paths or opens a terminal there. File › Index Folder… and the Settings page add
+  folders by hand. Deviations from the spec: `data/projects.toml` instead of JSON (no JSON library is bundled); user
+  guide [`docs/project-index.md`](project-index.md) instead of a plugin README; Linux/Windows Go to File is
+  Ctrl+Alt+Shift+P (Ctrl+Shift+P is the Command Palette); the truncation card names the Settings page instead of
+  linking to it (no SDK call opens Settings); Git listing is skipped when the work tree's top level is home; the
+  settings template lists defaults in comments. Deviation from the plan: the Task 7 fix round hardened Indexer: lister
+  Error/null no longer wedges a lane; project-list saves wait for load(); load() survives RuntimeException; persist
+  chain and finish() follow-up survive failures (6 extra IndexerTest cases). Full `./gradlew check --continue`:
+  **8841 tests, 0 failures, 0 errors, 6 skips**. (The first full run had one flaky failure,
+  `TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation` [3] "reflow", in
+  `jasper-terminal`, unrelated to the plugin; it passed on rerun.) No GUI, benchmark or AOT training; GUI checks (the
+  card and its three actions, the Files tab and its verbs, File › Index Folder…, the Settings page) are for the user.
+  Plan B (remote projects through a Remote API) is next. Not merged, not pushed.
 - **Bundled default terminal font** (2026-10-05; `codex/bundled-terminal-font`, isolated worktree
   `/Users/dustin/.codex/worktrees/bundled-terminal-font/moray`): implements the approved bounded design:
   the app bundles the supplied Cousine Nerd Font Mono regular/bold/italic/bold-italic faces with upstream
