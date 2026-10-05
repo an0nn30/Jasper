@@ -81,7 +81,7 @@ public final class LocalLister {
                     process.destroyForcibly();
                     throw new CancellationException();
                 }
-                if (excluded(path, skip)) continue;
+                if (excluded(path, skip) || folder(root, path)) continue;
                 if (files.size() >= maxFiles) {
                     process.destroyForcibly();
                     return Optional.of(new Listing(files, Strategy.GIT, true));
@@ -169,6 +169,16 @@ public final class LocalLister {
         });
         Collections.sort(files);
         return new Listing(files, Strategy.WALK, truncated[0]);
+    }
+
+    /**
+     * Whether a Git entry is a folder: an untracked nested repository ({@code name/}), or a submodule's gitlink or a
+     * link to a folder, which are tracked paths but name folders on disk.
+     */
+    private static boolean folder(Path root, String path) {
+        if (path.endsWith("/")) return true;
+        try { return Files.isDirectory(root.resolve(path)); }
+        catch (InvalidPathException unusable) { return false; }
     }
 
     /** Whether a {@code /}-separated path has an excluded folder name. */

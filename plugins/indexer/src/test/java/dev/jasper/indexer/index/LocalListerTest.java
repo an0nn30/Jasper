@@ -61,6 +61,26 @@ class LocalListerTest {
         assertThat(listing.truncated()).isFalse();
     }
 
+    @Test void nestedRepositoriesAreNotListedAsFiles() throws Exception {
+        assumeTrue(gitAvailable());
+        Path root = Files.createDirectories(home.resolve("src/app"));
+        git(root, "init", "-q");
+        write(root.resolve("a.txt"));
+        Path tracked = Files.createDirectories(root.resolve("tracked"));
+        git(tracked, "init", "-q");
+        write(tracked.resolve("inner.txt"));
+        git(tracked, "add", "-A");
+        git(tracked, "commit", "-q", "-m", "inner");
+        git(root, "add", "a.txt", "tracked");
+        git(root, "commit", "-q", "-m", "outer");
+        Path loose = Files.createDirectories(root.resolve("loose"));
+        git(loose, "init", "-q");
+        write(loose.resolve("other.txt"));
+        var listing = new LocalLister(List.of("git"), home).list(root, EXCLUDES, 1_000, () -> false);
+        assertThat(listing.strategy()).isEqualTo(Strategy.GIT);
+        assertThat(listing.files()).as("a gitlink and an untracked repository are folders, not files").containsExactly("a.txt");
+    }
+
     @Test void aRepositoryConfiguredFsmonitorNeverRuns() throws Exception {
         assumeTrue(gitAvailable() && !System.getProperty("os.name").startsWith("Windows"));
         Path root = Files.createDirectories(home.resolve("src/evil"));
