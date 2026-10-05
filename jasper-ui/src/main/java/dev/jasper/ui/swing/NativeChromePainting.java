@@ -19,10 +19,11 @@ public final class NativeChromePainting {
             if (button.isEnabled() && (model.isRollover() || model.isPressed() || model.isSelected())) {
                 g.setColor(model.isPressed() || model.isSelected() ? palette.color(SemanticColor.SEGMENT_SELECTED_BG)
                     : ColorMath.opacity(palette.color(SemanticColor.HOVER_OVERLAY), .08));
-                int arc = NativeControlStyles.metric(DesignMetrics.Role.CONTROL_RADIUS) * 2;
+                int arc = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC);
                 g.fillRoundRect(0, 0, button.getWidth(), button.getHeight(), arc, arc);
             }
-            if (!button.isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
+            if (!button.isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(
+                DesignMetrics.DEFAULT.value(DesignMetrics.Role.NATIVE_TOOLBAR_DISABLED_PERCENT) / 100f));
             Icon icon = button.getIcon();
             int pad = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING);
             int arrowSpace = NativeControlStyles.metric(DesignMetrics.Role.NATIVE_MENU_SPACE);
@@ -36,7 +37,7 @@ public final class NativeChromePainting {
                 g.drawString(button.getText(), x, (button.getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
                 x += metrics.stringWidth(button.getText());
             }
-            if (arrow != null) { x += NativeControlStyles.metric(DesignMetrics.Role.PORT_PREFIX_GAP); arrow.paintIcon(button, g, x, (button.getHeight() - arrow.getIconHeight()) / 2); }
+            if (arrow != null) { x += NativeControlStyles.metric(DesignMetrics.Role.NATIVE_MENU_ARROW_GAP); arrow.paintIcon(button, g, x, (button.getHeight() - arrow.getIconHeight()) / 2); }
         } finally { g.dispose(); }
     }
 
@@ -53,7 +54,7 @@ public final class NativeChromePainting {
             g.setColor(palette.color(SemanticColor.BORDER_INPUT));
             g.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);
             if (collapsed) { search.paintIcon(component, g, (width - search.getIconWidth()) / 2, (height - search.getIconHeight()) / 2); return; }
-            int pad = NativeControlStyles.metric(DesignMetrics.Role.BUTTON_GAP), gap = NativeControlStyles.metric(DesignMetrics.Role.ICON_GAP), x = pad;
+            int pad = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_PADDING), gap = NativeControlStyles.metric(DesignMetrics.Role.TITLE_SEARCH_GAP), x = pad;
             search.paintIcon(component, g, x, (height - search.getIconHeight()) / 2);
             x += search.getIconWidth() + gap;
             g.setFont(NativeControlStyles.font(Typography.Role.LABEL));

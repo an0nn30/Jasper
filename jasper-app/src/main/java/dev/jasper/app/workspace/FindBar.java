@@ -75,8 +75,8 @@ final class FindBar extends JPanel {
 
     /** IntelliJ's find row: history and toggles inside the field, then count, arrows and a far-right close. */
     private void build() {
-        setLayout(new BorderLayout(NativeControlStyles.metric(DesignMetrics.Role.ICON_GAP), 0));
-        setBorder(BorderFactory.createEmptyBorder(NativeControlStyles.metric(DesignMetrics.Role.FIND_TOP_PADDING), NativeControlStyles.metric(DesignMetrics.Role.ICON_GAP), NativeControlStyles.metric(DesignMetrics.Role.FIND_BOTTOM_PADDING), NativeControlStyles.metric(DesignMetrics.Role.ICON_GAP)));
+        setLayout(new BorderLayout(NativeControlStyles.metric(DesignMetrics.Role.FIND_GAP), 0));
+        setBorder(BorderFactory.createEmptyBorder(NativeControlStyles.metric(DesignMetrics.Role.FIND_TOP_PADDING), NativeControlStyles.metric(DesignMetrics.Role.FIND_SIDE_PADDING), NativeControlStyles.metric(DesignMetrics.Role.FIND_BOTTOM_PADDING), NativeControlStyles.metric(DesignMetrics.Role.FIND_SIDE_PADDING)));
         JButton history = iconButton("findHistory", "Recent searches", "Recent searches", "SEARCH_HISTORY", null);
         history.addActionListener(event -> recentMenu().show(history, 0, history.getHeight()));
         configure(clear, "clearFind", "Clear search", "Clear search", "CLOSE");
@@ -89,15 +89,15 @@ final class FindBar extends JPanel {
         trailing.add(clear); trailing.addSeparator(); trailing.add(caseSensitive); trailing.add(regex);
         query.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_COMPONENT, history);
         query.putClientProperty(FlatClientProperties.TEXT_FIELD_TRAILING_COMPONENT, trailing);
-        NativeControlStyles.field(query, () -> ThemeZone.theme(this));
+        NativeControlStyles.borderlessField(query, () -> ThemeZone.theme(this));
         count.setName("findCount");
         NativeControlStyles.label(count, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY, () -> ThemeZone.theme(this));
-        var controls = new JPanel(new FlowLayout(FlowLayout.LEADING, NativeControlStyles.metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), 0));
+        var controls = new JPanel(new FlowLayout(FlowLayout.LEADING, NativeControlStyles.metric(DesignMetrics.Role.FIND_CONTROL_GAP), 0));
         controls.setOpaque(false);
         controls.add(count);
         controls.add(iconButton("previousMatch", "Previous", "Previous match (Shift+Enter)", "PREVIOUS_MATCH", this::previous));
         controls.add(iconButton("nextMatch", "Next", "Next match (Enter)", "NEXT_MATCH", this::next));
-        controls.add(Box.createHorizontalStrut(NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL)));
+        controls.add(Box.createHorizontalStrut(NativeControlStyles.metric(DesignMetrics.Role.FIND_CLOSE_SPACER)));
         controls.add(iconButton("closeFind", "Close", "Close (Escape)", "CLOSE", this::close));
         add(query, BorderLayout.CENTER);
         add(controls, BorderLayout.EAST);

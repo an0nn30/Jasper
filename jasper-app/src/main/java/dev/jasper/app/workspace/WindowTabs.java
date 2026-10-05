@@ -131,8 +131,8 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         float shade = owner.theme().workspace().dark() ? .78f : .94f;
         setBackground(new Color(Math.round(background.getRed() * shade), Math.round(background.getGreen() * shade),
             Math.round(background.getBlue() * shade)));
-        list.setIcon(AppIcons.forBackground(AppIcons.named("DROPDOWN"), getBackground()));
-        add.setIcon(AppIcons.forBackground(AppIcons.named("ADD"), getBackground()));
+        list.setIcon(AppIcons.forSurface(AppIcons.named("DROPDOWN"), getBackground(), owner.theme().palette().foreground()));
+        add.setIcon(AppIcons.forSurface(AppIcons.named("ADD"), getBackground(), owner.theme().palette().foreground()));
         boolean retitled = false;
         for (Component tab : order) retitled |= entries.get(tab).refresh();
         // A tab that grows can push the selected tab out; keep it shown if it was shown.
@@ -167,7 +167,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         if (disposed) return;
         settle(); doLayout();
         double distance = event.getPreciseWheelRotation() * (event.getScrollType() == MouseWheelEvent.WHEEL_BLOCK_SCROLL
-            ? viewport.getWidth() : NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL) * event.getScrollAmount());
+            ? viewport.getWidth() : NativeControlStyles.metric(DesignMetrics.Role.TAB_SCROLL_STEP) * event.getScrollAmount());
         scrollOffset = Math.max(0, Math.min(Math.max(0, contentWidth - viewport.getWidth()), scrollOffset + distance));
         revealSelection = false;
         doLayout(); repaint();
@@ -205,7 +205,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         }
         contentWidth = (int) Math.ceil(total);
         if (revealSelection && selectedWidth > 0) {
-            double margin = selectedWidth + NativeControlStyles.metric(DesignMetrics.Role.TAB_REVEAL_SPACE) <= space ? NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL) : 0;
+            double margin = selectedWidth + NativeControlStyles.metric(DesignMetrics.Role.TAB_REVEAL_SPACE) <= space ? NativeControlStyles.metric(DesignMetrics.Role.TAB_REVEAL_MARGIN) : 0;
             if (selectedStart - margin < scrollOffset || selectedWidth > space) scrollOffset = selectedStart - margin;
             else if (selectedStart + selectedWidth + margin > scrollOffset + space) scrollOffset = selectedStart + selectedWidth + margin - space;
             // Continue revealing an expanding selected tab until its width has settled.
@@ -297,7 +297,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     /** Fade clipped tabs into the recessed strip; the tab-list button stays outside the viewport. */
     private void paintOverflow(Graphics2D graphics) {
         int width = viewport.getWidth(), height = viewport.getHeight();
-        int fade = Math.min(NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL), width / 2);
+        int fade = Math.min(NativeControlStyles.metric(DesignMetrics.Role.TAB_FADE_WIDTH), width / 2);
         if (fade < 2) return;
         Color surface = getBackground();
         Color clear = new Color(surface.getRed(), surface.getGreen(), surface.getBlue(), 0);
@@ -500,7 +500,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                     Point start = origin; origin = null;
                     if (disposed || start == null || !SwingUtilities.isLeftMouseButton(event)) return;
                     Point end = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
-                    if (start.distance(end) <= NativeControlStyles.metric(DesignMetrics.Role.DOCK_DRAG_THRESHOLD) || !viewport.getBounds().contains(end)) return;
+                    if (start.distance(end) <= NativeControlStyles.metric(DesignMetrics.Role.TAB_REORDER_THRESHOLD) || !viewport.getBounds().contains(end)) return;
                     settle(); doLayout();
                     for (int i = 0; i < order.size(); i++) {
                         Entry target = entries.get(order.get(i));
@@ -541,9 +541,10 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             String tip = capped(owner.tabTooltip(tab));
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
             Color surface = tab == selected ? owner.theme().palette().background() : WindowTabs.this.getBackground();
-            select.setIcon(tab == selected ? AppIcons.forBackground(owner.tabIcon(tab), surface) : null);
-            close.setIcon(AppIcons.forBackground(AppIcons.named("CLOSE"), surface));
-            close.setRolloverIcon(AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface));
+            Color ink = owner.theme().palette().foreground();
+            select.setIcon(tab == selected ? AppIcons.forSurface(owner.tabIcon(tab), surface, ink) : null);
+            close.setIcon(AppIcons.forSurface(AppIcons.named("CLOSE"), surface, ink));
+            close.setRolloverIcon(AppIcons.forSurface(AppIcons.named("CLOSE_HOVERED"), surface, ink));
             select.setSelected(tab == selected);
             select.setFont(ThemeZone.font(Typography.Role.BODY));
             select.setForeground(tab == selected ? owner.theme().palette().foreground()
@@ -563,7 +564,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         }
 
         @Override public void doLayout() {
-            int edge = UIScale.scale(EDGE), closeWidth = Math.min(NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL), getWidth());
+            int edge = UIScale.scale(EDGE), closeWidth = Math.min(NativeControlStyles.metric(DesignMetrics.Role.TAB_CLOSE_WIDTH), getWidth());
             int closeX = Math.max(0, getWidth() - edge - closeWidth);
             close.setBounds(closeX, 0, closeWidth, getHeight());
             // Reserve the icon's space even on plain inactive labels, so selecting never changes the tab width.

@@ -68,8 +68,20 @@ public final class AppIcons {
         return Objects.requireNonNull(AppIcons.class.getClassLoader().getResource(BASE + NamedIcons.id(name) + ".svg"), name);
     }
 
-    /** Select authored host artwork for an independently coloured surface; custom icons stay intact. */
-    public static Icon forBackground(Icon icon, Color background) {
+    /**
+     * Artwork for an independently coloured surface: authored host artwork selects its light/dark variant, and a
+     * named module icon is tinted for that surface from the route's primary text. Custom icons stay intact.
+     */
+    public static Icon forBackground(Icon icon, Color background) { return forSurface(icon, background, null); }
+
+    /**
+     * As {@link #forBackground}, with the surface's own foreground (for example the terminal palette's text on a
+     * folder tab) as the named icon's tint; the module holds it to the non-text contrast floor on that surface.
+     */
+    public static Icon forSurface(Icon icon, Color background, Color foregroundOrNull) {
+        Objects.requireNonNull(background, "background");
+        if (icon instanceof SemanticIcon named) return new SurfaceIcon(named, background, foregroundOrNull);
+        if (icon instanceof SurfaceIcon surface) return new SurfaceIcon(surface.icon(), background, foregroundOrNull);
         if (!(icon instanceof ZoneIcon zone)) return icon;
         boolean dark = (.2126 * background.getRed() + .7152 * background.getGreen()
             + .0722 * background.getBlue()) < 128;
@@ -126,6 +138,23 @@ public final class AppIcons {
                 if (disabled) g.setComposite(java.awt.AlphaComposite.SrcOver.derive(.42f));
                 NAMED.icon(name, ThemeZone.theme(component).semantic(), SemanticColor.TEXT_PRIMARY,
                     getIconWidth()).paintIcon(component, g, x, y);
+            } finally { g.dispose(); }
+        }
+    }
+
+    /** A named icon tinted for one explicit surface; value equality keeps repeated refreshes event-free. */
+    private record SurfaceIcon(SemanticIcon icon, Color surface, Color foreground) implements Icon, DisabledIconProvider {
+        @Override public Icon getDisabledIcon() {
+            return new SurfaceIcon((SemanticIcon) icon.getDisabledIcon(), surface, foreground);
+        }
+        @Override public int getIconWidth() { return icon.getIconWidth(); }
+        @Override public int getIconHeight() { return icon.getIconHeight(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                if (icon.disabled()) g.setComposite(java.awt.AlphaComposite.SrcOver.derive(.42f));
+                Color base = foreground != null ? foreground : ThemeZone.color(component, SemanticColor.TEXT_PRIMARY);
+                NAMED.icon(icon.name(), surface, base, getIconWidth()).paintIcon(component, g, x, y);
             } finally { g.dispose(); }
         }
     }

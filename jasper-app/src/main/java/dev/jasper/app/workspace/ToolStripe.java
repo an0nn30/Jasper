@@ -104,7 +104,7 @@ final class ToolStripe extends JPanel {
     private static void style(AbstractButton button) {
         button.setHideActionText(true);
         button.setText(null);
-        NativeControlStyles.button(button, () -> ThemeZone.theme(button));
+        NativeControlStyles.button(button, () -> ThemeZone.theme(button), DesignMetrics.Role.RAIL_BUTTON_ARC);
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setFocusable(false);
     }

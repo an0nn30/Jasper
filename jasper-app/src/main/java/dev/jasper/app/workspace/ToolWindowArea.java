@@ -222,6 +222,10 @@ final class ToolWindowArea extends JPanel {
     Runnable onMinimumSizeChanged = () -> { };
     BiConsumer<String, Slot> onMove = (id, slot) -> { };
     Consumer<String> onHide = id -> { };
+    /** Shows a borrowed kit header's Options menu under its button; a header that is not showing opens nothing. */
+    BiConsumer<JComponent, javax.swing.JPopupMenu> showOptions = (anchor, menu) -> {
+        if (anchor.isShowing()) menu.show(anchor, 0, anchor.getHeight());
+    };
     /** Hears of each header a sync creates (and its title label), so that a drag can start from it. */
     BiConsumer<JComponent, String> dragSource = (component, id) -> { };
     Consumer<JComponent> releaseDragSource = component -> { };
@@ -313,7 +317,10 @@ final class ToolWindowArea extends JPanel {
                 }
                 if (wanted.component() instanceof dev.jasper.ui.swing.KitView view) {
                     var release = host.releaseHeader;
-                    java.beans.PropertyChangeListener changed = event -> sync();
+                    Host mounted = host;
+                    // Plugin views update often (progress, switches, chips). Only a different borrowed header, or a
+                    // closed view, changes the dock frame; content-only updates must not relayout the whole area.
+                    java.beans.PropertyChangeListener changed = event -> { if (mounted.borrowedHeader != kitHeader(view)) sync(); };
                     view.addPropertyChangeListener("viewSpec", changed);
                     host.releaseHeader = () -> { view.removePropertyChangeListener("viewSpec", changed); release.run(); };
                 }
@@ -346,9 +353,9 @@ final class ToolWindowArea extends JPanel {
             new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", "collapse", ghost, "host.hide", "Hide")), event -> {
                 if (event instanceof dev.jasper.ui.model.UiEvent.Action action) {
                     if (action.id().equals("host.hide")) onHide.accept(id);
-                    else if (action.id().equals("host.options") && header.isShowing())
-                        ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
-                            slot -> onMove.accept(id, slot), () -> onHide.accept(id)).show(header, header.getWidth(), header.getHeight());
+                    else if (action.id().equals("host.options"))
+                        showOptions.accept(optionsAnchor(header), ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
+                            slot -> onMove.accept(id, slot), () -> onHide.accept(id)));
                 }
             });
         return () -> {
@@ -358,6 +365,18 @@ final class ToolWindowArea extends JPanel {
                     && current.id().equals(panel) && view.panelHeader(panel) == header)
                 view.setPanelHostActions(panel, List.of(), event -> {});
         };
+    }
+
+    /** The host Options button inside a borrowed header, so the menu opens under it; the header itself otherwise. */
+    private static JComponent optionsAnchor(JComponent header) {
+        for (var child : header.getComponents()) {
+            if (child instanceof javax.swing.AbstractButton button && "Options".equals(button.getToolTipText())) return button;
+            if (child instanceof JComponent nested) {
+                JComponent found = optionsAnchor(nested);
+                if (found != nested) return found;
+            }
+        }
+        return header;
     }
 
     private static void collectHeaderSources(JComponent component, java.util.List<JComponent> sources) {

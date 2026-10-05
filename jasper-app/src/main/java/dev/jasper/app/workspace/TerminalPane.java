@@ -201,12 +201,12 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         setBackground(ThemeZone.color(null, SemanticColor.SURFACE_PANEL));
         noticeLabel.putClientProperty("html.disable", Boolean.TRUE);
         NativeControlStyles.label(noticeLabel, dev.jasper.ui.metrics.Typography.Role.LABEL, SemanticColor.TEXT_PRIMARY, () -> ThemeZone.theme(this));
-        var buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, NativeControlStyles.metric(DesignMetrics.Role.BUTTON_GAP), 0));
+        var buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, NativeControlStyles.metric(DesignMetrics.Role.NOTICE_BUTTON_GAP), 0));
         buttons.setOpaque(false);
         buttons.add(noticeSecondary); buttons.add(noticePrimary);
-        notice.setBorder(NativeControlStyles.padding(DesignMetrics.Role.BUTTON_GAP, DesignMetrics.Role.COLUMN_GAP));
-        NativeControlStyles.button(noticePrimary, () -> ThemeZone.theme(this));
-        NativeControlStyles.button(noticeSecondary, () -> ThemeZone.theme(this));
+        notice.setBorder(NativeControlStyles.padding(DesignMetrics.Role.NOTICE_VERTICAL_PADDING, DesignMetrics.Role.NOTICE_HORIZONTAL_PADDING));
+        NativeControlStyles.framedButton(noticePrimary, () -> ThemeZone.theme(this));
+        NativeControlStyles.framedButton(noticeSecondary, () -> ThemeZone.theme(this));
         notice.add(noticeLabel, BorderLayout.CENTER);
         notice.add(buttons, BorderLayout.EAST);
         noticePrimary.addActionListener(event -> primaryAction.run());

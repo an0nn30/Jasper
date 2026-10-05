@@ -36,20 +36,45 @@ public final class NativeControlStyles {
     public static javax.swing.border.Border padding(DesignMetrics.Role vertical, DesignMetrics.Role horizontal) {
         return BorderFactory.createEmptyBorder(metric(vertical), metric(horizontal), metric(vertical), metric(horizontal));
     }
-    /** Compact ghost action; existing action/model and focus policy remain host-owned. */
-    public static void button(AbstractButton button, Supplier<GeneratedTheme> theme) {
+    /**
+     * Compact ghost toolbar action: module role colors only. The host's existing arc and toolbar margins are kept;
+     * action/model and focus policy remain host-owned.
+     */
+    public static void button(AbstractButton button, Supplier<GeneratedTheme> theme) { ghost(button, theme, null); }
+    /** Ghost toolbar action with a named, preserved native arc (for example the tool-window rail's 10). */
+    public static void button(AbstractButton button, Supplier<GeneratedTheme> theme, DesignMetrics.Role arc) {
+        ghost(button, theme, java.util.Objects.requireNonNull(arc));
+    }
+    private static void ghost(AbstractButton button, Supplier<GeneratedTheme> theme, DesignMetrics.Role arc) {
         bind(button, () -> {
             var palette = theme.get().semantic();
             button.setFont(font(Typography.Role.LABEL));
             button.setForeground(palette.color(SemanticColor.TEXT_SECONDARY));
             button.setOpaque(false);
             button.putClientProperty("JButton.buttonType", "toolBarButton");
+            var style = new java.util.LinkedHashMap<String, Object>();
+            if (arc != null) style.put("arc", DesignMetrics.DEFAULT.value(arc));
+            style.put("toolbar.hoverBackground", ColorMath.opacity(palette.color(SemanticColor.HOVER_OVERLAY), .08));
+            style.put("toolbar.pressedBackground", palette.color(SemanticColor.SURFACE_CONTROL_HOVER));
+            style.put("toolbar.selectedBackground", palette.color(SemanticColor.SEGMENT_SELECTED_BG));
+            button.putClientProperty("FlatLaf.style", Map.copyOf(style));
+        });
+    }
+    /**
+     * Standard framed command (the kit's secondary kind): module role colors; the host keeps the look and feel's
+     * button arc, margin, font and focus behavior. Native framed commands stay framed until Plan 3 Task 10.
+     */
+    public static void framedButton(AbstractButton button, Supplier<GeneratedTheme> theme) {
+        bind(button, () -> {
+            var palette = theme.get().semantic();
+            button.putClientProperty("JButton.buttonType", null);
+            button.setContentAreaFilled(true); button.setBorderPainted(true);
+            button.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
             button.putClientProperty("FlatLaf.style", Map.of(
-                "arc", DesignMetrics.DEFAULT.value(DesignMetrics.Role.CONTROL_RADIUS) * 2,
-                "toolbar.hoverBackground", ColorMath.opacity(palette.color(SemanticColor.HOVER_OVERLAY), .08),
-                "toolbar.pressedBackground", palette.color(SemanticColor.SURFACE_CONTROL_HOVER),
-                "toolbar.selectedBackground", palette.color(SemanticColor.SEGMENT_SELECTED_BG)));
-            button.setMargin(new Insets(0, 0, 0, 0));
+                "background", palette.color(SemanticColor.BUTTON_SECONDARY_BG),
+                "hoverBackground", palette.color(SemanticColor.BUTTON_SECONDARY_BG_HOVER),
+                "borderColor", palette.color(SemanticColor.BORDER_CONTROL),
+                "focusedBorderColor", palette.color(SemanticColor.BORDER_FOCUS)));
         });
     }
     /** Native informational label; text and accessibility remain host-owned. */
@@ -68,15 +93,13 @@ public final class NativeControlStyles {
             text.setSelectedTextColor(palette.color(SemanticColor.TEXT_ONACCENT));
         });
     }
-    /** Native menu presentation; keyboard routing and actions remain owned by the host. */
+    /** Native menu presentation (colors and typography); keyboard routing, actions and look-and-feel margins stay with the host. */
     public static void menu(JMenuItem item, Supplier<GeneratedTheme> theme) {
         bind(item, () -> {
             var palette = theme.get().semantic();
             item.setFont(font(Typography.Role.LABEL));
             item.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
             item.setBackground(palette.color(SemanticColor.SURFACE_MENU));
-            item.setMargin(new Insets(metric(DesignMetrics.Role.MENU_PADDING), metric(DesignMetrics.Role.MENU_ITEM_PADDING),
-                metric(DesignMetrics.Role.MENU_PADDING), metric(DesignMetrics.Role.MENU_ITEM_PADDING)));
             item.putClientProperty("FlatLaf.style", Map.of("selectionBackground", palette.color(SemanticColor.SELECTION_BG),
                 "selectionForeground", palette.color(SemanticColor.TEXT_ONACCENT)));
         });
@@ -89,20 +112,25 @@ public final class NativeControlStyles {
             if (child instanceof JMenu menu) menuTree(menu.getPopupMenu(), theme);
         }
     }
-    /** Standard text field, retaining its document/caret/input behavior. */
-    public static void field(JTextField field, Supplier<GeneratedTheme> theme) {
+    /**
+     * Borderless in-row field (the find bar's query): module colors and typography with the existing zero border
+     * and focus widths, so the row keeps its native height and has no focus ring until Plan 3 Task 10.
+     */
+    public static void borderlessField(JTextField field, Supplier<GeneratedTheme> theme) {
         bind(field, () -> {
-            var palette = theme.get().semantic();
-            field.setFont(font(Typography.Role.LABEL));
-            field.setBackground("error".equals(field.getClientProperty("JComponent.outline"))
-                ? theme.get().tokens().get(Token.ERROR_BACKGROUND) : palette.color(SemanticColor.SURFACE_INPUT));
-            field.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
-            field.setCaretColor(palette.color(SemanticColor.TEXT_PRIMARY));
-            field.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));
-            field.setSelectedTextColor(palette.color(SemanticColor.TEXT_ONACCENT));
-            field.putClientProperty("FlatLaf.style", Map.of("arc", DesignMetrics.DEFAULT.value(DesignMetrics.Role.CONTROL_RADIUS) * 2,
-                "borderColor", palette.color(SemanticColor.BORDER_INPUT), "focusedBorderColor", palette.color(SemanticColor.BORDER_FOCUS)));
+            fieldColors(field, theme.get());
+            field.putClientProperty("FlatLaf.style", "borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
         });
+    }
+    private static void fieldColors(JTextField field, GeneratedTheme theme) {
+        var palette = theme.semantic();
+        field.setFont(font(Typography.Role.LABEL));
+        field.setBackground("error".equals(field.getClientProperty("JComponent.outline"))
+            ? theme.tokens().get(Token.ERROR_BACKGROUND) : palette.color(SemanticColor.SURFACE_INPUT));
+        field.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
+        field.setCaretColor(palette.color(SemanticColor.TEXT_PRIMARY));
+        field.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));
+        field.setSelectedTextColor(palette.color(SemanticColor.TEXT_ONACCENT));
     }
     /** Reapply native adapter roles after either a LAF refresh or a workspace-only appearance update. */
     public static void refresh(JComponent component) {

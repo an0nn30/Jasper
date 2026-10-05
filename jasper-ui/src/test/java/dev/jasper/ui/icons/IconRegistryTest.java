@@ -71,6 +71,18 @@ class IconRegistryTest {
         var image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics(); try { icon.paintIcon(null, g, 0, 0); } finally { g.dispose(); } return image;
     }
+    @Test void surfaceTintKeepsAReadableForegroundAndLiftsAFaintOneToTheNonTextFloor() {
+        var white = new Color(0xfafafa);
+        assertThat(IconRegistry.surfaceTint(white, new Color(0x383a42))).isEqualTo(new Color(0x383a42));
+        var lifted = IconRegistry.surfaceTint(white, new Color(0xe6edf5));
+        assertThat(ColorMath.contrast(lifted, white)).isGreaterThanOrEqualTo(3);
+        var dark = new Color(0x18202b);
+        assertThat(ColorMath.contrast(IconRegistry.surfaceTint(dark, new Color(0x202734)), dark)).isGreaterThanOrEqualTo(3);
+        try (var registry = new IconRegistry()) {
+            assertThat(pixels(registry.icon("terminal", white, new Color(0xe6edf5), 16))).isPositive();
+        }
+    }
+
     private static int pixels(Icon icon) { var image = paint(icon); int count = 0;
         for(int y = 0; y < image.getHeight(); y++) for(int x = 0; x < image.getWidth(); x++) if((image.getRGB(x,y) >>> 24) > 0) count++;
         return count;

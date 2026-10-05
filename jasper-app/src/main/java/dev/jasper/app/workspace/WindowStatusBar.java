@@ -279,7 +279,7 @@ final class WindowStatusBar extends JPanel {
         var copy = (Graphics2D) g.create();
         try {
             copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int size = NativeControlStyles.metric(DesignMetrics.Role.STATUS_ITEM_GAP);
+            int size = NativeControlStyles.metric(DesignMetrics.Role.STATUS_RUNNING_DOT);
             copy.fillOval(NativeControlStyles.metric(DesignMetrics.Role.STATUS_GAP), (getHeight() - size) / 2, size, size);
         } finally { copy.dispose(); }
     }

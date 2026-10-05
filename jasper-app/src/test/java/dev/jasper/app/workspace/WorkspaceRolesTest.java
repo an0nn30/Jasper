@@ -15,7 +15,7 @@ class WorkspaceRolesTest {
     @Test void nativeSearchKeepsItsDocumentCaretAndSelectionAcrossAnAppearanceRefresh() {
         ThemeManager.install(Theme.DARK);
         var field = new JTextField("pending query");
-        dev.jasper.ui.swing.NativeControlStyles.field(field, () -> dev.jasper.app.platform.ThemeZone.theme(field));
+        dev.jasper.ui.swing.NativeControlStyles.borderlessField(field, () -> dev.jasper.app.platform.ThemeZone.theme(field));
         var document = field.getDocument(); field.select(2, 7);
         ThemeManager.install(Theme.JASPER_LIGHT);
         SwingUtilities.updateComponentTreeUI(field);

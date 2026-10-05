@@ -66,6 +66,42 @@ class AppIconsTest {
         });
     }
 
+    /**
+     * Folder tabs paint on the independent terminal palette, not the chrome/workspace route. A named (module-tinted)
+     * icon placed there is tinted for that surface: the surface's own foreground, held to the 3:1 non-text floor.
+     */
+    @Test void namedIconsOnAnIndependentlyColouredSurfaceAreTintedForThatSurface() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController(Theme.DARK);
+            try {
+                var named = AppIcons.named("TERMINAL");
+                int[] chrome = IntellijIconsTest.pixels(named);
+                var lightTerminal = new java.awt.Color(0xfafafa);
+                var terminalText = new java.awt.Color(0x383a42);
+                for (var tinted : java.util.List.of(AppIcons.forSurface(named, lightTerminal, terminalText),
+                        AppIcons.forBackground(named, lightTerminal))) {
+                    int[] pixels = IntellijIconsTest.pixels(tinted);
+                    assertThat(pixels).as("not the dark chrome route's light glyph").isNotEqualTo(chrome);
+                    var stroke = stroke(pixels);
+                    assertThat(dev.jasper.ui.theme.ColorMath.contrast(stroke, lightTerminal)).isGreaterThanOrEqualTo(3);
+                }
+                assertThat(stroke(IntellijIconsTest.pixels(AppIcons.forSurface(named, lightTerminal, terminalText))))
+                    .as("the surface's own foreground when it already reads").isEqualTo(terminalText);
+                assertThat(IntellijIconsTest.pixels(named)).as("the shared icon keeps the chrome route").isEqualTo(chrome);
+                var disabled = (javax.swing.Icon) ((com.formdev.flatlaf.FlatLaf.DisabledIconProvider)
+                    AppIcons.forSurface(named, lightTerminal, terminalText)).getDisabledIcon();
+                assertThat(disabled.getIconWidth()).isEqualTo(16);
+            } finally { themes.close(); new ThemeController(); }
+        });
+    }
+
+    private static java.awt.Color stroke(int[] pixels) {
+        int best = 0;
+        for (int pixel : pixels) if ((pixel >>> 24) > (best >>> 24)) best = pixel;
+        assertThat(best >>> 24).as("the glyph paints").isPositive();
+        return new java.awt.Color(best & 0xffffff);
+    }
+
     @Test void bundledIconsKeepFlatLafDisabledRendering() throws Exception {
         edt(() -> {
             new ThemeController(dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT);

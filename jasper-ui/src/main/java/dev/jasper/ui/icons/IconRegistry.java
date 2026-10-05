@@ -31,6 +31,21 @@ public final class IconRegistry implements AutoCloseable {
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
         return painted(name, palette.color(tint), null, logicalSize, false);
     }
+    /**
+     * Artwork on a surface outside the semantic palette (for example an independently coloured terminal surface):
+     * the surface's own foreground, moved toward black or white until it reaches the 3:1 non-text contrast floor.
+     */
+    public Icon icon(String name, Color surface, Color foreground, int logicalSize) {
+        return painted(name, surfaceTint(surface, foreground), null, logicalSize, false);
+    }
+    /** The tint {@link #icon(String, Color, Color, int)} paints; one module rule for surface-tinted artwork. */
+    public static Color surfaceTint(Color surface, Color foreground) {
+        Objects.requireNonNull(surface); Objects.requireNonNull(foreground);
+        Color extreme = ColorMath.contrast(Color.WHITE, surface) >= ColorMath.contrast(Color.BLACK, surface) ? Color.WHITE : Color.BLACK;
+        Color opaque = new Color(foreground.getRGB() & 0xffffff);
+        return ColorMath.contrast(opaque, surface) >= SURFACE_FLOOR ? opaque : ColorMath.readable(opaque, surface, SURFACE_FLOOR, extreme);
+    }
+    private static final double SURFACE_FLOOR = 3;
     /** Category tile. Selected treatment is shared across list/menu renderers, applied to base alpha exactly once. */
     public Icon tile(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize, boolean selected) {
         Color foreground = selected ? palette.color(SemanticColor.TEXT_ONACCENT) : tint(palette, hue);

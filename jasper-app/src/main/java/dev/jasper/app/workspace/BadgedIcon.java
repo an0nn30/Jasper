@@ -40,7 +40,7 @@ final class BadgedIcon implements Icon {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int dot = NativeControlStyles.metric(DesignMetrics.Role.STATUS_DOT), ring = NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE);
+            int dot = NativeControlStyles.metric(DesignMetrics.Role.RAIL_BADGE_DOT), ring = NativeControlStyles.metric(DesignMetrics.Role.HAIRLINE);
             int left = x + getIconWidth() - dot;
             Color rail = ThemeZone.color(null, SemanticColor.SURFACE_APP);
             if (rail != null) {

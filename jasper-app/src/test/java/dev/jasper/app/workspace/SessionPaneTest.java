@@ -187,6 +187,10 @@ class SessionPaneTest {
             assertThat(first.closes).as("closed before Reconnect is offered").hasValue(1);
             assertThat(pane.noticePrimary().getText()).isEqualTo("Reconnect");
             assertThat(pane.noticeSecondary().getText()).isEqualTo("Close");
+            for (var button : new javax.swing.JButton[]{pane.noticePrimary(), pane.noticeSecondary()}) {
+                assertThat(button.getClientProperty("JButton.buttonType")).as("notice commands stay framed buttons").isNull();
+                assertThat(button.isContentAreaFilled()).isTrue();
+            }
             assertThat(pane.snapshot().state()).isEqualTo(PaneSnapshot.State.EXITED);
             assertThat(pane.snapshot().exitStatus()).hasValue(3);
             pane.noticePrimary().doClick();

@@ -111,13 +111,15 @@ class FindBarModernTest {
                 assertThat(query.getForeground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.TEXT));
                 assertThat(query.getSelectionColor()).isEqualTo(themes.current().workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.SELECTION_BG));
                 assertThat(bar[0].getBackground()).isEqualTo(tokens.get(dev.jasper.ui.theme.Token.SURFACE));
-                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
+                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isEqualTo(ghostStyle(bar[0].caseButton()));
+                assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
                 themes.configureTerminal(dev.jasper.app.config.TerminalColors.MATCH);
                 WorkspaceTheme.apply(bar[0], themes.current()); bar[0].refreshTheme();
                 assertThat(query.getBackground()).isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
                 assertThat(query.getForeground()).isEqualTo(UIManager.getColor("TextField.foreground"));
-                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
-                assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isInstanceOf(java.util.Map.class);
+                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.STYLE)).isEqualTo(ghostStyle(bar[0].caseButton()));
+                assertThat(bar[0].caseButton().getClientProperty(FlatClientProperties.BUTTON_TYPE)).isEqualTo(FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+                assertThat(query.getClientProperty(FlatClientProperties.STYLE)).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
                 bar[0].caseButton().doClick();
             });
             until(() -> bar[0].result().count() == 2);
@@ -157,5 +159,14 @@ class FindBarModernTest {
             if (child instanceof Container nested) names.addAll(names(nested));
         }
         return names;
+    }
+
+    /** The module ghost toolbar recipe for the button's live route: role colors only, no arc or margin override. */
+    private static java.util.Map<String, Object> ghostStyle(JComponent button) {
+        var palette = dev.jasper.app.platform.ThemeZone.theme(button).semantic();
+        return java.util.Map.of(
+            "toolbar.hoverBackground", dev.jasper.ui.theme.ColorMath.opacity(palette.color(dev.jasper.ui.theme.SemanticColor.HOVER_OVERLAY), .08),
+            "toolbar.pressedBackground", palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER),
+            "toolbar.selectedBackground", palette.color(dev.jasper.ui.theme.SemanticColor.SEGMENT_SELECTED_BG));
     }
 }

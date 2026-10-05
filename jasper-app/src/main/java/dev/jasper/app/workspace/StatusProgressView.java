@@ -81,7 +81,7 @@ final class StatusProgressView extends JPanel {
     @Override public Dimension getPreferredSize() {
         return new Dimension(Math.min(NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_MAX_WIDTH), main.getPreferredSize().width + NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_RESERVE)
             + (secondary.isVisible() ? secondary.getPreferredSize().width + NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_GAP) : 0)),
-            Math.max(NativeControlStyles.metric(DesignMetrics.Role.PANEL_ACTION), Math.max(main.getPreferredSize().height, secondary.getPreferredSize().height)));
+            Math.max(NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_MIN_HEIGHT), Math.max(main.getPreferredSize().height, secondary.getPreferredSize().height)));
     }
     @Override public Dimension getMinimumSize() { return new Dimension(0, getPreferredSize().height); }
     @Override public void doLayout() {
@@ -92,7 +92,7 @@ final class StatusProgressView extends JPanel {
         int progress = Math.min(NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_WIDTH), remaining / 3);
         int gap = progress > 0 ? Math.min(NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_GAP), remaining - progress) : 0;
         main.setBounds(0, 0, Math.max(0, remaining - progress - gap), height);
-        int barHeight = Math.min(height, NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_GAP));
+        int barHeight = Math.min(height, NativeControlStyles.metric(DesignMetrics.Role.STATUS_PROGRESS_BAR_HEIGHT));
         bar.setBounds(remaining - progress, (height - barHeight) / 2, progress, barHeight);
     }
 }

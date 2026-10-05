@@ -666,6 +666,10 @@ class ConfigurationControllerTest {
         });
         assertThat(shown).hasSize(1);
         var button = find(shown.getFirst(), "configuration.migrate");
+        edt(() -> {
+            assertThat(button.getClientProperty("JButton.buttonType")).as("Migrate Config stays a framed button").isNull();
+            assertThat(((javax.swing.AbstractButton) button).isContentAreaFilled()).isTrue();
+        });
         edt(button::doClick);
         until(() -> !infos.isEmpty());
         assertThat(infos).containsExactly("Migrate Config: Migrated 1 old setting to the new layout. Backup: config.toml.v1.bak.");

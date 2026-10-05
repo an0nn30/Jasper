@@ -91,7 +91,7 @@ final class PathBreadcrumbs extends JPanel {
         for (var label : labels) { label.setFont(ThemeZone.font(Typography.Role.LABEL)); label.setForeground(ThemeZone.color(null, SemanticColor.TEXT_SECONDARY)); }
         ellipsis.setFont(ThemeZone.font(Typography.Role.LABEL)); ellipsis.setForeground(ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
     }
-    @Override public Dimension getMinimumSize() { return new Dimension(0, NativeControlStyles.metric(DesignMetrics.Role.ICON_RAIL)); }
+    @Override public Dimension getMinimumSize() { return new Dimension(0, NativeControlStyles.metric(DesignMetrics.Role.BREADCRUMB_COLLAPSED_HEIGHT)); }
     @Override public Dimension getPreferredSize() {
         int height = labels.stream().mapToInt(label -> label.getPreferredSize().height).max().orElse(0);
         return new Dimension(width(labels), Math.max(NativeControlStyles.metric(DesignMetrics.Role.BREADCRUMB_MIN_HEIGHT), height));

@@ -1,0 +1,118 @@
+package dev.jasper.ui.swing;
+
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.testsupport.*;
+import dev.jasper.ui.theme.*;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.Map;
+import javax.swing.*;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** Native adapter recipes consume module colors without changing the host's existing geometry or button kind. */
+class NativeControlStylesTest {
+    @Test void ghostToolbarRecipeAddsRoleColorsButKeepsTheHostsArcAndMargin() {
+        Edt.run(() -> {
+            var theme = KitFixtures.dark();
+            var palette = theme.semantic();
+            var button = new JButton();
+            Insets margin = button.getMargin();
+            NativeControlStyles.button(button, () -> theme);
+            assertThat(button.getClientProperty("JButton.buttonType")).isEqualTo("toolBarButton");
+            assertThat(button.getMargin()).as("toolbar margins stay the look and feel's").isEqualTo(margin).isInstanceOf(javax.swing.plaf.UIResource.class);
+            assertThat(button.getClientProperty("FlatLaf.style")).isEqualTo(Map.of(
+                "toolbar.hoverBackground", ColorMath.opacity(palette.color(SemanticColor.HOVER_OVERLAY), .08),
+                "toolbar.pressedBackground", palette.color(SemanticColor.SURFACE_CONTROL_HOVER),
+                "toolbar.selectedBackground", palette.color(SemanticColor.SEGMENT_SELECTED_BG)));
+            var rail = new JButton();
+            NativeControlStyles.button(rail, () -> theme, DesignMetrics.Role.RAIL_BUTTON_ARC);
+            assertThat(((Map<?, ?>) rail.getClientProperty("FlatLaf.style")).get("arc")).isEqualTo(10);
+        });
+    }
+
+    @Test void borderlessFieldKeepsZeroBorderAndFocusWidthsAcrossDelegateChanges() {
+        Edt.run(() -> {
+            var theme = KitFixtures.light();
+            var palette = theme.semantic();
+            var field = new JTextField("query");
+            NativeControlStyles.borderlessField(field, () -> theme);
+            SwingUtilities.updateComponentTreeUI(field);
+            assertThat(field.getClientProperty("FlatLaf.style")).isEqualTo("borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
+            assertThat(field.getBackground()).isEqualTo(palette.color(SemanticColor.SURFACE_INPUT));
+            assertThat(field.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_PRIMARY));
+            assertThat(field.getSelectionColor()).isEqualTo(palette.color(SemanticColor.SELECTION_BG));
+        });
+    }
+
+    @Test void framedButtonIsAStandardSecondaryButtonWithTheHostsFontAndMargin() {
+        Edt.run(() -> {
+            var theme = KitFixtures.dark();
+            var palette = theme.semantic();
+            var button = new JButton("Reconnect");
+            Font font = button.getFont(); Insets margin = button.getMargin();
+            NativeControlStyles.framedButton(button, () -> theme);
+            assertThat(button.getClientProperty("JButton.buttonType")).as("framed, not a toolbar ghost").isNull();
+            assertThat(button.isContentAreaFilled()).isTrue();
+            assertThat(button.isBorderPainted()).isTrue();
+            assertThat(button.getFont()).isSameAs(font);
+            assertThat(button.getMargin()).isEqualTo(margin).isInstanceOf(javax.swing.plaf.UIResource.class);
+            assertThat(button.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_PRIMARY));
+            assertThat(button.getClientProperty("FlatLaf.style")).isEqualTo(Map.of(
+                "background", palette.color(SemanticColor.BUTTON_SECONDARY_BG),
+                "hoverBackground", palette.color(SemanticColor.BUTTON_SECONDARY_BG_HOVER),
+                "borderColor", palette.color(SemanticColor.BORDER_CONTROL),
+                "focusedBorderColor", palette.color(SemanticColor.BORDER_FOCUS)));
+        });
+    }
+
+    @Test void nativeMenuRecipeKeepsTheLookAndFeelMargins() {
+        Edt.run(() -> {
+            var theme = KitFixtures.dark();
+            var item = new JMenuItem("Hide");
+            Insets margin = item.getMargin();
+            NativeControlStyles.menu(item, () -> theme);
+            assertThat(item.getMargin()).isEqualTo(margin).isInstanceOf(javax.swing.plaf.UIResource.class);
+            assertThat(item.getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PRIMARY));
+        });
+    }
+
+    @Test void toolbarCommandKeepsItsSixPixelHoverArcAndThirtyEightPercentDisabledContent() {
+        Edt.run(() -> {
+            var theme = KitFixtures.dark();
+            Icon icon = new Icon() {
+                @Override public void paintIcon(Component c, Graphics g, int x, int y) { g.setColor(Color.RED); g.fillRect(x, y, 16, 16); }
+                @Override public int getIconWidth() { return 16; }
+                @Override public int getIconHeight() { return 16; }
+            };
+            var button = new JButton(icon);
+            button.setSize(40, 24);
+            button.getModel().setRollover(true);
+            var hovered = paint(button, theme);
+            var reference = new BufferedImage(40, 24, BufferedImage.TYPE_INT_ARGB);
+            var g = reference.createGraphics();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(ColorMath.opacity(theme.semantic().color(SemanticColor.HOVER_OVERLAY), .08));
+                g.fillRoundRect(0, 0, 40, 24, 6, 6);
+            } finally { g.dispose(); }
+            for (int y = 0; y < 6; y++) for (int x = 0; x < 6; x++)
+                assertThat(hovered.getRGB(x, y)).as("hover corner %d,%d", x, y).isEqualTo(reference.getRGB(x, y));
+            button.getModel().setRollover(false);
+            button.setEnabled(false);
+            var disabled = paint(button, theme);
+            var expected = new BufferedImage(40, 24, BufferedImage.TYPE_INT_ARGB);
+            var e = expected.createGraphics();
+            try { e.setComposite(AlphaComposite.SrcOver.derive(.38f)); e.setColor(Color.RED); e.fillRect(12, 4, 16, 16); }
+            finally { e.dispose(); }
+            assertThat(disabled.getRGB(20, 12)).as("disabled content at .38").isEqualTo(expected.getRGB(20, 12));
+        });
+    }
+
+    private static BufferedImage paint(AbstractButton button, GeneratedTheme theme) {
+        var image = new BufferedImage(button.getWidth(), button.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { NativeChromePainting.action(button, g, theme, false, null); } finally { g.dispose(); }
+        return image;
+    }
+}

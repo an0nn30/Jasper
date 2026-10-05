@@ -622,7 +622,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             Runnable migrate = migrateConfiguration;
             if (!state.migratable() || migrate == null) { showConfigDiagnostics.accept(scroll); return; }
             var button = new JButton("Migrate Config\u2026");
-            dev.jasper.ui.swing.NativeControlStyles.button(button, () -> ThemeZone.theme(button));
+            dev.jasper.ui.swing.NativeControlStyles.framedButton(button, () -> ThemeZone.theme(button));
             button.setName("configuration.migrate");
             button.setToolTipText("Rewrite old keys in this file to the current layout; the original is backed up first.");
             button.addActionListener(event -> {
