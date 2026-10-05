@@ -1,7 +1,7 @@
 # File Server: share a folder with other computers
 
 File Server is bundled with Jasper. It shares a folder on this computer with other programs and computers, the way
-MobaXterm's Servers window does. This version serves **HTTP, HTTPS, FTP, FTPS and SFTP**; TFTP follows.
+MobaXterm's Servers window does. This version serves **HTTP, HTTPS, FTP, FTPS, SFTP and TFTP**.
 
 ## The File Servers panel
 
@@ -21,7 +21,7 @@ the panel.
 - **This computer only.** *Reachable from* chooses *All networks* or one network interface; the panel then lists
   the addresses others can use. macOS and Windows ask once whether Jasper may accept connections; on macOS, Jasper
   also needs Privacy & Security › Local Network.
-- **Unprivileged ports.** HTTP starts at 8080, FTP at 2121 and SFTP at 2222. On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
+- **Unprivileged ports.** HTTP starts at 8080, FTP at 2121, SFTP at 2222 and TFTP at 6969 (UDP). On Linux, ports below 1024 need root or `CAP_NET_BIND_SERVICE`; the
   editor suggests one 8000 higher.
 - **Jailed.** Clients cannot leave the folder, through `..` or through a link that points outside it.
 - **Warnings.** The panel and the editor warn about plain HTTP or plain FTP with a password ("Plain FTP sends the
@@ -100,6 +100,25 @@ WinSCP). It serves file transfer only: no shell, no commands and no port forward
   or a failed write (a full disk, say) leaves the old file. An exclusive create fails if the file appeared during the
   upload. Resuming, appending and writing part of a file happen in place.
 - On a writable server, a client may change a file's times and permissions. SFTP clients can't set owners or groups.
+
+## TFTP
+
+TFTP serves network boot files and firmware to devices that speak nothing else (PXE clients, switches, phones,
+embedded boards). It has **no login and no encryption**: anyone who can reach the port can read the folder, and on a
+writable server can replace its files. Keep it on This computer only or on a private network, and read-only unless a
+device must upload.
+
+- Reads work on any server; writes (WRQ) only on a writable one, where they replace a file only once it has arrived
+  completely.
+- A write that announced its size (`tsize`) and delivers a different amount, or a block larger than the agreed size,
+  is refused and the old file kept.
+- Modes `octet` and `netascii`; options `blksize` (8–65464) and `tsize`. Other options are ignored.
+- Each transfer gets its own UDP port; at most 16 run at once, and a further request is told "Server busy". A lost
+  packet is resent after a second, up to five times.
+- `..` stops at the shared folder, links that lead outside are refused, and errors never name paths on this
+  computer.
+- TFTP runs over UDP: open the port for UDP in your firewall. Each transfer also uses a random UDP port, so a strict
+  firewall must allow the replies too.
 
 ## Quitting
 

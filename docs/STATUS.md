@@ -2,6 +2,27 @@
 
 ## Current state — 2026-10-05
 
+- **File Server FS-4: TFTP** (2026-10-05; branch `claude/file-server-fs4`, plan `docs/superpowers/plans/2026-10-05-file-server-fs4.md`):
+  File Server 0.4.0 serves TFTP with a hand-written engine on the JDK's `DatagramSocket` (`engine.tftp`: `TftpPacket`,
+  `NetAscii`, `TftpTransfer`, `TftpEngine`). It handles RRQ, and WRQ when writable (committed after the final block),
+  octet and netascii, `blksize`/`tsize` through OACK, a resend after 1 s up to 5 times, at most 16 transfers ("Server
+  busy" beyond), error 5 for strangers, and fixed error texts that never name host paths. Serve Current Folder over
+  TFTP; `portFree` checks UDP too. Decisions: see the plan header. Full `./gradlew check` passed:
+  **8,849 tests, 0 failures, 0 errors, 6 existing skips** (File Server: 243, up from 215); source hygiene clean. No
+  GUI, benchmark or AOT training; not pushed.
+  Deviations from the plan text (details in the plan's banner): netascii writes are buffered under the decoder;
+  neither the server port nor a transfer socket ever answers an ERROR packet (Loop DoS, CVE-2024-2169); the transfer
+  limit is captured per start; a receive failure backs off 50 ms; a mid-read failure sends an error to the client; a
+  write is refused and abandoned when its length contradicts the announced `tsize`, or when a DATA block exceeds the
+  negotiated `blksize`; the upload is abandoned if the engine stopped just before commit; write failures are logged;
+  the busy-port test binds inside the try body.
+  Deferred: TFTP transfers use their own pool (at most 16 threads), not the plugin executor; a WRQ with an oversized
+  `tsize` aimed at a refused path gets "disk full" (error 3) rather than error 2; the final dally holds a transfer
+  slot for one timeout; the pre-commit stop guard covers a race that can't be tested deterministically; from FS-3:
+  sshd refuses some malformed or oversized SFTP writes before File Server's listener sees them, so a later CLOSE
+  still commits that upload without the chunk (only the client harms its own upload). GUI checks pending: `tftp` /
+  `curl tftp://` from another computer, a PXE or firmware client, the macOS firewall prompt for UDP.
+
 - **File Server FS-3: SFTP** (2026-10-05; branch `claude/file-server-fs3`, plan `docs/superpowers/plans/2026-10-01-file-server-fs3.md`):
   File Server 0.3.0 serves SFTP on Apache MINA sshd 2.19.0 with a persistent Ed25519 host key (`data/hostkey`,
   fingerprint on the server card and in Show Fingerprints…), password, authorized-key and keys-only logins (through

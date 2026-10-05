@@ -1,5 +1,20 @@
 # File Server FS-4: TFTP — Implementation Plan
 
+**Status:** executed on `claude/file-server-fs4` (2026-10-05), `./gradlew check` green (8,849 tests, 0 failures, 6 existing skips; File Server 243).
+
+**Deviations from the plan text:**
+1. *Netascii writes* are buffered under the decoder (`BufferedOutputStream` under `NetAscii.decoding`). Reason: the decoder writes byte by byte and `Upload.stream()` is unbuffered.
+2. *No answers to ERROR packets*: neither the server port nor a transfer socket ever answers one (checked on the raw opcode). Reason: two endpoints answering each other's errors loop forever from one spoofed datagram (Loop DoS, CVE-2024-2169); a review confirmed it with a probe.
+3. *The transfer limit is captured per start.* Reason: a restarted engine must not release permits into a new semaphore, or a stale thread could free a slot it never held.
+4. *A receive failure backs off 50 ms.* Reason: a socket that fails every receive otherwise spins a CPU core.
+5. *A mid-read failure sends an error to the client* ("Transfer failed"). Reason: otherwise the client waits for retransmissions that never come.
+6. *A write is refused and abandoned* when its length contradicts the announced `tsize`, or when a DATA block exceeds the negotiated `blksize`. Reason: a short or oversized transfer would otherwise commit a truncated or malformed file over the old one.
+7. *The upload is abandoned if the engine stopped just before commit.* Reason: the final block must not commit after Stop. The guard covers a race that can't be tested deterministically.
+8. *Write failures are logged.* Reason: an operator could not otherwise see why a device's upload failed (the client only gets a fixed text).
+9. *The busy-port test binds inside the try body.* Reason: the lint on resources rejected binding before the try.
+
+**Deferred:** TFTP transfers use their own pool (at most 16 threads), not the plugin executor; a WRQ with an oversized `tsize` aimed at a refused path gets "disk full" (error 3) rather than error 2; the final dally holds a transfer slot for one timeout; the pre-commit stop guard is untestable deterministically; from FS-3, sshd refuses some malformed or oversized SFTP writes before File Server's listener sees them, so a later CLOSE still commits that upload without the chunk (only the client harms its own upload).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a TFTP server type to the File Server plugin. It is hand-written on the JDK's `DatagramSocket`, following RFC 1350, and supports the `blksize` and `tsize` options (RFC 2347–2349). It handles reads, writes on writable shares, netascii, retransmission, and a limit of 16 transfers at once. Serve Current Folder over TFTP is added too.
