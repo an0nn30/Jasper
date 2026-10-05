@@ -2,6 +2,22 @@
 
 ## Current state — 2026-10-05
 
+- **Terminal Share Path** (2026-10-05; `codex/share-path`, isolated worktree
+  `/Users/dustin/.codex/worktrees/share-path/moray`): implements the user-approved bounded design:
+  terminal context menu **Share Path → HTTP / HTTPS / FTP / FTPS** starts a temporary server for the
+  invoked pane's current local folder, without a dialog, and reveals it in File Servers. Names and ports
+  are automatic; shares retain read-only/loopback defaults, FTP session passwords, and TLS is required
+  for FTPS. Missing, invalid and remote paths are rejected without substituting home or another pane.
+  Existing Serve Current Folder palette commands retain their documented behavior. Uses the existing
+  SDK menu contribution and server registry; no SDK/app changes. Native inline implementation with an
+  independent final review, without a new historical-plan execution. Eleven new cases failed before
+  implementation; focused plugin integration tests now pass, including real starts for all four types.
+  Independent final review found no actionable issues. Final `./gradlew check --continue` passed all
+  91 tasks: **8,782 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and
+  documentation gates. Changed-source hygiene and whitespace checks passed. The existing bounded
+  port search/bind-race failure handling is retained. No GUI, benchmark or AOT training; native menu
+  acceptance remains user-run. Awaiting the user's merge/push choice.
+
 - **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
   `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
   [flat-tab design](design/flat-tabs.md). One workspace-colored strip, persistent icons, muted inactive

@@ -38,6 +38,9 @@ import java.util.function.IntPredicate;
 import javax.swing.JMenuItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServerPluginTest {
@@ -361,6 +364,95 @@ class FileServerPluginTest {
             assertThat(served.definition().login()).isEqualTo(Login.SESSION);
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void contributesOnlyAvailableShareTypesAndRemovesThemOnStop() {
+        try (var host = new FakePluginHost(root)) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            settle(host);
+            assertThat(host.menu("context")).containsExactly("submenu:Share Path",
+                "  item:dev.jasper.fileserver.share-http", "  item:dev.jasper.fileserver.share-https",
+                "  item:dev.jasper.fileserver.share-ftp", "  item:dev.jasper.fileserver.share-ftps");
+            assertThat(host.actions()).contains("dev.jasper.fileserver.share-http|HTTP|true",
+                "dev.jasper.fileserver.share-https|HTTPS|true", "dev.jasper.fileserver.share-ftp|FTP|true",
+                "dev.jasper.fileserver.share-ftps|FTPS|true");
+            host.stopAll();
+            assertThat(host.menu("context")).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"http,HTTP,false,false", "https,HTTP,true,false", "ftp,FTP,false,false", "ftps,FTP,true,true"})
+    void sharesTheInvokedPanesFolderWithoutADialog(String type, Protocol protocol, boolean tls, boolean requireTls) throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> {
+                if (port == 8080 || port == 2121) return false;
+                try (var socket = new java.net.ServerSocket()) {
+                    socket.bind(new java.net.InetSocketAddress("127.0.0.1", port));
+                    return true;
+                } catch (java.io.IOException busy) { return false; }
+            });
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID clicked = host.addTerminalPane(tab, pane(Optional.of(project)));
+            UUID otherWindow = host.addTerminalWindow(), otherTab = host.addTerminalTab(otherWindow, "other");
+            UUID other = host.addTerminalPane(otherTab, pane(Optional.of(home)));
+            host.focusTerminalPane(other);
+            assertThat(host.invoke("dev.jasper.fileserver.share-" + type, window, clicked)).isTrue();
+            await(host, () -> plugin.registry().running() == 1, "the quick share runs");
+            var served = plugin.registry().servers().getFirst();
+            var definition = served.definition();
+            assertThat(served.temporary()).isTrue();
+            assertThat(definition.name()).isEqualTo("project (" + type.toUpperCase(java.util.Locale.ROOT) + ")");
+            assertThat(definition.folder()).isEqualTo(project);
+            assertThat(definition.protocol()).isEqualTo(protocol);
+            assertThat(definition.tls()).isEqualTo(tls);
+            assertThat(definition.requireTls()).isEqualTo(requireTls);
+            assertThat(definition.bind()).isEqualTo(Bind.LOOPBACK);
+            assertThat(definition.writable()).isFalse();
+            assertThat(definition.autostart()).isFalse();
+            assertThat(definition.port()).isBetween(protocol == Protocol.HTTP ? 8081 : 2122, protocol == Protocol.HTTP ? 8180 : 2221);
+            assertThat(definition.login()).isEqualTo(protocol == Protocol.HTTP ? Login.ANONYMOUS : Login.SESSION);
+            if (protocol == Protocol.FTP) assertThat(plugin.registry().password(definition.id())).hasValueSatisfying(password -> assertThat(password).isNotBlank());
+            assertThat(plugin.store().definitions()).isEmpty();
+            assertThat(host.windows()).as("no setup or login dialog").isEmpty();
+            var panel = (FileServersPanel) host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(panel.selected()).contains(definition.id());
+            assertThat(host.failures()).isEmpty();
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().servers().isEmpty(), "stopping removes the temporary share");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown", "missing", "file", "remote", "plugin", "no-pane"})
+    void sharePathRefusesUnavailableLocalFoldersInsteadOfSharingHome(String location) throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            Optional<Path> directory = switch (location) {
+                case "unknown" -> Optional.empty();
+                case "missing" -> Optional.of(home.resolve("gone"));
+                case "file" -> Optional.of(Files.writeString(home.resolve("file.txt"), "not a folder"));
+                default -> Optional.of(home);
+            };
+            PaneInfo info = new PaneInfo("zsh", directory,
+                location.equals("remote") ? Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory("remote", home.toString())) : Optional.empty(),
+                80, 24, true, location.equals("plugin") ? SessionKind.PLUGIN : SessionKind.LOCAL,
+                location.equals("plugin") ? Optional.of("dev.jasper.remote") : Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh");
+            UUID clicked = host.addTerminalPane(tab, info);
+            host.focusTerminalPane(host.addTerminalPane(tab, pane(Optional.of(home))));
+            assertThat(host.invoke("dev.jasper.fileserver.share-http", window, location.equals("no-pane") ? null : clicked)).isTrue();
+            settle(host);
+            assertThat(plugin.registry().servers()).as("never substitute another folder").isEmpty();
+            assertThat(host.notifications().lines()).singleElement().asString().contains("Could not share path");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
         }
     }
 
