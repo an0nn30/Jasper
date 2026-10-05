@@ -817,4 +817,117 @@ class FormsTest {
                     }
                 });
     }
+
+    @Test
+    void heroPreviewReservesItsOwnHeightAboveFullWidthActions() {
+        Edt.run(
+                () -> {
+                    var ctx = KitFixtures.context();
+                    var spec =
+                            new ViewSpec(
+                                    new Form(
+                                            "form",
+                                            ControlState.READY,
+                                            FormKind.HERO,
+                                            "Preview",
+                                            Optional.empty(),
+                                            List.of(field("name", FieldKind.TEXT, "")),
+                                            Optional.of(
+                                                    new Text(
+                                                            "preview",
+                                                            ControlState.READY,
+                                                            "Ready to unlock",
+                                                            TextRole.MONO_SMALL)),
+                                            List.of(button("save", ButtonKind.PRIMARY))));
+                    try (var view = new KitView(ctx, spec, e -> {})) {
+                        view.setSize(view.getPreferredSize());
+                        layout(view);
+                        var preview = find(view, "preview", JLabel.class);
+                        var action = find(view, "save", JButton.class);
+                        assertThat(preview.getHeight())
+                                .isGreaterThanOrEqualTo(preview.getPreferredSize().height);
+                        assertThat(preview.getParent().getHeight())
+                                .isGreaterThanOrEqualTo(preview.getPreferredSize().height);
+                        var previewBottom =
+                                SwingUtilities.convertPoint(preview, 0, preview.getHeight(), view);
+                        var actionTop = SwingUtilities.convertPoint(action, 0, 0, view);
+                        assertThat(previewBottom.y).isLessThanOrEqualTo(actionTop.y - s(12));
+                        assertThat(action.getWidth()).isEqualTo(s(344));
+                        assertThat(view.getPreferredSize()).isEqualTo(view.getSize());
+                    } finally {
+                        release(ctx);
+                    }
+                });
+    }
+
+    @Test
+    void nestedVerticalStackMeasuresWrappedSettingsAtTheAssignedWidthAndReflowsOnResize() {
+        Edt.run(
+                () -> {
+                    var ctx = KitFixtures.context();
+                    Object old = UIManager.get("defaultFont");
+                    try {
+                        UIManager.put("defaultFont", new Font("Dialog", Font.PLAIN, 18));
+                        var setting =
+                                new SettingRow(
+                                        "setting",
+                                        ControlState.READY,
+                                        "Automatic Connection",
+                                        "Connect automatically when the workspace opens. The saved"
+                                            + " credential is used for authentication and the host"
+                                            + " must already be reachable before the first"
+                                            + " connection begins.",
+                                        new Toggle(
+                                                "toggle",
+                                                ControlState.READY,
+                                                "Enabled",
+                                                true,
+                                                "toggle",
+                                                false),
+                                        false);
+                        var nested =
+                                new Stack(
+                                        "nested",
+                                        ControlState.READY,
+                                        LayoutRole.VERTICAL,
+                                        List.of(
+                                                setting,
+                                                new Text(
+                                                        "following",
+                                                        ControlState.READY,
+                                                        "Following row",
+                                                        TextRole.BODY)));
+                        try (var view =
+                                new KitView(
+                                        ctx,
+                                        new ViewSpec(form(FormKind.FULL, List.of(nested))),
+                                        e -> {})) {
+                            int widerHeight = 0;
+                            for (int width : new int[] {540, 320, 540}) {
+                                view.setSize(s(width), s(800));
+                                layout(view);
+                                var row = find(view, "setting", JComponent.class);
+                                var description =
+                                        find(view, "setting.description", JComponent.class);
+                                var following = find(view, "following", JComponent.class);
+                                assertThat(description.getY() + description.getHeight())
+                                        .isLessThanOrEqualTo(row.getHeight() - s(8));
+                                assertThat(following.getY())
+                                        .isGreaterThanOrEqualTo(
+                                                row.getY() + row.getHeight() + s(10));
+                                assertThat(find(view, "nested", JComponent.class).getHeight())
+                                        .isGreaterThanOrEqualTo(
+                                                following.getY() + following.getHeight());
+                                if (width == 320)
+                                    assertThat(row.getHeight()).isGreaterThan(widerHeight);
+                                else if (widerHeight == 0) widerHeight = row.getHeight();
+                                else assertThat(row.getHeight()).isEqualTo(widerHeight);
+                            }
+                        }
+                    } finally {
+                        UIManager.put("defaultFont", old);
+                        release(ctx);
+                    }
+                });
+    }
 }

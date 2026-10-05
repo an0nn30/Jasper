@@ -107,6 +107,12 @@
   menu chevron, negative narrow Browse bounds, mixed settings padding, empty tile painting, focused-menu
   Escape delegation, sheet title, menu tile and actual invalid-primary availability. Final focused normal/2x: **22 tests**; module
   check/architecture: **197 tests, 0 failures/errors/skips**. Source hygiene/diff checks clean.
+  Task 8 independent review fix round corrects two reproduced layout failures: HERO preview height
+  became zero because footer measurement used natural action width while layout filled the row;
+  nested vertical Stacks measured wrapped settings before assigning narrower widths. Shared footer
+  geometry and width-aware Stack child measurement/layout now agree at actual assigned widths.
+  **43 affected focused tests pass**, zero failures/errors/skips. Earlier module/scale counts remain
+  pre-fix evidence; no broad rerun or GUI was needed for these bounded repairs.
   Package-private Composition.java supplies width-aware layout and literal wrapping; screenshot calibration
   and native desktop focus remain later/user-run. No GUI, screen queries, AOT, push or merge.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha

@@ -275,9 +275,10 @@ final class Forms {
                                 case SHEET -> DesignMetrics.Role.SHEET_WIDTH;
                                 default -> DesignMetrics.Role.FORM_WIDTH;
                             });
+            int measuredWidth = getWidth() > 0 ? getWidth() : width;
             int height =
-                    Composition.height(owner.body, getWidth() > 0 ? getWidth() : width)
-                            + owner.footer.getPreferredSize().height;
+                    Composition.height(owner.body, measuredWidth)
+                            + Composition.height(owner.footer, measuredWidth);
             int available = view.availableHeight();
             return new Dimension(
                     width,
@@ -323,60 +324,93 @@ final class Forms {
             return ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
         }
 
+        record Geometry(
+                int contentWidth,
+                int actionWidth,
+                int actionHeight,
+                int previewWidth,
+                int previewHeight,
+                boolean stacked) {}
+
+        Geometry geometry(Container parent, int width) {
+            Insets i = parent.getInsets();
+            int contentWidth = Math.max(0, width - i.left - i.right);
+            int actionWidth =
+                    ((Nodes.Form) owner.node).kind() == Nodes.FormKind.HERO
+                            ? contentWidth
+                            : Math.min(contentWidth, owner.actions.getPreferredSize().width);
+            int actionHeight = Composition.height(owner.actions, actionWidth);
+            int sharedPreviewWidth = Math.max(0, contentWidth - actionWidth - gap());
+            boolean stacked =
+                    owner.preview.isVisible()
+                            && owner.preview.getPreferredSize().width > sharedPreviewWidth;
+            int previewWidth = stacked ? contentWidth : sharedPreviewWidth;
+            int previewHeight =
+                    owner.preview.isVisible() ? Composition.height(owner.preview, previewWidth) : 0;
+            return new Geometry(
+                    contentWidth, actionWidth, actionHeight, previewWidth, previewHeight, stacked);
+        }
+
         @Override
         public int height(Container p, int width) {
             Insets i = p.getInsets();
-            int aw = owner.actions.getPreferredSize().width,
-                    w = Math.max(0, width - i.left - i.right);
-            int ph = owner.preview.isVisible() ? Composition.height(owner.preview, w) : 0,
-                    ah = owner.actions.getPreferredSize().height;
+            var geometry = geometry(p, width);
             return i.top
                     + i.bottom
-                    + (owner.preview.isVisible()
-                                    && aw + owner.preview.getPreferredSize().width + gap() > w
-                            ? ph + gap() + ah
-                            : Math.max(ph, ah));
+                    + (geometry.stacked()
+                            ? geometry.previewHeight() + gap() + geometry.actionHeight()
+                            : Math.max(geometry.previewHeight(), geometry.actionHeight()));
         }
 
         @Override
         public Dimension preferredLayoutSize(Container p) {
             Insets i = p.getInsets();
-            int w =
+            int naturalWidth =
                     i.left
                             + i.right
                             + owner.actions.getPreferredSize().width
                             + (owner.preview.isVisible()
                                     ? owner.preview.getPreferredSize().width + gap()
                                     : 0);
-            return new Dimension(
-                    w,
-                    height(
-                            p,
-                            p.getWidth() > 0
+            int width =
+                    p.getParent() != null && p.getParent().getWidth() > 0
+                            ? p.getParent().getWidth()
+                            : p.getWidth() > 0
                                     ? p.getWidth()
                                     : ThemePainting.metric(
-                                            owner.context(), DesignMetrics.Role.FORM_WIDTH)));
+                                            owner.context(),
+                                            switch (((Nodes.Form) owner.node).kind()) {
+                                                case HERO -> DesignMetrics.Role.HERO_WIDTH;
+                                                case SHEET -> DesignMetrics.Role.SHEET_WIDTH;
+                                                default -> DesignMetrics.Role.FORM_WIDTH;
+                                            });
+            return new Dimension(naturalWidth, height(p, width));
         }
 
         @Override
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
-            int w = Math.max(0, p.getWidth() - i.left - i.right),
-                    aw =
-                            ((Nodes.Form) owner.node).kind() == Nodes.FormKind.HERO
-                                    ? w
-                                    : Math.min(w, owner.actions.getPreferredSize().width),
-                    ah = owner.actions.getPreferredSize().height;
-            int ay = p.getHeight() - i.bottom - ah;
-            owner.actions.setBounds(p.getWidth() - i.right - aw, Math.max(i.top, ay), aw, ah);
+            var geometry = geometry(p, p.getWidth());
+            int availableHeight = Math.max(0, p.getHeight() - i.top - i.bottom);
+            int actionY =
+                    geometry.stacked()
+                            ? i.top + geometry.previewHeight() + gap()
+                            : i.top + Math.max(0, (availableHeight - geometry.actionHeight()) / 2);
+            owner.actions.setBounds(
+                    p.getWidth() - i.right - geometry.actionWidth(),
+                    actionY,
+                    geometry.actionWidth(),
+                    geometry.actionHeight());
             if (owner.preview.isVisible()) {
-                int pw = Math.max(0, w - aw - gap());
-                boolean stack = owner.preview.getPreferredSize().width > pw;
+                int previewY =
+                        geometry.stacked()
+                                ? i.top
+                                : i.top
+                                        + Math.max(
+                                                0,
+                                                (availableHeight - geometry.previewHeight()) / 2);
                 owner.preview.setBounds(
-                        i.left,
-                        i.top,
-                        stack ? w : pw,
-                        stack ? Math.max(0, ay - i.top - gap()) : ah);
+                        i.left, previewY, geometry.previewWidth(), geometry.previewHeight());
             }
         }
     }

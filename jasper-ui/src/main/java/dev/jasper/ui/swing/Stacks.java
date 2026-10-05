@@ -158,7 +158,7 @@ final class Stacks {
         }
     }
 
-    static final class StackLayout implements LayoutManager {
+    static final class StackLayout implements Composition.WidthLayout {
         final KitContext context;
         final Nodes.LayoutRole role;
 
@@ -201,19 +201,54 @@ final class Stacks {
         }
 
         Dimension measure(Container parent, boolean minimum) {
-            int primary = 0, cross = 0, count = 0;
+            int width = 0, count = 0;
             for (Component child : parent.getComponents())
                 if (child.isVisible()) {
                     Dimension size = minimum ? child.getMinimumSize() : child.getPreferredSize();
-                    primary += horizontal() ? size.width : size.height;
-                    cross = Math.max(cross, horizontal() ? size.height : size.width);
+                    width = horizontal() ? width + size.width : Math.max(width, size.width);
                     count++;
                 }
-            primary += Math.max(0, count - 1) * gap();
-            var insets = parent.getInsets();
+            Insets insets = parent.getInsets();
+            width +=
+                    insets.left
+                            + insets.right
+                            + (horizontal() ? Math.max(0, count - 1) * gap() : 0);
             return new Dimension(
-                    (horizontal() ? primary : cross) + insets.left + insets.right,
-                    (horizontal() ? cross : primary) + insets.top + insets.bottom);
+                    width, height(parent, parent.getWidth() > 0 ? parent.getWidth() : width));
+        }
+
+        int fittedWidth(Component child, int width, int count, int total) {
+            int natural = child.getPreferredSize().width;
+            int available = Math.max(0, width - Math.max(0, count - 1) * gap());
+            return total > available && total > 0
+                    ? (int) ((long) natural * available / total)
+                    : natural;
+        }
+
+        @Override
+        public int height(Container parent, int width) {
+            Insets insets = parent.getInsets();
+            int available = Math.max(0, width - insets.left - insets.right), height = 0;
+            var children =
+                    java.util.Arrays.stream(parent.getComponents())
+                            .filter(Component::isVisible)
+                            .toList();
+            int total =
+                    horizontal()
+                            ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()
+                            : 0;
+            for (Component child : children) {
+                int childWidth =
+                        horizontal()
+                                ? fittedWidth(child, available, children.size(), total)
+                                : available;
+                int childHeight = Composition.height(child, childWidth);
+                height = horizontal() ? Math.max(height, childHeight) : height + childHeight;
+            }
+            return insets.top
+                    + insets.bottom
+                    + height
+                    + (horizontal() ? 0 : Math.max(0, children.size() - 1) * gap());
         }
 
         @Override
@@ -222,36 +257,30 @@ final class Stacks {
             int x = insets.left, y = insets.top;
             int width = Math.max(0, parent.getWidth() - insets.left - insets.right),
                     height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
-            for (Component child : parent.getComponents())
-                if (child.isVisible()) {
-                    var size = child.getPreferredSize();
-                    if (horizontal()) {
-                        int visible =
-                                (int)
-                                        java.util.Arrays.stream(parent.getComponents())
-                                                .filter(Component::isVisible)
-                                                .count();
-                        int total =
-                                java.util.Arrays.stream(parent.getComponents())
-                                        .filter(Component::isVisible)
-                                        .mapToInt(c -> c.getPreferredSize().width)
-                                        .sum();
-                        int available = Math.max(0, width - Math.max(0, visible - 1) * gap());
-                        int fitted =
-                                total > available && total > 0
-                                        ? (int) ((long) size.width * available / total)
-                                        : size.width;
-                        child.setBounds(
-                                x,
-                                y + Math.max(0, (height - size.height) / 2),
-                                fitted,
-                                Math.min(height, size.height));
-                        x += fitted + gap();
-                    } else {
-                        child.setBounds(x, y, width, size.height);
-                        y += size.height + gap();
-                    }
+            var children =
+                    java.util.Arrays.stream(parent.getComponents())
+                            .filter(Component::isVisible)
+                            .toList();
+            int total =
+                    horizontal()
+                            ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()
+                            : 0;
+            for (Component child : children) {
+                int childWidth =
+                        horizontal() ? fittedWidth(child, width, children.size(), total) : width;
+                int childHeight = Composition.height(child, childWidth);
+                if (horizontal()) {
+                    child.setBounds(
+                            x,
+                            y + Math.max(0, (height - childHeight) / 2),
+                            childWidth,
+                            Math.min(height, childHeight));
+                    x += childWidth + gap();
+                } else {
+                    child.setBounds(x, y, childWidth, childHeight);
+                    y += childHeight + gap();
                 }
+            }
         }
     }
 }
