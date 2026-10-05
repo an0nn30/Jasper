@@ -28,8 +28,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * One TFTP read or write, on its own socket. Every packet is resent after the timeout, up to the retry count, and a
- * packet from anyone but the client gets error 5. A duplicate acknowledgement is ignored, never answered with a
- * resend. Refusals are error packets with fixed texts, never host paths.
+ * packet from anyone but the client gets error 5, unless it is itself an error, which is never answered. A duplicate
+ * acknowledgement is ignored, never answered with a resend. Refusals are error packets with fixed texts, never host
+ * paths.
  */
 final class TftpTransfer {
     static final TftpPacket.Error BUSY = new TftpPacket.Error(0, "Server busy");
@@ -98,6 +99,9 @@ final class TftpTransfer {
                     }
                     block = (block + 1) & 0xFFFF;
                 }
+            } catch (IOException failure) {
+                if (!socket.isClosed()) reply(client, FAILED); // best effort: the client learns why the transfer ended
+                throw failure;
             } finally {
                 transfer.finish(complete);
             }
@@ -147,7 +151,7 @@ final class TftpTransfer {
             try { socket.receive(packet); }
             catch (SocketTimeoutException timedOut) { return null; }
             if (!client.equals(packet.getSocketAddress())) {
-                reply(packet.getSocketAddress(), UNKNOWN_ID);
+                if (!TftpPacket.isError(packet.getData(), packet.getLength())) reply(packet.getSocketAddress(), UNKNOWN_ID);
                 continue;
             }
             try { return TftpPacket.parse(packet.getData(), packet.getLength()); }
@@ -159,10 +163,11 @@ final class TftpTransfer {
 
     void send(byte[] bytes) throws IOException { socket.send(new DatagramPacket(bytes, bytes.length, client)); }
 
+    /** Sends {@code packet} to {@code to}, best effort. */
     private void reply(SocketAddress to, TftpPacket packet) {
         byte[] bytes = packet.encode();
         try { socket.send(new DatagramPacket(bytes, bytes.length, to)); }
-        catch (IOException ignored) { /* a stranger's loss */ }
+        catch (IOException ignored) { /* the peer will time out */ }
     }
 
     /** Answers a refusal with its error packet and logs it under the client path. */

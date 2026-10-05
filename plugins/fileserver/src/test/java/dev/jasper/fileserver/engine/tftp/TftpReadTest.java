@@ -9,6 +9,7 @@ import dev.jasper.fileserver.engine.ServerEvents;
 import dev.jasper.fileserver.share.ShareRoot;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -23,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.net.tftp.TFTP;
 import org.apache.commons.net.tftp.TFTPClient;
@@ -62,11 +66,15 @@ class TftpReadTest {
     @AfterEach void stop() { if (engine != null) engine.stop(); }
 
     TftpEngine engine(Duration timeout, int retries, int maxTransfers) throws IOException {
+        return engine(timeout, retries, maxTransfers, events::add);
+    }
+
+    TftpEngine engine(Duration timeout, int retries, int maxTransfers, Consumer<ServerEvent> sink) throws IOException {
         port = Ports.free();
         var base = ServerDefinition.create("tftp", Protocol.TFTP, shared);
         var definition = new ServerDefinition(base.id(), "tftp", Protocol.TFTP, shared, base.bind(), port, Optional.empty(), false,
             base.login(), List.of(), false, false, false);
-        engine = new TftpEngine(definition, new ShareRoot(shared, true), new ServerEvents(Clock.systemUTC(), events::add), List::of,
+        engine = new TftpEngine(definition, new ShareRoot(shared, true), new ServerEvents(Clock.systemUTC(), sink), List::of,
             timeout, retries, maxTransfers);
         return engine;
     }
@@ -233,5 +241,109 @@ class TftpReadTest {
         assertThat(transferred().getFirst().complete()).isFalse();
         assertThat(engine.addresses()).isEmpty();
         new DatagramSocket(new InetSocketAddress(InetAddress.getLoopbackAddress(), port)).close();
+    }
+
+    static final Duration QUIET = Duration.ofMillis(300);
+
+    @Test void errorPacketsAreNeverAnsweredOnTheServerPort() throws Exception {
+        start();
+        try (var client = new RawClient()) {
+            client.send(port, new TftpPacket.Error(4, "Illegal TFTP operation"));
+            assertThat(client.receive(QUIET)).as("an error is never acknowledged (RFC 1350)").isEmpty();
+            byte[] unterminated = {0, 5, 0, 0, 'x'};
+            client.socket.send(new DatagramPacket(unterminated, unterminated.length, InetAddress.getLoopbackAddress(), port));
+            assertThat(client.receive(QUIET)).as("nor a malformed one").isEmpty();
+            client.send(port, new TftpPacket.Ack(1));
+            assertThat(client.next().packet()).as("other strays still get error 4").isEqualTo(TftpTransfer.ILLEGAL);
+        }
+    }
+
+    @Test void aStrangersErrorOnATransferPortIsNotAnswered() throws Exception {
+        engine(Duration.ofSeconds(2), 5, 16).start();
+        try (var holder = new RawClient(); var stranger = new RawClient()) {
+            holder.send(port, RawClient.read("docs/a.txt", "octet"));
+            var held = holder.next();
+            stranger.send(held.port(), new TftpPacket.Error(0, "Transfer failed"));
+            assertThat(stranger.receive(QUIET)).isEmpty();
+            byte[] unterminated = {0, 5, 0, 0, 'x'};
+            stranger.socket.send(new DatagramPacket(unterminated, unterminated.length, InetAddress.getLoopbackAddress(), held.port()));
+            assertThat(stranger.receive(QUIET)).isEmpty();
+            holder.send(held.port(), new TftpPacket.Ack(1));
+            await(() -> transferred().size() == 1, "the held transfer ends");
+            assertThat(transferred().getFirst().complete()).as("the transfer carries on").isTrue();
+        }
+    }
+
+    @Test void aDuplicateAckIsNotAnsweredWithAResend() throws Exception {
+        engine(Duration.ofSeconds(2), 5, 16).start();
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.read("big.bin", "octet", "blksize", "1024"));
+            var oack = client.next();
+            client.send(oack.port(), new TftpPacket.Ack(0));
+            assertThat(((TftpPacket.Data) client.next().packet()).block()).isEqualTo(1);
+            client.send(oack.port(), new TftpPacket.Ack(0));
+            assertThat(client.receive(QUIET)).as("no resend of the OACK or of DATA 1").isEmpty();
+            for (int block = 1; block <= 3; block++) {
+                if (block > 1) assertThat(((TftpPacket.Data) client.next().packet()).block()).isEqualTo(block);
+                client.send(oack.port(), new TftpPacket.Ack(block));
+            }
+            client.send(oack.port(), new TftpPacket.Ack(3));
+            assertThat(client.receive(QUIET)).isEmpty();
+        }
+        await(() -> transferred().size() == 1, "the read ends");
+        assertThat(transferred().getFirst().complete()).isTrue();
+        assertThat(transferred().getFirst().bytes()).isEqualTo(3000L);
+    }
+
+    @Test void aFileOfWholeBlocksEndsWithAnEmptyBlock() throws Exception {
+        Files.write(shared.resolve("whole.bin"), pattern(1024));
+        start();
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.read("whole.bin", "octet"));
+            int[] lengths = new int[3];
+            int transferPort = -1;
+            for (int block = 1; block <= 3; block++) {
+                var reply = client.next();
+                transferPort = reply.port();
+                var data = (TftpPacket.Data) reply.packet();
+                assertThat(data.block()).isEqualTo(block);
+                lengths[block - 1] = data.bytes().length;
+                client.send(transferPort, new TftpPacket.Ack(block));
+            }
+            assertThat(lengths).containsExactly(512, 512, 0);
+        }
+        assertThat(fetch("whole.bin", TFTP.BINARY_MODE)).isEqualTo(pattern(1024));
+        await(() -> transferred().size() == 2, "both reads end");
+        assertThat(transferred()).allMatch(ServerEvent.Transferred::complete);
+    }
+
+    @Test void aTransferUnwindingAfterStopNeverFreesASlotOfTheNextStart() throws Exception {
+        var gate = new CountDownLatch(1);
+        var held = new AtomicReference<Thread>();
+        engine(Duration.ofSeconds(2), 5, 1, event -> {
+            events.add(event);
+            if (event instanceof ServerEvent.Transferred && held.compareAndSet(null, Thread.currentThread())) {
+                while (true) {
+                    try { gate.await(); return; }
+                    catch (InterruptedException stopping) { /* stop() interrupts the pool; keep holding */ }
+                }
+            }
+        }).start();
+        try (var holder = new RawClient()) {
+            holder.send(port, RawClient.read("docs/a.txt", "octet"));
+            holder.next();
+            engine.stop();
+        }
+        await(() -> held.get() != null, "the stopped transfer is held in its finish event");
+        engine.start();
+        gate.countDown();
+        held.get().join(5000);
+        assertThat(held.get().isAlive()).as("the old transfer thread has released its slot and ended").isFalse();
+        try (var first = new RawClient(); var second = new RawClient()) {
+            first.send(port, RawClient.read("docs/a.txt", "octet"));
+            assertThat(first.next().packet()).isInstanceOf(TftpPacket.Data.class);
+            second.send(port, RawClient.read("docs/a.txt", "octet"));
+            assertThat(second.next()).as("still one slot, not two").isEqualTo(new RawClient.Reply(port, TftpTransfer.BUSY));
+        }
     }
 }

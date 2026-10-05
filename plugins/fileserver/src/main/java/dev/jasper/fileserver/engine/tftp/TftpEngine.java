@@ -27,12 +27,15 @@ import java.util.function.Supplier;
 /**
  * A TFTP server for one share, on the JDK: the server's port takes requests, and each transfer runs on its own
  * ephemeral socket. At most 16 run at once; another request gets error 0 "Server busy". A lost packet is resent after
- * one second, up to five times. TFTP has no login: anyone who can reach the port can use it.
+ * one second, up to five times. TFTP has no login: anyone who can reach the port can use it. An error packet is never
+ * answered, so a forged one cannot start an endless exchange (CVE-2024-2169).
  */
 public final class TftpEngine implements ServerEngine {
     static final Duration TIMEOUT = Duration.ofSeconds(1);
     static final int RETRIES = 5;
     static final int MAX_TRANSFERS = 16;
+    /** How long the listener waits after a failed receive, so a persistent error cannot spin a core. */
+    static final Duration RECEIVE_PAUSE = Duration.ofMillis(50);
     private final ServerDefinition definition;
     private final ShareRoot share;
     private final ServerEvents events;
@@ -42,7 +45,6 @@ public final class TftpEngine implements ServerEngine {
     private final Set<DatagramSocket> transferSockets = ConcurrentHashMap.newKeySet();
     private DatagramSocket socket;
     private ExecutorService transfers;
-    private Semaphore slots;
     private Thread listener;
     private InetAddress address;
     private volatile boolean running;
@@ -67,35 +69,43 @@ public final class TftpEngine implements ServerEngine {
         address = bindTo;
         socket = bound;
         port = bound.getLocalPort();
-        slots = new Semaphore(maxTransfers);
-        transfers = Executors.newFixedThreadPool(maxTransfers, Thread.ofPlatform().daemon().name("file-server-tftp-transfer-", 0).factory());
+        // Each start has its own slots and pool, so a transfer still unwinding from an earlier start frees its own slot.
+        var slots = new Semaphore(maxTransfers);
+        var pool = Executors.newFixedThreadPool(maxTransfers, Thread.ofPlatform().daemon().name("file-server-tftp-transfer-", 0).factory());
+        transfers = pool;
         running = true;
         DatagramSocket listening = bound;
-        listener = Thread.ofPlatform().daemon().name("file-server-tftp-" + port).start(() -> listen(listening));
+        listener = Thread.ofPlatform().daemon().name("file-server-tftp-" + port).start(() -> listen(listening, slots, pool));
     }
 
-    /** Takes requests until the socket closes; each gets a slot and its own socket, or an error packet. */
-    private void listen(DatagramSocket server) {
+    /**
+     * Takes requests until the socket closes; each gets a slot and its own socket, or an error packet. An error packet
+     * gets nothing, even a malformed one.
+     */
+    private void listen(DatagramSocket server, Semaphore slots, ExecutorService pool) {
         byte[] buffer = new byte[TftpPacket.MAX_PACKET];
         while (running) {
             var received = new DatagramPacket(buffer, buffer.length);
             try { server.receive(received); }
-            catch (IOException closed) {
-                if (!running) return;
+            catch (IOException failed) {
+                if (!running || server.isClosed()) return;
+                try { Thread.sleep(RECEIVE_PAUSE); }
+                catch (InterruptedException interrupted) { return; }
                 continue;
             }
+            if (TftpPacket.isError(received.getData(), received.getLength())) continue;
             var client = (InetSocketAddress) received.getSocketAddress();
             TftpPacket packet;
             try { packet = TftpPacket.parse(received.getData(), received.getLength()); }
             catch (IllegalArgumentException malformed) { reply(server, client, TftpTransfer.ILLEGAL); continue; }
             if (!(packet instanceof TftpPacket.Request request)) { reply(server, client, TftpTransfer.ILLEGAL); continue; }
             if (!slots.tryAcquire()) { reply(server, client, TftpTransfer.BUSY); continue; }
-            try { transfers.execute(() -> serve(client, request)); }
+            try { pool.execute(() -> serve(client, request, slots)); }
             catch (RejectedExecutionException stopping) { slots.release(); }
         }
     }
 
-    private void serve(InetSocketAddress client, TftpPacket.Request request) {
+    private void serve(InetSocketAddress client, TftpPacket.Request request, Semaphore slots) {
         try (DatagramSocket transferSocket = new DatagramSocket(new InetSocketAddress(address, 0))) {
             transferSockets.add(transferSocket);
             try {
