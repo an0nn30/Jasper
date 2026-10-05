@@ -1,10 +1,10 @@
 # File Server FS-4: TFTP — Implementation Plan
 
-**Status:** executed on `claude/file-server-fs4` (2026-10-05), `./gradlew check` green (8,849 tests, 0 failures, 6 existing skips; File Server 243).
+**Status:** executed on `claude/file-server-fs4` (2026-10-05), `./gradlew check` green after the final-review fix wave (8,856 tests, 0 failures, 6 existing skips; File Server 250).
 
 **Deviations from the plan text:**
 1. *Netascii writes* are buffered under the decoder (`BufferedOutputStream` under `NetAscii.decoding`). Reason: the decoder writes byte by byte and `Upload.stream()` is unbuffered.
-2. *No answers to ERROR packets*: neither the server port nor a transfer socket ever answers one (checked on the raw opcode). Reason: two endpoints answering each other's errors loop forever from one spoofed datagram (Loop DoS, CVE-2024-2169); a review confirmed it with a probe.
+2. *Only well-formed TFTP is answered* (replaces decision 4's "a packet other than RRQ or WRQ on the server's port gets error 4"). The server port serves RRQ and WRQ and gives error 4 only to a well-formed DATA, ACK or OACK; a transfer socket gives error 5 only to a stranger's well-formed DATA, ACK or OACK. An ERROR packet, and anything that does not parse (an unknown opcode, a malformed request, a datagram larger than the largest packet), gets no reply on either. Reason: answering errors lets two TFTP endpoints loop forever from one spoofed datagram, and answering unparseable datagrams does the same with a chargen- or echo-style service (Loop DoS, CVE-2024-2169). The task review confirmed the first with a probe; the final review's chargen-style probe saw 87,317 exchanges in 2 s from one spoofed datagram, and 0 after the fix. A malformed request is dropped too, rather than answered with error 4, because a text reply could itself start with 00 01 or 00 02.
 3. *The transfer limit is captured per start.* Reason: a restarted engine must not release permits into a new semaphore, or a stale thread could free a slot it never held.
 4. *A receive failure backs off 50 ms.* Reason: a socket that fails every receive otherwise spins a CPU core.
 5. *A mid-read failure sends an error to the client* ("Transfer failed"). Reason: otherwise the client waits for retransmissions that never come.
@@ -12,8 +12,11 @@
 7. *The upload is abandoned if the engine stopped just before commit.* Reason: the final block must not commit after Stop. The guard covers a race that can't be tested deterministically.
 8. *Write failures are logged.* Reason: an operator could not otherwise see why a device's upload failed (the client only gets a fixed text).
 9. *The busy-port test binds inside the try body.* Reason: the lint on resources rejected binding before the try.
+10. *Receive buffers hold one byte more than the largest packet* (`MAX_PACKET + 1`). Reason: a datagram larger than the largest packet was truncated to a full block and acknowledged; now it is seen as oversized, and on a write it gets error 4 and the upload is abandoned.
+11. *A failure is not logged once the engine stopped*, and is logged by the exception's class name when it has no message. Reason: Stop during disk I/O logged a misleading "TFTP transfer failed: null".
+12. *The dally lasts timeout x retries* (5 s at the defaults) instead of one timeout (decision 2). Reason: clients with multi-second retransmit timers would otherwise never get the final ACK again. It holds the transfer slot that long, which is acceptable because writes are rare.
 
-**Deferred:** TFTP transfers use their own pool (at most 16 threads), not the plugin executor; a WRQ with an oversized `tsize` aimed at a refused path gets "disk full" (error 3) rather than error 2; the final dally holds a transfer slot for one timeout; the pre-commit stop guard is untestable deterministically; from FS-3, sshd refuses some malformed or oversized SFTP writes before File Server's listener sees them, so a later CLOSE still commits that upload without the chunk (only the client harms its own upload).
+**Deferred:** TFTP transfers use their own pool (at most 16 threads), not the plugin executor; a WRQ with an oversized `tsize` aimed at a refused path gets "disk full" (error 3) rather than error 2; a malformed request gets no reply, so a broken client only times out; a completed write is reported complete in the activity log only after the dally; the pre-commit stop guard is untestable deterministically; from FS-3, sshd refuses some malformed or oversized SFTP writes before File Server's listener sees them, so a later CLOSE still commits that upload without the chunk (only the client harms its own upload).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

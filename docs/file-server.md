@@ -50,6 +50,9 @@ session password; copy it with **Copy Password** in the server's menu.
 **Serve Current Folder over SFTP** does the same with a temporary read-only SFTP server on this computer only. It
 uses a session password; copy it with **Copy Password** in the server's menu.
 
+**Serve Current Folder over TFTP** does the same with a temporary read-only TFTP server on this computer only. TFTP
+has no login, so there is no password. It uses UDP port 6969, or the next free port above it.
+
 ## FTP and FTPS
 
 An FTP server shares the folder with any FTP client (FileZilla, Cyberduck, `ftp`, `curl`). New FTP servers use a Vault
@@ -110,8 +113,9 @@ device must upload.
 
 - Reads work on any server; writes (WRQ) only on a writable one, where they replace a file only once it has arrived
   completely.
-- A write that announced its size (`tsize`) and delivers a different amount, or a block larger than the agreed size,
-  is refused and the old file kept.
+- In octet mode, a write that announced its size (`tsize`) and delivers a different amount is refused and the old
+  file kept. Netascii writes skip this check, because line ends change the size on the wire. A block larger than the
+  agreed size is refused in either mode.
 - Modes `octet` and `netascii`; options `blksize` (8–65464) and `tsize`. Other options are ignored.
 - Each transfer gets its own UDP port; at most 16 run at once, and a further request is told "Server busy". A lost
   packet is resent after a second, up to five times.
@@ -119,6 +123,11 @@ device must upload.
   computer.
 - TFTP runs over UDP: open the port for UDP in your firewall. Each transfer also uses a random UDP port, so a strict
   firewall must allow the replies too.
+- UDP senders can be forged. A forged read request makes the server send up to about 3 KB (the first block and its
+  resends) to the forged address, and a few forged requests a second can keep all 16 transfers busy for about 6 s
+  each. Keep TFTP on This computer only or on a trusted network.
+- The server never answers an error packet, or a datagram that isn't well-formed TFTP, so a forged packet can't start
+  an endless exchange with another TFTP server or with a service such as chargen or echo.
 
 ## Quitting
 

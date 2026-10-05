@@ -8,17 +8,25 @@
   octet and netascii, `blksize`/`tsize` through OACK, a resend after 1 s up to 5 times, at most 16 transfers ("Server
   busy" beyond), error 5 for strangers, and fixed error texts that never name host paths. Serve Current Folder over
   TFTP; `portFree` checks UDP too. Decisions: see the plan header. Full `./gradlew check` passed:
-  **8,849 tests, 0 failures, 0 errors, 6 existing skips** (File Server: 243, up from 215); source hygiene clean. No
+  **8,856 tests, 0 failures, 0 errors, 6 existing skips** (File Server: 250, up from 215), after the final-review fix wave; source hygiene clean. No
   GUI, benchmark or AOT training; not pushed.
   Deviations from the plan text (details in the plan's banner): netascii writes are buffered under the decoder;
-  neither the server port nor a transfer socket ever answers an ERROR packet (Loop DoS, CVE-2024-2169); the transfer
-  limit is captured per start; a receive failure backs off 50 ms; a mid-read failure sends an error to the client; a
-  write is refused and abandoned when its length contradicts the announced `tsize`, or when a DATA block exceeds the
-  negotiated `blksize`; the upload is abandoned if the engine stopped just before commit; write failures are logged;
-  the busy-port test binds inside the try body.
+  only well-formed TFTP is ever answered: the server port serves RRQ/WRQ and gives error 4 to a well-formed DATA, ACK
+  or OACK, and a transfer socket gives error 5 to a stranger's DATA, ACK or OACK; an ERROR packet, and anything that
+  does not parse (unknown opcode, malformed request, oversized datagram), gets no reply on either, which closes the
+  TFTP-to-TFTP and the chargen/echo-style loops of CVE-2024-2169 (the final review's probe: 87,317 exchanges in 2 s
+  before, 0 after); the transfer limit is captured per start; a receive failure backs off 50 ms; a mid-read failure
+  sends an error to the client; a write is refused and abandoned when its length contradicts the announced `tsize`
+  (octet mode only), or when a DATA block exceeds the negotiated `blksize`, including a datagram larger than any
+  block (receive buffers hold one byte more than the largest packet); the upload is abandoned if the engine stopped
+  just before commit; write failures are logged, but not once the engine stopped, and by class name when the
+  exception has no message; after the final ACK of a write the server dallies for timeout x retries (5 s at the
+  defaults), holding the transfer slot that long; the busy-port test binds inside the try body.
   Deferred: TFTP transfers use their own pool (at most 16 threads), not the plugin executor; a WRQ with an oversized
-  `tsize` aimed at a refused path gets "disk full" (error 3) rather than error 2; the final dally holds a transfer
-  slot for one timeout; the pre-commit stop guard covers a race that can't be tested deterministically; from FS-3:
+  `tsize` aimed at a refused path gets "disk full" (error 3) rather than error 2; a malformed request gets no reply
+  (a text reply could start with 00 01 or 00 02), so a broken client only times out; a completed write is reported
+  complete in the activity log only after the dally; the pre-commit stop guard covers a race that can't be tested
+  deterministically; from FS-3:
   sshd refuses some malformed or oversized SFTP writes before File Server's listener sees them, so a later CLOSE
   still commits that upload without the chunk (only the client harms its own upload). GUI checks pending: `tftp` /
   `curl tftp://` from another computer, a PXE or firmware client, the macOS firewall prompt for UDP.
