@@ -25,6 +25,7 @@ import org.apache.sshd.common.file.nativefs.NativeFileSystemFactory;
 import org.apache.sshd.sftp.server.SftpSubsystemFactory;
 
 /** A loopback SSH server whose exec channels run real {@code sh} commands and whose SFTP sees this machine's files. */
+@SuppressWarnings("try")
 final class ProjectsFixture implements AutoCloseable {
     final LoopbackServer server = new LoopbackServer();
     final ExecutorService background = Executors.newVirtualThreadPerTaskExecutor();

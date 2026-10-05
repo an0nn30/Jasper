@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -23,11 +24,20 @@ class ScriptsTest {
     Run run(byte[] script, Path home, String marker) throws Exception {
         assumeTrue(!System.getProperty("os.name").startsWith("Windows"));
         var builder = new ProcessBuilder("sh", "-s").redirectError(ProcessBuilder.Redirect.DISCARD);
-        builder.environment().put("HOME", home.toString());
+        if (home == null) builder.environment().remove("HOME"); else builder.environment().put("HOME", home.toString());
         Process process = builder.start();
         try (var stdin = process.getOutputStream()) { stdin.write(script); }
-        byte[] output = process.getInputStream().readAllBytes();
-        assertThat(process.waitFor(10, TimeUnit.SECONDS)).isTrue();
+        var reading = CompletableFuture.supplyAsync(() -> {
+            try { return process.getInputStream().readAllBytes(); }
+            catch (IOException closed) { return new byte[0]; }
+        });
+        byte[] output;
+        try {
+            output = reading.get(10, TimeUnit.SECONDS);
+            assertThat(process.waitFor(10, TimeUnit.SECONDS)).as("script finished").isTrue();
+        } finally {
+            process.destroyForcibly();
+        }
         var fields = new ArrayList<String>();
         byte[] start = (marker + "\0").getBytes(StandardCharsets.UTF_8);
         int at = indexOf(output, start);
@@ -59,11 +69,13 @@ class ScriptsTest {
         Files.writeString(app.resolve("Shop.sln"), "");
         Path lib = Files.createDirectories(app.resolve("lib"));
         Files.writeString(lib.resolve("Cargo.toml"), "");
-        List<String> folders = List.of(lib.toString(), app.toString(), home.resolve("src").toString(), home.toString(), home.getParent().toString());
-        var run = run(Scripts.exists(folders, Set.of(".git", "Cargo.toml", "*.sln")), home, Scripts.EXISTS);
+        List<String> folders = List.of(lib.toString(), app.toString(), home.resolve("src").toString(), home.toString(), home + "/",
+            home.getParent().toString(), home.getParent() + "/", "/");
+        var run = run(Scripts.exists(folders, Set.of(".git", "Cargo.toml", "*.sln", "usr", "us*")), home, Scripts.EXISTS);
         assertThat(run.status()).isZero();
         Map<String, Set<String>> found = Scripts.pairs(run.fields());
         assertThat(found).containsOnlyKeys(lib.toString(), app.toString());
+        assertThat(found).as("home, its ancestors and / report nothing").doesNotContainKeys("/", home.toString(), home + "/", home.getParent().toString());
         assertThat(found.get(lib.toString())).containsExactly("Cargo.toml");
         assertThat(found.get(app.toString())).containsExactlyInAnyOrder(".git", "Shop.sln");
         assertThat(dir.resolve("pwned")).as("names are data, never code").doesNotExist();
@@ -94,6 +106,7 @@ class ScriptsTest {
         var run = run(Scripts.git(root.toString()), home, Scripts.LIST);
         assertThat(run.status()).isZero();
         assertThat(run.fields()).containsExactlyInAnyOrder(".gitignore", "kept.txt");
+        assertThat(run(Scripts.git(root.toString()), null, Scripts.LIST).fields()).as("no HOME is no home folder").contains("kept.txt");
         git(home, "init", "-q");
         Path plain = Files.createDirectories(home.resolve("plain"));
         assertThat(run(Scripts.git(plain.toString()), home, Scripts.LIST).status()).as("home's own work tree").isEqualTo(4);
