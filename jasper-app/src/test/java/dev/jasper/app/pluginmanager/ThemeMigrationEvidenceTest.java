@@ -7,13 +7,16 @@ import static dev.jasper.sdk.contracts.ThemeMigrationCapture.save;
 class ThemeMigrationEvidenceTest {
     @Test void capturesRealRemovalConfirmation() throws Exception {
         ThemeMigrationCapture.themes(theme -> {
-            new dev.jasper.app.appearance.ThemeController().configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
-            var consent = new ConsentView("Fixture plugin", "1.0.0", "Fixture vendor", java.util.List.of("palette.contribute"), false, "Allow", () -> { }, () -> { });
-            save("plugin-manager", theme, "consent", consent, 680, 360);
-            var confirm = new ConfirmView("Remove the fixture plugin? Its settings remain available.", "Remove", () -> { }, () -> { });
-            save("plugin-manager", theme, "remove-confirmation", confirm, 600, 200);
-            confirm.ok.setEnabled(false);
-            save("plugin-manager", theme, "removal-busy", confirm, 600, 200);
+            var controller = new dev.jasper.app.appearance.ThemeController();
+            controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var kit = controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
+            var consent = new ConsentView(kit, "Fixture plugin", "1.0.0", "Fixture vendor", java.util.List.of("palette.contribute"), false, "Allow", () -> { }, () -> { });
+            save("plugin-manager", theme, "consent", consent.view(), 680, 360);
+            var confirm = new ConfirmView(kit, "Remove the fixture plugin?", "Its settings remain available.", "Remove", () -> { }, () -> { });
+            save("plugin-manager", theme, "remove-confirmation", confirm.view(), 600, 200);
+            confirm.busy(true);
+            save("plugin-manager", theme, "removal-busy", confirm.view(), 600, 200);
+            consent.close(); confirm.close(); controller.close();
         });
     }
 }

@@ -101,6 +101,20 @@ class NoticeKitTest {
         });
     }
 
+    @Test void theKeysContinueFromASelectionTheHostMade() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var rows = List.of(plugin("a", true, READY, Optional.empty()), plugin("b", true, READY, Optional.empty()), plugin("c", true, READY, Optional.empty()));
+            try (var view = new KitView(context, new ViewSpec(plugins(rows, Set.of("a"))), events::add)) {
+                view.setSize(420, 300); InteractiveRowsTest.layout(view);
+                var owner = (ItemLists.ListControl) view.control("plugins");
+                view.update(new ViewSpec(plugins(rows, Set.of("b"))));
+                owner.canvas.getActionMap().get("DOWN").actionPerformed(null);
+                assertThat(events).as("Down moves on from the host's row").containsExactly(new UiEvent.Selected("plugins", Set.of("c")));
+            } finally { release(context); }
+        });
+    }
+
     @Test void aSwitchShowsItsTooltipUnlessAnErrorTakesPrecedence() {
         Edt.run(() -> {
             var context = KitFixtures.context();

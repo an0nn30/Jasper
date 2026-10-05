@@ -1,185 +1,198 @@
 package dev.jasper.app.pluginmanager;
 
-import com.formdev.flatlaf.FlatClientProperties;
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.plugins.PluginRuntime;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.MenuItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.Option;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.FlowLayout;
-import java.awt.Font;
+import java.awt.Dimension;
+import java.awt.Graphics;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
 import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
+import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
-import javax.swing.UIManager;
 
-/** The selected plugin: header, primary action and ▾ menu, then Overview and Details tabs. A passive view; EDT only. */
-final class PluginDetails extends JPanel {
-    final JButton primary = new JButton();
-    final JButton more = new JButton("▾");
-    final JButton homepage = new JButton("Plugin homepage ↗");
-    final JTabbedPane tabs = new JTabbedPane();
-    private final JLabel icon = new JLabel();
-    private final JLabel name = PluginManagerPanel.plain(new JLabel(" "));
-    private final JLabel vendor = PluginManagerPanel.plain(new JLabel());
-    private final JLabel version = PluginManagerPanel.plain(new JLabel());
-    private final JTextArea overview = area();
-    private final JTextArea details = area();
-    private final JPanel header = new JPanel(new BorderLayout(14, 0));
-    private final PluginManagerPanel.Handlers handlers;
+/**
+ * The selected plugin: its icon, name, vendor and homepage, the primary action, More actions and the version, then an
+ * Overview | Details choice over one read-only text area. A passive view built from kit views; EDT only.
+ */
+final class PluginDetails {
+    static final String PRIMARY = "primary", MORE = "more", HOMEPAGE = "homepage", SECTION = "section";
+    static final String OVERVIEW = "overview", DETAILS = "details";
+    private static final String ICON = "plugin.icon", TEXT = "plugin.text";
+    private final KitContext kit;
+    private final JPanel component = new JPanel(new BorderLayout());
+    private final KitView header, body;
+    private final IconCanvas icon = new IconCanvas();
+    private final JTextArea text = new JTextArea();
+    private final AutoCloseable theme;
     private PluginRuntime.Row row;
+    private boolean busy;
+    private String section = OVERVIEW;
 
-    PluginDetails(PluginManagerPanel.Handlers handlers) {
-        super(new BorderLayout(0, 12));
-        this.handlers = handlers;
-        setBorder(BorderFactory.createEmptyBorder(4, 16, 4, 4));
-        homepage.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
-        more.setToolTipText("More actions");
-        more.getAccessibleContext().setAccessibleName("More actions");
-        homepage.setMargin(new java.awt.Insets(0, 0, 0, 0));
-        homepage.setHorizontalAlignment(javax.swing.SwingConstants.LEADING);
-        var actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
-        actions.setOpaque(false);
-        actions.add(primary);
-        actions.add(more);
-        actions.add(Box.createHorizontalStrut(12));
-        actions.add(version);
-        var text = new JPanel();
-        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-        text.setOpaque(false);
-        // The homepage has a line of its own: beside a long vendor name it would wrap out of sight.
-        for (JComponent part : List.of(name, vendor, homepage, actions)) {
-            part.setAlignmentX(0f);
-            text.add(part);
-            text.add(Box.createVerticalStrut(6));
-        }
-        header.setOpaque(false);
-        header.add(icon, BorderLayout.WEST);
-        header.add(text, BorderLayout.CENTER);
-        add(header, BorderLayout.NORTH);
-        tabs.addTab("Overview", scroll(overview));
-        tabs.addTab("Details", scroll(details));
-        add(tabs, BorderLayout.CENTER);
-        primary.addActionListener(event -> {
-            if (row != null) (row.needsConsent() ? handlers.review() : handlers.toggle()).accept(row);
+    PluginDetails(KitContext kit, Consumer<UiEvent> events) {
+        this.kit = kit;
+        header = new KitView(kit, headerSpec(), event -> {
+            if (event instanceof UiEvent.Selected chosen && chosen.id().equals(SECTION)) {
+                chosen.ids().stream().findFirst().ifPresent(this::section);
+                return;
+            }
+            events.accept(event);
         });
-        more.addActionListener(event -> { if (row != null) menu().show(more, 0, more.getHeight()); });
-        homepage.addActionListener(event -> { if (row != null) homepage(row).ifPresent(handlers.browse()); });
+        header.registerContent(ICON, icon, () -> { });
+        body = new KitView(kit, new ViewSpec(new Nodes.Custom("plugin-text", ControlState.READY, TEXT, Nodes.CustomKind.EDITOR, "Overview")), events);
+        text.setEditable(false);
+        text.setLineWrap(true);
+        text.setWrapStyleWord(true);
+        text.setOpaque(false);
+        text.putClientProperty("html.disable", Boolean.TRUE);
+        // Specialized read-only text: selectable and scrollable like the former tabs, painted from module roles.
+        var scroll = new JScrollPane(text, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        body.registerContent(TEXT, scroll, () -> { });
+        component.setOpaque(false);
+        component.add(header, BorderLayout.NORTH);
+        component.add(body, BorderLayout.CENTER);
+        theme = kit.binding().subscribe(pair -> restyle());
         restyle();
         show(null, false);
     }
 
-    @Override public void updateUI() {
-        super.updateUI();
-        // Called by JPanel's constructor, before the labels exist.
-        if (version != null) restyle();
-    }
+    JComponent component() { return component; }
 
+    /** Geometry and colours from the module: the former gaps and paddings as named metrics. */
     private void restyle() {
-        Font base = UIManager.getFont("Label.font");
-        if (base != null) name.setFont(base.deriveFont(Font.BOLD, base.getSize2D() + 5f));
-        Color secondary = UIManager.getColor("Label.disabledForeground");
-        vendor.setForeground(secondary);
-        version.setForeground(secondary);
-        Color link = UIManager.getColor("Component.linkColor");
-        if (link != null) homepage.setForeground(link);
+        int edge = metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING);
+        component.setBorder(BorderFactory.createEmptyBorder(edge, metric(DesignMetrics.Role.PLUGIN_DETAILS_LEADING_PADDING), edge, edge));
+        ((BorderLayout) component.getLayout()).setVgap(metric(DesignMetrics.Role.PLUGIN_DETAILS_GAP));
+        int vertical = metric(DesignMetrics.Role.PLUGIN_TEXT_VERTICAL_PADDING), side = metric(DesignMetrics.Role.PLUGIN_TEXT_SIDE_PADDING);
+        text.setBorder(BorderFactory.createEmptyBorder(vertical, side, vertical, side));
+        var font = kit.typography().font(Typography.Role.BODY);
+        text.setFont(font.deriveFont(UIScale.scale(font.getSize2D())));
+        var palette = kit.theme().semantic();
+        text.setForeground(palette.color(SemanticColor.TEXT_PRIMARY));
+        text.setCaretColor(text.getForeground());
+        text.setSelectionColor(palette.color(SemanticColor.SELECTION_BG));
+        text.setSelectedTextColor(palette.color(SemanticColor.TEXT_PRIMARY));
+        icon.revalidate();
+        icon.repaint();
+        component.revalidate();
+        component.repaint();
     }
 
-    private static JTextArea area() {
-        var area = new JTextArea();
-        area.setEditable(false);
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-        area.setOpaque(false);
-        area.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-        return area;
-    }
-
-    private static JScrollPane scroll(JTextArea area) {
-        var scroll = new JScrollPane(area, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        return scroll;
-    }
+    private int metric(DesignMetrics.Role role) { return UIScale.scale(kit.metrics().value(role)); }
 
     /** Shows {@code shown}, or nothing when it is null; {@code busy} disables the actions. */
     void show(PluginRuntime.Row shown, boolean busy) {
-        row = shown;
-        header.setVisible(row != null);
-        tabs.setVisible(row != null);
-        if (row == null) {
-            overview.setText("");
-            details.setText("");
-            return;
-        }
-        icon.setIcon(PluginIcons.of(row, 64, PluginCard.greyed(row)));
-        name.setText(row.name());
-        vendor.setText(row.vendor().isBlank() ? row.origin() : row.vendor());
-        homepage.setVisible(homepage(row).isPresent());
-        version.setText(row.version());
-        primary.setVisible(PluginCard.toggleable(row));
-        primary.setText(row.needsConsent() ? "Review…" : row.enabled() ? "Disable" : "Enable");
-        primary.setEnabled(!busy);
-        more.setEnabled(!busy);
-        overview.setText(row.description().isBlank() ? "No description." : row.description());
-        overview.setCaretPosition(0);
-        details.setText(describe(row));
-        details.setCaretPosition(0);
+        this.row = shown;
+        this.busy = busy;
+        component.setVisible(shown != null);
+        icon.icon = shown == null ? null : PluginIcons.of(shown, kit.metrics().value(DesignMetrics.Role.PLUGIN_DETAIL_ICON), PluginCard.greyed(shown));
+        icon.revalidate();
+        icon.repaint();
+        if (!header.isClosed()) header.update(headerSpec());
+        fill();
     }
 
-    /** Everything the pane shows as text, for tests and search. */
+    /** Overview or Details: the chosen text replaces the other in the one text area. */
+    void section(String value) {
+        if (!value.equals(OVERVIEW) && !value.equals(DETAILS) || value.equals(section)) return;
+        section = value;
+        if (!header.isClosed()) header.update(headerSpec());
+        fill();
+    }
+
+    String section() { return section; }
+
+    private void fill() {
+        String next = row == null ? "" : section.equals(OVERVIEW) ? overview(row) : describe(row);
+        if (!next.equals(text.getText())) {
+            text.setText(next);
+            text.setCaretPosition(0);
+        }
+        text.getAccessibleContext().setAccessibleName(section.equals(OVERVIEW) ? "Overview" : "Details");
+    }
+
+    private static String overview(PluginRuntime.Row row) { return row.description().isBlank() ? "No description." : row.description(); }
+
+    private ViewSpec headerSpec() {
+        var shown = row;
+        boolean present = shown != null;
+        var hidden = new ControlState(false, true, false, "");
+        var actionsState = new ControlState(true, !busy, false, "");
+        List<MenuItem> items = present ? PluginCard.menu(shown, busy) : List.of(new MenuItem("none", "None", "", "none", false, false));
+        var primary = new Nodes.Button(PRIMARY, present && PluginCard.toggleable(shown) ? actionsState : hidden,
+            present && shown.needsConsent() ? "Review…" : present && shown.enabled() ? "Disable" : "Enable", "", Nodes.ButtonKind.SECONDARY, PRIMARY, "");
+        var more = new Nodes.MenuButton(MORE, present ? actionsState : hidden, "", "chevron.down", Nodes.ButtonKind.SECONDARY, "", items, "More actions");
+        var actions = new Nodes.Stack("actions", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(primary, more,
+            new Nodes.Text("version", ControlState.READY, present ? shown.version() : " ", Nodes.TextRole.CAPTION)));
+        var identity = new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE),
+            new Nodes.Text("vendor", ControlState.READY, present ? (shown.vendor().isBlank() ? shown.origin() : shown.vendor()) : " ", Nodes.TextRole.DESCRIPTION),
+            new Nodes.Button(HOMEPAGE, present && homepage(shown).isPresent() ? ControlState.READY : hidden, "Plugin homepage ↗", "", Nodes.ButtonKind.LINK, HOMEPAGE, ""),
+            actions));
+        var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Custom("icon", ControlState.READY, ICON, Nodes.CustomKind.PREVIEW, present ? shown.name() + " icon" : "Plugin icon"), identity));
+        var choice = new Nodes.Choice(SECTION, ControlState.READY, Nodes.ChoiceKind.SEGMENTED,
+            List.of(new Option(OVERVIEW, "Overview", Optional.empty()), new Option(DETAILS, "Details", Optional.empty())), section,
+            "Plugin information", "");
+        return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, choice)));
+    }
+
+    /** Everything the pane shows as text, for tests and search: the header, the overview and the details. */
     String text() {
         if (row == null) return "";
-        return name.getText() + " " + version.getText() + "\n" + vendor.getText() + "\n\n" + overview.getText() + "\n\n" + details.getText();
+        String vendor = row.vendor().isBlank() ? row.origin() : row.vendor();
+        return row.name() + " " + row.version() + "\n" + vendor + "\n\n" + overview(row) + "\n\n" + describe(row);
     }
 
-    /** The selected plugin's other actions: the three openers, then Remove…, Keep or Discard Install when it has one. */
-    JPopupMenu menu() {
-        var menu = new JPopupMenu();
-        if (row == null) return menu;
-        PluginRuntime.Row shown = row;
-        item(menu, "Open Settings", () -> handlers.openSettings().accept(shown));
-        item(menu, "Open Plugin Folder", () -> handlers.openFolder().accept(shown));
-        item(menu, "Open Data Folder", () -> handlers.openData().accept(shown));
-        String removal = removal(shown);
-        if (!removal.isEmpty()) {
-            menu.addSeparator();
-            item(menu, removal, () -> (shown.pendingInstall() ? handlers.discard() : handlers.remove()).accept(shown));
-        }
-        return menu;
-    }
+    /** The text the one text area shows now. */
+    String shownText() { return text.getText(); }
 
-    private static void item(JPopupMenu menu, String label, Runnable action) {
-        var item = new JMenuItem(label);
-        item.addActionListener(event -> action.run());
-        menu.add(item);
-    }
+    JTextArea textArea() { return text; }
 
+    KitView header() { return header; }
+
+    /** The More actions menu as labels, a separator as "-". */
     List<String> menuLabels() {
-        List<String> labels = new ArrayList<>();
-        for (Component component : menu().getComponents())
-            labels.add(component instanceof JMenuItem item ? item.getText() : "-");
-        return labels;
+        if (row == null) return List.of();
+        return PluginCard.menu(row, busy).stream().map(item -> item.separator() ? "-" : item.label()).toList();
     }
 
-    void clickMenu(String label) {
-        for (Component component : menu().getComponents())
-            if (component instanceof JMenuItem item && item.getText().equals(label)) { item.doClick(); return; }
-        throw new IllegalArgumentException("No menu item " + label);
+    boolean homepageShown() { return row != null && homepage(row).isPresent(); }
+
+    void close() {
+        try { theme.close(); } catch (Exception ignored) { /* the binding outlives nothing that needs this */ }
+        header.close();
+        body.close();
+    }
+
+    /** The plugin's manifest icon (or Jasper's plugin logo) at its named size: specialized artwork, not a control. */
+    private final class IconCanvas extends JComponent {
+        Icon icon;
+        @Override public Dimension getPreferredSize() {
+            int size = metric(DesignMetrics.Role.PLUGIN_DETAIL_ICON);
+            return new Dimension(size, size);
+        }
+        @Override protected void paintComponent(Graphics graphics) { if (icon != null) icon.paintIcon(this, graphics, 0, 0); }
     }
 
     static String removal(PluginRuntime.Row row) {

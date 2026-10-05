@@ -235,9 +235,12 @@ final class InteractiveRows {
             data();
             if (!Objects.equals(declaredSelection, specifiedSelection())
                     || declaredMultiple != multiple()) {
-                // A selection the host made (not the echo of the user's own) is scrolled into view.
-                if (!selected.equals(specifiedSelection()) && !specifiedSelection().isEmpty())
+                // A selection the host made (not the echo of the user's own) is scrolled into view, and the arrow keys
+                // and Space continue from it, as from a selection the user made.
+                if (!selected.equals(specifiedSelection()) && !specifiedSelection().isEmpty()) {
                     pendingReveal = specifiedSelection().stream().min(Comparator.comparingInt(this::indexOf)).orElse(null);
+                    if (pendingReveal != null && !Objects.equals(focusItem, pendingReveal)) { focusItem = pendingReveal; focusControl = null; }
+                }
                 selected.clear();
                 selected.addAll(specifiedSelection());
                 declaredSelection = specifiedSelection();

@@ -3,28 +3,27 @@ package dev.jasper.app.pluginmanager;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.testsupport.EdtTestExtension;
-import java.awt.event.ActionEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
+import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.ui.model.UiEvent;
 import java.util.ArrayList;
 import java.util.List;
-import javax.swing.JComponent;
-import javax.swing.KeyStroke;
+import javax.swing.JLabel;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+/** The plugin rows as kit list rows: groups, badges, switches, search, selection, keys and each row's own menu. */
 @ExtendWith(EdtTestExtension.class)
 class PluginCardListTest {
-    private final List<String> events = new ArrayList<>();
-    private final List<String> menus = new ArrayList<>();
+    private final List<UiEvent> events = new ArrayList<>();
     private int selections;
-    private final PluginCardList list = new PluginCardList(row -> events.add("toggle:" + row.id()), () -> selections++,
-        (component, point) -> menus.add("menu"));
+    private PluginCardList list;
 
-    private void key(int code, int modifiers) {
-        Object name = list.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke(code, modifiers));
-        list.getActionMap().get(name).actionPerformed(new ActionEvent(list, ActionEvent.ACTION_PERFORMED, ""));
-    }
+    /** Kit views are EDT confined; the extension runs only the test methods there. */
+    @BeforeEach void open() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> list = new PluginCardList(KitTestSupport.context(), events::add, () -> selections++)); }
+
+    @AfterEach void close() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> list.close()); }
 
     @Test void cardsAreGroupedSortedAndCounted() {
         list.show(List.of(
@@ -37,6 +36,9 @@ class PluginCardListTest {
         assertThat(list.listed()).containsExactly("Local  1.0.0", "Alpha  1.0.0", "zeta tool  1.0.0", "Editor  1.0.0", "Remote  1.0.0");
         assertThat(list.selected()).as("the first visible card").isEqualTo("dev.example.local");
         assertThat(selections).isPositive();
+        var texts = PluginKit.texts(list.view());
+        assertThat(texts).as("the headings and rows are on screen, in order")
+            .containsSubsequence("Development", "Local", "User-installed (2 of 2 enabled)", "Alpha", "zeta tool", "Bundled (1 of 2 enabled)", "Editor", "Remote");
     }
 
     @Test void eachCardShowsAtMostOneBadgeInTheSpecsOrder() {
@@ -53,27 +55,32 @@ class PluginCardListTest {
             "Eight  1.0.0 — Restart to apply", "Five  1.0.0 — Failed", "Four  1.0.0 — Needs review",
             "One  1.0.0 — Remove at restart", "Seven  1.0.0", "Six  1.0.0 — Skipped",
             "Three  1.0.0 — Restart to apply", "Two  1.0.0 — Install at restart");
+        PluginKit.laidOut(list.view());
+        assertThat(KitTestSupport.find(list.view(), "badge-dot:a.five", javax.swing.JComponent.class)).as("a failure is marked as danger").isNotNull();
+        assertThat(KitTestSupport.find(list.view(), "badge-dot:a.three", javax.swing.JComponent.class)).as("a pending change is not").isNull();
+        assertThat(KitTestSupport.find(list.view(), "badge:a.seven", javax.swing.JComponent.class)).isNull();
     }
 
-    @Test void theCheckboxShowsTheSnapshotAndAsksTheHandler() {
+    @Test void theSwitchShowsTheSnapshotAndAsksTheHandlerOnce() {
         var rows = List.of(TestRows.plugin("a.on", "On").row(), TestRows.plugin("a.review", "Review").needsReview("terminal.inject").row(),
             TestRows.plugin("a.fixed", "Fixed").removing().row());
         list.show(rows);
-        list.card("a.on").enabled.doClick();
-        assertThat(events).containsExactly("toggle:a.on");
-        assertThat(list.card("a.on").enabled.isSelected()).as("what the snapshot says until the next one").isTrue();
-        assertThat(list.card("a.review").enabled.isSelected()).as("not running until reviewed").isFalse();
-        list.card("a.review").enabled.doClick();
-        assertThat(events).containsExactly("toggle:a.on", "toggle:a.review");
-        assertThat(list.card("a.review").enabled.isSelected()).isFalse();
+        PluginKit.toggle(list, "a.on").doClick(0);
+        assertThat(events).containsExactly(new UiEvent.Toggled("toggle:a.on", false));
+        assertThat(PluginKit.toggle(list, "a.on").isSelected()).as("what the snapshot says until the next one").isTrue();
+        assertThat(PluginKit.toggle(list, "a.review").isSelected()).as("not running until reviewed").isFalse();
+        PluginKit.toggle(list, "a.review").doClick(0);
+        assertThat(events).containsExactly(new UiEvent.Toggled("toggle:a.on", false), new UiEvent.Toggled("toggle:a.review", true));
+        assertThat(PluginKit.toggle(list, "a.review").isSelected()).isFalse();
         list.show(rows);
-        assertThat(list.card("a.on").enabled.isSelected()).isTrue();
-        assertThat(list.card("a.fixed").enabled.isEnabled()).isFalse();
-        assertThat(list.card("a.fixed").enabled.getToolTipText()).isEqualTo("Will be removed at restart");
+        assertThat(PluginKit.toggle(list, "a.on").isSelected()).isTrue();
+        assertThat(PluginKit.toggle(list, "a.fixed").isEnabled()).isFalse();
+        assertThat(PluginKit.toggle(list, "a.fixed").getToolTipText()).isEqualTo("Will be removed at restart");
+        assertThat(PluginKit.toggle(list, "a.on").getAccessibleContext().getAccessibleName()).isEqualTo("Enable On");
         list.busy(true);
-        assertThat(list.card("a.on").enabled.isEnabled()).isFalse();
+        assertThat(PluginKit.toggle(list, "a.on").isEnabled()).isFalse();
         list.busy(false);
-        assertThat(list.card("a.on").enabled.isEnabled()).isTrue();
+        assertThat(PluginKit.toggle(list, "a.on").isEnabled()).isTrue();
     }
 
     @Test void searchFiltersCardsHidesEmptyGroupsAndMovesTheSelection() {
@@ -91,10 +98,12 @@ class PluginCardListTest {
         list.search("nothing like it");
         assertThat(list.listed()).isEmpty();
         assertThat(list.emptyText()).isEqualTo("No plugins match");
+        assertThat(PluginKit.emptyTitle(list.view())).as("the empty state says so").isEqualTo("No plugins match");
         assertThat(list.selected()).isNull();
         list.search("");
         list.show(List.of());
         assertThat(list.emptyText()).isEqualTo("No plugins installed");
+        assertThat(PluginKit.emptyTitle(list.view())).isEqualTo("No plugins installed");
     }
 
     @Test void theSelectionSurvivesARefreshAndTheKeysMoveToggleAndOpenTheMenu() {
@@ -105,24 +114,44 @@ class PluginCardListTest {
         list.select("a.b");
         list.show(List.of(a, b, c));
         assertThat(list.selected()).isEqualTo("a.b");
-        key(KeyEvent.VK_DOWN, 0);
+        PluginKit.key(list.view(), "DOWN");
         assertThat(list.selected()).isEqualTo("a.c");
-        key(KeyEvent.VK_DOWN, 0);
+        PluginKit.key(list.view(), "DOWN");
         assertThat(list.selected()).as("stays on the last card").isEqualTo("a.c");
-        key(KeyEvent.VK_UP, 0);
+        PluginKit.key(list.view(), "UP");
         assertThat(list.selected()).isEqualTo("a.b");
-        key(KeyEvent.VK_SPACE, 0);
-        assertThat(events).containsExactly("toggle:a.b");
-        key(KeyEvent.VK_F10, InputEvent.SHIFT_DOWN_MASK);
-        key(KeyEvent.VK_CONTEXT_MENU, 0);
-        assertThat(menus).hasSize(2);
+        events.clear();
+        PluginKit.key(list.view(), "SPACE");
+        assertThat(events).as("Space operates the row's switch, once").containsExactly(new UiEvent.Toggled("toggle:a.b", false));
+        assertThat(list.selected()).isEqualTo("a.b");
+        var menu = PluginKit.rowMenuOf(list.view());
+        events.clear();
+        PluginKit.key(list.view(), "shift F10");
+        assertThat(PluginKit.labels(menu)).containsExactly("Open Settings", "Open Plugin Folder", "Open Data Folder", "-", "Remove…");
+        PluginKit.key(list.view(), "CONTEXT_MENU");
+        PluginKit.choose(menu, "Open Data Folder");
+        assertThat(events).as("the focused row's menu names that row").containsExactly(new UiEvent.Action("data:a.b"));
         list.show(List.of(a, c));
         assertThat(list.selected()).as("the first card when the selected one is gone").isEqualTo("a.a");
+    }
+
+    @Test void aRightClickOpensThatRowsMenuWithoutSelectingItAndReportsOnlyItsAction() {
+        list.show(List.of(TestRows.plugin("a.a", "A").row(), TestRows.plugin("a.b", "B").row()));
+        assertThat(list.selected()).isEqualTo("a.a");
+        selections = 0;
+        var menu = PluginKit.rowMenu(list.view(), "name:a.b");
+        assertThat(PluginKit.labels(menu)).containsExactly("Open Settings", "Open Plugin Folder", "Open Data Folder", "-", "Remove…");
+        PluginKit.choose(menu, "Remove…");
+        assertThat(events).containsExactly(new UiEvent.Action("remove:a.b"));
+        assertThat(list.selected()).as("a context press never selects").isEqualTo("a.a");
+        assertThat(selections).isZero();
     }
 
     @Test void pluginTextIsNeverMarkup() {
         list.show(List.of(TestRows.plugin("a.h", "<html><b>Bold").vendor("<html><i>Acme").row()));
         assertThat(list.listed()).containsExactly("<html><b>Bold  1.0.0");
-        assertThat(list.card("a.h").name.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
+        var name = KitTestSupport.require(PluginKit.laidOut(list.view()), "name:a.h", JLabel.class);
+        assertThat(name.getText()).isEqualTo("<html><b>Bold");
+        assertThat(name.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
     }
 }

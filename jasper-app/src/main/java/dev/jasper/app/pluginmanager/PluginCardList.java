@@ -1,171 +1,137 @@
 package dev.jasper.app.pluginmanager;
 
 import dev.jasper.app.plugins.PluginRuntime;
-import java.awt.Component;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.ListItem;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import com.formdev.flatlaf.util.UIScale;
 import java.awt.Dimension;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.event.ActionEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.BiConsumer;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.KeyStroke;
-import javax.swing.Scrollable;
-import javax.swing.UIManager;
 
 /**
- * The plugins as cards under group headers (Development, User-installed, Bundled), filtered by a search. One visible card
- * is selected. The list is one focus stop: Up and Down move, Space toggles, Shift+F10 or the menu key opens the card's
- * menu. EDT only.
+ * The plugins as kit rows under group headings (Development, User-installed, Bundled), filtered by a search. One visible
+ * row is selected. The list is one focus stop: Up and Down move, Space operates the row's switch, Shift+F10 or the menu
+ * key opens the row's menu (a right click opens it on any row without selecting it). With nothing to show it is an empty
+ * state saying why. EDT only; the panel closes its view.
  */
-final class PluginCardList extends JPanel implements Scrollable {
-    /** A header's title and its plugins, sorted by name. */
-    record Group(String title, List<PluginRuntime.Row> rows) { }
+final class PluginCardList {
+    /** A header's origin and title and its plugins, sorted by name. */
+    record Group(String origin, String title, List<PluginRuntime.Row> rows) { }
 
-    private final Consumer<PluginRuntime.Row> toggle;
+    static final String LIST = "plugins";
+    private final KitView view;
     private final Runnable selectionChanged;
-    private final BiConsumer<Component, Point> menu;
-    private final List<PluginCard> cards = new ArrayList<>();
-    private final List<String> titles = new ArrayList<>();
-    private final JLabel empty = PluginManagerPanel.plain(new JLabel());
     private List<PluginRuntime.Row> rows = List.of();
+    private List<PluginRuntime.Row> shown = List.of();
+    private List<String> titles = List.of();
     private String query = "";
     private String selected;
     private boolean busy;
 
-    PluginCardList(Consumer<PluginRuntime.Row> toggle, Runnable selectionChanged, BiConsumer<Component, Point> menu) {
-        this.toggle = toggle;
+    PluginCardList(KitContext kit, Consumer<UiEvent> events, Runnable selectionChanged) {
         this.selectionChanged = selectionChanged;
-        this.menu = menu;
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setFocusable(true);
-        getAccessibleContext().setAccessibleName("Plugins");
-        empty.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
-        bind(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "jasper.up", () -> move(-1));
-        bind(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "jasper.down", () -> move(1));
-        bind(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), "jasper.toggle", () -> {
-            PluginCard card = card(selected);
-            if (card != null && card.enabled.isEnabled()) card.enabled.doClick();
+        view = new KitView(kit, spec(), event -> {
+            if (event instanceof UiEvent.Selected chosen && chosen.id().equals(LIST)) {
+                chosen.ids().stream().findFirst().filter(id -> row(id) != null).ifPresent(id -> { selected = id; selectionChanged.run(); });
+                return;
+            }
+            events.accept(event);
         });
-        bind(KeyStroke.getKeyStroke(KeyEvent.VK_F10, InputEvent.SHIFT_DOWN_MASK), "jasper.menu", this::menuAtSelection);
-        bind(KeyStroke.getKeyStroke(KeyEvent.VK_CONTEXT_MENU, 0), "jasper.menu", this::menuAtSelection);
-        rebuild();
+        view.getAccessibleContext().setAccessibleName("Plugins");
+        int pixels = UIScale.scale(kit.metrics().value(DesignMetrics.Role.PLUGIN_LIST_MIN_WIDTH));
+        view.setMinimumSize(new Dimension(pixels, UIScale.scale(kit.metrics().value(DesignMetrics.Role.PLUGIN_LIST_MIN_HEIGHT))));
     }
 
-    private void bind(KeyStroke stroke, String name, Runnable action) {
-        getInputMap(JComponent.WHEN_FOCUSED).put(stroke, name);
-        getActionMap().put(name, new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { action.run(); }
-        });
-    }
+    KitView view() { return view; }
 
     /** Replaces the plugins, keeping the selection and the search. */
     void show(List<PluginRuntime.Row> next) { rows = List.copyOf(next); rebuild(); }
 
     /** Shows only plugins whose name, vendor, description or id contains {@code text}, ignoring case. */
-    void search(String text) { query = text == null ? "" : text.strip(); rebuild(); }
+    void search(String text) {
+        String next = text == null ? "" : text.strip();
+        if (next.equals(query)) return;
+        query = next;
+        rebuild();
+    }
 
-    void busy(boolean value) { busy = value; cards.forEach(card -> card.busy(value)); }
+    void busy(boolean value) { if (busy == value) return; busy = value; rebuild(); }
 
-    /** Selects the visible card for {@code id}; does nothing when it is not shown. */
+    /** Selects the visible row for {@code id}; does nothing when it is not shown. */
     void select(String id) {
-        PluginCard card = card(id);
-        if (card == null) return;
+        if (row(id) == null) return;
         selected = id;
-        applySelection();
-        scrollRectToVisible(card.getBounds());
+        render();
         selectionChanged.run();
     }
 
     String selected() { return selected; }
 
-    PluginRuntime.Row selectedRow() {
-        PluginCard card = card(selected);
-        return card == null ? null : card.row();
-    }
+    PluginRuntime.Row selectedRow() { return row(selected); }
 
-    PluginCard card(String id) {
+    /** The shown row for {@code id}, or null. */
+    PluginRuntime.Row row(String id) {
         if (id == null) return null;
-        for (PluginCard card : cards) if (card.row().id().equals(id)) return card;
+        for (PluginRuntime.Row row : shown) if (row.id().equals(id)) return row;
         return null;
     }
 
-    List<String> listed() { return cards.stream().map(PluginCard::text).toList(); }
+    List<String> listed() { return shown.stream().map(PluginCard::text).toList(); }
 
-    List<String> groupTitles() { return List.copyOf(titles); }
+    List<String> groupTitles() { return titles; }
 
-    /** The text shown when no card is, or empty. */
-    String emptyText() { return empty.getParent() == this ? empty.getText() : ""; }
+    /** The text shown when no row is, or empty. */
+    String emptyText() { return shown.isEmpty() ? empty() : ""; }
+
+    private String empty() { return rows.isEmpty() ? "No plugins installed" : "No plugins match"; }
+
+    void close() { view.close(); }
 
     private void rebuild() {
-        removeAll();
-        cards.clear();
-        titles.clear();
+        var visible = new ArrayList<PluginRuntime.Row>();
+        var headings = new ArrayList<String>();
         for (Group group : groups(rows)) {
-            List<PluginRuntime.Row> shown = group.rows().stream().filter(row -> matches(row, query)).toList();
-            if (shown.isEmpty()) continue;
-            titles.add(group.title());
-            add(header(group.title()));
-            for (PluginRuntime.Row row : shown) {
-                var card = new PluginCard(row, () -> toggle.accept(row), () -> { requestFocusInWindow(); select(row.id()); },
-                    event -> popup(event));
-                card.setAlignmentX(0f);
-                card.busy(busy);
-                cards.add(card);
-                add(card);
-            }
+            List<PluginRuntime.Row> matching = group.rows().stream().filter(row -> matches(row, query)).toList();
+            if (matching.isEmpty()) continue;
+            headings.add(group.title());
+            visible.addAll(matching);
         }
-        if (cards.isEmpty()) {
-            empty.setText(rows.isEmpty() ? "No plugins installed" : "No plugins match");
-            empty.setAlignmentX(0f);
-            add(empty);
-        }
-        if (card(selected) == null) selected = cards.isEmpty() ? null : cards.get(0).row().id();
-        applySelection();
-        revalidate();
-        repaint();
+        shown = List.copyOf(visible);
+        titles = List.copyOf(headings);
+        if (row(selected) == null) selected = shown.isEmpty() ? null : shown.getFirst().id();
+        render();
         selectionChanged.run();
     }
 
-    private JComponent header(String title) {
-        var label = PluginManagerPanel.plain(new JLabel(title));
-        label.setForeground(UIManager.getColor("Label.disabledForeground"));
-        label.setBorder(BorderFactory.createEmptyBorder(10, 10, 4, 10));
-        var holder = new JPanel(new java.awt.BorderLayout()) {
-            @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
-        };
-        holder.setOpaque(false);
-        holder.setAlignmentX(0f);
-        holder.add(label);
-        return holder;
+    private void render() { if (!view.isClosed()) view.update(spec()); }
+
+    private ViewSpec spec() {
+        if (shown.isEmpty()) return new ViewSpec(new Nodes.Empty("plugins-empty", ControlState.READY,
+            new Nodes.Icon("plugins-empty-icon", ControlState.READY, "plugin", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Plugins"),
+            empty(), "", List.of()));
+        var items = new ArrayList<ListItem>();
+        for (Group group : groups(rows)) {
+            List<PluginRuntime.Row> matching = group.rows().stream().filter(row -> matches(row, query)).toList();
+            if (matching.isEmpty()) continue;
+            String heading = "group:" + group.origin();
+            items.add(new ListItem(heading, Optional.empty(), List.of(new Nodes.Text(heading + ":title", ControlState.READY, group.title(),
+                Nodes.TextRole.CAPTION)), List.of(), List.of(), true));
+            for (PluginRuntime.Row row : matching) items.add(PluginCard.item(row, busy));
+        }
+        return new ViewSpec(new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.DOUBLE, items,
+            selected == null ? Set.of() : Set.of(selected), "", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty()));
     }
-
-    private void applySelection() { cards.forEach(card -> card.setSelected(card.row().id().equals(selected))); }
-
-    private void move(int by) {
-        int index = cards.indexOf(card(selected));
-        int target = Math.max(0, Math.min(cards.size() - 1, index + by));
-        if (!cards.isEmpty() && target != index) select(cards.get(target).row().id());
-    }
-
-    private void menuAtSelection() {
-        PluginCard card = card(selected);
-        if (card != null) menu.accept(card, new Point(12, card.getHeight() / 2));
-    }
-
-    private void popup(MouseEvent event) { menu.accept(event.getComponent(), event.getPoint()); }
 
     /** The groups in page order, each sorted by name ignoring case; empty groups are left out. */
     static List<Group> groups(List<PluginRuntime.Row> rows) {
@@ -180,7 +146,7 @@ final class PluginCardList extends JPanel implements Scrollable {
                 case "Installed" -> "User-installed (" + on + " of " + members.size() + " enabled)";
                 default -> "Bundled (" + on + " of " + members.size() + " enabled)";
             };
-            result.add(new Group(title, members));
+            result.add(new Group(origin, title, members));
         }
         return result;
     }
@@ -190,10 +156,4 @@ final class PluginCardList extends JPanel implements Scrollable {
         String haystack = String.join("\n", row.name(), row.vendor(), row.description(), row.id()).toLowerCase(Locale.ROOT);
         return haystack.contains(query.toLowerCase(Locale.ROOT));
     }
-
-    @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
-    @Override public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction) { return 16; }
-    @Override public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction) { return visible.height; }
-    @Override public boolean getScrollableTracksViewportWidth() { return true; }
-    @Override public boolean getScrollableTracksViewportHeight() { return false; }
 }

@@ -312,6 +312,8 @@ rule; prior constructors remain and default to the old meaning):
   row whether or not it is selected, as on TableRow/TreeItem rows: a context press never selects, and a chosen item
   reports only its `Action`. The list's shared `contextActions` still act on the selection and open only on a selected
   row. Every row collection opens the focused row's menu with the menu key and with Shift+F10.
+- A selection the host sets (not the echo of the user's own) also becomes the keyboard row: the arrow keys, Space and
+  the menu keys continue from it, as they do from a row the user chose.
 - Space on a focused item-list row whose trailing slot holds exactly one `Toggle` operates that switch: it reports
   `Toggled(toggleId, !checked)` once and neither selects nor activates the row, so a list of switch rows stays one
   focus stop; a disabled or busy switch makes Space do nothing. Rows without exactly one switch select as before.
