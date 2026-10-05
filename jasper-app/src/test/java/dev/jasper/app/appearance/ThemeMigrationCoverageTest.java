@@ -26,7 +26,7 @@ class ThemeMigrationCoverageTest {
             assertThat(paths.add(row.get(0))).as("unique source: %s", row.get(0)).isTrue();
             String disposition = row.get(7);
             if ((disposition.startsWith("Removed in Plan 2 Tasks 2-3; authority=") || disposition.startsWith("Removed in Plan 2 Task 5; authority=")
-                    || disposition.startsWith("Removed in Plan 2 Task 6a; authority="))) {
+                    || disposition.startsWith("Removed in Plan 2 Task 6a; authority=") || disposition.startsWith("Removed in Plan 2 Task 6b; authority="))) {
                 assertThat(Files.exists(ROOT.resolve(row.get(0)))).as("removed source: %s", row.get(0)).isFalse();
                 String authority = disposition.substring(disposition.indexOf("authority=") + 10).split(";", 2)[0];
                 assertThat(Files.isRegularFile(ROOT.resolve(authority))).as("replacement authority: %s", authority).isTrue();

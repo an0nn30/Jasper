@@ -416,6 +416,28 @@ class BrowserKitTest {
         });
     }
 
+    @Test void actionsTooWideForOneRowWrapAtTheirNaturalWidthsInsteadOfBeingCutShort() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var buttons = List.<Node>of(new Nodes.Button("set", READY, "Set", "", ButtonKind.PRIMARY, "set", ""),
+                new Nodes.Button("cancel", READY, "Cancel", "", ButtonKind.SECONDARY, "cancel", ""),
+                new Nodes.Button("remove", READY, "Remove shortcut", "", ButtonKind.GHOST, "remove", ""),
+                new Nodes.Button("restore", READY, "Restore default", "", ButtonKind.GHOST, "restore", ""));
+            try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("actions", READY, LayoutRole.ACTIONS, buttons)), e -> {})) {
+                var row = find(view, "actions", JComponent.class);
+                int natural = row.getPreferredSize().width;
+                view.setSize(natural + 10, 200); InteractiveRowsTest.layout(view);
+                var restore = find(view, "restore", JButton.class);
+                assertThat(restore.getY()).as("wide enough: one row").isEqualTo(find(view, "set", JButton.class).getY());
+                view.setSize(natural * 2 / 3, 200); row.setSize(natural * 2 / 3, 200); InteractiveRowsTest.layout(view);
+                assertThat(restore.getY()).as("Restore wrapped to a second row").isGreaterThan(0);
+                assertThat(restore.getWidth()).as("at its natural width").isEqualTo(restore.getPreferredSize().width);
+                assertThat(Composition.height(row, natural * 2 / 3)).as("the stack grows to show both rows")
+                    .isGreaterThanOrEqualTo(restore.getY() + restore.getHeight());
+            } finally { release(context); }
+        });
+    }
+
     @Test void newPlaceGlyphsAreNamedKitArtwork() {
         try (var icons = new dev.jasper.ui.icons.IconRegistry()) {
             assertThat(icons.names()).contains("home", "desktop", "preview");

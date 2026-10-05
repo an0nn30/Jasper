@@ -1,199 +1,112 @@
 package dev.jasper.app.shortcuthelp;
 
-import com.formdev.flatlaf.FlatClientProperties;
-import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.platform.AppIcons;
-import java.awt.*;
-import java.awt.event.*;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.TreeItem;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
-import java.util.function.Consumer;
-import javax.swing.*;
-import javax.swing.event.TreeExpansionEvent;
-import javax.swing.event.TreeExpansionListener;
-import javax.swing.tree.*;
 
-/** Section disclosure state belongs to this window; searching reveals matches temporarily. */
-final class ShortcutTree extends JTree {
-    private final DefaultMutableTreeNode root = new DefaultMutableTreeNode();
-    private final DefaultTreeModel rows = new DefaultTreeModel(root);
-    private final Set<String> expanded = new HashSet<>();
+/**
+ * The grouped shortcut sections as a kit tree. Section disclosure belongs to this window; searching shows every
+ * section temporarily, and collapsing one while searching is not remembered. Item ids are {@code group/<name>} for a
+ * section and {@code action/<id>} for a shortcut. EDT only.
+ */
+final class ShortcutTree {
+    static final String ID = "shortcuts";
+    private static final String GROUP = "group/";
+    private static final String ACTION = "action/";
+
     private final boolean macOs;
-    private boolean filtering, rebuilding;
+    private final Set<String> expanded = new HashSet<>();
+    private final Set<String> collapsedWhileSearching = new HashSet<>();
+    private final LinkedHashMap<String, List<ShortcutEntry>> groups = new LinkedHashMap<>();
+    private boolean searching;
+    private String selected;
 
-    ShortcutTree(boolean macOs, Consumer<ShortcutEntry> edit) {
-        this.macOs = macOs;
-        setModel(rows); setRootVisible(false); setShowsRootHandles(true);
-        setToggleClickCount(1);
-        setCellRenderer(new Row());
-        setBorder(BorderFactory.createEmptyBorder(UIScale.scale(4), UIScale.scale(4), UIScale.scale(4), UIScale.scale(4)));
-        putClientProperty(FlatClientProperties.STYLE, "icon.arrowType: chevron");
-        putClientProperty(FlatClientProperties.TREE_WIDE_SELECTION, true);
-        putClientProperty(FlatClientProperties.TREE_WIDE_CELL_RENDERER, true);
-        getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
-        getAccessibleContext().setAccessibleName("Keyboard shortcuts grouped by section or plugin");
-        addTreeExpansionListener(new TreeExpansionListener() {
-            @Override public void treeExpanded(TreeExpansionEvent e) { remember(e, true); }
-            @Override public void treeCollapsed(TreeExpansionEvent e) { remember(e, false); }
-            private void remember(TreeExpansionEvent e, boolean open) {
-                if (filtering || rebuilding) return;
-                Object value = ((DefaultMutableTreeNode) e.getPath().getLastPathComponent()).getUserObject();
-                if (value instanceof String group) { if (open) expanded.add(group); else expanded.remove(group); }
-            }
-        });
-        addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) {
-                if (!SwingUtilities.isLeftMouseButton(e)) return;
-                var path = pathAt(e.getPoint());
-                if (path != null && entry(path) != null) edit.accept(entry(path));
-            }
-        });
-        getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "editShortcut");
-        getActionMap().put("editShortcut", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) {
-                var path = getSelectionPath();
-                if (path == null) return;
-                var item = entry(path);
-                if (item != null) edit.accept(item);
-                else if (isExpanded(path)) collapsePath(path); else expandPath(path);
-            }
-        });
-    }
+    ShortcutTree(boolean macOs) { this.macOs = macOs; }
 
-    @Override public void updateUI() {
-        super.updateUI();
-        setBackground(UIManager.getColor("Panel.background"));
-        if (getFont() != null) setRowHeight(getFontMetrics(getFont()).getHeight() + UIScale.scale(12));
-    }
+    static String groupId(String group) { return GROUP + group; }
+    static String actionId(ShortcutEntry entry) { return ACTION + entry.id(); }
 
-    @Override public boolean getScrollableTracksViewportWidth() { return true; }
-
-    @Override public String convertValueToText(Object value, boolean selected, boolean expanded,
-            boolean leaf, int row, boolean focused) {
-        Object item = value instanceof DefaultMutableTreeNode node ? node.getUserObject() : value;
-        return item instanceof ShortcutEntry shortcut ? shortcut.name() : item == null ? "" : item.toString();
-    }
-
-    // FlatLaf widens painting and selection independently of JTree's preferred-width hit bounds.
-    private TreePath pathAt(Point point) {
-        if (!contains(point)) return null;
-        var path = getClosestPathForLocation(point.x, point.y);
-        var bounds = path == null ? null : getPathBounds(path);
-        return bounds != null && point.x >= bounds.x && point.y >= bounds.y && point.y < bounds.y + bounds.height ? path : null;
-    }
-
-    @Override public String getToolTipText(MouseEvent event) {
-        var path = pathAt(event.getPoint());
-        if (path == null) return null;
-        var item = entry(path);
-        return item != null ? item.context() + (item.editable() ? " · Click to edit" : " · Read-only contextual key")
-            : isExpanded(path) ? "Collapse section" : "Expand section";
-    }
-
+    /** Shows {@code matches}; a search reveals every section until it ends. */
     void showRows(List<ShortcutEntry> matches, boolean searching) {
-        ShortcutEntry selection = entry(getSelectionPath());
-        Object selectedGroup = getLastSelectedPathComponent() instanceof DefaultMutableTreeNode node ? node.getUserObject() : null;
-        filtering = searching; rebuilding = true;
-        try {
-            root.removeAllChildren();
-            var groups = new LinkedHashMap<String, DefaultMutableTreeNode>();
-            for (var item : matches) {
-                var group = groups.computeIfAbsent(item.group(), name -> {
-                    var created = new DefaultMutableTreeNode(name); root.add(created); return created;
-                });
-                group.add(new DefaultMutableTreeNode(item, false));
-            }
-            rows.reload();
-            for (var group : groups.values()) {
-                var path = new TreePath(group.getPath());
-                if (searching || expanded.contains(group.getUserObject())) expandPath(path);
-                if (selection == null && group.getUserObject().equals(selectedGroup)) setSelectionPath(path);
-                if (selection != null) for (int i = 0; i < group.getChildCount(); i++) {
-                    var child = (DefaultMutableTreeNode) group.getChildAt(i);
-                    if (((ShortcutEntry) child.getUserObject()).id().equals(selection.id()) && isExpanded(path))
-                        setSelectionPath(new TreePath(child.getPath()));
-                }
-            }
-        } finally { rebuilding = false; }
+        this.searching = searching;
+        collapsedWhileSearching.clear();
+        groups.clear();
+        for (var item : matches) groups.computeIfAbsent(item.group(), name -> new ArrayList<>()).add(item);
+        if (selected != null && !visibleIds().contains(selected)) selected = null;
     }
 
-    void expandSections(boolean open) {
-        for (int i = 0; i < root.getChildCount(); i++) {
-            var path = new TreePath(((DefaultMutableTreeNode) root.getChildAt(i)).getPath());
-            if (open) expandPath(path); else collapsePath(path);
-        }
+    /** The user opened or closed a section. */
+    void expanded(String itemId, boolean open) {
+        if (!isGroup(itemId)) return;
+        String group = itemId.substring(GROUP.length());
+        if (searching) { if (open) collapsedWhileSearching.remove(group); else collapsedWhileSearching.add(group); }
+        else if (open) expanded.add(group); else expanded.remove(group);
+        if (selected != null && !visibleIds().contains(selected)) selected = itemId;
     }
 
-    ShortcutEntry entryAt(int row) { return entry(getPathForRow(row)); }
+    /** Opens or closes every section, remembered unless searching. */
+    void expandSections(boolean open) { for (String group : List.copyOf(groups.keySet())) expanded(groupId(group), open); }
 
-    private static ShortcutEntry entry(TreePath path) {
-        return path != null && ((DefaultMutableTreeNode) path.getLastPathComponent()).getUserObject() instanceof ShortcutEntry item ? item : null;
+    boolean isOpen(String group) {
+        return searching ? !collapsedWhileSearching.contains(group) : expanded.contains(group);
     }
 
-    /** Wide rows keep the binding aligned to the right with where it applies beside it; long action names ellipsize. */
-    private final class Row extends JPanel implements TreeCellRenderer {
-        private final JLabel name = new JLabel(), where = new JLabel(), binding = new JLabel();
-        private final JPanel trailing = new JPanel(new BorderLayout(UIScale.scale(12), 0));
-        Row() {
-            super(new BorderLayout(UIScale.scale(20), 0));
-            setOpaque(false);
-            name.putClientProperty("html.disable", true); where.putClientProperty("html.disable", true);
-            binding.putClientProperty("html.disable", true);
-            name.setIconTextGap(UIScale.scale(8));
-            binding.setHorizontalAlignment(SwingConstants.TRAILING);
-            trailing.setOpaque(false);
-            trailing.add(where, BorderLayout.CENTER); trailing.add(binding, BorderLayout.EAST);
-            add(name, BorderLayout.CENTER); add(trailing, BorderLayout.EAST);
-            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(4), 0, UIScale.scale(12)));
-        }
-        @Override public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected,
-                boolean open, boolean leaf, int row, boolean focused) {
-            var node = (DefaultMutableTreeNode) value;
-            var item = node.getUserObject();
-            Color foreground = UIManager.getColor(selected && tree.hasFocus() ? "Tree.selectionForeground" : "Label.foreground");
-            Color link = UIManager.getColor("Component.linkColor");
-            // A row whose shortcut differs from its default is blue, and so is a section holding one, as IntelliJ shows them.
-            boolean customized = item instanceof ShortcutEntry shortcut ? shortcut.customized(macOs)
-                : java.util.Collections.list(node.children()).stream().anyMatch(child ->
-                    ((DefaultMutableTreeNode) child).getUserObject() instanceof ShortcutEntry entry && entry.customized(macOs));
-            name.setForeground(customized && link != null && !(selected && tree.hasFocus()) ? link : foreground);
-            Color dim = selected && tree.hasFocus() ? foreground : UIManager.getColor("Label.disabledForeground");
-            binding.setForeground(dim); where.setForeground(dim);
-            name.setFont(tree.getFont().deriveFont(item instanceof ShortcutEntry ? Font.PLAIN : Font.BOLD));
-            binding.setFont(tree.getFont());
-            where.setFont(tree.getFont().deriveFont(tree.getFont().getSize2D() - 1f));
-            if (item instanceof ShortcutEntry shortcut) {
-                name.setText(shortcut.name()); name.setIcon(null);
-                binding.setText(ShortcutText.format(shortcut.stroke()));
-                where.setText(shortcut.where());
-                setToolTipText(shortcut.context() + (shortcut.editable() ? " · Click to edit" : " · Read-only contextual key"));
-            } else {
-                name.setText(String.valueOf(item));
-                name.setIcon(AppIcons.bundled(open ? "general/open" : "nodes/folder"));
-                binding.setText(String.valueOf(node.getChildCount()));
-                where.setText("");
-                setToolTipText(open ? "Collapse section" : "Expand section");
+    boolean isOpenItem(String groupId) { return isGroup(groupId) && isOpen(groupId.substring(GROUP.length())); }
+
+    void select(String itemId) { selected = itemId; }
+    String selected() { return selected; }
+    boolean isGroup(String itemId) { return itemId != null && itemId.startsWith(GROUP); }
+
+    /** The shortcut an item id names, if it is one that is shown. */
+    Optional<ShortcutEntry> entry(String itemId) {
+        if (itemId == null || !itemId.startsWith(ACTION)) return Optional.empty();
+        for (var rows : groups.values()) for (var row : rows) if (actionId(row).equals(itemId)) return Optional.of(row);
+        return Optional.empty();
+    }
+
+    /** The ids of the rows on screen, top to bottom. */
+    List<String> visibleIds() {
+        var ids = new ArrayList<String>();
+        groups.forEach((group, rows) -> {
+            ids.add(groupId(group));
+            if (isOpen(group)) for (var row : rows) ids.add(actionId(row));
+        });
+        return ids;
+    }
+
+    int rowCount() { return visibleIds().size(); }
+
+    /** The shortcut on screen row {@code row}, or null for a section. */
+    ShortcutEntry entryAt(int row) {
+        var ids = visibleIds();
+        return row < 0 || row >= ids.size() ? null : entry(ids.get(row)).orElse(null);
+    }
+
+    Nodes.Tree descriptor() {
+        var roots = new ArrayList<TreeItem>();
+        var open = new HashSet<String>();
+        groups.forEach((group, rows) -> {
+            var children = new ArrayList<TreeItem>();
+            boolean customized = false;
+            for (var row : rows) {
+                customized |= row.customized(macOs);
+                children.add(new TreeItem(actionId(row), row.name(), Optional.empty(), true, List.of(), OptionalInt.empty(),
+                    row.customized(macOs), row.context() + (row.editable() ? " · Click to edit" : " · Read-only contextual key"),
+                    Optional.empty(), List.of(row.where(), ShortcutText.format(row.stroke())), Optional.empty()));
             }
-            column(where, 88); column(binding, 96);
-            getAccessibleContext().setAccessibleName(name.getText() + ", " + binding.getText()
-                + (where.getText().isEmpty() ? "" : ", " + where.getText()));
-            getAccessibleContext().setAccessibleDescription(getToolTipText());
-            return this;
-        }
-        /** A minimum width for a trailing label, so the Where and binding columns line up from row to row. */
-        private void column(JLabel label, int minimum) {
-            label.setPreferredSize(null);
-            Dimension natural = label.getPreferredSize();
-            label.setPreferredSize(new Dimension(Math.max(natural.width, UIScale.scale(minimum)), natural.height));
-        }
-        @Override public void setBounds(int x, int y, int width, int height) {
-            super.setBounds(x, y, width, height);
-            doLayout(); trailing.doLayout(); // CellRendererPane does not validate compound tree renderers.
-        }
-        @Override public Dimension getPreferredSize() {
-            return new Dimension(UIScale.scale(320), getRowHeight());
-        }
+            boolean shown = isOpen(group);
+            if (shown) open.add(groupId(group));
+            // A section holding a shortcut that differs from its default is emphasized, as IntelliJ shows it.
+            roots.add(new TreeItem(groupId(group), group, Optional.of("folder"), false, children, OptionalInt.of(rows.size()),
+                customized, shown ? "Collapse section" : "Expand section", Optional.empty(), List.of(), Optional.empty()));
+        });
+        return new Nodes.Tree(ID, ControlState.READY, roots, open, selected == null ? Set.of() : Set.of(selected), "edit");
     }
 }

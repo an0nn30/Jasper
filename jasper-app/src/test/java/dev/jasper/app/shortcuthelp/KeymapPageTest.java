@@ -26,7 +26,7 @@ class KeymapPageTest {
     private final int[] changes = {0};
     // The Keymap page never touches the core-setting draft.
     private final PageContext context = new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(),
-        () -> changes[0]++);
+        () -> changes[0]++, () -> null, dev.jasper.app.testsupport.KitTestSupport::context);
 
     private KeymapPage page() {
         return new KeymapPage(new KeymapPage.Hooks(contributions, () -> Map.copyOf(saved), () -> Map.of("dev.test", "Test Plugin"),
@@ -68,7 +68,7 @@ class KeymapPageTest {
             saved.put("copy", "ctrl+h");
             saved.put("paste", "ctrl+j");
             page[0].refresh();
-            page[0].panel().search.setText("Copy");
+            ShortcutKit.search(page[0].panel()).setText("Copy");
             assertThat(page[0].panel().tree.entryAt(1).stroke()).isEqualTo(KeyStroke.getKeyStroke("ctrl H"));
             page[0].dispose();
         });
@@ -90,7 +90,7 @@ class KeymapPageTest {
             assertThat(page[0].modified()).isTrue();
             page[0].reset();
             assertThat(page[0].modified()).isFalse();
-            page[0].panel().search.setText("Copy");
+            ShortcutKit.search(page[0].panel()).setText("Copy");
             assertThat(page[0].panel().tree.entryAt(1).stroke())
                 .isEqualTo(KeyBindings.defaults(true).strokeFor("copy").orElseThrow());
             page[0].dispose();
@@ -105,15 +105,15 @@ class KeymapPageTest {
             assertThat(page.searchTerms()).contains("Keymap", "Clipboard").anySatisfy(term -> assertThat(term).startsWith("Copy"));
             page.component();
             page.highlight("paste");
-            assertThat(page.panel().search.getText()).isEqualTo("paste");
+            assertThat(ShortcutKit.search(page.panel()).getText()).isEqualTo("paste");
             page.highlight("");
-            assertThat(page.panel().search.getText()).as("clearing Settings' search clears what it put there").isEmpty();
+            assertThat(ShortcutKit.search(page.panel()).getText()).as("clearing Settings' search clears what it put there").isEmpty();
             var action = contributions.addAction("dev.test.hello", "Hello", null, List.of(), Optional.of("cmd+alt+h"), ignored -> { });
-            page.panel().search.setText("hello");
+            ShortcutKit.search(page.panel()).setText("hello");
             assertThat(page.panel().tree.entryAt(1).group()).isEqualTo("Test Plugin");
             assertThat(page.searchTerms()).contains("Test Plugin");
             action.close();
-            assertThat(page.panel().tree.getRowCount()).isZero();
+            assertThat(page.panel().tree.rowCount()).isZero();
             page.dispose();
         });
     }

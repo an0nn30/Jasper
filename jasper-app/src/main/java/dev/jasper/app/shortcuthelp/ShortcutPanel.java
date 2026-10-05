@@ -1,45 +1,48 @@
 package dev.jasper.app.shortcuthelp;
 
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.WindowInput;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.KeyboardFocusManager;
+import java.awt.EventQueue;
 import java.awt.KeyEventDispatcher;
+import java.awt.KeyboardFocusManager;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 
-/** Expandable shortcut sections and window-scoped capture. Native dispatch exists only while mounted. */
+/**
+ * The Keymap page body: a layout-only shell around kit views for the search row, the section tools, the shortcut tree,
+ * the edit card and the status line, plus window-scoped key capture. Native dispatch exists only while mounted. EDT only.
+ */
 final class ShortcutPanel extends JPanel implements AutoCloseable {
-    final JTextField search = new JTextField();
-    final JButton record = new JButton("Record shortcut");
-    final JButton clear = new JButton("Clear");
+    static final String SEARCH = "search";
     final ShortcutTree tree;
     final ShortcutEditPanel editor;
-    private final JLabel status = new JLabel();
+    private final KitView top, tools, list, footer;
     private List<ShortcutEntry> all = List.of();
     private List<ShortcutEntry> visible = List.of();
+    private String query = "";
     private KeyStroke captured;
     private boolean recording;
-    private boolean editingCapture;
     private boolean closed;
     private boolean installed;
     private boolean swallowTyped;
@@ -51,83 +54,131 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     private final WindowInput.ShortcutRecorder nativeRecorder = new WindowInput.ShortcutRecorder(this::capture);
     private JRootPane mountedRoot;
 
-    ShortcutPanel(boolean macOs, Function<Map<String, Optional<String>>,
-            CompletableFuture<Void>> writer) {
-        super(new BorderLayout(0, 12));
-        editor = new ShortcutEditPanel(macOs, writer, this::stopSearchRecording);
-        setBorder(BorderFactory.createEmptyBorder(18, 18, 14, 18));
-        var top = new JPanel(new BorderLayout(10, 8)); top.setOpaque(false);
-        var label = new JLabel("Find a shortcut"); label.setLabelFor(search);
-        top.add(label, BorderLayout.NORTH);
-        search.putClientProperty("JTextField.placeholderText", "Search actions, plugins, or Cmd+Shift+H");
-        search.getAccessibleContext().setAccessibleName("Search keyboard shortcuts");
-        top.add(search, BorderLayout.CENTER);
-        var buttons = new JPanel(new java.awt.GridLayout(1, 2, 6, 0)); buttons.setOpaque(false);
-        buttons.add(record); buttons.add(clear); top.add(buttons, BorderLayout.EAST);
+    ShortcutPanel(KitContext context, boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer) {
+        super(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_SECTION_GAP)));
+        setOpaque(false);
+        tree = new ShortcutTree(macOs);
+        editor = new ShortcutEditPanel(context, macOs, writer, this::stopSearchRecording);
+        int side = scaled(context, DesignMetrics.Role.KEYMAP_PAGE_PADDING);
+        setBorder(BorderFactory.createEmptyBorder(side, side, scaled(context, DesignMetrics.Role.KEYMAP_PAGE_BOTTOM_PADDING), side));
+        top = new KitView(context, topSpec(), this::event);
+        tools = new KitView(context, toolsSpec(), this::event);
+        list = new KitView(context, new ViewSpec(tree.descriptor()), this::event);
+        footer = new KitView(context, statusSpec(), this::event);
         add(top, BorderLayout.NORTH);
-        tree = new ShortcutTree(macOs, this::editRow);
-        javax.swing.ToolTipManager.sharedInstance().registerComponent(tree);
-        var scroll = new JScrollPane(tree) {
-            @Override public void updateUI() {
-                super.updateUI();
-                setBorder(BorderFactory.createEmptyBorder());
-                setBackground(UIManager.getColor("Panel.background"));
-                getViewport().setBackground(getBackground());
-            }
-        };
-        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.getVerticalScrollBar().putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE,
-            "track: $Panel.background; hoverTrackColor: $Panel.background; pressedTrackColor: $Panel.background");
-        var sections = new JPanel(new BorderLayout(0, 6)); sections.setOpaque(false);
-        var sectionTools = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 4, 0)); sectionTools.setOpaque(false);
-        for (boolean open : new boolean[] {true, false}) {
-            var button = new JButton(dev.jasper.app.platform.AppIcons.bundled(open ? "general/expandAll" : "general/collapseAll"));
-            button.setToolTipText(open ? "Expand all sections" : "Collapse all sections");
-            button.getAccessibleContext().setAccessibleName(button.getToolTipText());
-            button.putClientProperty("JButton.buttonType", "toolBarButton");
-            button.addActionListener(event -> tree.expandSections(open)); sectionTools.add(button);
-        }
-        sections.add(sectionTools, BorderLayout.NORTH); sections.add(scroll, BorderLayout.CENTER);
+        var sections = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_TOOLS_GAP)));
+        sections.setOpaque(false);
+        sections.add(tools, BorderLayout.NORTH);
+        sections.add(list, BorderLayout.CENTER);
         add(sections, BorderLayout.CENTER);
-        status.getAccessibleContext().setAccessibleName("Shortcut search status");
-        var bottom = new JPanel(new BorderLayout(0, 8)); bottom.setOpaque(false);
-        bottom.add(editor, BorderLayout.CENTER); bottom.add(status, BorderLayout.SOUTH);
+        var bottom = new JPanel(new BorderLayout(0, scaled(context, DesignMetrics.Role.KEYMAP_STATUS_GAP)));
+        bottom.setOpaque(false);
+        bottom.add(editor, BorderLayout.CENTER);
+        bottom.add(footer, BorderLayout.SOUTH);
         add(bottom, BorderLayout.SOUTH);
-        search.getDocument().addDocumentListener(new DocumentListener() {
-            private void changed() { if (!editingCapture) { captured = null; filter(); } }
-            @Override public void insertUpdate(DocumentEvent event) { changed(); }
-            @Override public void removeUpdate(DocumentEvent event) { changed(); }
-            @Override public void changedUpdate(DocumentEvent event) { changed(); }
-        });
-        record.addActionListener(event -> {
-            editor.stopRecording();
-            recording = !recording;
-            search.setEditable(!recording);
-            record.setText(recording ? "Stop recording" : "Record shortcut");
-            if (recording) { captured = null; search.setText(""); }
-            filter(); search.requestFocusInWindow();
-        });
-        clear.addActionListener(event -> { captured = null; search.setText(""); filter(); search.requestFocusInWindow(); });
         filter();
     }
 
+    private static int scaled(KitContext context, DesignMetrics.Role role) { return UIScale.scale(context.metrics().value(role)); }
+
     void setRows(List<ShortcutEntry> rows) { all = List.copyOf(rows); editor.setRows(all); filter(); }
+
+    /** Puts {@code text} in the search field, as typing it would. */
+    void setQuery(String text) { captured = null; query = text; filter(); }
+    String query() { return query; }
+
+    private void event(UiEvent event) {
+        if (closed) return;
+        switch (event) {
+            case UiEvent.Edited edited when edited.id().equals(SEARCH) -> {
+                if (recording) return;
+                captured = null; query = edited.text(); filter();
+            }
+            case UiEvent.Action action -> {
+                switch (action.id()) {
+                    case "record" -> {
+                        editor.stopRecording();
+                        recording = !recording;
+                        if (recording) { captured = null; query = ""; }
+                        filter();
+                        top.focus(SEARCH);
+                    }
+                    case "clear" -> { captured = null; query = ""; filter(); top.focus(SEARCH); }
+                    case "expand" -> { tree.expandSections(true); render(); }
+                    case "collapse" -> { tree.expandSections(false); render(); }
+                    case "edit" -> { if (!(EventQueue.getCurrentEvent() instanceof MouseEvent)) activate(tree.selected()); }
+                    default -> { }
+                }
+            }
+            case UiEvent.Selected selected when selected.id().equals(ShortcutTree.ID) -> {
+                String id = selected.ids().stream().findFirst().orElse(null);
+                tree.select(id);
+                // A single click edits a shortcut or opens or closes a section, as the old tree did; arrow keys,
+                // type-ahead and the second click of a double click only select. The kit reports Selected while it
+                // dispatches the click, so the event being dispatched tells a click from a key.
+                if (EventQueue.getCurrentEvent() instanceof MouseEvent mouse && mouse.getClickCount() == 1) activate(id);
+                else render();
+            }
+            case UiEvent.Expanded expanded when expanded.id().equals(ShortcutTree.ID) -> { tree.expanded(expanded.itemId(), expanded.expanded()); render(); }
+            default -> { }
+        }
+    }
+
+    /** Enter or a click: a section opens or closes; an editable shortcut starts editing. */
+    private void activate(String id) {
+        if (id == null) return;
+        if (tree.isGroup(id)) {
+            tree.expanded(id, !tree.isOpenItem(id));
+            render();
+            return;
+        }
+        tree.entry(id).ifPresent(this::editRow);
+        render();
+    }
 
     private void editRow(ShortcutEntry entry) {
         stopSearchRecording();
         editor.begin(entry); filter();
     }
 
-    private void stopSearchRecording() {
-        recording = false; search.setEditable(true); record.setText("Record shortcut"); filter();
-    }
+    private void stopSearchRecording() { recording = false; filter(); }
 
     private void filter() {
-        visible = all.stream().filter(row -> ShortcutText.matches(row, search.getText(), captured)).toList();
-        tree.showRows(visible, captured != null || !search.getText().isBlank());
-        status.setText(recording ? "Press a shortcut to find it. Click Stop recording when finished."
+        visible = all.stream().filter(row -> ShortcutText.matches(row, query, captured)).toList();
+        tree.showRows(visible, captured != null || !query.isBlank());
+        render();
+    }
+
+    private void render() {
+        if (closed) return;
+        top.update(topSpec());
+        tools.update(toolsSpec());
+        list.update(new ViewSpec(tree.descriptor()));
+        footer.update(statusSpec());
+        revalidate();
+        repaint();
+    }
+
+    private ViewSpec topSpec() {
+        var field = new Nodes.Field(SEARCH, new ControlState(true, !recording, false, ""), Nodes.FieldKind.SEARCH, query,
+            "Search actions, plugins, or Cmd+Shift+H", "Find a shortcut", "");
+        var buttons = new Nodes.Stack("search.actions", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record shortcut", "", Nodes.ButtonKind.SECONDARY, "record", ""),
+            new Nodes.Button("clear", ControlState.READY, "Clear", "", Nodes.ButtonKind.SECONDARY, "clear", "")));
+        return new ViewSpec(new Nodes.FormRow("find", ControlState.READY, "Find a shortcut", "", field, Optional.of(buttons)));
+    }
+
+    private static ViewSpec toolsSpec() {
+        return new ViewSpec(new Nodes.Stack("sections", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button("expand", ControlState.READY, "", "chevron.down", Nodes.ButtonKind.GHOST, "expand", "Expand all sections"),
+            new Nodes.Button("collapse", ControlState.READY, "", "collapse", Nodes.ButtonKind.GHOST, "collapse", "Collapse all sections"))));
+    }
+
+    private ViewSpec statusSpec() {
+        String text = recording ? "Press a shortcut to find it. Click Stop recording when finished."
             : visible.isEmpty() ? "No matching shortcuts. Try another name or key combination."
-            : visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts") + " · Select an action to edit · Contextual keys are read-only");
+            : visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts") + " · Select an action to edit · Contextual keys are read-only";
+        return new ViewSpec(new Nodes.Text("status", ControlState.READY, text, Nodes.TextRole.DESCRIPTION));
     }
 
     boolean capture(KeyStroke stroke) {
@@ -135,9 +186,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         if (editor.capture(stroke)) return true;
         if (!recording) return false;
         captured = stroke;
-        editingCapture = true;
-        try { search.setText(ShortcutText.format(stroke)); }
-        finally { editingCapture = false; }
+        query = ShortcutText.format(stroke);
         filter(); return true;
     }
 
@@ -158,7 +207,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     void focusLeftWindow() {
         held.clear(); swallowTyped = false;
         editor.stopRecording();
-        recording = false; search.setEditable(true); record.setText("Record shortcut");
+        recording = false;
         filter();
     }
 
@@ -194,6 +243,10 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         mountedRoot = null; held.clear(); swallowTyped = false;
     }
 
-    @Override public void close() { closed = true; recording = false; editor.close(); uninstall(); javax.swing.ToolTipManager.sharedInstance().unregisterComponent(tree); }
-
+    @Override public void close() {
+        if (closed) return;
+        recording = false; editor.close(); uninstall();
+        closed = true;
+        top.close(); tools.close(); list.close(); footer.close();
+    }
 }

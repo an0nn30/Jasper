@@ -42,7 +42,9 @@ public final class DesignMetrics {
         // Kit breadcrumbs and the opt-in overlay scroll policy (Plan 2 Task 6b), keeping the chooser's former geometry.
         BREADCRUMB_CRUMB_PADDING(4), BREADCRUMB_SEPARATOR_PADDING(2),
         OVERLAY_SCROLLBAR_WIDTH(10), OVERLAY_SCROLLBAR_INSET(2), OVERLAY_SCROLLBAR_ARC(6), OVERLAY_SCROLLBAR_ALPHA(190),
-        OVERLAY_SCROLLBAR_IDLE_MILLIS(1000), TYPE_AHEAD_MILLIS(1000);
+        OVERLAY_SCROLLBAR_IDLE_MILLIS(1000), TYPE_AHEAD_MILLIS(1000),
+        // App-owned shells keep their Plan 2 arrangement with these exact former values until Plan 3 recomposes them.
+        KEYMAP_PAGE_PADDING(18), KEYMAP_PAGE_BOTTOM_PADDING(14), KEYMAP_SECTION_GAP(12), KEYMAP_TOOLS_GAP(6), KEYMAP_STATUS_GAP(8);
         private final int value;
         Role(int value) { this.value = value; }
     }

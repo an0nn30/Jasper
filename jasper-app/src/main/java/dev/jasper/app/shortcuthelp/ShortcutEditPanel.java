@@ -1,92 +1,49 @@
 package dev.jasper.app.shortcuthelp;
 
-import com.formdev.flatlaf.ui.FlatLineBorder;
 import dev.jasper.app.config.KeyBindings;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
 import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.Insets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 
-/** One row edit. Set hands it to the page, which stages it until Apply. Owned by ShortcutPanel. */
+/**
+ * One row edit as a kit card. Set hands it to the page, which stages it until Apply. The card's value is a button:
+ * clicking it, like Record, starts recording. Owned by ShortcutPanel; the panel is the layout-only shell the card
+ * mounts in, hidden while nothing is being edited. EDT only.
+ */
 final class ShortcutEditPanel extends JPanel {
-    final JButton set = new JButton("Set");
-    final JButton cancel = new JButton("Cancel");
-    final JButton remove = new JButton("Remove shortcut");
-    final JButton restore = new JButton("Restore default");
-    final JButton record = new JButton("Record shortcut");
-    final JCheckBox reassign = new JCheckBox("Reassign from conflicting action");
-    /**
-     * The card's note. Container.validateTree lays out hidden children too, so while the card is hidden at 0x0 the note
-     * is given a negative width; a wrapped text area keeps measuring at that width, a character per line, and the card
-     * would ask to be ten times too tall on its first edit. A degenerate size is taken as none, which the text UI
-     * measures as never laid out.
-     */
-    final JTextArea message = new JTextArea(2, 20) {
-        @Override public void setBounds(int x, int y, int width, int height) {
-            if (width <= 0 || height <= 0) { width = 0; height = 0; }
-            super.setBounds(x, y, width, height);
-        }
-    };
-    private final JLabel title = new JLabel();
-    private final JTextField value = new JTextField();
     private final boolean macOs;
     private final Runnable recordingStarted;
     private final Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer;
+    private final KitView view;
     private List<ShortcutEntry> rows = List.of();
     private ShortcutEntry entry;
     private Optional<String> binding;
     private KeyStroke candidate;
     private List<ShortcutEntry> conflicts = List.of();
-    private boolean recording, saving, closed;
+    private boolean recording, saving, closed, reassign;
+    private String problem;
 
-    ShortcutEditPanel(boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer, Runnable recordingStarted) {
-        super(new BorderLayout(0, 8));
+    ShortcutEditPanel(KitContext context, boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer,
+                      Runnable recordingStarted) {
+        super(new BorderLayout());
         setOpaque(false);
-        reassign.setOpaque(false);
         this.macOs = macOs; this.writer = writer; this.recordingStarted = recordingStarted;
-        add(title, BorderLayout.NORTH);
-        var center = new JPanel(new BorderLayout(8, 6)); center.setOpaque(false);
-        value.setEditable(false); value.getAccessibleContext().setAccessibleName("New keyboard shortcut");
-        center.add(value, BorderLayout.CENTER); center.add(record, BorderLayout.EAST);
-        message.setEditable(false); message.setFocusable(false); message.setOpaque(false);
-        message.setLineWrap(true); message.setWrapStyleWord(true);
-        center.add(message, BorderLayout.SOUTH); add(center, BorderLayout.CENTER);
-        var bottom = new JPanel(new BorderLayout()); bottom.setOpaque(false);
-        bottom.add(reassign, BorderLayout.NORTH);
-        var buttons = new JPanel(new WrapLayout(FlowLayout.LEADING, 6, 0)); buttons.setOpaque(false);
-        buttons.add(set); buttons.add(cancel); buttons.add(remove); buttons.add(restore);
-        bottom.add(buttons, BorderLayout.SOUTH); add(bottom, BorderLayout.SOUTH);
-        record.addActionListener(e -> { recording = !recording; if (recording) recordingStarted.run(); update(); value.requestFocusInWindow(); });
-        value.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseClicked(java.awt.event.MouseEvent e) { if (!saving) { recording = true; recordingStarted.run(); update(); } }
-        });
-        cancel.addActionListener(e -> dismiss());
-        remove.addActionListener(e -> choose(Optional.of("none"), null));
-        restore.addActionListener(e -> choose(Optional.empty(), KeyBindings.parse(entry.defaultBinding(), macOs).orElse(null)));
-        reassign.addActionListener(e -> update());
-        set.addActionListener(e -> set());
+        view = new KitView(context, spec(), this::event);
+        add(view, BorderLayout.CENTER);
         setVisible(false);
-    }
-
-    @Override public void updateUI() {
-        super.updateUI();
-        var outline = UIManager.getColor("Component.borderColor");
-        setBorder(new FlatLineBorder(new Insets(12, 14, 12, 14),
-            outline != null ? outline : getForeground(), 1f, 16));
     }
 
     void setRows(List<ShortcutEntry> rows) {
@@ -99,10 +56,8 @@ final class ShortcutEditPanel extends JPanel {
 
     void begin(ShortcutEntry row) {
         if (closed || saving || !row.editable()) return;
-        entry = row; binding = null; candidate = row.stroke(); recording = true;
-        reassign.setSelected(false);
-        title.setText("Set shortcut for " + row.name());
-        setVisible(true); update(); value.requestFocusInWindow();
+        entry = row; binding = null; candidate = row.stroke(); recording = true; reassign = false; problem = null;
+        setVisible(true); update();
     }
 
     boolean capture(KeyStroke stroke) {
@@ -111,8 +66,7 @@ final class ShortcutEditPanel extends JPanel {
             choose(Optional.of(KeyBindings.format(stroke, macOs)), stroke);
             recording = true; update();
         } catch (IllegalArgumentException invalid) {
-            binding = null; candidate = null; update();
-            message.setText("This key combination cannot be saved. Try another shortcut.");
+            binding = null; candidate = null; problem = "This key combination cannot be saved. Try another shortcut."; update();
         }
         return true;
     }
@@ -121,34 +75,75 @@ final class ShortcutEditPanel extends JPanel {
     void stopRecording() { recording = false; if (entry != null) update(); }
 
     private void choose(Optional<String> binding, KeyStroke stroke) {
-        this.binding = binding; candidate = stroke; recording = false; reassign.setSelected(false); update();
+        this.binding = binding; candidate = stroke; recording = false; reassign = false; problem = null; update();
     }
+
+    private void event(UiEvent event) {
+        if (closed || entry == null) return;
+        switch (event) {
+            case UiEvent.Action action -> {
+                switch (action.id()) {
+                    case "editor.value" -> { if (!saving) { recording = true; recordingStarted.run(); problem = null; update(); } }
+                    case "editor.record" -> { recording = !recording; if (recording) recordingStarted.run(); problem = null; update(); }
+                    case "editor.cancel" -> dismiss();
+                    case "editor.remove" -> choose(Optional.of("none"), null);
+                    case "editor.restore" -> choose(Optional.empty(), KeyBindings.parse(entry.defaultBinding(), macOs).orElse(null));
+                    case "editor.set" -> set();
+                    default -> { }
+                }
+            }
+            case UiEvent.Toggled toggled when toggled.id().equals("editor.reassign") -> { reassign = toggled.checked(); update(); }
+            default -> { }
+        }
+    }
+
+    private boolean settable() { return !saving && binding != null && (conflicts.isEmpty() || reassign); }
 
     private void update() {
         if (entry == null) return;
         var nextConflicts = candidate == null ? List.<ShortcutEntry>of() : rows.stream()
             .filter(row -> row.editable() && !row.id().equals(entry.id()) && candidate.equals(row.stroke())).toList();
-        if (!nextConflicts.equals(conflicts)) reassign.setSelected(false);
+        if (!nextConflicts.equals(conflicts)) reassign = false;
         conflicts = nextConflicts;
-        value.setText(recording && binding == null ? "Press a key combination…" : ShortcutText.format(candidate));
-        record.setText(recording ? "Stop recording" : "Record shortcut");
-        reassign.setVisible(!conflicts.isEmpty());
-        reassign.setEnabled(!saving);
-        set.setEnabled(!saving && binding != null && (conflicts.isEmpty() || reassign.isSelected()));
-        cancel.setEnabled(!saving); remove.setEnabled(!saving); restore.setEnabled(!saving); record.setEnabled(!saving);
-        message.setText(saving ? "Setting shortcut\u2026" : !conflicts.isEmpty()
-            ? "Already used by: " + String.join(", ", conflicts.stream().map(ShortcutEntry::name).toList()) + ". Reassigning removes their shortcuts."
-            : recording ? "Press the new shortcut, then click Set. Use Cancel to keep the current binding."
-            : "Set stages this shortcut; Apply or OK in Settings saves it.");
+        view.update(spec());
         revalidate(); repaint();
     }
 
+    private String message() {
+        if (problem != null) return problem;
+        return saving ? "Setting shortcut…" : !conflicts.isEmpty()
+            ? "Already used by: " + String.join(", ", conflicts.stream().map(ShortcutEntry::name).toList()) + ". Reassigning removes their shortcuts."
+            : recording ? "Press the new shortcut, then click Set. Use Cancel to keep the current binding."
+            : "Set stages this shortcut; Apply or OK in Settings saves it.";
+    }
+
+    private ViewSpec spec() {
+        String title = entry == null ? "Set shortcut" : "Set shortcut for " + entry.name();
+        String value = recording && binding == null ? "Press a key combination…" : ShortcutText.format(candidate);
+        var idle = new ControlState(true, !saving, false, "");
+        var capture = new Nodes.Stack("editor.capture", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button("editor.value", idle, value, "", Nodes.ButtonKind.SECONDARY, "editor.value", "Click to record a new shortcut"),
+            new Nodes.Button("editor.record", idle, recording ? "Stop recording" : "Record shortcut", "", Nodes.ButtonKind.SECONDARY, "editor.record", "")));
+        var buttons = new Nodes.Stack("editor.buttons", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+            new Nodes.Button("editor.set", new ControlState(true, settable(), false, ""), "Set", "", Nodes.ButtonKind.PRIMARY, "editor.set", ""),
+            new Nodes.Button("editor.cancel", idle, "Cancel", "", Nodes.ButtonKind.SECONDARY, "editor.cancel", ""),
+            new Nodes.Button("editor.remove", idle, "Remove shortcut", "", Nodes.ButtonKind.SECONDARY, "editor.remove", ""),
+            new Nodes.Button("editor.restore", idle, "Restore default", "", Nodes.ButtonKind.SECONDARY, "editor.restore", "")));
+        return new ViewSpec(new Nodes.Card("editor", ControlState.READY, Nodes.CardKind.FORM, List.of(
+            new Nodes.Text("editor.title", ControlState.READY, title, Nodes.TextRole.BODY_STRONG),
+            new Nodes.FormRow("editor.shortcut", ControlState.READY, "New keyboard shortcut", "", capture, Optional.empty()),
+            new Nodes.FormRow("editor.note", ControlState.READY, "", "", new Nodes.Text("editor.message", ControlState.READY, message(), Nodes.TextRole.DESCRIPTION), Optional.empty()),
+            new Nodes.SettingRow("editor.reassign.row", new ControlState(!conflicts.isEmpty(), !saving, false, ""), "Reassign from conflicting action", "",
+                new Nodes.Toggle("editor.reassign", new ControlState(!conflicts.isEmpty(), !saving, false, ""), "Reassign from conflicting action", reassign, "editor.reassign", false), false),
+            buttons)));
+    }
+
     private void set() {
-        if (!set.isEnabled()) return;
+        if (!settable()) return;
         var changes = new LinkedHashMap<String, Optional<String>>();
         changes.put(entry.id(), binding);
         for (var conflict : conflicts) changes.put(conflict.id(), Optional.of("none"));
-        saving = true; recording = false; update();
+        saving = true; recording = false; problem = null; update();
         CompletableFuture<Void> result;
         try { result = writer.apply(Map.copyOf(changes)); }
         catch (RuntimeException failure) { result = CompletableFuture.failedFuture(failure); }
@@ -157,14 +152,15 @@ final class ShortcutEditPanel extends JPanel {
             saving = false;
             if (failure == null) dismiss();
             else {
-                update();
                 Throwable cause = failure;
                 while (cause instanceof java.util.concurrent.CompletionException && cause.getCause() != null) cause = cause.getCause();
-                message.setText("Could not set: " + cause.getMessage());
+                problem = "Could not set: " + cause.getMessage();
+                update();
             }
         }));
     }
 
-    private void dismiss() { entry = null; binding = null; recording = false; setVisible(false); }
-    void close() { closed = true; dismiss(); }
+    private void dismiss() { entry = null; binding = null; recording = false; problem = null; setVisible(false); }
+
+    void close() { closed = true; dismiss(); view.close(); }
 }

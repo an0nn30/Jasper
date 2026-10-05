@@ -219,6 +219,27 @@ final class Stacks {
                     width, height(parent, parent.getWidth() > 0 ? parent.getWidth() : width));
         }
 
+        /** ACTIONS too wide for one row wrap onto further rows at their natural widths instead of being cut short. */
+        List<List<Component>> rows(List<Component> children, int available) {
+            var rows = new java.util.ArrayList<List<Component>>();
+            var row = new java.util.ArrayList<Component>();
+            int used = 0;
+            for (Component child : children) {
+                int natural = child.getPreferredSize().width;
+                if (!row.isEmpty() && used + gap() + natural > available) { rows.add(row); row = new java.util.ArrayList<>(); used = 0; }
+                used += (row.isEmpty() ? 0 : gap()) + natural;
+                row.add(child);
+            }
+            if (!row.isEmpty()) rows.add(row);
+            return rows;
+        }
+
+        boolean wraps(List<Component> children, int available) {
+            if (role != Nodes.LayoutRole.ACTIONS || children.size() < 2) return false;
+            int total = children.stream().mapToInt(c -> c.getPreferredSize().width).sum() + (children.size() - 1) * gap();
+            return total > available;
+        }
+
         int fittedWidth(Component child, int width, int count, int total) {
             int natural = child.getPreferredSize().width;
             int available = Math.max(0, width - Math.max(0, count - 1) * gap());
@@ -235,6 +256,11 @@ final class Stacks {
                     java.util.Arrays.stream(parent.getComponents())
                             .filter(Component::isVisible)
                             .toList();
+            if (wraps(children, available)) {
+                var rows = rows(children, available);
+                for (var row : rows) height += row.stream().mapToInt(c -> Composition.height(c, Math.min(available, c.getPreferredSize().width))).max().orElse(0);
+                return insets.top + insets.bottom + height + Math.max(0, rows.size() - 1) * gap();
+            }
             int total =
                     horizontal()
                             ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()
@@ -263,6 +289,19 @@ final class Stacks {
                     java.util.Arrays.stream(parent.getComponents())
                             .filter(Component::isVisible)
                             .toList();
+            if (wraps(children, width)) {
+                for (var row : rows(children, width)) {
+                    int rowHeight = 0, rowX = x;
+                    for (Component child : row) {
+                        int childWidth = Math.min(width, child.getPreferredSize().width), childHeight = Composition.height(child, childWidth);
+                        child.setBounds(rowX, y, childWidth, childHeight);
+                        rowX += childWidth + gap();
+                        rowHeight = Math.max(rowHeight, childHeight);
+                    }
+                    y += rowHeight + gap();
+                }
+                return;
+            }
             int total =
                     horizontal()
                             ? children.stream().mapToInt(c -> c.getPreferredSize().width).sum()

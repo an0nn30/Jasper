@@ -12,10 +12,12 @@ public final class ShortcutTestSupport {
     public static boolean editing(KeymapPage page) { return page.panel().editor.isVisible(); }
 
     private static void set(ShortcutPanel panel, String query, KeyStroke shortcut) {
-        panel.search.setText(query);
-        panel.tree.setSelectionRow(1);
-        panel.tree.getActionMap().get("editShortcut").actionPerformed(null);
+        ShortcutKit.search(panel).setText(query);
+        if (panel.getWidth() == 0) panel.setSize(900, 600);
+        ShortcutKit.layout(panel);
+        ShortcutKit.selectRow(panel, 1);
+        ShortcutKit.key(panel, "ENTER");
         if (!panel.capture(shortcut)) throw new AssertionError("not recording");
-        panel.editor.set.doClick();
+        ShortcutKit.button(panel, "editor.set").doClick(0);
     }
 }
