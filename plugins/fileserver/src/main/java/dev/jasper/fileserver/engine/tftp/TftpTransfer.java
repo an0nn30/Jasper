@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 final class TftpTransfer {
     static final TftpPacket.Error BUSY = new TftpPacket.Error(0, "Server busy");
     static final TftpPacket.Error FAILED = new TftpPacket.Error(0, "Transfer failed");
+    static final TftpPacket.Error SIZE_MISMATCH = new TftpPacket.Error(0, "Transfer size mismatch");
     static final TftpPacket.Error NOT_FOUND = new TftpPacket.Error(1, "File not found");
     static final TftpPacket.Error ACCESS = new TftpPacket.Error(2, "Access violation");
     static final TftpPacket.Error DISK_FULL = new TftpPacket.Error(3, "Disk full or allocation exceeded");
@@ -133,16 +134,27 @@ final class TftpTransfer {
             byte[] lastSent = (accepted.isEmpty() ? new TftpPacket.Ack(0) : new TftpPacket.OptionAck(accepted)).encode();
             int block = 1;
             for (TftpPacket.Data data = awaitData(lastSent, block); data != null; data = awaitData(lastSent, block)) {
+                if (data.bytes().length > blockSize) {
+                    send(ILLEGAL);
+                    events.error(remote, ILLEGAL.message() + ": " + path);
+                    return;
+                }
                 try { out.write(data.bytes()); }
-                catch (IOException failed) { send(error(failed)); return; }
+                catch (IOException failed) { failWrite(failed); return; }
                 transfer.add(data.bytes().length);
                 lastSent = new TftpPacket.Ack(block).encode();
                 if (data.bytes().length < blockSize) {
+                    if (!netascii && announced >= 0 && transfer.bytes() != announced) {
+                        send(SIZE_MISMATCH);
+                        events.error(remote, SIZE_MISMATCH.message() + ": " + path);
+                        return;
+                    }
                     try {
                         out.close();
+                        if (socket.isClosed()) return; // the server stopped: abandon, never commit
                         upload.commit();
                     } catch (IOException failed) {
-                        send(error(failed));
+                        failWrite(failed);
                         return;
                     }
                     complete = true;
@@ -155,6 +167,12 @@ final class TftpTransfer {
         } finally {
             transfer.finish(complete);
         }
+    }
+
+    /** Logs a failed write as the read path does, then tells the client. */
+    private void failWrite(IOException failure) throws IOException {
+        events.error(remote, "TFTP transfer failed: " + failure.getMessage());
+        send(error(failure));
     }
 
     /** Sends {@code lastSent} until block {@code expected} arrives; a repeat of the previous block is answered at once. Null when it gives up. */

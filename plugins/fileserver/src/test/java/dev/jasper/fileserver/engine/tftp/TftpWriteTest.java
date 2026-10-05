@@ -142,4 +142,74 @@ class TftpWriteTest {
         }
         assertThat(shared.resolve("docs/huge.bin")).doesNotExist();
     }
+
+    List<String> tempFiles() throws IOException {
+        try (var listing = Files.list(shared.resolve("docs"))) {
+            return listing.map(p -> p.getFileName().toString()).filter(n -> n.startsWith(".jasper-upload-")).toList();
+        }
+    }
+
+    @Test void aWrongLengthIsRefusedAndTheOriginalKept() throws Exception {
+        start(true, Duration.ofMillis(300));
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.write("docs/a.txt", "octet", "tsize", "6"));
+            var oack = client.next();
+            assertThat(oack.packet()).isInstanceOf(TftpPacket.OptionAck.class);
+            client.send(oack.port(), new TftpPacket.Data(1, "short".getBytes(StandardCharsets.UTF_8)));
+            assertThat(client.next().packet()).isEqualTo(new TftpPacket.Error(0, "Transfer size mismatch"));
+        }
+        await(() -> transferred().size() == 1, "the refused write ends");
+        assertThat(transferred().getFirst().complete()).isFalse();
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
+        assertThat(tempFiles()).isEmpty();
+    }
+
+    @Test void anOversizedBlockIsIllegal() throws Exception {
+        start(true, Duration.ofMillis(300));
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.write("docs/a.txt", "octet", "blksize", "16"));
+            var oack = client.next();
+            assertThat(oack.packet()).isInstanceOf(TftpPacket.OptionAck.class);
+            client.send(oack.port(), new TftpPacket.Data(1, new byte[17]));
+            assertThat(client.next().packet()).isEqualTo(new TftpPacket.Error(4, "Illegal TFTP operation"));
+        }
+        await(() -> transferred().size() == 1, "the refused write ends");
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
+        assertThat(tempFiles()).isEmpty();
+    }
+
+    @Test void aDuplicatedBlockIsAcknowledgedAgainAndWrittenOnce() throws Exception {
+        start(true, Duration.ofMillis(500));
+        byte[] first = TftpReadTest.pattern(512);
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.write("docs/dup.bin", "octet"));
+            var ack0 = client.next();
+            assertThat(ack0.packet()).isEqualTo(new TftpPacket.Ack(0));
+            client.send(ack0.port(), new TftpPacket.Data(1, first));
+            assertThat(client.next().packet()).isEqualTo(new TftpPacket.Ack(1));
+            client.send(ack0.port(), new TftpPacket.Data(1, first));
+            assertThat(client.next().packet()).as("the duplicate is acknowledged again").isEqualTo(new TftpPacket.Ack(1));
+            client.send(ack0.port(), new TftpPacket.Data(2, "end".getBytes(StandardCharsets.UTF_8)));
+            assertThat(client.next().packet()).isEqualTo(new TftpPacket.Ack(2));
+        }
+        byte[] expected = new byte[515];
+        System.arraycopy(first, 0, expected, 0, 512);
+        System.arraycopy("end".getBytes(StandardCharsets.UTF_8), 0, expected, 512, 3);
+        assertThat(shared.resolve("docs/dup.bin")).hasBinaryContent(expected);
+    }
+
+    @Test void stoppingTheServerMidWriteKeepsTheOriginal() throws Exception {
+        start(true, Duration.ofSeconds(5));
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.write("docs/a.txt", "octet"));
+            var ack0 = client.next();
+            client.send(ack0.port(), new TftpPacket.Data(1, new byte[512]));
+            assertThat(client.next().packet()).isEqualTo(new TftpPacket.Ack(1));
+            engine.stop();
+            await(() -> transferred().size() == 1, "the stopped write ends");
+        }
+        assertThat(transferred().getFirst().complete()).isFalse();
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
+        assertThat(tempFiles()).isEmpty();
+    }
 }
