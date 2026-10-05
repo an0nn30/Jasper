@@ -186,7 +186,7 @@ class ShortcutSectionsTest {
         });
     }
 
-    @Test void aRightClickOnARowSelectsItButNeverEditsOrToggles() throws Exception {
+    @Test void aRightClickOnARowNeitherSelectsNorEditsNorToggles() throws Exception {
         edt(() -> {
             var panel = panel(changes -> { throw new AssertionError("Unexpected save"); });
             try {
@@ -201,7 +201,7 @@ class ShortcutSectionsTest {
                     post(press);
                     var release = new java.awt.event.MouseEvent(title, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 3, 3, 1, false, java.awt.event.MouseEvent.BUTTON3);
                     post(release);
-                    assertThat(panel.tree.selected()).as("a right click may select %s", item).isEqualTo(item);
+                    assertThat(panel.tree.selected()).as("a right click does not select %s", item).isNull();
                     assertThat(panel.editor.isVisible()).as("a right click never edits").isFalse();
                     assertThat(panel.tree.rowCount()).as("nor toggles a section").isEqualTo(rows);
                     layout(panel);

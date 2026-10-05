@@ -71,6 +71,12 @@ final class Trees {
             return item == null ? List.of() : item.contextActions().orElse(List.of());
         }
 
+        /** Tree menus are always the item's own. */
+        @Override
+        boolean ownsContextActions(String id) {
+            return items.containsKey(id);
+        }
+
         @Override
         String itemText(int i) {
             return visible.get(i).item().title();

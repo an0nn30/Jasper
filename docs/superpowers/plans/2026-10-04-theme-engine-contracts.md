@@ -266,9 +266,11 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   A left click on any header reports `Sorted(tableId,columnId)`; the host owns the order.
 - `TableRow.muted` paints every cell in `text.placeholder` (the theme's disabled text). A present
   `TableRow.contextActions`/`TreeItem.contextActions` is that row's context menu, replacing the table's; an empty
-  list means none. Trees gain context menus this way. A right click may select the row (reporting `Selected` when it
-  changes), but a context menu item of any row collection reports only its `Action` (6b-1 fix round 1): it never
-  re-reports the selection, so it cannot open, edit or navigate to the row. Hosts name the row in the item's action.
+  list means none. Trees gain context menus this way. A context press (right click or the context-menu key) targets the
+  row under the pointer and never changes the selection or reports `Selected` (6b-1 fix round 1, reversing Plan 1's
+  "context opening selects"); a menu item of any row collection reports only its `Action`, so it cannot open, edit or
+  navigate to the row. A row's own menu (`TableRow`/`TreeItem.contextActions`, which names the row in its actions) is
+  offered on any row; the control's shared menu acts on the selection, so it is offered only on a selected row.
   The mounted component carries the kit-owned menu under `KitOwnership.CONTEXT_MENU` (also on `Breadcrumbs`).
 - `TreeItem.tooltip` is the row's literal tooltip (no HTML) and accessible description; `status` adds a status dot
   after the icon; `trailing` texts are CAPTION columns at the row end, right-aligned, each as wide as its widest
@@ -279,7 +281,7 @@ remain and default to the old meaning (weight 1, no sort, not muted, no row menu
   from the last row chosen without Shift; a selection the host sets (not the echo of the user's own) is scrolled into
   view once the viewport has a size. A theme change keeps selection and scroll position.
 - Tables and trees report a plain left single click on a row as `Clicked(id,itemId)` after its `Selected`; keys, right
-  clicks, right-button clicks and the second click of a double click never report it (Enter and double clicks report
+  clicks (which do not select either), right-button clicks and the second click of a double click never report it (Enter and double clicks report
   the owner's activate action). Hosts that open or edit on a single click use `Clicked`, never the event being
   dispatched. Item lists keep their contract (no `Clicked`).
 - Kit `ACTIONS` stacks too wide for one row wrap onto further rows at their natural widths instead of squeezing their
@@ -327,8 +329,9 @@ Task 9 approved corrections (mirror exactly in the later SDK projection):
   in mounted components, including large expanded branches.
 - Row pointer selection (single click), keyboard navigation and multi-checkbox selection emit
   Selected(owner,ids). Double click/Enter activation first emits Selected for the activated item,
-  then Action(activateAction), when nonblank. Context opening selects an unselected clicked row;
-  context invocation emits current Selected(owner,ids), then Action(menuItem.action). A synchronous
+  then Action(activateAction), when nonblank. Context opening never changes the selection (Plan 2 Task 6b-1:
+  a shared menu opens only on a selected row; a row's own menu on any row) and invocation emits only
+  Action(menuItem.action). A synchronous
   selection-confirming update keeps the intended action. Closing/removing the owner/item or rebinding
   that action during Selected suppresses the stale subsequent Action. Inline controls never activate
   the containing row; Toggle emits only Toggled with its globally unique node id.

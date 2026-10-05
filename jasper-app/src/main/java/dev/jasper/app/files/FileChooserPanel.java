@@ -378,13 +378,16 @@ public final class FileChooserPanel extends JPanel {
             case UiEvent.Selected selected -> {
                 switch (selected.id()) {
                     case FILES -> { if (!updating) selectionChanged(selected.ids()); }
-                    // Keys and right clicks only move the places highlight; a left click or Enter opens the place.
-                    case PLACES -> placeFocus = selected.ids().stream().findFirst().orElse(null);
+                    // Moving the highlight (a left click or the arrow keys) opens the place, as before. A right click
+                    // never changes the selection, so it never reaches here.
+                    case PLACES -> {
+                        placeFocus = selected.ids().stream().findFirst().orElse(null);
+                        if (!updating) openPlace(placeFocus);
+                    }
                     case PATH -> selected.ids().stream().findFirst().map(crumbTargets::get).ifPresent(model::navigate);
                     default -> { }
                 }
             }
-            case UiEvent.Clicked clicked when clicked.id().equals(PLACES) -> openPlace(clicked.itemId());
             case UiEvent.Sorted sorted -> {
                 switch (sorted.columnId()) {
                     case "name" -> model.sortBy(ChooserModel.Column.NAME);

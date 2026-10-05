@@ -344,12 +344,20 @@ final class InteractiveRows {
             return null;
         }
 
+        /** Whether the row declares its own menu (which names it), rather than sharing the control's. */
+        boolean ownsContextActions(String id) {
+            return false;
+        }
+
+        /**
+         * A context press targets the row under the pointer and never changes the selection. A row's own menu is
+         * offered on any row; the control's shared menu acts on the selection, so it is offered only on a selected row.
+         */
         void context(String id, JComponent invoker, int x, int y) {
-            var actions = contextActions(id);
             if (!interactive()) return;
-            if (!selected.contains(id)) select(id, false);
-            if (!stillCurrent(id) || !actions.equals(contextActions(id))) return;
             clearPopup();
+            if (!stillCurrent(id) || !selected.contains(id) && !ownsContextActions(id)) return;
+            var actions = contextActions(id);
             for (var item : actions) {
                 if (item.separator()) {
                     popup.add(new Menus.Separator(context()));

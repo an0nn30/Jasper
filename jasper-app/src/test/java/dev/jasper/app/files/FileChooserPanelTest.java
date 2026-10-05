@@ -215,18 +215,36 @@ class FileChooserPanelTest {
         assertThat(panel.pathText()).isEqualTo(shown);
     }
 
-    @Test void aRightClickOnAPlaceNeverOpensItButALeftClickOrEnterDoes() {
+    @Test void aRightClickOnAPlaceLeavesTheHighlightAndTheFolderAlone() {
         var panel = panel(OPEN, Optional.empty());
         panel.togglePin(here("docs"));
         layout(panel);
         String shown = panel.pathText();
+        var before = ((Nodes.Tree) view(panel, FileChooserPanel.PLACES).spec().root()).selectedIds();
         var title = kit(panel, "@tree/places/" + panel.placeId(place(panel, "docs")) + "/title", JLabel.class);
         var press = new java.awt.event.MouseEvent(title, java.awt.event.MouseEvent.MOUSE_PRESSED, 0, java.awt.event.InputEvent.BUTTON3_DOWN_MASK, 2, 2, 1, true, java.awt.event.MouseEvent.BUTTON3);
         for (var listener : title.getMouseListeners()) listener.mousePressed(press);
-        assertThat(panel.pathText()).as("right click").isEqualTo(shown);
+        assertThat(panel.pathText()).as("a right click does not open the place").isEqualTo(shown);
+        assertThat(panel.selectedPlace()).as("nor moves the highlight").contains((Places.Place) panel.navigationItems().getFirst());
+        assertThat(((Nodes.Tree) view(panel, FileChooserPanel.PLACES).spec().root()).selectedIds()).isEqualTo(before);
         var canvas = (JComponent) kit(panel, FileChooserPanel.PLACES, javax.swing.JScrollPane.class).getViewport().getView();
         canvas.getActionMap().get(canvas.getInputMap().get(KeyStroke.getKeyStroke("ENTER"))).actionPerformed(null);
-        assertThat(panel.pathText()).as("Enter opens the highlighted place").endsWith("docs");
+        assertThat(panel.pathText()).as("Enter after the right click stays on the place shown").isEqualTo(shown);
+    }
+
+    @Test void arrowKeysInThePlacesOpenEachPlaceAsBeforeAndALeftClickOpensOne() {
+        var panel = panel(OPEN, Optional.empty());
+        panel.togglePin(here("docs"));
+        layout(panel);
+        var canvas = (JComponent) kit(panel, FileChooserPanel.PLACES, javax.swing.JScrollPane.class).getViewport().getView();
+        // Terminal folder, home (both the folder shown), the Pinned heading, then docs.
+        for (int i = 0; i < 4; i++) canvas.getActionMap().get(canvas.getInputMap().get(KeyStroke.getKeyStroke("DOWN"))).actionPerformed(null);
+        assertThat(panel.pathText()).as("moving the highlight with the keys opens the place, as before").endsWith("docs");
+        assertThat(panel.selectedPlace()).contains(place(panel, "docs"));
+        choosePlace(panel, (Places.Place) panel.navigationItems().getFirst());
+        assertThat(panel.pathText()).as("a left click opens a place").endsWith(dir.getFileName().toString());
+        choosePlace(panel, place(panel, "docs"));
+        assertThat(panel.pathText()).as("a left click opens a place").endsWith("docs");
     }
 
     @Test void theHiddenFilesToggleIsRememberedAndTypingSelects() throws IOException {

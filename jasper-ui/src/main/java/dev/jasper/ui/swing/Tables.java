@@ -88,6 +88,11 @@ final class Tables {
             return List.of();
         }
 
+        @Override
+        boolean ownsContextActions(String id) {
+            return value().rows().stream().anyMatch(row -> row.id().equals(id) && row.contextActions().isPresent());
+        }
+
         WeightLayout weights() {
             return new WeightLayout(value().columns().stream().mapToDouble(Column::weight).toArray());
         }

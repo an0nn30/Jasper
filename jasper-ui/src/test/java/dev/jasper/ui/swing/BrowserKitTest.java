@@ -95,8 +95,14 @@ class BrowserKitTest {
                 view.setSize(600, 300); InteractiveRowsTest.layout(view);
                 var owner = (Tables.TableControl) view.control("files");
                 owner.context("r0", owner.canvas, 0, 0);
-                assertThat(((JMenuItem) owner.popup.getComponent(0)).getText()).as("the table's menu").isEqualTo("Reveal");
+                assertThat(owner.popup.getComponentCount()).as("the table's shared menu acts on the selection, so an unselected row offers none").isZero();
+                assertThat(events).as("a context press never changes the selection").isEmpty();
+                owner.select("r0", false);
+                events.clear();
+                owner.context("r0", owner.canvas, 0, 0);
+                assertThat(((JMenuItem) owner.popup.getComponent(0)).getText()).as("the table's menu on a selected row").isEqualTo("Reveal");
                 owner.context("r2", owner.canvas, 0, 0);
+                assertThat(owner.selected).as("the row under the pointer is the target, not selected").containsExactly("r0");
                 assertThat(owner.popup.getComponentCount()).isEqualTo(1);
                 assertThat(((JMenuItem) owner.popup.getComponent(0)).getText()).as("the row's own menu").isEqualTo("Pin");
                 events.clear();
@@ -113,7 +119,8 @@ class BrowserKitTest {
                 view.setSize(300, 200); InteractiveRowsTest.layout(view);
                 var owner = (Trees.TreeControl) view.control("places");
                 owner.context("home", owner.canvas, 0, 0);
-                assertThat(treeEvents).as("the right-clicked row is selected first").containsExactly(new UiEvent.Selected("places", Set.of("home")));
+                assertThat(treeEvents).as("a right click does not select").isEmpty();
+                assertThat(owner.selected).isEmpty();
                 treeEvents.clear();
                 ((JMenuItem) owner.popup.getComponent(0)).doClick(0);
                 assertThat(treeEvents).as("never re-reports the row, so it cannot open it").containsExactly(new UiEvent.Action("unpin"));
@@ -453,10 +460,11 @@ class BrowserKitTest {
                 var other = find(view, "@tree/keys/scrollback/title", JLabel.class);
                 var rightOther = new MouseEvent(other, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK, 2, 2, 1, true, MouseEvent.BUTTON3);
                 for (var listener : other.getMouseListeners()) listener.mousePressed(rightOther);
-                assertThat(events).as("a right click may select but never clicks").containsExactly(new UiEvent.Selected("keys", Set.of("scrollback")));
+                assertThat(events).as("a right click neither selects nor clicks").isEmpty();
+                assertThat(owner.selected).containsExactly("new");
                 for (var listener : other.getMouseListeners())
                     listener.mouseClicked(new MouseEvent(other, MouseEvent.MOUSE_CLICKED, 0, 0, 2, 2, 1, false, MouseEvent.BUTTON3));
-                assertThat(events).as("nor does a right-button click").hasSize(1);
+                assertThat(events).as("nor does a right-button click").isEmpty();
                 events.clear();
                 owner.canvas.getActionMap().get("DOWN").actionPerformed(null);
                 owner.canvas.getActionMap().get("ENTER").actionPerformed(null);

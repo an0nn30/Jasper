@@ -602,6 +602,8 @@ class InteractiveRowsTest {
                                                     List.of(action))),
                                     e -> {})) {
                         var owner = (ItemLists.ListControl) view.control("servers");
+                        // A shared menu acts on the selection, so it opens on a selected row.
+                        owner.select("item0", false);
                         owner.context("item0", owner.canvas, 0, 0);
                         var old = (JMenuItem) owner.popup.getComponent(0);
                         assertThat(old).isInstanceOf(Menus.Item.class);
