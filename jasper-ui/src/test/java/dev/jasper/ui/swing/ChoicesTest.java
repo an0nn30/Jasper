@@ -16,6 +16,8 @@ class ChoicesTest {
     }
     @Test void pickerUsesChoiceSurfaceWhileSecondaryButtonsRetainTheirIndependentColors() {
         Edt.run(() -> {
+            int width = com.formdev.flatlaf.util.UIScale.scale(240), height = com.formdev.flatlaf.util.UIScale.scale(40);
+            int sampleX = com.formdev.flatlaf.util.UIScale.scale(120), sampleY = com.formdev.flatlaf.util.UIScale.scale(6);
             var base = KitFixtures.dark();
             var colors = new EnumMap<dev.jasper.ui.theme.SemanticColor, java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
             for (var role : dev.jasper.ui.theme.SemanticColor.values()) colors.put(role, base.semantic().color(role));
@@ -28,17 +30,17 @@ class ChoicesTest {
             var context = KitFixtures.context(); context.binding().publish(new dev.jasper.ui.theme.ThemePair(theme, theme));
             var secondary = new Nodes.Button("secondary", ControlState.READY, "Browse", "", ButtonKind.SECONDARY, "browse", "");
             try (var view = new KitView(context, stack(choice(ChoiceKind.DROPDOWN, "a", ControlState.READY), secondary), e -> {})) {
-                var dropdown = find(view, "choice.input", JComboBox.class); dropdown.setSize(240, 40); dropdown.doLayout();
-                assertThat(ButtonsTest.paint(dropdown).getRGB(120, 6)).isEqualTo(new java.awt.Color(23, 87, 139).getRGB());
+                var dropdown = find(view, "choice.input", JComboBox.class); dropdown.setSize(width, height); dropdown.doLayout();
+                assertThat(ButtonsTest.paint(dropdown).getRGB(sampleX, sampleY)).isEqualTo(new java.awt.Color(23, 87, 139).getRGB());
                 view.update(stack(choice(ChoiceKind.PICKER, "a", ControlState.READY), secondary));
-                var picker = find(view, "choice.input", JButton.class); picker.setSize(240, 40);
-                assertThat(ButtonsTest.paint(picker).getRGB(120, 6)).isEqualTo(new java.awt.Color(23, 87, 139).getRGB());
+                var picker = find(view, "choice.input", JButton.class); picker.setSize(width, height);
+                assertThat(ButtonsTest.paint(picker).getRGB(sampleX, sampleY)).isEqualTo(new java.awt.Color(23, 87, 139).getRGB());
                 picker.getModel().setRollover(true);
-                assertThat(ButtonsTest.paint(picker).getRGB(120, 6)).isEqualTo(new java.awt.Color(42, 121, 175).getRGB());
-                var button = find(view, "secondary", JButton.class); button.setSize(240, 40);
-                assertThat(ButtonsTest.paint(button).getRGB(120, 6)).isEqualTo(new java.awt.Color(193, 32, 68).getRGB());
+                assertThat(ButtonsTest.paint(picker).getRGB(sampleX, sampleY)).isEqualTo(new java.awt.Color(42, 121, 175).getRGB());
+                var button = find(view, "secondary", JButton.class); button.setSize(width, height);
+                assertThat(ButtonsTest.paint(button).getRGB(sampleX, sampleY)).isEqualTo(new java.awt.Color(193, 32, 68).getRGB());
                 button.getModel().setRollover(true);
-                assertThat(ButtonsTest.paint(button).getRGB(120, 6)).isEqualTo(new java.awt.Color(228, 61, 102).getRGB());
+                assertThat(ButtonsTest.paint(button).getRGB(sampleX, sampleY)).isEqualTo(new java.awt.Color(228, 61, 102).getRGB());
             } finally { release(context); }
         });
     }

@@ -14,6 +14,7 @@ final class Trees {
 
     static final class TreeControl extends InteractiveRows.RowsControl {
         final List<Visible> visible = new ArrayList<>();
+        final Set<String> itemIds = new HashSet<>();
 
         TreeControl(KitView view, Nodes.Tree node) {
             super(view, node);
@@ -59,13 +60,20 @@ final class Trees {
         @Override
         void data() {
             visible.clear();
-            value().roots().forEach(root -> flatten(root, 0));
+            itemIds.clear();
+            value().roots().forEach(root -> flatten(root, 0, true));
         }
 
-        void flatten(TreeItem item, int depth) {
-            visible.add(new Visible(item, depth));
-            if (value().expandedIds().contains(item.id()))
-                item.children().forEach(child -> flatten(child, depth + 1));
+        @Override
+        boolean containsItem(String id) {
+            return itemIds.contains(id);
+        }
+
+        void flatten(TreeItem item, int depth, boolean shown) {
+            itemIds.add(item.id());
+            if (shown) visible.add(new Visible(item, depth));
+            boolean childrenShown = shown && value().expandedIds().contains(item.id());
+            item.children().forEach(child -> flatten(child, depth + 1, childrenShown));
         }
 
         void expandFocused(boolean expanded) {

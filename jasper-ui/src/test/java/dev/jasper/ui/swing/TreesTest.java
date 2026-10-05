@@ -169,4 +169,74 @@ class TreesTest {
                     }
                 });
     }
+
+    @Test
+    void collapsingAndReopeningBranchRetainsDeclaredChildSelection() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    var root =
+                            new TreeItem(
+                                    "root",
+                                    "Root",
+                                    Optional.empty(),
+                                    false,
+                                    List.of(
+                                            new TreeItem(
+                                                    "child",
+                                                    "Child",
+                                                    Optional.empty(),
+                                                    true,
+                                                    List.of())));
+                    try (var view =
+                            new KitView(
+                                    context,
+                                    new ViewSpec(
+                                            new Tree(
+                                                    "tree",
+                                                    ControlState.READY,
+                                                    List.of(root),
+                                                    Set.of("root"),
+                                                    Set.of("child"),
+                                                    "open")),
+                                    e -> {})) {
+                        var owner = (Trees.TreeControl) view.control("tree");
+                        assertThat(owner.selected).containsExactly("child");
+                        view.update(
+                                new ViewSpec(
+                                        new Tree(
+                                                "tree",
+                                                ControlState.READY,
+                                                List.of(root),
+                                                Set.of(),
+                                                Set.of("child"),
+                                                "open")));
+                        assertThat(owner.mounted).doesNotContainKey("child");
+                        assertThat(owner.selected).containsExactly("child");
+                        view.update(
+                                new ViewSpec(
+                                        new Tree(
+                                                "tree",
+                                                ControlState.READY,
+                                                List.of(root),
+                                                Set.of("root"),
+                                                Set.of("child"),
+                                                "open")));
+                        assertThat(owner.mounted).containsKey("child");
+                        assertThat(owner.selected).containsExactly("child");
+                        view.update(
+                                new ViewSpec(
+                                        new Tree(
+                                                "tree",
+                                                ControlState.READY,
+                                                List.of(),
+                                                Set.of(),
+                                                Set.of(),
+                                                "open")));
+                        assertThat(owner.selected).isEmpty();
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
 }

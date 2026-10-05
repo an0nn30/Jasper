@@ -241,14 +241,16 @@ Secret content never appears in an event, immutable descriptor or `toString()`.
 Task 9 approved corrections (mirror exactly in the later SDK projection):
 - ItemList/Table explicitly select SINGLE or MULTIPLE; the old constructors default to SINGLE,
   and the ItemList old constructor has no add footer. SINGLE rejects more than one selected id.
-  MULTIPLE displays real checkboxes; mode never depends on selectedIds cardinality.
+  MULTIPLE displays real checkboxes; mode never depends on selectedIds cardinality. Changing mode
+  reasserts the descriptor selectedIds, so a SINGLE transition cannot retain pending multiple selection.
 - ItemList.addAction is an optional Button inside the bounded list surface, below the data rows.
   It emits its configured Action and is never a selectable item. ORDERED rows emit Reordered with
   the list owner id, stable local itemId and zero-based destination, or Removed(owner,itemId).
   Impossible first/last direction buttons use the ordinary button painter at 30% exactly once;
   other disabled buttons remain 42%, preserving authored alpha.
 - Expanded identifies the tree owner in id and the tree-local item in itemId. Expansion and
-  inline toggle/choice values are confirmed by the next descriptor. Tree flattening is bounded
+  inline toggle/choice values are confirmed by the next descriptor. Collapsing a branch only hides its
+  rows; selection membership still uses the complete tree descriptor. Tree flattening is bounded
   in mounted components, including large expanded branches.
 - Row pointer selection (single click), keyboard navigation and multi-checkbox selection emit
   Selected(owner,ids). Double click/Enter activation first emits Selected for the activated item,
@@ -260,7 +262,9 @@ Task 9 approved corrections (mirror exactly in the later SDK projection):
 - ListItem slots accept Text/Icon/Chip/StatusDot/Progress/Strength, Button/MenuButton/Toggle/Choice,
   and recursively INLINE Stacks only. Mutable Field/Secret, Custom, nested data and other composition
   kinds are rejected, rather than silently losing edits during recycling. Ordinary fields/query
-  inputs remain outside virtual rows in the stable parent composition. Standalone inputs are unchanged.
+  inputs remain outside virtual rows in the stable parent composition. Inline Choices suppress their
+  standalone label while retaining accessible names; descriptor-only content measurement reserves usable
+  input height in single/two-line lanes without creating offscreen controls. Standalone inputs are unchanged.
 - Only viewport rows plus two overscan rows on each side own live controls. Row shells are reused;
   same mounted node id/kind retains its control, while a recycled row closes old control listeners,
   popups and motion owners. Controlled values remain in descriptors. Offscreen focus is remembered by

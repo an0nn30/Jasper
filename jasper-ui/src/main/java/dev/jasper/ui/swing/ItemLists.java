@@ -1,5 +1,7 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.model.Nodes;
 
@@ -15,6 +17,10 @@ final class ItemLists {
 
     static final class ListControl extends InteractiveRows.RowsControl {
         final Map<String, Integer> nodeRows = new HashMap<>();
+        final EnumMap<Typography.Role, Integer> measuredFonts =
+                new EnumMap<>(Typography.Role.class);
+        final EnumMap<DesignMetrics.Role, Integer> measuredInputs =
+                new EnumMap<>(DesignMetrics.Role.class);
 
         ListControl(KitView view, Nodes.ItemList node) {
             super(view, node);
@@ -58,6 +64,86 @@ final class ItemLists {
         @Override
         int lines() {
             return value().kind() == Nodes.ListKind.DOUBLE ? 2 : 1;
+        }
+
+        /** Descriptor-only measurement keeps offscreen choices from allocating Swing widgets. */
+        @Override
+        int minimumRowHeight() {
+            measuredFonts.clear();
+            measuredInputs.clear();
+            int height = 0;
+            for (var item : value().items()) {
+                int middle = slotHeight(item.title()) + slotHeight(item.subtitle());
+                if (middle > 0)
+                    middle += ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP);
+                int side =
+                        Math.max(
+                                item.leading().map(this::inlineHeight).orElse(0),
+                                slotHeight(item.trailing()));
+                height = Math.max(height, Math.max(middle, side));
+            }
+            return height;
+        }
+
+        int slotHeight(List<Nodes.Node> nodes) {
+            return nodes.stream().mapToInt(this::inlineHeight).max().orElse(0);
+        }
+
+        int fontHeight(Typography.Role role) {
+            return measuredFonts.computeIfAbsent(
+                    role,
+                    key -> canvas.getFontMetrics(ThemePainting.font(context(), key)).getHeight());
+        }
+
+        int inputHeight(DesignMetrics.Role metric, Typography.Role font) {
+            return measuredInputs.computeIfAbsent(
+                    metric, key -> ThemePainting.height(context(), key, font));
+        }
+
+        int inlineHeight(Nodes.Node node) {
+            if (!node.state().visible()) return 0;
+            return switch (node) {
+                case Nodes.Choice choice -> {
+                    int input =
+                            switch (choice.kind()) {
+                                case DROPDOWN ->
+                                        inputHeight(
+                                                DesignMetrics.Role.FIELD_HEIGHT,
+                                                Typography.Role.BODY);
+                                case PICKER ->
+                                        inputHeight(
+                                                DesignMetrics.Role.BUTTON_HEIGHT,
+                                                Typography.Role.LABEL);
+                                case SEGMENTED ->
+                                        inputHeight(
+                                                        DesignMetrics.Role.PANEL_ACTION,
+                                                        Typography.Role.LABEL)
+                                                + 2
+                                                        * ThemePainting.metric(
+                                                                context(),
+                                                                DesignMetrics.Role.SEGMENT_PADDING);
+                            };
+                    yield input
+                            + (choice.state().error().isEmpty()
+                                    ? 0
+                                    : fontHeight(Typography.Role.CAPTION)
+                                            + ThemePainting.metric(
+                                                    context(), DesignMetrics.Role.ICON_GAP));
+                }
+                case Nodes.Stack stack -> slotHeight(stack.children());
+                case Nodes.Text text -> fontHeight(Typography.Role.valueOf(text.role().name()));
+                case Nodes.Icon icon ->
+                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(icon.size()));
+                case Nodes.Button _, Nodes.MenuButton _ ->
+                        inputHeight(DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
+                case Nodes.Toggle toggle ->
+                        ThemePainting.metric(
+                                context(),
+                                toggle.compact()
+                                        ? DesignMetrics.Role.COMPACT_SWITCH_HEIGHT
+                                        : DesignMetrics.Role.SWITCH_HEIGHT);
+                default -> fontHeight(Typography.Role.BODY);
+            };
         }
 
         @Override

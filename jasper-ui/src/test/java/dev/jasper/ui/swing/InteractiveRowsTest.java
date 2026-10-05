@@ -740,4 +740,143 @@ class InteractiveRowsTest {
                     }
                 });
     }
+
+    @Test
+    void switchingListToSingleSelectionReassertsDeclaredSelection() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    var items = List.of(item(0), item(1));
+                    try (var view =
+                            new KitView(
+                                    context,
+                                    new ViewSpec(
+                                            new ItemList(
+                                                    "list",
+                                                    ControlState.READY,
+                                                    ListKind.DOUBLE,
+                                                    items,
+                                                    Set.of(),
+                                                    "open",
+                                                    List.of(),
+                                                    SelectionMode.MULTIPLE,
+                                                    Optional.empty())),
+                                    e -> {})) {
+                        var owner = (ItemLists.ListControl) view.control("list");
+                        owner.select("item0", true);
+                        owner.select("item1", true);
+                        assertThat(owner.selected).hasSize(2);
+                        view.update(
+                                new ViewSpec(
+                                        new ItemList(
+                                                "list",
+                                                ControlState.READY,
+                                                ListKind.DOUBLE,
+                                                items,
+                                                Set.of(),
+                                                "open",
+                                                List.of(),
+                                                SelectionMode.SINGLE,
+                                                Optional.empty())));
+                        assertThat(owner.selected).isEmpty();
+                        assertThat(owner.mounted.get("item0").check.isVisible()).isFalse();
+                        owner.select("item1", false);
+                        assertThat(owner.selected).containsExactly("item1");
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
+
+    @Test
+    void inlineChoiceKindsKeepUsableInputHeightWithoutStandaloneLabels() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    try {
+                        for (var kind : ChoiceKind.values())
+                            for (var listKind : List.of(ListKind.SINGLE, ListKind.DOUBLE))
+                                for (boolean inTitle : List.of(false, true)) {
+                                    var choice =
+                                            new Nodes.Choice(
+                                                    "choice",
+                                                    ControlState.READY,
+                                                    kind,
+                                                    List.of(
+                                                            new Option(
+                                                                    "one", "One", Optional.empty()),
+                                                            new Option(
+                                                                    "two",
+                                                                    "Two",
+                                                                    Optional.empty())),
+                                                    "one",
+                                                    "Transport",
+                                                    "pick");
+                                    var title =
+                                            inTitle
+                                                    ? List.<Node>of(choice)
+                                                    : List.<Node>of(
+                                                            new Text(
+                                                                    "title",
+                                                                    ControlState.READY,
+                                                                    "Server",
+                                                                    TextRole.BODY));
+                                    var subtitle =
+                                            listKind == ListKind.DOUBLE
+                                                    ? List.<Node>of(
+                                                            new Text(
+                                                                    "subtitle",
+                                                                    ControlState.READY,
+                                                                    "Endpoint",
+                                                                    TextRole.MONO_SMALL))
+                                                    : List.<Node>of();
+                                    var row =
+                                            new ListItem(
+                                                    "row",
+                                                    Optional.empty(),
+                                                    title,
+                                                    subtitle,
+                                                    inTitle ? List.of() : List.of(choice));
+                                    try (var view =
+                                            new KitView(
+                                                    context,
+                                                    new ViewSpec(
+                                                            new ItemList(
+                                                                    "list",
+                                                                    ControlState.READY,
+                                                                    listKind,
+                                                                    List.of(row),
+                                                                    Set.of(),
+                                                                    "",
+                                                                    List.of())),
+                                                    e -> {})) {
+                                        view.setSize(
+                                                com.formdev.flatlaf.util.UIScale.scale(520),
+                                                com.formdev.flatlaf.util.UIScale.scale(180));
+                                        layout(view);
+                                        var control =
+                                                (Choices.ChoiceControl) view.control("choice");
+                                        assertThat(control.label.isVisible())
+                                                .as("%s %s title=%s", kind, listKind, inTitle)
+                                                .isFalse();
+                                        assertThat(control.input.getHeight())
+                                                .as(
+                                                        "usable %s %s title=%s",
+                                                        kind, listKind, inTitle)
+                                                .isGreaterThanOrEqualTo(
+                                                        control.input.getPreferredSize().height);
+                                        assertThat(
+                                                        control.input
+                                                                .getAccessibleContext()
+                                                                .getAccessibleName())
+                                                .isEqualTo("Transport");
+                                        var rendered = ButtonsTest.paint(control.input);
+                                        assertThat(maxAlpha(rendered)).isPositive();
+                                    }
+                                }
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
 }

@@ -132,6 +132,15 @@
   0 failures/errors/skips**. Source hygiene/diff checks clean. Query preservation is verified in the
   stable parent Stack; real Panel integration follows in Task 10. Native focus acceptance and visual
   gallery calibration remain later/user-run. No GUI, benchmark, AOT, push or merge.
+  Task 9 independent review fix round preserves selected descendants while branches are collapsed,
+  reapplies declared selection on list/table mode changes, and embeds Choice labels with usable
+  descriptor-measured input heights in single/two-line rows. Measurement caches per-role font/input
+  heights after a reproduced 10,000-row heap failure; no larger heap or offscreen widgets are needed.
+  Final affected default and 2x suites: **28 tests each**, zero failures/errors/skips. The broader 2x
+  run exposed the existing Choices picker-surface test's unscaled bounds/pixel probe at (120,6), which
+  landed on its doubled border. Per controller ruling, that fixture now scales logical bounds and
+  sample coordinates consistently; exact expected colors remain unchanged. Earlier module counts
+  are pre-fix evidence; no broad repository/module rerun was requested for this bounded fix.
   The existing app engine remains in place until Plan 2; kit paint treatments are tested as one alpha
   application to base semantic colors, with actual kit consumption covered by later tasks.
   The prior fresh headless baseline `./gradlew check`

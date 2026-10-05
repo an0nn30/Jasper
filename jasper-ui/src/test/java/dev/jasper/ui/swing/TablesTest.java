@@ -133,4 +133,53 @@ class TablesTest {
                     }
                 });
     }
+
+    @Test
+    void switchingToSingleSelectionReassertsDeclaredSelection() {
+        Edt.run(
+                () -> {
+                    var context = KitFixtures.context();
+                    var columns = List.of(new Column("name", "Name", TextRole.BODY, false));
+                    var rows =
+                            List.of(
+                                    new TableRow("a", Map.of("name", "A"), Optional.empty()),
+                                    new TableRow("b", Map.of("name", "B"), Optional.empty()));
+                    try (var view =
+                            new KitView(
+                                    context,
+                                    new ViewSpec(
+                                            new Table(
+                                                    "table",
+                                                    ControlState.READY,
+                                                    columns,
+                                                    rows,
+                                                    Set.of(),
+                                                    "open",
+                                                    List.of(),
+                                                    SelectionMode.MULTIPLE)),
+                                    e -> {})) {
+                        var owner = (Tables.TableControl) view.control("table");
+                        owner.select("a", true);
+                        owner.select("b", true);
+                        assertThat(owner.selected).hasSize(2);
+                        view.update(
+                                new ViewSpec(
+                                        new Table(
+                                                "table",
+                                                ControlState.READY,
+                                                columns,
+                                                rows,
+                                                Set.of(),
+                                                "open",
+                                                List.of(),
+                                                SelectionMode.SINGLE)));
+                        assertThat(owner.selected).isEmpty();
+                        assertThat(owner.mounted.get("a").check.isVisible()).isFalse();
+                        owner.select("b", false);
+                        assertThat(owner.selected).containsExactly("b");
+                    } finally {
+                        release(context);
+                    }
+                });
+    }
 }

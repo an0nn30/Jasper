@@ -23,6 +23,7 @@ final class InteractiveRows {
         final LinkedHashMap<String, Row> mounted = new LinkedHashMap<>();
         final Set<String> selected = new LinkedHashSet<>();
         Set<String> declaredSelection;
+        boolean declaredMultiple;
         String focusItem, focusControl;
         int rowHeight;
         boolean syncing;
@@ -95,16 +96,26 @@ final class InteractiveRows {
             return -1;
         }
 
+        boolean containsItem(String id) {
+            return indexOf(id) >= 0;
+        }
+
+        int minimumRowHeight() {
+            return 0;
+        }
+
         @Override
         void refresh() {
             state();
             data();
-            if (!Objects.equals(declaredSelection, specifiedSelection())) {
+            if (!Objects.equals(declaredSelection, specifiedSelection())
+                    || declaredMultiple != multiple()) {
                 selected.clear();
                 selected.addAll(specifiedSelection());
                 declaredSelection = specifiedSelection();
+                declaredMultiple = multiple();
             }
-            selected.removeIf(id -> indexOf(id) < 0);
+            selected.removeIf(id -> !containsItem(id));
             if (focusItem != null && indexOf(focusItem) < 0) {
                 focusItem = null;
                 focusControl = null;
@@ -119,6 +130,7 @@ final class InteractiveRows {
                                     Typography.Role.LABEL),
                             line * lines()
                                     + ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP));
+            rowHeight = Math.max(rowHeight, minimumRowHeight());
             canvas.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_APP));
             scroll.getVerticalScrollBar().setUnitIncrement(rowHeight);
             canvas.revalidate();
@@ -519,6 +531,7 @@ final class InteractiveRows {
                 }
             }
             c.parentEnabled = parentEnabled;
+            c.embeddedLabel(true);
             c.update(node);
             boolean enabled = c.interactive();
             var children =
@@ -604,8 +617,12 @@ final class InteractiveRows {
                 title.setBounds(x, 0, content, h);
                 subtitle.setBounds(0, 0, 0, 0);
             } else if (subtitle.getComponentCount() > 0) {
-                title.setBounds(x, 0, content, h / 2);
-                subtitle.setBounds(x, h / 2, content, h - h / 2);
+                int titleHeight = title.getPreferredSize().height,
+                        subtitleHeight = subtitle.getPreferredSize().height;
+                int extra = Math.max(0, h - titleHeight - subtitleHeight);
+                int split = Math.min(h, titleHeight + extra / 2);
+                title.setBounds(x, 0, content, split);
+                subtitle.setBounds(x, split, content, h - split);
             } else {
                 title.setBounds(x, 0, content, h);
                 subtitle.setBounds(0, 0, 0, 0);
