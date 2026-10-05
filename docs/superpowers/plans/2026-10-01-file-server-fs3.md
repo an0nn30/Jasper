@@ -21,12 +21,23 @@
 - End every commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Use `./gradlew` only; the plugin's project is `:jasper-plugin-fileserver`. Tests are headless and bind only to `127.0.0.1`. Never launch the GUI; GUI checks go to the user. Never push.
 - The plugin compiles against the SDK and, optionally, `dev.jasper.vault.api`. Vendor types stay inside `engine.*` sub-packages: sshd types only in `engine.sftp`, FtpServer only in `engine.ftp`, BouncyCastle only in `engine.tls` and in `engine.sftp`'s security registrar.
-- File Server becomes version `0.3.0` with `sdk = ">=0.11.0, <0.12"` (unchanged).
+- File Server becomes version `0.3.0`. Keep the `sdk` range that `plugin.toml` has on `main` (`">=0.14.2, <0.15"` on 2026-10-05).
 - SFTP defaults, from the spec: port 2222, read-only, bind `loopback`. A new SFTP server's login is a Vault account when the Vault is installed, otherwise a session password. "SFTP needs a password or authorized keys" (already enforced by `ServerDefinition`).
 - Host key: Ed25519, kept in `data/hostkey` (OpenSSH private key format, owner-only, written by sshd). Its fingerprint is shown in OpenSSH form: `SHA256:` followed by unpadded base64.
 - Panel placement is out of scope: do not change `PanelSpec`, `Anchor` or the app's panel code (the user is handling placement in another session).
 - Source hygiene: no raw control, private-use or unpaired-surrogate characters in Java source (AGENTS.md). Labels that show user or client text set `html.disable` before their text.
 - Threading: the registry, panels and dialogs live on the UI thread. Engines start and stop on `context.background()`. `HostKey` does file I/O and must not be called on the UI thread, except `cachedFingerprint()`.
+
+## Amendments for `main` as of 2026-10-05 (read before any task)
+
+The plan was written on 2026-10-01 against `main` 4c63e175. Since then `main` gained about 400 commits. Those that touch File Server:
+- **SDK 0.14.2.** `plugin.toml`'s range is now `sdk = ">=0.14.2, <0.15"`; keep it.
+- **Notifications.** `PluginContext.notices()` is gone. Plugins report through `context.notifications().group()`, using `error(title, content)`, `error(title, content, cause)` or `warning(title, content)`, as `FileServerPlugin` already does. Task 6's `keyFiles` uses that API (amended above).
+- **A redesigned panel.** `FileServersPanel` was redesigned (with `PanelStyle`, `ProtocolChip` and `RowArtwork`). Its constructor takes a header icon, and its `note(...)` helper has a two-argument form.
+  - `cardTls`, `setTlsFingerprint`, the card loop (`List.<JComponent>of(...)`), `refreshCard()` and `menuFor(...)`'s "Show Fingerprints…" item still exist.
+  - Task 7's panel edits apply to them as written. Match the new styling when adding `cardHostKey` (use `note("")` as `cardTls` does).
+  - `FileServersPanelTest`'s `panel()` helper and its `ZoneColors` test support already match the new constructor.
+- **Line numbers.** Plan text that quotes surrounding code may differ in line numbers or small details; apply its intent to the current code, and record any deviation.
 
 ## Decisions made while planning (record in `docs/STATUS.md` and this plan's banner)
 
@@ -2238,7 +2249,9 @@ and add:
         var text = new StringBuilder();
         for (Path file : chosen) {
             try { text.append(Files.readString(file)).append('\n'); }
-            catch (IOException | RuntimeException failure) { context.notices().error("Could not read " + file + ": " + message(failure)); }
+            catch (IOException | RuntimeException failure) {
+                context.notifications().group().error("Could not read a public key file", file + ": " + message(failure), failure);
+            }
         }
         return text.isEmpty() ? Optional.empty() : Optional.of(text.toString());
     }
