@@ -2,257 +2,138 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.AnimationSettings;
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
+import static dev.jasper.app.workspace.WindowTabsTest.named;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WindowTabMotionTest {
     private final java.util.List<WindowTabs> strips = new java.util.ArrayList<>();
     @AfterEach void cleanup() throws Exception { edt(() -> strips.forEach(WindowTabs::close)); closeOwners(); }
-    private static JComponent named(Container root, String name) {
-        for (var child : root.getComponents()) {
-            if (name.equals(child.getName())) return (JComponent) child;
-            if (child instanceof Container container) { var found = named(container, name); if (found != null) return found; }
-        }
-        return null;
-    }
 
-    @Test void openingExpandsAndFadesWithoutDelayingSelection() throws Exception {
+    @Test void firstRevealUsesFullHeightAndExpandsBothTitlesFromTheRecordedInset() throws Exception {
         edt(() -> {
-            var fixture = fixture();
-            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second"); fixture.strip.refresh();
-            Container second = named(fixture.strip, "select:second").getParent();
-            assertThat(fixture.owner.currentTab().title()).isEqualTo("second");
-            assertThat(second.getWidth()).isZero();
-            fixture.advance(75);
-            assertThat(second.getWidth()).isBetween(70, 240);
-            assertThat(maximumAlpha(second)).as("the entering title fades at midpoint").isBetween(1, 200);
-            fixture.advance(75);
-            assertThat(second.getWidth()).isBetween(160, 240);
-            assertThat(maximumAlpha(second)).isEqualTo(255);
-            assertThat(fixture.strip.motionRunning()).isFalse();
+            var f = fixture(); f.add("second");
+            assertThat(f.strip.isVisible()).isTrue();
+            assertThat(f.strip.getPreferredSize().height).isEqualTo(30);
+            assertThat(f.entry("first").getX()).isEqualTo(100);
+            assertThat(f.entry("first").getWidth()).isZero();
+            f.advance(75);
+            // Reference at 1.750 s: left inset 122 px, first width 329 px, on a 1698 px strip.
+            assertThat(f.entry("first").getX()).isBetween(57, 63);
+            assertThat(f.entry("first").getWidth()).isBetween(151, 159);
+            f.advance(415);
+            assertThat(f.entry("first").getBounds()).isEqualTo(new Rectangle(0, 0, 400, 30));
+            assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
+            assertThat(f.strip.motionRunning()).isFalse();
         });
     }
 
-    @Test void closingReleasesTheSessionImmediatelyAndClosesTheGapFromItsCurrentWidth() throws Exception {
+    @Test void thirdTabRedistributesTheFullWidthAtRecordedFrameTimes() throws Exception {
         edt(() -> {
-            var fixture = fixture();
-            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second"); fixture.strip.refresh(); fixture.advance(150);
-            var closing = fixture.owner.terminalTabs().get(0);
-            var pane = closing.focusedPane();
-            int[] released = {0}; pane.onClosed = () -> released[0]++;
-            Container second = named(fixture.strip, "select:second").getParent();
-            int before = second.getX();
-            fixture.owner.closeTab(closing); fixture.strip.refresh();
-            assertThat(fixture.owner.tabStrip().indexOfComponent(closing)).isEqualTo(-1);
-            assertThat(released[0]).as("resource teardown precedes the exit visual").isEqualTo(1);
+            var f = fixture(); f.add("second"); f.advance(490); f.add("third");
+            assertThat(f.entry("third").getWidth()).isZero();
+            f.advance(75);
+            // 2.908333 s: first boundary 1649 versus final 1491 and initial 1775.
+            assertThat(f.entry("first").getWidth()).isBetween(338, 344);
+            int edge = 0;
+            for (String title : new String[]{"first", "second", "third"}) {
+                assertThat(f.entry(title).getX()).isEqualTo(edge); edge += f.entry(title).getWidth();
+            }
+            assertThat(edge).isEqualTo(800);
+            f.advance(400);
+            assertThat(f.entry("third").getBounds()).isEqualTo(new Rectangle(533, 0, 267, 30));
+            assertThat(f.strip.motionRunning()).isFalse();
+        });
+    }
+
+    @Test void closingReleasesResourcesImmediatelyAndSurvivorsExpandAtRecordedSpeed() throws Exception {
+        edt(() -> {
+            var f = fixture(); f.add("second"); f.advance(490); f.add("third"); f.advance(475);
+            var closing = f.owner.currentTab(); var pane = closing.focusedPane(); int[] released = {0};
+            pane.onClosed = () -> released[0]++;
+            f.owner.closeTab(closing); f.strip.refresh();
+            assertThat(released[0]).isEqualTo(1);
+            assertThat(named(f.strip, "select:third")).isNull();
             assertThat(pane.getComponentCount()).isZero();
-            assertThat(named(fixture.strip, "select:first")).isNull();
-            assertThat(second.getX()).isEqualTo(before);
-            fixture.advance(60);
-            assertThat(second.getX()).isBetween(1, before - 1);
-            fixture.advance(60);
-            assertThat(second.getX()).isZero();
-            assertThat(fixture.strip.motionRunning()).isFalse();
+            f.advance(75);
+            assertThat(f.entry("first").getWidth()).isBetween(329, 335);
+            f.advance(350);
+            assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
+            assertThat(f.strip.motionRunning()).isFalse();
+            f.owner.closeTab(f.owner.currentTab()); f.strip.refresh();
+            assertThat(f.strip.isVisible()).isFalse();
+            assertThat(f.strip.getPreferredSize().height).isZero();
+            assertThat(f.strip.motionRunning()).isFalse();
         });
     }
 
-    @Test void switchingGlidesTheUnderlineAndRepeatedSwitchesRetargetWithoutAJump() throws Exception {
+    @Test void metadataAndSelectionDoNotRestartOrChangeTheGeometry() throws Exception {
         edt(() -> {
-            var fixture = fixture();
-            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second"); fixture.strip.refresh(); fixture.advance(150);
-            var second = fixture.owner.currentTab(); var first = fixture.owner.tabStrip().getComponentAt(0);
-            double start = fixture.strip.indicatorBounds().getX();
-            fixture.owner.selectTab(first); fixture.strip.refresh();
-            assertThat(fixture.owner.selectedComponent()).isSameAs(first);
-            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(start);
-            fixture.advance(65);
-            double middle = fixture.strip.indicatorBounds().getX();
-            assertThat(middle).isBetween(1.0, start - 1);
-            fixture.owner.selectTab(second); fixture.strip.refresh();
-            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(middle);
-            fixture.advance(130);
-            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(start);
+            var f = fixture(); f.add("second"); f.advance(490); f.add("third"); f.advance(100);
+            var before = f.entry("third").getBounds();
+            f.owner.currentTab().rename("a much longer title"); f.strip.refresh();
+            f.owner.selectTab(f.owner.terminalTabs().get(0)); f.strip.refresh();
+            assertThat(f.entry("a much longer title").getBounds()).isEqualTo(before);
+            f.advance(375);
+            assertThat(f.strip.motionRunning()).isFalse();
+            assertThat(f.entry("a much longer title").getWidth()).isEqualTo(267);
         });
     }
 
-    @Test void anUnrelatedTitleUpdatePreservesTheSwitchPositionAndDeadline() throws Exception {
+    @Test void interruptedMotionStartsFromCurrentBoundsAndResizeOrDisableSettles() throws Exception {
         edt(() -> {
-            var fixture = fixture();
-            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second");
-            fixture.strip.refresh(); fixture.advance(150);
-            var second = fixture.owner.currentTab();
-            fixture.owner.selectTab(fixture.owner.tabStrip().getComponentAt(0)); fixture.strip.refresh();
-            fixture.advance(65);
-            var before = fixture.strip.indicatorBounds();
-            assertThat(before.getX()).isGreaterThan(0);
-            second.rename("third"); fixture.strip.refresh();
-            assertThat(fixture.strip.indicatorBounds()).as("metadata must not snap the selected underline").isEqualTo(before);
-            fixture.advance(64);
-            assertThat(fixture.strip.motionRunning()).isTrue();
-            fixture.advance(1);
-            assertThat(fixture.strip.indicatorBounds().getX()).isZero();
-            assertThat(fixture.strip.motionRunning()).as("metadata must not extend the switch deadline").isFalse();
-        });
-    }
-
-    @Test void aTitleChangingTheSwitchDestinationRetargetsWithoutExtendingItsDeadline() throws Exception {
-        edt(() -> {
-            var fixture = fixture();
-            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second");
-            fixture.strip.refresh(); fixture.advance(150);
-            var first = fixture.owner.terminalTabs().get(0);
-            fixture.owner.selectTab(first); fixture.strip.refresh(); fixture.advance(65);
-            var before = fixture.strip.indicatorBounds();
-            first.rename("a shell title with enough characters to use the maximum tab width"); fixture.strip.refresh();
-            assertThat(fixture.strip.indicatorBounds()).isEqualTo(before);
-            fixture.advance(65);
-            assertThat(fixture.strip.indicatorBounds().getX()).isZero();
-            assertThat(fixture.strip.indicatorBounds().getWidth()).isEqualTo(240);
-            assertThat(fixture.strip.motionRunning()).isFalse();
-        });
-    }
-
-    @Test void rapidMouseClicksRetargetTheMovingUnderlineWithoutSnapping() throws Exception {
-        edt(() -> {
-            var fixture = fixture(); fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second");
-            fixture.strip.refresh(); fixture.advance(150);
-            click(named(fixture.strip, "select:first")); fixture.strip.refresh(); fixture.advance(65);
-            var before = fixture.strip.indicatorBounds();
-            click(named(fixture.strip, "select:second")); fixture.strip.refresh();
-            assertThat(fixture.owner.currentTab().title()).isEqualTo("second");
-            assertThat(fixture.strip.indicatorBounds()).isEqualTo(before);
-            fixture.advance(130);
-            assertThat(fixture.strip.indicatorBounds().getX()).isGreaterThan(before.getX());
-        });
-    }
-
-    private static void click(JComponent button) {
-        for (int id : new int[]{java.awt.event.MouseEvent.MOUSE_PRESSED, java.awt.event.MouseEvent.MOUSE_RELEASED})
-            button.dispatchEvent(new java.awt.event.MouseEvent(button, id, 1, 0, 10, 10, 1, false, java.awt.event.MouseEvent.BUTTON1));
-    }
-
-    @Test void rapidOpenCloseRetargetsTheCurrentGapAndLiveDisableSettlesEverything() throws Exception {
-        edt(() -> {
-            var fixture = fixture();
-            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("second"); fixture.strip.refresh(); fixture.advance(50);
-            int width = named(fixture.strip, "select:second").getParent().getWidth();
-            fixture.owner.closeTab(fixture.owner.currentTab()); fixture.strip.refresh();
-            fixture.owner.newTab(HOME); fixture.owner.currentTab().rename("third"); fixture.strip.refresh();
-            assertThat(named(fixture.strip, "select:third").getParent().getX()).isGreaterThanOrEqualTo(160 + width - 1);
-            fixture.strip.setAnimations(new AnimationSettings(false, 150, 120, 130));
-            assertThat(named(fixture.strip, "select:third").getParent().getWidth()).isBetween(160, 240);
-            assertThat(fixture.strip.motionRunning()).isFalse();
+            var f = fixture(); f.add("second"); f.advance(490); f.add("third"); f.advance(75);
+            var before = f.entry("first").getBounds();
+            f.owner.closeTab(f.owner.currentTab()); f.strip.refresh();
+            assertThat(f.entry("first").getBounds()).isEqualTo(before);
+            f.add("fourth");
+            f.strip.setSize(601, 30); f.strip.doLayout();
+            assertThat(f.strip.motionRunning()).isFalse();
+            assertThat(f.entry("fourth").getBounds()).isEqualTo(new Rectangle(401, 0, 200, 30));
+            f.add("fifth"); assertThat(f.strip.motionRunning()).isTrue();
+            f.strip.setAnimations(new AnimationSettings(false, 475, 425, 0));
+            assertThat(f.strip.motionRunning()).isFalse();
+            assertThat(f.entry("fifth").getWidth()).isEqualTo(150);
         });
     }
 
     @Test void zeroDurationsAndDisposalLeaveNoRunningTimer() throws Exception {
         edt(() -> {
-            var fixture = fixture(); fixture.strip.setAnimations(new AnimationSettings(true, 0, 0, 0));
-            fixture.owner.newTab(HOME); fixture.strip.refresh();
-            assertThat(fixture.strip.motionRunning()).isFalse();
-            fixture.strip.setAnimations(AnimationSettings.defaults());
-            fixture.owner.newTab(HOME); fixture.strip.refresh();
-            assertThat(fixture.strip.motionRunning()).isTrue();
-            fixture.strip.close(); fixture.advance(200);
-            assertThat(fixture.strip.motionRunning()).isFalse();
+            var f = fixture(); f.strip.setAnimations(new AnimationSettings(true, 0, 0, 0));
+            f.add("second"); assertThat(f.strip.motionRunning()).isFalse();
+            f.strip.setAnimations(AnimationSettings.defaults()); f.add("third");
+            assertThat(f.strip.motionRunning()).isTrue();
+            f.strip.close(); f.advance(1000);
+            assertThat(f.strip.motionRunning()).isFalse();
+            assertThat(named(f.strip, "select:third")).isNull();
         });
     }
 
-    @Test void overflowAndRepeatedGlassPaintStayBoundedDuringMotion() throws Exception {
+    @Test void firstRevealAnimatesAfterRealHiddenParentLayout() throws Exception {
         edt(() -> {
-            var fixture = fixture();
-            fixture.owner.applyBackgroundOpacity(.55);
-            for (int i = 0; i < 9; i++) { fixture.owner.newTab(HOME); fixture.strip.refresh(); }
-            fixture.advance(75);
-            fixture.strip.setSize(220, 30); fixture.strip.doLayout();
-            assertThat(named(fixture.strip, "newTab").getBounds()).isEqualTo(new Rectangle(196, 0, 24, 30));
-            fixture.owner.selectTab(fixture.owner.tabStrip().getComponentAt(0)); fixture.strip.refresh(); fixture.advance(65);
-            assertThat(fixture.strip.motionRunning()).isTrue();
-            var image = new BufferedImage(220, 30, BufferedImage.TYPE_INT_ARGB);
-            var g = image.createGraphics(); fixture.strip.paint(g); int before = image.getRGB(100, 29);
-            g.setClip(90, 20, 30, 10);
-            fixture.strip.paint(g); assertThat(image.getRGB(100, 29)).isEqualTo(before); g.dispose();
-            assertThat(fixture.strip.indicatorBounds().getWidth()).isBetween(0.0, 240.0);
-        });
-    }
-
-    @Test void operationDurationsKeepTheUnderlineWithOpeningAndClosingMotion() throws Exception {
-        edt(() -> {
-            var fixture = fixture(); fixture.strip.setAnimations(new AnimationSettings(true, 1000, 800, 0));
-            double initial = fixture.strip.indicatorBounds().getX();
-            fixture.owner.newTab(HOME); fixture.strip.refresh();
-            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(initial);
-            fixture.advance(500);
-            double middle = fixture.strip.indicatorBounds().getX();
-            assertThat(middle).isBetween(1.0, 159.0);
-            fixture.advance(500);
-            double beforeClose = fixture.strip.indicatorBounds().getX();
-            fixture.owner.closeTab(fixture.owner.currentTab()); fixture.strip.refresh();
-            assertThat(fixture.strip.indicatorBounds().getX()).isEqualTo(beforeClose);
-            fixture.advance(400);
-            assertThat(fixture.strip.indicatorBounds().getX()).isBetween(1.0, beforeClose - 1);
-            fixture.advance(400);
-            assertThat(fixture.strip.indicatorBounds().getX()).isZero();
-        });
-    }
-
-    @Test void aTitleArrivingMidOpenRetargetsWidthWithoutJumpingTheUnderline() throws Exception {
-        edt(() -> {
-            var fixture = fixture(); fixture.strip.setAnimations(new AnimationSettings(true, 1000, 800, 0));
-            fixture.owner.newTab(HOME); fixture.strip.refresh(); fixture.advance(500);
-            var before = fixture.strip.indicatorBounds();
-            fixture.owner.currentTab().rename("a shell title with enough characters to use the maximum tab width"); fixture.strip.refresh();
-            assertThat(fixture.strip.indicatorBounds()).isEqualTo(before);
-            fixture.advance(500);
-            assertThat(fixture.strip.indicatorBounds().getWidth()).isEqualTo(240);
-            assertThat(fixture.strip.motionRunning()).isFalse();
-        });
-    }
-
-    @Test void savedConfigurationDisablesRunningAndFutureMotionAcrossWindows() throws Exception {
-        edt(() -> {
-            var first = content(launcher(new ArrayDeque<>())); var second = content(launcher(new ArrayDeque<>()));
-            var enabled = dev.jasper.app.config.ConfigSnapshot.defaults().toBuilder()
-                .animations(new AnimationSettings(true, 1000, 1000, 1000)).build();
-            var disabled = enabled.toBuilder().animations(new AnimationSettings(false, 1000, 1000, 1000)).build();
-            for (var owner : java.util.List.of(first, second)) {
-                owner.applyConfiguration(enabled, false);
-                owner.windowTabs().setSize(800, 30); owner.windowTabs().doLayout();
-                owner.newTab(HOME); assertThat(owner.windowTabs().motionRunning()).isTrue();
-            }
-            for (var owner : java.util.List.of(first, second)) {
-                owner.applyConfiguration(disabled, false);
-                assertThat(owner.windowTabs().motionRunning()).isFalse();
-                owner.newTab(HOME);
-                assertThat(owner.windowTabs().motionRunning()).isFalse();
-                assertThat(named(owner.windowTabs(), "select:" + owner.currentTab().title()).getParent().getWidth()).isBetween(160, 240);
-            }
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setSize(800, 500); WindowTabsTest.layoutTree(owner);
+            assertThat(owner.windowTabs().isVisible()).isFalse();
+            owner.newTab(HOME); WindowTabsTest.layoutTree(owner);
+            assertThat(owner.windowTabs().motionRunning()).isTrue();
+            owner.setAnimations(new AnimationSettings(false, 475, 425, 0));
+            assertThat(owner.windowTabs().motionRunning()).isFalse();
         });
     }
 
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTab().rename("first"); owner.update();
         var clock = new AtomicLong(); var strip = new WindowTabs(owner, clock::get);
-        // Exercise explicit durations independently of the permanent product defaults.
-        strip.setAnimations(new AnimationSettings(true, 150, 120, 130));
         strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
         return new Fixture(owner, strip, clock);
     }
     private record Fixture(WindowContent owner, WindowTabs strip, AtomicLong clock) {
+        Container entry(String title) { return named(strip, "select:" + title).getParent(); }
+        void add(String title) { owner.newTab(HOME); owner.currentTab().rename(title); strip.refresh(); }
         void advance(int millis) { clock.addAndGet(millis * 1_000_000L); strip.animate(clock.get()); }
-    }
-    private static int maximumAlpha(Container entry) {
-        var image = new BufferedImage(entry.getWidth(), entry.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        var g = image.createGraphics(); entry.paint(g); g.dispose();
-        int maximum = 0;
-        for (int x = 0; x < image.getWidth(); x++) for (int y = 0; y < image.getHeight(); y++)
-            maximum = Math.max(maximum, image.getRGB(x, y) >>> 24);
-        return maximum;
     }
 }

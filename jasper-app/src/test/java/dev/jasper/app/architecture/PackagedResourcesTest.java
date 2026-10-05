@@ -5,6 +5,25 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class PackagedResourcesTest {
+    @Test void bundledTerminalFontsLoadFromTheProductionJarWithTheirNotices() throws Exception {
+        try (var jar = new JarFile(System.getProperty("jasper.appJar"))) {
+            String root = "dev/jasper/app/fonts/cousine/";
+            for (String style : java.util.List.of("Regular", "Bold", "Italic", "BoldItalic")) {
+                var entry = jar.getJarEntry(root + "CousineNerdFontMono-" + style + ".ttf");
+                assertThat(entry).as(style + " is shipped").isNotNull();
+                try (var stream = jar.getInputStream(entry)) {
+                    var font = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, stream);
+                    assertThat(font.getFamily(java.util.Locale.ROOT)).isEqualTo("Cousine Nerd Font Mono");
+                    assertThat(font.getPSName()).isEqualTo("CousineNFM-" + style);
+                    assertThat(font.canDisplay(0xE0B0)).as("Powerline glyph in " + style).isTrue();
+                    assertThat(font.canDisplay(0xF120)).as("Nerd Font terminal glyph in " + style).isTrue();
+                }
+            }
+            for (String notice : java.util.List.of("OFL.txt", "NERD-FONTS-LICENSE.txt", "README.md", "NOTICE.md"))
+                assertThat(jar.getJarEntry(root + notice)).as(notice + " travels with the fonts").isNotNull();
+        }
+    }
+
     @Test void productionJarPreservesResourcesAndContainsNoBuddyOrTestImplementation() throws Exception {
         try (var jar = new JarFile(System.getProperty("jasper.appJar"))) {
             for (String name : java.util.List.of(

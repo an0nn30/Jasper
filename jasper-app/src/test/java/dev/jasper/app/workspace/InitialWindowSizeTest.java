@@ -22,8 +22,9 @@ class InitialWindowSizeTest {
 
     @Test void initialAreaUsesActualSharedFontMetricsAndRequestedGrid() {
         var f = FontConfig.defaults();
-        var natural = new FontSet(f.family(), f.size(), f.fallback(), f.ligatures());
         var defaults = InitialWindowSize.terminalArea(ConfigSnapshot.defaults());
+        var natural = new FontSet(f.family(), f.size(), f.fallback(), f.ligatures());
+        assertThat(natural.primaryFamily()).isEqualTo("Cousine Nerd Font Mono");
         assertThat(defaults).isEqualTo(new Dimension(100 * natural.cellWidth() + 8, 35 * natural.cellHeight() + 8));
         var large = new FontConfig("Monospaced", 24, java.util.List.of(), false, 1.8f);
         var fonts = new FontSet(large.family(), large.size(), large.fallback(), large.ligatures(), large.lineHeight());

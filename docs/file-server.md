@@ -38,6 +38,20 @@ growing to half a minute; after ten wrong passwords the address is refused for f
 
 HTTP logins use Basic auth, which sends the password unencrypted; turn on **Use TLS** to serve HTTPS instead.
 
+## Share Path from the terminal
+
+Right-click a terminal and choose **Share Path → HTTP, HTTPS, FTP, FTPS, SFTP or TFTP**. The selected type starts immediately
+with that pane's current local folder, without a setup dialog. Jasper chooses a name and an available port starting
+at 8080 for HTTP/HTTPS, 2121 for FTP/FTPS, 2222 for SFTP or 6969 for TFTP, then opens File Servers with the new server selected.
+
+Quick shares are temporary, read-only and reachable on **this computer only**. HTTP/HTTPS and TFTP need no login;
+FTP/FTPS and SFTP generate a session password, available through **Copy Password**. FTPS requires TLS, and HTTPS/FTPS use
+Jasper's existing certificate. Stop the share to remove it, or use **Save as a Server…** to keep it and change settings
+such as network access.
+
+If the pane has no known local folder, reports a remote folder, or its folder no longer exists, Jasper reports that
+it cannot share the path. This menu never substitutes your home folder or another terminal's folder.
+
 ## Serve Current Folder
 
 **Serve Current Folder over HTTP** shares the folder your shell is in (or your home folder), read-only and on this

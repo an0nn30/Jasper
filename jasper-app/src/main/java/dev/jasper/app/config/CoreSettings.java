@@ -147,7 +147,7 @@ public final class CoreSettings {
     public static final Setting<String> TERMINAL_FONT_FAMILY = Setting.of("terminal.font.family",
             SettingKind.string(CoreSettings::fontName, FONT_NAME), FontConfig.defaults().family())
         .alias("font.family").label("Font").keywords("font", "typeface", "family")
-        .description("Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.").build();
+        .description("Font family and ordered fallbacks update live. Cousine Nerd Font Mono is bundled. Missing fonts use JBR/system fallback.").build();
     public static final Setting<Float> TERMINAL_FONT_SIZE = Setting.of("terminal.font.size", SettingKind.number(6, 72), FontConfig.defaults().size())
         .alias("font.size").label("Font size").keywords("font", "size", "points", "zoom")
         .description("Font size in points, 6-72; changes update all panes live.\n"

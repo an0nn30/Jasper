@@ -7,7 +7,8 @@
   `NetAscii`, `TftpTransfer`, `TftpEngine`). It handles RRQ, and WRQ when writable (committed after the final block),
   octet and netascii, `blksize`/`tsize` through OACK, a resend after 1 s up to 5 times, at most 16 transfers ("Server
   busy" beyond), error 5 for strangers, and fixed error texts that never name host paths. Serve Current Folder over
-  TFTP; `portFree` checks UDP too. Decisions: see the plan header. Full `./gradlew check` passed:
+  TFTP; `portFree` checks UDP too. Integrated with main's terminal Share Path (2026-10-05): the Share Path
+  menu also offers SFTP and TFTP. Decisions: see the plan header. Full `./gradlew check` passed:
   **8,856 tests, 0 failures, 0 errors, 6 existing skips** (File Server: 250, up from 215), after the final-review fix wave; source hygiene clean. No
   GUI, benchmark or AOT training; not pushed.
   Deviations from the plan text (details in the plan's banner): netascii writes are buffered under the decoder;
@@ -62,6 +63,65 @@
   "regenerate host key". GUI checks pending: OpenSSH `sftp`/`scp`, FileZilla and Cyberduck with a password and with a
   key; the first-connection host key prompt matching the card; refused shell (`ssh -p 2222 host`); the editor's key
   list.
+
+- **Bundled default terminal font** (2026-10-05; `codex/bundled-terminal-font`, isolated worktree
+  `/Users/dustin/.codex/worktrees/bundled-terminal-font/moray`): implements the approved bounded design:
+  the app bundles the supplied Cousine Nerd Font Mono regular/bold/italic/bold-italic faces with upstream
+  license notices and defaults terminal text to **12 pt**. Process-local font registration precedes app
+  startup, pane/window metrics and font-picker enumeration; no system installation. Explicit saved
+  family/size settings keep precedence. App panes without configuration use the same defaults; the
+  independent terminal library retains its own options. Native inline implementation with independent
+  final review; no new plan document. Regressions reproduced missing JAR fonts and old family/size
+  defaults before implementation. Focused config, font-picker, packaged-resource and pane/reset tests
+  pass. Independent final review found no actionable issues. Full `./gradlew check --continue
+  :jasper-app:verifyPackage -Pjasper.aot=false` passed: **8,785 tests, 0 failures, 0 errors, 6 existing
+  skips**, including architecture/documentation gates and the macOS native image. A final headless
+  package rebuild after license whitespace normalization passed; all four fonts and four notices in
+  the image match source bytes. Changed-source hygiene and whitespace checks passed. A 2x headless
+  12 pt style/symbol render was inspected (`jasper-app/build/font-preview/cousine-12pt-2x.png`).
+  No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05; no push requested.
+
+- **Alacritty-style workspace tabs** (2026-10-05; `codex/alacritty-tabs`, isolated worktree
+  `/Users/dustin/.codex/worktrees/alacritty-tabs/moray`): implements the user-approved
+  [equal-width layout and measured motion](design/alacritty-tabs.md), superseding the flat-tab pass.
+  A single tab hides the rail and reclaims its height. Multiple centered text tabs divide the full
+  terminal column, with theme-derived selected/inactive surfaces, separators and hover-only close.
+  New-tab remains in the toolbar/palette/shortcuts. First reveal is 490 ms, additions 475 ms,
+  removals 425 ms; selection and hiding the rail are immediate. Curves interpolate boundaries from
+  the third supplied recording using ffmpeg frames and their actual timestamps; no source easing
+  constants are claimed. Closed tabs release resources immediately. This bounded follow-up uses
+  regression-first native inline implementation and independent final review, not historical plans.
+  Initial behavior regressions failed before implementation; a real hidden-parent reveal regression
+  also reproduced before its fix. Workspace/config checks and dark/light/glass headless previews pass.
+  Independent review found narrow cells reserving all title space for a hidden close affordance; a
+  16-tab/800px regression reproduced it, and narrow cells now reclaim those gutters. Follow-up review
+  has no remaining findings. Final `./gradlew -I tools/previews/alacritty-tabs.gradle
+  :jasper-app:alacrittyTabsPreview :jasper-app:alacrittyTabMotionPreview check --continue` passed:
+  **8,753 tests, 0 failures, 0 errors, 6 existing skips**, including architecture, docs and native
+  headless gates. The explicit 2× scale check, source hygiene and whitespace checks passed. Replaced
+  superseded underline/scroll/natural-width tests with equal-width/visibility/measured-motion coverage.
+  Previews remain in `jasper-app/build/alacritty-tabs-preview/`, including `tab-motion.mp4`.
+  No GUI, benchmark or AOT training. Native GUI acceptance remains user-run.
+  User approved merging to main and pushing on 2026-10-05. Combined `./gradlew check --continue`
+  passed **8,764 tests, 0 failures, 0 errors, 6 existing skips**, preserving the Share Path integration.
+  Preview files are preserved in the main checkout at `jasper-app/build/alacritty-tabs-preview/`;
+  recording analyses are in `build/alacritty-tabs-reference/` for managed-worktree archival after integration.
+
+- **Terminal Share Path** (2026-10-05; `codex/share-path`, isolated worktree
+  `/Users/dustin/.codex/worktrees/share-path/moray`): implements the user-approved bounded design:
+  terminal context menu **Share Path → HTTP / HTTPS / FTP / FTPS** starts a temporary server for the
+  invoked pane's current local folder, without a dialog, and reveals it in File Servers. Names and ports
+  are automatic; shares retain read-only/loopback defaults, FTP session passwords, and TLS is required
+  for FTPS. Missing, invalid and remote paths are rejected without substituting home or another pane.
+  Existing Serve Current Folder palette commands retain their documented behavior. Uses the existing
+  SDK menu contribution and server registry; no SDK/app changes. Native inline implementation with an
+  independent final review, without a new historical-plan execution. Eleven new cases failed before
+  implementation; focused plugin integration tests now pass, including real starts for all four types.
+  Independent final review found no actionable issues. Final `./gradlew check --continue` passed all
+  91 tasks: **8,782 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and
+  documentation gates. Changed-source hygiene and whitespace checks passed. The existing bounded
+  port search/bind-race failure handling is retained. No GUI, benchmark or AOT training; native menu
+  acceptance remains user-run. User approved local main integration on 2026-10-05; no push requested.
 
 - **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
   `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
