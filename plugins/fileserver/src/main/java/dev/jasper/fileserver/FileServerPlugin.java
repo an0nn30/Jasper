@@ -88,6 +88,7 @@ public final class FileServerPlugin implements Plugin {
     public static final String SERVERS = ID + ".servers";
     public static final String SERVE_HTTP = ID + ".serve-http";
     public static final String SERVE_FTP = ID + ".serve-ftp";
+    public static final String SERVE_SFTP = ID + ".serve-sftp";
 
     /** What the plugin takes from the machine; tests replace each part. */
     record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree, Consumer<String> clipboard,
@@ -163,6 +164,9 @@ public final class FileServerPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SERVE_FTP, "Serve Current Folder over FTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "ftp", "folder")),
             invoked -> serve(invoked, Protocol.FTP));
+        context.actions().register(ActionSpec.of(SERVE_SFTP, "Serve Current Folder over SFTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "sftp", "ssh", "folder")),
+            invoked -> serve(invoked, Protocol.SFTP));
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
@@ -187,6 +191,8 @@ public final class FileServerPlugin implements Plugin {
         context.background().execute(() -> {
             try { tls.fingerprint(); }
             catch (EngineFailure unreadable) { /* reported when a TLS server starts or the fingerprints are shown */ }
+            try { hostKey.fingerprint(); }
+            catch (EngineFailure unreadable) { /* reported when an SFTP server starts or the fingerprints are shown */ }
             environment.ui().execute(() -> { if (!stopped) refreshPanels(); });
         });
     }
@@ -228,6 +234,7 @@ public final class FileServerPlugin implements Plugin {
             context.appearance().icon(IconName.SERVER));
         panel.onHeaderChanged(host::setHeader);
         panel.setTlsFingerprint(tls.cachedFingerprint());
+        panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), host);
@@ -433,6 +440,7 @@ public final class FileServerPlugin implements Plugin {
     private void refreshPanels() {
         for (FileServersPanel panel : panels.values()) {
             panel.setTlsFingerprint(tls.cachedFingerprint());
+            panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
             panel.setServers(registry.servers(), store.error());
             panel.refreshActivity();
         }
@@ -440,7 +448,12 @@ public final class FileServerPlugin implements Plugin {
 
     /** Shows the shared certificate's fingerprint, offering to regenerate it; the file I/O runs off the UI thread. */
     void showFingerprints(WindowHandle window, UUID id) {
-        if (registry.server(id).isEmpty()) return;
+        Optional<ServerRegistry.View> server = registry.server(id);
+        if (server.isEmpty()) return;
+        if (server.get().definition().protocol() == Protocol.SFTP) {
+            showHostKey(window);
+            return;
+        }
         context.background().execute(() -> {
             String text;
             try {
@@ -454,6 +467,29 @@ public final class FileServerPlugin implements Plugin {
                 if (stopped || !window.isOpen()) return;
                 refreshPanels();
                 confirm(window, "Fingerprints", shown, "Regenerate Certificate…", "Close", () -> confirmRegenerate(window), () -> { });
+            });
+        });
+    }
+
+    /** Shows the SSH host key's fingerprint, offering to copy it; the file I/O runs off the UI thread. */
+    private void showHostKey(WindowHandle window) {
+        context.background().execute(() -> {
+            Optional<String> fingerprint;
+            String text;
+            try {
+                fingerprint = hostKey.fingerprint();
+                text = fingerprint.map(value -> "SSH host key: " + value)
+                    .orElse("No SSH host key yet: Jasper creates one when an SFTP server first starts.");
+            } catch (EngineFailure unreadable) {
+                fingerprint = Optional.empty();
+                text = unreadable.getMessage();
+            }
+            Optional<String> copy = fingerprint;
+            String shown = text;
+            environment.ui().execute(() -> {
+                if (stopped || !window.isOpen()) return;
+                refreshPanels();
+                confirm(window, "Fingerprints", shown, "Copy Fingerprint", "Close", () -> copy.ifPresent(environment.clipboard()), () -> { });
             });
         });
     }

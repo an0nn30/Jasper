@@ -34,7 +34,7 @@ class PluginZipsTest {
                 assertThat(jars).as("RSyntaxTextArea travels with the editor").contains("rsyntaxtextarea-3.6.0.jar");
             else if (descriptor.id().equals("dev.jasper.fileserver"))
                 assertThat(jars).as("File Server's libraries travel with it")
-                    .contains("tomlj-1.1.1.jar", "ftpserver-core-1.2.1.jar", "bcpkix-jdk18on-1.85.jar");
+                    .contains("tomlj-1.1.1.jar", "ftpserver-core-1.2.1.jar", "bcpkix-jdk18on-1.85.jar", "sshd-core-2.19.0.jar", "sshd-sftp-2.19.0.jar");
             else assertThat(jars).as(descriptor.id() + " bundles nothing").hasSize(1);
         }
         assertThat(ids).containsExactlyInAnyOrder("dev.jasper.sample", "dev.jasper.snippets", "dev.jasper.history", "dev.jasper.vault", "dev.jasper.remote", "dev.jasper.editor", "dev.jasper.fileserver");

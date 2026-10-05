@@ -25,6 +25,25 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServersPanelTest {
+    @Test void anSftpServerShowsTheHostKeyFingerprint() {
+        var panel = panel();
+        var definition = new ServerDefinition(UUID.randomUUID(), "keys", Protocol.SFTP, HOME.resolve("work"), Bind.LOOPBACK, 2222,
+            Optional.empty(), false, Login.SESSION, List.of(), false, false, false);
+        views.add(new ServerRegistry.View(definition, false, ServerState.STOPPED, List.of(), Optional.empty(), false));
+        view("plain", ServerState.STOPPED, false, false, Bind.LOOPBACK, List.of(), Optional.empty());
+        panel.setServers(views, Optional.empty());
+        assertThat(panel.cardHostKey.isVisible()).isTrue();
+        assertThat(panel.cardTls.isVisible()).isFalse();
+        assertThat(panel.cardHostKey.getText()).isEqualTo("SSH host key: created when the server first starts");
+        panel.setHostKeyFingerprint(Optional.of("SHA256:abc"));
+        assertThat(panel.cardHostKey.getText()).isEqualTo("SSH host key SHA256:abc");
+        assertThat(titles(panel.menuFor(0))).contains("Show Fingerprints…");
+        click(panel.menuFor(0), "Show Fingerprints…");
+        assertThat(events).containsExactly("fingerprints keys");
+        panel.select(views.get(1).definition().id());
+        assertThat(panel.cardHostKey.isVisible()).as("only SFTP has a host key").isFalse();
+    }
+
     @Test void compactListKeepsDetailsClosedAndExposesCopyAndSpaceToggle() {
         var panel = panel();
         view("docs", ServerState.RUNNING, false, false, Bind.LOOPBACK,

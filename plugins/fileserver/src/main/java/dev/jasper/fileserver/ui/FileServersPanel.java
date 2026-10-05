@@ -3,6 +3,7 @@ package dev.jasper.fileserver.ui;
 import dev.jasper.sdk.ui.WorkspacePalette;
 import dev.jasper.sdk.ui.PanelHeader;
 import dev.jasper.fileserver.definition.Bind;
+import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.runtime.ActivityLog;
 import dev.jasper.fileserver.runtime.ServerRegistry;
@@ -82,6 +83,7 @@ public final class FileServersPanel extends JPanel {
     };
     final JLabel cardName = label(""), cardState = label(""), cardFolder = label(""), cardAccess = label(""), cardWarnings = label("");
     final JTextArea cardTls = note("");
+    final JTextArea cardHostKey = note("");
     final JPanel addresses = new JPanel();
     final List<JButton> addressCopies = new ArrayList<>();
     final JButton toggle = new JButton("Start"), edit = new JButton("Edit…");
@@ -98,6 +100,7 @@ public final class FileServersPanel extends JPanel {
     private List<ServerRegistry.View> views = List.of();
     private Optional<String> problem = Optional.empty();
     private Optional<String> tlsFingerprint = Optional.empty();
+    private Optional<String> hostKeyFingerprint = Optional.empty();
     private UUID selected;
     private boolean rebuilding;
 
@@ -143,7 +146,7 @@ public final class FileServersPanel extends JPanel {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         cardName.setFont(cardName.getFont().deriveFont(Font.BOLD));
         addresses.setLayout(new BoxLayout(addresses, BoxLayout.Y_AXIS));
-        for (JComponent part : List.<JComponent>of(cardName, cardState, cardFolder, cardAccess, cardWarnings, cardTls, addresses)) {
+        for (JComponent part : List.<JComponent>of(cardName, cardState, cardFolder, cardAccess, cardWarnings, cardTls, cardHostKey, addresses)) {
             part.setAlignmentX(LEFT_ALIGNMENT);
             card.add(part);
         }
@@ -275,6 +278,13 @@ public final class FileServersPanel extends JPanel {
         refreshCard();
     }
 
+    /** The SSH host key's fingerprint, or empty before it exists; shown for SFTP servers. */
+    public void setHostKeyFingerprint(Optional<String> fingerprint) {
+        if (fingerprint.equals(hostKeyFingerprint)) return;
+        hostKeyFingerprint = fingerprint;
+        refreshCard();
+    }
+
     /** Re-reads the selected server's activity log. */
     public void refreshActivity() {
         String text = selectedView().map(view -> log.apply(view.definition().id()).stream()
@@ -321,7 +331,7 @@ public final class FileServersPanel extends JPanel {
         copyPassword.setEnabled(phase == Phase.RUNNING && view.user().isPresent());
         menu.add(copyPassword);
         var fingerprints = item("Show Fingerprints…", () -> actions.fingerprints().accept(id));
-        fingerprints.setEnabled(view.definition().tls());
+        fingerprints.setEnabled(view.definition().tls() || view.definition().protocol() == Protocol.SFTP);
         menu.add(fingerprints);
         menu.addSeparator();
         menu.add(item(detailsOpen ? "Hide Details" : "Show Details", () -> {
@@ -383,6 +393,9 @@ public final class FileServersPanel extends JPanel {
             cardTls.setText(tlsFingerprint.map(fingerprint -> "TLS certificate SHA-256 " + fingerprint)
                 .orElse("TLS certificate: created when the server first starts"));
             cardTls.setVisible(definition.tls());
+            cardHostKey.setText(hostKeyFingerprint.map(fingerprint -> "SSH host key " + fingerprint)
+                .orElse("SSH host key: created when the server first starts"));
+            cardHostKey.setVisible(definition.protocol() == Protocol.SFTP);
             for (URI uri : view.addresses()) {
                 var row = new JPanel();
                 row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));

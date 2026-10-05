@@ -41,7 +41,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServerPluginTest {
-    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.2.0",
+    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.3.0",
         Set.of(Capabilities.NETWORK_LISTEN, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE));
     @TempDir Path home;
     @TempDir Path root;
@@ -83,6 +83,61 @@ class FileServerPluginTest {
     static void click(javax.swing.JPopupMenu menu, String title) {
         Arrays.stream(menu.getComponents()).filter(c -> c instanceof JMenuItem item && item.getText().equals(title))
             .map(c -> (JMenuItem) c).findFirst().orElseThrow().doClick();
+    }
+
+    @Test void servesTheFocusedFolderOverSftpWithASessionPassword() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> port != 2222);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            assertThat(host.actions()).contains("dev.jasper.fileserver.serve-sftp|Serve Current Folder over SFTP|true");
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(host.invoke(FileServerPlugin.SERVE_SFTP, window, local)).isTrue();
+            await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            var served = plugin.registry().servers().getFirst();
+            assertThat(served.temporary()).isTrue();
+            assertThat(served.definition().name()).isEqualTo("project (SFTP)");
+            assertThat(served.definition().protocol()).isEqualTo(Protocol.SFTP);
+            assertThat(served.definition().folder()).isEqualTo(project);
+            assertThat(served.definition().port()).as("2222 was taken").isEqualTo(2223);
+            assertThat(served.definition().writable()).isFalse();
+            assertThat(served.definition().login()).isEqualTo(Login.SESSION);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void showsTheHostKeyFingerprintAndCopiesIt() throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow();
+            var panel = (FileServersPanel) host.openPanel(FileServerPlugin.PANEL, window);
+            var base = ServerDefinition.create("keys", Protocol.SFTP, home);
+            var sftp = new ServerDefinition(base.id(), "keys", Protocol.SFTP, home, Bind.LOOPBACK, Ports.free(), Optional.empty(), false,
+                Login.SESSION, List.of(), false, false, false);
+            plugin.store().put(sftp);
+            settle(host);
+            assertThat(UiTestAccess.cardHostKey(panel).getText()).isEqualTo("SSH host key: created when the server first starts");
+            UiTestAccess.toggle(panel).doClick();
+            await(host, () -> plugin.registry().server(sftp.id()).orElseThrow().state().phase() == Phase.RUNNING, "the SFTP server runs");
+            String fingerprint = plugin.hostKey().cachedFingerprint().orElseThrow();
+            assertThat(fingerprint).startsWith("SHA256:");
+            assertThat(UiTestAccess.cardHostKey(panel).getText()).isEqualTo("SSH host key " + fingerprint);
+            click(UiTestAccess.menuFor(panel, 0), "Show Fingerprints…");
+            await(host, () -> plugin.currentConfirm() != null, "the fingerprint dialog opens");
+            assertThat(host.windows()).containsExactly("dialog|Fingerprints|true");
+            assertThat(UiTestAccess.message(plugin.currentConfirm()).getText()).isEqualTo("SSH host key: " + fingerprint);
+            UiTestAccess.confirm(plugin.currentConfirm()).doClick();
+            settle(host);
+            assertThat(copied).containsExactly(fingerprint);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
     }
 
     @Test void registersItsPanelActionsSettingsAndAHiddenStatus() {
