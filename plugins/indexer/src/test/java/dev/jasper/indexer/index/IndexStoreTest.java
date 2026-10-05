@@ -28,6 +28,20 @@ class IndexStoreTest {
         assertThatThrownBy(() -> new IndexStore(data).loadProjects()).isInstanceOf(IOException.class);
     }
 
+    @Test void aProjectsFileThatDoesNotLoadIsSetAsideBeforeTheNextSave() throws IOException {
+        String broken = "[[project]\nkey = ";
+        Files.writeString(data.resolve("projects.toml"), broken);
+        Files.writeString(data.resolve("projects.toml.bad"), "an older bad file");
+        var store = new IndexStore(data);
+        assertThatThrownBy(store::loadProjects).isInstanceOf(IOException.class);
+        var projects = List.of(new Project(ProjectKey.local(Path.of("/w/a")), "a", false));
+        store.saveProjects(projects);
+        assertThat(Files.readString(data.resolve("projects.toml.bad"))).isEqualTo(broken);
+        assertThat(store.loadProjects()).isEqualTo(projects);
+        store.saveProjects(List.of());
+        assertThat(Files.readString(data.resolve("projects.toml.bad"))).as("only the unreadable file is set aside").isEqualTo(broken);
+    }
+
     @Test void entriesWithBadKeysAreSkipped() throws IOException {
         Files.writeString(data.resolve("projects.toml"), "[[project]]\nkey = \"nonsense\"\n[[project]]\nkey = \"local:/w/a\"\n");
         assertThat(new IndexStore(data).loadProjects()).containsExactly(new Project(ProjectKey.local(Path.of("/w/a")), "a", false));
@@ -46,6 +60,24 @@ class IndexStoreTest {
         assertThat(loaded.truncated()).isTrue();
         store.deleteIndex(key);
         assertThat(store.loadIndex(key)).isEmpty();
+    }
+
+    @Test void anIndexThatCannotBeReadIsKept() throws IOException {
+        var store = new IndexStore(data);
+        var key = ProjectKey.local(Path.of("/w/app"));
+        Files.createDirectories(store.indexFile(key));
+        assertThat(store.loadIndex(key)).isEmpty();
+        assertThat(store.indexFile(key)).as("a read error is not a corrupt file").exists();
+    }
+
+    @Test void anIndexCutShortIsDeleted() throws IOException {
+        var store = new IndexStore(data);
+        var key = ProjectKey.local(Path.of("/w/app"));
+        store.saveIndex(new ProjectIndex(key, List.of("a", "b"), Strategy.GIT, Instant.EPOCH, false));
+        byte[] whole = Files.readAllBytes(store.indexFile(key));
+        Files.write(store.indexFile(key), java.util.Arrays.copyOf(whole, whole.length - 12));
+        assertThat(store.loadIndex(key)).isEmpty();
+        assertThat(store.indexFile(key)).doesNotExist();
     }
 
     @Test void aCorruptOrForeignIndexIsDeleted() throws IOException {

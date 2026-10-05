@@ -3,10 +3,13 @@ package dev.jasper.indexer.index;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UTFDataFormatException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
@@ -16,6 +19,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipException;
 import org.tomlj.Toml;
 import org.tomlj.TomlArray;
 import org.tomlj.TomlParseResult;
@@ -24,24 +28,43 @@ import org.tomlj.TomlTable;
 /**
  * The plugin's files: {@code projects.toml} lists the projects, and {@code indexes/<sha256 of key>.idx} holds each
  * snapshot as a gzip stream (magic, version, key, strategy, time, truncated flag, count, then the paths). Every write
- * replaces the file atomically. Blocking: call it off the UI thread.
+ * replaces the file atomically. A project list that could not be loaded is renamed {@code projects.toml.bad} before
+ * the next save, so it is never overwritten. Blocking: call it off the UI thread.
  */
 public final class IndexStore {
     static final String PROJECTS = "projects.toml";
+    static final String UNREADABLE_PROJECTS = "projects.toml.bad";
     private static final int MAGIC = 0x4A50_4958;
     private static final int VERSION = 1;
     private final Path directory;
+    private volatile boolean setAside;
+
+    /** A snapshot whose contents are not a Project Index file for the project asked for. */
+    private static final class Corrupt extends IOException {
+        Corrupt(String message) { super(message); }
+    }
 
     /** @param directory the plugin's data directory */
     public IndexStore(Path directory) { this.directory = directory; }
 
     /**
      * @return the saved projects; empty when there is no file. Entries without a valid key are skipped
-     * @throws IOException when the file cannot be read or does not parse
+     * @throws IOException when the file cannot be read or does not parse; the next save first renames it
      */
     public List<Project> loadProjects() throws IOException {
         Path file = directory.resolve(PROJECTS);
         if (!Files.exists(file)) return List.of();
+        try {
+            List<Project> projects = readProjects(file);
+            setAside = false;
+            return projects;
+        } catch (IOException | RuntimeException unreadable) {
+            setAside = true;
+            throw unreadable;
+        }
+    }
+
+    private static List<Project> readProjects(Path file) throws IOException {
         TomlParseResult toml = Toml.parse(Files.readString(file));
         if (toml.hasErrors()) throw new IOException(file + ": " + toml.errors().get(0));
         TomlArray array = toml.getArray("project");
@@ -61,9 +84,14 @@ public final class IndexStore {
 
     /**
      * @param projects every project, in display order
-     * @throws IOException when the file cannot be written
+     * @throws IOException when the file cannot be written, or a list that did not load cannot be set aside
      */
     public void saveProjects(List<Project> projects) throws IOException {
+        if (setAside) {
+            try { Files.move(directory.resolve(PROJECTS), directory.resolve(UNREADABLE_PROJECTS), StandardCopyOption.REPLACE_EXISTING); }
+            catch (NoSuchFileException gone) { /* nothing left to keep */ }
+            setAside = false;
+        }
         var out = new StringBuilder("# Projects indexed by Project Index. Jasper rewrites this file; edit the lists in Settings.\n");
         for (Project project : projects) {
             out.append("\n[[project]]\n");
@@ -82,25 +110,27 @@ public final class IndexStore {
 
     /**
      * @param key a project
-     * @return its saved snapshot; empty when there is none, or when the file was unreadable or named another project,
-     *     in which case it is deleted
+     * @return its saved snapshot; empty when there is none, or when it could not be read (the file stays), or when it is
+     *     corrupt or names another project (the file is deleted)
      */
     public Optional<ProjectIndex> loadIndex(ProjectKey key) {
         Path file = indexFile(key);
         if (!Files.exists(file)) return Optional.empty();
         try (InputStream raw = Files.newInputStream(file); var in = new DataInputStream(new GZIPInputStream(raw))) {
-            if (in.readInt() != MAGIC || in.readInt() != VERSION) throw new IOException("Not a Project Index file");
-            if (!in.readUTF().equals(key.id())) throw new IOException("The file belongs to another project");
+            if (in.readInt() != MAGIC || in.readInt() != VERSION) throw new Corrupt("Not a Project Index file");
+            if (!in.readUTF().equals(key.id())) throw new Corrupt("The file belongs to another project");
             Strategy strategy = Strategy.valueOf(in.readUTF());
             Instant at = Instant.ofEpochMilli(in.readLong());
             boolean truncated = in.readBoolean();
             int count = in.readInt();
-            if (count < 0) throw new IOException("Negative file count");
+            if (count < 0) throw new Corrupt("Negative file count");
             var files = new ArrayList<String>(Math.min(count, 1_000_000));
             for (int i = 0; i < count; i++) files.add(in.readUTF());
             return Optional.of(new ProjectIndex(key, files, strategy, at, truncated));
-        } catch (IOException | RuntimeException corrupt) {
+        } catch (Corrupt | EOFException | UTFDataFormatException | ZipException | RuntimeException corrupt) {
             try { Files.deleteIfExists(file); } catch (IOException ignored) { /* the next save replaces it */ }
+            return Optional.empty();
+        } catch (IOException unreadable) {
             return Optional.empty();
         }
     }

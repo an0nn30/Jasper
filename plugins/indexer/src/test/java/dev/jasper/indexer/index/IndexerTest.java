@@ -261,6 +261,11 @@ class IndexerTest {
         settle();
         assertThat(done).isCompleted();
         assertThat(projects.entries()).isEmpty();
+        indexer.add(new Project(APP, "app", false));
+        settle();
+        assertThat(java.nio.file.Files.readString(data.resolve("projects.toml.bad"))).as("the unreadable list is kept")
+            .isEqualTo("[[project]]\nkey = 5\n");
+        assertThat(projectsFile()).contains("local:" + APP.root());
     }
 
     @Test void aFailingReportStillStartsTheFollowUpAndClearsProgress() {
