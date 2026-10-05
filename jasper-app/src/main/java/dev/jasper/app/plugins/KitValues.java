@@ -10,16 +10,16 @@ final class KitValues {
  case dev.jasper.sdk.ui.Nodes.Button n -> new dev.jasper.ui.model.Nodes.Button(n.id(), toModule(n.state()), n.label(), n.icon(), dev.jasper.ui.model.Nodes.ButtonKind.valueOf(n.kind().name()), n.action(), n.tooltip());
  case dev.jasper.sdk.ui.Nodes.MenuButton n -> new dev.jasper.ui.model.Nodes.MenuButton(n.id(), toModule(n.state()), n.label(), n.icon(), dev.jasper.ui.model.Nodes.ButtonKind.valueOf(n.kind().name()), n.action(), n.items().stream().map(KitValues::toModule).toList(), n.tooltip());
  case dev.jasper.sdk.ui.Nodes.StatusDot n -> new dev.jasper.ui.model.Nodes.StatusDot(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.StatusKind.valueOf(n.kind().name()));
- case dev.jasper.sdk.ui.Nodes.Field n -> new dev.jasper.ui.model.Nodes.Field(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.FieldKind.valueOf(n.kind().name()), n.value(), n.hint(), n.label(), n.trailingAction());
+ case dev.jasper.sdk.ui.Nodes.Field n -> new dev.jasper.ui.model.Nodes.Field(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.FieldKind.valueOf(n.kind().name()), n.value(), n.hint(), n.label(), n.trailingAction(), n.numeric().map(KitValues::toModule));
  case dev.jasper.sdk.ui.Nodes.Secret n -> new dev.jasper.ui.model.Nodes.Secret(n.id(), toModule(n.state()), n.hint(), n.label(), n.revealGroup(), dev.jasper.ui.model.Nodes.SecretKind.valueOf(n.kind().name()), n.copyAction());
- case dev.jasper.sdk.ui.Nodes.Choice n -> new dev.jasper.ui.model.Nodes.Choice(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.ChoiceKind.valueOf(n.kind().name()), n.options().stream().map(KitValues::toModule).toList(), n.selectedId(), n.label(), n.action(), n.icon());
+ case dev.jasper.sdk.ui.Nodes.Choice n -> new dev.jasper.ui.model.Nodes.Choice(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.ChoiceKind.valueOf(n.kind().name()), n.options().stream().map(KitValues::toModule).toList(), n.selectedId(), n.label(), n.action(), n.icon(), n.search().map(KitValues::toModule));
  case dev.jasper.sdk.ui.Nodes.Toggle n -> new dev.jasper.ui.model.Nodes.Toggle(n.id(), toModule(n.state()), n.label(), n.checked(), n.action(), n.compact());
  case dev.jasper.sdk.ui.Nodes.Chip n -> new dev.jasper.ui.model.Nodes.Chip(n.id(), toModule(n.state()), n.label(), dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()));
  case dev.jasper.sdk.ui.Nodes.Progress n -> new dev.jasper.ui.model.Nodes.Progress(n.id(), toModule(n.state()), n.fraction(), n.label());
  case dev.jasper.sdk.ui.Nodes.Strength n -> new dev.jasper.ui.model.Nodes.Strength(n.id(), toModule(n.state()), n.filled(), n.label());
  case dev.jasper.sdk.ui.Nodes.Stack n -> new dev.jasper.ui.model.Nodes.Stack(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.LayoutRole.valueOf(n.role().name()), n.children().stream().map(KitValues::toModule).toList());
- case dev.jasper.sdk.ui.Nodes.FormRow n -> new dev.jasper.ui.model.Nodes.FormRow(n.id(), toModule(n.state()), n.label(), n.caption(), toModule(n.control()), n.trailing().map(KitValues::toModule));
- case dev.jasper.sdk.ui.Nodes.SettingRow n -> new dev.jasper.ui.model.Nodes.SettingRow(n.id(), toModule(n.state()), n.title(), n.description(), toModule(n.control()), n.dependent());
+ case dev.jasper.sdk.ui.Nodes.FormRow n -> new dev.jasper.ui.model.Nodes.FormRow(n.id(), toModule(n.state()), n.label(), n.caption(), toModule(n.control()), n.trailing().map(KitValues::toModule), n.highlighted());
+ case dev.jasper.sdk.ui.Nodes.SettingRow n -> new dev.jasper.ui.model.Nodes.SettingRow(n.id(), toModule(n.state()), n.title(), n.description(), toModule(n.control()), n.dependent(), n.highlighted());
  case dev.jasper.sdk.ui.Nodes.Card n -> new dev.jasper.ui.model.Nodes.Card(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.CardKind.valueOf(n.kind().name()), n.children().stream().map(KitValues::toModule).toList());
  case dev.jasper.sdk.ui.Nodes.Section n -> new dev.jasper.ui.model.Nodes.Section(n.id(), toModule(n.state()), n.title(), toModule(n.body()));
  case dev.jasper.sdk.ui.Nodes.Empty n -> new dev.jasper.ui.model.Nodes.Empty(n.id(), toModule(n.state()), toModule(n.icon()), n.title(), n.description(), n.actions().stream().map(KitValues::toModule).toList());
@@ -38,7 +38,9 @@ final class KitValues {
  static dev.jasper.ui.model.ListItem toModule(dev.jasper.sdk.ui.ListItem n) { return new dev.jasper.ui.model.ListItem(n.id(), n.leading().map(KitValues::toModule), n.title().stream().map(KitValues::toModule).toList(), n.subtitle().stream().map(KitValues::toModule).toList(), n.trailing().stream().map(KitValues::toModule).toList()); }
  static dev.jasper.ui.model.Column toModule(dev.jasper.sdk.ui.Column n) { return new dev.jasper.ui.model.Column(n.id(), n.title(), toModule(n.role()), n.numeric()); }
  static dev.jasper.ui.model.TableRow toModule(dev.jasper.sdk.ui.TableRow n) { return new dev.jasper.ui.model.TableRow(n.id(), n.cells(), n.icon()); }
- static dev.jasper.ui.model.TreeItem toModule(dev.jasper.sdk.ui.TreeItem n) { return new dev.jasper.ui.model.TreeItem(n.id(), n.title(), n.icon(), n.leaf(), n.children().stream().map(KitValues::toModule).toList()); }
+ static dev.jasper.ui.model.TreeItem toModule(dev.jasper.sdk.ui.TreeItem n) { return new dev.jasper.ui.model.TreeItem(n.id(), n.title(), n.icon(), n.leaf(), n.children().stream().map(KitValues::toModule).toList(), n.count(), n.emphasized()); }
+ static dev.jasper.ui.model.Nodes.Numeric toModule(dev.jasper.sdk.ui.Nodes.Numeric n) { return new dev.jasper.ui.model.Nodes.Numeric(n.min(), n.max(), n.step(), n.decimals()); }
+ static dev.jasper.ui.model.Nodes.ChoiceSearch toModule(dev.jasper.sdk.ui.Nodes.ChoiceSearch n) { return new dev.jasper.ui.model.Nodes.ChoiceSearch(n.pinned(), n.noMatches(), n.entry()); }
  static dev.jasper.ui.model.Nodes.FieldKind toModule(dev.jasper.sdk.ui.Nodes.FieldKind n) { return dev.jasper.ui.model.Nodes.FieldKind.valueOf(n.name()); }
  static dev.jasper.ui.model.Nodes.ChoiceKind toModule(dev.jasper.sdk.ui.Nodes.ChoiceKind n) { return dev.jasper.ui.model.Nodes.ChoiceKind.valueOf(n.name()); }
  static dev.jasper.ui.model.Nodes.ListKind toModule(dev.jasper.sdk.ui.Nodes.ListKind n) { return dev.jasper.ui.model.Nodes.ListKind.valueOf(n.name()); }

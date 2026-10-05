@@ -18,6 +18,26 @@ public abstract class KitContractTest {
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
         new Nodes.Secret("secret",ControlState.READY,"","Password","")))); }
+    /** Settings descriptors: tree counts/emphasis, highlighted rows, number bounds and both searchable choice modes. */
+    protected static ViewSpec settings(boolean highlighted, String entry) {
+        var toggle=new Nodes.Toggle("toggle",ControlState.READY,"Ligatures",true,"toggle",false);
+        var options=List.of(new Option("same","Same as UI theme",Optional.empty()),new Option("nord","Nord",Optional.empty()));
+        return new ViewSpec(new Nodes.Stack("root",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(
+            new Nodes.Tree("pages",ControlState.READY,List.of(new TreeItem("font","Font",Optional.empty(),true,List.of(),OptionalInt.of(2),true)),Set.of(),Set.of("font"),"open"),
+            new Nodes.SettingRow("row",ControlState.READY,"Ligatures","",toggle,false,highlighted),
+            new Nodes.FormRow("form",ControlState.READY,"Size","",new Nodes.Field("size",ControlState.READY,Nodes.FieldKind.NUMBER,"13","","Size","",Optional.of(new Nodes.Numeric(6,72,0.5,1))),Optional.empty(),highlighted),
+            new Nodes.Choice("theme",ControlState.READY,Nodes.ChoiceKind.SEARCHABLE,options,"nord","Theme","","",Optional.of(new Nodes.ChoiceSearch(1,"No matching themes",Optional.empty()))),
+            new Nodes.Choice("font",ControlState.READY,Nodes.ChoiceKind.SEARCHABLE,options.subList(1,2),"","Font","","",Optional.of(new Nodes.ChoiceSearch(0,"No matches",Optional.of(entry)))))));
+    }
+    @Test void settingsDescriptorsMountUpdateRevealAndReportTypedEdits() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var view=kit.create(settings(true,"Menlo"),events::add);
+        assertThat(view.spec()).isEqualTo(settings(true,"Menlo"));
+        view.update(settings(false,"Iosevka"));assertThat(view.spec()).isEqualTo(settings(false,"Iosevka"));
+        view.reveal("row");assertThatThrownBy(() -> view.reveal("missing")).isInstanceOf(IllegalArgumentException.class);
+        emit(view,new UiEvent.Selected("theme",Set.of("same")));emit(view,new UiEvent.Edited("font","SF Mono"));emit(view,new UiEvent.Edited("size","14.5"));
+        assertThat(events).containsExactly(new UiEvent.Selected("theme",Set.of("same")),new UiEvent.Edited("font","SF Mono"),new UiEvent.Edited("size","14.5"));
+        stop(kit);assertThatThrownBy(() -> view.reveal("row")).isInstanceOf(IllegalStateException.class);
+    }); }
     @Test void disposalCannotReenterUpdate() throws Exception { edt(() -> {
         var kit=kit("owner"); var before=new ViewSpec(new Nodes.Custom("custom",ControlState.READY,"content",Nodes.CustomKind.EDITOR,"Editor"));
         var view=kit.create(before,e -> {}); var calls=new java.util.concurrent.atomic.AtomicInteger(); var rejected=new java.util.concurrent.atomic.AtomicBoolean();

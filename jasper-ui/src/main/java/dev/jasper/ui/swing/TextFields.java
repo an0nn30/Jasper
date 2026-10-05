@@ -31,6 +31,10 @@ final class TextFields {
             if (input instanceof JTextArea area) { area.setLineWrap(true); area.setWrapStyleWord(true); }
             input.setOpaque(false); input.setBorder(new EmptyBorder(0, 0, 0, 0)); KitOwnership.mark(input, node.id() + ".input");
             if (node.kind() == Nodes.FieldKind.PORT) ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumericFilter());
+            if (node.kind() == Nodes.FieldKind.NUMBER) {
+                ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumberFilter(() -> ((Nodes.Field)this.node).numeric().orElseThrow()));
+                bindStep("UP", 1); bindStep("DOWN", -1); bindStep("KP_UP", 1); bindStep("KP_DOWN", -1);
+            }
             surface = new FieldSurface(context(), input, node.kind() == Nodes.FieldKind.TEXTAREA);
             var focus = new ThemePainting.Focus(input, surface, view); surface.focus = focus; own(focus);
             if (node.kind() == Nodes.FieldKind.TEXTAREA) {
@@ -59,6 +63,18 @@ final class TextFields {
             input.getDocument().addDocumentListener(listener); own(() -> input.getDocument().removeDocumentListener(listener));
             setValue(node.value());
             refresh();
+        }
+        /** Arrow keys step a NUMBER field by its step, clamped to its bounds; the edit reaches the host like typing. */
+        private void bindStep(String stroke, int direction) {
+            KeyStroke key = KeyStroke.getKeyStroke(stroke); String name = "number.step." + stroke;
+            input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
+            input.getActionMap().put(name, new AbstractAction() {
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                    if (!interactive()) return;
+                    input.setText(NumberFilter.step(input.getText(), ((Nodes.Field)node).numeric().orElseThrow(), direction));
+                }
+            });
+            own(() -> { input.getInputMap(JComponent.WHEN_FOCUSED).remove(key); input.getActionMap().remove(name); });
         }
         private Nodes.Button browseNode(Nodes.Field field) {
             return new Nodes.Button(field.id() + ".browse", field.state(), "Browse…", "", Nodes.ButtonKind.SECONDARY,
@@ -107,7 +123,9 @@ final class TextFields {
             // The kit surface owns placeholder painting; FlatLaf must not paint a second copy.
             input.putClientProperty("JTextField.placeholderText", null); surface.hint = field.hint(); surface.role = role;
             input.getAccessibleContext().setAccessibleName(field.label());
-            input.getAccessibleContext().setAccessibleDescription(field.state().error().isEmpty() ? field.hint() : field.state().error());
+            String bounds = field.numeric().map(n -> "From " + NumberFilter.text(n.min()) + " to " + NumberFilter.text(n.max())).orElse("");
+            String described = field.state().error().isEmpty() ? field.hint() : field.state().error();
+            input.getAccessibleContext().setAccessibleDescription(bounds.isEmpty() ? described : described.isEmpty() ? bounds : described + ". " + bounds);
             label.setText(field.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(component.isEnabled());
             error.setText(field.state().error()); error.setVisible(!field.state().error().isEmpty());
@@ -144,6 +162,44 @@ final class TextFields {
         }
         @Override public void replace(FilterBypass bypass, int offset, int length, String text, AttributeSet attributes) throws BadLocationException {
             if (text == null || text.chars().allMatch(c -> c >= '0' && c <= '9')) super.replace(bypass, offset, length, text, attributes);
+        }
+    }
+    /** Admits text shaped like a number of the field's bounds while typing: a sign only below zero, limited decimals. */
+    static final class NumberFilter extends DocumentFilter {
+        final java.util.function.Supplier<Nodes.Numeric> numeric;
+        NumberFilter(java.util.function.Supplier<Nodes.Numeric> numeric) { this.numeric = numeric; }
+        @Override public void insertString(FilterBypass bypass, int offset, String text, AttributeSet attributes) throws BadLocationException {
+            replace(bypass, offset, 0, text, attributes);
+        }
+        @Override public void replace(FilterBypass bypass, int offset, int length, String text, AttributeSet attributes) throws BadLocationException {
+            var document = bypass.getDocument();
+            String current = document.getText(0, document.getLength());
+            String next = current.substring(0, offset) + (text == null ? "" : text) + current.substring(offset + length);
+            if (admits(next, numeric.get())) super.replace(bypass, offset, length, text, attributes);
+        }
+        @Override public void remove(FilterBypass bypass, int offset, int length) throws BadLocationException {
+            var document = bypass.getDocument();
+            String current = document.getText(0, document.getLength());
+            if (admits(current.substring(0, offset) + current.substring(offset + length), numeric.get())) super.remove(bypass, offset, length);
+        }
+        static boolean admits(String text, Nodes.Numeric numeric) {
+            String sign = numeric.min() < 0 ? "-?" : "";
+            String fraction = numeric.decimals() > 0 ? "(\\.\\d{0," + numeric.decimals() + "})?" : "";
+            return text.matches(sign + "\\d*" + fraction);
+        }
+        static String step(String text, Nodes.Numeric numeric, int direction) {
+            var min = java.math.BigDecimal.valueOf(numeric.min()); var max = java.math.BigDecimal.valueOf(numeric.max());
+            java.math.BigDecimal value;
+            try { value = new java.math.BigDecimal(text); }
+            catch (NumberFormatException empty) { value = java.math.BigDecimal.ZERO.max(min).min(max); }
+            value = value.add(java.math.BigDecimal.valueOf(numeric.step()).multiply(java.math.BigDecimal.valueOf(direction)));
+            value = value.max(min).min(max).setScale(numeric.decimals(), java.math.RoundingMode.HALF_UP);
+            return plain(value);
+        }
+        static String text(double value) { return plain(java.math.BigDecimal.valueOf(value)); }
+        private static String plain(java.math.BigDecimal value) {
+            String text = value.stripTrailingZeros().toPlainString();
+            return text.equals("-0") ? "0" : text;
         }
     }
     static final class FieldSurface extends JPanel {

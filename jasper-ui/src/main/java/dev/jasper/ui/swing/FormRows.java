@@ -18,7 +18,7 @@ final class FormRows {
         final Composition.WrappedText caption;
 
         RowControl(KitView view, Nodes.FormRow node) {
-            super(view, node, new JPanel());
+            super(view, node, new SettingRows.SearchHighlight(view.context()));
             caption = Composition.text(node.id() + ".caption");
             KitOwnership.mark(label, node.id() + ".label");
             component.setOpaque(false);
@@ -41,6 +41,7 @@ final class FormRows {
             label.setEnabled(component.isEnabled());
             caption.setEnabled(component.isEnabled());
             component.setLayout(new RowLayout(this));
+            ((SettingRows.SearchHighlight) component).highlight(row.highlighted());
         }
 
         @Override

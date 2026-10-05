@@ -19,7 +19,7 @@ final class SettingRows {
         boolean panelFooter;
 
         RowControl(KitView view, Nodes.SettingRow node) {
-            super(view, node, new JPanel());
+            super(view, node, new SearchHighlight(view.context()));
             title = Composition.text(node.id() + ".title");
             description = Composition.text(node.id() + ".description");
             component.setOpaque(false);
@@ -46,12 +46,45 @@ final class SettingRows {
                                     context(), DesignMetrics.Role.SETTING_VERTICAL_PADDING);
             component.setBorder(panelFooter ? new EmptyBorder(0,0,0,0) : new EmptyBorder(vertical, side, vertical, side));
             component.setLayout(new RowLayout(this));
+            ((SearchHighlight) component).highlight(row.highlighted());
         }
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
             controls.forEach(c -> Composition.label(c, true));
             Stacks.mount(component, List.of(title, description, controls.getFirst().component));
+        }
+    }
+
+    /** A row surface that paints the host's search highlight behind its content, in the theme's selection color. */
+    static final class SearchHighlight extends JPanel {
+        final KitContext context;
+        boolean highlighted;
+
+        SearchHighlight(KitContext context) {
+            this.context = context;
+        }
+
+        void highlight(boolean value) {
+            highlighted = value;
+            getAccessibleContext().setAccessibleDescription(value ? "Matches search" : null);
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics graphics) {
+            if (highlighted) {
+                var g = (Graphics2D) graphics.create();
+                try {
+                    ThemePainting.antialias(g);
+                    g.setColor(ThemePainting.color(context, SemanticColor.SELECTION_BG));
+                    int r = ThemePainting.metric(context, DesignMetrics.Role.CONTROL_RADIUS);
+                    g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
+                } finally {
+                    g.dispose();
+                }
+            }
+            super.paintComponent(graphics);
         }
     }
 

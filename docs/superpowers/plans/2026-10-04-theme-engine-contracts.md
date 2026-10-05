@@ -170,16 +170,16 @@ unique within their owning control; references resolve only in that control. Do 
 | Button | `String label, String icon, ButtonKind kind, String action, String tooltip` |
 | MenuButton | `String label, String icon, ButtonKind kind, String action, List<MenuItem> items, String tooltip` |
 | StatusDot | `StatusKind kind` |
-| Field | `FieldKind kind, String value, String hint, String label, String trailingAction` |
+| Field | `FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric` (present exactly for NUMBER) |
 | Secret | `String hint, String label, String revealGroup, SecretKind kind, String copyAction` (no string value) |
-| Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon` |
+| Choice | `ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search` (present exactly for SEARCHABLE) |
 | Toggle | `String label, boolean checked, String action, boolean compact` |
 | Chip | `String label, Hue hue` |
 | Progress | `double fraction, String label` (-1 means indeterminate) |
 | Strength | `int filled, String label` (0–4) |
 | Stack | `LayoutRole role, List<Node> children` |
-| FormRow | `String label, String caption, Node control, Optional<Node> trailing` |
-| SettingRow | `String title, String description, Node control, boolean dependent` |
+| FormRow | `String label, String caption, Node control, Optional<Node> trailing, boolean highlighted` |
+| SettingRow | `String title, String description, Node control, boolean dependent, boolean highlighted` |
 | Card | `CardKind kind, List<Node> children` |
 | Section | `String title, Node body` |
 | Empty | `Node icon, String title, String description, List<Node> actions` |
@@ -197,14 +197,16 @@ Support records, each in its own model file: `Option(String id,String label,Opti
 `ListItem(String id,Optional<Node> leading,List<Node> title,List<Node> subtitle,List<Node> trailing)`,
 `Column(String id,String title,TextRole role,boolean numeric)`,
 `TableRow(String id,Map<String,String> cells,Optional<String> icon)`,
-`TreeItem(String id,String title,Optional<String> icon,boolean leaf,List<TreeItem> children)`.
+`TreeItem(String id,String title,Optional<String> icon,boolean leaf,List<TreeItem> children,OptionalInt count,boolean emphasized)`.
+Nested in `Nodes`: `Numeric(double min,double max,double step,int decimals)` and
+`ChoiceSearch(int pinned,String noMatches,Optional<String> entry)`.
 
 Enums are nested in `Nodes`: TextRole is HERO_TITLE/DETAIL_TITLE/WINDOW_TITLE/PANEL_TITLE/BODY/
 BODY_STRONG/LABEL/DESCRIPTION/CAPTION/SECTION_LABEL/COUNT/CHIP/MONO/MONO_SMALL; Hue is
 BLUE/GREEN/AMBER/PURPLE/NEUTRAL/NONE; IconSize is CAPTION/CONTROL/RAIL/EMPTY/HERO;
 ButtonKind is PRIMARY/SECONDARY/GHOST/DESTRUCTIVE_GHOST/LINK;
 StatusKind is SUCCESS/WARNING/DANGER/IDLE;
-FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA; ChoiceKind is DROPDOWN/PICKER/SEGMENTED;
+FieldKind is TEXT/SEARCH/PORT/PATH/TEXTAREA/NUMBER; ChoiceKind is DROPDOWN/PICKER/SEGMENTED/SEARCHABLE;
 CardKind is FORM/SETTINGS/MIXED; ListKind is SINGLE/DOUBLE/COMPACT/ORDERED; SelectionMode is SINGLE/MULTIPLE;
 FormKind is HERO/SHEET/FULL/SETTINGS; LayoutRole is VERTICAL/INLINE/ACTIONS/HERO/DETAIL/FOOTER/NAVIGATION;
 SplitKind is SIDEBAR_DETAIL/THREE_COLUMN/DOCUMENT; CustomKind is EDITOR/TERMINAL/CHART/PREVIEW.
@@ -227,6 +229,26 @@ accessible names; moving back to standalone composition restores their labels. S
 `dependent` flag is domain presentation information; it never resets the child value automatically.
 
 Widths/gaps come from these semantic roles; plugins cannot pass dimensions or UI delegates.
+
+Plan 2 Task 6a settings additions (spec section 6, "extend the kit for a genuinely missing standard control";
+mirrored exactly in SDK `Nodes`/`TreeItem`, host `KitValues`, testkit `FakeKitView` and `KitContractTest`;
+SDK version unchanged until Task 11). Prior constructors remain and default to the old meaning:
+- `TreeItem.count` paints a trailing COUNT text (for example search matches); `emphasized` paints the title
+  BODY_STRONG in `text.link` (for example unsaved changes). One flag covers one presentation.
+- `SettingRow.highlighted`/`FormRow.highlighted` paint the host's search match in `selection.bg` behind the
+  row and describe it accessibly; it survives theme changes and stable-id updates. `KitView.reveal(id)` and
+  SDK `UiView.reveal(id)` scroll a node into view without moving keyboard focus or caret.
+- `FieldKind.NUMBER` requires `Numeric`: typing admits only numbers of that shape (a sign only when `min < 0`,
+  at most `decimals` fraction digits; rejected text keeps the previous value), Up/Down step by `step` clamped
+  to the bounds and report `Edited` like typing. The domain keeps range authority and reports through `ControlState.error`.
+  There is no spinner control.
+- `ChoiceKind.SEARCHABLE` requires `ChoiceSearch`: one type-to-filter dropdown. Typing shows a search bar and
+  narrows options to labels holding every typed word (case-insensitive); the first `pinned` options always
+  show; `noMatches` is the muted line for an empty result, with nothing highlighted. Up/Down/Page/Home/End move
+  the highlight, Enter picks it as `Selected`, Escape/Backspace edit or end the search, the first letter never
+  picks, and a look-and-feel reinstall keeps the kit UI. A present `entry` makes it free entry: the
+  dropdown is editable, `selectedId` is blank, options are suggestions, and typed or picked text is reported
+  only as `Edited(choiceId,text)`. A domain update while the user's edit is delivered follows after it.
 
 `ViewSpec(Node root)` validates the tree and references. `UiEvent` is sealed with nested records
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,

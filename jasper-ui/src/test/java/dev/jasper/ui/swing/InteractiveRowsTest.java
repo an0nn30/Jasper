@@ -824,7 +824,11 @@ class InteractiveRowsTest {
                                                                     Optional.empty())),
                                                     "one",
                                                     "Transport",
-                                                    "pick");
+                                                    "pick",
+                                                    kind == ChoiceKind.PICKER ? "key" : "",
+                                                    kind == ChoiceKind.SEARCHABLE
+                                                            ? Optional.of(new ChoiceSearch(0, "No matches", Optional.empty()))
+                                                            : Optional.empty());
                                     var title =
                                             inTitle
                                                     ? List.<Node>of(choice)

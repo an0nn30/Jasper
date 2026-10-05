@@ -15,7 +15,8 @@ import static org.assertj.core.api.Assertions.*;
 @SuppressWarnings("try")
 class KitViewTest {
     static Field field(String id, FieldKind kind, String value) {
-        return new Field(id, ControlState.READY, kind, value, "Example", "Name", kind == FieldKind.PATH ? "browse" : "");
+        return new Field(id, ControlState.READY, kind, value, "Example", "Name", kind == FieldKind.PATH ? "browse" : "",
+            kind == FieldKind.NUMBER ? java.util.Optional.of(new Numeric(0, 100, 1, 0)) : java.util.Optional.empty());
     }
     static ViewSpec stack(Node... children) {
         return new ViewSpec(new Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(children)));

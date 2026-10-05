@@ -114,16 +114,29 @@ final class Trees {
                                                     Nodes.IconSize.CONTROL,
                                                     item.title())));
             row.slot(row.leading, leading);
+            String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
             row.slot(
                     row.title,
                     List.of(
                             new Nodes.Text(
-                                    "@tree/" + node.id() + "/" + item.id() + "/title",
+                                    titleId,
                                     ControlState.READY,
                                     item.title(),
-                                    Nodes.TextRole.BODY)));
+                                    item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
+            // Emphasis is strong text in the link color; the text control's own refresh picks its role color first.
+            if (item.emphasized())
+                row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
             row.slot(row.subtitle, List.of());
-            row.slot(row.trailing, List.of());
+            row.slot(
+                    row.trailing,
+                    item.count().isPresent()
+                            ? List.of(
+                                    new Nodes.Text(
+                                            "@tree/" + node.id() + "/" + item.id() + "/count",
+                                            ControlState.READY,
+                                            Integer.toString(item.count().getAsInt()),
+                                            Nodes.TextRole.COUNT))
+                            : List.of());
             if (!item.leaf()) {
                 var c = (Buttons.ButtonControl) row.controls.get(leading.getFirst().id());
                 if (c.button.getClientProperty("Jasper.treeCommand") == null) {

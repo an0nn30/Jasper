@@ -24,6 +24,9 @@ public interface UiView extends Subscription {
  /** Focus a node.
  * @param id node id */
  void focus(String id);
+ /** Scroll a node into view without moving keyboard focus, such as the first row a search matches.
+ * @param id node id */
+ void reveal(String id);
  /** Register approved specialized content.
  * @param content content matching a Custom node's contentId and kind */
  void registerContent(CustomContent content);

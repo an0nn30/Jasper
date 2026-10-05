@@ -116,6 +116,13 @@ explicit `lock` or empty artwork; nonempty cues on other kinds are rejected. Men
 No domain meaning is inferred from ids/text. Category tiles likewise follow explicit SHEET/DETAIL, HERO/RAIL and
 single/double-list roles; ordinary CONTROL folder icons remain plain glyphs.
 
+Settings capabilities (Plan 2 Task 6a): tree items carry an optional trailing count and an emphasized
+title; setting and form rows carry a search `highlighted` flag, and `KitView.reveal(id)` scrolls a node into view
+without moving focus; `FieldKind.NUMBER` admits only numbers within its `Numeric` shape and steps with the arrow
+keys (no spinner); `ChoiceKind.SEARCHABLE` is the one type-to-filter dropdown, with optional free entry whose
+options are suggestions. The [contracts appendix](superpowers/plans/2026-10-04-theme-engine-contracts.md) states
+the exact semantics.
+
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).
 

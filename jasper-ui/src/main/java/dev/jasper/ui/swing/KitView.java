@@ -75,6 +75,15 @@ public final class KitView extends JPanel implements AutoCloseable {
     void revealSecrets(SecretFields.SecretControl source, boolean revealed) { reconciler.revealSecrets(source, revealed); }
     /** Focus a control; an offscreen inline row control is first scrolled into view and mounted. */
     public void focus(String id) { requireOpen(); reconciler.control(Objects.requireNonNull(id)).focusTarget().requestFocusInWindow(); }
+    /**
+     * Scroll a node into view without moving keyboard focus, for example the first row matching a search while the
+     * search field keeps focus and caret. An offscreen inline row control is first mounted.
+     */
+    public void reveal(String id) {
+        requireOpen();
+        var component = reconciler.control(Objects.requireNonNull(id)).component;
+        component.scrollRectToVisible(new Rectangle(0, 0, component.getWidth(), component.getHeight()));
+    }
     /** Register by Custom.contentId (not node id); ordinary Swing trees cannot enter through this method. */
     public void registerContent(String id, JComponent component, AutoCloseable lifetime) { requireOpen(); reconciler.registerContent(id, Objects.requireNonNull(component), Objects.requireNonNull(lifetime)); }
     /** Borrow the mounted kit header; ownership remains with the view. */

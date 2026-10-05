@@ -27,6 +27,8 @@ public final class StateFixtures {
         for (FieldKind kind : FieldKind.values()) controls.add(field("field-" + kind, "", kind.name(), kind));
         controls.add(new Secret("secret", READY, "Password", "Password", ""));
         for (ChoiceKind kind : ChoiceKind.values()) controls.add(choice("choice-" + kind, kind, "Selected", "Selected", "Other"));
+        controls.add(new Choice("choice-free-entry", READY, ChoiceKind.SEARCHABLE, List.of(new Option("menlo", "Menlo", Optional.empty()), new Option("sf-mono", "SF Mono", Optional.empty())),
+            "", "Font family", "", "", Optional.of(new ChoiceSearch(0, "No installed font matches", Optional.of("Iosevka")))));
         controls.add(new Toggle("switch", READY, "Switch", true, "switch", false));
         controls.add(new Chip("chip", READY, "HTTP", Hue.BLUE));
         controls.add(new Progress("progress", READY, .65, "Progress"));
@@ -36,11 +38,13 @@ public final class StateFixtures {
         var layouts = new ArrayList<Node>();
         for (LayoutRole role : LayoutRole.values()) layouts.add(stack("stack-" + role, role, text("layout-label-" + role, role.name(), TextRole.BODY)));
         for (CardKind kind : CardKind.values()) layouts.add(card("card-" + kind, kind, setting("setting-" + kind, kind.name(), "Description", toggle("toggle-" + kind, true))));
+        layouts.add(card("card-highlighted", CardKind.SETTINGS, new SettingRow("setting-highlighted", READY, "Matches search", "A row the search highlights", toggle("toggle-highlighted", true), false, true)));
         result.add(sheet("composition", new Stack("composition", READY, LayoutRole.VERTICAL, layouts), 600, 700));
         var data = new ArrayList<Node>();
         for (ListKind kind : ListKind.values()) data.add(new ItemList("list-" + kind, READY, kind, List.of(new ListItem("one", Optional.empty(), List.of(text("list-title-" + kind, kind.name(), TextRole.BODY)), List.of(text("list-subtitle-" + kind, "Secondary text", TextRole.DESCRIPTION)), List.of())), Set.of("one"), "activate", List.of(), kind == ListKind.COMPACT ? SelectionMode.MULTIPLE : SelectionMode.SINGLE, Optional.empty()));
         data.add(new Table("table", READY, List.of(new Column("name", "Name", TextRole.BODY, false), new Column("bytes", "Size", TextRole.MONO_SMALL, true)), List.of(new TableRow("one", Map.of("name", "Documents", "bytes", "2048"), Optional.of("folder"))), Set.of("one"), "open", List.of(), SelectionMode.MULTIPLE));
-        data.add(new Tree("tree", READY, List.of(new TreeItem("root", "Home", Optional.of("folder"), false, List.of(new TreeItem("child", "Documents", Optional.of("folder"), true, List.of())))), Set.of("root"), Set.of("child"), "open"));
+        data.add(new Tree("tree", READY, List.of(new TreeItem("root", "Home", Optional.of("folder"), false, List.of(new TreeItem("child", "Documents", Optional.of("folder"), true, List.of()),
+            new TreeItem("matched", "Downloads", Optional.of("folder"), true, List.of(), OptionalInt.of(3), true)))), Set.of("root"), Set.of("child"), "open"));
         result.add(sheet("data", new Stack("data", READY, LayoutRole.VERTICAL, data), 600, 760));
         for (SplitKind kind : SplitKind.values()) result.add(sheet("split-" + kind, new Split("split", READY, kind, List.of(text("left", "Sidebar", TextRole.BODY), text("right", "Detail", TextRole.BODY))), 600, 100));
         for (FormKind kind : FormKind.values()) result.add(sheet("form-" + kind, new Form("form", READY, kind, kind.name(), Optional.empty(), List.of(row("row", "Label", field("input", "", "Value", FieldKind.TEXT))), Optional.empty(), List.of(button("save", "Save", ButtonKind.PRIMARY)), "cancel"), 480, 200));

@@ -106,7 +106,7 @@ final class ItemLists {
                 case Nodes.Choice choice -> {
                     int input =
                             switch (choice.kind()) {
-                                case DROPDOWN ->
+                                case DROPDOWN, SEARCHABLE ->
                                         inputHeight(
                                                 DesignMetrics.Role.FIELD_HEIGHT,
                                                 Typography.Role.BODY);

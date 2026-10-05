@@ -13,14 +13,14 @@ public final class FormFixtures {
     static Text text(String id, String value, TextRole role) { return new Text(id, READY, value, role); }
     static Icon icon(String id, String name, Hue hue, IconSize size) { return new Icon(id, READY, name, hue, size, name); }
     static Button button(String id, String label, ButtonKind kind) { return new Button(id, READY, label, "", kind, id, ""); }
-    static Field field(String id, String value, String hint, FieldKind kind) { return new Field(id, READY, kind, value, hint, id, ""); }
+    static Field field(String id, String value, String hint, FieldKind kind) { return new Field(id, READY, kind, value, hint, id, "", kind == FieldKind.NUMBER ? Optional.of(new Numeric(0, 100, 1, 0)) : Optional.empty()); }
     static FormRow row(String id, String label, Node control) { return new FormRow(id, READY, label, "", control, Optional.empty()); }
     static Stack stack(String id, LayoutRole role, Node... children) { return new Stack(id, READY, role, List.of(children)); }
     static Card card(String id, CardKind kind, Node... children) { return new Card(id, READY, kind, List.of(children)); }
     static Section section(String id, String title, Node body) { return new Section(id, READY, title, body); }
     static Toggle toggle(String id, boolean checked) { return new Toggle(id, READY, id, checked, id, false); }
     static Choice choice(String id, ChoiceKind kind, String selected, String... labels) {
-        return new Choice(id, READY, kind, Arrays.stream(labels).map(s -> new Option(s, s, Optional.empty())).toList(), selected, id, id, kind == ChoiceKind.PICKER ? "lock" : "");
+        return new Choice(id, READY, kind, Arrays.stream(labels).map(s -> new Option(s, s, Optional.empty())).toList(), selected, id, id, kind == ChoiceKind.PICKER ? "lock" : "", kind == ChoiceKind.SEARCHABLE ? Optional.of(new ChoiceSearch(0, "No matches", Optional.empty())) : Optional.empty());
     }
     static SettingRow setting(String id, String title, String description, Node control) { return new SettingRow(id, READY, title, description, control, false); }
     static List<Button> actions(String submit) { return List.of(button("cancel", "Cancel", ButtonKind.SECONDARY), new Button("submit", DISABLED, submit, "", ButtonKind.PRIMARY, "submit", "")); }

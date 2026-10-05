@@ -86,13 +86,13 @@ class TextFieldsTest {
     @Test void allFieldKindsHaveAssociatedLabelsHintAndEditableInput() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
-            Node[] nodes = java.util.Arrays.stream(FieldKind.values()).map(k -> (Node)field(k.name(), k, k == FieldKind.PORT ? "22" : "abc")).toArray(Node[]::new);
+            Node[] nodes = java.util.Arrays.stream(FieldKind.values()).map(k -> (Node)field(k.name(), k, k == FieldKind.PORT || k == FieldKind.NUMBER ? "22" : "abc")).toArray(Node[]::new);
             try (var view = new KitView(context, stack(nodes), events::add)) {
                 for (FieldKind kind : FieldKind.values()) {
                     var input = editor(view, kind.name());
                     assertThat(input.getAccessibleContext().getAccessibleName()).isEqualTo("Name");
                     assertThat(find(view, kind.name() + ".label", JLabel.class).getLabelFor()).isSameAs(input);
-                    assertThat(input.getAccessibleContext().getAccessibleDescription()).isEqualTo("Example");
+                    assertThat(input.getAccessibleContext().getAccessibleDescription()).isEqualTo(kind == FieldKind.NUMBER ? "Example. From 0 to 100" : "Example");
                     assertThat(input.getClientProperty("JTextField.placeholderText")).as("kit owns hint paint").isNull();
                 }
                 assertThat(editor(view, "TEXTAREA")).isInstanceOf(JTextArea.class);

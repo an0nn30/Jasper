@@ -54,4 +54,18 @@ class KitValuesTest {
   assertThat(events).hasSize(UiEvent.class.getPermittedSubclasses().length);for(var event:events)assertThat(KitValues.toSdk(event).toString()).isEqualTo(event.toString());
   assertThat(Arrays.stream(SemanticColor.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.theme.SemanticColor.values()).map(Enum::name).toArray(String[]::new));
  }
+ @Test void settingsCapabilitiesProjectWithoutLoss(){
+  var toggle=new Toggle("toggle",READY,"On",true,"toggle",false);
+  var options=List.of(new Option("same","Same",Optional.empty()),new Option("nord","Nord",Optional.of(Hue.BLUE)));
+  List<Node> nodes=List.of(
+   new Field("number",READY,FieldKind.NUMBER,"1.5","","Size","",Optional.of(new Numeric(0.5,3,0.05,2))),
+   new Choice("pick",READY,ChoiceKind.SEARCHABLE,options,"nord","Theme","","",Optional.of(new ChoiceSearch(1,"No matching themes",Optional.empty()))),
+   new Choice("free",READY,ChoiceKind.SEARCHABLE,options,"","Font","","",Optional.of(new ChoiceSearch(0,"No matches",Optional.of("Iosevka")))),
+   new SettingRow("setting",READY,"Title","",toggle,false,true),
+   new FormRow("row",READY,"Label","",new Text("c",READY,"x",TextRole.BODY),Optional.empty(),true),
+   new Tree("tree",READY,List.of(new TreeItem("a","A",Optional.empty(),false,List.of(new TreeItem("b","B",Optional.empty(),true,List.of(),OptionalInt.of(4),true)),OptionalInt.of(0),false)),Set.of("a"),Set.of("b"),""));
+  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  assertThat(Arrays.stream(FieldKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.FieldKind.values()).map(Enum::name).toArray(String[]::new));
+  assertThat(Arrays.stream(ChoiceKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ChoiceKind.values()).map(Enum::name).toArray(String[]::new));
+ }
 }

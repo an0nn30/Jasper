@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -36,6 +37,17 @@ final class Choices {
                     if (combo.getSelectedItem() instanceof Option selected) emit(new UiEvent.Selected(this.node.id(), Set.of(selected.id())));
                 };
                 combo.addActionListener(listener); own(() -> combo.removeActionListener(listener));
+            } else if (node.kind() == Nodes.ChoiceKind.SEARCHABLE) {
+                var combo = new SearchChoices.Combo(context()); input = combo;
+                combo.setRenderer((list, value, index, selected, focus) -> optionLabel(value, selected && index >= 0));
+                ActionListener listener = event -> {
+                    if (applying || combo.freeEntry) return;
+                    if (!interactive()) { refresh(); return; }
+                    if (combo.getSelectedItem() instanceof Option selected) emit(new UiEvent.Selected(this.node.id(), Set.of(selected.id())));
+                };
+                combo.addActionListener(listener); own(() -> combo.removeActionListener(listener));
+                combo.entered = text -> { if (!applying) { if (interactive()) emit(new UiEvent.Edited(this.node.id(), text)); else refresh(); } };
+                own(() -> { combo.entered = text -> {}; combo.dispose(); });
             } else if (node.kind() == Nodes.ChoiceKind.PICKER) {
                 var picker = new PickerButton(context()); input = picker;
                 picker.kind = Nodes.ButtonKind.SECONDARY; picker.setContentAreaFilled(false); picker.setBorderPainted(false); picker.setFocusPainted(false); picker.setOpaque(false);
@@ -49,26 +61,8 @@ final class Choices {
             label.setLabelFor(input); refresh();
         }
         private JLabel optionLabel(Option option, boolean selected) {
-            var renderer = new Labels.LiteralLabel() {
-                @Override protected void paintComponent(Graphics graphics) {
-                    if (selected) {
-                        var g=(Graphics2D)graphics.create();
-                        try { ThemePainting.antialias(g);g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));
-                            int r=ThemePainting.metric(context(),DesignMetrics.Role.MENU_ITEM_RADIUS);
-                            g.fillRoundRect(0,0,getWidth(),getHeight(),r*2,r*2);
-                        } finally {g.dispose();}
-                    }
-                    super.paintComponent(graphics);
-                }
-            };
-            renderer.putClientProperty("html.disable",true); renderer.setOpaque(false);
-            renderer.setText(option == null ? "Choose…" : option.label());
-            renderer.setFont(ThemePainting.font(context(), Typography.Role.BODY));
-            renderer.setForeground(ThemePainting.color(context(), selected ? SemanticColor.TEXT_ONACCENT : option == null ? SemanticColor.TEXT_TERTIARY : SemanticColor.TEXT_PRIMARY));
-            renderer.setBackground(ThemePainting.color(context(), selected ? SemanticColor.ACCENT : SemanticColor.SURFACE_MENU));
-            if (option != null && option.hue().isPresent()) renderer.setIcon(new HueDot(context(), option.hue().get()));
-            int pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
-            renderer.setBorder(new EmptyBorder(0, pad, 0, pad)); return renderer;
+            return Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
+                option == null ? SemanticColor.TEXT_TERTIARY : null);
         }
         private void closeOptions() {
             for (var lifetime : optionLifetimes) try { lifetime.close(); } catch (Exception failure) { view.report(failure); }
@@ -84,6 +78,7 @@ final class Choices {
                 input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY)); input.setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_CONTROL));
                 if (input instanceof JComboBox<?> raw) {
                     var combo = (JComboBox<Option>)raw;
+                    if (combo instanceof SearchChoices.Combo searchable) choice.search().ifPresent(searchable::configure);
                     ((ChoiceCombo)combo).refreshPopup();
                     if (!options.equals(choice.options())) {
                         combo.setModel(new DefaultComboBoxModel<>(choice.options().toArray(Option[]::new))); options = choice.options();
@@ -146,6 +141,29 @@ final class Choices {
         private void select(String id) { emit(new UiEvent.Selected(node.id(), Set.of(id))); }
         @Override JComponent focusTarget() { return input.getComponentCount() > 0 && input instanceof SegmentTrack ? (JComponent)input.getComponent(0) : input; }
     }
+    /** An option row as the kit's dropdowns paint it; {@code role} overrides the text color (for placeholders). */
+    static JLabel optionLabel(KitContext context, String text, Optional<Nodes.Hue> hue, boolean selected, SemanticColor role) {
+        var renderer = new Labels.LiteralLabel() {
+            @Override protected void paintComponent(Graphics graphics) {
+                if (selected) {
+                    var g=(Graphics2D)graphics.create();
+                    try { ThemePainting.antialias(g);g.setColor(ThemePainting.color(context,SemanticColor.ACCENT));
+                        int r=ThemePainting.metric(context,DesignMetrics.Role.MENU_ITEM_RADIUS);
+                        g.fillRoundRect(0,0,getWidth(),getHeight(),r*2,r*2);
+                    } finally {g.dispose();}
+                }
+                super.paintComponent(graphics);
+            }
+        };
+        renderer.putClientProperty("html.disable",true); renderer.setOpaque(false);
+        renderer.setText(text);
+        renderer.setFont(ThemePainting.font(context, Typography.Role.BODY));
+        renderer.setForeground(ThemePainting.color(context, selected ? SemanticColor.TEXT_ONACCENT : role != null ? role : SemanticColor.TEXT_PRIMARY));
+        renderer.setBackground(ThemePainting.color(context, selected ? SemanticColor.ACCENT : SemanticColor.SURFACE_MENU));
+        hue.ifPresent(h -> renderer.setIcon(new HueDot(context, h)));
+        int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+        renderer.setBorder(new EmptyBorder(0, pad, 0, pad)); return renderer;
+    }
     static Color hue(KitContext context, Nodes.Hue hue) {
         return ThemePainting.color(context, switch (hue) {
             case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
@@ -177,19 +195,25 @@ final class Choices {
             } finally { g.dispose(); }
         }
     }
-    static final class ChoiceCombo extends JComboBox<Option> {
+    static class ChoiceCombo extends JComboBox<Option> {
         final KitContext context; ThemePainting.Focus focus; BasicComboPopup popup;
         ChoiceCombo(KitContext context) {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
-            setUI(new BasicComboBoxUI() {
-                @Override protected ComboPopup createPopup() {
-                    ChoiceCombo.this.popup = new BasicComboPopup(comboBox) {
-                        @Override protected void paintComponent(Graphics graphics) { Menus.paintSurface(this, graphics, context); }
-                    };
-                    ChoiceCombo.this.popup.setOpaque(false);
-                    return ChoiceCombo.this.popup;
-                }
+            setUI(kitUi());
+        }
+        /** The kit's popup for this combo; a searchable combo supplies its own. */
+        ComboPopup createKitPopup(JComboBox<Object> comboBox) {
+            popup = new BasicComboPopup(comboBox) {
+                @Override protected void paintComponent(Graphics graphics) { Menus.paintSurface(this, graphics, context); }
+            };
+            popup.setOpaque(false);
+            return popup;
+        }
+        final BasicComboBoxUI kitUi() { return new KitUi(); }
+        /** Kit painting around Swing's combo behaviour; distinct class so a reinstall can be recognised. */
+        class KitUi extends BasicComboBoxUI {
+                @Override protected ComboPopup createPopup() { return createKitPopup(comboBox); }
                 @Override protected JButton createArrowButton() { return new JButton() {
                     { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); }
                     @Override protected void paintComponent(Graphics graphics) {
@@ -199,7 +223,6 @@ final class Choices {
                     }
                 }; }
                 @Override public void paintCurrentValueBackground(Graphics graphics, Rectangle bounds, boolean hasFocus) {}
-            });
         }
         void refreshPopup() {
             if (popup == null) return;

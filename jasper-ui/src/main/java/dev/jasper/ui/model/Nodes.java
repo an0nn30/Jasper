@@ -18,8 +18,8 @@ public final class Nodes {
     public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, HERO }
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }
     public enum StatusKind { SUCCESS, WARNING, DANGER, IDLE }
-    public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA }
-    public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED }
+    public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER }
+    public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED, SEARCHABLE }
     public enum CardKind { FORM, SETTINGS, MIXED }
     public enum SelectionMode { SINGLE, MULTIPLE }
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED }
@@ -74,7 +74,21 @@ public final class Nodes {
         }
     }
 
-    public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction) implements Node {
+    /**
+     * Bounds and shape of a NUMBER field: the kit admits only numbers of this shape and steps by {@code step} with the
+     * arrow keys, clamped to the bounds. The domain still validates the value and reports problems through state.
+     */
+    public record Numeric(double min, double max, double step, int decimals) {
+        public Numeric {
+            if (!Double.isFinite(min) || !Double.isFinite(max) || !Double.isFinite(step)) throw new IllegalArgumentException("Numeric bounds must be finite");
+            if (min > max) throw new IllegalArgumentException("Numeric minimum exceeds maximum");
+            if (step <= 0) throw new IllegalArgumentException("Numeric step must be positive");
+            if (decimals < 0 || decimals > 6) throw new IllegalArgumentException("Numeric decimals must be in 0..6");
+        }
+    }
+
+    /** A NUMBER field states its {@link Numeric} shape; other kinds have none. */
+    public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -82,6 +96,11 @@ public final class Nodes {
             Objects.requireNonNull(hint);
             ModelChecks.label(label, "label");
             Objects.requireNonNull(trailingAction);
+            Objects.requireNonNull(numeric);
+            if ((kind == FieldKind.NUMBER) != numeric.isPresent()) throw new IllegalArgumentException("Numeric bounds belong to NUMBER fields only, which require them");
+        }
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction) {
+            this(id, state, kind, value, hint, label, trailingAction, Optional.empty());
         }
     }
 
@@ -99,7 +118,20 @@ public final class Nodes {
         }
     }
 
-    public record Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon) implements Node {
+    /**
+     * Type-to-filter configuration of a SEARCHABLE choice. The first {@code pinned} options always show; {@code noMatches}
+     * is the line shown when typing matches nothing. A present {@code entry} makes the value free text (options become
+     * suggestions): the kit reports typed or picked text as {@link UiEvent.Edited}, and the choice has no selected id.
+     */
+    public record ChoiceSearch(int pinned, String noMatches, Optional<String> entry) {
+        public ChoiceSearch {
+            if (pinned < 0) throw new IllegalArgumentException("Negative pinned count");
+            ModelChecks.label(noMatches, "noMatches");
+            Objects.requireNonNull(entry);
+        }
+    }
+
+    public record Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon, Optional<ChoiceSearch> search) implements Node {
         public Choice {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -108,8 +140,16 @@ public final class Nodes {
             ModelChecks.label(label, "label");
             Objects.requireNonNull(action);
             Objects.requireNonNull(icon);
+            Objects.requireNonNull(search);
             if (kind != ChoiceKind.PICKER && !icon.isEmpty()) throw new IllegalArgumentException("Icon cue requires PICKER");
+            if ((kind == ChoiceKind.SEARCHABLE) != search.isPresent()) throw new IllegalArgumentException("Search configuration belongs to SEARCHABLE choices only, which require it");
+            if (search.isPresent() && search.get().pinned() > options.size()) throw new IllegalArgumentException("More pinned entries than options");
+            if (search.isPresent() && search.get().entry().isPresent() && !selectedId.isEmpty()) throw new IllegalArgumentException("Free entry owns the value; no option is selected");
             ModelChecks.unique(options, Option::id);
+        }
+        /** A choice without search; SEARCHABLE requires the full constructor. */
+        public Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action, String icon) {
+            this(id, state, kind, options, selectedId, label, action, icon, Optional.empty());
         }
         /** Existing pickers retain the key cue; use the full constructor for an explicit cue or none. */
         public Choice(String id, ControlState state, ChoiceKind kind, List<Option> options, String selectedId, String label, String action) {
@@ -157,7 +197,8 @@ public final class Nodes {
         }
     }
 
-    public record FormRow(String id, ControlState state, String label, String caption, Node control, Optional<Node> trailing) implements Node {
+    /** {@code highlighted} marks a row matching the host's current search. */
+    public record FormRow(String id, ControlState state, String label, String caption, Node control, Optional<Node> trailing, boolean highlighted) implements Node {
         public FormRow {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(label);
@@ -165,14 +206,21 @@ public final class Nodes {
             Objects.requireNonNull(control);
             Objects.requireNonNull(trailing);
         }
+        public FormRow(String id, ControlState state, String label, String caption, Node control, Optional<Node> trailing) {
+            this(id, state, label, caption, control, trailing, false);
+        }
     }
 
-    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent) implements Node {
+    /** {@code highlighted} marks a row matching the host's current search. */
+    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted) implements Node {
         public SettingRow {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.label(title, "title");
             Objects.requireNonNull(description);
             Objects.requireNonNull(control);
+        }
+        public SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent) {
+            this(id, state, title, description, control, dependent, false);
         }
     }
 

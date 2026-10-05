@@ -40,6 +40,11 @@ public final class FakeKitView implements UiView {
  @Override public void withSecret(String id,Consumer<char[]> use){requireSecret(id);Objects.requireNonNull(use);char[] copy=secrets.getOrDefault(id,new char[0]).clone();try{use.accept(copy);}finally{Arrays.fill(copy,(char)0);}}
  @Override public void clearSecret(String id){requireSecret(id);var old=secrets.remove(id);if(old!=null)Arrays.fill(old,(char)0);}
  @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}
+ private String revealed;
+ @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");revealed=id;}
+ /** The node last scrolled into view; reveal never moves logical focus.
+ * @return node id */
+ public Optional<String> revealed(){guard();return Optional.ofNullable(revealed);}
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
  /** Deliver a typed event through containment. */
