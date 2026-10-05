@@ -192,8 +192,20 @@
   include compile-checked public examples. UI **258**, SDK **59**, testkit **106**, KitValues **4** pass,
   zero failures/errors/skips, with UI/SDK doclint and four architecture gates. Headless installDist and
   verifyUiDistribution confirm the application engine jar and isolate all seven plugin runtimes.
-  Task 14 still supplies full repository verification and the single final whole-branch review;
-  Plans 2–3 consumer/surface migration and native acceptance remain unexecuted. No GUI/AOT/push/merge.
+  Task 14 headless repository verification and audit are complete (single final whole-branch review
+  pending): fresh `./gradlew check --rerun-tasks` passed in **5m 6s**, **99/99 tasks executed**.
+  Across **681 XML files**: **9,043 tests, 9,037 passed, 0 failures, 0 errors, 6 skipped**; per-module
+  counts in [UI maintenance](ui-maintenance.md). All five architecture gates and UI/SDK doclint passed.
+  All 26 module/SDK nodes have real renderer/exhaustive host branches; eight events and 14 node enum
+  vocabularies match. The two unreachable unsupported-renderer defaults are removed, making creation
+  and validation compile-time exhaustive. The [exact temporary-path ledger](design/theme-engine/temporary-paths.md)
+  is linked from Plan 2 and assigns 27 app copies, the old theme bridge, differently named helpers and
+  27 byte-identical resource pairs to removal/adaptation owners; app config.TerminalColors is retained
+  as a saved-choice record. Module algorithms are the designated authority; app consumers remain until
+  Plan 2. Branch diff whitespace and the 178 changed Java sources passed hygiene against `192443b3`.
+  Task 14's independent whole-branch review and three deferred minor findings remain pending; no final
+  review completion is claimed. Plans 2–3 consumer/surface migration remain unexecuted. Native acceptance
+  and user review of gallery/calibration artifacts remain user-run before Plan 2. No GUI/benchmark/AOT/push/merge.
 
 - **Tab width correction** (2026-10-04): clarified that only the starting size should double. Tabs now
   have a 160-pixel minimum, normal measured title growth, and the original 240-pixel maximum. Removed the

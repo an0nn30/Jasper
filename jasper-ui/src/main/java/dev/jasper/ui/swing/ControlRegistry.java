@@ -19,7 +19,6 @@ final class ControlRegistry {
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
             case Nodes.Table _, Nodes.Tree _ -> {}
             case Nodes.Panel _, Nodes.Header _, Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _ -> children(node).forEach(ControlRegistry::validate);
-            default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         }
     }
     static Control create(KitView view, Nodes.Node node) {
@@ -50,7 +49,6 @@ final class ControlRegistry {
             case Nodes.ItemList list -> new ItemLists.ListControl(view,list);
             case Nodes.Table table -> new Tables.TableControl(view,table);
             case Nodes.Tree tree -> new Trees.TreeControl(view,tree);
-            default -> throw new UnsupportedOperationException("Renderer not implemented yet: " + node.getClass().getSimpleName());
         };
     }
     static List<Nodes.Node> children(Nodes.Node node) {

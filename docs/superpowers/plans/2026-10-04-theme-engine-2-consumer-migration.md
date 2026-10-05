@@ -40,6 +40,11 @@ composition in existing named UI owner files rather than introducing a second fe
 Existing `JPanel` classes become view controllers owning `UiView`/`KitView`, or descriptor builders,
 according to their existing lifetime. No plugin gets a raw component from `UiView`.
 
+The [exact temporary extraction/removal ledger](../../design/theme-engine/temporary-paths.md)
+records the Plan 1 app copies, differently named helpers, bridges and copied resources assigned to
+Tasks 2/3/5. It is audit evidence, not consumer migration; Task 1 folds these dispositions into its
+complete inventory. App `config.TerminalColors` is a saved-choice record and remains app-owned.
+
 The ledger below assigns every family, including non-panel surfaces. Task 1 expands each row into
 exact current files and existing tests in `docs/design/theme-engine/migration.csv` and classifies
 nonvisual helpers explicitly. Newly found UI owners must get a task before implementation proceeds.
