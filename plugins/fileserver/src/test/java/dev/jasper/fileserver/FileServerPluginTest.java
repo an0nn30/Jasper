@@ -41,7 +41,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServerPluginTest {
-    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.3.0",
+    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.4.0",
         Set.of(Capabilities.NETWORK_LISTEN, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE));
     @TempDir Path home;
     @TempDir Path root;
@@ -107,6 +107,39 @@ class FileServerPluginTest {
             assertThat(served.definition().login()).isEqualTo(Login.SESSION);
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void servesTheFocusedFolderOverTftp() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> port != 6969);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            assertThat(host.actions()).contains("dev.jasper.fileserver.serve-tftp|Serve Current Folder over TFTP|true");
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(host.invoke(FileServerPlugin.SERVE_TFTP, window, local)).isTrue();
+            await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            var served = plugin.registry().servers().getFirst();
+            assertThat(served.temporary()).isTrue();
+            assertThat(served.definition().name()).isEqualTo("project (TFTP)");
+            assertThat(served.definition().protocol()).isEqualTo(Protocol.TFTP);
+            assertThat(served.definition().port()).as("6969 was taken").isEqualTo(6970);
+            assertThat(served.definition().writable()).isFalse();
+            assertThat(served.definition().login()).isEqualTo(Login.ANONYMOUS);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void aPortIsFreeOnlyWhenBothTcpAndUdpAre() throws Exception {
+        int port = Ports.free();
+        assertThat(FileServerPlugin.portFree(port)).isTrue();
+        try (var udp = new java.net.DatagramSocket(new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), port))) {
+            assertThat(udp.isBound()).isTrue();
+            assertThat(FileServerPlugin.portFree(port)).as("UDP taken").isFalse();
         }
     }
 

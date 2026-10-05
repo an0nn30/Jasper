@@ -48,6 +48,7 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -89,6 +90,7 @@ public final class FileServerPlugin implements Plugin {
     public static final String SERVE_HTTP = ID + ".serve-http";
     public static final String SERVE_FTP = ID + ".serve-ftp";
     public static final String SERVE_SFTP = ID + ".serve-sftp";
+    public static final String SERVE_TFTP = ID + ".serve-tftp";
     /** The largest public key file read; a real one is well under 16 KiB. */
     private static final long MAX_KEY_FILE = 64 * 1024;
 
@@ -169,6 +171,9 @@ public final class FileServerPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SERVE_SFTP, "Serve Current Folder over SFTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "sftp", "ssh", "folder")),
             invoked -> serve(invoked, Protocol.SFTP));
+        context.actions().register(ActionSpec.of(SERVE_TFTP, "Serve Current Folder over TFTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "tftp", "boot", "folder")),
+            invoked -> serve(invoked, Protocol.TFTP));
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
@@ -552,10 +557,14 @@ public final class FileServerPlugin implements Plugin {
         return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 
+    /** Whether a port is free on loopback for both TCP and UDP, so Serve Current Folder can use it for any protocol. */
     static boolean portFree(int port) {
-        try (var socket = new ServerSocket()) {
-            socket.setReuseAddress(false);
-            socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
+        var loopback = new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
+        try (var tcp = new ServerSocket(); var udp = new DatagramSocket(null)) {
+            tcp.setReuseAddress(false);
+            tcp.bind(loopback);
+            udp.setReuseAddress(false);
+            udp.bind(loopback);
             return true;
         } catch (IOException taken) {
             return false;

@@ -33,6 +33,29 @@ class ServerEditorTest {
             () -> Optional.of(folder), ServerEditor.KeySources.NONE, linux, saved::add, () -> cancelled = true);
     }
 
+    @Test void tftpHasNoLoginNoTlsAndNoKeys() {
+        var editor = new ServerEditor(List.of(), Optional.empty(), false, Set.of(Protocol.values()), List.of(), false,
+            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> Optional.of(folder),
+            ServerEditor.KeySources.NONE, false, saved::add, () -> cancelled = true);
+        editor.protocol.setSelectedItem(Protocol.TFTP);
+        assertThat(editor.port.getText()).isEqualTo("6969");
+        assertThat(editor.anonymous.getText()).isEqualTo("No login (TFTP has none)");
+        assertThat(editor.anonymous.isSelected()).isTrue();
+        assertThat(editor.session.isEnabled()).isFalse();
+        assertThat(editor.useTls.isEnabled()).isFalse();
+        assertThat(editor.addKeyFile.isEnabled()).isFalse();
+        editor.writable.doClick();
+        assertThat(editor.warnings.getText()).contains("TFTP has no login: anyone who can reach it can change files");
+        editor.name.setText("boot");
+        editor.folder.setText(folder.toString());
+        editor.save.doClick();
+        assertThat(saved).singleElement().satisfies(definition -> {
+            assertThat(definition.protocol()).isEqualTo(Protocol.TFTP);
+            assertThat(definition.login()).isEqualTo(Login.ANONYMOUS);
+            assertThat(definition.writable()).isTrue();
+        });
+    }
+
     @Test void createsAnHttpServerWithSafeDefaults() throws Exception {
         var editor = editor(Optional.empty(), false, true, false, List.of());
         assertThat(editor.save.getText()).isEqualTo("Add Server");
