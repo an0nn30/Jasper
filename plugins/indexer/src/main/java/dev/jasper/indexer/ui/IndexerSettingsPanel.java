@@ -39,6 +39,8 @@ public final class IndexerSettingsPanel implements SettingsPanel {
     private final Projects projects;
     private final Indexer indexer;
     private final Function<ProjectKey, String> location;
+    private final Predicate<ProjectKey> reachable;
+    private final Predicate<ProjectKey> connected;
     private final Runnable addFolder;
     private final Predicate<String> confirm;
     private Subscription listening = () -> { };
@@ -48,13 +50,15 @@ public final class IndexerSettingsPanel implements SettingsPanel {
      * @param projects the indexed projects
      * @param indexer reindexes and removes them
      * @param location how the table names a project's location
+     * @param reachable whether a project's files can be reached at all (false: Remote missing or host no longer saved)
+     * @param connected whether a project's host is connected; always true for a local project
      * @param addFolder runs Index Folder…
      * @param confirm asks a yes-or-no question; true means yes
      */
     public IndexerSettingsPanel(IndexerSettings settings, Projects projects, Indexer indexer, Function<ProjectKey, String> location,
-                                Runnable addFolder, Predicate<String> confirm) {
+                                Predicate<ProjectKey> reachable, Predicate<ProjectKey> connected, Runnable addFolder, Predicate<String> confirm) {
         this.settings = settings; this.projects = projects; this.indexer = indexer; this.location = location;
-        this.addFolder = addFolder; this.confirm = confirm;
+        this.reachable = reachable; this.connected = connected; this.addFolder = addFolder; this.confirm = confirm;
     }
 
     @Override public JComponent create(SettingsPanelHost host) {
@@ -127,6 +131,14 @@ public final class IndexerSettingsPanel implements SettingsPanel {
         return row < 0 ? Optional.empty() : Optional.of(model.rows.get(table.convertRowIndexToModel(row)));
     }
 
+    private String state(Projects.Entry entry) {
+        ProjectKey key = entry.project().key();
+        if (!reachable.test(key)) return "Unavailable";
+        Projects.State state = entry.state();
+        if (!connected.test(key) && (state == Projects.State.FRESH || state == Projects.State.TRUNCATED)) return "Stale";
+        return label(state);
+    }
+
     private static String label(Projects.State state) {
         return switch (state) {
             case FRESH -> "Fresh";
@@ -158,7 +170,7 @@ public final class IndexerSettingsPanel implements SettingsPanel {
                 case 1 -> location.apply(entry.project().key());
                 case 2 -> entry.index().map(index -> String.format(Locale.ROOT, "%,d", index.size())).orElse("");
                 case 3 -> entry.index().map(index -> WHEN.format(index.indexedAt())).orElse("");
-                default -> label(entry.state());
+                default -> state(entry);
             };
         }
     }

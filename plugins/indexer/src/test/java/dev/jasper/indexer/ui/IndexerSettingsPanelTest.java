@@ -61,7 +61,8 @@ class IndexerSettingsPanelTest {
         try (var host = new FakePluginHost(data)) {
             host.start(IndexerTesting.INFO, Set.of(), Set.of(), context -> {
                 var settings = new IndexerSettings(context.settings());
-                context.settings().page(new IndexerSettingsPanel(settings, projects, indexer, key -> "at " + key.root(), adds::incrementAndGet,
+                context.settings().page(new IndexerSettingsPanel(settings, projects, indexer, key -> "at " + key.root(), key -> true, key -> true,
+                    adds::incrementAndGet,
                     question -> { questions.add(question); return allow.get(); }));
             });
             JComponent page = host.settingsPanel(IndexerTesting.INFO.id()).orElseThrow();
@@ -90,6 +91,28 @@ class IndexerSettingsPanelTest {
             remove.doClick();
             assertThat(projects.entries()).isEmpty();
             assertThat(table.getRowCount()).isZero();
+        }
+    }
+
+    @Test void remoteProjectsShowWhetherTheyCanBeReached() {
+        var host = java.util.UUID.randomUUID();
+        var reachable = ProjectKey.remote(host, "/srv/app");
+        var gone = ProjectKey.remote(java.util.UUID.randomUUID(), "/srv/old");
+        var projects = new Projects();
+        var notifications = new FakeNotifications();
+        var indexer = new Indexer(projects, new IndexStore(data.resolve("store")), job -> new CompletableFuture<Listing>(),
+            new ManualExecutor(), new ManualExecutor(), Instant::now, text -> { }, notifications.group("r"), notifications.group("f"),
+            System.getLogger("test"));
+        projects.loaded(new Project(reachable, "app", false), Optional.of(new ProjectIndex(reachable, List.of("a"), Strategy.GIT, Instant.EPOCH, false)));
+        projects.loaded(new Project(gone, "old", false), Optional.of(new ProjectIndex(gone, List.of("a"), Strategy.GIT, Instant.EPOCH, false)));
+        try (var fake = new FakePluginHost(data)) {
+            fake.start(IndexerTesting.INFO, Set.of(), Set.of(), context -> context.settings().page(new IndexerSettingsPanel(
+                new IndexerSettings(context.settings()), projects, indexer, key -> "build-01: " + key.root(),
+                key -> key.equals(reachable), key -> false, () -> { }, question -> true)));
+            JTable table = find(fake.settingsPanel(IndexerTesting.INFO.id()).orElseThrow(), JTable.class, "projects");
+            assertThat(table.getValueAt(0, 1)).isEqualTo("build-01: /srv/app");
+            assertThat(table.getValueAt(0, 4)).as("not connected").isEqualTo("Stale");
+            assertThat(table.getValueAt(1, 4)).isEqualTo("Unavailable");
         }
     }
 }

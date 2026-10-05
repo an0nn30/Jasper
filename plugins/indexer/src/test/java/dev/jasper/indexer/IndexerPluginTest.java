@@ -4,9 +4,13 @@ import dev.jasper.editor.api.Editor;
 import dev.jasper.editor.api.EditorDocument;
 import dev.jasper.indexer.index.FileRef;
 import dev.jasper.indexer.index.ProjectKey;
+import dev.jasper.indexer.testsupport.FakeRemote;
+import dev.jasper.indexer.testsupport.FakeRemotePlugin;
 import dev.jasper.indexer.testsupport.IndexerTesting;
 import dev.jasper.indexer.testsupport.ManualExecutor;
 import dev.jasper.indexer.ui.FilesScope;
+import dev.jasper.remote.api.RemoteFolder;
+import dev.jasper.remote.api.RemoteListing;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.files.FileChoice;
 import dev.jasper.sdk.files.FileLocation;
@@ -19,8 +23,10 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -174,5 +180,82 @@ class IndexerPluginTest {
             settle(host);
             assertThat(host.searchScope(FilesScope.ID, "todo", window, null)).as("the saved snapshot, not a new walk").hasSize(1);
         }
+    }
+
+    @Test void aRemoteProjectIsOfferedIndexedSearchedAndOpenedThroughRemote() throws IOException {
+        UUID buildHost = UUID.fromString("0b6f2b5e-8c1a-4c55-9d43-2f3a4b5c6d7e");
+        var fake = new FakeRemote();
+        fake.names.put(buildHost, "build-01");
+        fake.connectedHosts.add(buildHost);
+        fake.markers.put("/srv/app", Set.of(".git"));
+        fake.listings.put("/srv/app", new RemoteListing(List.of("README.md", "src/main.rs"), RemoteListing.Strategy.GIT, false));
+        var editor = new FakeEditor();
+        try (var host = host()) {
+            host.start(EDITOR, Set.of(), Set.of(), editor);
+            host.start(FakeRemotePlugin.INFO, Set.of(), Set.of(), new FakeRemotePlugin(fake));
+            UUID window = window(host);
+            UUID tab = host.addTerminalTab(window, "build-01");
+            UUID pane = host.addTerminalPane(tab, IndexerTesting.pane(null));
+            fake.panes.put(pane, new RemoteFolder(buildHost, "build-01", "/srv/app/src"));
+            host.start(IndexerTesting.INFO, Set.of(), Set.of("dev.jasper.editor", "dev.jasper.remote"), plugin());
+            host.remoteCwdChanged(pane, "build-01", "/srv/app/src");
+            settle(host);
+            assertThat(host.notifications().posts()).filteredOn(post -> post.spec().title().equals("Index project?")).singleElement()
+                .satisfies(post -> assertThat(post.spec().content()).isEqualTo("app · /srv/app\nGit repository\non build-01"));
+            assertThat(host.notifications().runAction("Index project?", "Yes")).isTrue();
+            settle(host);
+            assertThat(fake.calls).contains("list /srv/app signed-in");
+            assertThat(host.notifications().lines()).contains("dev.jasper.indexer.results|INFO|Indexed app|2 files");
+            String main = FilesScope.rowId(new FileRef(ProjectKey.remote(buildHost, "/srv/app"), "src/main.rs"));
+            assertThat(host.searchScope(FilesScope.ID, "main", window, pane)).containsExactly(main + "|main.rs|true");
+            host.executeInScope(FilesScope.ID, main, "open", window, pane);
+            host.executeInScope(FilesScope.ID, main, "copy-path", window, pane);
+            host.executeInScope(FilesScope.ID, main, "terminal", window, pane);
+            assertThat(fake.calls).contains("open /srv/app/src/main.rs", "terminal /srv/app/src");
+            assertThat(clipboard).containsExactly("build-01:/srv/app/src/main.rs");
+            fake.names.remove(buildHost);
+            assertThat(host.searchScope(FilesScope.ID, "main", window, pane)).as("a host that is no longer saved")
+                .containsExactly(main + "|main.rs|false");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void terminalEventsBeforeSavedProjectsLoadWaitForThem() throws IOException {
+        Path workspace = Files.createDirectories(home.resolve("ws"));
+        Files.writeString(workspace.resolve("Cargo.toml"), "");
+        Path member = Files.createDirectories(workspace.resolve("member"));
+        Files.writeString(member.resolve("lib.rs"), "");
+        try (var host = host()) {
+            UUID window = window(host);
+            host.start(IndexerTesting.INFO, Set.of(), Set.of(), plugin());
+            host.queueFileChoice(List.of(new FileLocation.Local(member)));
+            host.invoke(IndexerPlugin.INDEX_FOLDER, window, null);
+            settle(host);
+        }
+        try (var host = host()) {
+            UUID window = window(host);
+            UUID tab = host.addTerminalTab(window, "zsh");
+            UUID pane = host.addTerminalPane(tab, IndexerTesting.pane(home));
+            host.start(IndexerTesting.INFO, Set.of(), Set.of(), plugin());
+            host.cwdChanged(pane, member);
+            host.flush();
+            settle(host);
+            assertThat(host.notifications().posts()).as("the saved project covers the folder; the workspace above it is not offered")
+                .noneMatch(post -> post.spec().title().equals("Index project?"));
+            host.cwdChanged(pane, workspace);
+            settle(host);
+            assertThat(host.notifications().posts()).as("events after loading still reach the watcher")
+                .filteredOn(post -> post.spec().title().equals("Index project?")).hasSize(1);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void localDetectionCompletesWhenTheProbeFails() {
+        var background = new ManualExecutor();
+        CompletableFuture<Optional<String>> answer = IndexerPlugin.<String>probe(background, ui, () -> { throw new StackOverflowError(); })
+            .toCompletableFuture();
+        background.drain();
+        ui.drain();
+        assertThat(answer).isCompletedWithValue(Optional.empty());
     }
 }
