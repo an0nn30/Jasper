@@ -44,13 +44,15 @@ class TftpWriteTest {
 
     @AfterEach void stop() { if (engine != null) engine.stop(); }
 
-    void start(boolean writable, Duration timeout) throws Exception {
+    void start(boolean writable, Duration timeout) throws Exception { start(writable, timeout, 5); }
+
+    void start(boolean writable, Duration timeout, int retries) throws Exception {
         port = Ports.free();
         var base = ServerDefinition.create("tftp", Protocol.TFTP, shared);
         var definition = new ServerDefinition(base.id(), "tftp", Protocol.TFTP, shared, base.bind(), port, Optional.empty(), writable,
             base.login(), List.of(), false, false, false);
         engine = new TftpEngine(definition, new ShareRoot(shared, !writable), new ServerEvents(Clock.systemUTC(), events::add), List::of,
-            timeout, 5, 16);
+            timeout, retries, 16);
         engine.start();
     }
 
@@ -176,6 +178,62 @@ class TftpWriteTest {
         await(() -> transferred().size() == 1, "the refused write ends");
         assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
         assertThat(tempFiles()).isEmpty();
+    }
+
+    @Test void aDatagramLargerThanTheLargestBlockIsIllegal() throws Exception {
+        start(true, Duration.ofSeconds(1));
+        try (var client = new RawClient()) {
+            client.socket.setSendBufferSize(1 << 17);
+            client.send(port, RawClient.write("docs/a.txt", "octet", "blksize", "65464"));
+            var oack = client.next();
+            assertThat(oack.packet()).isEqualTo(new TftpPacket.OptionAck(java.util.Map.of("blksize", "65464")));
+            client.send(oack.port(), new TftpPacket.Data(1, new byte[TftpPacket.MAX_BLOCK + 20]));
+            assertThat(client.next().packet()).as("not truncated to a full block and acknowledged").isEqualTo(TftpTransfer.ILLEGAL);
+        }
+        await(() -> transferred().size() == 1, "the refused write ends");
+        assertThat(transferred().getFirst().complete()).isFalse();
+        assertThat(shared.resolve("docs/a.txt")).hasContent("hello");
+        assertThat(tempFiles()).isEmpty();
+    }
+
+    @Test void theFinalAckIsRepeatedForTheWholeDally() throws Exception {
+        start(true, Duration.ofMillis(300));
+        try (var client = new RawClient()) {
+            client.send(port, RawClient.write("docs/c.txt", "octet"));
+            var ack0 = client.next();
+            assertThat(ack0.packet()).isEqualTo(new TftpPacket.Ack(0));
+            client.send(ack0.port(), new TftpPacket.Data(1, "hello".getBytes(StandardCharsets.UTF_8)));
+            assertThat(nextOtherThan(client, new TftpPacket.Ack(0)).packet()).isEqualTo(new TftpPacket.Ack(1));
+            Thread.sleep(600); // two timeouts: a client with a slower retransmit timer than the server's
+            client.send(ack0.port(), new TftpPacket.Data(1, "hello".getBytes(StandardCharsets.UTF_8)));
+            assertThat(client.next().packet()).as("the dally lasts timeout x retries (1.5 s here)").isEqualTo(new TftpPacket.Ack(1));
+        }
+        assertThat(shared.resolve("docs/c.txt")).hasContent("hello");
+    }
+
+    @Test void aFailedWriteIsLoggedByClassNameAndNotAtAllOnceStopped() throws Exception {
+        var sink = new ServerEvents(Clock.systemUTC(), events::add);
+        try (var client = new RawClient(); var socket = new java.net.DatagramSocket(new java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), 0))) {
+            var transfer = new TftpTransfer(new ShareRoot(shared, false), sink, (java.net.InetSocketAddress) client.socket.getLocalSocketAddress(),
+                RawClient.read("missing.txt", "octet"), Duration.ofMillis(100), 0);
+            transfer.run(socket);
+            assertThat(client.next().packet()).isEqualTo(TftpTransfer.NOT_FOUND);
+            events.clear();
+            transfer.failWrite(new IOException((String) null));
+            assertThat(client.next().packet()).as("the client still learns why").isEqualTo(TftpTransfer.FAILED);
+            assertThat(events).singleElement().satisfies(event ->
+                assertThat(((ServerEvent.Failed) event).message()).isEqualTo("TFTP transfer failed: IOException"));
+            events.clear();
+            socket.close();
+            transfer.failWrite(new IOException("Stream Closed"));
+            assertThat(events).as("a stop during disk I/O is not an error").isEmpty();
+        }
+    }
+
+    static RawClient.Reply nextOtherThan(RawClient client, TftpPacket resent) throws IOException {
+        RawClient.Reply reply;
+        do reply = client.next(); while (reply.packet().equals(resent));
+        return reply;
     }
 
     @Test void aDuplicatedBlockIsAcknowledgedAgainAndWrittenOnce() throws Exception {

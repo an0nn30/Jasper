@@ -53,7 +53,8 @@ final class TftpTransfer {
     private final Duration timeout;
     private final int retries;
     private final String remote;
-    private final byte[] buffer = new byte[TftpPacket.MAX_PACKET];
+    /** One byte more than the largest packet, so an oversized datagram is seen as oversized rather than truncated. */
+    private final byte[] buffer = new byte[TftpPacket.MAX_PACKET + 1];
     private DatagramSocket socket;
     private int blockSize = TftpPacket.DEFAULT_BLOCK;
 
@@ -77,8 +78,15 @@ final class TftpTransfer {
             if (request.write()) write(path, netascii);
             else read(path, netascii);
         } catch (IOException failure) {
-            if (!socket.isClosed()) events.error(remote, "TFTP transfer failed: " + failure.getMessage());
+            report(failure);
         }
+    }
+
+    /** Logs a failed transfer, unless the engine stopped (its socket closed), which is not an error. */
+    private void report(IOException failure) {
+        if (socket.isClosed()) return;
+        String reason = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+        events.error(remote, "TFTP transfer failed: " + reason);
     }
 
     private void read(String path, boolean netascii) throws IOException {
@@ -135,7 +143,7 @@ final class TftpTransfer {
             byte[] lastSent = (accepted.isEmpty() ? new TftpPacket.Ack(0) : new TftpPacket.OptionAck(accepted)).encode();
             int block = 1;
             for (TftpPacket.Data data = awaitData(lastSent, block); data != null; data = awaitData(lastSent, block)) {
-                if (data.bytes().length > blockSize) {
+                if (data.bytes().length > blockSize) { // larger than agreed, or than any datagram TFTP allows
                     send(ILLEGAL);
                     events.error(remote, ILLEGAL.message() + ": " + path);
                     return;
@@ -170,9 +178,10 @@ final class TftpTransfer {
         }
     }
 
-    /** Logs a failed write as the read path does, then tells the client. */
-    private void failWrite(IOException failure) throws IOException {
-        events.error(remote, "TFTP transfer failed: " + failure.getMessage());
+    /** Logs a failed write as the read path does, then tells the client; nothing once the engine stopped. */
+    void failWrite(IOException failure) throws IOException {
+        if (socket.isClosed()) return;
+        report(failure);
         send(error(failure));
     }
 
@@ -191,9 +200,12 @@ final class TftpTransfer {
         return null;
     }
 
-    /** After the final ACK, answers a repeated final block for one timeout, for a client whose ACK was lost. */
+    /**
+     * After the final ACK, answers a repeated final block for the whole retry window (timeout x retries, 5 s at the
+     * defaults), for a client whose ACK was lost and whose retransmit timer is slower than the server's.
+     */
     private void dally(byte[] finalAck, int block) throws IOException {
-        long deadline = System.nanoTime() + timeout.toNanos();
+        long deadline = System.nanoTime() + timeout.toNanos() * Math.max(1, retries);
         for (TftpPacket reply = receive(deadline); reply != null; reply = receive(deadline))
             if (reply instanceof TftpPacket.Data data && data.block() == block) send(finalAck);
     }
