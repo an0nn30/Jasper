@@ -227,22 +227,51 @@ class SchemaPageTest {
             .row(CoreSettings.TERMINAL_ENV, Editors.table())
             .build(context);
         var viewport = new javax.swing.JScrollPane(page.component());
-        var heights = new ArrayList<Integer>();
         for (int width : new int[]{300, 1400}) {
             viewport.setSize(width, 900);
             for (int i = 0; i < 3; i++) KitTestSupport.layout(viewport);
-            var list = kit(page, "terminal.shell.args", JComponent.class);
-            assertThat(list.getHeight()).as("at " + width + " px the list keeps its rows").isPositive();
-            heights.add(list.getHeight());
+            for (String editor : List.of("terminal.shell.args", "terminal.env"))
+                assertThat(kit(page, editor, JComponent.class).getSize()).as(editor + " at " + width + " px")
+                    .isEqualTo(kit(page, editor, JComponent.class).getPreferredSize());
         }
-        assertThat(heights.get(0)).as("narrowing never squashes the list").isEqualTo(heights.get(1));
-        int minimum = page.component().getMinimumSize().width;
-        viewport.setSize(Math.max(1, minimum - 1), 900);
+        viewport.setSize(300, 900);
         KitTestSupport.layout(viewport);
         assertThat(((javax.swing.Scrollable) page.component()).getScrollableTracksViewportWidth()).as("scrolls sideways").isFalse();
         viewport.setSize(1400, 900);
         KitTestSupport.layout(viewport);
         assertThat(((javax.swing.Scrollable) page.component()).getScrollableTracksViewportWidth()).isTrue();
+    }
+
+    /** Runs the input's own Enter binding as Swing does: only an enabled action consumes the key before the dialog's OK. */
+    static boolean enter(JComponent input) {
+        var name = input.getInputMap(JComponent.WHEN_FOCUSED).get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0));
+        var action = name == null ? null : input.getActionMap().get(name);
+        if (action == null || !action.isEnabled()) return false;
+        action.actionPerformed(new java.awt.event.ActionEvent(input, 0, ""));
+        return true;
+    }
+
+    @Test void enterInAListsEntryAddsItInsteadOfPressingOk() {
+        var page = SchemaPage.page("shell", "Shell").row(CoreSettings.TERMINAL_SHELL_ARGS, Editors.textList()).build(context);
+        var entry = kit(page, "terminal.shell.args:new.input", JTextField.class);
+        assertThat(enter(entry)).as("an empty entry leaves Enter to the dialog").isFalse();
+        entry.setText("-l");
+        assertThat(enter(entry)).as("Enter is the entry's own").isTrue();
+        assertThat(draft.value(CoreSettings.TERMINAL_SHELL_ARGS)).containsExactly("-l");
+        assertThat(kit(page, "terminal.shell.args:new.input", JTextField.class).getText()).as("ready for the next").isEmpty();
+    }
+
+    @Test void enterInAFontListsEntryAddsTheHighlightedFamily() {
+        var page = SchemaPage.page("font", "Font").row(CoreSettings.TERMINAL_FONT_FALLBACK, Editors.fontList(false)).build(context);
+        var before = draft.value(CoreSettings.TERMINAL_FONT_FALLBACK);
+        var combo = kit(page, "terminal.font.fallback:new.input", javax.swing.JComboBox.class);
+        var field = (JTextField) combo.getEditor().getEditorComponent();
+        field.setText("monospaced");
+        var enter = new java.awt.event.KeyEvent(field, java.awt.event.KeyEvent.KEY_PRESSED, 0, 0, java.awt.event.KeyEvent.VK_ENTER, java.awt.event.KeyEvent.CHAR_UNDEFINED);
+        for (var listener : field.getKeyListeners()) listener.keyPressed(enter);
+        assertThat(enter.isConsumed()).as("Enter never reaches OK").isTrue();
+        var expected = new ArrayList<>(before); expected.add("Monospaced");
+        assertThat(draft.value(CoreSettings.TERMINAL_FONT_FALLBACK)).containsExactlyElementsOf(expected);
     }
 
     @Test void aLongDescriptionWrapsInsteadOfWideningThePage() {

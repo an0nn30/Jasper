@@ -490,6 +490,64 @@ class SettingsDialogTest {
         }
     }
 
+    /**
+     * The kit discard confirmation over Settings. The fake native shell answers the modal sheet while it is shown, as
+     * the user does, through the sheet's own buttons or its Enter/Escape bindings.
+     */
+    @Test void discardingAsksWithAKitSheetOverSettingsAndKeepsEditingUnlessDiscarded() throws Exception {
+        var answer = new String[1];
+        var sheets = new ArrayList<AuxiliarySurface>();
+        var texts = new ArrayList<String>();
+        var fronted = new int[1];
+        var confirming = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> {
+                if (!surface.title().equals("Discard Changes")) return;
+                sheets.add(surface);
+                texts.addAll(KitTestSupport.texts(surface.holder()));
+                var form = KitTestSupport.require(surface.holder(), "discard-sheet", javax.swing.JComponent.class);
+                switch (answer[0]) {
+                    case "discard", "keep" -> KitTestSupport.require(surface.holder(), answer[0], javax.swing.JButton.class).doClick();
+                    case "enter" -> form.getActionMap().get("primary").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    case "escape" -> form.getActionMap().get("cancel").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    default -> surface.close();
+                }
+            }, () -> { if (surface.title().equals("Settings")) fronted[0]++; }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1000, 700),
+            (title, initial) -> Optional.empty()));
+        var holder = new SettingsDialog[1];
+        holder[0] = new SettingsDialog(confirming, context -> CorePages.pages(ThemeChoices.of(() -> List.of("Jasper Dark")),
+            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+            page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
+            new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
+                () -> { }, () -> { }, uri -> { }, (parent, count) -> holder[0].askDiscard(parent, count), KitTestSupport::context));
+        var dialog = holder[0];
+        edt(() -> {
+            dialog.open(null, "window");
+            dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50));
+            for (String keep : List.of("keep", "escape", "closed")) {
+                answer[0] = keep;
+                int before = fronted[0];
+                dialog.cancel();
+                assertThat(dialog.isOpen()).as(keep + " keeps editing").isTrue();
+                assertThat(dialog.draft().modified()).isTrue();
+                assertThat(sheets.getLast().closed()).as("the sheet closes").isTrue();
+                assertThat(sheets.getLast().ownerSurface()).as("owned by Settings").hasValueSatisfying(owner -> assertThat(owner.title()).isEqualTo("Settings"));
+                assertThat(fronted[0]).as("focus returns to Settings").isEqualTo(before + 1);
+            }
+            assertThat(texts).contains("Discard 1 unsaved change?");
+            dialog.draft().stage(CoreSettings.WINDOW_STATUS_BAR, Optional.of(false));
+            answer[0] = "enter";
+            dialog.cancel();
+            assertThat(dialog.isOpen()).as("Enter discards, as the default answer did").isFalse();
+            assertThat(texts).contains("Discard 2 unsaved changes?");
+            dialog.open(null, "window");
+            dialog.draft().stage(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50));
+            answer[0] = "discard";
+            dialog.cancel();
+            assertThat(dialog.isOpen()).isFalse();
+            assertThat(sheets).allSatisfy(sheet -> assertThat(sheet.closed()).isTrue());
+            confirming.close();
+        });
+    }
+
     /** A page standing in for Keymap: settable modification, counted applies and recorded highlights. */
     static final class FakePage implements SettingsPage {
         final String id;

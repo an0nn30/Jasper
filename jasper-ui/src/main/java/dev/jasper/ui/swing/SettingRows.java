@@ -128,14 +128,12 @@ final class SettingRows {
 
         @Override
         public Dimension preferredLayoutSize(Container p) {
+            int control = p.getComponentCount() > 2 ? p.getComponent(2).getPreferredSize().width : 0;
+            // The trailing control takes at most half the row, so a wide control (a list) needs twice its width.
             int w =
-                    owner.title.getPreferredSize().width
-                            + gap()
+                    Math.max(owner.title.getPreferredSize().width + gap() + control, 2 * control + gap())
                             + p.getInsets().left
-                            + p.getInsets().right
-                            + (p.getComponentCount() > 2
-                                    ? p.getComponent(2).getPreferredSize().width
-                                    : 0);
+                            + p.getInsets().right;
             return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
         }
 

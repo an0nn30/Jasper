@@ -12,9 +12,11 @@
   (`SettingsDialog.Hooks.kit`, `PageContext.kit`): search field, page `Tree`, header, banner, footer, schema pages
   (Sections/SETTINGS cards/SettingRows with typed editors) and group pages; theme-import dialogs are kit SHEET forms.
   `SearchCombo`, `HighlightBox`, `TitledSeparator` and `WrappingText` are gone; the 11 SearchCombo behaviours run
-  against the kit control. SettingsDraft, apply order, Cancel and persistence are unchanged. Open for the review:
-  `SettingsDialog.askDiscard` still uses `JOptionPane`; top-level tree pages are no longer bold (emphasis marks
-  unsaved pages). Evidence in the Task 6a report.
+  against the kit control. SettingsDraft, apply order, Cancel and persistence are unchanged. Review fix round 1: host and fake settings-row
+  rewriting keep `highlighted`; the discard confirmation is a modal kit sheet (Enter discards; Keep/Escape/close keep;
+  focus back to Settings); Enter in a list's add entry adds it (kit field trailing action / free-entry choice action)
+  instead of pressing OK; settings rows prefer the width that gives wide controls their preferred size. Top-level tree
+  pages are no longer bold (emphasis marks unsaved pages). Evidence in the Task 6a report.
 - **Theme engine Plan 2 Task 5 complete** (2026-10-05; commits e8ffc7f8..38ca45f3, scoped re-review clean after fix
   round 1). Controller
   ruling applied: canonical `surface.status` (module, SDK projection, `[semantic]` TOML; base `status_bar`, vendor

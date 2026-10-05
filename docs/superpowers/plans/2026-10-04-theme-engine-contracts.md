@@ -249,6 +249,13 @@ SDK version unchanged until Task 11). Prior constructors remain and default to t
   picks, and a look-and-feel reinstall keeps the kit UI. A present `entry` makes it free entry: the
   dropdown is editable, `selectedId` is blank, options are suggestions, and typed or picked text is reported
   only as `Edited(choiceId,text)`. A domain update while the user's edit is delivered follows after it.
+- Enter (Task 6a fix round 1): a single-line TEXT/SEARCH/PORT/NUMBER field with a nonblank `trailingAction` runs it on
+  Enter and keeps the key (for example adding a typed list entry); without one Enter passes on to the form or dialog.
+  PATH keeps Browse as its trailing action. In free entry, Enter enters the highlighted suggestion (if the list is
+  open or filtering) and then runs the choice's nonblank `action`; a pick-only searchable choice consumes Enter only
+  while open or searching. Multiline fields keep newlines.
+- `SettingRow` preferred width gives a trailing control its preferred width despite the half-row cap
+  (`max(title + gap + control, 2 * control + gap)`), so a host laying out at preferred width never squashes it.
 
 `ViewSpec(Node root)` validates the tree and references. `UiEvent` is sealed with nested records
 `Action(String id)`, `Edited(String id,String text)`, `Selected(String id,Set<String> ids)`,

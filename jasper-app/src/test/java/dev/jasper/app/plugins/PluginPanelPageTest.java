@@ -92,6 +92,34 @@ class PluginPanelPageTest {
         onEdtValue(() -> size.get().set(9)).get(5,TimeUnit.SECONDS);
         onEdt(() -> assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class));
     }
+    @Test void kitPanelRowsKeepTheirSearchHighlightThroughTheHostsRowRewriting() throws Exception {
+        var view=new AtomicReference<HostedKitView>();var size=new AtomicReference<Setting<Integer>>();var rows=new AtomicReference<SettingsPanelHost>();
+        java.util.function.Function<SettingsPanelHost,dev.jasper.sdk.ui.ViewSpec> spec=h -> {
+            var hostRow=(dev.jasper.sdk.ui.Nodes.SettingRow)h.rowNode(size.get());
+            var ready=dev.jasper.sdk.ui.ControlState.READY;
+            return new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Card("card",ready,dev.jasper.sdk.ui.Nodes.CardKind.SETTINGS,List.of(
+                new dev.jasper.sdk.ui.Nodes.SettingRow(hostRow.id(),hostRow.state(),hostRow.title(),hostRow.description(),hostRow.control(),hostRow.dependent(),true),
+                new dev.jasper.sdk.ui.Nodes.SettingRow("own",ready,"Own","",new dev.jasper.sdk.ui.Nodes.Toggle("own-toggle",ready,"Own",true,"own-toggle",false),false,true),
+                new dev.jasper.sdk.ui.Nodes.FormRow("form",ready,"Form","",new dev.jasper.sdk.ui.Nodes.Text("form-text",ready,"x",dev.jasper.sdk.ui.Nodes.TextRole.BODY),Optional.empty(),true))));
+        };
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
+            size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
+            context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(spec.apply(h),e -> {});view.set(made);return made;});
+        })));
+        var page=onEdtValue(() -> (PluginPanelPage)host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            view.get().update(spec.apply(rows.get()));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:size","5"));
+            var card=(dev.jasper.sdk.ui.Nodes.Card)view.get().spec().root();
+            assertThat(card.children()).as("plugin and host rows keep the highlight the plugin asked for").allSatisfy(node -> assertThat(
+                node instanceof dev.jasper.sdk.ui.Nodes.SettingRow row ? row.highlighted() : ((dev.jasper.sdk.ui.Nodes.FormRow)node).highlighted()).isTrue());
+            for(String id:List.of("settings:size:row","own","form"))
+                assertThat(dev.jasper.app.testsupport.KitTestSupport.require(view.get().component(),id,JComponent.class).getAccessibleContext().getAccessibleDescription())
+                    .as(id).isEqualTo("Matches search");
+            page.dispose();
+        });
+    }
     private static String displayedSize(HostedKitView view) {
         var row=(dev.jasper.sdk.ui.Nodes.SettingRow)view.spec().root();
         return ((dev.jasper.sdk.ui.Nodes.Field)((dev.jasper.sdk.ui.Nodes.Stack)row.control()).children().getFirst()).value();

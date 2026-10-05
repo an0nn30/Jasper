@@ -204,8 +204,8 @@ the former readers of `Panel.background`, `Label.foreground`, `Label.disabledFor
 (`SettingsView`, `PageTree`, `GroupPage`, `SearchCombo`, `HighlightBox`, `TitledSeparator`, `WrappingText`,
 `ThemeImportView`, `ThemeDialogs`) were deleted or rewritten. The `restart` rows are nonvisual. The keys stay published
 for their other consumers (Tasks 6b/6c app pages and dialogs, Tasks 7–10 plugins) until Task 11 removes the adapter.
-Remaining raw Swing in these families is layout only (`SettingsView` split/scroller, `PageBody`, `FillingPage`) plus
-`SettingsDialog.askDiscard`'s `JOptionPane` confirmation, reported in the Task 6a report for the controller's ruling.
+Remaining raw Swing in these families is layout only (`SettingsView` split/scroller, `PageBody`, `FillingPage`);
+fix round 1 replaced `SettingsDialog.askDiscard`'s `JOptionPane` with a modal kit SHEET over Settings.
 
 The dynamic WorkspacePalette callers are exactly:
 - Task 7: `plugins/vault/.../ui/ManagerPanel.java`.

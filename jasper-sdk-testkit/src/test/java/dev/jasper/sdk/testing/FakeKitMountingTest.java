@@ -46,6 +46,29 @@ class FakeKitMountingTest {
             }
         });
     }
+    @Test void rowsKeepTheSearchHighlightThePluginAskedForThroughHostProjection() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try(var host=new FakePluginHost()) {
+                var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var size=new AtomicReference<Setting<Integer>>();
+                java.util.function.Function<SettingsPanelHost,ViewSpec> spec=h -> {
+                    var hostRow=(Nodes.SettingRow)h.rowNode(size.get());
+                    return new ViewSpec(new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(
+                        new Nodes.SettingRow(hostRow.id(),hostRow.state(),hostRow.title(),hostRow.description(),hostRow.control(),hostRow.dependent(),true),
+                        new Nodes.SettingRow("own",ControlState.READY,"Own","",new Nodes.Toggle("own-toggle",ControlState.READY,"Own",true,"own-toggle",false),false,true),
+                        new Nodes.FormRow("form",ControlState.READY,"Form","",new Nodes.Text("form-text",ControlState.READY,"x",Nodes.TextRole.BODY),Optional.empty(),true))));
+                };
+                host.start(new PluginInfo("test.highlight","Highlight","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
+                    size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
+                    context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(FakeKitView)context.kit().create(spec.apply(h),e -> {});view.set(made);return made;});
+                });
+                host.settingsPanel("test.highlight");
+                view.get().update(spec.apply(rows.get()));
+                view.get().emit(new UiEvent.Edited("settings:size","5"));
+                var card=(Nodes.Card)view.get().spec().root();
+                assertThat(card.children()).allSatisfy(node -> assertThat(node instanceof Nodes.SettingRow row ? row.highlighted() : ((Nodes.FormRow)node).highlighted()).isTrue());
+            }
+        });
+    }
     @Test void resetRemovesSavedOverrideWithoutChangingOrdinaryStageDefault() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var host=new FakePluginHost()) {

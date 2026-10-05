@@ -115,7 +115,11 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         return KitSettingRows.project(spec, node -> {
             if (node instanceof Nodes.SettingRow row) {
                 var owned = rows.values().stream().filter(value -> row.id().equals("settings:" + value.setting.key() + ":row")).findFirst();
-                if (owned.isPresent()) return rowNode(owned.get().setting);
+                if (owned.isPresent()) {
+                    // Rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
+                    var fresh = (Nodes.SettingRow) rowNode(owned.get().setting);
+                    return new Nodes.SettingRow(fresh.id(), fresh.state(), fresh.title(), fresh.description(), fresh.control(), fresh.dependent(), row.highlighted());
+                }
             }
             return node;
         });

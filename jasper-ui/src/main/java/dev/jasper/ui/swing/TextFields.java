@@ -31,6 +31,7 @@ final class TextFields {
             if (input instanceof JTextArea area) { area.setLineWrap(true); area.setWrapStyleWord(true); }
             input.setOpaque(false); input.setBorder(new EmptyBorder(0, 0, 0, 0)); KitOwnership.mark(input, node.id() + ".input");
             if (node.kind() == Nodes.FieldKind.PORT) ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumericFilter());
+            if (node.kind() != Nodes.FieldKind.TEXTAREA && node.kind() != Nodes.FieldKind.PATH) bindSubmit();
             if (node.kind() == Nodes.FieldKind.NUMBER) {
                 ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumberFilter(() -> ((Nodes.Field)this.node).numeric().orElseThrow()));
                 bindStep("UP", 1); bindStep("DOWN", -1); bindStep("KP_UP", 1); bindStep("KP_DOWN", -1);
@@ -63,6 +64,21 @@ final class TextFields {
             input.getDocument().addDocumentListener(listener); own(() -> input.getDocument().removeDocumentListener(listener));
             setValue(node.value());
             refresh();
+        }
+        /**
+         * Enter in a single-line field with a trailing action runs that action (for example adding a typed entry) and
+         * stays with the field; without one, Enter passes on to the containing form or dialog.
+         */
+        private void bindSubmit() {
+            KeyStroke key = KeyStroke.getKeyStroke("ENTER"); String name = "field.submit";
+            input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
+            input.getActionMap().put(name, new AbstractAction() {
+                @Override public boolean isEnabled() { return !closed && !((Nodes.Field)node).trailingAction().isBlank(); }
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                    if (isEnabled()) emit(new UiEvent.Action(((Nodes.Field)node).trailingAction()));
+                }
+            });
+            own(() -> { input.getInputMap(JComponent.WHEN_FOCUSED).remove(key); input.getActionMap().remove(name); });
         }
         /** Arrow keys step a NUMBER field by its step, clamped to its bounds; the edit reaches the host like typing. */
         private void bindStep(String stroke, int direction) {

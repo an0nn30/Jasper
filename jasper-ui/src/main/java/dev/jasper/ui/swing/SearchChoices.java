@@ -52,6 +52,8 @@ final class SearchChoices {
         boolean freeEntry;
         /** Receives free-entry text the user typed or picked; descriptor updates are quiet. */
         Consumer<String> entered = text -> {};
+        /** Free entry's Enter: runs the choice's action, when it has one; answers whether it did. */
+        java.util.function.BooleanSupplier submitted = () -> false;
         private boolean quiet;
         private boolean entering;
         private final DocumentListener typing = new DocumentListener() {
@@ -461,7 +463,15 @@ final class SearchChoices {
             }
 
             @Override public void keyPressed(KeyEvent event) {
-                if (!isVisible() && !searching() || event.isControlDown() || event.isMetaDown() || event.isAltDown()) return;
+                if (event.isControlDown() || event.isMetaDown() || event.isAltDown()) return;
+                if (combo.freeEntry && event.getKeyCode() == KeyEvent.VK_ENTER) {
+                    // Enter enters the highlighted suggestion, if any, then runs the choice's action (such as Add).
+                    boolean open = isVisible() || searching();
+                    if (open) choose();
+                    if (combo.submitted.getAsBoolean() || open) event.consume();
+                    return;
+                }
+                if (!isVisible() && !searching()) return;
                 switch (event.getKeyCode()) {
                     // Every key the combo's own bindings would answer with a pick behind the list is handled here.
                     case KeyEvent.VK_DOWN, KeyEvent.VK_KP_DOWN -> move(1);

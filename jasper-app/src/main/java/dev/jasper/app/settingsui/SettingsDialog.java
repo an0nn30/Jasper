@@ -23,9 +23,12 @@ import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
-import javax.swing.JOptionPane;
+import dev.jasper.ui.swing.KitView;
 import javax.swing.SwingUtilities;
 
 /**
@@ -75,6 +78,8 @@ public final class SettingsDialog {
     private boolean rejected;
     private boolean applying;
     private Runnable bannerAction = () -> { };
+    /** The chrome kit context of the current opening. */
+    private KitContext kit;
 
     public SettingsDialog(AuxiliaryWindows windows, Function<PageContext, List<SettingsPage>> pages, Hooks hooks) {
         this.windows = Objects.requireNonNull(windows);
@@ -82,11 +87,32 @@ public final class SettingsDialog {
         this.hooks = Objects.requireNonNull(hooks);
     }
 
-    /** Asks with a standard Yes/No dialog; the default {@code confirmDiscard}. */
-    public static boolean askDiscard(Component parent, Integer count) {
+    /**
+     * Asks over Settings, with a kit sheet, whether to discard that many unsaved changes: the application's
+     * {@code confirmDiscard}. Discard is the primary answer (Enter); Keep Editing, Escape and closing the sheet keep the
+     * edits. The sheet is modal, so this returns once answered; focus then goes back to Settings.
+     */
+    public boolean askDiscard(Component parent, Integer count) {
+        if (!isOpen() || kit == null) return true;
         String changes = count == 1 ? "1 unsaved change" : count + " unsaved changes";
-        return JOptionPane.showConfirmDialog(parent, "Discard " + changes + "?", "Settings", JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION;
+        boolean[] discard = {false};
+        var sheet = windows.dialog("Discard Changes", true, surface);
+        var sheetView = new KitView(kit, new ViewSpec(new Nodes.Form("discard-sheet", ControlState.READY, Nodes.FormKind.SHEET,
+            "Discard changes?", Optional.empty(),
+            List.of(new Nodes.Text("discard-message", ControlState.READY, "Discard " + changes + "?", Nodes.TextRole.BODY)), Optional.empty(),
+            List.of(new Nodes.Button("keep", ControlState.READY, "Keep Editing", "", Nodes.ButtonKind.SECONDARY, "keep", ""),
+                new Nodes.Button("discard", ControlState.READY, "Discard", "", Nodes.ButtonKind.PRIMARY, "discard", "")), "keep")),
+            event -> {
+                if (!(event instanceof UiEvent.Action action)) return;
+                if (action.id().equals("discard")) discard[0] = true;
+                if (action.id().equals("discard") || action.id().equals("keep")) sheet.close();
+            });
+        sheet.onClosed(sheetView::close);
+        sheet.setContent(sheetView);
+        sheet.show();
+        sheet.close();
+        if (!discard[0] && isOpen()) surface.toFront();
+        return discard[0];
     }
 
     public boolean isOpen() { return surface != null && !surface.closed(); }
@@ -103,11 +129,11 @@ public final class SettingsDialog {
         }
         ConfigService.State state = hooks.state().get();
         draft = new SettingsDraft(state.values());
-        KitContext kit = hooks.kit().get();
+        kit = hooks.kit().get();
         view = new SettingsView(kit, this::event, this::cancel);
         view.onEnter(this::ok);
         pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow,
-            () -> isOpen() ? surface : null, () -> kit)));
+            () -> isOpen() ? surface : null, this::kit)));
         backStack.clear();
         forwardStack.clear();
         current = null;
@@ -152,6 +178,7 @@ public final class SettingsDialog {
     }
 
     SettingsView view() { return view; }
+    private KitContext kit() { return kit; }
     SettingsDraft draft() { return draft; }
     List<SettingsPage> pages() { return pages; }
     String currentPage() { return current; }

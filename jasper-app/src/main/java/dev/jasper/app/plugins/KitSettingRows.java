@@ -62,7 +62,12 @@ final class KitSettingRows {
     }
     ViewSpec refresh(ViewSpec spec){return new ViewSpec(replace(spec.root()));}
     private Nodes.Node replace(Nodes.Node n){
-        for(var entry:controls.entrySet())if(n.id().equals(entry.getKey()+":row"))return row(entry.getValue());
+        // A host row is rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
+        for(var entry:controls.entrySet())if(n.id().equals(entry.getKey()+":row")){
+            var fresh=(Nodes.SettingRow)row(entry.getValue());
+            boolean highlighted=n instanceof Nodes.SettingRow asked && asked.highlighted();
+            return new Nodes.SettingRow(fresh.id(),fresh.state(),fresh.title(),fresh.description(),fresh.control(),fresh.dependent(),highlighted);
+        }
         return switch(n){
             case Nodes.Stack v -> new Nodes.Stack(v.id(),v.state(),v.role(),v.children().stream().map(this::replace).toList());
             case Nodes.Card v -> new Nodes.Card(v.id(),v.state(),v.kind(),v.children().stream().map(this::replace).toList());
@@ -70,8 +75,8 @@ final class KitSettingRows {
             case Nodes.Form v -> new Nodes.Form(v.id(),v.state(),v.kind(),v.title(),v.hero().map(this::replace),v.sections().stream().map(this::replace).toList(),v.preview().map(this::replace),v.actions(),v.cancelAction());
             case Nodes.Split v -> new Nodes.Split(v.id(),v.state(),v.kind(),v.children().stream().map(this::replace).toList());
             case Nodes.Panel v -> new Nodes.Panel(v.id(),v.state(),(Nodes.Header)replace(v.header()),v.searchOrNavigation().map(this::replace),replace(v.body()),v.footer().map(this::replace));
-            case Nodes.FormRow v -> new Nodes.FormRow(v.id(),v.state(),v.label(),v.caption(),replace(v.control()),v.trailing().map(this::replace));
-            case Nodes.SettingRow v -> new Nodes.SettingRow(v.id(),v.state(),v.title(),v.description(),replace(v.control()),v.dependent());
+            case Nodes.FormRow v -> new Nodes.FormRow(v.id(),v.state(),v.label(),v.caption(),replace(v.control()),v.trailing().map(this::replace),v.highlighted());
+            case Nodes.SettingRow v -> new Nodes.SettingRow(v.id(),v.state(),v.title(),v.description(),replace(v.control()),v.dependent(),v.highlighted());
             case Nodes.Empty v -> new Nodes.Empty(v.id(),v.state(),replace(v.icon()),v.title(),v.description(),v.actions().stream().map(this::replace).toList());
             case Nodes.Header v -> new Nodes.Header(v.id(),v.state(),v.title(),v.count(),v.context().map(this::replace),v.primary(),v.overflow());
             default -> n;

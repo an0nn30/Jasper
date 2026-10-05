@@ -437,10 +437,12 @@ public final class Editors {
                 rows.add(new ListItem("item-" + i, Optional.empty(),
                     List.of(new Nodes.Text(id + ":item-" + i, ControlState.READY, items.get(i), Nodes.TextRole.BODY)), List.of(), List.of()));
             var list = new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, Set.of(), "", List.of());
+            // Enter in the entry adds it (the entry's own action); an empty entry leaves Enter to the dialog's OK.
+            String submit = pending.isBlank() ? "" : id + ":add";
             Nodes.Node entry = suggestions.isPresent()
-                ? new Nodes.Choice(id + ":new", plain(state), Nodes.ChoiceKind.SEARCHABLE, options(suggestions.get().get()), "", "Add to " + label, "", "",
+                ? new Nodes.Choice(id + ":new", plain(state), Nodes.ChoiceKind.SEARCHABLE, options(suggestions.get().get()), "", "Add to " + label, id + ":add", "",
                     Optional.of(new Nodes.ChoiceSearch(0, "No installed font matches", Optional.of(pending))))
-                : new Nodes.Field(id + ":new", plain(state), Nodes.FieldKind.TEXT, pending, "Add…", "Add to " + label, "");
+                : new Nodes.Field(id + ":new", plain(state), Nodes.FieldKind.TEXT, pending, "Add…", "Add to " + label, submit);
             var addState = new ControlState(state.visible(), state.enabled() && !pending.isBlank(), state.busy(), "");
             var add = new Nodes.Button(id + ":add", addState, "Add", "add", Nodes.ButtonKind.SECONDARY, id + ":add", "");
             return new Nodes.Stack(id + ":editor", plain(state), Nodes.LayoutRole.VERTICAL,

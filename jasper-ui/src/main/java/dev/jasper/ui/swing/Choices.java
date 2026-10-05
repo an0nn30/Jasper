@@ -47,7 +47,13 @@ final class Choices {
                 };
                 combo.addActionListener(listener); own(() -> combo.removeActionListener(listener));
                 combo.entered = text -> { if (!applying) { if (interactive()) emit(new UiEvent.Edited(this.node.id(), text)); else refresh(); } };
-                own(() -> { combo.entered = text -> {}; combo.dispose(); });
+                combo.submitted = () -> {
+                    String action = ((Nodes.Choice)this.node).action();
+                    if (action.isBlank() || !interactive()) return false;
+                    emit(new UiEvent.Action(action));
+                    return true;
+                };
+                own(() -> { combo.entered = text -> {}; combo.submitted = () -> false; combo.dispose(); });
             } else if (node.kind() == Nodes.ChoiceKind.PICKER) {
                 var picker = new PickerButton(context()); input = picker;
                 picker.kind = Nodes.ButtonKind.SECONDARY; picker.setContentAreaFilled(false); picker.setBorderPainted(false); picker.setFocusPainted(false); picker.setOpaque(false);

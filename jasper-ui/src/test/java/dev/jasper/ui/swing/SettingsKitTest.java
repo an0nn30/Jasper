@@ -100,6 +100,21 @@ class SettingsKitTest {
         });
     }
 
+    @Test void aSettingRowAtItsPreferredWidthGivesAWideControlItsPreferredWidth() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var items = new ArrayList<ListItem>();
+            for (int i = 0; i < 3; i++) items.add(new ListItem("i" + i, Optional.empty(), List.of(new Text("t" + i, ControlState.READY, "A long list entry " + i, TextRole.BODY)), List.of(), List.of()));
+            var row = new SettingRow("row", ControlState.READY, "Args", "", new ItemList("list", ControlState.READY, ListKind.ORDERED, items, Set.of(), "", List.of()), false);
+            try (var view = new KitView(context, stack(row), e -> {})) {
+                var preferred = view.getPreferredSize();
+                KitFixtures.render(view, preferred.width, preferred.height, 1);
+                var list = find(view, "list", JComponent.class);
+                assertThat(list.getWidth()).as("the half-row cap never squashes the control at the preferred width").isEqualTo(list.getPreferredSize().width);
+            } finally { release(context); }
+        });
+    }
+
     @Test void formRowsHighlightToo() {
         Edt.run(() -> {
             var context = KitFixtures.context();
@@ -156,6 +171,54 @@ class SettingsKitTest {
                 assertThat(query.getCaretPosition()).isEqualTo(2);
                 assertThatThrownBy(() -> view.reveal("missing")).isInstanceOf(IllegalArgumentException.class);
             } finally { KeyboardFocusManager.setCurrentKeyboardFocusManager(prior); release(context); }
+        });
+    }
+
+    /** Runs the input's own Enter binding as Swing does: only an enabled action consumes the key. */
+    static boolean enter(JComponent input) {
+        var name = input.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0));
+        var action = name == null ? null : input.getActionMap().get(name);
+        if (action == null || !action.isEnabled()) return false;
+        action.actionPerformed(new java.awt.event.ActionEvent(input, 0, ""));
+        return true;
+    }
+
+    @Test void enterInAFieldWithATrailingActionRunsItInsteadOfReachingTheDialog() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var entry = new Field("entry", ControlState.READY, FieldKind.TEXT, "-l", "Add…", "New argument", "entry:add");
+            var plain = new Field("plain", ControlState.READY, FieldKind.TEXT, "", "", "Plain", "");
+            try (var view = new KitView(context, stack(entry, plain), events::add)) {
+                assertThat(enter(editor(view, "entry"))).as("Enter is the field's own").isTrue();
+                assertThat(events).containsExactly(new UiEvent.Action("entry:add"));
+                assertThat(find(view, "entry.browse", JButton.class)).as("no Browse button outside PATH").isNull();
+                assertThat(enter(editor(view, "plain"))).as("without an action Enter passes on to the dialog").isFalse();
+                view.update(stack(new Field("entry", ControlState.READY, FieldKind.TEXT, "-l", "Add…", "New argument", ""), plain));
+                assertThat(enter(editor(view, "entry"))).as("the binding follows the descriptor").isFalse();
+            } finally { release(context); }
+        });
+    }
+
+    @Test void enterInAFreeEntryChoiceEntersTheHighlightThenRunsItsAction() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            var options = List.of(new Option("menlo", "Menlo", Optional.<Hue>empty()), new Option("sf", "SF Mono", Optional.<Hue>empty()));
+            java.util.function.Function<String, Nodes.Choice> font = text -> new Nodes.Choice("font", ControlState.READY, ChoiceKind.SEARCHABLE, options, "", "Font", "font:add", "",
+                Optional.of(new ChoiceSearch(0, "No installed font matches", Optional.of(text))));
+            try (var view = new KitView(context, stack(font.apply("")), events::add)) {
+                var combo = find(view, "font.input", SearchChoices.Combo.class);
+                combo.editorField().setText("men");
+                events.clear();
+                var enter = new KeyEvent(combo.editorField(), KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED);
+                combo.searchPopup().getKeyListener().keyPressed(enter);
+                assertThat(enter.isConsumed()).isTrue();
+                assertThat(events).containsExactly(new UiEvent.Edited("font", "Menlo"), new UiEvent.Action("font:add"));
+                events.clear();
+                var again = new KeyEvent(combo.editorField(), KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED);
+                combo.searchPopup().getKeyListener().keyPressed(again);
+                assertThat(again.isConsumed()).as("closed and not searching, Enter still runs the action").isTrue();
+                assertThat(events).containsExactly(new UiEvent.Action("font:add"));
+            } finally { release(context); }
         });
     }
 
