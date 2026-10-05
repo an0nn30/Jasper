@@ -10,6 +10,7 @@ import dev.jasper.fileserver.engine.EngineFailure;
 import dev.jasper.fileserver.engine.LoginThrottle;
 import dev.jasper.fileserver.engine.ServerAddresses;
 import dev.jasper.fileserver.engine.ServerEvent;
+import dev.jasper.fileserver.engine.sftp.HostKey;
 import dev.jasper.fileserver.engine.tls.TlsMaterial;
 import dev.jasper.fileserver.runtime.Engines;
 import dev.jasper.fileserver.runtime.ServerRegistry;
@@ -42,7 +43,9 @@ import dev.jasper.vault.api.VaultApi;
 import java.awt.Desktop;
 import java.awt.HeadlessException;
 import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
@@ -109,6 +112,7 @@ public final class FileServerPlugin implements Plugin {
     private DefinitionStore store;
     private ServerRegistry registry;
     private TlsMaterial tls;
+    private HostKey hostKey;
     private TransferActivities transfers;
     private FileServerScope scope;
     private StatusItem status;
@@ -136,7 +140,8 @@ public final class FileServerPlugin implements Plugin {
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
         transfers = new TransferActivities(context.activities()::begin, SHOW);
         tls = new TlsMaterial(context.dataDirectory().resolve("tls"), Clock.systemUTC(), FileServerPlugin::hostName);
-        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange), logins,
+        hostKey = new HostKey(context.dataDirectory().resolve("hostkey"));
+        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange, hostKey), logins,
             context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
         var icon = context.appearance().icon(IconName.SERVER);
@@ -202,6 +207,7 @@ public final class FileServerPlugin implements Plugin {
     void observe(ServerEvent event) { if (!stopped) transfers.accept(event); }
 
     TlsMaterial tls() { return tls; }
+    HostKey hostKey() { return hostKey; }
 
     /** This computer's name for the certificate; empty when the system will not say. Slow on some networks, so call it off the UI thread. */
     static String hostName() {
@@ -251,6 +257,7 @@ public final class FileServerPlugin implements Plugin {
         editor[0] = new ServerEditor(store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
             this::accountName, () -> pickAccount(window),
             () -> context.windows().chooseDirectory(window, "Folder to share", initial.map(ServerDefinition::folder)),
+            new ServerEditor.KeySources(() -> keyFiles(window), FileServerPlugin::pasted),
             environment.linux(),
             definition -> store.put(definition).whenComplete((ignored, failure) -> environment.ui().execute(() -> {
                 if (stopped) return;
@@ -265,6 +272,29 @@ public final class FileServerPlugin implements Plugin {
         dialog.setContent(editor[0]);
         dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
+    }
+
+    /** The text of public key files the user picks; a file that can't be read is reported and skipped. */
+    private Optional<String> keyFiles(WindowHandle window) {
+        List<Path> chosen = context.windows().chooseFiles(window, "Public keys to allow", Optional.of(environment.home().resolve(".ssh")));
+        var text = new StringBuilder();
+        for (Path file : chosen) {
+            try { text.append(Files.readString(file)).append('\n'); }
+            catch (IOException | RuntimeException failure) {
+                context.notifications().group().error("Could not read a public key file", file + ": " + message(failure), failure);
+            }
+        }
+        return text.isEmpty() ? Optional.empty() : Optional.of(text.toString());
+    }
+
+    /** The clipboard's text; empty when there is none or no clipboard. */
+    static Optional<String> pasted() {
+        try {
+            Object data = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+            return data instanceof String text && !text.isBlank() ? Optional.of(text) : Optional.empty();
+        } catch (HeadlessException | IllegalStateException | UnsupportedFlavorException | IOException unavailable) {
+            return Optional.empty();
+        }
     }
 
     /** Shares the folder the shell is in, read-only and on this computer only, until stopped. */

@@ -9,6 +9,7 @@ import dev.jasper.fileserver.engine.ServerAddresses;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -29,7 +30,7 @@ class ServerEditorTest {
         return new ServerEditor(others, initial, existing, Set.of(Protocol.HTTP), List.of(en0), vaultPresent,
             id -> id.equals(ACCOUNT) ? Optional.of("Share login") : Optional.empty(),
             () -> CompletableFuture.completedFuture(Optional.of(new ServerEditor.Account(ACCOUNT, "Share login"))),
-            () -> Optional.of(folder), linux, saved::add, () -> cancelled = true);
+            () -> Optional.of(folder), ServerEditor.KeySources.NONE, linux, saved::add, () -> cancelled = true);
     }
 
     @Test void createsAnHttpServerWithSafeDefaults() throws Exception {
@@ -135,7 +136,7 @@ class ServerEditorTest {
 
     ServerEditor ftpEditor(Optional<ServerDefinition> initial, boolean existing) {
         return new ServerEditor(List.of(), initial, existing, Set.of(Protocol.HTTP, Protocol.FTP), List.of(), false,
-            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> Optional.of(folder), false,
+            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> Optional.of(folder), ServerEditor.KeySources.NONE, false,
             saved::add, () -> cancelled = true);
     }
 
@@ -195,6 +196,69 @@ class ServerEditorTest {
         assertThat(editor.useTls.isSelected()).isTrue();
         assertThat(editor.requireTls.isSelected()).isTrue();
         assertThat(editor.requireTls.isEnabled()).isTrue();
+        editor.save.doClick();
+        assertThat(saved).singleElement().isEqualTo(original);
+    }
+
+    static final String ED25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAEgwWITbeAjMHfs63n4fe6AxR8buxH3Wx+IdWdotPF0 alice@laptop";
+    static final String ECDSA = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCKLV4ChGhVzArLw7brgwvIOQAjpwGqDaTifUtUTLxNQCWVdgGVtTjhhZSbIMKVdDUtRyBDkfjMCE3d4mznEAa8=";
+
+    ServerEditor sftpEditor(Optional<ServerDefinition> initial, boolean existing, String file, String clipboard) {
+        return new ServerEditor(List.of(), initial, existing, Set.of(Protocol.HTTP, Protocol.FTP, Protocol.SFTP), List.of(), false,
+            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), () -> Optional.of(folder),
+            new ServerEditor.KeySources(() -> Optional.ofNullable(file), () -> Optional.ofNullable(clipboard)), false,
+            saved::add, () -> cancelled = true);
+    }
+
+    @Test void sftpTakesAuthorizedKeysAndMayBeKeysOnly() {
+        var editor = sftpEditor(Optional.empty(), false, "# my keys\n" + ED25519 + "\n", ECDSA + " ");
+        assertThat(editor.addKeyFile.isEnabled()).as("HTTP has no keys").isFalse();
+        assertThat(editor.pasteKeys.isEnabled()).isFalse();
+        editor.protocol.setSelectedItem(Protocol.SFTP);
+        assertThat(editor.port.getText()).isEqualTo("2222");
+        assertThat(editor.session.isSelected()).as("no Vault: a session password").isTrue();
+        assertThat(editor.anonymous.getText()).isEqualTo("Keys only (no password)");
+        assertThat(editor.anonymous.isEnabled()).isTrue();
+        assertThat(editor.removeKey.isEnabled()).as("nothing selected").isFalse();
+        editor.addKeyFile.doClick();
+        editor.pasteKeys.doClick();
+        editor.pasteKeys.doClick();
+        assertThat(Collections.list(editor.keyLines.elements())).as("a listed key is not added twice").containsExactly(ED25519, ECDSA);
+        editor.keys.setSelectedIndex(1);
+        assertThat(editor.removeKey.isEnabled()).isTrue();
+        editor.removeKey.doClick();
+        editor.anonymous.doClick();
+        editor.name.setText("drop");
+        editor.folder.setText(folder.toString());
+        editor.save.doClick();
+        assertThat(saved).singleElement().satisfies(definition -> {
+            assertThat(definition.protocol()).isEqualTo(Protocol.SFTP);
+            assertThat(definition.login()).isEqualTo(Login.ANONYMOUS);
+            assertThat(definition.authorizedKeys()).containsExactly(ED25519);
+        });
+    }
+
+    @Test void keysOnlyNeedsAKeyAndBadKeyTextIsExplained() {
+        var editor = sftpEditor(Optional.empty(), false, "not a key", null);
+        editor.protocol.setSelectedItem(Protocol.SFTP);
+        editor.addKeyFile.doClick();
+        assertThat(editor.message.getText()).isEqualTo("Line 1: Not an OpenSSH public key (for example ssh-ed25519 AAAA…)");
+        editor.pasteKeys.doClick();
+        assertThat(editor.keyLines.isEmpty()).as("an empty clipboard adds nothing").isTrue();
+        editor.anonymous.doClick();
+        editor.name.setText("keys");
+        editor.folder.setText(folder.toString());
+        editor.save.doClick();
+        assertThat(editor.message.getText()).isEqualTo("SFTP needs a password or authorized keys");
+        assertThat(saved).isEmpty();
+    }
+
+    @Test void editingAnSftpServerKeepsItsKeysAndLogin() {
+        var original = new ServerDefinition(UUID.randomUUID(), "keys", Protocol.SFTP, folder, Bind.LOOPBACK, 2222, Optional.empty(), false,
+            Login.ANONYMOUS, List.of(ED25519), false, false, false);
+        var editor = sftpEditor(Optional.of(original), true, null, null);
+        assertThat(editor.anonymous.isSelected()).isTrue();
+        assertThat(editor.keys.getModel().getSize()).isEqualTo(1);
         editor.save.doClick();
         assertThat(saved).singleElement().isEqualTo(original);
     }

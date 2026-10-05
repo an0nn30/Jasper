@@ -1,5 +1,6 @@
 package dev.jasper.fileserver.ui;
 
+import dev.jasper.fileserver.auth.AuthorizedKeys;
 import dev.jasper.fileserver.definition.Bind;
 import dev.jasper.fileserver.definition.Login;
 import dev.jasper.fileserver.definition.PortRange;
@@ -14,6 +15,7 @@ import java.awt.Insets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -26,13 +28,18 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
+import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
@@ -45,6 +52,11 @@ public final class ServerEditor extends JPanel {
         @Override public String toString() { return label; }
     }
 
+    /** Where "Add from File…" and "Paste" get authorized-key text; each returns empty when there is nothing. */
+    public record KeySources(Supplier<Optional<String>> fromFile, Supplier<Optional<String>> fromClipboard) {
+        public static final KeySources NONE = new KeySources(Optional::empty, Optional::empty);
+    }
+
     final JTextField name = new JTextField(24), folder = new JTextField(24), port = new JTextField(6);
     final JComboBox<Protocol> protocol = new JComboBox<>();
     final JButton chooseFolder = new JButton("Choose…"), chooseAccount = new JButton("Choose…");
@@ -54,6 +66,9 @@ public final class ServerEditor extends JPanel {
     final JRadioButton anonymous = new JRadioButton("Anonymous"), vault = new JRadioButton("Vault account"), session = new JRadioButton("Session password");
     final JCheckBox useTls = new JCheckBox("Use TLS"), requireTls = new JCheckBox("Require TLS (refuse logins and transfers without it)");
     final JTextField passive = new JTextField(12);
+    final DefaultListModel<String> keyLines = new DefaultListModel<>();
+    final JList<String> keys = new JList<>(keyLines);
+    final JButton addKeyFile = new JButton("Add from File…"), pasteKeys = new JButton("Paste"), removeKey = new JButton("Remove");
     final JLabel accountLabel = label("none chosen"), portHint = label(" "), warnings = label(" "), message = label(" ");
     final JButton save, cancel = new JButton("Cancel");
     private final List<ServerDefinition> others;
@@ -65,7 +80,7 @@ public final class ServerEditor extends JPanel {
     public ServerEditor(List<ServerDefinition> others, Optional<ServerDefinition> initial, boolean existing, Set<Protocol> protocols,
                         List<ServerAddresses.Nic> interfaces, boolean vaultPresent, Function<UUID, Optional<String>> accountName,
                         Supplier<CompletableFuture<Optional<Account>>> accountPicker, Supplier<Optional<Path>> folderChooser,
-                        boolean linux, Consumer<ServerDefinition> onSave, Runnable onCancel) {
+                        KeySources keySources, boolean linux, Consumer<ServerDefinition> onSave, Runnable onCancel) {
         super(new BorderLayout(0, 8));
         this.others = List.copyOf(others);
         this.initial = initial;
@@ -98,6 +113,7 @@ public final class ServerEditor extends JPanel {
             useTls.setSelected(definition.tls());
             requireTls.setSelected(definition.requireTls());
             passive.setText(definition.passiveRange().map(PortRange::token).orElse(""));
+            definition.authorizedKeys().forEach(keyLines::addElement);
             switch (definition.login()) {
                 case Login.Anonymous none -> anonymous.setSelected(true);
                 case Login.Session password -> session.setSelected(true);
@@ -133,6 +149,21 @@ public final class ServerEditor extends JPanel {
         login.add(line(vault, chooseAccount, accountLabel));
         login.add(session);
         row(form, at, "Login", login);
+        keys.setVisibleRowCount(3);
+        keys.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        keys.setCellRenderer(new DefaultListCellRenderer() {
+            { putClientProperty("html.disable", Boolean.TRUE); }
+            @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
+                return super.getListCellRendererComponent(list, keySummary(String.valueOf(value)), index, selected, focused);
+            }
+        });
+        var keyPanel = new JPanel();
+        keyPanel.setLayout(new BoxLayout(keyPanel, BoxLayout.Y_AXIS));
+        var keyScroll = new JScrollPane(keys);
+        keyScroll.setAlignmentX(LEFT_ALIGNMENT);
+        keyPanel.add(keyScroll);
+        keyPanel.add(line(addKeyFile, pasteKeys, removeKey));
+        row(form, at, "Authorized keys", keyPanel);
         row(form, at, "Security", useTls);
         row(form, at, "", requireTls);
         row(form, at, "", warnings);
@@ -164,6 +195,14 @@ public final class ServerEditor extends JPanel {
             @Override public void removeUpdate(DocumentEvent event) { refresh(); }
             @Override public void changedUpdate(DocumentEvent event) { refresh(); }
         });
+        addKeyFile.addActionListener(event -> addKeys(keySources.fromFile().get()));
+        pasteKeys.addActionListener(event -> addKeys(keySources.fromClipboard().get()));
+        removeKey.addActionListener(event -> {
+            int[] chosen = keys.getSelectedIndices();
+            for (int i = chosen.length - 1; i >= 0; i--) keyLines.remove(chosen[i]);
+            refresh();
+        });
+        keys.addListSelectionListener(event -> refresh());
         chooseFolder.addActionListener(event -> folderChooser.get().ifPresent(path -> folder.setText(path.toString())));
         chooseAccount.addActionListener(event -> accountPicker.get().thenAccept(chosen -> chosen.ifPresent(account -> {
             accountId = account.id();
@@ -203,13 +242,30 @@ public final class ServerEditor extends JPanel {
             login = new Login.Vault(accountId);
         } else login = Login.SESSION;
         ServerDefinition base = initial.orElse(null);
-        boolean same = base != null && base.protocol() == chosen;
         boolean tlsOn = chosen.allowsTls() && useTls.isSelected();
         boolean requireOn = chosen == Protocol.FTP && tlsOn && requireTls.isSelected();
         String range = passive.getText().strip();
         Optional<PortRange> passiveRange = chosen == Protocol.FTP && !range.isEmpty() ? Optional.of(PortRange.parse(range)) : Optional.empty();
         return new ServerDefinition(existing ? base.id() : UUID.randomUUID(), nameText, chosen, folderPath, selectedBind(), portValue,
-            passiveRange, writable.isSelected(), login, same ? base.authorizedKeys() : List.of(), tlsOn, requireOn, autostart.isSelected());
+            passiveRange, writable.isSelected(), login, chosen == Protocol.SFTP ? Collections.list(keyLines.elements()) : List.of(), tlsOn, requireOn, autostart.isSelected());
+    }
+
+    /** Adds every key in {@code text} that is not listed yet; bad text is explained, and nothing is added from it. */
+    private void addKeys(Optional<String> text) {
+        if (text.isEmpty()) return;
+        try {
+            for (AuthorizedKeys.Key key : AuthorizedKeys.parseAll(text.get()))
+                if (!keyLines.contains(key.line())) keyLines.addElement(key.line());
+            message.setText(" ");
+        } catch (IllegalArgumentException bad) {
+            message.setText(bad.getMessage());
+        }
+        refresh();
+    }
+
+    private static String keySummary(String line) {
+        try { return AuthorizedKeys.parse(line).summary(); }
+        catch (IllegalArgumentException unreadable) { return line; }
     }
 
     private void protocolChanged() {
@@ -222,20 +278,25 @@ public final class ServerEditor extends JPanel {
 
     private void refresh() {
         Protocol chosen = selectedProtocol();
-        boolean ftp = chosen == Protocol.FTP;
+        boolean ftp = chosen == Protocol.FTP, sftp = chosen == Protocol.SFTP;
         passive.setEnabled(ftp);
         useTls.setEnabled(chosen.allowsTls());
         if (!chosen.allowsTls()) useTls.setSelected(false);
         requireTls.setEnabled(ftp && useTls.isSelected());
         if (!requireTls.isEnabled()) requireTls.setSelected(false);
         boolean login = chosen.hasLogin();
-        anonymous.setText(login ? "Anonymous" : "No login (TFTP has none)");
-        anonymous.setEnabled(login && chosen.allowsAnonymous());
+        boolean noPassword = chosen.allowsAnonymous() || sftp; // SFTP's "anonymous" means keys only
+        anonymous.setText(!login ? "No login (TFTP has none)" : sftp ? "Keys only (no password)" : "Anonymous");
+        anonymous.setEnabled(login && noPassword);
         vault.setEnabled(login && vaultPresent);
         chooseAccount.setEnabled(login && vaultPresent);
         session.setEnabled(login);
         if (!login) anonymous.setSelected(true);
-        else if (anonymous.isSelected() && !chosen.allowsAnonymous()) (vaultPresent ? vault : session).setSelected(true);
+        else if (anonymous.isSelected() && !noPassword) (vaultPresent ? vault : session).setSelected(true);
+        keys.setEnabled(sftp);
+        addKeyFile.setEnabled(sftp);
+        pasteKeys.setEnabled(sftp);
+        removeKey.setEnabled(sftp && !keys.isSelectionEmpty());
         int value = parsedPort();
         portHint.setText(linux && value > 0 && value < 1024
             ? "Ports below 1024 need root or CAP_NET_BIND_SERVICE on Linux — try " + chosen.suggestedPort(value) : " ");
