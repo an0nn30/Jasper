@@ -139,6 +139,31 @@ class EditorTabTest {
         assertThat(tab.bannerFirst().getClientProperty("Jasper.workspace.exempt")).isNull();
     }
 
+    @Test void focusAskedForWhileLoadingArrivesWhenTheTextShows() throws Exception {
+        var tab = open(Files.writeString(folder.resolve("a.txt"), "a\n"));
+        var focused = new java.util.concurrent.atomic.AtomicInteger();
+        tab.focusAction(focused::incrementAndGet);
+        tab.focusText();
+        assertThat(focused).as("the text area is hidden while loading").hasValue(0);
+        drain();
+        assertThat(focused).as("granted once the text shows").hasValue(1);
+        tab.session().reload();
+        drain();
+        assertThat(focused).as("a later reload does not take focus again").hasValue(1);
+        tab.focusText();
+        assertThat(focused).as("a loaded tab takes focus at once").hasValue(2);
+    }
+
+    @Test void aFailedLoadDropsTheFocusRequest() throws Exception {
+        var tab = open(folder.resolve("missing.txt"));
+        var focused = new java.util.concurrent.atomic.AtomicInteger();
+        tab.focusAction(focused::incrementAndGet);
+        tab.focusText();
+        drain();
+        assertThat(tab.showingText()).isFalse();
+        assertThat(focused).hasValue(0);
+    }
+
     @Test void showsLoadingThenTheTextInItsLanguage() throws Exception {
         var tab = open(Files.writeString(folder.resolve("a.toml"), "a = 1\n"));
         assertThat(tab.showingText()).isFalse();

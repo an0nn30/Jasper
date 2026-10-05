@@ -58,6 +58,8 @@ public final class EditorTab extends JPanel {
     private final boolean debounce;
     private boolean replacing;
     private String showing = STATE;
+    private Runnable focusArea = area::requestFocusInWindow;
+    private boolean focusPending;
     private VimEditor vim;
     private int tabSize = 4;
 
@@ -141,6 +143,18 @@ public final class EditorTab extends JPanel {
 
     public DocumentSession session() { return session; }
     public VimTextArea area() { return area; }
+
+    /**
+     * Gives the text keyboard focus, or, while the document is still loading and the text is hidden, as soon as it
+     * shows. A failed load drops the request.
+     */
+    public void focusText() {
+        if (showingText()) focusArea.run();
+        else focusPending = true;
+    }
+
+    /** Replaces how the text takes focus, for tests (a component without a peer never becomes the focus owner). */
+    void focusAction(Runnable value) { focusArea = value; }
 
     /**
      * Turns Vim mode on or off for this tab; the text and its undo history stay.
@@ -283,12 +297,19 @@ public final class EditorTab extends JPanel {
                 showCard(STATE);
             }
             case FAILED -> {
+                focusPending = false;
                 stateText.setText(session.failure());
                 retry.setVisible(session.retryable());
                 dismiss.setText("Close");
                 showCard(STATE);
             }
-            case READY -> showCard(TEXT);
+            case READY -> {
+                showCard(TEXT);
+                if (focusPending) {
+                    focusPending = false;
+                    focusArea.run();
+                }
+            }
         }
         if (!area.getSyntaxEditingStyle().equals(session.style())) area.setSyntaxEditingStyle(session.style());
         area.setLineWrap(session.wrap());
