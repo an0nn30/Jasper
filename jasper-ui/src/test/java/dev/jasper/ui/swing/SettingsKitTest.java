@@ -18,6 +18,16 @@ import org.junit.jupiter.api.Test;
 
 /** Kit capabilities the Settings dialog needs: tree counts and emphasis, row search highlight, reveal and number bounds. */
 class SettingsKitTest {
+    /** Enlarged evidence is claimed only when the run's observed scale is the requested one. */
+    @Test void observedScaleMatchesTheRequestedScale() {
+        Edt.run(() -> {
+            String requested = System.getProperty("flatlaf.uiScale");
+            float observed = com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+            System.out.println("SettingsKitTest observed UI scale " + observed);
+            if (requested != null) assertThat(observed).isEqualTo(Float.parseFloat(requested));
+        });
+    }
+
     static Tree tree(int count, boolean emphasized) {
         return new Tree("pages", ControlState.READY, List.of(
             new TreeItem("terminal", "Terminal", Optional.empty(), false, List.of(
@@ -71,21 +81,21 @@ class SettingsKitTest {
                 int w = 400, h = 200;
                 var image = KitFixtures.render(view, w, h, 1);
                 var a = find(view, "a", JComponent.class); var b = find(view, "b", JComponent.class);
-                var highlight = context.theme().semantic().color(SemanticColor.SELECTION_BG).getRGB();
-                assertThat(pixel(image, view, a)).isEqualTo(highlight);
-                assertThat(pixel(image, view, b)).as("an unmatched row is not highlighted").isNotEqualTo(highlight);
+                var highlight = context.theme().semantic().color(SemanticColor.SELECTION_BG);
+                assertThat(share(image, view, a, highlight)).isGreaterThan(0.5);
+                assertThat(share(image, view, b, highlight)).as("an unmatched row is not highlighted").isLessThan(0.01);
                 assertThat(a.getAccessibleContext().getAccessibleDescription()).contains("Matches search");
 
                 var light = KitFixtures.light();
                 context.binding().publish(new ThemePair(light, light));
                 image = KitFixtures.render(view, w, h, 1);
-                assertThat(pixel(image, view, a)).as("a theme switch keeps the highlight").isEqualTo(light.semantic().color(SemanticColor.SELECTION_BG).getRGB());
+                assertThat(share(image, view, a, light.semantic().color(SemanticColor.SELECTION_BG))).as("a theme switch keeps the highlight").isGreaterThan(0.5);
 
                 view.update(stack(setting("a", false), setting("b", true)));
                 image = KitFixtures.render(view, w, h, 1);
                 assertThat(find(view, "a", JComponent.class)).as("identity kept").isSameAs(a);
-                assertThat(pixel(image, view, a)).isNotEqualTo(light.semantic().color(SemanticColor.SELECTION_BG).getRGB());
-                assertThat(pixel(image, view, b)).isEqualTo(light.semantic().color(SemanticColor.SELECTION_BG).getRGB());
+                assertThat(share(image, view, a, light.semantic().color(SemanticColor.SELECTION_BG))).isLessThan(0.01);
+                assertThat(share(image, view, b, light.semantic().color(SemanticColor.SELECTION_BG))).isGreaterThan(0.5);
             } finally { release(context); }
         });
     }
@@ -94,16 +104,23 @@ class SettingsKitTest {
         Edt.run(() -> {
             var context = KitFixtures.context();
             var row = new FormRow("row", ControlState.READY, "Name", "", new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", ""), Optional.empty(), true);
-            try (var view = new KitView(context, stack(row), e -> {})) {
-                var image = KitFixtures.render(view, 400, 80, 1);
-                assertThat(pixel(image, view, find(view, "row", JComponent.class))).isEqualTo(context.theme().semantic().color(SemanticColor.SELECTION_BG).getRGB());
+            var plain = new FormRow("plain", ControlState.READY, "Host", "", new Field("host", ControlState.READY, FieldKind.TEXT, "", "", "Host", ""), Optional.empty());
+            try (var view = new KitView(context, stack(row, plain), e -> {})) {
+                var image = KitFixtures.render(view, 400, 160, 1);
+                var highlight = context.theme().semantic().color(SemanticColor.SELECTION_BG);
+                assertThat(share(image, view, find(view, "row", JComponent.class), highlight)).as("behind the label and around the field").isGreaterThan(0.15);
+                assertThat(share(image, view, find(view, "plain", JComponent.class), highlight)).isLessThan(0.01);
             } finally { release(context); }
         });
     }
 
-    static int pixel(java.awt.image.BufferedImage image, Component root, JComponent row) {
-        var at = SwingUtilities.convertPoint(row, 3, row.getHeight() / 2, root);
-        return image.getRGB(at.x, at.y);
+    /** The share of a row's painted area in exactly {@code color}: the highlight fills the row behind its content. */
+    static double share(java.awt.image.BufferedImage image, Component root, JComponent row, java.awt.Color color) {
+        var at = SwingUtilities.convertPoint(row, 0, 0, root);
+        int hits = 0, total = 0;
+        for (int y = at.y; y < Math.min(image.getHeight(), at.y + row.getHeight()); y++)
+            for (int x = at.x; x < Math.min(image.getWidth(), at.x + row.getWidth()); x++) { total++; if (image.getRGB(x, y) == color.getRGB()) hits++; }
+        return total == 0 ? 0 : (double) hits / total;
     }
 
     static final class Focus extends DefaultKeyboardFocusManager {

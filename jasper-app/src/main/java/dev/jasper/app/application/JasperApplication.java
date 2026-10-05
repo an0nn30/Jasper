@@ -814,7 +814,8 @@ public final class JasperApplication {
                         context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
                         context -> plugins.settingsPages(context))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
-                    this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
+                    this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard,
+                    () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
         }
         boolean[] replayed = new boolean[1];

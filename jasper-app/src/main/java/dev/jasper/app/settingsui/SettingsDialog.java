@@ -23,10 +23,10 @@ import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.swing.KitContext;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 
 /**
  * The Settings dialog: a modal, singleton surface with a page tree, search, back and forward, banners and
@@ -46,14 +46,15 @@ public final class SettingsDialog {
      * @param migrate runs Migrate Config
      * @param browse opens a web page
      * @param confirmDiscard asks, over a component, whether to discard that many unsaved changes
+     * @param kit the application's chrome kit context, read on the EDT each time the dialog opens
      */
     public record Hooks(Function<SettingsEdit, CompletableFuture<ConfigService.State>> save, Supplier<ConfigService.State> state,
                         Function<Consumer<ConfigService.State>, Subscription> onState, Runnable openConfigFile, Runnable migrate,
-                        Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard) {
+                        Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard, Supplier<KitContext> kit) {
         public Hooks {
             Objects.requireNonNull(save); Objects.requireNonNull(state); Objects.requireNonNull(onState);
             Objects.requireNonNull(openConfigFile); Objects.requireNonNull(migrate); Objects.requireNonNull(browse);
-            Objects.requireNonNull(confirmDiscard);
+            Objects.requireNonNull(confirmDiscard); Objects.requireNonNull(kit);
         }
     }
 
@@ -73,6 +74,7 @@ public final class SettingsDialog {
     private String query = "";
     private boolean rejected;
     private boolean applying;
+    private Runnable bannerAction = () -> { };
 
     public SettingsDialog(AuxiliaryWindows windows, Function<PageContext, List<SettingsPage>> pages, Hooks hooks) {
         this.windows = Objects.requireNonNull(windows);
@@ -101,9 +103,11 @@ public final class SettingsDialog {
         }
         ConfigService.State state = hooks.state().get();
         draft = new SettingsDraft(state.values());
-        view = new SettingsView(this::select, this::cancel);
+        KitContext kit = hooks.kit().get();
+        view = new SettingsView(kit, this::event, this::cancel);
+        view.onEnter(this::ok);
         pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow,
-            () -> isOpen() ? surface : null)));
+            () -> isOpen() ? surface : null, () -> kit)));
         backStack.clear();
         forwardStack.clear();
         current = null;
@@ -112,27 +116,39 @@ public final class SettingsDialog {
         surface.setContent(view);
         surface.onClosing(this::mayClose);
         surface.onClosed(this::closed);
-        wire();
         draftListening = draft.onChanged(this::refreshNow);
         stateListening = hooks.onState().apply(this::accept);
         accept(state);
         view.tree.show(pages, page -> true, Map.of(), false);
+        view.tree();
         select(pageOrNull != null ? pageOrNull : lastPage != null ? lastPage : CorePages.DEFAULT_PAGE);
         surface.show();
     }
 
-    private void wire() {
-        view.back.addActionListener(event -> back());
-        view.forward.addActionListener(event -> forward());
-        view.apply.addActionListener(event -> apply());
-        view.ok.addActionListener(event -> ok());
-        view.cancel.addActionListener(event -> cancel());
-        view.help.addActionListener(event -> page(current).ifPresent(page -> hooks.browse().accept(URI.create(HELP_URL + page.helpAnchor()))));
-        view.search.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent event) { search(view.search.getText()); }
-            @Override public void removeUpdate(DocumentEvent event) { search(view.search.getText()); }
-            @Override public void changedUpdate(DocumentEvent event) { search(view.search.getText()); }
-        });
+    /** Routes the shell's kit events: search, tree navigation and the header, banner and footer buttons. */
+    private void event(UiEvent event) {
+        if (!isOpen() && surface != null) return;
+        switch (event) {
+            case UiEvent.Edited edited when edited.id().equals(SettingsView.SEARCH) -> search(edited.text());
+            case UiEvent.Selected selected when selected.id().equals(PageTree.ID) -> selected.ids().stream().findFirst().ifPresent(this::select);
+            case UiEvent.Expanded expanded when expanded.id().equals(PageTree.ID) -> {
+                view.tree.expanded(expanded.itemId(), expanded.expanded());
+                view.tree();
+            }
+            case UiEvent.Action action -> {
+                switch (action.id()) {
+                    case SettingsView.BACK -> back();
+                    case SettingsView.FORWARD -> forward();
+                    case SettingsView.APPLY -> apply();
+                    case SettingsView.OK -> ok();
+                    case SettingsView.CANCEL -> cancel();
+                    case SettingsView.HELP -> page(current).ifPresent(page -> hooks.browse().accept(URI.create(HELP_URL + page.helpAnchor())));
+                    case SettingsView.BANNER_ACTION -> bannerAction.run();
+                    default -> { }
+                }
+            }
+            default -> { }
+        }
     }
 
     SettingsView view() { return view; }
@@ -179,8 +195,9 @@ public final class SettingsDialog {
         current = page.id();
         lastPage = page.id();
         view.page(page.component());
-        view.breadcrumb.setText(breadcrumb(page));
+        view.breadcrumb(breadcrumb(page));
         view.tree.select(page.id());
+        view.tree();
         page.highlight(query);
         page.selected();
         refreshNow();
@@ -196,9 +213,11 @@ public final class SettingsDialog {
     /** Filters the tree to pages matching {@code text}, with match counts, and highlights the visible page. */
     void search(String text) {
         query = text == null ? "" : text;
+        if (!view.query().equals(query)) view.query(query);
         if (query.isBlank()) {
             view.tree.show(pages, page -> true, Map.of(), false);
             if (current != null) view.tree.select(current);
+            view.tree();
         } else {
             var counts = new LinkedHashMap<String, Integer>();
             for (SettingsPage page : pages) {
@@ -206,11 +225,13 @@ public final class SettingsDialog {
                 if (matches > 0) counts.put(page.id(), matches);
             }
             view.tree.show(pages, page -> counts.containsKey(page.id()), counts, true);
+            view.tree();
             if (!counts.containsKey(current) && !counts.isEmpty()) {
                 select(counts.keySet().iterator().next());
                 return;
             }
             if (current != null) view.tree.select(current);
+            view.tree();
         }
         page(current).ifPresent(page -> page.highlight(query));
     }
@@ -227,21 +248,24 @@ public final class SettingsDialog {
     void refreshNow() {
         if (view == null) return;
         view.tree.modifiedBy(id -> page(id).map(SettingsPage::modified).orElse(false));
+        view.tree();
         boolean blocked = rejected || !valid() || applying;
-        view.apply.setEnabled(modified() && !blocked);
-        view.ok.setEnabled(!blocked);
-        view.back.setEnabled(!backStack.isEmpty());
-        view.forward.setEnabled(!forwardStack.isEmpty());
+        view.buttons(!backStack.isEmpty(), !forwardStack.isEmpty(), modified() && !blocked, !blocked);
     }
 
     private void accept(ConfigService.State state) {
         rejected = state.rejected();
         if (!rejected) draft.rebase(state.values());
-        if (rejected) view.banner("config.toml has errors, so changes can't be saved until they're fixed.", "Open config.toml", hooks.openConfigFile());
-        else if (state.migratable()) view.banner("config.toml uses old setting names.", "Migrate Config…", hooks.migrate());
-        else view.banner(null, null, null);
+        if (rejected) banner("config.toml has errors, so changes can't be saved until they're fixed.", "Open config.toml", hooks.openConfigFile());
+        else if (state.migratable()) banner("config.toml uses old setting names.", "Migrate Config…", hooks.migrate());
+        else banner(null, null, () -> { });
         pages.forEach(SettingsPage::refresh);
         refreshNow();
+    }
+
+    private void banner(String text, String button, Runnable action) {
+        bannerAction = action;
+        view.banner(text, button);
     }
 
     /** Saves the draft, then every other modified page in tree order; stops at the first failure. */
@@ -258,7 +282,7 @@ public final class SettingsDialog {
     private void apply(Runnable done) {
         if (applying || rejected || !valid() || !modified()) return;
         applying = true;
-        view.message.setText("");
+        view.message("");
         refreshNow();
         CompletableFuture<ConfigService.State> core = draft.modified() ? hooks.save().apply(draft.edit()) : CompletableFuture.completedFuture(null);
         core.whenComplete((state, failure) -> SwingUtilities.invokeLater(() -> {
@@ -289,7 +313,7 @@ public final class SettingsDialog {
     private void failed(SettingsPage page, Throwable failure) {
         applying = false;
         Throwable cause = failure instanceof CompletionException && failure.getCause() != null ? failure.getCause() : failure;
-        view.message.setText((page == null ? "" : page.title() + ": ") + cause.getMessage());
+        view.message((page == null ? "" : page.title() + ": ") + cause.getMessage());
         refreshNow();
     }
 
@@ -311,6 +335,7 @@ public final class SettingsDialog {
         if (stateListening != null) stateListening.close();
         pages.forEach(SettingsPage::dispose);
         pages = List.of();
+        if (view != null) view.close();
         surface = null;
     }
 }

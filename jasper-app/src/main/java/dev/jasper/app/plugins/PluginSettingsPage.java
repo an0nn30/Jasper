@@ -34,7 +34,7 @@ final class PluginSettingsPage implements SettingsPage {
         this.title = title;
         this.declared = declared;
         draft = new SettingsDraft(declared.values());
-        var own = new PageContext(draft, context.navigate(), context.closeThen(), context.chooseFile(), context.changed(), context.surface());
+        var own = context.withDraft(draft);
         inner = spec(PluginRuntime.settingsPageId(pluginId), title, declared.handles()).build(own);
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());

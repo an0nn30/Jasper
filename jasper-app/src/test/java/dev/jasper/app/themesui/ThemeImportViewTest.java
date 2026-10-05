@@ -3,6 +3,7 @@ import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.themeimport.*;
 import dev.jasper.ui.themeimport.*;
 import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.app.testsupport.KitTestSupport;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -12,17 +13,35 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class ThemeImportViewTest {
+    private static JComboBox<?> decision(ThemeImportView view, String id) { return KitTestSupport.require(view.view, "decision:" + id + ".input", JComboBox.class); }
+    private static void pick(JComboBox<?> box, String label) {
+        for (int i = 0; i < box.getItemCount(); i++) if (((dev.jasper.ui.model.Option) box.getItemAt(i)).label().equals(label)) { box.setSelectedIndex(i); return; }
+        throw new AssertionError("No choice " + label);
+    }
     @Test void distinctProviderDecisionsAreLiteralAndDefaultsSafe() {
         var conversion=new ConversionResult(Theme.DARK.source().document(),List.of("<html>console fallback"),"provider");
         var old=new ThemeImporter.Item("old",conversion,Optional.of(Path.of("mine.toml")),Optional.of("hash"),false);
         var fresh=new ThemeImporter.Item("fresh",conversion,Optional.empty(),Optional.empty(),true);
         var result=new AtomicReference<Map<String,ThemeImporter.ConflictChoice>>();
-        var view=new ThemeImportView(new ThemeImporter.ImportPlan(List.of(old,fresh),List.of(new ThemeConverter.Failure("bad","broken"))),result::set,()->{});
+        var view=new ThemeImportView(KitTestSupport.context(),new ThemeImporter.ImportPlan(List.of(old,fresh),List.of(new ThemeConverter.Failure("bad","broken"))),result::set,()->{});
         assertThat(view.choices()).containsEntry("old",ThemeImporter.ConflictChoice.SKIP).containsEntry("fresh",ThemeImporter.ConflictChoice.KEEP_BOTH);
-        view.decisions.get("old").setSelectedItem(ThemeImporter.ConflictChoice.REPLACE); view.decisions.get("fresh").setSelectedItem(ThemeImporter.ConflictChoice.SKIP); view.commit.doClick();
+        assertThat(decision(view,"old").getItemCount()).as("a name already installed may be replaced").isEqualTo(3);
+        assertThat(decision(view,"fresh").getItemCount()).as("a new name cannot replace anything").isEqualTo(2);
+        assertThat(view.view.spec().root()).isInstanceOfSatisfying(dev.jasper.ui.model.Nodes.Form.class,
+            form -> assertThat(form.kind()).isEqualTo(dev.jasper.ui.model.Nodes.FormKind.SHEET));
+        pick(decision(view,"old"),"Replace"); pick(decision(view,"fresh"),"Skip");
+        var commit=KitTestSupport.require(view.view,"import",JButton.class);
+        commit.doClick();
         assertThat(result.get()).containsEntry("old",ThemeImporter.ConflictChoice.REPLACE).containsEntry("fresh",ThemeImporter.ConflictChoice.SKIP);
-        assertThat(view.details.getText()).contains("<html>console fallback", "bad", "broken"); assertThat(view.details.getClientProperty("html")).isNull();
-        var empty=new ThemeImportView(new ThemeImporter.ImportPlan(List.of(),List.of(new ThemeConverter.Failure("bad","broken"))),m->fail("commit"),()->{});
-        assertThat(empty.commit.isEnabled()).isFalse();
+        assertThat(commit.isEnabled()).as("one commit").isFalse();
+        var details=KitTestSupport.require(view.view,"details",JLabel.class);
+        assertThat(details.getText()).contains("<html>console fallback", "bad", "broken");
+        assertThat(details.getClientProperty("html")).isNull();
+        assertThat(details.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
+        var empty=new ThemeImportView(KitTestSupport.context(),new ThemeImporter.ImportPlan(List.of(),List.of(new ThemeConverter.Failure("bad","broken"))),m->fail("commit"),()->{});
+        var none=KitTestSupport.require(empty.view,"import",JButton.class);
+        assertThat(none.isEnabled()).isFalse();
+        none.doClick();
+        view.view.close(); empty.view.close();
     }
 }

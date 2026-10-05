@@ -1,22 +1,31 @@
 package dev.jasper.app.settingsui;
 
+import static dev.jasper.app.settingsui.PageKit.kit;
+import static dev.jasper.app.settingsui.PageKit.node;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.CoreSettings;
+import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.ui.model.Nodes;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JTextField;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(EdtTestExtension.class)
 class SchemaPageTest {
     private final SettingsDraft draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "[window]\ntab_height = 44\n", true).values());
     private final List<String> navigated = new ArrayList<>();
     private final int[] changes = new int[1];
-    private final PageContext context = new PageContext(draft, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> changes[0]++);
+    private final PageContext context = PageKit.context(draft, navigated::add, () -> changes[0]++);
 
     private SchemaPage page() {
         return SchemaPage.page("window", "Window").parent("appearance-behavior").anchor("window-anchor")
@@ -28,54 +37,81 @@ class SchemaPageTest {
             .build(context);
     }
 
+    private static boolean checked(SchemaPage page, String id) { return ((Nodes.Toggle) node(page, id)).checked(); }
+
     @Test void rowsShowTheDraftAndStageEdits() {
         var page = page();
         page.component();
-        var rows = page.rows();
-        assertThat(rows).hasSize(4);
-        var statusBar = (JCheckBox) rows.get(0).editor().component();
-        assertThat(statusBar.isSelected()).isTrue();
-        statusBar.doClick();
+        assertThat(page.rows()).hasSize(4);
+        assertThat(node(page, "row:window.status_bar")).isInstanceOf(Nodes.SettingRow.class);
+        assertThat(checked(page, "window.status_bar")).isTrue();
+        kit(page, "window.status_bar", JButton.class).doClick();
         assertThat(draft.value(CoreSettings.WINDOW_STATUS_BAR)).isFalse();
+        assertThat(checked(page, "window.status_bar")).isFalse();
         assertThat(page.modified()).isTrue();
         page.reset();
         assertThat(page.modified()).isFalse();
-        assertThat(statusBar.isSelected()).as("reset shows the saved value again").isTrue();
+        assertThat(checked(page, "window.status_bar")).as("reset shows the saved value again").isTrue();
+        assertThat(kit(page, "window.tab_height.input", JTextField.class).getText()).isEqualTo("44");
     }
 
     @Test void invalidValuesShowTheLoadersMessageAndAreNotStaged() {
         var page = page();
-        page.component();
-        @SuppressWarnings("unchecked") var font = (ValueEditor<String>) page.rows().get(2).editor();
-        ((javax.swing.JTextField) font.component()).setText("   ");
-        assertThat(page.rows().get(2).error().getText()).isEqualTo("Use a nonblank font name without NUL; using the default.");
-        assertThat(page.rows().get(2).error().isVisible()).isTrue();
+        var font = kit(page, "terminal.font.family.input", JTextField.class);
+        font.setText("   ");
+        var error = kit(page, "terminal.font.family.error", JLabel.class);
+        assertThat(error.getText()).isEqualTo("Use a nonblank font name without NUL; using the default.");
+        assertThat(error.isVisible()).isTrue();
+        assertThat(page.rows().get(2).error()).isEqualTo(error.getText());
         assertThat(page.valid()).isFalse();
         assertThat(draft.modified(CoreSettings.TERMINAL_FONT_FAMILY)).isFalse();
         assertThat(changes[0]).isPositive();
-        ((javax.swing.JTextField) font.component()).setText("Iosevka");
+        assertThat(font.getText()).as("the typed text stays for correcting").isEqualTo("   ");
+        font.setText("Iosevka");
         assertThat(page.valid()).isTrue();
+        assertThat(error.isVisible()).isFalse();
         assertThat(draft.value(CoreSettings.TERMINAL_FONT_FAMILY)).isEqualTo("Iosevka");
+    }
+
+    @Test void numbersRejectWhatIsNoNumberOrOutOfRangeWithoutStaging() {
+        var page = page();
+        var height = kit(page, "window.tab_height.input", JTextField.class);
+        assertThat(((Nodes.Field) node(page, "window.tab_height")).numeric()).contains(new Nodes.Numeric(20, 72, 1, 0));
+        height.setText("abc");
+        assertThat(height.getText()).as("letters never enter a number field").isEqualTo("44");
+        height.setText("");
+        assertThat(page.rows().get(1).error()).isEqualTo("Not a valid value.");
+        assertThat(page.valid()).isFalse();
+        height.setText("99");
+        assertThat(page.rows().get(1).error()).as("the schema keeps range authority").isNotBlank().isNotEqualTo("Not a valid value.");
+        assertThat(draft.value(CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(44);
+        height.setText("50");
+        assertThat(page.valid()).isTrue();
+        assertThat(draft.value(CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(50);
     }
 
     @Test void resetLinksAppearForNonDefaultValuesAndRemoveTheKey() {
         var page = page();
-        page.component();
-        JButton reset = page.rows().get(1).reset();
+        JButton reset = kit(page, "window.tab_height:reset", JButton.class);
         assertThat(reset.isVisible()).as("44 is not the default 30").isTrue();
-        assertThat(page.rows().get(0).reset().isVisible()).isFalse();
+        assertThat(reset.getAccessibleContext().getAccessibleName()).isEqualTo("Reset Tab height to default");
+        assertThat(kit(page, "window.status_bar:reset", JButton.class).isVisible()).isFalse();
         reset.doClick();
         assertThat(draft.value(CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(30);
         assertThat(draft.edit().changes()).containsEntry(CoreSettings.WINDOW_TAB_HEIGHT, Optional.empty());
         assertThat(reset.isVisible()).isFalse();
+        assertThat(kit(page, "window.tab_height.input", JTextField.class).getText()).isEqualTo("30");
     }
 
     @Test void commentsSayWhenAChangeAppliesAndIncludeNotes() {
         var page = page();
         page.component();
-        assertThat(page.rows().get(3).comment().getText()).isEqualTo("Applies to new windows");
-        assertThat(page.rows().get(2).comment().getText()).isEqualTo("Missing fonts fall back.");
-        assertThat(page.rows().get(0).comment().isVisible()).isFalse();
+        assertThat(page.rows().get(3).comment()).isEqualTo("Applies to new windows");
+        assertThat(page.rows().get(2).comment()).isEqualTo("Missing fonts fall back.");
+        assertThat(((Nodes.SettingRow) node(page, "row:window.columns")).description()).isEqualTo("Applies to new windows");
+        assertThat(kit(page, "row:window.columns.description", JComponent.class).getAccessibleContext().getAccessibleName())
+            .isEqualTo("Applies to new windows");
+        assertThat(kit(page, "row:window.status_bar.description", JComponent.class).isVisible()).isFalse();
     }
 
     @Test void searchTermsAndHighlightCoverLabelsDescriptionsAndKeywords() {
@@ -84,12 +120,32 @@ class SchemaPageTest {
         assertThat(String.join(" ", page.searchTerms())).contains("footer");
         page.component();
         page.highlight("footer");
-        assertThat(page.rows().get(0).box().highlighted()).isTrue();
-        assertThat(page.rows().get(1).box().highlighted()).isFalse();
+        assertThat(((Nodes.SettingRow) node(page, "row:window.status_bar")).highlighted()).isTrue();
+        assertThat(((Nodes.SettingRow) node(page, "row:window.tab_height")).highlighted()).isFalse();
+        assertThat(kit(page, "row:window.status_bar", JComponent.class).getAccessibleContext().getAccessibleDescription()).isEqualTo("Matches search");
         page.highlight("");
-        assertThat(page.rows().get(0).box().highlighted()).isFalse();
+        assertThat(((Nodes.SettingRow) node(page, "row:window.status_bar")).highlighted()).isFalse();
         assertThat(page.helpAnchor()).isEqualTo("window-anchor");
         assertThat(page.parent()).hasValue("appearance-behavior");
+    }
+
+    @Test void highlightingScrollsTheFirstMatchIntoViewInTheDialogsScroller() {
+        var spec = SchemaPage.page("long", "Long");
+        for (var setting : List.of(CoreSettings.WINDOW_TAB_HEIGHT, CoreSettings.WINDOW_RAIL_WIDTH, CoreSettings.WINDOW_COLUMNS,
+                CoreSettings.WINDOW_LINES, CoreSettings.TERMINAL_SCROLLBACK, CoreSettings.TERMINAL_COPY_ON_SELECT,
+                CoreSettings.PALETTE_VISIBLE_ROWS, CoreSettings.BUDDY_ENABLED, CoreSettings.TERMINAL_CURSOR_BLINK, CoreSettings.WINDOW_STATUS_BAR))
+            spec.row(setting);
+        var page = spec.build(context);
+        var scroller = new javax.swing.JScrollPane(page.component());
+        scroller.setSize(600, 160);
+        for (int i = 0; i < 3; i++) KitTestSupport.layout(scroller);
+        assertThat(scroller.getViewport().getViewPosition().y).isZero();
+        page.highlight("footer");
+        for (int i = 0; i < 2; i++) KitTestSupport.layout(scroller);
+        var row = kit(page, "row:window.status_bar", JComponent.class);
+        var bounds = javax.swing.SwingUtilities.convertRectangle(row.getParent(), row.getBounds(), scroller.getViewport().getView());
+        assertThat(scroller.getViewport().getViewRect().intersects(bounds)).as("the matching row is visible").isTrue();
+        assertThat(scroller.getViewport().getViewPosition().y).isPositive();
     }
 
     @Test void actionRowsReadTheirTextAndEnablementOnRefresh() {
@@ -99,7 +155,9 @@ class SchemaPageTest {
             .action(() -> "Rewrite old names.", new SchemaPage.Button("Migrate Config…", () -> runs[0]++, () -> enabled[0]))
             .build(context);
         page.component();
-        JButton migrate = page.actionButtons().getFirst();
+        JButton migrate = kit(page, page.actionButtons().getFirst(), JButton.class);
+        assertThat(migrate.getText()).isEqualTo("Migrate Config…");
+        assertThat(KitTestSupport.texts(page.component())).contains("Rewrite old names.");
         assertThat(migrate.isEnabled()).isFalse();
         enabled[0] = true;
         page.refresh();
@@ -111,8 +169,10 @@ class SchemaPageTest {
     @Test void groupPagesLinkToTheirChildren() {
         var child = page();
         var group = new GroupPage("appearance-behavior", "Appearance & Behavior", Optional.empty(), false, () -> List.of(child), context);
-        var link = (JButton) ((javax.swing.JPanel) group.component()).getComponent(1);
+        var link = KitTestSupport.require(group.component(), "link:window", JButton.class);
         assertThat(link.getText()).isEqualTo("Window");
+        assertThat(((Nodes.Button) ((Nodes.Stack) group.view().spec().root()).children().get(1)).kind()).isEqualTo(Nodes.ButtonKind.LINK);
+        assertThat(KitTestSupport.texts(group.component())).contains("Appearance & Behavior");
         link.doClick();
         assertThat(navigated).containsExactly("window");
         assertThat(group.modified()).isFalse();
@@ -125,12 +185,11 @@ class SchemaPageTest {
             .row(CoreSettings.WINDOW_STATUS_BAR)
             .row(CoreSettings.WINDOW_STATUS_BAR_HEIGHT, Editors.integer("px")).enabledWhen(d -> d.value(CoreSettings.WINDOW_STATUS_BAR))
             .build(context);
-        page.component();
-        var height = page.rows().get(1).editor().component();
+        var height = kit(page, "window.status_bar_height.input", JTextField.class);
         assertThat(height.isEnabled()).isTrue();
-        ((JCheckBox) page.rows().get(0).editor().component()).doClick();
-        assertThat(height.isEnabled()).isFalse();
-        assertThat(((java.awt.Container) height).getComponent(0).isEnabled()).as("its children too").isFalse();
+        kit(page, "window.status_bar", JButton.class).doClick();
+        assertThat(node(page, "window.status_bar_height").state().enabled()).isFalse();
+        assertThat(height.isEnabled()).as("the input itself").isFalse();
         page.reset();
         assertThat(height.isEnabled()).isTrue();
     }
@@ -143,6 +202,7 @@ class SchemaPageTest {
         var page = spec.build(context);
         page.component();
         assertThat(page.rows()).hasSize(1);
+        assertThat(KitTestSupport.find(page.component(), "row:window.native_decorations", JComponent.class)).isNull();
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.WINDOW_NATIVE_DECORATIONS.label());
     }
 
@@ -156,48 +216,32 @@ class SchemaPageTest {
             .section("Size")
             .row(CoreSettings.WINDOW_COLUMNS);
         var page = spec.build(context);
-        assertThat(sectionTitles(page.component())).containsExactly("Bars", "Empty", "Size");
+        assertThat(PageKit.sectionTitles(page)).containsExactly("Bars", "Empty", "Size");
         assertThat(page.searchTerms()).contains("Bars", "Empty", "Size").doesNotContain("Elsewhere");
     }
 
-    static List<String> sectionTitles(java.awt.Component component) {
-        var titles = new ArrayList<String>();
-        if (component instanceof TitledSeparator separator) titles.add(separator.title.getText());
-        else if (component instanceof java.awt.Container container)
-            for (var child : container.getComponents()) titles.addAll(sectionTitles(child));
-        return titles;
-    }
-
-    private static void layOut(java.awt.Component component) {
-        component.doLayout();
-        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) layOut(child);
-    }
-
-    private static List<javax.swing.JScrollPane> scrolls(java.awt.Component component) {
-        var found = new ArrayList<javax.swing.JScrollPane>();
-        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) {
-            if (child instanceof javax.swing.JScrollPane scroll) found.add(scroll); else found.addAll(scrolls(child));
-        }
-        return found;
-    }
-
     @Test void aNarrowPageScrollsSidewaysRatherThanSquashingItsLists() {
+        draft.rebase(ConfigLoader.parse(Path.of("config.toml"), "[terminal.shell]\nargs = ['-l', '-i']\n[terminal.env]\nA = '1'\n", true).values());
         var page = SchemaPage.page("shell", "Shell")
             .row(CoreSettings.TERMINAL_SHELL_ARGS, Editors.textList())
             .row(CoreSettings.TERMINAL_ENV, Editors.table())
             .build(context);
         var viewport = new javax.swing.JScrollPane(page.component());
+        var heights = new ArrayList<Integer>();
         for (int width : new int[]{300, 1400}) {
             viewport.setSize(width, 900);
-            layOut(viewport);
-            assertThat(scrolls(page.component())).as("at " + width + " px").hasSize(2)
-                .allSatisfy(scroll -> assertThat(scroll.getSize()).isEqualTo(scroll.getPreferredSize()));
+            for (int i = 0; i < 3; i++) KitTestSupport.layout(viewport);
+            var list = kit(page, "terminal.shell.args", JComponent.class);
+            assertThat(list.getHeight()).as("at " + width + " px the list keeps its rows").isPositive();
+            heights.add(list.getHeight());
         }
-        viewport.setSize(300, 900);
-        layOut(viewport);
+        assertThat(heights.get(0)).as("narrowing never squashes the list").isEqualTo(heights.get(1));
+        int minimum = page.component().getMinimumSize().width;
+        viewport.setSize(Math.max(1, minimum - 1), 900);
+        KitTestSupport.layout(viewport);
         assertThat(((javax.swing.Scrollable) page.component()).getScrollableTracksViewportWidth()).as("scrolls sideways").isFalse();
         viewport.setSize(1400, 900);
-        layOut(viewport);
+        KitTestSupport.layout(viewport);
         assertThat(((javax.swing.Scrollable) page.component()).getScrollableTracksViewportWidth()).isTrue();
     }
 
@@ -209,11 +253,16 @@ class SchemaPageTest {
         assertThat(page.component().getPreferredSize().width).isEqualTo(plain);
         var viewport = new javax.swing.JScrollPane(page.component());
         viewport.setSize(500, 900);
-        layOut(viewport);
-        layOut(viewport);
-        var comment = page.rows().get(0).comment();
+        for (int i = 0; i < 3; i++) KitTestSupport.layout(viewport);
+        var comment = kit(page, "row:terminal.font.family.description", JComponent.class);
         assertThat(comment.getWidth()).isLessThanOrEqualTo(500);
         assertThat(comment.getHeight()).as("several lines").isGreaterThan(3 * comment.getFontMetrics(comment.getFont()).getHeight());
     }
 
+    @Test void disposingClosesThePagesKitView() {
+        var page = page();
+        page.component();
+        page.dispose();
+        assertThat(page.view().isClosed()).isTrue();
+    }
 }

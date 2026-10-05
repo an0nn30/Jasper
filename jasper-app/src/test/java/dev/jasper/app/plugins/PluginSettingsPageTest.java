@@ -42,7 +42,7 @@ class PluginSettingsPageTest {
     private final int[] changes = {0};
     private PluginHost host;
     private final PageContext context = new PageContext(null, navigated::add, Runnable::run, (title, initial) -> Optional.empty(),
-        () -> changes[0]++);
+        () -> changes[0]++, () -> null, dev.jasper.app.testsupport.KitTestSupport::context);
 
     @BeforeEach void open() {
         host = AppContractTest.host(data, Duration.ofMillis(200), onEdtValue(Contributions::new), new AtomicBoolean(true),

@@ -1,14 +1,12 @@
 package dev.jasper.app.settingsui;
 
-import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.lifecycle.Subscription;
-import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.settings.Setting;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -17,15 +15,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.Scrollable;
-import javax.swing.UIManager;
 
-/** A page generated from a list of settings: IntelliJ-style rows of label, control, comment and Reset. EDT only. */
+/**
+ * A page generated from a list of settings: kit settings rows of title, comment, typed control and Reset, grouped in
+ * sections. The page owns its kit view and the editors' state; the dialog's draft owns the values. EDT only.
+ */
 public final class SchemaPage implements SettingsPage {
     /** A button on an action row; {@code enabled} is read again on every refresh. */
     public record Button(String label, Runnable action, BooleanSupplier enabled) { }
@@ -67,7 +62,7 @@ public final class SchemaPage implements SettingsPage {
         public Spec enabledWhen(Predicate<SettingsDraft> condition) {
             if (items.isEmpty() || !(items.getLast() instanceof RowItem)) throw new IllegalStateException("A condition follows a row");
             RowItem row = (RowItem) items.removeLast();
-            items.add(new RowItem(row.setting(), row.editor(), row.note(), java.util.Objects.requireNonNull(condition, "condition"), row.shown()));
+            items.add(new RowItem(row.setting(), row.editor(), row.note(), Objects.requireNonNull(condition, "condition"), row.shown()));
             return this;
         }
 
@@ -92,58 +87,59 @@ public final class SchemaPage implements SettingsPage {
         public SchemaPage build(PageContext context) { return new SchemaPage(this, context); }
     }
 
-    /** One row's parts; package-private for tests. */
+    /** One row's state; package-private for tests. */
     static final class Row<T> {
         private final Setting<T> setting;
         private final ValueEditor<T> editor;
         private final Predicate<SettingsDraft> enabled;
-        private final HighlightBox box;
-        private final WrappingText comment = new WrappingText("Label.disabledForeground", Color.GRAY, 1f);
-        private final WrappingText error = new WrappingText("Jasper.configErrorForeground", Color.RED, 0f);
-        private final JButton reset = new JButton();
+        private final String comment;
         private final String searchText;
         private boolean invalid;
-        private boolean shownEnabled = true;
+        private String error = "";
+        private boolean highlighted;
+        private boolean resettable;
 
         Row(Setting<T> setting, ValueEditor<T> editor, String note, List<String> terms, Predicate<SettingsDraft> enabled) {
             this.setting = setting;
             this.editor = editor;
             this.enabled = enabled;
-            JComponent labelled = editor.labelled() ? editor.component() : label(setting.label() + ":");
-            box = new HighlightBox(labelled);
             String applies = switch (setting.applies()) {
                 case LIVE -> "";
                 case NEW_PANES -> "Applies to new panes";
                 case NEW_WINDOWS -> "Applies to new windows";
                 case RESTART -> "Takes effect after restart";
             };
-            String text = applies.isEmpty() ? note : note.isEmpty() ? applies : applies + ". " + note;
-            comment.setText(text);
-            comment.setVisible(!text.isEmpty());
-            error.setVisible(false);
-            reset.setIcon(AppIcons.bundled("general/reset"));
-            reset.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_BORDERLESS);
-            reset.setToolTipText("Reset to default");
-            reset.getAccessibleContext().setAccessibleName("Reset " + setting.label() + " to default");
+            comment = applies.isEmpty() ? note : note.isEmpty() ? applies : applies + ". " + note;
             searchText = String.join(" ", List.of(setting.label(), setting.description(), String.join(" ", setting.keywords()),
                 String.join(" ", terms)));
         }
 
         Setting<T> setting() { return setting; }
         ValueEditor<T> editor() { return editor; }
-        JButton reset() { return reset; }
-        WrappingText error() { return error; }
-        WrappingText comment() { return comment; }
-        HighlightBox box() { return box; }
+        /** The control's node id: the setting's name. */
+        String id() { return setting.name(); }
+        /** The settings row's node id. */
+        String rowId() { return "row:" + setting.name(); }
+        /** The Reset button's node id and action. */
+        String resetId() { return setting.name() + ":reset"; }
+        String comment() { return comment; }
+        String error() { return error; }
+        boolean highlighted() { return highlighted; }
+        boolean resettable() { return resettable; }
+    }
+
+    private record ActionRow(ActionItem item, int index) {
+        String buttonId(int button) { return "action-" + index + "-" + button; }
     }
 
     private final Spec spec;
     private final PageContext context;
     private final List<Row<?>> rows = new ArrayList<>();
-    private final List<JButton> actionButtons = new ArrayList<>();
-    private final List<Runnable> actionRefreshers = new ArrayList<>();
-    private JPanel panel;
+    private final List<ActionRow> actions = new ArrayList<>();
+    private KitView view;
+    private PageBody body;
     private Subscription listening;
+    private boolean disposed;
 
     private SchemaPage(Spec spec, PageContext context) { this.spec = spec; this.context = context; }
 
@@ -182,149 +178,113 @@ public final class SchemaPage implements SettingsPage {
     }
 
     List<Row<?>> rows() { return rows; }
-    List<JButton> actionButtons() { return actionButtons; }
+    /** The action buttons' node ids, in page order; for tests. */
+    List<String> actionButtons() {
+        var ids = new ArrayList<String>();
+        for (var action : actions) for (int i = 0; i < action.item().buttons().size(); i++) ids.add(action.buttonId(i));
+        return ids;
+    }
+    /** The page's kit view once built; for tests. */
+    KitView view() { return view; }
 
     @Override public JComponent component() {
-        if (panel != null) return panel;
-        panel = new WidthTracking();
-        panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
-        int y = 0;
-        boolean first = true;
+        if (body != null) return body;
+        int actionIndex = 0;
+        for (Item item : spec.items) {
+            if (item instanceof RowItem row && row.shown()) addRow(row);
+            else if (item instanceof ActionItem action) actions.add(new ActionRow(action, actionIndex++));
+        }
+        listening = context.draft().onChanged(this::showValues);
+        showValues(false);
+        view = new KitView(context.kit().get(), viewSpec(), this::event);
+        body = new PageBody(view);
+        return body;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void addRow(RowItem item) {
+        var setting = (Setting<T>) item.setting();
+        var factory = (Editors.Factory<T>) item.editor();
+        ValueEditor<T> editor = factory.build().apply(setting, context);
+        rows.add(new Row<>(setting, editor, item.note(), factory.terms(), item.enabled()));
+        editor.onChanged(this::render);
+    }
+
+    /** The page as kit sections of settings rows and action rows. */
+    ViewSpec viewSpec() {
+        var children = new ArrayList<Nodes.Node>();
+        var group = new ArrayList<Nodes.Node>();
+        String title = null;
+        int sections = 0, rowIndex = 0, actionIndex = 0;
         for (Item item : spec.items) {
             switch (item) {
                 case SectionItem section -> {
                     if (!sectionShown(section)) continue;
-                    var c = constraints(0, y++, 3);
-                    c.fill = GridBagConstraints.HORIZONTAL;
-                    c.insets = new Insets(first ? 0 : 14, 0, 6, 0);
-                    panel.add(new TitledSeparator(section.title()), c);
+                    close(children, group, title, sections++);
+                    title = section.title();
                 }
-                case RowItem row -> { if (row.shown()) y = addRow(row, y); }
-                case ActionItem action -> y = addAction(action, y);
+                case RowItem row -> { if (row.shown()) group.add(rowNode(rows.get(rowIndex++))); }
+                case ActionItem ignored -> group.add(actionNode(actions.get(actionIndex++)));
             }
-            first = false;
         }
-        var filler = constraints(0, y, 3);
-        filler.weighty = 1;
-        filler.weightx = 1;
-        filler.fill = GridBagConstraints.BOTH;
-        var space = new JPanel();
-        space.setOpaque(false);
-        panel.add(space, filler);
-        listening = context.draft().onChanged(this::showValues);
-        showValues();
-        refresh();
-        return panel;
+        close(children, group, title, sections);
+        return new ViewSpec(new Nodes.Stack("page:" + spec.id, ControlState.READY, Nodes.LayoutRole.DETAIL, children));
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> int addRow(RowItem item, int y) {
-        var setting = (Setting<T>) item.setting();
-        var factory = (Editors.Factory<T>) item.editor();
-        ValueEditor<T> editor = factory.build().apply(setting, context);
-        var row = new Row<>(setting, editor, item.note(), factory.terms(), item.enabled());
-        rows.add(row);
-        if (editor.labelled()) {
-            var c = constraints(0, y, 2);
-            c.insets = new Insets(4, 0, 2, 0);
-            panel.add(row.box, c);
-        } else {
-            var label = constraints(0, y, 1);
-            label.insets = new Insets(4, 0, 2, 12);
-            panel.add(row.box, label);
-            var control = constraints(1, y, 1);
-            control.insets = new Insets(4, 0, 2, 0);
-            panel.add(new Natural(editor.component()), control);
+    /** Ends a section: its title over a settings card of its rows; an empty untitled run adds nothing. */
+    private static void close(List<Nodes.Node> children, List<Nodes.Node> group, String title, int index) {
+        if (title == null && group.isEmpty()) return;
+        Nodes.Node body = new Nodes.Card("card-" + index, ControlState.READY, Nodes.CardKind.SETTINGS, List.copyOf(group));
+        children.add(title == null ? body : new Nodes.Section("section-" + index, ControlState.READY, title, body));
+        group.clear();
+    }
+
+    private Nodes.Node rowNode(Row<?> row) {
+        boolean enabled = row.enabled.test(context.draft());
+        var state = new ControlState(true, enabled, false, row.error);
+        var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "refresh",
+            Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default");
+        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(row.editor.node(row.id(), state), reset));
+        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.setting.label(), row.comment, control, false, row.highlighted);
+    }
+
+    private Nodes.Node actionNode(ActionRow action) {
+        var buttons = new ArrayList<Nodes.Node>();
+        for (int i = 0; i < action.item().buttons().size(); i++) {
+            var button = action.item().buttons().get(i);
+            buttons.add(new Nodes.Button(action.buttonId(i), new ControlState(true, button.enabled().getAsBoolean(), false, ""), button.label(), "",
+                Nodes.ButtonKind.SECONDARY, action.buttonId(i), ""));
         }
-        var reset = constraints(2, y, 1);
-        reset.weightx = 1;
-        reset.insets = new Insets(4, 4, 2, 0);
-        panel.add(row.reset, reset);
-        int column = editor.labelled() ? 0 : 1;
-        var comment = constraints(column, y + 1, 3 - column);
-        comment.fill = GridBagConstraints.HORIZONTAL;
-        comment.insets = new Insets(0, editor.labelled() ? 24 : 0, 2, 0);
-        panel.add(row.comment, comment);
-        var error = constraints(column, y + 2, 3 - column);
-        error.fill = GridBagConstraints.HORIZONTAL;
-        error.insets = new Insets(0, editor.labelled() ? 24 : 0, 4, 0);
-        panel.add(row.error, error);
-        editor.onEdit(() -> edited(row));
-        row.reset.addActionListener(event -> {
-            row.invalid = false;
-            row.error.setVisible(false);
-            context.draft().stage(setting, Optional.empty());
-            context.changed().run();
-        });
-        return y + 3;
+        return new Nodes.Stack("action-" + action.index(), ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Text("action-" + action.index() + ":text", ControlState.READY, action.item().text().get(), Nodes.TextRole.DESCRIPTION),
+            new Nodes.Stack("action-" + action.index() + ":buttons", ControlState.READY, Nodes.LayoutRole.INLINE, buttons)));
     }
 
-    private int addAction(ActionItem action, int y) {
-        var text = new JLabel();
-        text.putClientProperty("html.disable", true);
-        var c = constraints(0, y, 3);
-        c.insets = new Insets(8, 0, 2, 0);
-        panel.add(text, c);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
-        buttons.setOpaque(false);
-        var made = new ArrayList<JButton>();
-        for (Button button : action.buttons()) {
-            var control = new JButton(button.label());
-            control.addActionListener(event -> button.action().run());
-            buttons.add(control);
-            made.add(control);
-            actionButtons.add(control);
+    private void render() {
+        if (view != null && !disposed && !view.isClosed()) view.update(viewSpec());
+    }
+
+    /** Routes a kit event to the row or action it names. */
+    void event(UiEvent event) {
+        if (disposed) return;
+        if (event instanceof UiEvent.Action action) {
+            for (var row : rows) if (action.id().equals(row.resetId())) { reset(row); return; }
+            for (var actionRow : actions)
+                for (int i = 0; i < actionRow.item().buttons().size(); i++)
+                    if (action.id().equals(actionRow.buttonId(i))) { actionRow.item().buttons().get(i).action().run(); render(); return; }
         }
-        var b = constraints(0, y + 1, 3);
-        b.insets = new Insets(2, 0, 6, 0);
-        panel.add(buttons, b);
-        actionRefreshers.add(() -> {
-            text.setText(action.text().get());
-            for (int i = 0; i < made.size(); i++) made.get(i).setEnabled(action.buttons().get(i).enabled().getAsBoolean());
-        });
-        return y + 2;
-    }
-
-    /**
-     * The page follows the dialog's width while it fits; narrower than its editors need, it scrolls sideways rather than
-     * squashing them.
-     */
-    private static final class WidthTracking extends JPanel implements Scrollable {
-        WidthTracking() { super(new GridBagLayout()); }
-        @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
-        @Override public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction) { return 16; }
-        @Override public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction) { return visible.height; }
-        @Override public boolean getScrollableTracksViewportWidth() {
-            return !(getParent() instanceof javax.swing.JViewport viewport) || viewport.getWidth() >= getMinimumSize().width;
+        for (var row : rows) {
+            if (row.editor.event(row.id(), event)) { edited(row); render(); return; }
         }
-        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+        render();
     }
 
-    /**
-     * Holds an editor at its preferred size. GridBagLayout lays every child out at its minimum size once the page is
-     * narrower than it prefers, which squashed lists and tables to a single line.
-     */
-    private static final class Natural extends JPanel {
-        Natural(JComponent editor) {
-            super(new java.awt.BorderLayout());
-            setOpaque(false);
-            add(editor);
-        }
-        @Override public java.awt.Dimension getMinimumSize() { return getPreferredSize(); }
-    }
-
-    private static GridBagConstraints constraints(int x, int y, int width) {
-        var c = new GridBagConstraints();
-        c.gridx = x; c.gridy = y; c.gridwidth = width;
-        c.anchor = GridBagConstraints.WEST;
-        return c;
-    }
-
-    private static JLabel label(String text) {
-        var label = new JLabel(text);
-        label.putClientProperty("html.disable", true);
-        return label;
+    private <T> void reset(Row<T> row) {
+        row.invalid = false;
+        row.error = "";
+        context.draft().stage(row.setting, Optional.empty());
+        context.changed().run();
+        render();
     }
 
     private <T> void edited(Row<T> row) {
@@ -348,19 +308,23 @@ public final class SchemaPage implements SettingsPage {
 
     private void invalid(Row<?> row, String message) {
         row.invalid = true;
-        row.error.setText(message);
-        row.error.setVisible(true);
+        row.error = message;
         context.changed().run();
     }
 
     private void valid(Row<?> row) {
         boolean was = row.invalid;
         row.invalid = false;
-        row.error.setVisible(false);
+        row.error = "";
         if (was) context.changed().run();
     }
 
-    private void showValues() { for (Row<?> row : rows) showValue(row); }
+    private void showValues() { showValues(true); }
+
+    private void showValues(boolean render) {
+        for (Row<?> row : rows) showValue(row);
+        if (render) render();
+    }
 
     private <T> void showValue(Row<T> row) {
         T value = context.draft().value(row.setting);
@@ -369,19 +333,7 @@ public final class SchemaPage implements SettingsPage {
             try { current = row.editor.value(); } catch (RuntimeException unreadable) { current = null; }
             if (!Objects.equals(current, value)) row.editor.show(value);
         }
-        row.reset.setVisible(!Objects.equals(value, row.setting.defaultValue()));
-        // Only on a change: an editor that disables a part of itself (the optional size's spinner) keeps it disabled.
-        boolean enabled = row.enabled.test(context.draft());
-        if (enabled != row.shownEnabled) {
-            row.shownEnabled = enabled;
-            enable(row.editor.component(), enabled);
-        }
-    }
-
-    /** Swing does not disable a container's children with it. */
-    private static void enable(java.awt.Component component, boolean enabled) {
-        component.setEnabled(enabled);
-        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) enable(child, enabled);
+        row.resettable = !Objects.equals(value, row.setting.defaultValue());
     }
 
     @Override public boolean modified() {
@@ -391,31 +343,34 @@ public final class SchemaPage implements SettingsPage {
     @Override public boolean valid() { return rows.stream().noneMatch(row -> row.invalid); }
 
     @Override public void reset() {
-        for (Row<?> row : rows) { row.invalid = false; row.error.setVisible(false); }
+        for (Row<?> row : rows) { row.invalid = false; row.error = ""; }
         context.draft().reset(spec.settings());
         showValues();
     }
 
     @Override public CompletableFuture<Void> apply() { return CompletableFuture.completedFuture(null); }
 
+    /** Highlights the rows matching {@code query} and scrolls the first into view, leaving focus with the search. */
     @Override public void highlight(String query) {
-        JComponent first = null;
+        Row<?> first = null;
         for (Row<?> row : rows) {
-            boolean match = SearchText.matches(row.searchText, query);
-            row.box.setHighlighted(match);
-            if (match && first == null) first = row.box;
+            row.highlighted = SearchText.matches(row.searchText, query);
+            if (row.highlighted && first == null) first = row;
         }
-        if (first != null) first.scrollRectToVisible(new java.awt.Rectangle(0, 0, first.getWidth(), first.getHeight()));
+        render();
+        if (first != null && view != null && !view.isClosed()) view.reveal(first.rowId());
     }
 
     @Override public void refresh() {
-        actionRefreshers.forEach(Runnable::run);
         for (Row<?> row : rows) row.editor.refresh();
-        if (panel != null) showValues();
+        if (body != null) showValues();
     }
 
     @Override public void dispose() {
+        if (disposed) return;
+        disposed = true;
         if (listening != null) listening.close();
         for (Row<?> row : rows) row.editor.dispose();
+        if (view != null) view.close();
     }
 }

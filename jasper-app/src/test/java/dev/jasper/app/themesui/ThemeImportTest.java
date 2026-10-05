@@ -34,7 +34,7 @@ class ThemeImportTest {
         edt(() -> {
             windows = new AuxiliaryWindows(UiState.inMemory(), s -> new AuxiliarySurface.Shell(() -> {}, () -> {}, () -> {}, t -> {}, () -> new Rectangle(0,0,10,10), (t,p) -> Optional.empty()));
             owner = windows.window("settings", "Settings", new Dimension(600,600), false); owner.show();
-            context = new PageContext(draft, s -> {}, Runnable::run, (t,p) -> Optional.ofNullable(chosen), () -> {}, () -> owner);
+            context = new PageContext(draft, s -> {}, Runnable::run, (t,p) -> Optional.ofNullable(chosen), () -> {}, () -> owner, dev.jasper.app.testsupport.KitTestSupport::context);
             imports = new ThemeImport(context, home, windows, () -> { assertThat(SwingUtilities.isEventDispatchThread()).isTrue(); refreshes.incrementAndGet(); afterRefresh.run(); return CompletableFuture.completedFuture(null); },
                 worker);
         });
@@ -45,7 +45,7 @@ class ThemeImportTest {
     static void edt(Runnable run) throws Exception { var thrown=new AtomicReference<Throwable>(); SwingUtilities.invokeAndWait(() -> {try{run.run();}catch(Throwable t){thrown.set(t);}}); if(thrown.get()!=null)throw new AssertionError(thrown.get()); }
     void click(String label) throws Exception { edt(() -> { var buttons = buttons(windows.open().getLast().holder()); buttons.stream().filter(b -> b.getText().equals(label)).findFirst().orElseThrow().doClick(); }); }
     static List<JButton> buttons(Container root){var out=new ArrayList<JButton>();for(var c:root.getComponents()){if(c instanceof JButton b)out.add(b);if(c instanceof Container nested)out.addAll(buttons(nested));}return out;}
-    static List<String> texts(Container root){var out=new ArrayList<String>();for(var c:root.getComponents()){if(c instanceof javax.swing.text.JTextComponent t)out.add(t.getText());if(c instanceof Container nested)out.addAll(texts(nested));}return out;}
+    static List<String> texts(Container root){return dev.jasper.app.testsupport.KitTestSupport.texts(root);}
     @Test void importUsesFrozenPlanAndBusyGatesDoubleClickWithoutConfigWrite() throws Exception {
         chosen=source("Example"); Files.writeString(home.resolve("config.toml"), "# untouched\n");
         edt(() -> { imports.importThemes(report::set); imports.importThemes(report::set); }); assertThat(worker.jobs).hasSize(1);

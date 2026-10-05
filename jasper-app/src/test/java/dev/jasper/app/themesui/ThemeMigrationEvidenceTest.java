@@ -14,14 +14,17 @@ import static dev.jasper.sdk.contracts.ThemeMigrationCapture.save;
 class ThemeMigrationEvidenceTest {
     @Test void capturesThemeImportConflictAndFailureWithoutFilePublication() throws Exception {
         ThemeMigrationCapture.themes(theme -> {
-            new dev.jasper.app.appearance.ThemeController().configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var controller = new dev.jasper.app.appearance.ThemeController();
+            controller.configure(theme.equals("dark") ? dev.jasper.app.appearance.Theme.DARK : dev.jasper.app.appearance.Theme.JASPER_LIGHT);
+            var kit = controller.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
             var conversion = new ConversionResult(Theme.DARK.source().document(), List.of("Fixture import warning"), "fixture-theme");
             var old = new ThemeImporter.Item("fixture", conversion, Optional.of(Path.of("fixture.toml")), Optional.of("hash"), false);
-            var view = new ThemeImportView(new ThemeImporter.ImportPlan(List.of(old), List.of()), choices -> { }, () -> { });
-            save("theme-import", theme, "conflict", view, 680, 440);
-            view.commit.doClick(); save("theme-import", theme, "pending-commit", view, 680, 440);
-            var failed = new ThemeImportView(new ThemeImporter.ImportPlan(List.of(), List.of(new ThemeConverter.Failure("fixture-theme", "Fixture parse failure"))), choices -> { }, () -> { });
-            save("theme-import", theme, "failure", failed, 680, 440);
+            var view = new ThemeImportView(kit, new ThemeImporter.ImportPlan(List.of(old), List.of()), choices -> { }, () -> { });
+            save("theme-import", theme, "conflict", view.view, 680, 440);
+            dev.jasper.app.testsupport.KitTestSupport.require(view.view, "import", javax.swing.JButton.class).doClick(); save("theme-import", theme, "pending-commit", view.view, 680, 440);
+            var failed = new ThemeImportView(kit, new ThemeImporter.ImportPlan(List.of(), List.of(new ThemeConverter.Failure("fixture-theme", "Fixture parse failure"))), choices -> { }, () -> { });
+            save("theme-import", theme, "failure", failed.view, 680, 440);
+            view.view.close(); failed.view.close(); controller.close();
         });
     }
 }

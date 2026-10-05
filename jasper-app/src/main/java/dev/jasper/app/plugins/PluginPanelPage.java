@@ -57,7 +57,7 @@ final class PluginPanelPage implements SettingsPage {
         this.pluginId = pluginId; this.title = title; this.declared = declared; this.panel = panel;
         this.containment = containment; this.context = context;
         draft = new SettingsDraft(declared.values());
-        own = new PageContext(draft, context.navigate(), context.closeThen(), context.chooseFile(), context.changed(), context.surface());
+        own = context.withDraft(draft);
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
             refreshRows();

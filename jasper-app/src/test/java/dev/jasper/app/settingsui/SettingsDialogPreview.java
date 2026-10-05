@@ -106,7 +106,8 @@ public final class SettingsDialogPreview {
                         return List.copyOf(pages);
                     }),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,
-                        listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true));
+                        listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true,
+                        () -> themes[0].appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
                 SwingUtilities.invokeAndWait(() -> {
                     themes[0].configure(theme, new UiFontConfig("system", size));
                     dialog.open(null, "appearance");
@@ -120,9 +121,9 @@ public final class SettingsDialogPreview {
                     render(holder[0], output.resolve("shell-narrow-" + suffix), 760);
                     dialog.select("system");
                     render(holder[0], output.resolve("system-" + suffix));
-                    dialog.view().search.setText("font");
+                    searchField(dialog).setText("font");
                     render(holder[0], output.resolve("search-" + suffix));
-                    dialog.view().search.setText("");
+                    searchField(dialog).setText("");
                     dialog.draft().stage(dev.jasper.app.config.CoreSettings.TERMINAL_BELL, Optional.of(dev.jasper.terminal.config.BellMode.NONE));
                     dialog.select("terminal");
                     render(holder[0], output.resolve("modified-" + suffix));
@@ -131,9 +132,9 @@ public final class SettingsDialogPreview {
                 });
                 SwingUtilities.invokeAndWait(() -> {
                     render(holder[0], output.resolve("keymap-" + suffix));
-                    dialog.view().search.setText("paste");
+                    searchField(dialog).setText("paste");
                     render(holder[0], output.resolve("keymap-search-" + suffix));
-                    dialog.view().search.setText("");
+                    searchField(dialog).setText("");
                     dialog.select("plugins");
                 });
                 await(() -> dialog.pages().stream().filter(page -> page.id().equals("plugins")).findFirst().orElseThrow()
@@ -165,6 +166,8 @@ public final class SettingsDialogPreview {
             SwingUtilities.invokeAndWait(windows::close);
         }
     }
+
+    private static javax.swing.JTextField searchField(SettingsDialog dialog) { return dialog.view().control("search.input", javax.swing.JTextField.class); }
 
     /** Polls a condition on the EDT, so runtime callbacks queued there can run in between. */
     private static void await(BooleanSupplier onEdt) throws Exception {

@@ -11,14 +11,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(dev.jasper.app.testsupport.EdtTestExtension.class)
 class CorePagesTest {
     private final List<String> calls = new ArrayList<>();
     private final CorePages.SystemActions system = new CorePages.SystemActions(() -> Path.of("/home/me/.config/jasper/config.toml"),
         () -> calls.add("open"), () -> calls.add("reveal"), () -> calls.add("reload"), () -> calls.add("migrate"), () -> true);
     private static final ThemeChoices JASPER_DARK = ThemeChoices.of(() -> List.of("Jasper Dark"));
-    private final PageContext context = new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
-        id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { });
+    private final PageContext context = PageKit.context(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
+        id -> { }, () -> { });
 
     @Test void everyCoreSettingIsOnExactlyOnePage() {
         var shown = new ArrayList<Setting<?>>();
@@ -53,7 +55,7 @@ class CorePagesTest {
             .contains(CoreSettings.UI_FONT_FAMILY, CoreSettings.UI_FONT_SIZE);
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
         assertThat(page.searchTerms()).doesNotContain("Workspace");
-        assertThat(SchemaPageTest.sectionTitles(page.component())).containsExactly("Theme", "Interface font", "View mode", "Animations");
+        assertThat(PageKit.sectionTitles(page)).containsExactly("Theme", "Interface font", "View mode", "Animations");
         page.dispose();
     }
 
@@ -63,7 +65,8 @@ class CorePagesTest {
         assertThat(builtSettings(page)).contains(CoreSettings.UI_WORKSPACE_OPACITY, CoreSettings.UI_WORKSPACE_BLUR);
         for (var row : page.rows()) {
             if (row.setting() != CoreSettings.UI_WORKSPACE_OPACITY && row.setting() != CoreSettings.UI_WORKSPACE_BLUR) continue;
-            assertThat(row.editor().component().isEnabled()).as(row.setting().label()).isTrue();
+            var control = (dev.jasper.ui.model.Nodes.Stack) ((dev.jasper.ui.model.Nodes.SettingRow) PageKit.node(page, "row:" + row.setting().name())).control();
+            assertThat(control.children().getFirst().state().enabled()).as(row.setting().label()).isTrue();
         }
         assertThat(page.searchTerms()).contains(CoreSettings.UI_WORKSPACE_OPACITY.label(), CoreSettings.UI_WORKSPACE_BLUR.label());
         page.dispose();
@@ -77,9 +80,9 @@ class CorePagesTest {
     }
 
     private static List<String> sectionTitles(SchemaPage.Spec spec) {
-        var page = spec.build(new PageContext(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
-            id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
-        var titles = SchemaPageTest.sectionTitles(page.component());
+        var page = spec.build(PageKit.context(new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values()),
+            id -> { }, () -> { }));
+        var titles = PageKit.sectionTitles(page);
         page.dispose();
         return titles;
     }
@@ -90,10 +93,11 @@ class CorePagesTest {
         page.component();
         int index = spec.settings().indexOf(CoreSettings.UI_WORKSPACE_BLUR);
         assertThat(page.rows()).hasSameSizeAs(spec.settings());
-        @SuppressWarnings("unchecked") var box = (javax.swing.JComboBox<String>) page.rows().get(index).editor().component();
+        var box = PageKit.kit(page, "ui.workspace.blur.input", javax.swing.JComboBox.class);
         var items = new ArrayList<String>();
-        for (int i = 0; i < box.getItemCount(); i++) items.add(box.getItemAt(i));
+        for (int i = 0; i < box.getItemCount(); i++) items.add(((dev.jasper.ui.model.Option) box.getItemAt(i)).label());
         assertThat(items).containsExactly("Use theme's value", "On", "Off");
+        assertThat(((Editors.Pick<?>) page.rows().get(index).editor()).labels()).isEqualTo(items);
     }
 
     @Test void theTreeIsTheApprovedOne() {
@@ -122,16 +126,18 @@ class CorePagesTest {
         var pages = CorePages.pages(JASPER_DARK, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();
         systemPage.component();
-        assertThat(systemPage.actionButtons()).extracting(javax.swing.JButton::getText)
+        var buttons = systemPage.actionButtons().stream().map(id -> PageKit.kit(systemPage, id, javax.swing.JButton.class)).toList();
+        assertThat(buttons).extracting(javax.swing.JButton::getText)
             .containsExactly("Open in Editor", "Reveal", "Reload from Disk", "Migrate Config\u2026");
-        systemPage.actionButtons().forEach(javax.swing.JButton::doClick);
+        buttons.forEach(javax.swing.JButton::doClick);
         assertThat(calls).containsExactly("open", "reveal", "reload", "migrate");
     }
 
     @Test void fontAndColorsLinksToTheWorkspaceSchemeInAppearance() {
         var navigation = new ArrayList<String>();
         for (var spec : CorePages.specs(ThemeChoices.of(List::of), system, ShellChoices.NONE, navigation::add)) {
-            var page = spec.build(context); page.component(); page.actionButtons().forEach(javax.swing.JButton::doClick); page.dispose();
+            var page = spec.build(context); page.component();
+            page.actionButtons().forEach(id -> PageKit.kit(page, id, javax.swing.JButton.class).doClick()); page.dispose();
         }
         assertThat(navigation).containsExactly("appearance");
     }
@@ -152,8 +158,8 @@ class CorePagesTest {
         var page = spec.build(context);
         page.component();
         assertThat(page.rows().getFirst().editor()).isInstanceOf(Editors.Profile.class);
-        var program = page.rows().get(1).editor().component();
-        var args = page.rows().get(2).editor().component();
+        var program = PageKit.kit(page, "terminal.shell.program.input", javax.swing.JTextField.class);
+        var args = PageKit.kit(page, "terminal.shell.args:new.input", javax.swing.JTextField.class);
         assertThat(program.isEnabled()).isFalse();
         assertThat(args.isEnabled()).isFalse();
         context.draft().stage(CoreSettings.TERMINAL_SHELL_PROFILE, Optional.of("custom"));

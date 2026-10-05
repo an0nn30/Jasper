@@ -193,6 +193,20 @@ Exact UiTokenKeys residual publication (no derivation):
 | `Jasper.editorGutter` | Editor Task 9; Task 11 removal. |
 | `Jasper.editorLineNumbers` | Editor Task 9; Task 11 removal. |
 
+## Task 6a consumer removal (settingsui, restart, themesui)
+
+Plan 2 Task 6a moved the Settings dialog shell controls, schema/group pages and theme-import dialogs to module kit
+views on the app's chrome `KitContext` (`ThemeController.appearance().context(ThemeRoute.CHROME)` through
+`SettingsDialog.Hooks.kit` and `PageContext.kit`). These families no longer read any `LegacyAppearanceDefaults` key:
+the former readers of `Panel.background`, `Label.foreground`, `Label.disabledForeground`, `Component.linkColor`,
+`Separator.foreground`, `Jasper.configErrorForeground`, the `Tree.*`/`List.*`/`ComboBox.*` selection and popup keys,
+`Banner.warningBackground`, `SearchMatch.startBackground` and `TextComponent.selectionBackgroundInactive`
+(`SettingsView`, `PageTree`, `GroupPage`, `SearchCombo`, `HighlightBox`, `TitledSeparator`, `WrappingText`,
+`ThemeImportView`, `ThemeDialogs`) were deleted or rewritten. The `restart` rows are nonvisual. The keys stay published
+for their other consumers (Tasks 6b/6c app pages and dialogs, Tasks 7–10 plugins) until Task 11 removes the adapter.
+Remaining raw Swing in these families is layout only (`SettingsView` split/scroller, `PageBody`, `FillingPage`) plus
+`SettingsDialog.askDiscard`'s `JOptionPane` confirmation, reported in the Task 6a report for the controller's ruling.
+
 The dynamic WorkspacePalette callers are exactly:
 - Task 7: `plugins/vault/.../ui/ManagerPanel.java`.
 - Task 8: `plugins/remote/.../ui/HostsPanel.java`, `ui/tunnels/TunnelsPanel.java`, `ui/transfers/TransferStrip.java`.

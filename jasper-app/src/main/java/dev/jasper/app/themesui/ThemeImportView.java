@@ -1,42 +1,86 @@
 package dev.jasper.app.themesui;
 
 import dev.jasper.app.themeimport.ThemeImporter;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
+import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.model.Option;
+import dev.jasper.ui.model.UiEvent;
+import dev.jasper.ui.model.ViewSpec;
+import dev.jasper.ui.swing.KitContext;
+import dev.jasper.ui.swing.KitView;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
-import javax.swing.*;
 
-/** Immutable providers and explicit per-provider choices. No file operations. */
-final class ThemeImportView extends JPanel {
-    final Map<String,JComboBox<ThemeImporter.ConflictChoice>> decisions = new LinkedHashMap<>();
-    final JTextArea details = new JTextArea();
-    final JButton commit = new JButton("Import");
-    ThemeImportView(ThemeImporter.ImportPlan plan, Consumer<Map<String,ThemeImporter.ConflictChoice>> accept, Runnable cancel) {
-        super(new BorderLayout(8,8)); setBorder(BorderFactory.createEmptyBorder(12,12,12,12));
-        var rows = new JPanel(); rows.setLayout(new BoxLayout(rows,BoxLayout.Y_AXIS));
+/**
+ * Immutable providers and explicit per-provider choices, as a kit sheet: one conflict dropdown per theme, the warnings
+ * and failures as literal text, and Cancel/Import. No file operations. EDT only.
+ */
+final class ThemeImportView {
+    static final String IMPORT = "import", CANCEL = "cancel", DETAILS = "details";
+    private final ThemeImporter.ImportPlan plan;
+    private final Map<String, ThemeImporter.ConflictChoice> decisions = new LinkedHashMap<>();
+    private final String details;
+    private boolean committing;
+    final KitView view;
+
+    ThemeImportView(KitContext context, ThemeImporter.ImportPlan plan, Consumer<Map<String, ThemeImporter.ConflictChoice>> accept, Runnable cancel) {
+        this.plan = plan;
         var text = new StringBuilder();
         for (var item : plan.items()) {
-            var row = new JPanel(new BorderLayout(8,4));
-            row.add(literal(item.conversion().document().name() + " — " + item.conversion().sourceEntry()),BorderLayout.CENTER);
-            var choice = new JComboBox<>(item.target().isPresent() ? ThemeImporter.ConflictChoice.values()
-                : new ThemeImporter.ConflictChoice[]{ThemeImporter.ConflictChoice.KEEP_BOTH,ThemeImporter.ConflictChoice.SKIP});
-            choice.setSelectedItem(item.target().isPresent() ? ThemeImporter.ConflictChoice.SKIP : ThemeImporter.ConflictChoice.KEEP_BOTH);
-            choice.setRenderer(new DefaultListCellRenderer(){@Override public java.awt.Component getListCellRendererComponent(JList<?> list,Object value,int index,boolean selected,boolean focus){
-                super.getListCellRendererComponent(list,value,index,selected,focus); setText(switch((ThemeImporter.ConflictChoice)value){case REPLACE -> "Replace";case KEEP_BOTH -> "Keep both";case SKIP -> "Skip";});return this;}});
-            choice.getAccessibleContext().setAccessibleName(item.conversion().document().name()+" conflict choice");
-            decisions.put(item.id(),choice); row.add(choice,BorderLayout.EAST); rows.add(row);
-            for(var warning:item.conversion().warnings())text.append(item.conversion().sourceEntry()).append(": ").append(warning).append('\n');
-            if(item.shadowsBundled())text.append(item.conversion().document().name()).append(": overrides a bundled theme\n");
+            decisions.put(item.id(), item.target().isPresent() ? ThemeImporter.ConflictChoice.SKIP : ThemeImporter.ConflictChoice.KEEP_BOTH);
+            for (var warning : item.conversion().warnings()) text.append(item.conversion().sourceEntry()).append(": ").append(warning).append('\n');
+            if (item.shadowsBundled()) text.append(item.conversion().document().name()).append(": overrides a bundled theme\n");
         }
-        for(var failure:plan.failures())text.append(failure.sourceEntry()).append(": ").append(failure.message()).append('\n');
-        details.setText(text.toString()); details.setEditable(false); details.setLineWrap(true); details.setWrapStyleWord(true);
-        rows.add(details); var scroll=new JScrollPane(rows);scroll.setPreferredSize(new Dimension(600,360));add(scroll);
-        var buttons=new JPanel(new FlowLayout(FlowLayout.TRAILING));var back=new JButton("Cancel");buttons.add(back);buttons.add(commit);add(buttons,BorderLayout.SOUTH);
-        commit.setEnabled(!plan.items().isEmpty());commit.addActionListener(e -> {commit.setEnabled(false);accept.accept(choices());});back.addActionListener(e -> cancel.run());
+        for (var failure : plan.failures()) text.append(failure.sourceEntry()).append(": ").append(failure.message()).append('\n');
+        details = text.toString().strip();
+        view = new KitView(context, spec(), event -> {
+            switch (event) {
+                case UiEvent.Selected picked when picked.id().startsWith("decision:") -> {
+                    picked.ids().stream().findFirst().ifPresent(choice -> decisions.put(picked.id().substring("decision:".length()),
+                        ThemeImporter.ConflictChoice.valueOf(choice)));
+                    render();
+                }
+                case UiEvent.Action action when action.id().equals(IMPORT) -> {
+                    if (committing || plan.items().isEmpty()) return;
+                    committing = true;
+                    render();
+                    accept.accept(choices());
+                }
+                case UiEvent.Action action when action.id().equals(CANCEL) -> cancel.run();
+                default -> { }
+            }
+        });
     }
-    private static JLabel literal(String text) { var label = new JLabel(); label.putClientProperty("html.disable", Boolean.TRUE); label.setText(text); return label; }
-    Map<String,ThemeImporter.ConflictChoice> choices(){var values=new LinkedHashMap<String,ThemeImporter.ConflictChoice>();decisions.forEach((id,box)->values.put(id,(ThemeImporter.ConflictChoice)box.getSelectedItem()));return Map.copyOf(values);}
+
+    private static String label(ThemeImporter.ConflictChoice choice) {
+        return switch (choice) { case REPLACE -> "Replace"; case KEEP_BOTH -> "Keep both"; case SKIP -> "Skip"; };
+    }
+
+    private ViewSpec spec() {
+        var sections = new ArrayList<Nodes.Node>();
+        for (var item : plan.items()) {
+            var offered = item.target().isPresent() ? List.of(ThemeImporter.ConflictChoice.values())
+                : List.of(ThemeImporter.ConflictChoice.KEEP_BOTH, ThemeImporter.ConflictChoice.SKIP);
+            var options = offered.stream().map(choice -> new Option(choice.name(), label(choice), Optional.<Nodes.Hue>empty())).toList();
+            String name = item.conversion().document().name();
+            sections.add(new Nodes.FormRow("row:" + item.id(), ControlState.READY, name, item.conversion().sourceEntry(),
+                new Nodes.Choice("decision:" + item.id(), ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options,
+                    decisions.get(item.id()).name(), name + " conflict choice", ""), Optional.empty()));
+        }
+        if (!details.isEmpty()) sections.add(new Nodes.Text(DETAILS, ControlState.READY, details, Nodes.TextRole.DESCRIPTION));
+        var importing = new ControlState(true, !plan.items().isEmpty() && !committing, false, "");
+        return new ViewSpec(new Nodes.Form("theme-import", ControlState.READY, Nodes.FormKind.SHEET, "Import themes", Optional.empty(), sections,
+            Optional.empty(), List.of(new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
+                new Nodes.Button(IMPORT, importing, "Import", "", Nodes.ButtonKind.PRIMARY, IMPORT, "")), CANCEL));
+    }
+
+    private void render() { if (!view.isClosed()) view.update(spec()); }
+
+    String details() { return details; }
+
+    Map<String, ThemeImporter.ConflictChoice> choices() { return Map.copyOf(decisions); }
 }

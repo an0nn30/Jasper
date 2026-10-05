@@ -47,7 +47,7 @@ public final class ThemeImport implements AutoCloseable {
                        ExecutorService worker) {
         this.context = Objects.requireNonNull(context);
         this.importer = new ThemeImporter(home);
-        this.dialogs = new ThemeDialogs(windows, context.surface());
+        this.dialogs = new ThemeDialogs(windows, context.surface(), context.kit());
         this.refresh = Objects.requireNonNull(refresh);
         this.worker = Objects.requireNonNull(worker);
     }
@@ -71,11 +71,11 @@ public final class ThemeImport implements AutoCloseable {
             error(new IllegalArgumentException("Choose a .theme.json, .jar, .zip or .toml file."));
             return;
         }
-        work(() -> importer.plan(chosen.get()), plan -> dialogs.view("Import themes", (accept, cancel) -> new ThemeImportView(plan, choices -> {
+        work(() -> importer.plan(chosen.get()), plan -> dialogs.view("Import themes", (accept, cancel) -> new ThemeImportView(dialogs.kit(), plan, choices -> {
             accept.run();
             if (closed || ticket != generation) return;
             work(() -> importer.commit(plan, choices), result -> { done(); report.accept(result); }, true);
-        }, cancel), this::done), false);
+        }, cancel).view, this::done), false);
     }
 
     /** One line per imported theme, warning and failure. */
