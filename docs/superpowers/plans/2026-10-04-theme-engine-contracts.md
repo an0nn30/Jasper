@@ -573,7 +573,10 @@ actual Editor-plugin applied syntax palette; the latter remains an Editor migrat
 ## Plan 2 Task 5 native consumer integration
 
 `ui.swing.NativeControlStyles` supplies native adapter `font(Typography.Role)`, scaled `metric(Role)`,
-`padding`, `unframed`, `button`, `field`, `label`, `textArea`, `menu`, `menuTree`, and `refresh`. These retain existing
+`padding`, `unframed`, `button(button, theme)` / `button(button, theme, DesignMetrics.Role arc)` (ghost toolbar),
+`framedButton` (kit secondary kind), `borderlessField`, `label`, `textArea`, `menu`, `menuTree`, and `refresh`
+(fix round 1 replaced the unused framed `field`). Recipes add role colors/typography only and keep the host's
+existing arc, margins, focus widths and button kind; preserved native values have their own named metrics. These retain existing
 Actions/documents/models/focus routing; local UI listeners reapply module styling after delegate changes.
 No global component registry or feature-owned FlatLaf recipe is introduced. Raw user defaultFont/Label
 font overrides feed module typography once; role geometry comes from DesignMetrics. NativeChromePainting
@@ -600,6 +603,18 @@ failure containment. ToolWindowArea (the actual outer-header owner) borrows `pan
 sources to non-button descendants, and installs placement/hide through `setPanelHostActions`. Hide, move,
 replacement, re-show and host close release listeners/actions; plugin close before host teardown is safe.
 The app never closes the plugin-owned view merely to hide it. No new SDK method is needed.
+
+Fix round 1 (2026-10-05): `IconRegistry.icon(String, Color surface, Color foreground, int)` and static
+`surfaceTint(surface, foreground)` tint artwork on a surface outside the semantic palette, holding the surface's
+foreground to 3:1; app `AppIcons.forSurface(icon, background, foregroundOrNull)` (and `forBackground`) route named
+icons through it, so folder tabs on the independent terminal palette stay readable. `UiColorKeys.semanticRoles()`
+is the single vendor-key → canonical-role table (`ToolWindow.background`, `TextField.background`,
+`Separator.foreground`); in `ThemeGenerator` an authored value there beats the legacy token and an explicit
+`[semantic]` value beats both. Keys without a canonical role are listed as unsupported native overrides in the
+ledger. Borrowed kit headers resync the dock only when `panelHeader` identity changes (or the view closes); the
+Options host action opens under its button. `ThemeController.startup(saved, fallingBack)` owns the Jasper Dark
+start-up fallback and installs a snapshot before any reader runs. Open: the status-bar surface/indicator floors
+(ledger, Task 5 fix round 1).
 
 Temporary raw defaults and plugin styling retain only the exact consumers/removal owners in
 [temporary-paths](../../design/theme-engine/temporary-paths.md). Dynamic SDK current() readers require

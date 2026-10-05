@@ -220,6 +220,60 @@ claim Plan 3 composition or screenshot matching. Unchanged coordination-only own
 licenses and import algorithms stay in jasper-ui. Inventory removed/moved rows retain their authority paths;
 checksum and discovery assertions are unchanged apart from recognizing Task 5 removal dispositions.
 
+## Task 5 review fix round 1 — native geometry, vendor roles and open status-surface item
+
+**Preserved native geometry (no visual change in Plan 2).** Native adapters keep their pre-migration values
+under their own `DesignMetrics` names, so changing a kit, icon or dock role cannot move them:
+rail button arc `RAIL_BUTTON_ARC` 10; chrome toolbar command hover arc `NATIVE_TOOLBAR_HOVER_ARC` 6 and
+disabled content `NATIVE_TOOLBAR_DISABLED_PERCENT` 38; folder-tab scroll step/reveal margin/fade/close width
+`TAB_SCROLL_STEP`/`TAB_REVEAL_MARGIN`/`TAB_FADE_WIDTH`/`TAB_CLOSE_WIDTH` 16 and reorder threshold
+`TAB_REORDER_THRESHOLD` 5; running dot `STATUS_RUNNING_DOT` 5; progress bar/min height
+`STATUS_PROGRESS_BAR_HEIGHT` 8/`STATUS_PROGRESS_MIN_HEIGHT` 24; tool header padding
+`TOOL_HEADER_LEADING_PADDING` 10/`TOOL_HEADER_TRAILING_PADDING` 6; rail badge `RAIL_BADGE_DOT` 6; find row
+`FIND_GAP`/`FIND_SIDE_PADDING` 6, `FIND_CONTROL_GAP` 4, `FIND_CLOSE_SPACER` 16; title search padding/gap
+`TITLE_SEARCH_PADDING` 8/`TITLE_SEARCH_GAP` 6; menu arrow gap `NATIVE_MENU_ARROW_GAP` 3; terminal notice
+`NOTICE_VERTICAL_PADDING` 8/`NOTICE_HORIZONTAL_PADDING` 12/`NOTICE_BUTTON_GAP` 8; collapsed breadcrumbs
+`BREADCRUMB_COLLAPSED_HEIGHT` 16. `NativeControlStyles` recipes add role colors and typography only: the find
+query stays borderless (`borderWidth: 0; focusWidth: 0; innerFocusWidth: 0`), ghost toolbar buttons keep the
+look-and-feel arc and margins (the rail passes its named arc), native menus keep look-and-feel margins, and the
+terminal notice commands and Migrate Config stay framed standard buttons (`framedButton`, the kit secondary
+kind; before Task 5 both notice commands were identical default `JButton`s, so there was no primary emphasis to
+restore). Any visual change to these belongs to **Plan 3 Task 10**.
+
+**Vendor keys with a canonical role.** One module table, `UiColorKeys.semanticRoles()`, translates
+`ToolWindow.background` → `surface.sidebar`, `TextField.background` → `surface.input` and
+`Separator.foreground` → `border.subtle`: an authored value wins over the legacy token for that role (as the raw
+key did for the native consumer) and an explicit `[semantic]` value wins over both. `MainToolbar.background` and
+`TitlePane.background` keep their existing translation as `title_bar` aliases into `surface.app` (token
+precedence, as the old `Jasper.titleBackground` publication had).
+
+**Unsupported native overrides (no canonical role).** These authored `[ui]` keys remain accepted color data,
+stay in the raw compatibility publication for not-yet-migrated raw controls until Task 11, and no longer
+affect migrated native chrome. Diagnostic behaviour in Plan 2: none at runtime (import conversion warnings for
+non-color data are unchanged); Task 11 owns the diagnostic when raw publication is removed.
+
+| Key(s) | Native consumer now | Canonical route |
+|---|---|---|
+| `StatusBar.background` | status bar surface | `surface.app` (see open item below) |
+| `TitlePane.foreground`, `TitlePane.inactiveForeground`, `MainToolbar.foreground` | title/toolbar text | `text.secondary`/`text.tertiary`/`text.primary` |
+| `MainToolbar.borderColor`, `Borders.color` | title separator | `border.subtle` |
+| `MainToolbar.searchField.*`, `SearchEverywhere.SearchField.*` | title search field | `surface.input`, `surface.control.hover`, `border.input`, `text.primary`, `text.placeholder` |
+| `EditorTabs.*` | folder tabs | terminal palette plus workspace `accent`/text roles |
+| `Button.toolbar.{hover,pressed,selected}Background` | native toolbar commands | `hover.overlay` at 8 %, `surface.control.hover`, `segment.selected.bg` |
+| `Popup.dropShadowColor` | command palette shadow | `surface.scrim` |
+| `DragAndDrop.areaBackground`, `DragAndDrop.borderColor` | dock drop guides | `accent` at the named 25 %/60 % alphas |
+| `Label.infoForeground`, `Actions.{Green,Yellow,Red}`, `TabbedPane.underlineColor` | muted/status/badge colors | `text.secondary`, `status.*`, `accent` |
+
+**Open (controller decision needed): status-bar surface and chrome indicator contrast floors.** Task 5 paints the
+status bar on `surface.app` (the title bar), but the module derives `status.*` readable against the
+`status_bar` token, and the deleted ChromeKeys floors measured status text against `StatusBar.background` and
+rail badges against the title bar. There is no canonical status-bar surface role. Holding the shared canonical
+`status.*`/`text.link` roles to a floor on `surface.app` was tried and rejected: in a light theme with a dark
+title bar (for example IntelliJ New UI Light: `MainToolbar.background` Gray2, `StatusBar.background` Gray13)
+it moves the status colors toward white, unreadable on light panels where kit status chips use the same roles.
+Options are recorded in the Task 5 report (fix round 1, F5). Until decided, derived status colors keep their
+4.5:1 floor against the `status_bar` token (module generator) and no floor is guaranteed against `surface.app`.
+
 ## Task 4 typed-mount transition — exact Task 11 removal owners
 
 All entries below are temporary source compatibility for bundled plugins migrating in Tasks 7–10.

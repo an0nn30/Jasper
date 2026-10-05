@@ -2,6 +2,19 @@
 
 ## Current state — 2026-10-05
 
+- **Theme engine Plan 2 Task 5 review fix round 1: F1–F4, F6–F8 fixed; F5 partly fixed, one item needs a
+  controller decision** (2026-10-05). Named icons on terminal-palette folder tabs are tinted for that surface;
+  native recipes keep pre-migration geometry and button kinds (borderless find query, rail arc 10, toolbar hover
+  arc 6, disabled 38 %, framed notice/Migrate Config, look-and-feel margins) under their own named metrics;
+  borrowed kit headers no longer relayout the dock on content-only updates; host Options/Hide and the focused
+  find/title search theme switch are tested; start-up fallback is `ThemeController.startup` with tests. Vendor
+  `ToolWindow/TextField/Separator` colors translate into their canonical roles in one module table; dock drop
+  guides use the canonical accent; other vendor keys are ledgered as unsupported native overrides. Open: the
+  status bar paints `surface.app`, so the old status/badge contrast floors have no canonical surface to hold
+  against (see the ledger). Gate: app153 suites/1079 tests, module35/290, module check and all four
+  architecture checks; 2×: app4/10, module3/18. Known pre-existing (07d894ef) failure outside scope:
+  JasperApplicationPluginsTest expects the LAF class `IntelliJTheme$ThemeLaf` (now `SnapshotLaf`).
+
 - **Theme engine Plan 2 Task 5 implemented; independent review pending** (2026-10-05).
   Native workspace/chrome presentation consumes module roles, named fixed metrics and semantic icons;
   identity-sensitive controls use module-owned native styling entrypoints. Folder tab geometry/motion,
