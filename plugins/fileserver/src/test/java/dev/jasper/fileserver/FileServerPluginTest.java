@@ -123,6 +123,7 @@ class FileServerPluginTest {
             assertThat(host.invoke(FileServerPlugin.SERVE_TFTP, window, local)).isTrue();
             await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
             var served = plugin.registry().servers().getFirst();
+            assertThat(served.state().phase()).as("the TFTP engine started").isEqualTo(Phase.RUNNING);
             assertThat(served.temporary()).isTrue();
             assertThat(served.definition().name()).isEqualTo("project (TFTP)");
             assertThat(served.definition().protocol()).isEqualTo(Protocol.TFTP);
