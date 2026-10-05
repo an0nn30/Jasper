@@ -29,4 +29,5 @@ public final class UiTestAccess {
     public static JButton confirm(ConfirmPanel panel) { return panel.confirm; }
     public static JButton cancel(ConfirmPanel panel) { return panel.cancel; }
     public static JTextArea cardTls(FileServersPanel panel) { return panel.cardTls; }
+    public static JTextArea cardHostKey(FileServersPanel panel) { return panel.cardHostKey; }
 }

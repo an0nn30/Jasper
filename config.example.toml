@@ -42,6 +42,12 @@ long_command_seconds = 10
 # balloons, or notify-send on Linux.
 system = true
 
+[notifications.groups]
+# Live. How each group's notifications appear: "card" (a card that hides itself), "sticky" (a card
+# that stays until you close it), "history" (only the Notifications panel) or "off". Settings > Notifications
+# lists every group; a group not listed here keeps its default.
+# "jasper.commands" = "history"
+
 [system]
 # Keep Jasper running with no windows so a new window opens instantly, and start it in the background at login.
 # On by default on macOS and Windows and off on Linux, so it is commented out here: uncomment it to choose.
@@ -55,10 +61,10 @@ system = true
 visible_rows = 5
 
 [terminal.font]
-# Live across existing and new panes. Missing fonts use JBR/system fallback.
-family = "JetBrains Mono"
+# Live across existing and new panes. Cousine Nerd Font Mono is bundled; other missing fonts use JBR/system fallback.
+family = "Cousine Nerd Font Mono"
 # Range: 6-72 points. A saved size change is live; new panes and Font reset use this value.
-size = 16.0
+size = 12.0
 # Ordered live fallbacks; names must be nonblank. An empty list is allowed.
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 # Live across existing and new panes.

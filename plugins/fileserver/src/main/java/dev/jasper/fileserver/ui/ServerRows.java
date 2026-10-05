@@ -35,6 +35,21 @@ public final class ServerRows {
         return List.copyOf(rows);
     }
 
+    /** The bound address when running, otherwise the saved bind and port. */
+    public static String address(ServerRegistry.View view) {
+        if (!view.addresses().isEmpty()) {
+            var uri = view.addresses().getFirst();
+            String host = uri.getHost();
+            if (host != null) return host + ":" + (uri.getPort() < 0 ? view.definition().port() : uri.getPort());
+        }
+        String host = switch (view.definition().bind()) {
+            case Bind.Loopback ignored -> "127.0.0.1";
+            case Bind.All ignored -> "0.0.0.0";
+            case Bind.Interface named -> named.name();
+        };
+        return host + ":" + view.definition().port();
+    }
+
     public static String access(ServerDefinition definition) {
         String who = switch (definition.login()) {
             case Login.Anonymous anonymous -> definition.protocol() == Protocol.SFTP ? "keys only"

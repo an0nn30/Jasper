@@ -17,11 +17,28 @@ public final class PanelSite {
     private final BooleanSupplier visible;
     private final List<Consumer<Boolean>> visibility = new ArrayList<>();
     private final List<Runnable> closed = new ArrayList<>();
+    private final Consumer<PanelHeaderState> headerChanged;
     private boolean done;
 
     public PanelSite(UUID windowId, Runnable show, Runnable hide, BooleanSupplier visible) {
+        this(windowId, show, hide, visible, header -> { });
+    }
+
+    public PanelSite(UUID windowId, Runnable show, Runnable hide, BooleanSupplier visible,
+                     Consumer<PanelHeaderState> headerChanged) {
+        this.headerChanged = Objects.requireNonNull(headerChanged);
         this.windowId = Objects.requireNonNull(windowId); this.show = Objects.requireNonNull(show);
         this.hide = Objects.requireNonNull(hide); this.visible = Objects.requireNonNull(visible);
+    }
+
+    /** Publishes metadata while guarding callbacks against a discarded panel instance. */
+    public void setHeader(PanelHeaderState header) {
+        Objects.requireNonNull(header);
+        if (done) return;
+        headerChanged.accept(new PanelHeaderState(header.detail(), header.active(), header.actions().stream()
+            .map(action -> new PanelHeaderState.Action(action.label(), action.icon(), () -> {
+                if (!done) action.invoke().run();
+            })).toList()));
     }
 
     public UUID windowId() { return windowId; }
@@ -52,6 +69,7 @@ public final class PanelSite {
     public void notifyClosed() {
         if (done) return;
         done = true;
+        headerChanged.accept(PanelHeaderState.EMPTY);
         for (Runnable listener : List.copyOf(closed)) {
             try { listener.run(); }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A panel close listener failed", failure); }

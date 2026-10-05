@@ -176,6 +176,13 @@ Your `PanelHost.onVisibility` hears a drop only when it shows your hidden panel,
 your panel to make room in the target slot; a drop that leaves your panel shown or hidden as it was
 tells it nothing.
 
+Since SDK 0.14.2, call `host.setHeader(new PanelHeader(detail, active, actions))` inside the panel
+factory or when its model changes. `detail` is a count or connection name; `active` adds a status dot.
+Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button with an accessible name
+and tooltip. Keep callbacks scoped to that factory's window. Header state survives hiding and moving
+the panel, and callbacks become inert when the instance closes. Use `PanelHeader.EMPTY` to clear it;
+do not add a duplicate action row inside the panel. Declare `sdk = ">=0.14.2, <0.15"` when using it.
+
 A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
 is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
 its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
@@ -484,6 +491,8 @@ sync.error("Could not sync", "prod: connection refused", failure);
 - The returned `NotificationHandle` expires the notification. It also expires when the user removes it, when its
   group drops it, and when your plugin stops.
 - Group ids follow the panel id pattern and start with your plugin id and a dot; `<plugin-id>.activities` is Jasper's.
+- Your group's mode is a default. The user can choose another for any group in Settings › Notifications or in
+  `[notifications.groups]`, and theirs wins.
 - When one of your activities succeeds or fails, Jasper posts its outcome in `<plugin-id>.activities`; post nothing
   for it yourself.
 
@@ -824,7 +833,7 @@ list.setCellRenderer((owner, value, index, selected, focused) -> {
 });
 ```
 
-The bundled audit covers all seven plugins. Semantic status dots remain colored independently of selected row
+The bundled audit covers all eight plugins. Semantic status dots remain colored independently of selected row
 text/background; normal card text uses ordinary control colors. The audit used
 `rg -n 'UIManager.getColor|new Color\(|Color\.' plugins/*/src/main/java` plus setter/renderer/paint searches.
 
@@ -841,7 +850,7 @@ text/background; normal card text uses ordinary control colors. The audit used
 | Editor `VimBar`: fixed error, output text, panel background/bell | Changed: mounted palette, plugin-owned style maps, first-paint palette comparison; 150 ms bell and 12-row limit retained |
 | Editor `EditorTheme`: fixed Color copies and blending | Domain-owned syntax/document surfaces; unchanged, exempt from generic styles |
 | Editor `vim/HighlightedYank`: configured RGBA color | Domain-owned user setting; unchanged |
-| History, Snippets, Sample | No custom color/painter occurrences; inherited standard controls (or palette contributions rendered by the host) |
+| History, Snippets, Sample, Project Index | No custom color/painter occurrences; inherited standard controls (or palette contributions rendered by the host) |
 
 FlatLaf 3.7 supports per-control progress track/fill colors but not progress text colors. Text on an external
 plugin's string-painted progress bar remains delegate-owned and can retain chrome colors. The audited bundled

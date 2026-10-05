@@ -132,6 +132,7 @@ class GraphiteChromeTest {
         for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {
                 owner.selectTheme(theme);
+                owner.newTab(HOME);
                 var root = new javax.swing.JRootPane();
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     var panel = new javax.swing.JPanel(new java.awt.BorderLayout(0, 12));
@@ -156,8 +157,8 @@ class GraphiteChromeTest {
                     var corner = javax.swing.SwingUtilities.convertPoint(strip, 0, 0, root);
                     assertThat(image.getRGB(corner.x, corner.y)).as("rounded tab-strip shoulder").isEqualTo(chrome);
                     var quiet = javax.swing.SwingUtilities.convertPoint(strip, strip.getWidth() - 50, strip.getHeight() - 1, root);
-                    assertThat(image.getRGB(quiet.x, quiet.y)).as("the recessed strip has no baseline rule")
-                        .isEqualTo(strip.getBackground().getRGB());
+                    assertThat(image.getRGB(quiet.x, quiet.y)).as("the flat strip has a subtle baseline separator")
+                        .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.BORDER).getRGB());
                     var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
                     javax.imageio.ImageIO.write(image, "png", output.resolve("fluid-workspace-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
                 }

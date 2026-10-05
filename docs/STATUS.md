@@ -2,6 +2,28 @@
 
 ## Current state — 2026-10-05
 
+- **Merged main (`d3455d47`) into the theme engine branch** (2026-10-05). Main's Project Index plugin (eighth bundled
+  plugin, `plugins/indexer`), File Server FS-3/FS-4 (SFTP/TFTP), Alacritty-style equal-width workspace tabs, SDK
+  `PanelHeader`/`PanelHost.setHeader` (SDK 0.14.2, main's bump kept), notification-groups settings, bundled Cousine
+  font, Remote exec/projects APIs and the Editor focus fix all arrive intact. Re-applied onto the branch's migration:
+  `WindowTabs` keeps main's layout and motion but paints with module roles (`BORDER_WINDOW` dividers,
+  `TEXT_SECONDARY`/`TEXT_TERTIARY` titles, `BODY` font, surface-tinted icons, module menu recipe) and named
+  `TAB_*` metrics (new `TAB_REVEAL_INSET`, `TAB_CLOSE_FIT_WIDTH`, `TAB_CLOSE_GUTTER`, `TAB_COMPACT_GUTTER`,
+  `TAB_CLOSE_TRAILING`, `TAB_DIVIDER`; folder-only roles removed; `TAB_*_MILLIS` now 475/425/0 as main);
+  `ToolWindowHeader` shows main's detail, connected dot and contributed actions on module roles (detail as the kit
+  header count, dot `STATUS_SUCCESS` floored to 3:1 on `SURFACE_SIDEBAR`, actions on the ghost recipe, keeping main's
+  focusable action buttons); `ToolWindowArea` keeps kit-header borrowing and registers/releases all of main's header
+  drag surfaces; main's `NotificationGroupsEditor` is rewritten onto the Task 6a kit `ValueEditor` (one `FormRow` per
+  group, DROPDOWN with the default marked, SECONDARY Reset; the id shows in the row caption instead of a tooltip).
+  Tests from main were kept and asserted on the combined behaviour (dot colour from module roles in dark and light
+  instead of main's fixed `0x38ba54`/`0x248943`; editor and Settings tests driven through kit nodes/events and the
+  mounted kit dropdown). New raw consumers recorded in `migration.csv` (49 rows) and the temporary ledger with owners:
+  Task 6d (post-merge) for `PanelHeader` on borrowed kit headers, Task 8 for the Remote panel redesign
+  (`PanelStyle`, `TunnelSwitch`), Task 10 for File Server FS-3/FS-4 UI and Project Index, Task 11 for raw
+  `PanelHeader` icons and eight bundled manifests. Gate: module 355, SDK 63, testkit 123, app 2619 (1 existing skip),
+  plugins editor 4794/fileserver 264/history 41/indexer 95/remote 435/sample 13/snippets 11/vault 144 (1 existing
+  skip), four architecture checks green; 2x scale subset green. No GUI, benchmark, AOT or push.
+
 - **Theme engine Plan 2 Task 6c implemented (pluginmanager, notificationui, Buddy adapter, chooser prompts); Task 6
   complete pending its review** (2026-10-05). Kit first (`8dfccd78`, rulings G1/G4/G5/G7, mirrored in SDK, host
   `KitValues`, testkit fake and `KitContractTest`, SDK version unchanged): `ListItem.contextActions` (row-owned menus,
@@ -390,6 +412,253 @@
   is not claimed. Plans 2–3 consumer/surface migration remain unexecuted. Native acceptance
   and user review of gallery/calibration artifacts remain user-run before Plan 2. No GUI/benchmark/AOT/push/merge.
 
+- **Project Index, plan B (remote)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`):
+  [plan B](superpowers/plans/2026-10-05-project-index-b-remote.md). Remote 0.12.0 exports `dev.jasper.remote.api`
+  (`RemoteProjects`: `locate`, `connected`, `hostName`, `folder`, `exists`, `list`, `open`, `openTerminal`) backed by
+  `dev.jasper.remote.projects` (fixed `sh -s` scripts for markers, `git ls-files` and `find`, an SFTP walk fallback),
+  `Connections.existingLease(UUID)` for prompt-free background work, and a start-folder PTY exec channel for SSH tabs
+  opened in a folder (Reconnect returns there). Project Index 0.2.0 confines Remote types to
+  `dev.jasper.indexer.remote.RemoteBridge`, offers and indexes projects in connected SSH panes, searches and opens
+  them through Remote, copies `host:path`, opens SSH tabs in a file's folder, adds remote folders from Index Folder…,
+  and shows Unavailable/Stale remote projects in Settings. Deviations from the spec: start folder via exec channel
+  (Remote had no such path); the marker script, not the indexer, enforces the remote home boundary; ignored remote
+  entries show as `<host id>:<path>`; a background remote job whose host is not connected when it starts is dropped
+  quietly (a connection that drops mid-run fails the job with a "Couldn't index" card; the saved snapshot stays, shown
+  as Stale).
+  Deviations and hardening made during execution: Task 2: the PTY test asserts COLUMNS/LINES, the start-folder
+  round-trip test also runs ksh/tcsh/dash/fish when present, and the exec path skips MOTD/lastlog. Task 3: Exec
+  catches a throwing field filter so it fails the run, not the shared SSH session; `/` and trailing-slash folders
+  count as ancestors of home; the git script guards against HOME being unset. Task 4: a dropped session (marker seen,
+  no exit status) is never accepted as a complete Git/find listing. Task 5: ProjectsService closes borrowed leases
+  when the background executor rejects work. Task 8: terminal events received before the saved project list loads
+  are held and replayed (no prompt for already-indexed projects at startup), and local detection completes even if
+  the probe throws an Error. Marker detection (`exists`) needs a POSIX `sh` on the host, so Windows OpenSSH hosts get
+  no cards; `list` falls back to an SFTP walk where `sh`, Git or `find` is missing. Remote cards and
+  refresh-on-entry need the remote shell to report its folder with OSC 7 (Remote's probe-based following raises no
+  `CWD_CHANGED`), and after-command refreshes also need OSC 133 marks; current-project ranking and Reindex Current
+  Project work from Remote's followed folder. Known gap: opening a remote file that no longer exists does not queue a
+  refresh of its project (spec §7; local only). Final review fixes: an unreadable local root fails the job (the old
+  snapshot stays) and a root that is a link is walked; initials matching is memoized (no exponential backtracking);
+  Git listings skip nested repositories and gitlinks; an unloadable `projects.toml` is renamed `projects.toml.bad`
+  before the next save; snapshots are deleted only when corrupt, not on read errors; remote detection that throws
+  finds nothing; Remote's SFTP walk reports a root missing only on SFTP's no-such-file status; the guide, `remote.md`
+  and deviation 4 now say what the code does. Focused checks after the fixes: Project Index 95 and Remote 431 tests,
+  0 failures. Full `./gradlew check --continue` before them: **8875 tests, 0 failures, 0 errors, 6 skips**.
+  No GUI, benchmark or AOT training; GUI checks (an SSH pane's card, which needs a host shell that sends OSC 7, remote
+  Files rows and their three verbs, Index Folder… on a saved host, an SSH tab opened in a folder) are for the user.
+  Merged to local main 2026-10-05; not pushed.
+- **Project Index, plan A (local)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`): new bundled
+  plugin Project Index (`plugins/indexer`, `dev.jasper.indexer` 0.1.0) per the
+  [design](superpowers/specs/2026-10-05-jasper-project-index-design.md) and
+  [plan A](superpowers/plans/2026-10-05-project-index-a-local.md). A terminal entering a local project (configurable
+  strong/weak markers) gets an "Index project?" card (Yes / No for the session / Ignore this path); indexes come from
+  `git ls-files` (with `core.fsmonitor=false`, never in a home-folder work tree) or a folder walk skipping excluded
+  names, capped at 200,000 files, saved under the plugin's data directory and refreshed when a pane re-enters the
+  project or a command finishes there (5-minute throttle, 3 s debounce). The palette's **Files** scope (Go to File,
+  ⌘P / Ctrl+Alt+Shift+P) ranks exact, prefix, initials, substring and path matches with the current project first and
+  opens files in the Editor, copies paths or opens a terminal there. File › Index Folder… and the Settings page add
+  folders by hand. Deviations from the spec: `data/projects.toml` instead of JSON (no JSON library is bundled); user
+  guide [`docs/project-index.md`](project-index.md) instead of a plugin README; Linux/Windows Go to File is
+  Ctrl+Alt+Shift+P (Ctrl+Shift+P is the Command Palette); the truncation card names the Settings page instead of
+  linking to it (no SDK call opens Settings); Git listing is skipped when the work tree's top level is home; the
+  settings template lists defaults in comments. Deviation from the plan: the Task 7 fix round hardened Indexer: lister
+  Error/null no longer wedges a lane; project-list saves wait for load(); load() survives RuntimeException; persist
+  chain and finish() follow-up survive failures (6 extra IndexerTest cases). Full `./gradlew check --continue`:
+  **8841 tests, 0 failures, 0 errors, 6 skips**. (The first full run had one flaky failure,
+  `TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation` [3] "reflow", in
+  `jasper-terminal`, unrelated to the plugin; it passed on rerun.) No GUI, benchmark or AOT training; GUI checks (the
+  card and its three actions, the Files tab and its verbs, File › Index Folder…, the Settings page) are for the user.
+  Plan B (remote projects) followed (entry above). Merged to local main 2026-10-05; not pushed.
+- **File Server FS-4: TFTP** (2026-10-05; branch `claude/file-server-fs4`, plan `docs/superpowers/plans/2026-10-05-file-server-fs4.md`):
+  File Server 0.4.0 serves TFTP with a hand-written engine on the JDK's `DatagramSocket` (`engine.tftp`: `TftpPacket`,
+  `NetAscii`, `TftpTransfer`, `TftpEngine`). It handles RRQ, and WRQ when writable (committed after the final block),
+  octet and netascii, `blksize`/`tsize` through OACK, a resend after 1 s up to 5 times, at most 16 transfers ("Server
+  busy" beyond), error 5 for strangers, and fixed error texts that never name host paths. Serve Current Folder over
+  TFTP; `portFree` checks UDP too. Integrated with main's terminal Share Path (2026-10-05): the Share Path
+  menu also offers SFTP and TFTP. Decisions: see the plan header. Full `./gradlew check` passed:
+  **8,856 tests, 0 failures, 0 errors, 6 existing skips** (File Server: 250, up from 215), after the final-review fix wave; source hygiene clean. No
+  GUI, benchmark or AOT training; not pushed.
+  Deviations from the plan text (details in the plan's banner): netascii writes are buffered under the decoder;
+  only well-formed TFTP is ever answered: the server port serves RRQ/WRQ and gives error 4 to a well-formed DATA, ACK
+  or OACK, and a transfer socket gives error 5 to a stranger's DATA, ACK or OACK; an ERROR packet, and anything that
+  does not parse (unknown opcode, malformed request, oversized datagram), gets no reply on either, which closes the
+  TFTP-to-TFTP and the chargen/echo-style loops of CVE-2024-2169 (the final review's probe: 87,317 exchanges in 2 s
+  before, 0 after); the transfer limit is captured per start; a receive failure backs off 50 ms; a mid-read failure
+  sends an error to the client; a write is refused and abandoned when its length contradicts the announced `tsize`
+  (octet mode only), or when a DATA block exceeds the negotiated `blksize`, including a datagram larger than any
+  block (receive buffers hold one byte more than the largest packet); the upload is abandoned if the engine stopped
+  just before commit; write failures are logged, but not once the engine stopped, and by class name when the
+  exception has no message; after the final ACK of a write the server dallies for timeout x retries (5 s at the
+  defaults), holding the transfer slot that long; the busy-port test binds inside the try body.
+  Deferred: TFTP transfers use their own pool (at most 16 threads), not the plugin executor; a WRQ with an oversized
+  `tsize` aimed at a refused path gets "disk full" (error 3) rather than error 2; a malformed request gets no reply
+  (a text reply could start with 00 01 or 00 02), so a broken client only times out; a completed write is reported
+  complete in the activity log only after the dally; the pre-commit stop guard covers a race that can't be tested
+  deterministically; from FS-3:
+  sshd refuses some malformed or oversized SFTP writes before File Server's listener sees them, so a later CLOSE
+  still commits that upload without the chunk (only the client harms its own upload). GUI checks pending: `tftp` /
+  `curl tftp://` from another computer, a PXE or firmware client, the macOS firewall prompt for UDP.
+
+- **File Server FS-3: SFTP** (2026-10-05; branch `claude/file-server-fs3`, plan `docs/superpowers/plans/2026-10-01-file-server-fs3.md`):
+  File Server 0.3.0 serves SFTP on Apache MINA sshd 2.19.0 with a persistent Ed25519 host key (`data/hostkey`,
+  fingerprint on the server card and in Show Fingerprints…), password, authorized-key and keys-only logins (through
+  `LoginThrottle`; unauthorized keys don't count), and only the SFTP subsystem (no shell, exec, forwarding or
+  keyboard-interactive). The jail is `engine.sftp.ShareAccessor`: every path through `ClientPaths` and
+  `ShareRoot.locate`, every operation through `ShareRoot`, links refused, only harmless extensions. Uploads commit on
+  a normal CLOSE when every write succeeded. Editor: authorized keys (Add from File…, Paste, Remove) and "Keys
+  only". Serve Current Folder over SFTP. Decisions: see the plan header. Full `./gradlew check` passed after the
+  final-review fixes: **8,821 tests, 0 failures, 0 errors, 6 existing skips** (File Server: 215, up from 165); source
+  hygiene clean. No GUI, benchmark or AOT training; not pushed.
+  Deviations from the plan text (details in the plan's banner): amended for main as of 2026-10-05 (SDK range kept at
+  `>=0.14.2, <0.15`; `context.notifications().group()` instead of `notices()`; Task 7's panel edits applied to the
+  redesigned panel); `ShareRoot.openWriteChannel` converts the plain IOException the JDK throws for NOFOLLOW_LINKS on
+  a final symlink into a FileSystemException; Task 4 hardening from auditing sshd's direct file calls
+  (`UnsupportedAttributePolicy.ThrowException`, a `resolveFileAccessLinkOptions` gate, `readFileAttributes` mapping
+  only READDIR's root `..`, rewriting the host folder name in v3 REALPATH long names, generic error text); security
+  review fixes (`ShareRoot.resolve` refuses a missing folder behind an outward link, which also protects HTTP and
+  FTP; owner and group lookups refuse without looking the name up); final-review fixes: an upload whose write failed
+  is abandoned at CLOSE and reported incomplete (`UploadChannel.fail()`, set by the channel and by
+  `SftpActivity.written`), and an exclusive create commits with `ShareRoot.Upload.commit(false)`, which uses a hard
+  link rather than an atomic move (on Unix that renames over a file created meanwhile); `AuthorizedKeys` accepts tab
+  separators; "Add from File…" skips files over 64 KiB or not regular.
+  Deferred: FSTAT/FSETSTAT on an upload handle act on the target, not the temporary file (OpenSSH `put -p` may warn,
+  and times may be lost); LSTAT of an outward link shows the link's own metadata (listings hide such links); sshd
+  still advertises extensions that File Server refuses; the `org.apache.sshd` log level is JVM-wide, so it also
+  quiets Remote's sshd INFO lines; a path through an outward link that lands back inside the share is accepted (a
+  client can confirm the share's absolute host path when such a link exists); "Add from File…" still reads key files
+  (at most 64 KiB each) on the UI thread; sshd replaces an unreadable host key silently, and there is no
+  "regenerate host key". GUI checks pending: OpenSSH `sftp`/`scp`, FileZilla and Cyberduck with a password and with a
+  key; the first-connection host key prompt matching the card; refused shell (`ssh -p 2222 host`); the editor's key
+  list.
+
+- **Bundled default terminal font** (2026-10-05; `codex/bundled-terminal-font`, isolated worktree
+  `/Users/dustin/.codex/worktrees/bundled-terminal-font/moray`): implements the approved bounded design:
+  the app bundles the supplied Cousine Nerd Font Mono regular/bold/italic/bold-italic faces with upstream
+  license notices and defaults terminal text to **12 pt**. Process-local font registration precedes app
+  startup, pane/window metrics and font-picker enumeration; no system installation. Explicit saved
+  family/size settings keep precedence. App panes without configuration use the same defaults; the
+  independent terminal library retains its own options. Native inline implementation with independent
+  final review; no new plan document. Regressions reproduced missing JAR fonts and old family/size
+  defaults before implementation. Focused config, font-picker, packaged-resource and pane/reset tests
+  pass. Independent final review found no actionable issues. Full `./gradlew check --continue
+  :jasper-app:verifyPackage -Pjasper.aot=false` passed: **8,785 tests, 0 failures, 0 errors, 6 existing
+  skips**, including architecture/documentation gates and the macOS native image. A final headless
+  package rebuild after license whitespace normalization passed; all four fonts and four notices in
+  the image match source bytes. Changed-source hygiene and whitespace checks passed. A 2x headless
+  12 pt style/symbol render was inspected (`jasper-app/build/font-preview/cousine-12pt-2x.png`).
+  No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05; no push requested.
+
+- **Alacritty-style workspace tabs** (2026-10-05; `codex/alacritty-tabs`, isolated worktree
+  `/Users/dustin/.codex/worktrees/alacritty-tabs/moray`): implements the user-approved
+  [equal-width layout and measured motion](design/alacritty-tabs.md), superseding the flat-tab pass.
+  A single tab hides the rail and reclaims its height. Multiple centered text tabs divide the full
+  terminal column, with theme-derived selected/inactive surfaces, separators and hover-only close.
+  New-tab remains in the toolbar/palette/shortcuts. First reveal is 490 ms, additions 475 ms,
+  removals 425 ms; selection and hiding the rail are immediate. Curves interpolate boundaries from
+  the third supplied recording using ffmpeg frames and their actual timestamps; no source easing
+  constants are claimed. Closed tabs release resources immediately. This bounded follow-up uses
+  regression-first native inline implementation and independent final review, not historical plans.
+  Initial behavior regressions failed before implementation; a real hidden-parent reveal regression
+  also reproduced before its fix. Workspace/config checks and dark/light/glass headless previews pass.
+  Independent review found narrow cells reserving all title space for a hidden close affordance; a
+  16-tab/800px regression reproduced it, and narrow cells now reclaim those gutters. Follow-up review
+  has no remaining findings. Final `./gradlew -I tools/previews/alacritty-tabs.gradle
+  :jasper-app:alacrittyTabsPreview :jasper-app:alacrittyTabMotionPreview check --continue` passed:
+  **8,753 tests, 0 failures, 0 errors, 6 existing skips**, including architecture, docs and native
+  headless gates. The explicit 2× scale check, source hygiene and whitespace checks passed. Replaced
+  superseded underline/scroll/natural-width tests with equal-width/visibility/measured-motion coverage.
+  Previews remain in `jasper-app/build/alacritty-tabs-preview/`, including `tab-motion.mp4`.
+  No GUI, benchmark or AOT training. Native GUI acceptance remains user-run.
+  User approved merging to main and pushing on 2026-10-05. Combined `./gradlew check --continue`
+  passed **8,764 tests, 0 failures, 0 errors, 6 existing skips**, preserving the Share Path integration.
+  Preview files are preserved in the main checkout at `jasper-app/build/alacritty-tabs-preview/`;
+  recording analyses are in `build/alacritty-tabs-reference/` for managed-worktree archival after integration.
+
+- **Terminal Share Path** (2026-10-05; `codex/share-path`, isolated worktree
+  `/Users/dustin/.codex/worktrees/share-path/moray`): implements the user-approved bounded design:
+  terminal context menu **Share Path → HTTP / HTTPS / FTP / FTPS** starts a temporary server for the
+  invoked pane's current local folder, without a dialog, and reveals it in File Servers. Names and ports
+  are automatic; shares retain read-only/loopback defaults, FTP session passwords, and TLS is required
+  for FTPS. Missing, invalid and remote paths are rejected without substituting home or another pane.
+  Existing Serve Current Folder palette commands retain their documented behavior. Uses the existing
+  SDK menu contribution and server registry; no SDK/app changes. Native inline implementation with an
+  independent final review, without a new historical-plan execution. Eleven new cases failed before
+  implementation; focused plugin integration tests now pass, including real starts for all four types.
+  Independent final review found no actionable issues. Final `./gradlew check --continue` passed all
+  91 tasks: **8,782 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and
+  documentation gates. Changed-source hygiene and whitespace checks passed. The existing bounded
+  port search/bind-race failure handling is retained. No GUI, benchmark or AOT training; native menu
+  acceptance remains user-run. User approved local main integration on 2026-10-05; no push requested.
+
+- **Flat workspace tabs** (2026-10-04; `codex/flat-tabs`, isolated worktree
+  `/Users/dustin/.codex/worktrees/flat-tabs/moray`): implements the approved screenshot-directed
+  [flat-tab design](design/flat-tabs.md). One workspace-colored strip, persistent icons, muted inactive
+  labels, full-width animated accent underline, subtle separator, and a live-session dot after terminal
+  titles replace the folder silhouette. Existing close/list/add controls, sizing and interaction paths
+  remain. Status space is reserved; pending/exited sessions and documents have no live dot. The full
+  strip shares workspace glass opacity. This bounded change uses native inline implementation and one
+  independent final review, without re-executing historical plans. Initial visual/lifecycle regressions
+  failed before implementation; the 650-test workspace suite passes, and dark/light/glass/overflow
+  headless renders were inspected. The 2× geometry check passed. Independent review found missing fallback
+  artwork for hosted tabs; a regression reproduced it, and a generic document icon now covers absent/cleared
+  artwork while preserving supplied icons. The full check exposed a lifecycle-test fixture trying to paint
+  a zero-width animated opening; that test now disables motion, retaining the separate animation suite.
+  Focused tab tests and independent follow-up review passed with no remaining findings. Final
+  `./gradlew check --continue` passed: **8,771 tests, 0 failures, 0 errors, 6 existing skips**,
+  including architecture, documentation and native headless gates. Source hygiene and whitespace checks
+  passed. Reproduce previews with `./gradlew -I tools/previews/flat-tabs.gradle :jasper-app:flatTabsPreview`.
+  No GUI, benchmark or AOT training. User approved local main integration on 2026-10-05;
+  the unrelated inherited Markdown-preview design stays on its own branch. Integrated as `e27dba15`;
+  `./gradlew check --continue` on main passed **8,771 tests, 0 failures, 0 errors, 6 existing skips**.
+  Previews are preserved in the main checkout under `jasper-app/build/flat-tabs-preview/`.
+  The managed worktree is archived after verification. No push performed.
+
+- **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
+  second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
+  Sessions has header-only Add/Import icons and count, flat alphabetical ungrouped hosts, a pencil-only edit action,
+  and a blue Open Shell action for connected hosts. SFTP places its connection in the header, uses compact
+  back/forward/path/refresh/upload controls and Name/Size rows, and preserves operation menus and destination picking.
+  Successful navigation history is scoped to each pane and connection identity. Tunnel/server rows use explicit
+  on/off switches; server rows add protocol chips, address/copy controls and an optional details view.
+  Supported chips are HTTP/SFTP/FTP/TFTP; the mock's RSYNC sample does not add an unsupported transport.
+  SDK **0.14.2** adds per-window `PanelHeader` via `PanelHost.setHeader`; the app translates it at the plugin boundary,
+  retains metadata while hidden/moved, contains action failures, and invalidates callbacks on close. Remote and
+  File Server now require that patch version. The screenshot-directed scope continues the bounded parallel
+  implementation/independent-review workflow rather than re-running historical feature plans. This follow-up
+  intentionally supersedes the earlier pass's default Other group/favorites-first order and app-only title bars.
+  Independent review approved after fixing header drag registration for the new label/detail surfaces. Regression
+  tests cover header action isolation/containment/disposal, hidden/moved headers, navigation history and row actions.
+  Final `./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview check --continue` passed:
+  **8,709 tests, 0 failures, 0 errors, 6 existing skips**; architecture, documentation and native headless gates passed.
+  Changed-source hygiene and whitespace checks passed. Refreshed empty/populated dark/light previews at 220/300px
+  and 18pt UI-font layouts were inspected, including narrow size-column and switch-contrast corrections.
+  Previews remain under `jasper-app/build/plugin-panel-preview/` (populated variants end in `-populated.png`).
+  Native desktop acceptance remains user-run. No GUI, benchmark or AOT training has been run.
+  User approved merge to main and push. Integrated main `192443b3`, preserving its tab-width correction and
+  OS-notification changes; only status notes conflicted and both entries were retained. Combined
+  `./gradlew check --continue` passed: **8,771 tests, 0 failures, 0 errors, 6 skipped**.
+  Preview images are preserved in the main checkout under `jasper-app/build/plugin-panel-preview/`.
+
+- **Plugin panel visual refresh** (2026-10-04; `codex/plugin-panel-redesign`, isolated worktree
+  `/Users/dustin/.codex/worktrees/plugin-panel-redesign/moray`): implements the user's supplied mock as the direction
+  for Remote's Sessions panel and disconnected SFTP / empty Tunnels and File Servers. Sessions shows addresses beside
+  names, leading status dots, trailing favorites, rounded selection and an icon-led selected-host footer with a local
+  accent Connect action. SFTP shows a centered folder prompt and a window-owned Choose Session action, plus a separated
+  Follow terminal folder switch. Empty tunnel/server views use centered icon/title/help/action stacks, retaining visible
+  parse errors and existing creation flows. Existing host grouping, favorites-first ordering and app-owned title bars
+  are retained; populated SFTP/tunnel/server layouts await the user's next reference. No SDK or connection architecture
+  changes. Helpers stay inside each plugin's boundary and read the active component-zone palette.
+  This bounded screenshot-directed follow-up used independent SFTP and empty-panel implementers and a whole-change
+  review, without re-executing historical plans. Meaningful state/action regressions were observed failing before
+  implementation. Review found narrow-row wrapping, live font refresh and missing keyboard focus on the custom
+  primary button; all are corrected. Font and focus regressions were observed failing before their fixes, and
+  independent follow-up review approved with no remaining findings. Final `./gradlew check --continue` passed:
+  **8,689 tests, 0 failures, 0 errors, 6 existing skips**, including architecture and documentation gates.
+  Changed-source hygiene and whitespace checks passed. Dark/light, 220/300px rails and 18pt UI-font previews were
+  inspected; native desktop acceptance remains user-run. Headless previews are reproducible with
+  `./gradlew -I tools/previews/plugin-panels.gradle :jasper-app:pluginPanelsPreview` and written under
+  `jasper-app/build/plugin-panel-preview/`. No native GUI, benchmark or AOT training launched.
+
 - **Tab width correction** (2026-10-04): clarified that only the starting size should double. Tabs now
   have a 160-pixel minimum, normal measured title growth, and the original 240-pixel maximum. Removed the
   content-width multiplier; the 64 × 2 accent pill and hidden-rail corners are unchanged. The regression
@@ -400,6 +669,23 @@
   were retained. Final combined `./gradlew check --continue`: **8,743 tests, 0 failures, 0 errors, 6 skipped**.
   Changed-source hygiene and whitespace checks passed.
 
+- **Notifications plan 6: Settings, reviewed on branch `claude/notifications-6`; awaiting the user's GUI checks and
+  merge decision** (plan `docs/superpowers/plans/2026-10-04-notifications-6-settings.md`,
+  [guide](configuration.md#notification-groups)): `[notifications.groups]` maps a group id to `"card"`, `"sticky"`,
+  `"history"` or `"off"`, and Settings › Notifications gains a Groups section. It lists every group declared so far
+  (Jasper's, and each plugin's once it has run): its name (pointing at it shows the id), who declared it, a mode combo
+  marking the default, and Reset. Changes apply to the next notification, and entries for plugins that are not
+  running are kept. An unusable entry is a warning, and the group keeps its default: `SettingKind.MapRules` gains a
+  severity, and a WARNING map ignores even an entry of the wrong type instead of rejecting the file. Removing a
+  table's last entry removes the table, and `Setting.sameSaved` treats an empty table as no table, both when saving
+  and in the Settings draft. That also fixes Reset on `terminal.env`, and a phantom unsaved change in a config.toml
+  made from the template, whose table headers are uncommented. Spec interpretations: see the plan's list (1 to 10).
+  Known limitation, shared with `terminal.env`: an unapplied edit to the table in Settings wins over a hand edit of
+  the same table made meanwhile; Apply writes what the dialog shows. `./gradlew check --continue`: **8770 tests, 0
+  failures, 0 errors, 6 skipped**. No GUI launched. GUI checks for the user: Settings › Notifications shows the Groups
+  table in light and dark themes; choosing History only for Long-running commands and applying it makes the next long
+  command go to the panel without a card; Reset returns a group to its default; editing `[notifications.groups]` by
+  hand with an unknown mode shows a configuration warning; a plugin's groups appear once the plugin has started.
 - **Notifications plan 5: OS notifiers, reviewed on branch `claude/notifications-5`; awaiting the user's GUI checks and
   merge decision** (2026-10-04; plan `docs/superpowers/plans/2026-10-03-notifications-5-os-notifiers.md`,
   [guide](notifications.md#system-notifications)): while Jasper is in the background, or idle as a resident Jasper with

@@ -13,6 +13,13 @@ public interface PanelHost {
      */
     WindowHandle window();
 
+    /**
+     * Replaces this instance's header metadata and icon actions. Callbacks become inert when the instance closes.
+     * @param header the header description
+     * @since 0.14.2
+     */
+    void setHeader(PanelHeader header);
+
     /** Shows the panel in this window, hiding whatever else occupied its slot. */
     void show();
 

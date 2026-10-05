@@ -201,8 +201,8 @@ final class WindowContributions implements AutoCloseable {
             if (current.containsKey(id)) continue;
             PanelInstance gone = panels.remove(id);
             dock.remove(id);
-            owner.area().removeContent(id);
             if (gone.site != null) gone.site.notifyClosed();
+            owner.area().removeContent(id);
         }
         for (PanelEntry entry : current.values()) {
             if (panels.containsKey(entry.id())) continue;
@@ -257,13 +257,14 @@ final class WindowContributions implements AutoCloseable {
     private void build(String id) {
         PanelInstance panel = panels.get(id);
         if (panel == null || panel.component != null) return;
-        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> visible(id));
+        panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> visible(id), header -> owner.area().setHeader(id, header));
         JComponent built = null;
         try { built = panel.entry.factory().apply(panel.site); }
         catch (RuntimeException failure) {
             // A plugin's adapter turns its own failures into null, so an exception reaching here came from no adapter.
             LOG.log(System.Logger.Level.WARNING, "The panel " + id + " could not be built; showing a placeholder.", failure);
         }
+        if (built == null) panel.site.setHeader(dev.jasper.app.contributions.PanelHeaderState.EMPTY);
         panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
         if (built == null) dev.jasper.ui.swing.NativeControlStyles.label((JLabel) panel.component, dev.jasper.ui.metrics.Typography.Role.LABEL,
             dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY, () -> dev.jasper.app.platform.ThemeZone.theme(panel.component));

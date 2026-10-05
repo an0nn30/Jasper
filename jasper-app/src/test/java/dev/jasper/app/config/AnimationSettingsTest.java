@@ -16,18 +16,18 @@ class AnimationSettingsTest {
             """, true);
         assertThat(result.diagnostics()).isEmpty();
         assertThat(result.rejected()).isFalse();
-        assertThat(result.snapshot().animations()).isEqualTo(new AnimationSettings(false, 80, 100, 130));
+        assertThat(result.snapshot().animations()).isEqualTo(new AnimationSettings(false, 475, 425, 0));
         assertThat(result.snapshot().toBuilder().tabHeight(40).build().animations())
-            .isEqualTo(new AnimationSettings(false, 80, 100, 130));
+            .isEqualTo(new AnimationSettings(false, 475, 425, 0));
     }
 
     @Test void absentSettingsEnableFinalMotionWhileAnInvalidToggleRejectsTheFile() {
         assertThat(ConfigLoader.parse(Path.of("config.toml"), "", true).snapshot().animations())
-            .isEqualTo(new AnimationSettings(true, 80, 100, 130));
+            .isEqualTo(new AnimationSettings(true, 475, 425, 0));
         var invalid = ConfigLoader.parse(Path.of("config.toml"), "[ui.animations]\nenabled = 4\ntab_open_ms = 'slow'", true);
         assertThat(invalid.rejected()).isTrue();
         assertThat(invalid.diagnostics()).extracting(ConfigDiagnostic::key).containsExactly("ui.animations.enabled");
-        assertThat(invalid.snapshot().animations()).isEqualTo(new AnimationSettings(true, 80, 100, 130));
+        assertThat(invalid.snapshot().animations()).isEqualTo(new AnimationSettings(true, 475, 425, 0));
     }
 
     @Test void retiredDurationsIgnoreTypesAndRangesWithoutRejectingOrWarning() {
@@ -37,7 +37,7 @@ class AnimationSettingsTest {
             tab_close_ms = -1
             tab_switch_ms = [9999, false]
             """, true);
-        assertThat(result.snapshot().animations()).isEqualTo(new AnimationSettings(true, 80, 100, 130));
+        assertThat(result.snapshot().animations()).isEqualTo(new AnimationSettings(true, 475, 425, 0));
         assertThat(result.rejected()).isFalse();
         assertThat(result.diagnostics()).isEmpty();
         assertThat(result.legacyKeys()).isEmpty();
@@ -78,7 +78,7 @@ class AnimationSettingsTest {
         String original = "# keep\r\n[ui.animations]\r\nenabled = true\r\ntab_open_ms = 310 # tuned\r\n";
         Files.writeString(file, original);
         try (var service = new ConfigService(file, true)) {
-            assertThat(service.initialState().snapshot().animations()).isEqualTo(new AnimationSettings(true, 80, 100, 130));
+            assertThat(service.initialState().snapshot().animations()).isEqualTo(new AnimationSettings(true, 475, 425, 0));
             assertThat(Files.readString(file)).isEqualTo(original);
         }
         assertThat(Files.readString(file)).isEqualTo(original);
@@ -90,14 +90,14 @@ class AnimationSettingsTest {
         try (var service = new ConfigService(file, true)) {
             var state = service.save(SettingsEdit.of(CoreSettings.UI_ANIMATIONS_ENABLED, false, service.initialState().values()))
                 .get(5, java.util.concurrent.TimeUnit.SECONDS);
-            assertThat(state.snapshot().animations()).isEqualTo(new AnimationSettings(false, 80, 100, 130));
+            assertThat(state.snapshot().animations()).isEqualTo(new AnimationSettings(false, 475, 425, 0));
         }
         try (var reloaded = new ConfigService(file, true)) {
-            assertThat(reloaded.initialState().snapshot().animations()).isEqualTo(new AnimationSettings(false, 80, 100, 130));
+            assertThat(reloaded.initialState().snapshot().animations()).isEqualTo(new AnimationSettings(false, 475, 425, 0));
             assertThat(reloaded.initialState().snapshot().tabHeight()).isEqualTo(40);
             var state = reloaded.save(SettingsEdit.of(CoreSettings.UI_ANIMATIONS_ENABLED, true, reloaded.initialState().values()))
                 .get(5, java.util.concurrent.TimeUnit.SECONDS);
-            assertThat(state.snapshot().animations()).isEqualTo(new AnimationSettings(true, 80, 100, 130));
+            assertThat(state.snapshot().animations()).isEqualTo(new AnimationSettings(true, 475, 425, 0));
         }
         assertThat(Files.readString(file)).contains("# keep", "tab_height = 40", "tab_open_ms = 310 # tuned",
             "tab_close_ms = 17", "tab_switch_ms = 900", "enabled = true");

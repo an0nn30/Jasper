@@ -6,6 +6,8 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.NativeControlStyles;
 
 import dev.jasper.app.config.ShellExitBehavior;
+import dev.jasper.app.config.FontConfig;
+import dev.jasper.app.platform.BundledFonts;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.terminal.config.TerminalOptions;
@@ -34,7 +36,7 @@ import javax.swing.*;
 /** Exactly one asynchronously launched shell and its retained output. Owned on the EDT. */
 public final class TerminalPane extends JPanel implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(TerminalPane.class.getName());
-    static final float DEFAULT_FONT_SIZE = 16f;
+    static final float DEFAULT_FONT_SIZE = FontConfig.defaults().size();
     static final int PADDING = 4;
     private final UUID id = UUID.randomUUID();
     private final Path launchDirectory;
@@ -389,7 +391,10 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     }
 
     private static TerminalOptions applicationOptions() {
-        return TerminalOptions.defaults().toBuilder().fontSize(DEFAULT_FONT_SIZE).build();
+        BundledFonts.register();
+        FontConfig font = FontConfig.defaults();
+        return TerminalOptions.defaults().toBuilder().fontFamily(font.family()).fontSize(font.size())
+            .fallbackFonts(font.fallback()).ligatures(font.ligatures()).lineHeight(font.lineHeight()).build();
     }
 
     private void trackFocus(Component component) {

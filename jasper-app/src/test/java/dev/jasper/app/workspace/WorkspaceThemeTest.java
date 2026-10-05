@@ -38,7 +38,8 @@ class WorkspaceThemeTest {
             ToolWindowSurface.apply(toolWindow);
             assertThat(toolWindow.getBackground()).as("and the tool-window consumer paints it").isEqualTo(sidebar);
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            // The selected folder joins this workspace; the rest of the strip is recessed.
+            owner.newTab(HOME);
+            owner.setAnimations(new AnimationSettings(false, 0, 0, 0));
             assertStripSurfaces(owner);
             themes.configure(chrome, new WorkspaceThemeChoice("Jasper Light"), Theme.JASPER_LIGHT, UiFontConfig.defaults());
             assertStripSurfaces(owner);
@@ -67,11 +68,15 @@ class WorkspaceThemeTest {
                 if (control instanceof AbstractButton button && button.isSelected()) entry = candidate;
         }
         assertThat(entry).as("one real selected tab").isNotNull();
-        assertThat(new java.awt.Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 29)))
-            .as("active folder follows the actual workspace palette").isEqualTo(owner.theme().palette().background());
-        assertThat(new java.awt.Color(image.getRGB(500, 15)))
-            .as("negative space follows the workspace-derived recess").isEqualTo(strip.getBackground())
-            .isNotEqualTo(owner.theme().palette().background());
+        var selected = new java.awt.Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 4));
+        var base = owner.theme().palette().background();
+        assertThat(Math.abs(selected.getRed() - base.getRed())).isLessThanOrEqualTo(31);
+        assertThat(Math.abs(selected.getGreen() - base.getGreen())).isLessThanOrEqualTo(31);
+        assertThat(Math.abs(selected.getBlue() - base.getBlue())).isLessThanOrEqualTo(31);
+        int otherX = entry.getX() == 0 ? 500 : 10;
+        assertThat(image.getRGB(otherX, 4)).as("inactive cell has its own workspace-derived surface")
+            .isNotEqualTo(selected.getRGB());
+        assertThat(strip.getBackground()).isEqualTo(base);
     }
 
     @Test void independentWorkspaceMarksNewTabsAndPaintsStripWithoutChangingChrome() throws Exception {

@@ -329,23 +329,38 @@ final class FakeUi {
         final UUID windowId;
         JComponent content;
         boolean visible = true;
+        boolean done;
+        dev.jasper.sdk.ui.PanelHeader header = dev.jasper.sdk.ui.PanelHeader.EMPTY;
         final List<Consumer<Boolean>> visibility = new ArrayList<>();
         final List<Runnable> closed = new ArrayList<>();
         PanelInstance(UUID windowId) { this.windowId = windowId; }
         @Override public WindowHandle window() { return context.terminals.windowHandle(windowId); }
+        @Override public void setHeader(dev.jasper.sdk.ui.PanelHeader value) {
+            java.util.Objects.requireNonNull(value);
+            if (done) return;
+            header = new dev.jasper.sdk.ui.PanelHeader(value.detail(), value.active(), value.actions().stream()
+                .map(action -> new dev.jasper.sdk.ui.PanelHeader.Action(action.label(), action.icon(), () -> {
+                    if (done) return;
+                    try { action.invoke().run(); }
+                    catch (RuntimeException | LinkageError failure) { host.recordFailure(pluginId() + " panel header action: " + failure); }
+                })).toList());
+        }
         @Override public void show() { setVisible(true); }
         @Override public void hide() { setVisible(false); }
         void setVisible(boolean value) {
-            if (visible == value) return;
+            if (done || visible == value) return;
             visible = value;
             for (var listener : List.copyOf(visibility)) {
                 try { listener.accept(value); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel visibility: " + failure); }
             }
         }
-        @Override public boolean visible() { return visible; }
+        @Override public boolean visible() { return !done && visible; }
         @Override public Subscription onVisibility(Consumer<Boolean> handler) { visibility.add(handler); return () -> visibility.remove(handler); }
         @Override public Subscription onClosed(Runnable handler) { closed.add(handler); return () -> closed.remove(handler); }
         void close() {
+            if (done) return;
+            done = true;
+            header = dev.jasper.sdk.ui.PanelHeader.EMPTY;
             for (var handler : List.copyOf(closed)) {
                 try { handler.run(); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel closed: " + failure); }
             }

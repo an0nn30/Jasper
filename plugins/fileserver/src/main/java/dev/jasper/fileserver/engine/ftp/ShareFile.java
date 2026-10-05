@@ -1,5 +1,6 @@
 package dev.jasper.fileserver.engine.ftp;
 
+import dev.jasper.fileserver.engine.ClientPaths;
 import dev.jasper.fileserver.engine.ServerEvent;
 import dev.jasper.fileserver.engine.ServerEvents;
 import dev.jasper.fileserver.share.ShareEntry;
@@ -30,7 +31,7 @@ final class ShareFile implements FtpFile {
     /** {@code known} is the entry a listing already read, or null to read it when asked. */
     ShareFile(ShareView view, String path, ShareEntry known) { this.view = view; this.path = path; this.known = known; }
 
-    private String relative() { return FtpPaths.relative(path); }
+    private String relative() { return ClientPaths.relative(path); }
 
     private Optional<ShareEntry> entry() {
         if (known != null) return Optional.of(known);
@@ -39,7 +40,7 @@ final class ShareFile implements FtpFile {
     }
 
     @Override public String getAbsolutePath() { return path; }
-    @Override public String getName() { return FtpPaths.name(path); }
+    @Override public String getName() { return ClientPaths.name(path); }
     @Override public boolean isHidden() { return false; }
     @Override public boolean isDirectory() { return entry().map(ShareEntry::directory).orElse(false); }
     @Override public boolean isFile() { return entry().map(entry -> !entry.directory()).orElse(false); }

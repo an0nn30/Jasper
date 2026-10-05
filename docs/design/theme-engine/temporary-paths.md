@@ -322,7 +322,10 @@ under their own `DesignMetrics` names, so changing a kit, icon or dock role cann
 rail button arc `RAIL_BUTTON_ARC` 10; chrome toolbar command hover arc `NATIVE_TOOLBAR_HOVER_ARC` 6 and
 disabled content `NATIVE_TOOLBAR_DISABLED_PERCENT` 38; folder-tab scroll step/reveal margin/fade/close width
 `TAB_SCROLL_STEP`/`TAB_REVEAL_MARGIN`/`TAB_FADE_WIDTH`/`TAB_CLOSE_WIDTH` 16 and reorder threshold
-`TAB_REORDER_THRESHOLD` 5; running dot `STATUS_RUNNING_DOT` 5; progress bar/min height
+`TAB_REORDER_THRESHOLD` 5 (superseded by the main merge of 2026-10-05: main's equal-width tabs keep
+`TAB_CLOSE_WIDTH` 16 and `TAB_REORDER_THRESHOLD` 5 and add `TAB_REVEAL_INSET` 100, `TAB_CLOSE_FIT_WIDTH` 80,
+`TAB_CLOSE_GUTTER` 28, `TAB_COMPACT_GUTTER` 4, `TAB_CLOSE_TRAILING` 6, `TAB_DIVIDER` 1; the folder-only roles and
+`TAB_REVEAL_SPACE` are removed and motion is `TAB_OPEN_MILLIS` 475/`TAB_CLOSE_MILLIS` 425/`TAB_SWITCH_MILLIS` 0); running dot `STATUS_RUNNING_DOT` 5; progress bar/min height
 `STATUS_PROGRESS_BAR_HEIGHT` 8/`STATUS_PROGRESS_MIN_HEIGHT` 24; tool header padding
 `TOOL_HEADER_LEADING_PADDING` 10/`TOOL_HEADER_TRAILING_PADDING` 6; rail badge `RAIL_BADGE_DOT` 6; find row
 `FIND_GAP`/`FIND_SIDE_PADDING` 6, `FIND_CONTROL_GAP` 4, `FIND_CLOSE_SPACER` 16; title search padding/gap
@@ -393,3 +396,24 @@ semantic icon resolution and live motion source are final behavior, not removal 
 JComponent transport in contributions/windows/workspace remains an internal module boundary; it does
 not expose raw Swing through the final SDK. Existing auxiliary/panel/content lifetime owners require
 no duplicate new adapter outside app.plugins.
+
+## Main merge (2026-10-05, main `d3455d47`) — new raw consumers and owners
+
+Merging main brought new UI. Consumers in already-migrated families were re-bound in the merge commit; the rest stay
+raw (they need real design work) with these exact owners. Every path below has a `migration.csv` row.
+
+| Exact path | What stays raw | Owner |
+|---|---|---|
+| `jasper-sdk/src/main/java/dev/jasper/sdk/ui/PanelHeader.java` (SDK 0.14.2, main's bump kept) | `Action.icon` is a raw `javax.swing.Icon` | Task 11 (0.15 cutover) replaces raw SDK icons |
+| `jasper-app/src/main/java/dev/jasper/app/contributions/PanelHeaderState.java` | carries the raw action icons to the native header | Task 11 with `PanelHeader` |
+| `jasper-app/src/main/java/dev/jasper/app/workspace/ToolWindowArea.java` (`setHeader`) | a borrowed kit panel header does not show `PanelHeader` detail, connected dot or actions (the native `ToolWindowHeader` does, on module roles) | Task 6d (post-merge): project `PanelHeader` onto kit headers or rule that kit panels use their `Panel` node |
+| `plugins/remote/src/main/java/dev/jasper/remote/ui/PanelStyle.java`, `ui/tunnels/TunnelSwitch.java` and the redesigned `HostsPanel`/`SftpPanel`/`TunnelsPanel` | `UIManager.getFont("Label.font")`, fixed accent colours `0x3274f6`/`0x2467de`, custom-painted switch | Task 8 |
+| `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/PanelStyle.java`, `ui/RowArtwork.java`, `ui/ProtocolChip.java` and FS-3/FS-4 `ServerEditor` additions | the same raw font/accent reads and painted chips/artwork | Task 10 |
+| `plugins/indexer/src/main/java/dev/jasper/indexer/ui/IndexerSettingsPanel.java`, `ui/FilesScope.java`, `IndexerPlugin.java` (Project Index, eighth bundled plugin) | raw Swing settings page; palette rows with raw SDK icons | Task 10 (Task 11 for the SDK icon path) |
+
+Re-bound in the merge (no temporary path): `WindowTabs` (main's equal-width tabs on module roles and named `TAB_*`
+metrics), `ToolWindowHeader` (main's detail/dot/actions on module roles), `NotificationGroupsEditor` (main's
+notification-groups editor rewritten onto the Task 6a kit `ValueEditor`), `AnimationSettings` (main's 475/425/0 ms
+motion through `TAB_*_MILLIS`). Task 11's bundled-plugin manifest work now covers eight plugins (editor,
+fileserver, history, indexer, remote, sample, snippets, vault); `ThemeMigrationCoverageTest` discovers them from
+`plugins/` and requires a `dev.jasper.indexer` owner.

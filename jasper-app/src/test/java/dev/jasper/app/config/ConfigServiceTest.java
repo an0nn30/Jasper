@@ -139,7 +139,7 @@ class ConfigServiceTest {
             Files.writeString(file, "window.tab_height=44\nterminal.font.size=100\nfont.future=1");
             var state = service.reload().get(5, TimeUnit.SECONDS);
             assertThat(state.snapshot().tabHeight()).isEqualTo(44);
-            assertThat(state.snapshot().fontSize()).isEqualTo(16f);
+            assertThat(state.snapshot().fontSize()).isEqualTo(12f);
             assertThat(state.diagnostics()).extracting(ConfigDiagnostic::severity)
                 .containsExactly(ConfigDiagnostic.Severity.ERROR, ConfigDiagnostic.Severity.WARNING);
         }

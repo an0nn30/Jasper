@@ -199,7 +199,7 @@ public final class ConfigService implements AutoCloseable {
                     if (parsed.rejected()) throw new IllegalArgumentException("Fix config.toml's errors before saving settings.");
                     for (var change : edit.changes().entrySet()) {
                         Setting<?> setting = change.getKey();
-                        if (!parsed.values().saved(setting).equals(edit.expected().get(setting)))
+                        if (!setting.sameSaved(parsed.values().saved(setting), edit.expected().get(setting)))
                             throw new StaleSetting(setting.name() + " changed on disk. Review the new value and try again.");
                         change.getValue().ifPresent(value -> check(setting, value));
                     }
@@ -212,7 +212,7 @@ public final class ConfigService implements AutoCloseable {
                     String updated = document.text();
                     var checked = ConfigLoader.parse(file, updated, macOs);
                     if (checked.rejected() || edit.changes().entrySet().stream()
-                            .anyMatch(change -> !checked.values().saved(change.getKey()).equals(change.getValue())))
+                            .anyMatch(change -> !change.getKey().sameSaved(checked.values().saved(change.getKey()), change.getValue())))
                         throw new IllegalArgumentException("Cannot safely save these settings; review config.toml.");
                     return updated;
                 });

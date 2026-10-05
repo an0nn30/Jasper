@@ -138,6 +138,12 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Table(), List.of());
     }
 
+    /** The {@code notifications.groups} editor: one line per group {@code choices} lists. */
+    public static Factory<Map<String, String>> notificationGroups(NotificationGroupChoices choices) {
+        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices),
+            List.of("group", "card", "sticky", "history only", "off", "mute"));
+    }
+
     /** A switch meaning "use the default", and a number field enabled while it is off; the default removes the key. */
     public static Factory<Float> optionalNumber(String label, double step, String unit) {
         return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit), List.of());

@@ -125,4 +125,55 @@ class SettingsSaveTest {
     @Test void anEditMustNameTheSameSettingsTwice() {
         assertThatIllegalArgumentException().isThrownBy(() -> edit(Map.of(CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(40)), Map.of()));
     }
+
+    @Test void resettingATableRemovesItsEntriesAndTheTableLeftEmpty() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "[terminal.env]\nA = \"1\"\n\n[window]\ntab_height = 44\n");
+        try (var service = new ConfigService(file, true)) {
+            var state = save(service, edit(Map.of(CoreSettings.TERMINAL_ENV, Optional.empty()),
+                Map.of(CoreSettings.TERMINAL_ENV, Optional.of(Map.of("A", "1")))));
+            assertThat(Files.readString(file)).doesNotContain("[terminal.env]").contains("[window]\ntab_height = 44\n");
+            assertThat(state.values().saved(CoreSettings.TERMINAL_ENV)).isEmpty();
+            assertThat(state.snapshot().tabHeight()).isEqualTo(44);
+        }
+    }
+
+    /** The template's table headers are uncommented, so a new file already holds an empty [terminal.env]. */
+    @Test void aTableStartsFromTheTemplatesEmptyHeader() throws Exception {
+        Path file = directory.resolve("new/config.toml");
+        try (var service = new ConfigService(file, true)) {
+            var state = save(service, edit(Map.of(CoreSettings.TERMINAL_ENV, Optional.of(Map.of("A", "1"))),
+                Map.of(CoreSettings.TERMINAL_ENV, Optional.empty())));
+            assertThat(state.snapshot().terminal().env()).containsExactly(Map.entry("A", "1"));
+            assertThat(Files.readString(file)).containsOnlyOnce("[terminal.env]");
+            assertThat(state.diagnostics()).isEmpty();
+        }
+    }
+
+    @Test void notificationGroupsKeepOtherGroupsAndAnEmptiedTableLeavesNoHeader() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "[notifications.groups]\n\"dev.jasper.remote.activities\" = \"off\"\n");
+        try (var service = new ConfigService(file, true)) {
+            var both = Map.of("dev.jasper.remote.activities", "off", "jasper.commands", "history");
+            var state = save(service, edit(Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(both)),
+                Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(Map.of("dev.jasper.remote.activities", "off")))));
+            assertThat(state.values().get(CoreSettings.NOTIFICATIONS_GROUPS)).isEqualTo(both);
+            assertThat(Files.readString(file)).containsOnlyOnce("[notifications.groups]");
+            state = save(service, edit(Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.empty()),
+                Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(both))));
+            assertThat(state.values().saved(CoreSettings.NOTIFICATIONS_GROUPS)).isEmpty();
+            assertThat(Files.readString(file)).doesNotContain("[notifications.groups]");
+        }
+    }
+
+    @Test void aFirstGroupModeIsSavedIntoTheTemplate() throws Exception {
+        Path file = directory.resolve("new/config.toml");
+        try (var service = new ConfigService(file, true)) {
+            var state = save(service, edit(Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.of(Map.of("jasper.commands", "off"))),
+                Map.of(CoreSettings.NOTIFICATIONS_GROUPS, Optional.empty())));
+            assertThat(state.values().get(CoreSettings.NOTIFICATIONS_GROUPS)).isEqualTo(Map.of("jasper.commands", "off"));
+            assertThat(Files.readString(file)).containsOnlyOnce("[notifications.groups]");
+            assertThat(state.diagnostics()).isEmpty();
+        }
+    }
 }

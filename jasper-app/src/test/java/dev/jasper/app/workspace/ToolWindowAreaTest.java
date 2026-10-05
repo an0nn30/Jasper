@@ -341,6 +341,73 @@ class ToolWindowAreaTest {
         assertThat(left.getParent().getWidth()).isEqualTo(UIScale.scale(DockState.MIN_SIZE));
     }
 
+    @Test void headerTitleDetailAndUnusedSpaceAreDragSourcesButActionButtonsAreNot() {
+        var area = new ToolWindowArea(new JPanel(), new DockState());
+        var registered = new ArrayList<javax.swing.JComponent>();
+        area.dragSource = (component, id) -> registered.add(component);
+        String id = DockTestSupport.id(Slot.LEFT_TOP);
+        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        area.setHeader(id, new dev.jasper.app.contributions.PanelHeaderState("prod-web-1", true, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Add", icon, () -> {}))));
+        DockTestSupport.show(area, Slot.LEFT_TOP, new JPanel(), 260);
+        var header = area.headerOf(Slot.LEFT_TOP);
+        var detail = headerDescendants(header).stream().filter(c -> c instanceof JLabel label && "prod-web-1".equals(label.getText()))
+            .map(c -> (JLabel) c).findFirst().orElseThrow();
+        assertThat(registered).contains(header, header.titleLabel(), detail, (javax.swing.JComponent) detail.getParent());
+        assertThat(registered).doesNotContainAnyElementsOf(headerButtons(header));
+    }
+
+    @Test void headerMetadataSurvivesHiddenUpdatesAndMovingWithoutLeakingToAReplacement() {
+        var area = new ToolWindowArea(new JPanel(), new DockState());
+        String id = "panel.sessions";
+        var content = new JPanel();
+        var calls = new ArrayList<String>();
+        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        area.setHeader(id, new dev.jasper.app.contributions.PanelHeaderState("5", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Add session", icon, () -> calls.add("first")))));
+        area.setContent(id, "Sessions", content);
+        area.state().add(id, Slot.LEFT_TOP);
+        area.state().show(id);
+        area.sync();
+        layout(area);
+        assertThat(headerTexts(area.headerOf(Slot.LEFT_TOP))).contains("Sessions", "5");
+        area.state().hide(id);area.sync();
+        area.setHeader(id, new dev.jasper.app.contributions.PanelHeaderState("6", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Add session", icon, () -> calls.add("updated")))));
+        assertThat(area.headerOf(Slot.LEFT_TOP)).isNull();
+        area.state().move(id, Slot.RIGHT_BOTTOM, 0);
+        area.state().show(id);area.sync();layout(area);
+        var moved = area.headerOf(Slot.RIGHT_BOTTOM);
+        assertThat(area.content(Slot.RIGHT_BOTTOM)).isSameAs(content);
+        assertThat(headerTexts(moved)).contains("Sessions", "6").doesNotContain("5");
+        headerButtons(moved).stream().filter(button -> "Add session".equals(button.getAccessibleContext().getAccessibleName()))
+            .findFirst().orElseThrow().doClick();
+        assertThat(calls).containsExactly("updated");
+        area.state().remove(id);area.removeContent(id);area.sync();
+        area.setContent(id, "Replacement", new JPanel());
+        area.state().add(id, Slot.RIGHT_BOTTOM);area.state().show(id);area.sync();layout(area);
+        var replacement = area.headerOf(Slot.RIGHT_BOTTOM);
+        assertThat(headerTexts(replacement)).contains("Replacement").doesNotContain("6");
+        assertThat(headerButtons(replacement)).noneMatch(button -> "Add session".equals(button.getAccessibleContext().getAccessibleName()));
+    }
+
+    private static List<Component> headerDescendants(java.awt.Container parent) {
+        var result = new ArrayList<Component>();
+        for (var child : parent.getComponents()) {
+            result.add(child);
+            if (child instanceof java.awt.Container nested) result.addAll(headerDescendants(nested));
+        }
+        return result;
+    }
+
+    private static List<String> headerTexts(ToolWindowHeader header) {
+        return headerDescendants(header).stream().filter(c -> c instanceof JLabel).map(c -> ((JLabel) c).getText()).toList();
+    }
+
+    private static List<javax.swing.JButton> headerButtons(ToolWindowHeader header) {
+        return headerDescendants(header).stream().filter(c -> c instanceof javax.swing.JButton).map(c -> (javax.swing.JButton) c).toList();
+    }
+
     @Test void theHeaderHidesAndMovesThroughTheArea() {
         var area = new ToolWindowArea(new JPanel(), new DockState());
         List<String> events = new ArrayList<>();

@@ -4,6 +4,8 @@ import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.NativeControlStyles;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 
 import com.formdev.flatlaf.ui.FlatEmptyBorder;
 import com.formdev.flatlaf.util.UIScale;
@@ -19,12 +21,11 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.UIManager;
 
 /**
  * The header at the top of a tool window's frame, as in IntelliJ's new UI: the title on the left and, on the right,
- * an options button (the ⋮ menu: Move to, Hide) and a hide button (—). It has no bar colour of its own: a plain
- * panel inside the frame, it takes the tool window background. Plan 2 makes it a drag handle. EDT only.
+ * contributed icon actions, an options menu (Move to, Hide), and a collapse chevron. It takes the
+ * tool window background and its non-control area is a drag handle. EDT only.
  */
 final class ToolWindowHeader extends JPanel {
     /** Height in logical pixels. */
@@ -37,9 +38,19 @@ final class ToolWindowHeader extends JPanel {
             if (font != null) setFont(ThemeZone.font(Typography.Role.PANEL_TITLE));
         }
     };
+    // Module glyphs: "more" is the horizontal ellipsis and "collapse" the down chevron main's panel redesign chose.
     private final JButton options = button("more", "Options");
     private final JButton hide = button("collapse", "Hide");
     private final Supplier<JPopupMenu> menu;
+    /** Count or connection name beside the title: the kit panel header's count typography and colour. */
+    private final JLabel detail = new JLabel() {
+        @Override public void updateUI() { super.updateUI(); setFont(ThemeZone.font(Typography.Role.COUNT)); }
+        @Override public java.awt.Color getForeground() { return ThemeZone.color(this, SemanticColor.TEXT_SECONDARY); }
+    };
+    private final JPanel labels;
+    private final JPanel contributed = new JPanel();
+    private final java.util.List<JButton> actionButtons = new java.util.ArrayList<>();
+    private dev.jasper.app.contributions.PanelHeaderState presentation = dev.jasper.app.contributions.PanelHeaderState.EMPTY;
 
     /**
      * @param text the window's title, shown as plain text
@@ -58,12 +69,28 @@ final class ToolWindowHeader extends JPanel {
         var buttons = new JPanel();
         buttons.setOpaque(false);
         buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
+        contributed.setOpaque(false);
+        contributed.setLayout(new BoxLayout(contributed, BoxLayout.X_AXIS));
+        buttons.add(contributed);
         buttons.add(options);
         buttons.add(Box.createHorizontalStrut(2));
         buttons.add(hide);
         // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern ToolWindowArea.Host.gutters uses.
         setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, DesignMetrics.DEFAULT.value(DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING), 0, DesignMetrics.DEFAULT.value(DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING)), null));
-        add(title, BorderLayout.CENTER);
+        detail.putClientProperty("html.disable", Boolean.TRUE);
+        labels = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0)) {
+            @Override public void doLayout() {
+                int titleWidth = Math.min(title.getPreferredSize().width, getWidth());
+                int height = getHeight();
+                title.setBounds(0, 0, titleWidth, height);
+                int x = titleWidth + NativeControlStyles.metric(DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
+                detail.setBounds(x, 0, Math.max(0, getWidth() - x), height);
+            }
+            @Override public Dimension getMinimumSize() { return new Dimension(0, 0); }
+        };
+        labels.setOpaque(false);
+        labels.add(title); labels.add(detail);
+        add(labels, BorderLayout.CENTER);
         add(buttons, BorderLayout.EAST);
     }
 
@@ -75,6 +102,49 @@ final class ToolWindowHeader extends JPanel {
         button.getAccessibleContext().setAccessibleName(name);
         return button;
     }
+
+    void presentation(dev.jasper.app.contributions.PanelHeaderState state) {
+        presentation = java.util.Objects.requireNonNull(state);
+        detail.setText(state.detail());
+        detail.setToolTipText(state.detail().isEmpty() ? null : state.detail());
+        detail.setIcon(state.active() ? new javax.swing.Icon() {
+            @Override public int getIconWidth() { return NativeControlStyles.metric(DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT); }
+            @Override public int getIconHeight() { return getIconWidth(); }
+            @Override public void paintIcon(java.awt.Component c, java.awt.Graphics graphics, int x, int y) {
+                var g = (java.awt.Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                    // The connected dot is the success status, held readable on the tool window surface it sits on.
+                    g.setColor(SurfaceContrast.on(ThemeZone.theme(ToolWindowHeader.this).semantic(), SemanticColor.STATUS_SUCCESS,
+                        SemanticColor.SURFACE_SIDEBAR, SurfaceContrast.INDICATOR));
+                    g.fillOval(x, y, getIconWidth(), getIconHeight());
+                } finally { g.dispose(); }
+            }
+        } : null);
+        while (actionButtons.size() > state.actions().size()) {
+            contributed.remove(actionButtons.removeLast());
+        }
+        for (int i = 0; i < state.actions().size(); i++) {
+            var action = state.actions().get(i);
+            if (i == actionButtons.size()) {
+                int index = i;
+                var button = new JButton();
+                NativeControlStyles.button(button, () -> ThemeZone.theme(button));
+                button.addActionListener(event -> {
+                    if (index < presentation.actions().size()) presentation.actions().get(index).invoke().run();
+                });
+                actionButtons.add(button); contributed.add(button);
+            }
+            var button = actionButtons.get(i);
+            button.setIcon(action.icon());
+            button.setToolTipText(action.label());
+            button.getAccessibleContext().setAccessibleName(action.label());
+        }
+        revalidate(); repaint();
+    }
+
+    /** Every non-control header surface receives its own mouse listener because Swing events do not bubble. */
+    java.util.List<javax.swing.JComponent> dragSurfaces() { return java.util.List.of(this, title, detail, labels); }
 
     JLabel titleLabel() { return title; }
 

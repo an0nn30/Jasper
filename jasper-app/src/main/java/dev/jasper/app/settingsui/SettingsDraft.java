@@ -39,7 +39,7 @@ public final class SettingsDraft {
     /** Records an edit; one that matches the saved state removes any pending edit instead. */
     public <T> void stage(Setting<T> setting, Optional<T> value) {
         Objects.requireNonNull(value, "value");
-        if (value.equals(baseline.saved(setting))) pending.remove(setting);
+        if (setting.sameSaved(value, baseline.saved(setting))) pending.remove(setting);
         else pending.put(setting, value);
         changed();
     }
@@ -61,7 +61,7 @@ public final class SettingsDraft {
     /** Adopts newer saved values; pending edits the new values already hold are dropped. */
     public void rebase(SettingValues next) {
         baseline = Objects.requireNonNull(next, "next");
-        pending.entrySet().removeIf(entry -> entry.getValue().equals(baseline.saved(entry.getKey())));
+        pending.entrySet().removeIf(entry -> entry.getKey().sameSaved(entry.getValue(), baseline.saved(entry.getKey())));
         changed();
     }
 

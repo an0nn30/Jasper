@@ -8,25 +8,23 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 class WorkspaceMetricsTest {
-    @Test void approvedFolderAndDockGeometryIsModuleOwnedAndUnscaled() {
+    /** Main's Alacritty-style tabs (merged 2026-10-05): equal widths, measured 475/425 ms motion, no switch motion. */
+    @Test void approvedTabAndDockGeometryIsModuleOwnedAndUnscaled() {
         var metrics = DesignMetrics.DEFAULT;
-        assertThat(metrics.value(DesignMetrics.Role.TAB_MIN_WIDTH)).isEqualTo(160);
-        assertThat(metrics.value(DesignMetrics.Role.TAB_MAX_WIDTH)).isEqualTo(240);
-        assertThat(metrics.value(DesignMetrics.Role.TAB_ACCENT_WIDTH)).isEqualTo(64);
-        assertThat(metrics.value(DesignMetrics.Role.TAB_ACCENT_HEIGHT)).isEqualTo(2);
-        assertThat(metrics.value(DesignMetrics.Role.TAB_OPEN_MILLIS)).isEqualTo(80);
-        assertThat(metrics.value(DesignMetrics.Role.TAB_CLOSE_MILLIS)).isEqualTo(100);
-        assertThat(metrics.value(DesignMetrics.Role.TAB_SWITCH_MILLIS)).isEqualTo(130);
-        assertThat(AnimationSettings.defaults()).isEqualTo(new AnimationSettings(true, 80, 100, 130));
+        assertThat(metrics.value(DesignMetrics.Role.TAB_OPEN_MILLIS)).isEqualTo(475);
+        assertThat(metrics.value(DesignMetrics.Role.TAB_CLOSE_MILLIS)).isEqualTo(425);
+        assertThat(metrics.value(DesignMetrics.Role.TAB_SWITCH_MILLIS)).isEqualTo(0);
+        assertThat(AnimationSettings.defaults()).isEqualTo(new AnimationSettings(true, 475, 425, 0));
         assertThat(metrics.value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC)).isEqualTo(16);
     }
 
     /** Each native dimension has its own name, carrying the exact pre-migration value. */
     @Test void nativeGeometryKeepsItsExactValuesUnderItsOwnNames() {
         var expected = new java.util.LinkedHashMap<DesignMetrics.Role, Integer>();
-        expected.putAll(Map.of(DesignMetrics.Role.TAB_SCROLL_STEP, 16, DesignMetrics.Role.TAB_REVEAL_MARGIN, 16,
-            DesignMetrics.Role.TAB_FADE_WIDTH, 16, DesignMetrics.Role.TAB_CLOSE_WIDTH, 16, DesignMetrics.Role.TAB_REORDER_THRESHOLD, 5,
-            DesignMetrics.Role.STATUS_RUNNING_DOT, 5, DesignMetrics.Role.STATUS_PROGRESS_BAR_HEIGHT, 8,
+        expected.putAll(Map.of(DesignMetrics.Role.TAB_REVEAL_INSET, 100, DesignMetrics.Role.TAB_CLOSE_FIT_WIDTH, 80,
+            DesignMetrics.Role.TAB_CLOSE_GUTTER, 28, DesignMetrics.Role.TAB_COMPACT_GUTTER, 4, DesignMetrics.Role.TAB_CLOSE_WIDTH, 16,
+            DesignMetrics.Role.TAB_CLOSE_TRAILING, 6, DesignMetrics.Role.TAB_DIVIDER, 1, DesignMetrics.Role.TAB_REORDER_THRESHOLD, 5));
+        expected.putAll(Map.of(DesignMetrics.Role.STATUS_RUNNING_DOT, 5, DesignMetrics.Role.STATUS_PROGRESS_BAR_HEIGHT, 8,
             DesignMetrics.Role.STATUS_PROGRESS_MIN_HEIGHT, 24, DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING, 10,
             DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING, 6));
         expected.putAll(Map.of(DesignMetrics.Role.RAIL_BUTTON_ARC, 10, DesignMetrics.Role.NATIVE_TOOLBAR_HOVER_ARC, 6,
@@ -61,7 +59,8 @@ class WorkspaceMetricsTest {
         }
         var required = Map.of("WindowStatusBar.java", List.of("STATUS_RUNNING_DOT"),
             "StatusProgressView.java", List.of("STATUS_PROGRESS_BAR_HEIGHT", "STATUS_PROGRESS_MIN_HEIGHT"),
-            "WindowTabs.java", List.of("TAB_SCROLL_STEP", "TAB_REVEAL_MARGIN", "TAB_FADE_WIDTH", "TAB_CLOSE_WIDTH", "TAB_REORDER_THRESHOLD"),
+            "WindowTabs.java", List.of("TAB_REVEAL_INSET", "TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",
+                "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "TAB_DIVIDER", "TAB_REORDER_THRESHOLD"),
             "ToolWindowHeader.java", List.of("TOOL_HEADER_LEADING_PADDING", "TOOL_HEADER_TRAILING_PADDING"));
         for (var entry : required.entrySet())
             assertThat(Files.readString(workspace.resolve(entry.getKey()))).as(entry.getKey()).contains(entry.getValue());

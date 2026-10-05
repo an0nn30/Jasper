@@ -10,6 +10,7 @@ import dev.jasper.fileserver.engine.EngineFailure;
 import dev.jasper.fileserver.engine.LoginThrottle;
 import dev.jasper.fileserver.engine.ServerAddresses;
 import dev.jasper.fileserver.engine.ServerEvent;
+import dev.jasper.fileserver.engine.sftp.HostKey;
 import dev.jasper.fileserver.engine.tls.TlsMaterial;
 import dev.jasper.fileserver.runtime.Engines;
 import dev.jasper.fileserver.runtime.ServerRegistry;
@@ -23,6 +24,7 @@ import dev.jasper.fileserver.ui.ServerRows;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
+import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -33,6 +35,7 @@ import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
+import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
@@ -42,9 +45,12 @@ import dev.jasper.vault.api.VaultApi;
 import java.awt.Desktop;
 import java.awt.HeadlessException;
 import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -85,6 +91,10 @@ public final class FileServerPlugin implements Plugin {
     public static final String SERVERS = ID + ".servers";
     public static final String SERVE_HTTP = ID + ".serve-http";
     public static final String SERVE_FTP = ID + ".serve-ftp";
+    public static final String SERVE_SFTP = ID + ".serve-sftp";
+    public static final String SERVE_TFTP = ID + ".serve-tftp";
+    /** The largest public key file read; a real one is well under 16 KiB. */
+    private static final long MAX_KEY_FILE = 64 * 1024;
 
     /** What the plugin takes from the machine; tests replace each part. */
     record Environment(Executor ui, Supplier<List<ServerAddresses.Nic>> nics, IntPredicate portFree, Consumer<String> clipboard,
@@ -109,6 +119,7 @@ public final class FileServerPlugin implements Plugin {
     private DefinitionStore store;
     private ServerRegistry registry;
     private TlsMaterial tls;
+    private HostKey hostKey;
     private TransferActivities transfers;
     private FileServerScope scope;
     private StatusItem status;
@@ -136,7 +147,8 @@ public final class FileServerPlugin implements Plugin {
         var logins = new LoginResolver(vault, () -> System.getProperty("user.name", "jasper"), SessionPasswords::generate);
         transfers = new TransferActivities(context.activities()::begin, SHOW);
         tls = new TlsMaterial(context.dataDirectory().resolve("tls"), Clock.systemUTC(), FileServerPlugin::hostName);
-        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange), logins,
+        hostKey = new HostKey(context.dataDirectory().resolve("hostkey"));
+        registry = new ServerRegistry(Engines.factory(new LoginThrottle(Clock.systemUTC()), environment.nics(), tls, settings::passiveRange, hostKey), logins,
             context.background(), environment.ui(), Clock.systemUTC(), settings.activityEntries::get, this::observe);
         store = new DefinitionStore(context.dataDirectory().resolve("servers.toml"), context.background(), environment.ui());
         var icon = context.appearance().icon(IconName.SERVER);
@@ -158,6 +170,19 @@ public final class FileServerPlugin implements Plugin {
         context.actions().register(ActionSpec.of(SERVE_FTP, "Serve Current Folder over FTP").withIcon(icon)
                 .withKeywords(List.of("file server", "share", "serve", "ftp", "folder")),
             invoked -> serve(invoked, Protocol.FTP));
+        context.actions().register(ActionSpec.of(SERVE_SFTP, "Serve Current Folder over SFTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "sftp", "ssh", "folder")),
+            invoked -> serve(invoked, Protocol.SFTP));
+        context.actions().register(ActionSpec.of(SERVE_TFTP, "Serve Current Folder over TFTP").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "serve", "tftp", "boot", "folder")),
+            invoked -> serve(invoked, Protocol.TFTP));
+        var shareMenu = context.menus().terminalContext().submenu("Share Path");
+        registerShareAction(shareMenu, Protocol.HTTP, false);
+        registerShareAction(shareMenu, Protocol.HTTP, true);
+        registerShareAction(shareMenu, Protocol.FTP, false);
+        registerShareAction(shareMenu, Protocol.FTP, true);
+        registerShareAction(shareMenu, Protocol.SFTP, false);
+        registerShareAction(shareMenu, Protocol.TFTP, false);
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
@@ -182,6 +207,8 @@ public final class FileServerPlugin implements Plugin {
         context.background().execute(() -> {
             try { tls.fingerprint(); }
             catch (EngineFailure unreadable) { /* reported when a TLS server starts or the fingerprints are shown */ }
+            try { hostKey.fingerprint(); }
+            catch (EngineFailure unreadable) { /* reported when an SFTP server starts or the fingerprints are shown */ }
             environment.ui().execute(() -> { if (!stopped) refreshPanels(); });
         });
     }
@@ -202,6 +229,7 @@ public final class FileServerPlugin implements Plugin {
     void observe(ServerEvent event) { if (!stopped) transfers.accept(event); }
 
     TlsMaterial tls() { return tls; }
+    HostKey hostKey() { return hostKey; }
 
     /** This computer's name for the certificate; empty when the system will not say. Slow on some networks, so call it off the UI thread. */
     static String hostName() {
@@ -218,8 +246,11 @@ public final class FileServerPlugin implements Plugin {
             this::duplicate, id -> delete(window, id), this::reveal, environment.clipboard(),
             id -> registry.password(id).ifPresent(environment.clipboard()), registry::clearActivity,
             id -> showFingerprints(window, id)),
-            registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone());
+            registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
+            context.appearance().icon(IconName.SERVER));
+        panel.onHeaderChanged(host::setHeader);
         panel.setTlsFingerprint(tls.cachedFingerprint());
+        panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), host);
@@ -249,6 +280,7 @@ public final class FileServerPlugin implements Plugin {
         editor[0] = new ServerEditor(store.definitions(), initial, existing, Engines.AVAILABLE, environment.nics().get(), vault.isPresent(),
             this::accountName, () -> pickAccount(window),
             () -> context.windows().chooseDirectory(window, "Folder to share", initial.map(ServerDefinition::folder)),
+            new ServerEditor.KeySources(() -> keyFiles(window), FileServerPlugin::pasted),
             environment.linux(),
             definition -> store.put(definition).whenComplete((ignored, failure) -> environment.ui().execute(() -> {
                 if (stopped) return;
@@ -265,10 +297,69 @@ public final class FileServerPlugin implements Plugin {
         dialog.show();
     }
 
+    /**
+     * The text of public key files the user picks. A file that can't be read is reported and skipped, and so is one
+     * that is not a regular file or is larger than 64 KiB: this runs on the UI thread.
+     */
+    Optional<String> keyFiles(WindowHandle window) {
+        List<Path> chosen = context.windows().chooseFiles(window, "Public keys to allow", Optional.of(environment.home().resolve(".ssh")));
+        var text = new StringBuilder();
+        for (Path file : chosen) {
+            try {
+                if (!Files.isRegularFile(file) || Files.size(file) > MAX_KEY_FILE) {
+                    context.notifications().group().error("Could not read a public key file",
+                        file + ": not a public key file (too large or not a regular file)");
+                    continue;
+                }
+                text.append(Files.readString(file)).append('\n');
+            }
+            catch (IOException | RuntimeException failure) {
+                context.notifications().group().error("Could not read a public key file", file + ": " + message(failure), failure);
+            }
+        }
+        return text.isEmpty() ? Optional.empty() : Optional.of(text.toString());
+    }
+
+    /** The clipboard's text; empty when there is none or no clipboard. */
+    static Optional<String> pasted() {
+        try {
+            Object data = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+            return data instanceof String text && !text.isBlank() ? Optional.of(text) : Optional.empty();
+        } catch (HeadlessException | IllegalStateException | UnsupportedFlavorException | IOException unavailable) {
+            return Optional.empty();
+        }
+    }
+
+    private void registerShareAction(PluginMenu menu, Protocol protocol, boolean tls) {
+        if (!Engines.AVAILABLE.contains(protocol)) return;
+        String type = protocol.label() + (tls ? "S" : "");
+        String id = ID + ".share-" + type.toLowerCase(Locale.ROOT);
+        context.actions().register(ActionSpec.of(id, type).withIcon(context.appearance().icon(IconName.SERVER))
+                .withKeywords(List.of("file server", "share path", "folder", type.toLowerCase(Locale.ROOT))),
+            invoked -> sharePath(invoked, protocol, tls));
+        menu.add(id);
+    }
+
+    /** A context-menu share must use this pane's local directory, never a substitute. */
+    private void sharePath(ActionContext invoked, Protocol protocol, boolean tls) {
+        Optional<Path> folder = invoked.pane().map(pane -> pane.info())
+            .filter(info -> info.kind() == SessionKind.LOCAL && info.remoteDirectory().isEmpty())
+            .flatMap(info -> info.workingDirectory()).filter(Path::isAbsolute).filter(Files::isDirectory);
+        if (folder.isEmpty()) {
+            context.notifications().group().error("Could not share path", "This terminal has no available local folder to share.");
+            return;
+        }
+        serve(invoked.window(), folder.get(), protocol, tls);
+    }
+
     /** Shares the folder the shell is in, read-only and on this computer only, until stopped. */
     void serve(ActionContext invoked, Protocol protocol) {
         Path folder = invoked.pane().or(() -> context.terminals().activePane())
             .flatMap(pane -> pane.info().workingDirectory()).filter(Files::isDirectory).orElse(environment.home());
+        serve(invoked.window(), folder, protocol, false);
+    }
+
+    private void serve(WindowHandle window, Path folder, Protocol protocol, boolean tls) {
         Set<Integer> used = registry.servers().stream().filter(view -> !view.state().phase().startable())
             .map(view -> view.definition().port()).collect(Collectors.toSet());
         int port = protocol.defaultPort();
@@ -276,11 +367,12 @@ public final class FileServerPlugin implements Plugin {
         Path leaf = folder.getFileName();
         String folderName = leaf == null ? folder.toString() : leaf.toString();
         if (folderName.length() > 60) folderName = folderName.substring(0, 60) + "…";
-        var created = ServerDefinition.create(uniqueName(folderName + " (" + protocol.label() + ")"), protocol, folder);
+        String type = protocol.label() + (tls ? "S" : "");
+        var created = ServerDefinition.create(uniqueName(folderName + " (" + type + ")"), protocol, folder);
         var definition = new ServerDefinition(created.id(), created.name(), protocol, folder, Bind.LOOPBACK, port, Optional.empty(), false,
-            created.login(), List.of(), false, false, false);
-        registry.startTemporary(definition, invoked.window());
-        showPanel(invoked.window(), definition.id());
+            created.login(), List.of(), tls, tls && protocol == Protocol.FTP, false);
+        registry.startTemporary(definition, window);
+        showPanel(window, definition.id());
     }
 
     private void showPanel(WindowHandle window, UUID id) {
@@ -401,6 +493,7 @@ public final class FileServerPlugin implements Plugin {
     private void refreshPanels() {
         for (FileServersPanel panel : panels.values()) {
             panel.setTlsFingerprint(tls.cachedFingerprint());
+            panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
             panel.setServers(registry.servers(), store.error());
             panel.refreshActivity();
         }
@@ -408,7 +501,12 @@ public final class FileServerPlugin implements Plugin {
 
     /** Shows the shared certificate's fingerprint, offering to regenerate it; the file I/O runs off the UI thread. */
     void showFingerprints(WindowHandle window, UUID id) {
-        if (registry.server(id).isEmpty()) return;
+        Optional<ServerRegistry.View> server = registry.server(id);
+        if (server.isEmpty()) return;
+        if (server.get().definition().protocol() == Protocol.SFTP) {
+            showHostKey(window);
+            return;
+        }
         context.background().execute(() -> {
             String text;
             try {
@@ -422,6 +520,29 @@ public final class FileServerPlugin implements Plugin {
                 if (stopped || !window.isOpen()) return;
                 refreshPanels();
                 confirm(window, "Fingerprints", shown, "Regenerate Certificate…", "Close", () -> confirmRegenerate(window), () -> { });
+            });
+        });
+    }
+
+    /** Shows the SSH host key's fingerprint, offering to copy it; the file I/O runs off the UI thread. */
+    private void showHostKey(WindowHandle window) {
+        context.background().execute(() -> {
+            Optional<String> fingerprint;
+            String text;
+            try {
+                fingerprint = hostKey.fingerprint();
+                text = fingerprint.map(value -> "SSH host key: " + value)
+                    .orElse("No SSH host key yet: Jasper creates one when an SFTP server first starts.");
+            } catch (EngineFailure unreadable) {
+                fingerprint = Optional.empty();
+                text = unreadable.getMessage();
+            }
+            Optional<String> copy = fingerprint;
+            String shown = text;
+            environment.ui().execute(() -> {
+                if (stopped || !window.isOpen()) return;
+                refreshPanels();
+                confirm(window, "Fingerprints", shown, "Copy Fingerprint", "Close", () -> copy.ifPresent(environment.clipboard()), () -> { });
             });
         });
     }
@@ -472,10 +593,14 @@ public final class FileServerPlugin implements Plugin {
         return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 
+    /** Whether a port is free on loopback for both TCP and UDP, so Serve Current Folder can use it for any protocol. */
     static boolean portFree(int port) {
-        try (var socket = new ServerSocket()) {
-            socket.setReuseAddress(false);
-            socket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
+        var loopback = new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
+        try (var tcp = new ServerSocket(); var udp = new DatagramSocket(null)) {
+            tcp.setReuseAddress(false);
+            tcp.bind(loopback);
+            udp.setReuseAddress(false);
+            udp.bind(loopback);
             return true;
         } catch (IOException taken) {
             return false;

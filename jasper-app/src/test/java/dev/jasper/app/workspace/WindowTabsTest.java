@@ -2,12 +2,10 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.config.KeyBindings;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
-import java.util.Map;
 import javax.swing.*;
 import javax.swing.plaf.basic.BasicHTML;
 import org.junit.jupiter.api.AfterEach;
@@ -18,238 +16,107 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowTabsTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void stripIsAlwaysVisibleAndSelectsAndClosesRealTabs() throws Exception {
+    @Test void oneTabHidesTheBarAndTwoTabsRestoreIt() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            JComponent strip = named(owner, "windowTabs");
-            assertThat(strip).isNotNull();
-            assertThat(strip.getPreferredSize().height).isEqualTo(30);
-            assertThat(strip.isVisible()).as("a lone tab still shows, as in IntelliJ").isTrue();
-            var first = owner.currentTab(); first.rename("first"); owner.newTab(HOME);
-            var second = owner.currentTab(); second.rename("second"); owner.update();
-            ((AbstractButton) named(strip, "select:first")).doClick();
-            assertThat(owner.currentTab()).isSameAs(first);
-            ((AbstractButton) named(strip, "close:second")).doClick();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+            var strip = owner.windowTabs();
+            assertThat(strip.isVisible()).isFalse();
+            assertThat(strip.getPreferredSize().height).isZero();
+            owner.invoke(ActionId.NEW_TAB);
             assertThat(strip.isVisible()).isTrue();
-            assertThat(named(strip, "newTab")).as("New tab stays reachable at the strip end").isNotNull();
-            owner.tabStrip().setSize(600, 300); owner.tabStrip().doLayout();
-            assertThat(owner.tabStrip().getComponentAt(0).getY()).isLessThanOrEqualTo(1);
+            assertThat(strip.getPreferredSize().height).isEqualTo(owner.tabHeight());
+            owner.closeTab(owner.currentTab());
+            assertThat(strip.isVisible()).isFalse();
+            assertThat(strip.getMinimumSize().height).isZero();
+            assertThat(named(strip, "newTab")).isNull();
+            assertThat(named(strip, "tabList")).isNull();
         });
     }
 
-    @Test void widerStartingSizeDoesNotDoubleLongerTitles() throws Exception {
+    @Test void titlesAreCenteredAndCellsDivideEveryPixelRegardlessOfTitleLength() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 80, 100, 130));
-            var strip = owner.windowTabs();
-            owner.currentTab().rename("~"); owner.update(); layout(strip, 800, 30);
-            assertThat(named(strip, "select:~").getParent().getWidth()).as("short titles use the larger starting size")
-                .isEqualTo(160);
-            String sshTitle = "ubuntu@amp-mc-1: ~";
-            owner.currentTab().rename(sshTitle); owner.update(); layout(strip, 800, 30);
-            assertThat(named(strip, "select:" + sshTitle).getParent().getWidth())
-                .as("SSH titles grow normally instead of multiplying their measured width").isBetween(160, 240);
-            String longTitle = "a very long terminal title ".repeat(4);
-            owner.currentTab().rename(longTitle); owner.update(); layout(strip, 800, 30);
-            assertThat(named(strip, "select:" + longTitle).getParent().getWidth()).isEqualTo(240);
-            owner.currentTab().rename("~"); owner.update(); layout(strip, 800, 30);
-            assertThat(named(strip, "select:~").getParent().getWidth()).isEqualTo(160);
-        });
-    }
-
-    @Test void tabsAreContentSizedLeftAlignedWithIconTitleAndTrailingClose() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second");
-            var strip = owner.windowTabs(); layout(strip, 800, 38);
-            var first = (AbstractButton) named(strip, "select:first");
-            var second = (AbstractButton) named(strip, "select:second");
-            assertThat(first.getIcon()).as("inactive tabs are plain labels").isNull();
-            assertThat(second.getIcon()).isNotNull();
-            assertThat(second.getIcon().getIconWidth()).isEqualTo(16);
-            assertThat(first.getHorizontalAlignment()).isEqualTo(SwingConstants.LEADING);
-            Container one = first.getParent(), two = second.getParent();
-            assertThat(one.getX()).isZero();
-            assertThat(two.getX()).isEqualTo(one.getWidth());
-            assertThat(one.getWidth()).isBetween(160, 240);
-            assertThat(one.getWidth() + two.getWidth()).isLessThan(800 - 24);
-            var close = named(strip, "close:second");
-            assertThat(close.isVisible()).as("the selected tab always offers close").isTrue();
-            assertThat(close.getX()).isGreaterThanOrEqualTo(second.getX() + second.getWidth());
-            var otherClose = named(strip, "close:first");
-            assertThat(otherClose.isVisible()).isFalse();
-            mouse(first, MouseEvent.MOUSE_ENTERED, 10, 10, MouseEvent.NOBUTTON);
-            assertThat(otherClose.isVisible()).isTrue();
-            mouse(first, MouseEvent.MOUSE_EXITED, -100, -100, MouseEvent.NOBUTTON);
-            assertThat(otherClose.isVisible()).isFalse();
-            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(752, 0, 24, 38));
-        });
-    }
-
-    @Test void tooltipsCarryTheTitleAndTheLiveSelectShortcut() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), true);
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            owner.newTab(HOME); owner.currentTab().rename("a long title ".repeat(20)); owner.update();
             var strip = owner.windowTabs();
-            assertThat(named(strip, "select:second").getToolTipText()).isEqualTo("second (⌘2)");
-            owner.setBindings(KeyBindings.withOverrides(true, Map.of("select_tab_2", "ctrl+alt+2")));
-            assertThat(named(strip, "select:second").getToolTipText()).isEqualTo("second (⌃⌥2)");
-            owner.setBindings(KeyBindings.withOverrides(true, Map.of("select_tab_2", "none")));
-            assertThat(named(strip, "select:second").getToolTipText()).isEqualTo("second");
-        });
-    }
-
-    @Test void selectedFolderJoinsTheWorkspaceWithConcaveShouldersAndNoOutline() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(theme);
-                var strip = owner.windowTabs(); layout(strip, 800, 30);
-                Container selected = named(strip, "select:second").getParent();
-                int x = selected.getX(), right = x + selected.getWidth(), middle = x + selected.getWidth() / 2;
-                Color surface = owner.theme().palette().background();
-                Color recessed = pixel(strip, 650, 15);
-                assertThat(recessed).as("a recessed strip separates inactive titles from the workspace").isNotEqualTo(surface);
-                assertThat(pixel(strip, middle, 5)).as("top body has workspace fill, with no accent outline").isEqualTo(surface);
-                assertThat(pixel(strip, middle, 29)).as("folder bottom joins the terminal without a gap").isEqualTo(surface);
-                assertThat(pixel(strip, x - 5, 29)).as("left shoulder spreads outward at the bottom").isEqualTo(surface);
-                assertThat(pixel(strip, right + 4, 29)).as("right shoulder spreads outward at the bottom").isEqualTo(surface);
-                assertThat(pixel(strip, x - 5, 20)).as("left shoulder is concave above the bottom").isEqualTo(recessed);
-                assertThat(pixel(strip, right + 4, 20)).as("right shoulder is concave above the bottom").isEqualTo(recessed);
-                assertThat(pixel(strip, x, 0)).as("soft top corner exposes the recess").isEqualTo(recessed);
-                owner.setActive(false);
-                assertThat(pixel(strip, middle, 5)).as("window activation adds no outline").isEqualTo(surface);
-                owner.setActive(true);
-            }
-        });
-    }
-
-    @Test void hiddenRailsSquareOnlyTheFolderCornerAtTheWorkspaceEdge() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            var contributions = new dev.jasper.app.contributions.Contributions();
-            owner.connectContributions(contributions);
-            contributions.addPanel("test.panel", "Panel", new ImageIcon(), dev.jasper.app.dock.Slot.LEFT_TOP,
-                site -> new JLabel("panel"));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 80, 100, 130));
-            owner.currentTab().rename("first");
-            var first = owner.currentTab();
-            owner.newTab(HOME); owner.currentTab().rename("second");
-            var strip = owner.windowTabs();
-            for (boolean zen : new boolean[]{false, true}) {
-                owner.selectTab(first); owner.update(); layout(strip, 800, 30);
-                assertThat(owner.leftStripe().isVisible()).isTrue();
-                assertThat(pixel(strip, 0, 0)).isEqualTo(strip.getBackground());
-                if (zen) owner.toggleZenMode(); else owner.setRailVisible(false);
-                layout(strip, 800, 30);
-                assertThat(owner.leftStripe().isVisible()).isFalse();
-                assertThat(pixel(strip, 0, 0)).as("hidden rails join the folder to the workspace edge, Zen=%s", zen)
-                    .isEqualTo(owner.workspaceSurface());
-                var entry = named(strip, "select:first").getParent();
-                assertThat(pixel(strip, entry.getWidth() - 1, 0)).as("the inner right corner stays rounded")
-                    .isEqualTo(strip.getBackground());
-                owner.selectTab(owner.terminalTabs().get(1)); owner.update(); layout(strip, 800, 30);
-                var second = named(strip, "select:second").getParent();
-                assertThat(pixel(strip, second.getX(), 0)).as("interior tabs retain their rounded left corner")
-                    .isEqualTo(strip.getBackground());
-                owner.selectTab(first);
-                if (zen) owner.toggleZenMode(); else owner.setRailVisible(true);
-                layout(strip, 800, 30);
-                assertThat(owner.leftStripe().isVisible()).isTrue();
-                assertThat(pixel(strip, 0, 0)).as("showing rails restores the rounded outer corner")
-                    .isEqualTo(strip.getBackground());
-            }
-        });
-    }
-
-    @Test void activeFolderHasAThinPillInTheWorkspaceAccent() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(theme);
-                var strip = owner.windowTabs(); layout(strip, 800, 30);
-                var selected = named(strip, "select:second").getParent();
-                int middle = selected.getX() + selected.getWidth() / 2;
-                Color accent = owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.ACCENT);
-                assertThat(pixel(strip, middle, 28)).as("active indicator uses the current workspace accent").isEqualTo(accent);
-                assertThat(pixel(strip, middle, 26)).as("indicator remains only two pixels tall").isEqualTo(owner.workspaceSurface());
-                assertThat(pixel(strip, middle, 29)).as("the folder still joins the terminal below the indicator").isEqualTo(owner.workspaceSurface());
-                assertThat(pixel(strip, 40, 28)).as("inactive tabs have no accent indicator").isEqualTo(strip.getBackground());
-            }
-        });
-    }
-
-    @Test void newTabAtTheFarRightOpensAndSelectsATabAndStopsAfterClosure() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            owner.currentTab().rename("first"); owner.update();
-            var strip = owner.windowTabs(); layout(strip, 330, 30);
-            var add = (AbstractButton) named(strip, "newTab");
-            assertThat(add).isNotNull();
-            assertThat(add.getBounds()).isEqualTo(new Rectangle(306, 0, 24, 30));
-            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(282, 0, 24, 30));
-            assertThat(SwingUtilities.getDeepestComponentAt(strip, 318, 15)).isSameAs(add);
-            var first = owner.currentTab();
-            add.doClick(); layout(strip, 330, 30);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
-            assertThat(owner.currentTab()).isNotSameAs(first);
-            owner.close();
-            assertThat(add.isEnabled()).isFalse();
-            add.doClick();
-            assertThat(owner.tabStrip().getTabCount()).isZero();
-        });
-    }
-
-    @Test void foldersRemainFlushAndControlsFitAtTheMinimumConfiguredHeight() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            var strip = owner.windowTabs();
-            for (int height : new int[]{20, 30, 72}) {
-                owner.setTabHeight(height); layout(strip, 800, height);
-                var label = named(strip, "select:second");
-                var close = named(strip, "close:second");
-                int middle = label.getParent().getX() + label.getParent().getWidth() / 2;
-                assertThat(pixel(strip, middle, height - 1)).as("no seam at height %s", height)
-                    .isEqualTo(owner.theme().palette().background());
-                assertThat(close.getHeight()).isGreaterThanOrEqualTo(16);
-                assertThat(label.getY() + label.getHeight()).isEqualTo(height);
-                assertThat(close.getY() + close.getHeight()).isEqualTo(height);
-            }
-        });
-    }
-
-    @Test void selectedTabUsesActualWorkspaceColorsWithIndependentTerminalPalettes() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
-            for (Theme chrome : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(chrome);
-                for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
-                    owner.selectTerminalColors(colors);
-                    var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    JComponent label = named(strip, "select:selected");
-                    assertThat(pixel(label.getParent(), label.getParent().getWidth() / 2, 6)).isEqualTo(owner.theme().palette().background());
-                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
-                    owner.setActive(false);
-                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
-                    owner.setActive(true);
+            for (int width : new int[]{801, 800, 151, 8}) {
+                layout(strip, width, 30);
+                int edge = 0;
+                for (var tab : owner.terminalTabs()) {
+                    var label = (AbstractButton) named(strip, "select:" + tab.title());
+                    var entry = label.getParent();
+                    assertThat(entry.getX()).isEqualTo(edge);
+                    assertThat(entry.getWidth()).isBetween(width / 3, (width + 2) / 3);
+                    assertThat(label.getHorizontalAlignment()).isEqualTo(SwingConstants.CENTER);
+                    assertThat(label.getIcon()).isNull();
+                    assertThat(label.getX() * 2 + label.getWidth()).isEqualTo(entry.getWidth());
+                    edge += entry.getWidth();
                 }
+                assertThat(edge).isEqualTo(width);
             }
         });
     }
 
-    @Test void recessedStripKeepsReadableTitlesWhateverTheUiTheme() throws Exception {
+    @Test void narrowCellsKeepTitleAndTooltipHitAreaWhenCloseCannotFit() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
+            for (int i = 0; i < 16; i++) {
+                if (i > 0) owner.newTab(HOME);
+                owner.currentTab().rename("tab-" + i);
+            }
+            owner.update(); var strip = owner.windowTabs(); layout(strip, 800, 30);
+            for (int i = 0; i < 16; i++) {
+                var label = (AbstractButton) named(strip, "select:tab-" + i);
+                assertThat(label.getWidth()).as("text space for 50px tab %s", i).isGreaterThanOrEqualTo(40);
+                assertThat(label.getToolTipText()).startsWith("tab-" + i);
+                assertThat(SwingUtilities.getDeepestComponentAt(strip, i * 50 + 25, 15)).isSameAs(label);
+                mouse(label, MouseEvent.MOUSE_ENTERED, 10, 10, MouseEvent.NOBUTTON);
+                assertThat(named(strip, "close:tab-" + i).isVisible()).isFalse();
+            }
+        });
+    }
+
+    @Test void hoverCloseDoesNotShiftTheCenteredTitleAndButtonsStillSelectAndClose() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
+            var first = owner.currentTab(); first.rename("first");
+            owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            var strip = owner.windowTabs(); layout(strip, 800, 30);
+            var label = (AbstractButton) named(strip, "select:first");
+            var close = (AbstractButton) named(strip, "close:first");
+            var before = label.getBounds();
+            assertThat(close.isVisible()).isFalse();
+            mouse(label, MouseEvent.MOUSE_ENTERED, 10, 10, MouseEvent.NOBUTTON);
+            assertThat(close.isVisible()).isTrue();
+            assertThat(label.getBounds()).isEqualTo(before);
+            label.doClick(); assertThat(owner.currentTab()).isSameAs(first);
+            close.doClick(); assertThat(owner.terminalTabs()).doesNotContain(first);
+            assertThat(strip.isVisible()).isFalse();
+        });
+    }
+
+    @Test void selectedCellHasASeparateSurfaceAndNoAccentUnderline() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
+            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            var strip = owner.windowTabs(); layout(strip, 800, 30);
+            var before = render(strip);
+            assertThat(before.getRGB(410, 5)).isNotEqualTo(before.getRGB(10, 5));
+            assertThat(before.getRGB(410, 5)).isEqualTo(before.getRGB(410, 28));
+            assertThat(before.getRGB(399, 5)).isNotEqualTo(before.getRGB(10, 5));
+            owner.selectTab(owner.terminalTabs().get(0));
+            var after = render(strip);
+            assertThat(after.getRGB(10, 5)).isEqualTo(before.getRGB(410, 5));
+            assertThat(after.getRGB(410, 5)).isEqualTo(before.getRGB(10, 5));
+            assertThat(strip.motionRunning()).isFalse();
+        });
+    }
+
+    @Test void inactiveCellsKeepReadableTitlesWhateverTheUiTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
@@ -259,14 +126,14 @@ class WindowTabsTest {
                 for (var colors : dev.jasper.app.config.TerminalColors.builtIns()) {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
-                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isNotEqualTo(owner.theme().palette().background());
+                    assertThat(strip.getBackground()).as("%s UI, %s terminal", chrome, colors).isEqualTo(owner.theme().palette().background());
                     for (boolean active : new boolean[]{true, false}) {
                         owner.setActive(active);
                         Color text = named(strip, "select:other").getForeground();
                         if (!owner.theme().matching())
                             assertThat(text).as("inactive title uses workspace TEXT_MUTED, active %s", active)
                                 .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.TEXT_MUTED));
-                        assertThat(contrast(text, strip.getBackground())).as("%s UI, %s terminal, active %s", chrome, colors, active)
+                        assertThat(contrast(text, pixel(strip, 10, 4))).as("%s UI, %s terminal, active %s", chrome, colors, active)
                             .isGreaterThanOrEqualTo(3);
                     }
                 }
@@ -324,24 +191,6 @@ class WindowTabsTest {
         });
     }
 
-    @Test void aGrowingSelectedTitleStaysVisibleInOverflow() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            var strip = owner.windowTabs();
-            owner.currentTab().rename("a");
-            for (String name : new String[] {"b", "c", "d", "e"}) { owner.newTab(HOME); owner.currentTab().rename(name); }
-            owner.invoke(ActionId.SELECT_TAB_3); owner.update();
-            layout(strip, 330, 38);
-            var selected = owner.currentTab();
-            assertThat(named(strip, "select:c").getParent().isVisible()).as("c is the rightmost visible tab").isTrue();
-            assertThat(named(strip, "select:d").getParent().isVisible()).as("the next tab is partially visible").isTrue();
-            selected.rename("vim somefile.txt with a much longer title than before"); owner.update();
-            layout(strip, 330, 38);
-            assertThat(named(strip, "select:" + selected.title()).getParent().isVisible()).isTrue();
-        });
-    }
-
     @Test void middleClickAndDragUseTheSameSelectionAndOrderModel() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
@@ -359,186 +208,6 @@ class WindowTabsTest {
             mouse(two, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON2);
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
             assertThat(owner.currentTab()).isSameAs(first);
-        });
-    }
-
-    @Test void overflowScrollsKeepsSelectionVisibleAndTheListReachesEveryLiteralTitle() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            var tabs = owner.windowTabs();
-            Dimension minimum = tabs.getMinimumSize();
-            for (int i = 0; i < 12; i++) { owner.currentTab().rename("<b>long name ".repeat(100) + i); owner.newTab(HOME); }
-            owner.update(); layout(tabs, 330, 38);
-            assertThat(tabs.getMinimumSize()).isEqualTo(minimum);
-            for (Component child : tabs.getComponents())
-                if (child.isVisible()) assertThat(child.getX() + child.getWidth()).isLessThanOrEqualTo(330);
-            owner.invoke(ActionId.SELECT_TAB_1); layout(tabs, 330, 38);
-            JComponent selected = named(tabs, "select:" + owner.currentTab().title());
-            assertThat(selected.getParent().isVisible()).isTrue();
-            wheel(tabs, 12); layout(tabs, 330, 38);
-            assertThat(selected.getParent().isVisible()).isFalse();
-            owner.invoke(ActionId.NEXT_TAB); layout(tabs, 330, 38);
-            assertThat(named(tabs, "select:" + owner.currentTab().title()).getParent().isVisible()).isTrue();
-            JPopupMenu list = tabs.tabList();
-            assertThat(list.getComponentCount()).isEqualTo(13);
-            var item = (JMenuItem) list.getComponent(3);
-            assertThat(item.getClientProperty("html.disable")).isEqualTo(true);
-            assertThat(item.getText()).startsWith("<b>long name");
-            ((JMenuItem) list.getComponent(12)).doClick(); layout(tabs, 330, 38);
-            assertThat(owner.tabStrip().getSelectedIndex()).isEqualTo(12);
-            assertThat(named(tabs, "select:" + owner.currentTab().title()).getParent().isVisible()).isTrue();
-        });
-    }
-
-    @Test void narrowingTheWindowKeepsTheSelectedTabVisible() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            JComponent strip = named(owner, "windowTabs");
-            for (int i = 0; i < 4; i++) owner.newTab(HOME);
-            owner.currentTab().rename("selected"); owner.update();
-            layout(strip, 850, 38);
-            assertThat(named(strip, "select:selected").getParent().isVisible()).isTrue();
-            layout(strip, 250, 38);
-            assertThat(named(strip, "select:selected").getParent().isVisible()).isTrue();
-        });
-    }
-
-    @Test void preciseWheelScrollsPartialTabsOverLabelsAndCloseButtonsAndClampsAtEnds() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            for (int i = 0; i < 8; i++) {
-                if (i > 0) owner.newTab(HOME);
-                owner.currentTab().rename("Tab " + i + " with a longer title");
-            }
-            owner.invoke(ActionId.SELECT_TAB_1); owner.update();
-            var strip = owner.windowTabs(); layout(strip, 430, 38);
-            var first = named(strip, "select:" + owner.currentTab().title());
-            var entry = first.getParent();
-            int naturalWidth = entry.getWidth();
-            wheel(first, 0.25); layout(strip, 430, 38);
-            assertThat(entry.getX()).as("fractional wheel input moves tabs without snapping").isBetween(-30, -1);
-            assertThat(entry.getWidth()).as("edge tabs clip instead of shrinking").isEqualTo(naturalWidth);
-            int before = entry.getX();
-            wheel(named(strip, "close:" + owner.currentTab().title()), 0.25); layout(strip, 430, 38);
-            assertThat(entry.getX()).isLessThan(before);
-            assertThat(owner.tabStrip().getSelectedIndex()).as("scrolling does not select another tab").isZero();
-            wheel(strip, -1000); layout(strip, 430, 38);
-            assertThat(entry.getX()).isZero();
-            wheel(strip, 1000); layout(strip, 430, 38);
-            var last = named(strip, "select:Tab 7 with a longer title").getParent();
-            assertThat(last.getX() + last.getWidth()).isEqualTo(last.getParent().getWidth());
-            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(382, 0, 24, 38));
-            assertThat(SwingUtilities.getDeepestComponentAt(strip, 394, 19)).isSameAs(named(strip, "tabList"));
-            ((JMenuItem) strip.tabList().getComponent(0)).doClick(); layout(strip, 430, 38);
-            assertThat(entry.getX()).as("choosing the already-selected tab reveals it again").isZero();
-            layout(strip, 4400, 38);
-            assertThat(entry.getX()).isZero();
-            wheel(first, 1000); layout(strip, 4400, 38);
-            assertThat(entry.getX()).as("no movement when all tabs fit").isZero();
-        });
-    }
-
-    @Test void overflowFadesOnlyClippedEdgesIntoTheRecessedStrip() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            for (int i = 0; i < 5; i++) {
-                if (i > 0) owner.newTab(HOME);
-                owner.currentTab().rename("wide selected tab " + i);
-            }
-            var strip = owner.windowTabs();
-            for (var theme : java.util.List.of(Theme.DARK, dev.jasper.app.appearance.ThemeFixtures.INTELLIJ_LIGHT)) {
-                owner.selectTheme(theme); owner.invoke(ActionId.SELECT_TAB_1); owner.update();
-                layout(strip, 380, 38);
-                var first = named(strip, "select:wide selected tab 0");
-                wheel(first, 0.5); layout(strip, 380, 38);
-                var viewport = first.getParent().getParent();
-                Color surface = strip.getBackground();
-                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the recessed strip").isEqualTo(surface);
-                assertThat(pixel(viewport, 24, 6)).as("selection beyond the fade is unchanged")
-                    .isEqualTo(owner.theme().palette().background());
-                var output = java.nio.file.Path.of("build/render-preview");
-                try {
-                    java.nio.file.Files.createDirectories(output);
-                    javax.imageio.ImageIO.write(render(strip), "png", output.resolve("scrolling-tabs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
-                } catch (java.io.IOException error) { throw new java.io.UncheckedIOException(error); }
-                // Scroll near the end so the selected final tab is clipped at the right edge.
-                ((JMenuItem) strip.tabList().getComponent(4)).doClick(); layout(strip, 380, 38);
-                wheel(strip, -0.5); layout(strip, 380, 38);
-                assertThat(pixel(viewport, viewport.getWidth() - 1, 6)).isEqualTo(surface);
-                assertThat(pixel(viewport, viewport.getWidth() - 25, 6)).isEqualTo(owner.theme().palette().background());
-            }
-        });
-    }
-
-    @Test void scrolledTabsKeepDragCloseAndSelectionGeometry() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            for (int i = 0; i < 6; i++) {
-                if (i > 0) owner.newTab(HOME);
-                owner.currentTab().rename("tab-" + i);
-            }
-            var strip = owner.windowTabs(); layout(strip, 612, 38);
-            var selected = owner.currentTab();
-            var source = named(strip, "select:tab-5");
-            var target = named(strip, "select:tab-4");
-            Point end = SwingUtilities.convertPoint(target, 10, 10, source);
-            mouse(source, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
-            mouse(source, MouseEvent.MOUSE_RELEASED, end.x, end.y, MouseEvent.BUTTON1);
-            assertThat(owner.tabStrip().getComponentAt(4)).isSameAs(selected);
-            layout(strip, 612, 38);
-            var bounds = SwingUtilities.convertRectangle(source.getParent(), source.getBounds(), source.getParent().getParent());
-            assertThat(bounds.x).isGreaterThanOrEqualTo(0);
-            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(564);
-            ((AbstractButton) named(strip, "close:tab-5")).doClick(); layout(strip, 612, 38);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(5);
-            var remaining = named(strip, "select:" + owner.currentTab().title()).getParent();
-            assertThat(remaining.isVisible()).isTrue();
-            assertThat(remaining.getX()).isGreaterThanOrEqualTo(0);
-            assertThat(remaining.getX() + remaining.getWidth()).isLessThanOrEqualTo(564);
-        });
-    }
-
-    @Test void droppingOverFixedControlsDoesNotTargetAClippedTab() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            for (int i = 0; i < 5; i++) {
-                if (i > 0) owner.newTab(HOME);
-                owner.currentTab().rename("long tab title number " + i);
-            }
-            owner.invoke(ActionId.SELECT_TAB_1); owner.update();
-            var first = owner.currentTab();
-            var strip = owner.windowTabs(); layout(strip, 330, 38);
-            var source = named(strip, "select:" + first.title());
-            for (int x : new int[] {294, 318, 345, -8}) {
-                Point end = SwingUtilities.convertPoint(strip, x, 19, source);
-                mouse(source, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
-                mouse(source, MouseEvent.MOUSE_RELEASED, end.x, end.y, MouseEvent.BUTTON1);
-                assertThat(owner.tabStrip().getComponentAt(0)).as("drop outside viewport at %d", x).isSameAs(first);
-            }
-        });
-    }
-
-    private static void wheel(Component component, double rotation) {
-        var event = new java.awt.event.MouseWheelEvent(component, MouseEvent.MOUSE_WHEEL, 1, 0,
-            10, 10, 10, 10, 0, false, java.awt.event.MouseWheelEvent.WHEEL_UNIT_SCROLL, 3,
-            (int) rotation, rotation);
-        component.dispatchEvent(event);
-        assertThat(event.isConsumed()).as("the tab strip owns its scroll gesture").isTrue();
-    }
-
-    @Test void closedOwnerDisablesTheTabList() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 150, 120, 130));
-            JComponent strip = named(owner, "windowTabs");
-            owner.close();
-            assertThat(named(strip, "tabList").isEnabled()).isFalse();
         });
     }
 
@@ -561,7 +230,7 @@ class WindowTabsTest {
     }
     private static Color pixel(Container entry, int x, int y) { return new Color(render(entry).getRGB(x, y)); }
     private static BufferedImage render(Container entry) {
-        // Folder shoulders are painted by the strip across entry boundaries; crop the real whole strip.
+        // Cell surfaces are painted by the strip; crop the real whole strip.
         var ancestor = SwingUtilities.getAncestorOfClass(WindowTabs.class, entry);
         if (ancestor instanceof WindowTabs strip) {
             Point at = SwingUtilities.convertPoint(entry, 0, 0, strip);

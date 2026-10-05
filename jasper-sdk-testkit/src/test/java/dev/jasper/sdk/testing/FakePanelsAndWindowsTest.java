@@ -20,6 +20,39 @@ import static org.assertj.core.api.Assertions.*;
 class FakePanelsAndWindowsTest {
     private static final PluginInfo INFO = new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of());
 
+    @Test void panelHeadersAreIndependentContainFailuresAndIgnoreRetainedActionsAfterClose() {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            var panels = new ArrayList<PanelHost>();
+            var calls = new ArrayList<String>();
+            String id = "dev.x.tool.headers";
+            var registration = context.panels().register(new PanelSpec(id, "Headers", new ImageIcon(), Anchor.LEFT),
+                panel -> { panels.add(panel); return new JLabel(); });
+            UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+            host.openPanel(id, first); host.openPanel(id, second);
+            var icon = new ImageIcon();
+            panels.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("5", false, List.of(
+                new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("first")),
+                new dev.jasper.sdk.ui.PanelHeader.Action("Failure", icon, () -> { throw new IllegalStateException("header failed"); }),
+                new dev.jasper.sdk.ui.PanelHeader.Action("Linkage failure", icon, () -> { throw new NoClassDefFoundError("header dependency"); }))));
+            panels.getLast().setHeader(new dev.jasper.sdk.ui.PanelHeader("amp", true, List.of(
+                new dev.jasper.sdk.ui.PanelHeader.Action("Add", icon, () -> calls.add("second")))));
+            var stale = host.panelHeader(id, first);
+            assertThat(stale.detail()).isEqualTo("5");
+            assertThat(host.panelHeader(id, second).detail()).isEqualTo("amp");
+            stale.actions().forEach(action -> action.invoke().run());
+            host.panelHeader(id, second).actions().getFirst().invoke().run();
+            assertThat(host.failures()).hasSize(2);
+            registration.close();
+            panels.getFirst().setHeader(new dev.jasper.sdk.ui.PanelHeader("late", false, List.of()));
+            stale.actions().forEach(action -> action.invoke().run());
+            assertThat(host.panelHeader(id, first)).isEqualTo(dev.jasper.sdk.ui.PanelHeader.EMPTY);
+            assertThat(host.panelHeader(id, second)).isEqualTo(dev.jasper.sdk.ui.PanelHeader.EMPTY);
+            assertThat(calls).containsExactly("first", "second");
+            assertThat(host.failures()).hasSize(2);
+        }
+    }
+
     @Test void fileSelectionWorksForWindowsAndDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });

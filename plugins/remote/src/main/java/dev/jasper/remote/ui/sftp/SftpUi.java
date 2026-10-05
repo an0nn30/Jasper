@@ -52,6 +52,8 @@ public final class SftpUi implements AutoCloseable {
     }
     private JComponent create(PanelHost host) {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();
+        panel.onHeaderChanged(host::setHeader);
+        panel.onChooseSession(()-> { if(!closed && window.isOpen()) chooseHost(window); });
         panel.transfers(transferStrip.apply(window));
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);

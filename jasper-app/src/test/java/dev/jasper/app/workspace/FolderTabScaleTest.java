@@ -2,10 +2,8 @@ package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.Rectangle;
-import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
-import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
@@ -15,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FolderTabScaleTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void scaledFoldersKeepTheirShouldersFlushAndFixedControlsReachable() throws Exception {
+    @Test void equalCellsAndSeparatorsFollowScaleAndConfiguredHeight() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             String requestedScale = System.getProperty("flatlaf.uiScale");
@@ -29,26 +27,15 @@ class FolderTabScaleTest {
                 var g = image.createGraphics();
                 try { strip.paint(g); } finally { g.dispose(); }
                 var entry = WindowTabsTest.named(strip, "select:second").getParent();
-                Color surface = owner.theme().palette().background();
-                assertThat(new Color(image.getRGB(entry.getX() + entry.getWidth() / 2,
-                    strip.getHeight() - UIScale.scale(2))))
-                    .as("the thin accent indicator follows UI scale and configured height")
-                    .isEqualTo(owner.theme().workspace().tokens().get(dev.jasper.ui.theme.Token.ACCENT));
-                assertThat(new Color(image.getRGB(entry.getX() + entry.getWidth() / 2, 0)))
-                    .as("folder reaches the top of the rail without a dark gap").isEqualTo(surface);
-                for (int cornerX : new int[]{entry.getX() + UIScale.scale(5),
-                        entry.getX() + entry.getWidth() - UIScale.scale(5) - 1}) {
-                    assertThat(new Color(image.getRGB(cornerX, UIScale.scale(1))))
-                        .as("upper corner follows the rail's eight-pixel radius at height %s", height).isEqualTo(surface);
-                }
-                int x = entry.getX() - UIScale.scale(4), y = strip.getHeight() - 1;
-                assertThat(new Color(image.getRGB(x, y))).as("scaled shoulder joins the terminal at height %s", height)
-                    .isEqualTo(owner.theme().palette().background());
-                var add = WindowTabsTest.named(strip, "newTab");
-                assertThat(add.getBounds()).isEqualTo(new Rectangle(UIScale.scale(776), 0,
-                    UIScale.scale(24), UIScale.scale(height)));
-                assertThat(SwingUtilities.getDeepestComponentAt(strip, UIScale.scale(788), UIScale.scale(height / 2)))
-                    .isSameAs(add);
+                assertThat(entry.getBounds()).isEqualTo(new Rectangle(UIScale.scale(400), 0,
+                    UIScale.scale(400), UIScale.scale(height)));
+                int body = image.getRGB(entry.getX() + UIScale.scale(10), UIScale.scale(4));
+                assertThat(image.getRGB(entry.getX() + UIScale.scale(10), strip.getHeight() - UIScale.scale(2)))
+                    .as("selected surface has no underline").isEqualTo(body);
+                assertThat(image.getRGB(UIScale.scale(400) - 1, UIScale.scale(4)))
+                    .as("vertical separator follows scale").isEqualTo(owner.theme().workspace().tokens()
+                        .get(dev.jasper.ui.theme.Token.BORDER).getRGB());
+                assertThat(WindowTabsTest.named(strip, "newTab")).isNull();
                 assertThat(WindowTabsTest.named(strip, "close:second").getHeight()).isGreaterThanOrEqualTo(UIScale.scale(16));
             }
         });

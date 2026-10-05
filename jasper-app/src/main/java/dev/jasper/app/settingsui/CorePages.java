@@ -67,6 +67,12 @@ public final class CorePages {
      * Settings rows (and their Workspace section) are built.
      */
     static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells, java.util.function.Consumer<String> navigate, boolean glass) {
+        return specs(themes, system, shells, navigate, glass, NotificationGroupChoices.NONE);
+    }
+
+    /** As above, with the notification groups the Notifications page lists. */
+    static List<SchemaPage.Spec> specs(ThemeChoices themes, SystemActions system, ShellChoices shells,
+                                       java.util.function.Consumer<String> navigate, boolean glass, NotificationGroupChoices groups) {
         return List.of(
             SchemaPage.page("appearance", "Appearance").parent("appearance-behavior").anchor("theme")
                 .section("Theme")
@@ -97,7 +103,10 @@ public final class CorePages {
                 .row(WINDOW_LINES, Editors.integer("lines")),
             SchemaPage.page("notifications", "Notifications").parent("appearance-behavior").anchor("finished-command-notifications")
                 .row(NOTIFICATIONS_SYSTEM)
-                .row(NOTIFICATIONS_LONG_COMMAND_SECONDS, Editors.integer("s")).note("0 turns these notifications off."),
+                .row(NOTIFICATIONS_LONG_COMMAND_SECONDS, Editors.integer("s")).note("0 turns these notifications off.")
+                .section("Groups")
+                .row(NOTIFICATIONS_GROUPS, Editors.notificationGroups(groups))
+                .note("How each kind of notification appears. A plugin's groups are listed once it has run."),
             SchemaPage.page("command-palette", "Command Palette").parent("appearance-behavior").anchor("palette")
                 .row(PALETTE_VISIBLE_ROWS, Editors.integer("")),
             SchemaPage.page("desk-buddy", "Desk Buddy").parent("appearance-behavior").anchor("desk-buddy")
@@ -181,11 +190,17 @@ public final class CorePages {
         return pages(themes, system, shells, new Pages(keymap, plugins, tools));
     }
 
-    /** The whole tree for one dialog, in display order, with the pages the application supplies. */
+    /** The whole tree for one dialog, in display order, with the pages the application supplies and no notification groups. */
     public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes,
                                                                    SystemActions system, ShellChoices shells, Pages supplied) {
+        return pages(themes, system, shells, NotificationGroupChoices.NONE, supplied);
+    }
+
+    /** The whole tree for one dialog, in display order, with the notification groups and pages the application supplies. */
+    public static Function<PageContext, List<SettingsPage>> pages(ThemeChoices themes, SystemActions system, ShellChoices shells,
+                                                                   NotificationGroupChoices groups, Pages supplied) {
         return context -> {
-            var specs = specs(themes, system, shells, context.navigate());
+            var specs = specs(themes, system, shells, context.navigate(), com.formdev.flatlaf.util.SystemInfo.isMacOS, groups);
             var all = new ArrayList<SettingsPage>();
             Function<String, Supplier<List<SettingsPage>>> childrenOf = id ->
                 () -> all.stream().filter(page -> page.parent().equals(Optional.of(id))).toList();

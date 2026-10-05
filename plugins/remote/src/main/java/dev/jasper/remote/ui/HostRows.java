@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TreeMap;
 
-/** The panel's list model: the WSL group first, then group headers with counts and hosts, favorites first, "Other" last. */
+/** The panel's list model: WSL first, then alphabetical hosts in groups, with the default group last. */
 public final class HostRows {
     public static final String OTHER = "Other";
     /** The WSL group's title. */
@@ -65,11 +65,13 @@ public final class HostRows {
             groups.computeIfAbsent(host.group().isEmpty() ? defaultGroup : host.group(), name -> new ArrayList<>()).add(host);
         }
         var rows = new ArrayList<Row>();
+        boolean flat = defaultGroup.equals(OTHER) && hosts.stream().allMatch(host -> host.group().isEmpty());
         for (var entry : groups.entrySet()) {
             boolean hidden = !searching && collapsed.contains(entry.getKey());
-            rows.add(new Group(entry.getKey(), entry.getValue().size(), hidden));
+            // Keep a restored collapsed header reachable; a renamed default group retains its identity too.
+            if (!flat || hidden) rows.add(new Group(entry.getKey(), entry.getValue().size(), hidden));
             if (hidden) continue;
-            entry.getValue().stream().sorted(Comparator.comparing((RemoteHost host) -> !host.favorite()).thenComparing(host -> host.name().toLowerCase(Locale.ROOT)))
+            entry.getValue().stream().sorted(Comparator.comparing((RemoteHost host) -> host.name().toLowerCase(Locale.ROOT)).thenComparing(RemoteHost::name))
                 .forEach(host -> rows.add(new Host(host)));
         }
         return List.copyOf(rows);

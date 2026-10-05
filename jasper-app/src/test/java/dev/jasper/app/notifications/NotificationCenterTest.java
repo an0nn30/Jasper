@@ -8,6 +8,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -482,5 +483,42 @@ class NotificationCenterTest {
         UUID incident = UUID.randomUUID();
         UUID third = center.post(request(CARDS, "again").withIncident(incident)).orElseThrow();
         assertThat(center.post(request(CARDS, "again").withIncident(incident))).contains(third);
+    }
+
+    @Test void theUsersModeReplacesAGroupsDefault() {
+        var center = center();
+        center.useModes(Map.of(CARDS.id(), DisplayMode.HISTORY));
+        assertThat(center.mode(CARDS.id())).isEqualTo(DisplayMode.HISTORY);
+        center.post(request(CARDS, "quiet"));
+        assertThat(kinds()).containsExactly("Upserted");
+        center.useModes(Map.of(CARDS.id(), DisplayMode.OFF));
+        assertThat(center.post(request(CARDS, "dropped"))).isEmpty();
+        center.useModes(Map.of());
+        assertThat(center.mode(CARDS.id())).isEqualTo(DisplayMode.CARD);
+        center.post(request(CARDS, "loud"));
+        assertThat(kinds()).containsExactly("Upserted", "Upserted", "CardRequested");
+    }
+
+    @Test void aModeForAnUndeclaredGroupDeclaresNothing() {
+        var center = center();
+        center.useModes(Map.of("test.unknown", DisplayMode.CARD));
+        assertThat(center.mode("test.unknown")).isEqualTo(DisplayMode.OFF);
+        assertThat(center.post(NotificationRequest.of("test.unknown", Severity.INFO, "nobody"))).isEmpty();
+    }
+
+    /** A mode changed while a card shows or waits applies to later posts only. */
+    @Test void changingAModeLeavesShowingAndWaitingCardsAlone() {
+        var center = center();
+        presence = Delivery.Presence.BACKGROUND;
+        UUID waiting = center.post(request(STICKY, "waits")).orElseThrow();
+        presence = Delivery.Presence.FOCUSED;
+        UUID showing = center.post(request(CARDS, "shows")).orElseThrow();
+        changes.clear();
+        center.useModes(Map.of(STICKY.id(), DisplayMode.OFF, CARDS.id(), DisplayMode.OFF));
+        assertThat(changes).isEmpty();
+        center.focusReturned();
+        assertThat(changes).singleElement().isInstanceOfSatisfying(NotificationCenter.Change.CardRequested.class,
+            requested -> assertThat(requested.notification().id()).isEqualTo(waiting));
+        assertThat(center.find(showing)).isPresent();
     }
 }

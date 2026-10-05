@@ -1,0 +1,14 @@
+# Settings for Project Index. Change them in Jasper's Settings or here. Indexed projects live in data/projects.toml.
+# prompt = true            # offer to index a project when a terminal enters it
+# A marker makes a folder a project; * matches any text and a leading ! marks a strong marker. The defaults:
+# markers = ["!.git", "!.hg", "!.svn", "!*.sln", "Cargo.toml", "go.mod", "pyproject.toml", "setup.py",
+#            "requirements.txt", "Pipfile", "package.json", "deno.json", "pom.xml", "build.gradle", "build.gradle.kts",
+#            "settings.gradle", "settings.gradle.kts", "CMakeLists.txt", "Makefile", "meson.build", "composer.json",
+#            "Gemfile", "mix.exs", "pubspec.yaml", "Package.swift", "*.csproj", "*.xcodeproj", "flake.nix"]
+# Folder names never indexed. The defaults:
+# excludes = [".git", ".hg", ".svn", "node_modules", "target", "build", "dist", "out", ".gradle", ".idea", ".vscode",
+#             ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".tox", ".next", ".nuxt", "vendor",
+#             "Pods", "DerivedData", "bin", "obj"]
+# ignored = []             # folders never offered; remote entries are <host id>:<path>
+# max_files = 200000       # 1000 to 1000000 files indexed per project
+# refresh_minutes = 5      # 1 to 1440 minutes between background refreshes of one project

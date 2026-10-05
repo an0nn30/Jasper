@@ -9,6 +9,7 @@ import dev.jasper.app.settings.Setting;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -173,4 +174,54 @@ class CorePagesTest {
         page.dispose();
     }
 
+    @Test void theNotificationsPageListsEveryGroupInItsOwnSection() {
+        var groups = new NotificationGroupChoices(() -> List.of(
+            new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
+        var spec = CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+            .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values());
+        var page = spec.build(PageKit.context(draft, id -> { }, () -> { }));
+        assertThat(PageKit.sectionTitles(page)).containsExactly("Groups");
+        var row = page.rows().stream().filter(candidate -> candidate.setting() == CoreSettings.NOTIFICATIONS_GROUPS)
+            .findFirst().orElseThrow();
+        assertThat(row.editor()).isInstanceOf(NotificationGroupsEditor.class);
+        pick(page, "history");
+        assertThat(draft.value(CoreSettings.NOTIFICATIONS_GROUPS)).isEqualTo(Map.of("jasper.commands", "history"));
+        pick(page, "card");
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).as("back at the default, nothing to save").isFalse();
+        page.dispose();
+    }
+
+    /** A config.toml Jasper made holds the template's empty [notifications.groups]; going back to a default is no change. */
+    @Test void aGroupBackAtItsDefaultIsNoChangeInAFileMadeFromTheTemplate() {
+        var groups = new NotificationGroupChoices(() -> List.of(
+            new NotificationGroupChoices.Group("jasper.commands", "Long-running commands", "Jasper", "card")));
+        var spec = CorePages.specs(JASPER_DARK, system(), ShellChoices.NONE, id -> { }, false, groups).stream()
+            .filter(page -> page.settings().contains(CoreSettings.NOTIFICATIONS_GROUPS)).findFirst().orElseThrow();
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), dev.jasper.app.config.ConfigTemplate.text(true), true).values());
+        var page = spec.build(PageKit.context(draft, id -> { }, () -> { }));
+        page.component();
+        pick(page, "history");
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).isTrue();
+        pick(page, "card");
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).as("back at the default, nothing to save").isFalse();
+        pick(page, "off");
+        var reset = PageKit.kit(page, NotificationGroupsEditor.resetId(CoreSettings.NOTIFICATIONS_GROUPS.name(), 0), javax.swing.JButton.class);
+        assertThat(reset.isEnabled()).isTrue();
+        reset.doClick();
+        assertThat(draft.modified(CoreSettings.NOTIFICATIONS_GROUPS)).as("reset, nothing to save").isFalse();
+        page.dispose();
+    }
+
+    /** Chooses {@code token} in the first group's mounted kit dropdown, as a user does. */
+    private static void pick(SchemaPage page, String token) {
+        var combo = PageKit.kit(page, NotificationGroupsEditor.modeId(CoreSettings.NOTIFICATIONS_GROUPS.name(), 0) + ".input",
+            javax.swing.JComboBox.class);
+        for (int i = 0; i < combo.getItemCount(); i++)
+            if (combo.getItemAt(i) instanceof dev.jasper.ui.model.Option option && option.id().equals(token)) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        throw new AssertionError("No mode " + token);
+    }
 }

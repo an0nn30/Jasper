@@ -38,10 +38,13 @@ import java.util.function.IntPredicate;
 import javax.swing.JMenuItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FileServerPluginTest {
-    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.2.0",
+    static final PluginInfo INFO = new PluginInfo("dev.jasper.fileserver", "File Server", "0.4.0",
         Set.of(Capabilities.NETWORK_LISTEN, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE));
     @TempDir Path home;
     @TempDir Path root;
@@ -85,6 +88,95 @@ class FileServerPluginTest {
             .map(c -> (JMenuItem) c).findFirst().orElseThrow().doClick();
     }
 
+    @Test void servesTheFocusedFolderOverSftpWithASessionPassword() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> port != 2222);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            assertThat(host.actions()).contains("dev.jasper.fileserver.serve-sftp|Serve Current Folder over SFTP|true");
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(host.invoke(FileServerPlugin.SERVE_SFTP, window, local)).isTrue();
+            await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            var served = plugin.registry().servers().getFirst();
+            assertThat(served.temporary()).isTrue();
+            assertThat(served.definition().name()).isEqualTo("project (SFTP)");
+            assertThat(served.definition().protocol()).isEqualTo(Protocol.SFTP);
+            assertThat(served.definition().folder()).isEqualTo(project);
+            assertThat(served.definition().port()).as("2222 was taken").isEqualTo(2223);
+            assertThat(served.definition().writable()).isFalse();
+            assertThat(served.definition().login()).isEqualTo(Login.SESSION);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void servesTheFocusedFolderOverTftp() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> port != 6969 && FileServerPlugin.portFree(port));
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            assertThat(host.actions()).contains("dev.jasper.fileserver.serve-tftp|Serve Current Folder over TFTP|true");
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(host.invoke(FileServerPlugin.SERVE_TFTP, window, local)).isTrue();
+            await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
+            var served = plugin.registry().servers().getFirst();
+            assertThat(served.state().phase()).as("the TFTP engine started").isEqualTo(Phase.RUNNING);
+            assertThat(served.temporary()).isTrue();
+            assertThat(served.definition().name()).isEqualTo("project (TFTP)");
+            assertThat(served.definition().protocol()).isEqualTo(Protocol.TFTP);
+            assertThat(served.definition().port()).as("6969 was taken; the next free port above it").isGreaterThanOrEqualTo(6970);
+            assertThat(served.definition().writable()).isFalse();
+            assertThat(served.definition().login()).isEqualTo(Login.ANONYMOUS);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void aPortIsFreeOnlyWhenBothTcpAndUdpAre() throws Exception {
+        int port = Ports.free();
+        assertThat(FileServerPlugin.portFree(port)).isTrue();
+        try (var udp = new java.net.DatagramSocket(new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), port))) {
+            assertThat(udp.isBound()).isTrue();
+            assertThat(FileServerPlugin.portFree(port)).as("UDP taken").isFalse();
+        }
+    }
+
+    @Test void showsTheHostKeyFingerprintAndCopiesIt() throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow();
+            var panel = (FileServersPanel) host.openPanel(FileServerPlugin.PANEL, window);
+            var base = ServerDefinition.create("keys", Protocol.SFTP, home);
+            var sftp = new ServerDefinition(base.id(), "keys", Protocol.SFTP, home, Bind.LOOPBACK, Ports.free(), Optional.empty(), false,
+                Login.SESSION, List.of(), false, false, false);
+            plugin.store().put(sftp);
+            settle(host);
+            assertThat(UiTestAccess.cardHostKey(panel).getText()).isEqualTo("SSH host key: created when the server first starts");
+            UiTestAccess.toggle(panel).doClick();
+            await(host, () -> plugin.registry().server(sftp.id()).orElseThrow().state().phase() == Phase.RUNNING, "the SFTP server runs");
+            String fingerprint = plugin.hostKey().cachedFingerprint().orElseThrow();
+            assertThat(fingerprint).startsWith("SHA256:");
+            assertThat(UiTestAccess.cardHostKey(panel).getText()).isEqualTo("SSH host key " + fingerprint);
+            click(UiTestAccess.menuFor(panel, 0), "Show Fingerprints…");
+            await(host, () -> plugin.currentConfirm() != null, "the fingerprint dialog opens");
+            assertThat(host.windows()).containsExactly("dialog|Fingerprints|true");
+            assertThat(UiTestAccess.message(plugin.currentConfirm()).getText()).isEqualTo("SSH host key: " + fingerprint);
+            UiTestAccess.confirm(plugin.currentConfirm()).doClick();
+            settle(host);
+            assertThat(copied).containsExactly(fingerprint);
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
     @Test void registersItsPanelActionsSettingsAndAHiddenStatus() {
         try (var host = new FakePluginHost(root)) {
             host.start(INFO, Set.of(), Set.of(), plugin());
@@ -97,6 +189,25 @@ class FileServerPluginTest {
                 .anySatisfy(line -> assertThat(line).startsWith("confirm_quit"))
                 .anySatisfy(line -> assertThat(line).startsWith("activity_entries"))
                 .anySatisfy(line -> assertThat(line).startsWith("passive_ports"));
+        }
+    }
+
+    @Test void keyFilesSkipsLargeFilesAndFolders() throws Exception {
+        Path keys = Files.createDirectories(home.resolve(".ssh"));
+        Path good = Files.writeString(keys.resolve("id_ed25519.pub"), "ssh-ed25519 AAAA alice");
+        Path huge = Files.writeString(keys.resolve("huge.pub"), "x".repeat(64 * 1024 + 1));
+        Path exact = Files.writeString(keys.resolve("exact.pub"), "y".repeat(64 * 1024));
+        Path folder = Files.createDirectories(keys.resolve("folder.pub"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            var owner = plugin.windowHandle(host.addTerminalWindow());
+            host.queuePathSelection(List.of(good, huge, folder, exact));
+            assertThat(plugin.keyFiles(owner)).contains("ssh-ed25519 AAAA alice\n" + "y".repeat(64 * 1024) + "\n");
+            String reason = ": not a public key file (too large or not a regular file)";
+            assertThat(host.notifications().lines()).containsExactly(
+                "dev.jasper.fileserver|ERROR|Could not read a public key file|" + huge + reason,
+                "dev.jasper.fileserver|ERROR|Could not read a public key file|" + folder + reason);
         }
     }
 
@@ -361,6 +472,92 @@ class FileServerPluginTest {
             assertThat(served.definition().login()).isEqualTo(Login.SESSION);
             plugin.registry().stopAll();
             await(host, () -> plugin.registry().active() == 0, "everything stops");
+        }
+    }
+
+    @Test void contributesOnlyAvailableShareTypesAndRemovesThemOnStop() {
+        try (var host = new FakePluginHost(root)) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            settle(host);
+            assertThat(host.menu("context")).containsExactly("submenu:Share Path",
+                "  item:dev.jasper.fileserver.share-http", "  item:dev.jasper.fileserver.share-https",
+                "  item:dev.jasper.fileserver.share-ftp", "  item:dev.jasper.fileserver.share-ftps",
+                "  item:dev.jasper.fileserver.share-sftp", "  item:dev.jasper.fileserver.share-tftp");
+            assertThat(host.actions()).contains("dev.jasper.fileserver.share-http|HTTP|true",
+                "dev.jasper.fileserver.share-https|HTTPS|true", "dev.jasper.fileserver.share-ftp|FTP|true",
+                "dev.jasper.fileserver.share-ftps|FTPS|true", "dev.jasper.fileserver.share-sftp|SFTP|true",
+                "dev.jasper.fileserver.share-tftp|TFTP|true");
+            host.stopAll();
+            assertThat(host.menu("context")).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"http,HTTP,false,false", "https,HTTP,true,false", "ftp,FTP,false,false", "ftps,FTP,true,true",
+        "sftp,SFTP,false,false", "tftp,TFTP,false,false"})
+    void sharesTheInvokedPanesFolderWithoutADialog(String type, Protocol protocol, boolean tls, boolean requireTls) throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(port -> port != protocol.defaultPort() && FileServerPlugin.portFree(port));
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            UUID clicked = host.addTerminalPane(tab, pane(Optional.of(project)));
+            UUID otherWindow = host.addTerminalWindow(), otherTab = host.addTerminalTab(otherWindow, "other");
+            UUID other = host.addTerminalPane(otherTab, pane(Optional.of(home)));
+            host.focusTerminalPane(other);
+            assertThat(host.invoke("dev.jasper.fileserver.share-" + type, window, clicked)).isTrue();
+            await(host, () -> plugin.registry().running() == 1, "the quick share runs");
+            var served = plugin.registry().servers().getFirst();
+            var definition = served.definition();
+            assertThat(served.temporary()).isTrue();
+            assertThat(definition.name()).isEqualTo("project (" + type.toUpperCase(java.util.Locale.ROOT) + ")");
+            assertThat(definition.folder()).isEqualTo(project);
+            assertThat(definition.protocol()).isEqualTo(protocol);
+            assertThat(definition.tls()).isEqualTo(tls);
+            assertThat(definition.requireTls()).isEqualTo(requireTls);
+            assertThat(definition.bind()).isEqualTo(Bind.LOOPBACK);
+            assertThat(definition.writable()).isFalse();
+            assertThat(definition.autostart()).isFalse();
+            assertThat(definition.port()).isBetween(protocol.defaultPort() + 1, protocol.defaultPort() + 99);
+            assertThat(definition.login()).isEqualTo(protocol == Protocol.HTTP || protocol == Protocol.TFTP ? Login.ANONYMOUS : Login.SESSION);
+            if (protocol == Protocol.FTP || protocol == Protocol.SFTP) assertThat(plugin.registry().password(definition.id())).hasValueSatisfying(password -> assertThat(password).isNotBlank());
+            assertThat(plugin.store().definitions()).isEmpty();
+            assertThat(host.windows()).as("no setup or login dialog").isEmpty();
+            var panel = (FileServersPanel) host.openPanel(FileServerPlugin.PANEL, window);
+            assertThat(panel.selected()).contains(definition.id());
+            assertThat(host.failures()).isEmpty();
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().servers().isEmpty(), "stopping removes the temporary share");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown", "missing", "file", "remote", "plugin", "no-pane"})
+    void sharePathRefusesUnavailableLocalFoldersInsteadOfSharingHome(String location) throws Exception {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
+            Optional<Path> directory = switch (location) {
+                case "unknown" -> Optional.empty();
+                case "missing" -> Optional.of(home.resolve("gone"));
+                case "file" -> Optional.of(Files.writeString(home.resolve("file.txt"), "not a folder"));
+                default -> Optional.of(home);
+            };
+            PaneInfo info = new PaneInfo("zsh", directory,
+                location.equals("remote") ? Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory("remote", home.toString())) : Optional.empty(),
+                80, 24, true, location.equals("plugin") ? SessionKind.PLUGIN : SessionKind.LOCAL,
+                location.equals("plugin") ? Optional.of("dev.jasper.remote") : Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh");
+            UUID clicked = host.addTerminalPane(tab, info);
+            host.focusTerminalPane(host.addTerminalPane(tab, pane(Optional.of(home))));
+            assertThat(host.invoke("dev.jasper.fileserver.share-http", window, location.equals("no-pane") ? null : clicked)).isTrue();
+            settle(host);
+            assertThat(plugin.registry().servers()).as("never substitute another folder").isEmpty();
+            assertThat(host.notifications().lines()).singleElement().asString().contains("Could not share path");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
         }
     }
 

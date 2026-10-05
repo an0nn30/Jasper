@@ -469,7 +469,8 @@ class RemotePluginTest {
             settle(host);
             assertThat(host.windows()).isEmpty();
             assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
-            assertThat(list(panel).getModel().getSize()).as("Other group + host").isEqualTo(2);
+            assertThat(list(panel).getModel().getSize()).as("ungrouped host without a redundant header").isEqualTo(1);
+            assertThat(host.panelHeader(RemotePlugin.PANEL, window).detail()).isEqualTo("1");
             panel.select(plugin.store().hosts().getFirst().id());
             assertThat(cardCredential(panel).getText()).isEqualTo("SSH agent");
             assertThat(host.invoke(RemotePlugin.IMPORT, window, null)).isTrue();
@@ -487,9 +488,14 @@ class RemotePluginTest {
             plugin.currentConfirm().confirm.doClick();
             settle(host);
             assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
+            menuItem(menuFor(panel, 0), "Rename group\u2026").doClick();
+            groupName(plugin.currentGroupEditor()).setText("Servers");
+            saveGroup(plugin.currentGroupEditor()).doClick(); settle(host);
             toggle(panel, 0);
             settle(host);
-            assertThat(Files.readString(context.dataDirectory().resolve("panel-state.toml"))).contains("Other");
+            var savedPanelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
+            assertThat(savedPanelState.defaultGroup()).isEqualTo("Servers");
+            assertThat(savedPanelState.collapsed()).containsExactly("Servers");
         }
     }
 
@@ -595,7 +601,8 @@ class RemotePluginTest {
             plugin.store().put(saved); settle(host);
             var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
             var menu = menuFor(panel, 0);
-            ((javax.swing.JMenuItem) menu.getComponent(0)).doClick();
+            java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance)
+                .map(javax.swing.JMenuItem.class::cast).filter(item -> item.getText().equals("Rename group\u2026")).findFirst().orElseThrow().doClick();
             groupName(plugin.currentGroupEditor()).setText("My machines");
             saveGroup(plugin.currentGroupEditor()).doClick(); settle(host);
             assertThat(host.windows()).isEmpty();

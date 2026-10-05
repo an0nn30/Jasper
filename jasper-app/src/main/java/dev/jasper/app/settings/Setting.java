@@ -50,6 +50,19 @@ public record Setting<T>(List<String> key, SettingKind<T> kind, T defaultValue, 
     /** The key's last component. */
     public String leaf() { return key.getLast(); }
 
+    /**
+     * Whether two saved states of this setting mean the same file. For a table, no entries is the same as no table: an
+     * empty {@code [table]} header (the template has them uncommented) holds nothing.
+     */
+    public boolean sameSaved(Optional<?> one, Optional<?> other) {
+        return withEntries(one).equals(withEntries(other));
+    }
+
+    private Optional<?> withEntries(Optional<?> saved) {
+        if (!(kind instanceof SettingKind.StringMap)) return saved;
+        return saved.filter(map -> !((java.util.Map<?, ?>) map).isEmpty());
+    }
+
     /** Caller-confined construction; {@link #build} validates. */
     public static final class Builder<T> {
         private final List<String> key;

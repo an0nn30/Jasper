@@ -24,6 +24,63 @@ class ToolWindowHeaderTest {
         javax.swing.SwingUtilities.invokeAndWait(() -> dev.jasper.app.appearance.ThemeManager.install(dev.jasper.app.appearance.Theme.DARK));
     }
 
+    /**
+     * Main's connected-status dot, on the branch's module roles: the success status, held to the indicator floor on
+     * the tool window surface, in a dark and a light theme (it replaces main's fixed 0x38ba54/0x248943 reference).
+     */
+    @Test void connectedHeaderDotIsTheReadableSuccessStatusInDarkAndLight() {
+        for (var theme : List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.JASPER_LIGHT)) {
+            assertThat(dev.jasper.app.appearance.ThemeManager.install(theme)).isTrue();
+            var header = new ToolWindowHeader("SFTP", JPopupMenu::new, () -> {});
+            header.presentation(new dev.jasper.app.contributions.PanelHeaderState("prod", true, List.of()));
+            var detail = descendants(header).stream().filter(c -> c instanceof javax.swing.JLabel label && "prod".equals(label.getText()))
+                .map(c -> (javax.swing.JLabel) c).findFirst().orElseThrow();
+            var image = new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try { detail.getIcon().paintIcon(detail, graphics, 0, 0); } finally { graphics.dispose(); }
+            int middle = detail.getIcon().getIconWidth() / 2;
+            var dot = new java.awt.Color(image.getRGB(middle, middle), true);
+            var palette = dev.jasper.app.platform.ThemeZone.theme(header).semantic();
+            var surface = palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR);
+            assertThat(dot).as(theme.id()).isEqualTo(dev.jasper.ui.theme.SurfaceContrast.on(palette,
+                dev.jasper.ui.theme.SemanticColor.STATUS_SUCCESS, dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR,
+                dev.jasper.ui.theme.SurfaceContrast.INDICATOR));
+            assertThat(dev.jasper.ui.theme.ColorMath.contrast(dot, surface)).as(theme.id()).isGreaterThanOrEqualTo(3);
+            assertThat(dot.getGreen()).as("%s: a green status", theme.id()).isGreaterThan(Math.max(dot.getRed(), dot.getBlue()));
+            assertThat(detail.getForeground()).as("detail uses the kit header's count colour")
+                .isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
+        }
+    }
+
+    @Test void contributedActionsLiveInTheHeaderAndSurviveMetadataRefresh() {
+        var header = new ToolWindowHeader("Sessions", JPopupMenu::new, () -> { });
+        var icon = dev.jasper.app.platform.AppIcons.bundled("general/add");
+        header.presentation(new dev.jasper.app.contributions.PanelHeaderState("5", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Import sessions", icon, () -> events.add("import")))));
+        var actions = descendants(header).stream().filter(c -> c instanceof javax.swing.JButton button
+            && "Import sessions".equals(button.getAccessibleContext().getAccessibleName())).toList();
+        assertThat(actions).hasSize(1);
+        var action = (javax.swing.JButton) actions.getFirst();
+        assertThat(action.getText()).isNullOrEmpty();
+        assertThat(action.isFocusable()).isTrue();
+        action.doClick();
+        header.presentation(new dev.jasper.app.contributions.PanelHeaderState("6", false, List.of(
+            new dev.jasper.app.contributions.PanelHeaderState.Action("Import sessions", icon, () -> events.add("updated")))));
+        assertThat(descendants(header)).contains(action);
+        action.doClick();
+        assertThat(events).containsExactly("import", "updated");
+        assertThat(descendants(header).stream().filter(c -> c instanceof javax.swing.JLabel label && "6".equals(label.getText()))).hasSize(1);
+    }
+
+    private static List<java.awt.Component> descendants(java.awt.Container parent) {
+        var result = new ArrayList<java.awt.Component>();
+        for (var child : parent.getComponents()) {
+            result.add(child);
+            if (child instanceof java.awt.Container container) result.addAll(descendants(container));
+        }
+        return result;
+    }
+
     private final List<String> events = new ArrayList<>();
 
     private JPopupMenu menu(Slot current, boolean visible) {
