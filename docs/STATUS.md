@@ -2,6 +2,63 @@
 
 ## Current state — 2026-10-05
 
+- **Project Index, plan B (remote)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`):
+  [plan B](superpowers/plans/2026-10-05-project-index-b-remote.md). Remote 0.12.0 exports `dev.jasper.remote.api`
+  (`RemoteProjects`: `locate`, `connected`, `hostName`, `folder`, `exists`, `list`, `open`, `openTerminal`) backed by
+  `dev.jasper.remote.projects` (fixed `sh -s` scripts for markers, `git ls-files` and `find`, an SFTP walk fallback),
+  `Connections.existingLease(UUID)` for prompt-free background work, and a start-folder PTY exec channel for SSH tabs
+  opened in a folder (Reconnect returns there). Project Index 0.2.0 confines Remote types to
+  `dev.jasper.indexer.remote.RemoteBridge`, offers and indexes projects in connected SSH panes, searches and opens
+  them through Remote, copies `host:path`, opens SSH tabs in a file's folder, adds remote folders from Index Folder…,
+  and shows Unavailable/Stale remote projects in Settings. Deviations from the spec: start folder via exec channel
+  (Remote had no such path); the marker script, not the indexer, enforces the remote home boundary; ignored remote
+  entries show as `<host id>:<path>`; a background remote job whose host is not connected when it starts is dropped
+  quietly (a connection that drops mid-run fails the job with a "Couldn't index" card; the saved snapshot stays, shown
+  as Stale).
+  Deviations and hardening made during execution: Task 2: the PTY test asserts COLUMNS/LINES, the start-folder
+  round-trip test also runs ksh/tcsh/dash/fish when present, and the exec path skips MOTD/lastlog. Task 3: Exec
+  catches a throwing field filter so it fails the run, not the shared SSH session; `/` and trailing-slash folders
+  count as ancestors of home; the git script guards against HOME being unset. Task 4: a dropped session (marker seen,
+  no exit status) is never accepted as a complete Git/find listing. Task 5: ProjectsService closes borrowed leases
+  when the background executor rejects work. Task 8: terminal events received before the saved project list loads
+  are held and replayed (no prompt for already-indexed projects at startup), and local detection completes even if
+  the probe throws an Error. Marker detection (`exists`) needs a POSIX `sh` on the host, so Windows OpenSSH hosts get
+  no cards; `list` falls back to an SFTP walk where `sh`, Git or `find` is missing. Remote cards and
+  refresh-on-entry need the remote shell to report its folder with OSC 7 (Remote's probe-based following raises no
+  `CWD_CHANGED`), and after-command refreshes also need OSC 133 marks; current-project ranking and Reindex Current
+  Project work from Remote's followed folder. Known gap: opening a remote file that no longer exists does not queue a
+  refresh of its project (spec §7; local only). Final review fixes: an unreadable local root fails the job (the old
+  snapshot stays) and a root that is a link is walked; initials matching is memoized (no exponential backtracking);
+  Git listings skip nested repositories and gitlinks; an unloadable `projects.toml` is renamed `projects.toml.bad`
+  before the next save; snapshots are deleted only when corrupt, not on read errors; remote detection that throws
+  finds nothing; Remote's SFTP walk reports a root missing only on SFTP's no-such-file status; the guide, `remote.md`
+  and deviation 4 now say what the code does. Focused checks after the fixes: Project Index 95 and Remote 431 tests,
+  0 failures. Full `./gradlew check --continue` before them: **8875 tests, 0 failures, 0 errors, 6 skips**.
+  No GUI, benchmark or AOT training; GUI checks (an SSH pane's card, which needs a host shell that sends OSC 7, remote
+  Files rows and their three verbs, Index Folder… on a saved host, an SSH tab opened in a folder) are for the user.
+  Merged to local main 2026-10-05; not pushed.
+- **Project Index, plan A (local)** (2026-10-05; `claude/file-indexer`, worktree `.worktrees/file-indexer`): new bundled
+  plugin Project Index (`plugins/indexer`, `dev.jasper.indexer` 0.1.0) per the
+  [design](superpowers/specs/2026-10-05-jasper-project-index-design.md) and
+  [plan A](superpowers/plans/2026-10-05-project-index-a-local.md). A terminal entering a local project (configurable
+  strong/weak markers) gets an "Index project?" card (Yes / No for the session / Ignore this path); indexes come from
+  `git ls-files` (with `core.fsmonitor=false`, never in a home-folder work tree) or a folder walk skipping excluded
+  names, capped at 200,000 files, saved under the plugin's data directory and refreshed when a pane re-enters the
+  project or a command finishes there (5-minute throttle, 3 s debounce). The palette's **Files** scope (Go to File,
+  ⌘P / Ctrl+Alt+Shift+P) ranks exact, prefix, initials, substring and path matches with the current project first and
+  opens files in the Editor, copies paths or opens a terminal there. File › Index Folder… and the Settings page add
+  folders by hand. Deviations from the spec: `data/projects.toml` instead of JSON (no JSON library is bundled); user
+  guide [`docs/project-index.md`](project-index.md) instead of a plugin README; Linux/Windows Go to File is
+  Ctrl+Alt+Shift+P (Ctrl+Shift+P is the Command Palette); the truncation card names the Settings page instead of
+  linking to it (no SDK call opens Settings); Git listing is skipped when the work tree's top level is home; the
+  settings template lists defaults in comments. Deviation from the plan: the Task 7 fix round hardened Indexer: lister
+  Error/null no longer wedges a lane; project-list saves wait for load(); load() survives RuntimeException; persist
+  chain and finish() follow-up survive failures (6 extra IndexerTest cases). Full `./gradlew check --continue`:
+  **8841 tests, 0 failures, 0 errors, 6 skips**. (The first full run had one flaky failure,
+  `TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation` [3] "reflow", in
+  `jasper-terminal`, unrelated to the plugin; it passed on rerun.) No GUI, benchmark or AOT training; GUI checks (the
+  card and its three actions, the Files tab and its verbs, File › Index Folder…, the Settings page) are for the user.
+  Plan B (remote projects) followed (entry above). Merged to local main 2026-10-05; not pushed.
 - **File Server FS-4: TFTP** (2026-10-05; branch `claude/file-server-fs4`, plan `docs/superpowers/plans/2026-10-05-file-server-fs4.md`):
   File Server 0.4.0 serves TFTP with a hand-written engine on the JDK's `DatagramSocket` (`engine.tftp`: `TftpPacket`,
   `NetAscii`, `TftpTransfer`, `TftpEngine`). It handles RRQ, and WRQ when writable (committed after the final block),
