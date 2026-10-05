@@ -86,6 +86,40 @@ final class FakeSetting<T> implements Setting<T> {
         };
     }
 
+    @SuppressWarnings("unchecked")
+    T checked(Object candidate) {
+        T next = (T) Objects.requireNonNull(candidate);
+        spec.kind().check(next).ifPresent(problem -> { throw new IllegalArgumentException(problem); });
+        return next;
+    }
+
+    /** Convert typed UI intent using the fake's existing TOML value conversion and validation. */
+    Object edited(dev.jasper.sdk.ui.UiEvent event) {
+        Object raw = switch (event) {
+            case dev.jasper.sdk.ui.UiEvent.Toggled toggled -> toggled.checked();
+            case dev.jasper.sdk.ui.UiEvent.Selected selected -> selected.ids().stream().findFirst().orElse("");
+            case dev.jasper.sdk.ui.UiEvent.Edited edited -> {
+                String text = edited.text();
+                if (value instanceof Integer) yield Long.valueOf(text);
+                if (value instanceof Double) yield Double.valueOf(text);
+                if (value instanceof List<?>) yield text.isEmpty() ? List.of() : List.of(text.split("\n", -1));
+                yield text;
+            }
+            default -> throw new IllegalArgumentException("Unsupported setting edit");
+        };
+        // Editor integers reject overflow instead of the file loader's bounded conversion.
+        if (value instanceof Integer && raw instanceof Long number && (number < Integer.MIN_VALUE || number > Integer.MAX_VALUE))
+            throw new IllegalArgumentException("Enter an integer in range.");
+        Object converted = convert(raw);
+        if (converted == WRONG_TYPE || converted == null) throw new IllegalArgumentException("Enter " + expected() + ".");
+        return checked(converted);
+    }
+
+    void writeDraft(Optional<?> edit) {
+        if (edit.isEmpty()) owner.raw().remove(key());
+        else owner.raw().put(key(), toRaw(checked(edit.get())));
+    }
+
     private Object toRaw(T next) {
         return switch (spec.kind()) {
             case SettingKind.IntegerRange range -> ((Integer) next).longValue();

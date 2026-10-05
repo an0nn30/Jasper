@@ -62,6 +62,41 @@ class PluginPanelPageTest {
         java.util.concurrent.CompletableFuture.allOf(pending.get().toArray(java.util.concurrent.CompletableFuture[]::new)).join();
     }
 
+    @Test void kitResetRemovesSavedOverrideAndReloadRebasesCleanAndPendingRows() throws Exception {
+        var view=new AtomicReference<HostedKitView>();var rows=new AtomicReference<SettingsPanelHost>();
+        var size=new AtomicReference<Setting<Integer>>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
+            size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
+            context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(new dev.jasper.sdk.ui.ViewSpec(h.rowNode(size.get())),e -> {});view.set(made);return made;});
+        })));
+        onEdtValue(() -> size.get().set(7)).get(5,TimeUnit.SECONDS);
+        var page=onEdtValue(() -> (PluginPanelPage)host.settingsPages(context).getFirst());
+        onEdt(() -> {page.component();view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:size:reset"));assertThat(rows.get().pending(size.get())).isEqualTo(4);});
+        onEdtValue(page::apply).get(5,TimeUnit.SECONDS);
+        var file=host.environment.settingsFiles().file(ID);
+        assertThat(org.tomlj.Toml.parse(Files.readString(file)).contains("size")).isFalse();
+        // Ordinary stage(default) remains an explicit override when a value was saved.
+        onEdtValue(() -> size.get().set(7)).get(5,TimeUnit.SECONDS);
+        onEdt(() -> rows.get().stage(size.get(),4));
+        onEdtValue(page::apply).get(5,TimeUnit.SECONDS);
+        assertThat(org.tomlj.Toml.parse(Files.readString(file)).getLong("size")).isEqualTo(4);
+        onEdt(() -> view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:size:reset")));
+        onEdtValue(page::apply).get(5,TimeUnit.SECONDS);
+        assertThat(org.tomlj.Toml.parse(Files.readString(file)).contains("size")).isFalse();
+        onEdtValue(() -> size.get().set(6)).get(5,TimeUnit.SECONDS);
+        onEdt(() -> {assertThat(displayedSize(view.get())).isEqualTo("6");rows.get().stage(size.get(),8);});
+        onEdtValue(() -> size.get().set(5)).get(5,TimeUnit.SECONDS);
+        onEdt(() -> {assertThat(displayedSize(view.get())).isEqualTo("8");assertThat(page.modified()).isTrue();});
+        onEdtValue(() -> size.get().set(8)).get(5,TimeUnit.SECONDS);
+        onEdt(() -> {assertThat(displayedSize(view.get())).isEqualTo("8");assertThat(page.modified()).isFalse();page.dispose();});
+        onEdtValue(() -> size.get().set(9)).get(5,TimeUnit.SECONDS);
+        onEdt(() -> assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class));
+    }
+    private static String displayedSize(HostedKitView view) {
+        var row=(dev.jasper.sdk.ui.Nodes.SettingRow)view.spec().root();
+        return ((dev.jasper.sdk.ui.Nodes.Field)((dev.jasper.sdk.ui.Nodes.Stack)row.control()).children().getFirst()).value();
+    }
+
     @Test void kitPageRowsStageValidateResetApplyCancelAndOwnerStop() throws Exception {
         var view=new AtomicReference<HostedKitView>();
         var pageHost=new AtomicReference<SettingsPanelHost>();

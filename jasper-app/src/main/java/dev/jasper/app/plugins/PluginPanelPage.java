@@ -46,7 +46,7 @@ final class PluginPanelPage implements SettingsPage {
     private HostedKit kit;
     private HostedKitView view;
     private final Host rowHost = new Host();
-    private final KitSettingRows kitRows = new KitSettingRows(rowHost, this::settingSpec);
+    private final KitSettingRows kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset);
     private dev.jasper.sdk.settings.SettingSpec<?> settingSpec(dev.jasper.sdk.settings.Setting<?> setting){return declared.handle(setting).spec();}
     void kit(HostedKit value) { kit=value; }
     private void refreshRows(){if(view!=null && !disposed)view.update(view.spec());}
@@ -198,6 +198,16 @@ final class PluginPanelPage implements SettingsPage {
             applied = false;
             kitRows.staged(setting);
             draft.stage(app, unsetDefault ? Optional.empty() : Optional.of(staged));
+            refreshRows();
+        }
+
+        /** A standard Reset removes the saved override, unlike ordinary stage(default). */
+        private void unset(dev.jasper.sdk.settings.Setting<?> setting) {
+            guard();
+            var handle = declared.handle(setting);
+            kitRows.staged(setting);
+            applied = false;
+            draft.stage(handle.appSetting(), Optional.empty());
             refreshRows();
         }
 

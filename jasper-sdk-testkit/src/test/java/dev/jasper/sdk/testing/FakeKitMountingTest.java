@@ -10,6 +10,84 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class FakeKitMountingTest {
+    @Test void independentFakeRowsUseDeclaredKindsValidationAndNestedProjection() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try(var host=new FakePluginHost()) {
+                var view=new AtomicReference<FakeKitView>();
+                host.start(new PluginInfo("test.kinds","Kinds","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
+                    var settings=List.of(
+                        context.settings().declare(SettingSpec.of("bool",SettingKind.bool(),false).label("Bool")),
+                        context.settings().declare(SettingSpec.of("choice",SettingKind.choice(List.of(Choice.of("off","Off",false),Choice.of("on","On",true))),false).label("Choice")),
+                        context.settings().declare(SettingSpec.of("number",SettingKind.number(0,10),1.0).label("Number")),
+                        context.settings().declare(SettingSpec.of("text",SettingKind.text(value -> !value.isBlank(),"Required"),"before").label("Text")),
+                        context.settings().declare(SettingSpec.of("list",SettingKind.stringList(),List.of("before")).label("List")));
+                    context.settings().page((SettingsPanel.View) rows -> {
+                        var body=new Nodes.Section("section",ControlState.READY,"Settings",new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,settings.stream().map(rows::rowNode).toList()));
+                        var made=(FakeKitView)context.kit().create(new ViewSpec(body),event -> {throw new AssertionError("Owned setting event leaked");});view.set(made);return made;
+                    });
+                });
+                host.settingsPanel("test.kinds");
+                var card=(Nodes.Card)((Nodes.Section)view.get().spec().root()).body();
+                var choice=(Nodes.SettingRow)card.children().get(1);
+                assertThat(((Nodes.Stack)choice.control()).children().getFirst()).isInstanceOf(Nodes.Choice.class);
+                view.get().emit(new UiEvent.Toggled("settings:bool",true));
+                view.get().emit(new UiEvent.Selected("settings:choice",Set.of("on")));
+                view.get().emit(new UiEvent.Edited("settings:number","NaN"));
+                assertThatThrownBy(() -> host.applySettingsPanel("test.kinds")).isInstanceOf(IllegalStateException.class);
+                view.get().emit(new UiEvent.Edited("settings:number","2.5"));
+                view.get().emit(new UiEvent.Edited("settings:text",""));
+                assertThatThrownBy(() -> host.applySettingsPanel("test.kinds")).isInstanceOf(IllegalStateException.class);
+                view.get().emit(new UiEvent.Edited("settings:text","after"));
+                view.get().emit(new UiEvent.Edited("settings:list","one\ntwo"));
+                host.applySettingsPanel("test.kinds");
+                assertThat(host.savedSettings("test.kinds")).containsEntry("bool",true).containsEntry("choice","on")
+                    .containsEntry("number",2.5).containsEntry("text","after").containsEntry("list",List.of("one","two"));
+                assertThat(view.get().owner.failures()).isEmpty();
+            }
+        });
+    }
+    @Test void resetRemovesSavedOverrideWithoutChangingOrdinaryStageDefault() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try(var host=new FakePluginHost()) {
+                var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var size=new AtomicReference<Setting<Integer>>();
+                host.start(new PluginInfo("test.reset","Reset","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
+                    size.set(context.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
+                    context.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(FakeKitView)context.kit().create(new ViewSpec(h.rowNode(size.get())),e -> {});view.set(made);return made;});
+                });
+                size.get().set(7).join();host.settingsPanel("test.reset");
+                view.get().emit(new UiEvent.Action("settings:size:reset"));host.applySettingsPanel("test.reset");
+                assertThat(host.savedSettings("test.reset")).doesNotContainKey("size");
+                size.get().set(7).join();rows.get().stage(size.get(),4);host.applySettingsPanel("test.reset");
+                assertThat(host.savedSettings("test.reset")).containsEntry("size",4L);
+                view.get().emit(new UiEvent.Action("settings:size:reset"));host.applySettingsPanel("test.reset");
+                assertThat(host.savedSettings("test.reset")).doesNotContainKey("size");
+                assertThat(host.pendingSettings("test.reset")).isEmpty();
+            }
+        });
+    }
+    @Test void reloadRebasesCleanAndPendingMountedRowsUntilPageCloses() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try(var host=new FakePluginHost()) {
+                var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var size=new AtomicReference<Setting<Integer>>();
+                var context=host.start(new PluginInfo("test.reload","Reload","1.0.0",Set.of()),Set.of(),Set.of(),started -> {
+                    size.set(started.settings().declare(SettingSpec.of("size",SettingKind.integer(1,10),4).label("Size")));
+                    started.settings().page((SettingsPanel.View) h -> {rows.set(h);var made=(FakeKitView)started.kit().create(new ViewSpec(h.rowNode(size.get())),e -> {});view.set(made);return made;});
+                });
+                host.settingsPanel("test.reload");assertThat(context.settings.reloadListenerCount()).isEqualTo(1);size.get().set(6).join();
+                assertThat(displayedSize(view.get())).isEqualTo("6");
+                rows.get().stage(size.get(),8);size.get().set(5).join();
+                assertThat(displayedSize(view.get())).isEqualTo("8");assertThat(host.pendingSettings("test.reload")).containsEntry("size",8);
+                size.get().set(8).join();assertThat(displayedSize(view.get())).isEqualTo("8");assertThat(host.pendingSettings("test.reload")).isEmpty();
+                host.closeSettingsPanel("test.reload");assertThat(context.settings.reloadListenerCount()).isZero();size.get().set(9).join();
+                assertThatThrownBy(view.get()::spec).isInstanceOf(IllegalStateException.class);
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+    private static String displayedSize(FakeKitView view) {
+        var row=(Nodes.SettingRow)view.spec().root();
+        return ((Nodes.Field)((Nodes.Stack)row.control()).children().getFirst()).value();
+    }
     @Test void ownedTabPinsDuringChooserAndOwnerClosureDiscardsSelection() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var host=new FakePluginHost()) {

@@ -553,3 +553,18 @@ PluginPanelPage (the plan brief named PluginSettingsPage, which owns generated l
 Motion integration is live: ConfigurationController feeds ThemeController independently of theme-install
 success; AppearanceBindings reads its supplier and PluginRuntime passes the same source to HostedKit
 before startup. Existing effects poll and settle on their next frame; no global UI default controls motion.
+
+
+### Task 4 review round 1 persistence/reload/retry clarification
+
+Standard row Reset stages an absent override (deletes the persisted key on Apply), distinct from
+programmatic stage(default), which retains an explicit default when a value was saved. Clean rows
+follow saved reloads; pending edits survive differing reloads and are removed when the saved
+representation matches the edit. A page closes its reload subscription with its view. Real and fake
+hosts verify these rules independently; the fake's row helper now projects descriptors only and its
+own draft/setting conversion supplies behavior, without a new SDK helper or reflective framework.
+
+Reopening an existing typed content key still enters ContentRegistry.open, so an entry stranded by a
+failed move and failed recovery can reattach. It uses the original component/view; the unused incoming
+view remains caller-owned. Generic custom-content document/caret/opacity tests are not evidence of
+actual Editor-plugin applied syntax palette; the latter remains an Editor migration obligation (Task 9).

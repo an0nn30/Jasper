@@ -11,6 +11,31 @@ class KitMountingTest {
     private static ViewSpec toggle(boolean checked) {
         return new ViewSpec(new Nodes.Toggle("motion",ControlState.READY,"Motion",checked,"motion",false));
     }
+    @Test void duplicateTypedOpenRecoversStrandedDocumentWithoutConsumingIncomingView() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var containment=new Containment(() -> true);var model=new dev.jasper.app.contributions.Contributions();
+            var fixture=new TerminalFixture();var main=fixture.addWindow();var separate=fixture.addWindow();
+            var failMain=new java.util.concurrent.atomic.AtomicBoolean();var holder=new JPanel();
+            model.content().addHost(new dev.jasper.app.contributions.ContentHost(main,false,e -> {if(failMain.get())throw new IllegalStateException("recovery failed");holder.add(e.component());},e -> holder.remove(e.component()),e -> {},() -> {}));
+            model.content().addHost(new dev.jasper.app.contributions.ContentHost(separate,true,e -> {throw new IllegalStateException("destination failed");},e -> {},e -> {},() -> {}));
+            model.content().setFactory(detached -> detached?separate:main);
+            var terminals=new HostedTerminals("test.kit",new CapabilityGate("test.kit",java.util.Set.of()),fixture.registry,Runnable::run,() -> true,() -> true,new HostedSessions("test.kit",containment,Runnable::run,id -> null));
+            var ui=new HostedUi("test.kit",model,containment,Runnable::run,() -> true,() -> true,getClass().getClassLoader(),() -> dev.jasper.sdk.Variant.DARK,h -> () -> {},AppContractTest.headlessWindows(),terminals);
+            var kit=new HostedKit("test.kit",() -> true,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
+            var disposed=new AtomicInteger();var original=kit.create(HostedKitTest.custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
+            var editor=new JTextArea("unsaved");var document=editor.getDocument();original.registerContent(new CustomContent("doc",Nodes.CustomKind.EDITOR,editor,disposed::incrementAndGet));
+            var spec=new ContentSpec("doc","Document");var tab=ui.windows().openTab(spec,null,original);var entry=model.content().entries().getFirst();
+            failMain.set(true);assertThatThrownBy(() -> tab.move(true)).isInstanceOf(IllegalStateException.class).hasMessage("destination failed");
+            assertThat(entry.window()).isNull();assertThat(entry.closed()).isFalse();failMain.set(false);
+            var incoming=kit.create(new ViewSpec(new Nodes.Text("body",ControlState.READY,"Unused",Nodes.TextRole.BODY)),e -> {});
+            assertThat(ui.windows().openTab(spec,null,incoming)).isSameAs(tab);
+            assertThat(entry.window()).isEqualTo(main);assertThat(holder.getComponent(0)).isSameAs(original.component());
+            assertThat(editor.getDocument()).isSameAs(document);assertThat(disposed.get()).isZero();
+            var window=ui.windows().create(new WindowSpec("test.kit.extra","Extra",new Dimension(400,300),false));window.setContent(incoming);
+            tab.close();assertThat(disposed.get()).isEqualTo(1);window.close();ui.closeAll();kit.close();
+        });
+    }
+
     @Test void livePolicySettlesActiveNativeAndHostedEffectsAndDisablesFutureEffects() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var themes=new dev.jasper.app.appearance.ThemeController()) {

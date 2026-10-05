@@ -8,10 +8,11 @@ import java.util.function.Function;
 /** Standard descriptor rows; the settings page retains the draft and lifetime. */
 final class KitSettingRows {
     private final SettingsPanelHost host;
+    private final java.util.function.Consumer<Setting<?>> unset;
     private final Function<Setting<?>, SettingSpec<?>> specs;
     private final Map<String, Setting<?>> controls = new LinkedHashMap<>();
     private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>();
-    KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs) { this.host=host;this.specs=specs; }
+    KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs, java.util.function.Consumer<Setting<?>> unset) { this.host=host;this.specs=specs;this.unset=unset; }
     boolean valid(){return errors.isEmpty();}
     void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
     void reset(){errors.clear();edits.clear();}
@@ -41,7 +42,7 @@ final class KitSettingRows {
         var spec=specs.apply(setting);
         try{
             Object value;
-            if(reset){value=spec.defaultValue();edits.remove(id);}
+            if(reset){unset.accept(setting);host.changed();return true;}
             else if(event instanceof UiEvent.Toggled toggle && spec.kind() instanceof SettingKind.Bool)value=toggle.checked();
             else if(event instanceof UiEvent.Selected selected && spec.kind() instanceof SettingKind.OneOf<?> choice)
                 value=choice.choices().stream().filter(c -> selected.ids().contains(c.token())).findFirst().orElseThrow().value();

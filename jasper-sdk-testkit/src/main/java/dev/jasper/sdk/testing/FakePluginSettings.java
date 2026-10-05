@@ -20,9 +20,14 @@ final class FakePluginSettings implements PluginSettings {
     private final Path file;
     private final List<FakeSetting<?>> declared = new ArrayList<>();
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<Runnable> reloadListeners = new CopyOnWriteArrayList<>();
+    int reloadListenerCount() { return reloadListeners.size(); }
+    Subscription onReloaded(Runnable listener) {
+        reloadListeners.add(listener);
+        return () -> reloadListeners.remove(listener);
+    }
     private boolean open = true;
     private dev.jasper.sdk.settings.SettingsPanel panel;
-    Setting<?> handleByKey(String key){return declared.stream().filter(s -> s.key().equals(key)).findFirst().orElseThrow();}
 
     FakePluginSettings(FakePluginHost host, String pluginId, Path file) {
         this.host = host; this.pluginId = pluginId; this.file = file;
@@ -92,11 +97,13 @@ final class FakePluginSettings implements PluginSettings {
             if (declared.stream().noneMatch(setting -> setting.key().equals(key))) reports.add(key + ": " + UNKNOWN);
         host.settingsReports.put(pluginId, List.copyOf(reports));
         if (changed) for (Runnable listener : listeners) listener.run();
+        for (Runnable listener : reloadListeners) listener.run();
     }
 
     void close() {
         open = false;
         listeners.clear();
+        reloadListeners.clear();
         declared.forEach(FakeSetting::close);
     }
 }

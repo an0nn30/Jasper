@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-05
 
-- **Theme engine Plan 2 Task 4 implemented; independent review pending** (2026-10-05).
+- **Theme engine Plan 2 Task 4 review fixes implemented; fix review pending** (2026-10-05).
   Owned SDK views mount in panels, windows/dialogs/overlays, content tabs and custom settings pages.
   Real/fake adapters retain guards, chooser pinning, draft Apply/Cancel and exactly-once disposal;
   custom content keeps its document/caret and resamples opacity during reparenting. Semantic panel
@@ -15,6 +15,12 @@
   Focused gate: app171 tests and testkit89 tests; zero failures/errors/skips; all four architecture
   checks pass. Self-review evidence is recorded in the Task 4 implementation report;
   full repository gate remains Task 12. Frozen before assets are unchanged; no GUI/AOT/push/merge.
+  Review round 1 corrected standard Reset to remove persisted overrides, fake clean/pending reload
+  rebasing with subscription disposal, and duplicate typed-open recovery after failed move/recovery.
+  The fake now owns an independent in-memory draft and reuses FakeSetting conversion; only descriptor
+  projection remains in its row helper. Fix coverage: app128/testkit89 tests, all four architecture
+  checks pass. The generic document test covers component/caret/opacity; actual Editor-applied syntax
+  palette reparenting remains Task 9, and baseline SDK JavaDoc warning cleanup remains Task 12.
 
 - **Theme engine Plan 2 Tasks 2–3 implemented; review round 1 fixes ready** (2026-10-05).
   App selection/catalog/import now consume the module engine directly; 27 duplicate pure types,

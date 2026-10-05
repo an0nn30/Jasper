@@ -586,7 +586,7 @@ final class HostedUi {
                 guard("openTab");
                 var view = kit.requireOwned(content);
                 var existing = ownedContent.values().stream().filter(c -> c.entry.key().equals(spec.key())).findFirst();
-                if(existing.isPresent()) { existing.get().select(); return existing.get(); }
+                if(existing.isPresent()) return openTab(spec, owner, existing.get().entry.component());
                 // Reserve before publishing: a view cannot be owned by two surface lifetimes.
                 view.mount(spec);
                 try {

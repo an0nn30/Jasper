@@ -3,77 +3,59 @@ package dev.jasper.sdk.testing;
 import dev.jasper.sdk.settings.*;
 import dev.jasper.sdk.ui.*;
 import java.util.*;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
-/** Standard descriptor rows; the settings page retains the draft and lifetime. */
+/** Descriptor projection only. The fake draft, edits, validation and reload are independent of rendering. */
 final class KitSettingRows {
-    private final SettingsPanelHost host;
-    private final Function<Setting<?>, SettingSpec<?>> specs;
-    private final Map<String, Setting<?>> controls = new LinkedHashMap<>();
-    private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>();
-    KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs) { this.host=host;this.specs=specs; }
-    boolean valid(){return errors.isEmpty();}
-    void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
-    void reset(){errors.clear();edits.clear();}
-    Nodes.Node row(Setting<?> setting){
-        var spec=specs.apply(setting);String id="settings:"+setting.key();controls.put(id,setting);
-        Object value=host.pending(setting);var state=new ControlState(true,true,false,errors.getOrDefault(id,""));
-        Nodes.Node control;
-        if(spec.kind() instanceof SettingKind.Bool)control=new Nodes.Toggle(id,state,spec.label(),(Boolean)value,id,false);
-        else if(spec.kind() instanceof SettingKind.OneOf<?> choices){
-            var options=choices.choices().stream().map(c -> new Option(c.token(),c.displayName(),Optional.empty())).toList();
-            String selected=choices.choices().stream().filter(c -> c.value().equals(value)).findFirst().orElseThrow().token();
-            control=new Nodes.Choice(id,state,Nodes.ChoiceKind.DROPDOWN,options,selected,spec.label(),id);
-        }else {
-            String text=value instanceof List<?> list?String.join("\n",list.stream().map(Object::toString).toList()):value.toString();
-            var kind=spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:spec.editor().orElse(null) instanceof EditorHint.File?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
-            control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),"",spec.label(),"");
+    private KitSettingRows() {}
+
+    static Nodes.Node row(SettingSpec<?> spec, Object value, String invalidText, String error) {
+        String id = "settings:" + spec.key();
+        var state = new ControlState(true, true, false, error);
+        Nodes.Node input;
+        if (spec.kind() instanceof SettingKind.Bool) {
+            input = new Nodes.Toggle(id, state, spec.label(), (Boolean) value, id, false);
+        } else if (spec.kind() instanceof SettingKind.OneOf<?> choice) {
+            var options = new ArrayList<Option>();
+            String selected = "";
+            for (var option : choice.choices()) {
+                options.add(new Option(option.token(), option.displayName(), Optional.empty()));
+                if (option.value().equals(value)) selected = option.token();
+            }
+            input = new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, selected, spec.label(), id);
+        } else {
+            var kind = value instanceof List<?> ? Nodes.FieldKind.TEXTAREA
+                : spec.editor().orElse(null) instanceof EditorHint.File ? Nodes.FieldKind.PATH : Nodes.FieldKind.TEXT;
+            String text = invalidText != null ? invalidText : value instanceof List<?> items
+                ? String.join("\n", items.stream().map(Object::toString).toList()) : String.valueOf(value);
+            input = new Nodes.Field(id, state, kind, text, "", spec.label(), "");
         }
-        var reset=new Nodes.Button(id+":reset",ControlState.READY,"Reset","",Nodes.ButtonKind.GHOST,id+":reset","Reset to default");
-        return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),
-            new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(control,reset)),false);
+        var reset = new Nodes.Button(id + ":reset", ControlState.READY, "Reset", "", Nodes.ButtonKind.GHOST, id + ":reset", "Reset to default");
+        return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),
+            new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(input, reset)), false);
     }
-    @SuppressWarnings({"unchecked","rawtypes"})
-    boolean event(UiEvent event){
-        boolean reset=event instanceof UiEvent.Action && event.id().endsWith(":reset");
-        String id=reset?event.id().substring(0,event.id().length()-6):event.id();
-        var setting=controls.get(id);if(setting==null)return false;
-        var spec=specs.apply(setting);
-        try{
-            Object value;
-            if(reset){value=spec.defaultValue();edits.remove(id);}
-            else if(event instanceof UiEvent.Toggled toggle && spec.kind() instanceof SettingKind.Bool)value=toggle.checked();
-            else if(event instanceof UiEvent.Selected selected && spec.kind() instanceof SettingKind.OneOf<?> choice)
-                value=choice.choices().stream().filter(c -> selected.ids().contains(c.token())).findFirst().orElseThrow().value();
-            else if(event instanceof UiEvent.Edited edited){
-                edits.put(id,edited.text());
-                value=switch(spec.kind()){
-                    case SettingKind.IntegerRange ignored -> Integer.valueOf(edited.text());
-                    case SettingKind.NumberRange ignored -> Double.valueOf(edited.text());
-                    case SettingKind.StringList ignored -> edited.text().isEmpty()?List.of():List.of(edited.text().split("\n",-1));
-                    case SettingKind.Text ignored -> edited.text();
-                    default -> throw new IllegalArgumentException("Unexpected edit");
-                };
-            }else return false;
-            host.stage((Setting)setting,value);errors.remove(id);
-        }catch(RuntimeException failure){errors.put(id,failure instanceof IllegalArgumentException && !(failure instanceof NumberFormatException) && failure.getMessage()!=null ? failure.getMessage() : "Enter a valid value.");}
-        host.changed();return true;
+
+    static ViewSpec project(ViewSpec spec, UnaryOperator<Nodes.Node> replace) {
+        return new ViewSpec(project(spec.root(), replace));
     }
-    ViewSpec refresh(ViewSpec spec){return new ViewSpec(replace(spec.root()));}
-    private Nodes.Node replace(Nodes.Node n){
-        for(var entry:controls.entrySet())if(n.id().equals(entry.getKey()+":row"))return row(entry.getValue());
-        return switch(n){
-            case Nodes.Stack v -> new Nodes.Stack(v.id(),v.state(),v.role(),v.children().stream().map(this::replace).toList());
-            case Nodes.Card v -> new Nodes.Card(v.id(),v.state(),v.kind(),v.children().stream().map(this::replace).toList());
-            case Nodes.Section v -> new Nodes.Section(v.id(),v.state(),v.title(),replace(v.body()));
-            case Nodes.Form v -> new Nodes.Form(v.id(),v.state(),v.kind(),v.title(),v.hero().map(this::replace),v.sections().stream().map(this::replace).toList(),v.preview().map(this::replace),v.actions(),v.cancelAction());
-            case Nodes.Split v -> new Nodes.Split(v.id(),v.state(),v.kind(),v.children().stream().map(this::replace).toList());
-            case Nodes.Panel v -> new Nodes.Panel(v.id(),v.state(),(Nodes.Header)replace(v.header()),v.searchOrNavigation().map(this::replace),replace(v.body()),v.footer().map(this::replace));
-            case Nodes.FormRow v -> new Nodes.FormRow(v.id(),v.state(),v.label(),v.caption(),replace(v.control()),v.trailing().map(this::replace));
-            case Nodes.SettingRow v -> new Nodes.SettingRow(v.id(),v.state(),v.title(),v.description(),replace(v.control()),v.dependent());
-            case Nodes.Empty v -> new Nodes.Empty(v.id(),v.state(),replace(v.icon()),v.title(),v.description(),v.actions().stream().map(this::replace).toList());
-            case Nodes.Header v -> new Nodes.Header(v.id(),v.state(),v.title(),v.count(),v.context().map(this::replace),v.primary(),v.overflow());
-            default -> n;
+
+    /** Explicit SDK container reconstruction is projection, not settings behavior. No reflective API. */
+    private static Nodes.Node project(Nodes.Node node, UnaryOperator<Nodes.Node> replace) {
+        var replacement = replace.apply(node);
+        if (replacement != node) return replacement;
+        UnaryOperator<Nodes.Node> child = value -> project(value, replace);
+        return switch (node) {
+            case Nodes.Stack n -> new Nodes.Stack(n.id(), n.state(), n.role(), n.children().stream().map(child).toList());
+            case Nodes.Card n -> new Nodes.Card(n.id(), n.state(), n.kind(), n.children().stream().map(child).toList());
+            case Nodes.Split n -> new Nodes.Split(n.id(), n.state(), n.kind(), n.children().stream().map(child).toList());
+            case Nodes.Section n -> new Nodes.Section(n.id(), n.state(), n.title(), child.apply(n.body()));
+            case Nodes.Form n -> new Nodes.Form(n.id(), n.state(), n.kind(), n.title(), n.hero().map(child), n.sections().stream().map(child).toList(), n.preview().map(child), n.actions(), n.cancelAction());
+            case Nodes.FormRow n -> new Nodes.FormRow(n.id(), n.state(), n.label(), n.caption(), child.apply(n.control()), n.trailing().map(child));
+            case Nodes.SettingRow n -> new Nodes.SettingRow(n.id(), n.state(), n.title(), n.description(), child.apply(n.control()), n.dependent());
+            case Nodes.Header n -> new Nodes.Header(n.id(), n.state(), n.title(), n.count(), n.context().map(child), n.primary(), n.overflow());
+            case Nodes.Panel n -> new Nodes.Panel(n.id(), n.state(), (Nodes.Header) child.apply(n.header()), n.searchOrNavigation().map(child), child.apply(n.body()), n.footer().map(child));
+            case Nodes.Empty n -> new Nodes.Empty(n.id(), n.state(), child.apply(n.icon()), n.title(), n.description(), n.actions().stream().map(child).toList());
+            default -> node;
         };
     }
 }
